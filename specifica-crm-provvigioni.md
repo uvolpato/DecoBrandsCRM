@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 1.2 — **Stato:** validata con il cliente
+**Versione:** 1.3 — **Stato:** validata con il cliente
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -31,6 +31,14 @@ stesso PostgreSQL, le stesse tabelle esistenti vengono **riusate senza modificar
 e il CRM aggiunge le proprie tabelle (§4). Ordini, clienti, articoli e utenti sono
 quindi gli stessi dati già visti dalla gestione ordini.
 
+**Tutti i documenti del flusso** — ordini cliente, ordini a fornitore, conferme,
+fatture e bollettini — vengono inseriti con **lo stesso sistema della Gestione Ordini**:
+l'app li **importa** da PDF e vari documenti tramite **OCR** e li fa passare dalla
+**validazione** dell'operatore, che conferma i dati letti prima del salvataggio. Il CRM
+legge dal database condiviso senza doppie inserzioni manuali; la tracciatura *ordine →
+conferma → fattura* lavora quindi sugli stessi documenti già importati ed elaborati da
+quel sistema (`ordini_upload_queue`, `processing_errors`, §4.1, §6).
+
 ---
 
 ## 2. Vincoli e requisiti generali
@@ -38,7 +46,7 @@ quindi gli stessi dati già visti dalla gestione ordini.
 | # | Vincolo | Valore |
 |---|---------|--------|
 | V1 | Unica applicazione | Tutte le funzioni in un'unica applicazione web |
-| V2 | Database condiviso | Stesso PostgreSQL (`decobrands`) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM |
+| V2 | Database condiviso | Stesso PostgreSQL (`decobrands`) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM. **Tutti i documenti entrano tramite lo stesso sistema della Gestione Ordini**: importazione (upload + OCR) e validazione dei dati letti; vengono poi letti dal CRM (§6) |
 | V3 | Autenticazione | Tabella `users` con ruoli; utente di default `admin` (ruolo `admin`) |
 | V4 | Stile grafico | Bootstrap 5.3, navbar scura, sfondo `#f5f6f8`, logo Decobrands |
 | V5 | Lingua | Tutte le interfacce in italiano |
@@ -116,14 +124,27 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
 | `codici_alias` | cambi codice articolo con conferma |
 | `kit_testata` / `kit_dettaglio` | kit di articoli |
 | `ordini_cliente_testata` / `ordini_cliente_articoli` | ordini dei clienti (`fornitore` è testo libero → si mappa ai fornitori CRM) |
-| `ordini_upload_queue` | coda di elaborazione degli upload documenti |
+| `ordini_upload_queue` | coda di elaborazione degli upload documenti (import PDF/vari documenti tramite OCR della Gestione Ordini) |
 | `audit_log` | log di tutte le scritture |
 | `movimenti_giacenza` | movimenti stock |
 | `processing_errors` | errori di elaborazione documenti |
 
-> In `ordini_cliente_testata` il fornitore è una stringa libera; il CRM aggiunge
-> l'anagrafica `fornitori` (§4.2.1) e collega le pratiche fornitore alla stessa
-> `cliente_piva` usata negli ordini clienti.
+> **Ordini cliente vs ordini fornitore: restano separati.** Gli ordini dei clienti
+> (`ordini_cliente_testata` / `ordini_cliente_articoli`) e le pratiche ordine a fornitore
+> (`ordini_fornitore_testata` / `ordini_fornitore_righe`, §4.2.7) sono **oggetti di
+> business diversi** e non vanno unificati: il primo è l'ordine **ricevuto dal cliente**
+> (pipeline OCR della Gestione Ordini, verifica operatore, CSV Integra, con `fornitore`
+> come testo libero informativo); il secondo è l'ordine **emesso da Decobrands verso il
+> fornitore**, con vita propria (stati `inviato → confermato → fatturato`, allegati
+> conferma/fattura, quantità confermate §5.8) e ad esso si riconducono le provvigioni
+> (`importo_merce`). Nessuna tabella esistente viene modificata (V2).
+>
+> **Ponte tra i due** (tracciabilità ordine → conferma → fattura): l'aggancio parte
+> dall'ordine cliente tramite `fornitore` (testo libero, mappato all'anagrafica
+> `fornitori` §4.2.1) e `rif_nro_ordine_fornitore` (numero ordine del fornitore indicato
+> dal cliente, spec Gestione Ordini). La pratica fornitore risale all'ordine cliente di
+> origine via `ordine_cliente_id` — FK opzionale su `ordini_fornitore_testata` §4.2.7 —
+> e collega le pratiche alla stessa `cliente_piva` usata negli ordini clienti.
 
 ### 4.2 Nuove tabelle CRM
 
@@ -235,6 +256,7 @@ attraversa gli stati `inviato → confermato → fatturato`.
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
 | `fornitore_id` | BIGINT FK → `fornitori` | |
+| `ordine_cliente_id` | BIGINT FK → `ordini_cliente_testata` | nullable — ordine cliente che ha originato la pratica (ponte §4.1) |
 | `numero_ordine` | VARCHAR(50) | numero ordine del fornitore |
 | `data_ordine` | DATE | |
 | `cliente_piva` | VARCHAR(20) | cliente finale |
@@ -324,6 +346,7 @@ fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
 fornitori 1 ── n ordini_fornitore_testata 1 ── n ordini_fornitore_righe
 fornitori 1 ── n bollettini_testata 1 ── n bollettini_righe
 interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)
+ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1)
 ```
 
 ### 4.4 Note di schema
@@ -433,6 +456,15 @@ il bollettino può passare a `verificato` o `contestato`.
 
 ## 6. Flussi funzionali
 
+**Canale comune: importazione e validazione.** Tutti i documenti (ordini cliente,
+ordini a fornitore, conferme, fatture, bollettini) vengono inseriti con lo **stesso
+sistema della Gestione Ordini**: l'app li **importa** (upload del file → coda
+`ordini_upload_queue` → estrazione automatica OCR) e li fa passare dalla
+**validazione** dell'operatore, che conferma o corregge i dati letti prima del
+salvataggio — senza doppie digitazioni. I documenti non elaborabili finiscono in
+`processing_errors`; gli allegati restano sulla pratica (`att_filename_*`). Tutti i
+flussi sotto usano questo canale.
+
 ### 6.1 Flusso documentale: ordine → conferma → fattura
 
 ```
@@ -441,14 +473,16 @@ il bollettino può passare a `verificato` o `contestato`.
 [3] Fattura  ──aggancio alla pratica──►  stato "fatturato"   → entra nel calcolo provvigioni
 ```
 
+- La pratica può essere agganciata all'**ordine cliente di origine** via
+  `ordine_cliente_id` (§4.1): la tracciabilità parte dall'ordine ricevuto dal cliente.
 - Ogni fase include **upload del documento PDF** allegato alla pratica
   (`att_filename_ordine` / `att_filename_conferma` / `att_filename_fattura`).
 - Alla creazione della pratica si calcola `conferma_scadenza = data_ordine +
   giorni_attesa_conferma` del fornitore.
 - Passata la scadenza senza conferma, la pratica finisce nella lista **segnalazioni**
   della dashboard (alert in-app, §5.12).
-- La lettura automatica dei documenti propone i dati letti dal PDF; l'operatore li
-  conferma prima del salvataggio.
+- La **lettura automatica** dei documenti propone i dati letti dal PDF (canale §6:
+  importazione + validazione); l'operatore li **conferma** prima del salvataggio.
 
 ### 6.2 Flusso controllo bollettini
 
@@ -567,6 +601,61 @@ il bollettino può passare a `verificato` o `contestato`.
 
 Ordini cliente, liste, articoli, giacenze, errori, clienti, utenti: viste integrate
 nell'applicazione con lo stesso comportamento e lo stesso stile di tutte le altre.
+
+### 7.10 Schema dei flussi e navigazione tra le schermate
+
+Il prototipo si naviga a partire dal launcher `index.html`; ogni schermata ha la
+navbar comune che riporta al launcher (nessun menu laterale). Il dato che collega
+tutta l'applicazione è l'**ordine a fornitore**, osservato a tre livelli:
+anagrafiche, pratiche, controlli/pagamenti. Tutti i documenti entrano dal canale
+comune di importazione e validazione della Gestione Ordini (§6).
+
+```
+index.html (launcher) ───── login.html (facciata, autenticazione in esercizio §3.3)
+        │
+        ├── dashboard.html ─────────────────┐   aggregatore: KPI per stato, segnalazioni
+        │                                   │   conferme scadute, bollettini da verificare,
+        │                                   │   ultime pratiche, riepilogo provvigioni
+        │                                   │
+        ├── Anagrafiche                     │
+        │   fornitori → fornitore-dettaglio │   scaglioni provvigioni (§5.1)
+        │   agenti                          │   agente + subagenti
+        │   interscambio                    │   subagente × cliente × fornitore, sconto
+        │        │_ sconto → scaglione (§5.1)
+        │
+        ├── Pratiche
+        │   ordini-fornitore → ordine-fornitore-dettaglio
+        │        stati inviato → confermato → fatturato, documenti per fase (§6.1)
+        │
+        └── Controlli e pagamenti
+            bollettini → bollettino-dettaglio    riconosciuto vs calcolato (§10)
+            liquidazione                         rendiconto trimestrale + export (§11)
+```
+
+Considerazioni:
+
+- **Navigazione**: nel prototipo l'ingresso è il launcher `index.html`; ogni schermata
+  è un file HTML separato (`prototipo-crm/`) con i dati dimostrativi condivisi in
+  `assets/js/data.js` e il motore di calcolo in `assets/js/app.js`; la navbar comune
+  (logo + versione) riporta al launcher.
+- **Login**: `login.html` è una schermata di facciata nel prototipo (nessuna
+  autenticazione reale). In esercizio (V3) l'accesso usa la tabella `users` (§3.3)
+  con sessioni server-side e `requireAuth`/`requireAdmin`.
+- **Dashboard come aggregatore**: è il punto d'ingresso del percorso consigliato;
+  gli ordini che arrivano nuovi dalla Gestione Ordini (§6) compaiono tra le
+  segnalazioni e nei KPI, da qui si entra nelle liste.
+- **`interscambio` è la chiave di collegamento**: per ogni pratica risolve quale
+  subagente segue il cliente presso il fornitore e con quale sconto; lo sconto
+  determina lo scaglione (§5.1) usato sia per il confronto bollettini sia per la
+  liquidazione. Il vincolo unico di §5.10 garantisce un solo subagente per
+  cliente × fornitore.
+- **Documenti**: ogni fase (ordine, conferma, fattura, bollettino) passa dal canale
+  comune importazione + validazione della Gestione Ordini (§6): upload → coda →
+  OCR → validazione operatore; i documenti non leggibili finiscono in
+  `processing_errors`.
+- **Liquidazione**: considera solo le pratiche in stato `fatturato` nel periodo
+  filtrato; le percentuali sono risolte dagli scaglioni correnti (o dalle eccezioni
+  temporanee, §5.7), mentre per i periodi passati si usano i valori congelati (§5.11).
 
 ---
 

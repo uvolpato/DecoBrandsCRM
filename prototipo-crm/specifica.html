@@ -12,7 +12,7 @@
     .spec-body h2 { font-size: 1.45rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 2px solid var(--db-border); }
     .spec-body h3 { font-size: 1.12rem; margin-top: 1.75rem; }
     .spec-body h4 { font-size: 1rem; margin-top: 1.4rem; }
-    .spec-body section { scroll-margin-top: 1rem; }
+    .spec-body section { scroll-margin-top: 3.5rem; }
     #indice { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
     #indice .nav-link { padding: .2rem .6rem; font-size: .8rem; color: #495057; }
     #indice .nav-link.active { color: var(--bs-primary); font-weight: 600; }
@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.2, validata con il cliente.
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.3, validata con il cliente.
   </div>
 
   <div class="row g-4">
@@ -98,6 +98,7 @@
               <li class="nav-item"><a class="nav-link" href="#sec-7-7">7.7 Bollettini</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-8">7.8 Liquidazione</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-9">7.9 Modulo ordini cliente</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-10">7.10 Schema dei flussi</a></li>
             </ul>
           </li>
           <li class="nav-item"><a class="nav-link" href="#sec-8">8. API endpoint</a></li>
@@ -117,7 +118,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.2 — <strong>Stato:</strong> validata con il cliente</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.3 — <strong>Stato:</strong> validata con il cliente</p>
           <p class="small text-muted mb-3">Fonte: <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -134,6 +135,7 @@
 <pre class="spec-code"><code>FORNITORE  ──provvigione agente──►  DECOBRANDS  ──provvigione subagente──►  SUBAGENTE
            (obiettivo 2: da controllare)         (obiettivo 3: da liquidare)</code></pre>
           <p>L'applicazione <strong>condivide il database</strong> con la gestione degli ordini di Decobrands: stesso PostgreSQL, le stesse tabelle esistenti vengono <strong>riusate senza modificarle</strong> e il CRM aggiunge le proprie tabelle (§4). Ordini, clienti, articoli e utenti sono quindi gli stessi dati già visti dalla gestione ordini.</p>
+          <p><strong>Tutti i documenti del flusso</strong> — ordini cliente, ordini a fornitore, conferme, fatture e bollettini — vengono inseriti con <strong>lo stesso sistema della Gestione Ordini</strong>: l'app li <strong>importa</strong> da PDF e vari documenti tramite <strong>OCR</strong> e li fa passare dalla <strong>validazione</strong> dell'operatore, che conferma i dati letti prima del salvataggio. Il CRM legge dal database condiviso senza doppie inserzioni manuali; la tracciatura <em>ordine → conferma → fattura</em> lavora quindi sugli stessi documenti già importati ed elaborati da quel sistema (<code>ordini_upload_queue</code>, <code>processing_errors</code>, §4.1, §6).</p>
         </section>
 
         <section id="sec-2">
@@ -143,7 +145,7 @@
               <thead class="table-light"><tr><th style="width:70px">#</th><th style="width:180px">Vincolo</th><th>Valore</th></tr></thead>
               <tbody>
                 <tr><td>V1</td><td>Unica applicazione</td><td>Tutte le funzioni in un'unica applicazione web</td></tr>
-                <tr><td>V2</td><td>Database condiviso</td><td>Stesso PostgreSQL (<code>decobrands</code>) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM</td></tr>
+                <tr><td>V2</td><td>Database condiviso</td><td>Stesso PostgreSQL (<code>decobrands</code>) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM. <strong>Tutti i documenti entrano tramite lo stesso sistema della Gestione Ordini</strong>: importazione (upload + OCR) e validazione dei dati letti; vengono poi letti dal CRM (§6)</td></tr>
                 <tr><td>V3</td><td>Autenticazione</td><td>Tabella <code>users</code> con ruoli; utente di default <code>admin</code> (ruolo <code>admin</code>)</td></tr>
                 <tr><td>V4</td><td>Stile grafico</td><td>Bootstrap 5.3, navbar scura, sfondo <code>#f5f6f8</code>, logo Decobrands</td></tr>
                 <tr><td>V5</td><td>Lingua</td><td>Tutte le interfacce in italiano</td></tr>
@@ -216,14 +218,17 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
                   <tr><td><code>codici_alias</code></td><td>cambi codice articolo con conferma</td></tr>
                   <tr><td><code>kit_testata</code> / <code>kit_dettaglio</code></td><td>kit di articoli</td></tr>
                   <tr><td><code>ordini_cliente_testata</code> / <code>ordini_cliente_articoli</code></td><td>ordini dei clienti (<code>fornitore</code> è testo libero → si mappa ai fornitori CRM)</td></tr>
-                  <tr><td><code>ordini_upload_queue</code></td><td>coda di elaborazione degli upload documenti</td></tr>
+                  <tr><td><code>ordini_upload_queue</code></td><td>coda di elaborazione degli upload documenti (import PDF/vari documenti tramite OCR della Gestione Ordini)</td></tr>
                   <tr><td><code>audit_log</code></td><td>log di tutte le scritture</td></tr>
                   <tr><td><code>movimenti_giacenza</code></td><td>movimenti stock</td></tr>
                   <tr><td><code>processing_errors</code></td><td>errori di elaborazione documenti</td></tr>
                 </tbody>
               </table>
             </div>
-            <blockquote class="blockquote-footer mt-2 mb-0">In <code>ordini_cliente_testata</code> il fornitore è una stringa libera; il CRM aggiunge l'anagrafica <code>fornitori</code> (§4.2.1) e collega le pratiche fornitore alla stessa <code>cliente_piva</code> usata negli ordini clienti.</blockquote>
+            <blockquote class="blockquote-footer mt-2 mb-0 fs-6">
+              <p class="mb-1"><strong>Ordini cliente vs ordini fornitore: restano separati.</strong> Gli ordini dei clienti (<code>ordini_cliente_testata</code> / <code>ordini_cliente_articoli</code>) e le pratiche ordine a fornitore (<code>ordini_fornitore_testata</code> / <code>ordini_fornitore_righe</code>, §4.2.7) sono <strong>oggetti di business diversi</strong> e non vanno unificati: il primo è l'ordine <strong>ricevuto dal cliente</strong> (pipeline OCR della Gestione Ordini, verifica operatore, CSV Integra, con <code>fornitore</code> come testo libero informativo); il secondo è l'ordine <strong>emesso da Decobrands verso il fornitore</strong>, con vita propria (stati <code>inviato → confermato → fatturato</code>, allegati conferma/fattura, quantità confermate §5.8) e ad esso si riconducono le provvigioni (<code>importo_merce</code>). Nessuna tabella esistente viene modificata (V2).</p>
+              <p class="mb-0"><strong>Ponte tra i due</strong> (tracciabilità ordine → conferma → fattura): l'aggancio parte dall'ordine cliente tramite <code>fornitore</code> (testo libero, mappato all'anagrafica <code>fornitori</code> §4.2.1) e <code>rif_nro_ordine_fornitore</code> (numero ordine del fornitore indicato dal cliente, spec Gestione Ordini). La pratica fornitore risale all'ordine cliente di origine via <code>ordine_cliente_id</code> — FK opzionale su <code>ordini_fornitore_testata</code> §4.2.7 — e collega le pratiche alla stessa <code>cliente_piva</code> usata negli ordini clienti.</p>
+            </blockquote>
           </section>
 
           <section id="sec-4-2">
@@ -352,6 +357,7 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
                 <tbody>
                   <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
                   <tr><td><code>fornitore_id</code></td><td>BIGINT FK → <code>fornitori</code></td><td></td></tr>
+                  <tr><td><code>ordine_cliente_id</code></td><td>BIGINT FK → <code>ordini_cliente_testata</code></td><td>nullable — ordine cliente che ha originato la pratica (ponte §4.1)</td></tr>
                   <tr><td><code>numero_ordine</code></td><td>VARCHAR(50)</td><td>numero ordine del fornitore</td></tr>
                   <tr><td><code>data_ordine</code></td><td>DATE</td><td></td></tr>
                   <tr><td><code>cliente_piva</code></td><td>VARCHAR(20)</td><td>cliente finale</td></tr>
@@ -445,7 +451,8 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
 fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
 fornitori 1 ── n ordini_fornitore_testata 1 ── n ordini_fornitore_righe
 fornitori 1 ── n bollettini_testata 1 ── n bollettini_righe
-interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)</code></pre>
+interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)
+ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1)</code></pre>
           </section>
 
           <section id="sec-4-4">
@@ -541,6 +548,7 @@ interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_
 
         <section id="sec-6">
           <h2>6. Flussi funzionali</h2>
+          <p class="small text-muted"><strong>Canale comune: importazione e validazione.</strong> Tutti i documenti (ordini cliente, ordini a fornitore, conferme, fatture, bollettini) vengono inseriti con lo <strong>stesso sistema della Gestione Ordini</strong>: l'app li <strong>importa</strong> (upload del file → coda <code>ordini_upload_queue</code> → estrazione automatica OCR) e li fa passare dalla <strong>validazione</strong> dell'operatore, che conferma o corregge i dati letti prima del salvataggio — senza doppie digitazioni. I documenti non elaborabili finiscono in <code>processing_errors</code>; gli allegati restano sulla pratica (<code>att_filename_*</code>). Tutti i flussi sotto usano questo canale.</p>
 
           <section id="sec-6-1">
             <h3>6.1 Flusso documentale: ordine → conferma → fattura</h3>
@@ -548,10 +556,11 @@ interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_
 [2] Conferma ──aggancio alla pratica──►  stato "confermato"  (quantità/importi possono variare)
 [3] Fattura  ──aggancio alla pratica──►  stato "fatturato"   → entra nel calcolo provvigioni</code></pre>
             <ul>
+              <li>La pratica può essere agganciata all'<strong>ordine cliente di origine</strong> via <code>ordine_cliente_id</code> (§4.1): la tracciabilità parte dall'ordine ricevuto dal cliente.</li>
               <li>Ogni fase include <strong>upload del documento PDF</strong> allegato alla pratica (<code>att_filename_ordine</code> / <code>att_filename_conferma</code> / <code>att_filename_fattura</code>).</li>
               <li>Alla creazione della pratica si calcola <code>conferma_scadenza = data_ordine + giorni_attesa_conferma</code> del fornitore.</li>
               <li>Passata la scadenza senza conferma, la pratica finisce nella lista <strong>segnalazioni</strong> della dashboard (alert in-app, §5.12).</li>
-              <li>La lettura automatica dei documenti propone i dati letti dal PDF; l'operatore li conferma prima del salvataggio.</li>
+              <li>La <strong>lettura automatica</strong> dei documenti propone i dati letti dal PDF (canale §6: importazione + validazione); l'operatore li <strong>conferma</strong> prima del salvataggio.</li>
             </ul>
           </section>
 
@@ -687,6 +696,39 @@ interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_
           <section id="sec-7-9">
             <h4>7.9 Modulo ordini cliente</h4>
             <p>Ordini cliente, liste, articoli, giacenze, errori, clienti, utenti: viste integrate nell'applicazione con lo stesso comportamento e lo stesso stile di tutte le altre.</p>
+          </section>
+
+          <section id="sec-7-10">
+            <h4>7.10 Schema dei flussi e navigazione tra le schermate</h4>
+            <p>Il prototipo si naviga a partire dal launcher <code>index.html</code>; ogni schermata ha la navbar comune che riporta al launcher (nessun menu laterale). Il dato che collega tutta l'applicazione è l'<strong>ordine a fornitore</strong>, osservato a tre livelli: anagrafiche, pratiche, controlli/pagamenti. Tutti i documenti entrano dal canale comune di importazione e validazione della Gestione Ordini (§6).</p>
+<pre class="spec-code"><code>index.html (launcher) ───── login.html (facciata, autenticazione in esercizio §3.3)
+        │
+        ├── dashboard.html ─────────────────┐   aggregatore: KPI per stato, segnalazioni
+        │                                   │   conferme scadute, bollettini da verificare,
+        │                                   │   ultime pratiche, riepilogo provvigioni
+        │                                   │
+        ├── Anagrafiche                     │
+        │   fornitori → fornitore-dettaglio │   scaglioni provvigioni (§5.1)
+        │   agenti                          │   agente + subagenti
+        │   interscambio                    │   subagente × cliente × fornitore, sconto
+        │        │_ sconto → scaglione (§5.1)
+        │
+        ├── Pratiche
+        │   ordini-fornitore → ordine-fornitore-dettaglio
+        │        stati inviato → confermato → fatturato, documenti per fase (§6.1)
+        │
+        └── Controlli e pagamenti
+            bollettini → bollettino-dettaglio    riconosciuto vs calcolato (§10)
+            liquidazione                         rendiconto trimestrale + export (§11)</code></pre>
+            <p>Considerazioni:</p>
+            <ul>
+              <li><strong>Navigazione</strong>: nel prototipo l'ingresso è il launcher <code>index.html</code>; ogni schermata è un file HTML separato (<code>prototipo-crm/</code>) con i dati dimostrativi condivisi in <code>assets/js/data.js</code> e il motore di calcolo in <code>assets/js/app.js</code>; la navbar comune (logo + versione) riporta al launcher.</li>
+              <li><strong>Login</strong>: <code>login.html</code> è una schermata di facciata nel prototipo (nessuna autenticazione reale). In esercizio (V3) l'accesso usa la tabella <code>users</code> (§3.3) con sessioni server-side e <code>requireAuth</code>/<code>requireAdmin</code>.</li>
+              <li><strong>Dashboard come aggregatore</strong>: è il punto d'ingresso del percorso consigliato; gli ordini che arrivano nuovi dalla Gestione Ordini (§6) compaiono tra le segnalazioni e nei KPI, da qui si entra nelle liste.</li>
+              <li><strong><code>interscambio</code> è la chiave di collegamento</strong>: per ogni pratica risolve quale subagente segue il cliente presso il fornitore e con quale sconto; lo sconto determina lo scaglione (§5.1) usato sia per il confronto bollettini sia per la liquidazione. Il vincolo unico di §5.10 garantisce un solo subagente per cliente × fornitore.</li>
+              <li><strong>Documenti</strong>: ogni fase (ordine, conferma, fattura, bollettino) passa dal canale comune importazione + validazione della Gestione Ordini (§6): upload → coda → OCR → validazione operatore; i documenti non leggibili finiscono in <code>processing_errors</code>.</li>
+              <li><strong>Liquidazione</strong>: considera solo le pratiche in stato <code>fatturato</code> nel periodo filtrato; le percentuali sono risolte dagli scaglioni correnti (o dalle eccezioni temporanee, §5.7), mentre per i periodi passati si usano i valori congelati (§5.11).</li>
+            </ul>
           </section>
         </section>
 

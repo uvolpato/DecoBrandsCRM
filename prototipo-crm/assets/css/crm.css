@@ -70,10 +70,15 @@ body.login { background: #f5f6f8; display: flex; align-items: center; justify-co
 .diff-alert { color: #dc3545; font-weight: 600; }
 .diff-neg { color: #198754; }
 
+/* ---- Header fisso in alto ---- */
+#topnav { position: fixed; top: 0; left: 0; right: 0; z-index: 1040; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+#topnav .navbar { width: 100%; }
+
 /* ---- Footer fisso in basso (© Ugo Volpato · Licenza BSL 1.1) ---- */
-body:not(.login) { padding-bottom: 3.25rem; }
-body.login { padding-bottom: 0; }
-.db-footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030; border-top: 1px solid var(--db-border); background: #fff; color: #6c757d; font-size: .8rem; padding: .6rem 0; }
+body:not(.login) { padding-bottom: 3.25rem; padding-top: 3.5rem; }
+body.login { padding-bottom: 0; padding-top: 0; }
+.db-footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030; border-top: 1px solid var(--db-border); background: #fff; color: #6c757d; font-size: .8rem; padding: .6rem 0; text-align: center; }
+.db-footer .container-fluid { padding-left: 0; padding-right: 0; }
 .db-footer a { color: #495057; text-decoration: none; }
 .db-footer a:hover { text-decoration: underline; }
 .db-footer .db-footer-sep { margin: 0 .55rem; opacity: .6; }

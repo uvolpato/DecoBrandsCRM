@@ -159,11 +159,12 @@
     const slot = document.getElementById('topnav');
     if (!slot) return;
     slot.innerHTML =
-      '<nav class="navbar navbar-dark bg-dark px-3 py-2">' +
+      '<nav class="navbar navbar-dark bg-dark px-3 py-2 d-flex justify-content-between align-items-center">' +
       '<a class="navbar-brand d-flex align-items-center gap-2" href="index.html" title="Torna al launcher">' +
       '<img src="assets/img/logo-decobrands.png" alt="CRM" style="max-height:32px;max-width:120px;object-fit:contain;filter:brightness(0) invert(1)" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-block\'">' +
       '<i class="bi bi-box-seam" style="display:none"></i>' +
       'CRM</a>' +
+      '<span class="text-white-50 small opacity-50" style="font-size:.72rem">v' + VERSIONE_PROTOTIPO + '</span>' +
       '</nav>';
   }
 

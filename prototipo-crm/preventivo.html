@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Preventivo - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+  <style>
+    .spec-body { font-size: .92rem; line-height: 1.6; max-width: 920px; }
+    .spec-body h2 { font-size: 1.45rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 2px solid var(--db-border); }
+    .spec-body h3 { font-size: 1.12rem; margin-top: 1.75rem; }
+    .spec-body .table { font-size: .88rem; }
+    .spec-body .table td:first-child, .spec-body .table th:first-child { white-space: nowrap; }
+    .spec-body tfoot td { font-weight: 600; }
+  </style>
+</head>
+<body>
+<div id="topnav" data-active=""></div>
+<div class="container-fluid px-3 px-md-4 py-4 spec-body">
+
+  <div class="mb-3">
+    <h4 class="mb-1"><i class="bi bi-file-earmark-arrow-down me-2"></i>Preventivo — CRM Ordini a Fornitore, Bollettini e Provvigioni</h4>
+    <div class="text-muted small">Stima dei costi in funzione di complessità, specifica (§1–§14) e mole del progetto. Riferimento: <code>preventivo-crm-provvigioni.md</code>.</div>
+  </div>
+
+  <div class="alert alert-light border small">
+    <strong>Redatto da:</strong> Ugo Volpato — AI Consultant ·
+    <strong>Data:</strong> 04/09/2026 ·
+    <strong>Cliente:</strong> Decobrands S.r.l. (da confermare)<br>
+    <strong>Modalità di sviluppo:</strong> assistita da AI (analisi, generazione e codifica tramite modelli AI)
+  </div>
+
+  <h2 id="oggetto" data-od-id="sezione-oggetto">1. Oggetto</h2>
+  <p>
+    Web app full-stack (<strong>frontend Next.js + React + TypeScript</strong>, <strong>backend NestJS</strong>,
+    <strong>ORM Prisma</strong>, <strong>PostgreSQL condiviso</strong> con la Gestione Ordini — <strong>senza
+    modificare le tabelle esistenti</strong>) per:
+  </p>
+  <ul>
+    <li>tracciare il percorso <strong>ordine → conferma d'ordine → fattura</strong> delle pratiche verso i fornitori, con <strong>upload dei documenti PDF</strong> e scadenze conferma automatiche;</li>
+    <li>controllare i <strong>bollettini</strong> trimestrali dei fornitori, confrontando riga per riga il <strong>riconosciuto</strong> con il <strong>calcolato</strong> (differenze evidenziate, verifica/contestazione);</li>
+    <li><strong>liquidare i subagenti</strong> ogni trimestre con rendiconto calcolato al volo dagli scaglioni e <strong>export a 8 campi</strong>;</li>
+    <li>condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, <code>requireAuth</code>/<code>requireAdmin</code>);</li>
+    <li>integrare il <strong>modulo ordini cliente</strong> (ordini, upload, liste, clienti, utenti, errori) sulle rotte dell'applicazione.</li>
+  </ul>
+  <p class="small text-muted">Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v1.2 (validata con il cliente, §1–§14).</p>
+
+  <h2 id="tariffe" data-od-id="sezione-tariffe">2. Tariffe applicate (indicative, mercato Italia)</h2>
+  <table class="table table-bordered bg-white">
+    <thead><tr><th>Voce</th><th>Tariffa oraria</th></tr></thead>
+    <tbody>
+      <tr><td>Analisi, consulenza e prototipazione</td><td>€ 80,00</td></tr>
+      <tr><td>Sviluppo assistito da AI</td><td>€ 55,00</td></tr>
+      <tr><td>Sviluppo tradizionale (riferimento)</td><td>€ 70,00</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="gia-svolto" data-od-id="sezione-gia-svolto">3. Attività già svolte (questa sessione)</h2>
+  <div class="table-wrap">
+    <table class="table table-bordered bg-white">
+      <thead><tr><th>#</th><th>Attività</th><th>Ore</th><th>Tariffa</th><th>Importo</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Analisi del flusso provvigioni (documento <code>ANALISI_CRM_PROVVIGIONI</code>, risposte Matteo Caironi) e redazione della <strong>specifica v1.2 validata</strong> con il cliente</td><td>4</td><td>€ 80,00</td><td>€ 320,00</td></tr>
+        <tr><td>2</td><td>Prototipo HTML navigabile: launcher, login, dashboard, anagrafiche (fornitori con scaglioni, agenti/subagenti, interscambio), elenco/dettaglio pratiche, elenco/dettaglio bollettini, liquidazione</td><td>8</td><td>€ 80,00</td><td>€ 640,00</td></tr>
+        <tr><td>3</td><td>Motore di calcolo provvigioni lato client (§10): scaglioni per sconto, eccezioni subagente, associazioni interscambio, nota di credito, confronto bollettini</td><td>3</td><td>€ 80,00</td><td>€ 240,00</td></tr>
+        <tr><td>4</td><td>Export liquidazione a 8 campi (§11) e gestione trimestri</td><td>1</td><td>€ 80,00</td><td>€ 80,00</td></tr>
+        <tr><td>5</td><td>Dati dimostrativi coerenti con il seed (§12): Gries 0/1/5/10/100 %, subagenti Bastasin/Nista, nota di credito e conferma ridotta (7/10)</td><td>2</td><td>€ 80,00</td><td>€ 160,00</td></tr>
+        <tr><td>6</td><td>Stile applicato alla app esistente (Bootstrap 5.3, navbar scura, sfondo <code>#f5f6f8</code>, logo) + footer/versione</td><td>1</td><td>€ 80,00</td><td>€ 80,00</td></tr>
+        <tr><td>7</td><td>Debug e rifiniture (footer fisso, launcher, compatibilità anteprima)</td><td>1</td><td>€ 80,00</td><td>€ 80,00</td></tr>
+      </tbody>
+      <tfoot><tr><td></td><td><strong>Subtotale già svolto</strong></td><td><strong>20</strong></td><td></td><td><strong>€ 1.600,00</strong></td></tr></tfoot>
+    </table>
+  </div>
+
+  <h2 id="da-svolgere" data-od-id="sezione-da-svolgere">4. Attività da svolgere (implementazione Next.js + NestJS + Prisma)</h2>
+  <p class="small text-muted">"Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il tempo che richiederebbe uno sviluppo tradizionale (riferimento).</p>
+  <div class="table-wrap">
+    <table class="table table-bordered bg-white">
+      <thead><tr><th>#</th><th>Attività</th><th>Ore (AI)</th><th>Ore (senza AI)</th><th>Importo (AI)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Setup monorepo (Next.js App Router + NestJS + Prisma), collegamento al <strong>PostgreSQL condiviso</strong> <code>decobrands</code>, deploy senza Docker (processi Node separati)</td><td>4</td><td>10</td><td>€ 220,00</td></tr>
+        <tr><td>2</td><td>Autenticazione <strong>condivisa</strong> con la Gestione Ordini: riuso tabella <code>users</code>, sessioni server-side nel DB, argon2, remember cookie, cambio password / reset token, guard <code>requireAuth</code>/<code>requireAdmin</code></td><td>5</td><td>14</td><td>€ 275,00</td></tr>
+        <tr><td>3</td><td>Schema Prisma delle <strong>nuove tabelle CRM</strong> (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe, bollettini + righe) + lettura delle tabelle esistenti condivise</td><td>6</td><td>16</td><td>€ 330,00</td></tr>
+        <tr><td>4</td><td>Motore provvigioni lato server: scaglioni, eccezioni, maturazione maturato/fatturato, congelamento percentuali alla verifica, nota di credito (§4.2, §5.3, §5.5, §5.11)</td><td>5</td><td>14</td><td>€ 275,00</td></tr>
+        <tr><td>5</td><td>API REST NestJS: CRUD fornitori + scaglioni, interscambio (vincolo unico), pratiche + righe + cambio stato, <strong>upload documenti PDF</strong> (multer), bollettini + righe con calcolo differenze, liquidazione</td><td>12</td><td>30</td><td>€ 660,00</td></tr>
+        <tr><td>6</td><td>Frontend Next.js viste CRM: login, dashboard (KPI + segnalazioni scadenze), anagrafiche, dettaglio pratica con <strong>3 pannelli upload</strong>, bollettini con divergenze, liquidazione + export a 8 campi</td><td>12</td><td>30</td><td>€ 660,00</td></tr>
+        <tr><td>7</td><td>Integrazione <strong>modulo ordini cliente</strong> (API <code>/api/ordini*</code>, <code>/api/lookup/*</code>, <code>/api/clienti*</code>, <code>/api/utenti*</code>, <code>/api/errori*</code> montate) + viste coerenti</td><td>6</td><td>15</td><td>€ 330,00</td></tr>
+        <tr><td>8</td><td>Test end-to-end, collaudo con dati seed (§12), rifiniture responsive e anteprima produzione</td><td>5</td><td>13</td><td>€ 275,00</td></tr>
+      </tbody>
+      <tfoot><tr><td></td><td><strong>Subtotale da svolgere</strong></td><td><strong>55</strong></td><td><strong>142</strong></td><td><strong>€ 3.025,00</strong></td></tr></tfoot>
+    </table>
+  </div>
+
+  <h2 id="riepilogo" data-od-id="sezione-riepilogo">5. Riepilogo economico</h2>
+  <table class="table table-bordered bg-white" style="max-width:520px">
+    <thead><tr><th>Voce</th><th>Ore</th><th>Importo</th></tr></thead>
+    <tbody>
+      <tr><td>Attività già svolte</td><td>20</td><td>€ 1.600,00</td></tr>
+      <tr><td>Attività da svolgere</td><td>55</td><td>€ 3.025,00</td></tr>
+    </tbody>
+    <tfoot><tr><td><strong>Totale complessivo</strong></td><td><strong>75</strong></td><td><strong>€ 4.625,00</strong></td></tr></tfoot>
+  </table>
+  <div class="alert alert-success border">
+    <i class="bi bi-graph-down-arrow me-1"></i>
+    <strong>Riferimento senza AI</strong> — lo sviluppo tradizionale richiederebbe <strong>142 ore</strong> (≈ 2,6× le ore assistite):
+    142 h × € 70,00 = <strong>€ 9.940,00</strong>, per un totale di <strong>€ 11.540,00</strong> (€ 1.600,00 già svolto + € 9.940,00 sviluppo).<br>
+    L'approccio assistito da AI consente un <strong>risparmio di € 6.915,00</strong> sul solo sviluppo (€ 9.940,00 → € 3.025,00, <strong>−70%</strong>).
+  </div>
+
+  <h2 id="note" data-od-id="sezione-note">6. Note</h2>
+  <ul>
+    <li>Le ore della sezione "già svolte" sono una <strong>stima</strong> del tempo impiegato in questa sessione (analisi, specifica, prototipo e iterazioni); da confermare.</li>
+    <li>Il costo ridotto dello sviluppo riflette la <strong>velocizzazione dell'AI</strong>, non una riduzione di qualità o delle garanzie.</li>
+    <li>Tariffe indicative e personalizzabili; <strong>IVA esclusa</strong>.</li>
+    <li>Il progetto <strong>condivide il database</strong> con la Gestione Ordini: le tabelle esistenti vengono riusate <strong>senza modifiche</strong>; il CRM aggiunge solo le proprie tabelle (§4.2).</li>
+    <li>Esclusioni (casi limite §13 della specifica, in backlog): gestione UI delle eccezioni subagente (B1), pratiche multi-tranche / fatture multi-ordine con tabella a ponte (B2), importazione mensile dei bollettini (B3), riga bollettino per totale cliente (B4), versioning degli scaglioni per periodo (B5), <strong>popolamento dei dati storici reali dagli Excel manuali</strong> (B8). Il consolidamento sconto (B6) è già definito nella specifica.</li>
+  </ul>
+
+</div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
