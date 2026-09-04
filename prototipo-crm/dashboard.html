@@ -12,9 +12,15 @@
 <div id="topnav" data-active="dashboard.html"></div>
 <div class="container-fluid px-3 px-md-4 py-4">
 
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
-    <span class="text-muted small"><span id="trimestreLabel"></span> — Mese corrente</span>
+  <!-- Intestazione -->
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+    <div>
+      <h4 class="mb-1"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
+      <p class="text-muted mb-0 nota-prototipo">Panoramica delle pratiche, delle segnalazioni e delle provvigioni del periodo</p>
+    </div>
+    <span class="badge bg-white text-dark border px-3 py-2 fw-semibold">
+      <i class="bi bi-calendar3 me-1"></i><span id="trimestreLabel"></span>
+    </span>
   </div>
 
   <!-- KPI Cards -->
@@ -33,33 +39,61 @@
     </div>
   </div>
 
-  <div class="row g-4">
+  <!-- Tab: Segnalazioni / Ordini fornitore -->
+  <ul class="nav nav-tabs tabs-crm mb-4" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="nav-tab-segnalazioni" data-bs-toggle="tab" data-bs-target="#tab-segnalazioni" type="button" role="tab" aria-controls="tab-segnalazioni" aria-selected="true">
+        <i class="bi bi-bell me-1"></i>Segnalazioni
+        <span class="badge bg-danger rounded-pill ms-1" id="tab-badge-segnalazioni">0</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="nav-tab-ordini" data-bs-toggle="tab" data-bs-target="#tab-ordini" type="button" role="tab" aria-controls="tab-ordini" aria-selected="false">
+        <i class="bi bi-truck me-1"></i>Ordini fornitore
+        <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1" id="tab-badge-ordini">0</span>
+      </button>
+    </li>
+  </ul>
 
-    <!-- Colonna sinistra: Scadenze + Bollettini -->
-    <div class="col-lg-6">
-      <div class="card mb-4">
-        <div class="card-header bg-white fw-semibold">
-          <i class="bi bi-exclamation-triangle text-danger me-2"></i>Conferme scadute
+  <div class="tab-content">
+    <!-- Tab: Segnalazioni -->
+    <div class="tab-pane fade show active" id="tab-segnalazioni" role="tabpanel" aria-labelledby="nav-tab-segnalazioni">
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <span class="fw-semibold"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Conferme scadute</span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-danger rounded-pill" id="badge-scadute">0</span>
+                <a href="ordini-fornitore.html" class="text-decoration-none small text-nowrap">Vedi tutti &rarr;</a>
+              </div>
+            </div>
+            <div class="card-body p-0 box-stabile" id="box-scadute"></div>
+          </div>
         </div>
-        <div class="card-body p-0" id="box-scadute"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header bg-white fw-semibold">
-          <i class="bi bi-receipt text-warning me-2"></i>Bollettini da verificare
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <span class="fw-semibold"><i class="bi bi-receipt text-warning me-2"></i>Bollettini da verificare</span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-warning text-dark rounded-pill" id="badge-bollettini">0</span>
+                <a href="bollettini.html" class="text-decoration-none small text-nowrap">Vedi tutti &rarr;</a>
+              </div>
+            </div>
+            <div class="card-body p-0 box-stabile" id="box-bollettini"></div>
+          </div>
         </div>
-        <div class="card-body p-0" id="box-bollettini"></div>
       </div>
     </div>
 
-    <!-- Colonna destra: Ultimi ordini -->
-    <div class="col-lg-6">
+    <!-- Tab: Ordini fornitore -->
+    <div class="tab-pane fade" id="tab-ordini" role="tabpanel" aria-labelledby="nav-tab-ordini">
       <div class="card">
-        <div class="card-header bg-white fw-semibold d-flex justify-content-between">
-          <span><i class="bi bi-clock-history me-2"></i>Ultimi ordini fornitore</span>
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <span class="fw-semibold"><i class="bi bi-clock-history me-2"></i>Ultimi ordini</span>
           <a href="ordini-fornitore.html" class="text-decoration-none small">Vedi tutti &rarr;</a>
         </div>
-        <div class="card-body p-0">
+        <div class="table-box">
           <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
               <tr><th>Ordine</th><th>Fornitore</th><th>Cliente</th><th class="text-end">Importo</th><th>Stato</th></tr>
@@ -110,6 +144,7 @@ function render() {
     .filter(o => o.stato === 'inviato' && scadenzaOrdine(o) < oggi)
     .sort((a, b) => scadenzaOrdine(a).localeCompare(scadenzaOrdine(b)));
 
+  document.getElementById('badge-scadute').textContent = scadute.length;
   const boxS = document.getElementById('box-scadute');
   if (!scadute.length) { boxS.innerHTML = '<div class="text-center text-muted py-4">Nessuna conferma scaduta</div>'; }
   else {
@@ -127,6 +162,8 @@ function render() {
   }
 
   const bollettini = DATA.bollettini.filter(b => b.stato === 'da_verificare');
+  document.getElementById('badge-bollettini').textContent = bollettini.length;
+  document.getElementById('tab-badge-segnalazioni').textContent = scadute.length + bollettini.length;
   const boxB = document.getElementById('box-bollettini');
   if (!bollettini.length) { boxB.innerHTML = '<div class="text-center text-muted py-4">Nessun bollettino in attesa</div>'; }
   else {
@@ -140,6 +177,7 @@ function render() {
   }
 
   const ultimi = DATA.ordini.slice().sort((a, b) => b.data_ordine.localeCompare(a.data_ordine)).slice(0, 5);
+  document.getElementById('tab-badge-ordini').textContent = ultimi.length;
   const tb = document.getElementById('tbl-ultimi');
   tb.innerHTML = ultimi.map(o =>
     '<tr class="cursor-pointer" onclick="location.href=\'ordine-fornitore-dettaglio.html?id=' + o.id + '\'">' +

@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.3, validata con il cliente.
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.5, validata con il cliente.
   </div>
 
   <div class="row g-4">
@@ -99,6 +99,7 @@
               <li class="nav-item"><a class="nav-link" href="#sec-7-8">7.8 Liquidazione</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-9">7.9 Modulo ordini cliente</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-10">7.10 Schema dei flussi</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-11">7.11 Log eventi</a></li>
             </ul>
           </li>
           <li class="nav-item"><a class="nav-link" href="#sec-8">8. API endpoint</a></li>
@@ -108,6 +109,7 @@
           <li class="nav-item"><a class="nav-link" href="#sec-12">12. Dati di esempio (seed)</a></li>
           <li class="nav-item"><a class="nav-link" href="#sec-13">13. Casi limite / backlog</a></li>
           <li class="nav-item"><a class="nav-link" href="#sec-14">14. Deliverable di riferimento</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-15">15. Tracciamento eventi applicativi</a></li>
         </ul>
       </nav>
     </div>
@@ -118,7 +120,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.3 — <strong>Stato:</strong> validata con il cliente</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.5 — <strong>Stato:</strong> validata con il cliente</p>
           <p class="small text-muted mb-3">Fonte: <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -152,6 +154,8 @@
                 <tr><td>V6</td><td>Responsive</td><td>Desktop + tablet + mobile</td></tr>
                 <tr><td>V7</td><td>Stack</td><td>Frontend Next.js (App Router) + React + TypeScript, backend NestJS, ORM Prisma, PostgreSQL condiviso (V2). Deploy senza Docker: frontend e backend girano come servizi/processi Node separati</td></tr>
                 <tr><td>V8</td><td>Fidelità</td><td>Alta fedeltà — dati reali, interazioni reali</td></tr>
+                <tr><td>V9</td><td>Contenitori dati stabili</td><td>Le viste con tabelle o liste filtrate usano contenitori stabili (altezza minima e massima, scroll interno, intestazione fissa): il layout non cambia al variare del numero di righe</td></tr>
+                <tr><td>V10</td><td>Tracciamento eventi</td><td>Il sistema registra automaticamente gli eventi applicativi (CRUD, cambi di stato, upload/export, autenticazione) ed errori su <code>eventi_app</code> (§4.2.11), consultabili in sola lettura da <code>/eventi</code> (§7.11, §15); le tabelle della Gestione Ordini non vengono modificate (V2)</td></tr>
               </tbody>
             </table>
           </div>
@@ -445,6 +449,31 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
             <blockquote class="blockquote-footer mt-2 fs-6"><code>pct_calcolata</code> / <code>importo_calcolato</code> vengono <strong>congelati alla verifica</strong>: è il modo per rileggere un trimestre vecchio con le percentuali di allora (§5.11).</blockquote>
           </section>
 
+          <section id="sec-4-2-11">
+            <h4>4.2.11 <code>eventi_app</code></h4>
+            <p class="small text-muted">Registro <strong>append-only</strong> degli eventi applicativi (audit trail): CRUD, cambi di stato, upload/export e autenticazione. Compilazione esclusivamente server-side (§15); nessuna UPDATE/DELETE in esercizio.</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>ts</code></td><td>TIMESTAMPTZ</td><td>data/ora evento (server)</td></tr>
+                  <tr><td><code>utente_id</code></td><td>BIGINT FK → <code>users</code></td><td>NULL per eventi di sistema / login non riuscito</td></tr>
+                  <tr><td><code>sessione_id</code></td><td>VARCHAR(100)</td><td>sessione server-side (per eventi <code>auth</code>)</td></tr>
+                  <tr><td><code>tipo</code></td><td>VARCHAR(30)</td><td><code>auth</code> · <code>crud</code> · <code>stato</code> · <code>documento</code> · <code>calcolo</code> · <code>export</code> · <code>errore</code></td></tr>
+                  <tr><td><code>entita</code></td><td>VARCHAR(50)</td><td><code>fornitore</code>, <code>scaglione</code>, <code>agente</code>, <code>subagente</code>, <code>interscambio</code>, <code>pratica</code>, <code>riga_pratica</code>, <code>bollettino</code>, <code>riga_bollettino</code>, <code>liquidazione</code>, <code>utente</code>, <code>sistema</code></td></tr>
+                  <tr><td><code>entita_id</code></td><td>BIGINT</td><td>id dell'entità coinvolta (dove applicabile)</td></tr>
+                  <tr><td><code>azione</code></td><td>VARCHAR(30)</td><td><code>create</code> · <code>update</code> · <code>delete</code> · <code>upload</code> · <code>export</code> · <code>change_state</code> · <code>verify</code> · <code>login</code> · <code>logout</code> · <code>change_password</code> · <code>reset_requested</code> · <code>access_denied</code> · <code>error</code></td></tr>
+                  <tr><td><code>esito</code></td><td>VARCHAR(10)</td><td><code>successo</code> · <code>errore</code> · <code>negato</code></td></tr>
+                  <tr><td><code>dettaglio</code></td><td>JSONB</td><td>sempre la chiave <code>etichetta</code>; diff <code>prima</code>/<code>dopo</code>, nuovo stato, riferimento documento / <code>processing_errors</code>, errore tecnico breve (§15.4)</td></tr>
+                  <tr><td><code>ip</code></td><td>VARCHAR(45)</td><td>indirizzo client (solo eventi <code>auth</code>/<code>negato</code>)</td></tr>
+                  <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <blockquote class="blockquote-footer mt-2 fs-6">Tabella <strong>append-only</strong>: nessuna modifica/eliminazione manuale. La riga viene scritta <strong>nella stessa transazione</strong> dell'operazione che la genera (§15.3); un job di pulizia elimina le righe più vecchie di 36 mesi (§15.7). Indici: <code>(tipo, ts)</code>, <code>(entita, entita_id)</code>, <code>(utente_id, ts)</code>.</blockquote>
+          </section>
+
           <section id="sec-4-3">
             <h3>4.3 Diagramma relazionale</h3>
 <pre class="spec-code"><code>fornitori 1 ── n provvigioni_scaglioni 1 ── n provvigioni_eccezioni (→ subagenti)
@@ -452,7 +481,8 @@ fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
 fornitori 1 ── n ordini_fornitore_testata 1 ── n ordini_fornitore_righe
 fornitori 1 ── n bollettini_testata 1 ── n bollettini_righe
 interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)
-ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1)</code></pre>
+ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1)
+users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
           </section>
 
           <section id="sec-4-4">
@@ -605,7 +635,7 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
                 <tr><td>1</td><td><code>/login</code></td><td>Login</td></tr>
                 <tr><td>2</td><td><code>/dashboard</code></td><td>Dashboard (home dopo login)</td></tr>
                 <tr><td>3</td><td><code>/ordini-fornitore</code></td><td>Elenco pratiche ordini fornitore</td></tr>
-                <tr><td>4</td><td><code>/ordini-fornitore/:id</code></td><td>Dettaglio pratica (3 pannelli documento + righe + storico)</td></tr>
+                <tr><td>4</td><td><code>/ordini-fornitore/:id</code></td><td>Dettaglio pratica (tab per fase + strip riepilogo + righe + storico)</td></tr>
                 <tr><td>5</td><td><code>/fornitori</code></td><td>Anagrafica fornitori</td></tr>
                 <tr><td>6</td><td><code>/fornitori/:id</code></td><td>Dettaglio fornitore con scaglioni</td></tr>
                 <tr><td>7</td><td><code>/agenti</code></td><td>Agenti + subagenti</td></tr>
@@ -616,6 +646,7 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
                 <tr><td>12</td><td><code>/cambia-password</code>, <code>/richiedi-reset</code></td><td>Gestione credenziali</td></tr>
                 <tr><td>13</td><td><code>/ordini</code>, <code>/ordini/upload</code>, <code>/liste</code></td><td>Gestione ordini cliente</td></tr>
                 <tr><td>14</td><td><code>/clienti</code>, <code>/utenti</code>, <code>/errori</code></td><td>Anagrafiche e utility (admin)</td></tr>
+                <tr><td>15</td><td><code>/eventi</code></td><td>Log eventi applicativi: CRUD, cambi di stato, upload/export, autenticazione, errori (admin)</td></tr>
               </tbody>
             </table>
           </div>
@@ -623,11 +654,9 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
           <section id="sec-7-1">
             <h4>7.1 Dashboard (<code>/dashboard</code>)</h4>
             <ul>
-              <li>KPI: ordini in stato <code>inviato</code> / <code>confermato</code> / <code>fatturato</code>.</li>
-              <li><strong>Segnalazioni</strong>: ordini in attesa di conferma con scadenza superata (alert §5.12).</li>
-              <li><strong>Bollettini da verificare</strong>: bollettini in stato <code>da_verificare</code>.</li>
-              <li>Ultimi ordini fornitore (8).</li>
-              <li>Riepilogo provvigioni del trimestre corrente (totale merce fatturato).</li>
+              <li>Header con titolo e <strong>trimestre corrente</strong>; <strong>KPI sempre visibili</strong>: ordini in stato <code>inviato</code> / <code>confermato</code> / <code>fatturato</code> e totale merce fatturata del trimestre.</li>
+              <li><strong>Organizzazione a tab</strong> (pattern <code>tabs-crm</code>): <strong>Segnalazioni</strong> — conferme scadute (alert §5.12) e bollettini in stato <code>da_verificare</code>, con contatore sul tab; <strong>Ordini fornitore</strong> — ultimi ordini (8) con accesso al dettaglio.</li>
+              <li>Contenitori stabili (V9): liste segnalazioni con altezza costante, ultimi ordini in tabella con intestazione fissa e scroll interno.</li>
             </ul>
           </section>
 
@@ -642,11 +671,16 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
           <section id="sec-7-3">
             <h4>7.3 Dettaglio pratica (<code>/ordini-fornitore/:id</code>)</h4>
             <ul>
-              <li>Dati testata (fornitore, numero/data ordine, cliente, agente, importo merce, stato, note).</li>
-              <li><strong>3 pannelli documento</strong>: Ordine / Conferma / Fattura, ciascuno con <strong>upload PDF</strong> e link all'allegato (<code>att_filename_*</code>).</li>
-              <li>Campi conferma (data, numero, scadenza) e fattura (numero, data, importo).</li>
-              <li>Tabella <strong>righe</strong> (numero riga, codice, descrizione, UM, q.tà, prezzo, importo) con aggiunta/eliminazione.</li>
-              <li>Cambio stato guidato: <code>inviato → confermato → fatturato</code>.</li>
+              <li><strong>Stepper</strong> stato pratica: <code>inviato → confermato → fatturato</code>.</li>
+              <li><strong>Strip riepilogo</strong>: fornitore, cliente, agente, importo merce, scadenza conferma.</li>
+              <li><strong>Tab a flusso</strong>:
+                <ul>
+                  <li><strong>Pratica</strong> — dati testata (fornitore, numero/data ordine, cliente, agente, importo merce, stato, note) + <strong>subagente derivato da <code>interscambio</code></strong> (§5.10) + documento ordine;</li>
+                  <li><strong>Conferma</strong> — campi data/numero/scadenza; <strong>Fattura</strong> — campi numero/data/importo; ciascuna fase con <strong>upload PDF</strong> e link all'allegato (<code>att_filename_*</code>), evidenziata con check quando compilata;</li>
+                  <li><strong>Righe</strong> — tabella (numero riga, codice, descrizione, UM, q.tà, prezzo, importo) con aggiunta/eliminazione e <strong>totale merce</strong> in chiusura.</li>
+                </ul>
+              </li>
+              <li>Cambio stato guidato con accesso alla fase successiva.</li>
             </ul>
           </section>
 
@@ -686,10 +720,10 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
           <section id="sec-7-8">
             <h4>7.8 Liquidazione (<code>/liquidazione</code>)</h4>
             <ul>
-              <li>Filtri: fornitore, subagente, trimestre, anno.</li>
-              <li>Riepilogo per subagente (n° fatture, totale merce, totale provvigione subagente).</li>
-              <li>Rendiconto in dettaglio (riga per riga).</li>
-              <li><strong>Export</strong> con i campi §11.</li>
+              <li><strong>Filtri in card</strong>: fornitore, subagente, trimestre, anno.</li>
+              <li><strong>KPI del periodo</strong>: documenti liquidabili, totale merce, provvigione agente, provvigione subagenti (solo pratiche <code>fatturato</code> del periodo, §5.5; V9).</li>
+              <li><strong>Tab Riepilogo / Dettaglio rendiconto</strong>: riepilogo per subagente (n° fatture, totale merce, totale provvigione subagente) con riga totale; dettaglio riga per riga.</li>
+              <li><strong>Export</strong> con i campi §11 nell'header del dettaglio.</li>
             </ul>
           </section>
 
@@ -728,6 +762,19 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
               <li><strong><code>interscambio</code> è la chiave di collegamento</strong>: per ogni pratica risolve quale subagente segue il cliente presso il fornitore e con quale sconto; lo sconto determina lo scaglione (§5.1) usato sia per il confronto bollettini sia per la liquidazione. Il vincolo unico di §5.10 garantisce un solo subagente per cliente × fornitore.</li>
               <li><strong>Documenti</strong>: ogni fase (ordine, conferma, fattura, bollettino) passa dal canale comune importazione + validazione della Gestione Ordini (§6): upload → coda → OCR → validazione operatore; i documenti non leggibili finiscono in <code>processing_errors</code>.</li>
               <li><strong>Liquidazione</strong>: considera solo le pratiche in stato <code>fatturato</code> nel periodo filtrato; le percentuali sono risolte dagli scaglioni correnti (o dalle eccezioni temporanee, §5.7), mentre per i periodi passati si usano i valori congelati (§5.11).</li>
+              <li><strong>Tab e contenitori stabili</strong>: le viste complesse organizzano le informazioni a tab per flusso (Pratica → Conferma → Fattura → Righe; Riepilogo/Dettaglio liquidazione; Segnalazioni/Ordini in dashboard); le tabelle filtrate usano contenitori stabili (V9) così il layout non salta al variare del numero di righe.</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-11">
+            <h4>7.11 Log eventi applicativi (<code>/eventi</code>)</h4>
+            <ul>
+              <li><strong>Sola lettura, admin</strong>: nessuna modifica/eliminazione di eventi; accesso con ruolo <code>admin</code> (§3.3).</li>
+              <li><strong>Filtri</strong>: tipo evento, entità, utente, periodo (da/a), esito; filtro rapido "solo errori".</li>
+              <li><strong>Tabella</strong> (contenitore stabile V9): data/ora, utente, tipo, entità, riferimento (es. pratica/bollettino), esito; intestazione fissa, scroll interno, paginazione.</li>
+              <li><strong>Dettaglio evento</strong> in modale: JSON <code>dettaglio</code> formattato (diff <code>prima</code>/<code>dopo</code>, nuovo stato, riferimento documento / <code>processing_errors</code>).</li>
+              <li><strong>Export CSV</strong> del log filtrato (§8.1).</li>
+              <li>Dettagli di progettazione in §15.</li>
             </ul>
           </section>
         </section>
@@ -748,6 +795,8 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
                 <tr><td>DELETE</td><td><code>/api/scaglioni/:id</code></td><td>elimina scaglione</td></tr>
                 <tr><td>GET</td><td><code>/api/fornitori-lista</code></td><td>dropdown fornitori attivi</td></tr>
                 <tr><td>GET</td><td><code>/agenti</code> · <code>/api/agenti-lista</code> · <code>/api/subagenti</code></td><td>anagrafica agenti/subagenti</td></tr>
+                <tr><td>POST</td><td><code>/api/agenti</code> · PUT <code>/api/agenti/:id</code> · DELETE <code>/api/agenti/:id</code></td><td>CRUD agente</td></tr>
+                <tr><td>POST</td><td><code>/api/subagenti</code> · PUT <code>/api/subagenti/:id</code> · DELETE <code>/api/subagenti/:id</code></td><td>CRUD subagente</td></tr>
                 <tr><td>GET</td><td><code>/interscambio</code></td><td>tabella interscambio</td></tr>
                 <tr><td>POST</td><td><code>/api/interscambio</code></td><td>nuova associazione</td></tr>
                 <tr><td>DELETE</td><td><code>/api/interscambio/:id</code></td><td>elimina associazione</td></tr>
@@ -764,6 +813,11 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
                 <tr><td>POST</td><td><code>/api/bollettini/:id/righe</code></td><td>aggiunge riga (calcolo atteso + differenza)</td></tr>
                 <tr><td>DELETE</td><td><code>/api/bollettini/:id/righe/:rid</code></td><td>elimina riga</td></tr>
                 <tr><td>GET</td><td><code>/liquidazione</code></td><td>rendiconto provvigioni</td></tr>
+                <tr><td>GET</td><td><code>/api/liquidazione/export</code></td><td>export CSV della liquidazione (§11)</td></tr>
+                <tr><td>GET</td><td><code>/eventi</code></td><td>log eventi applicativi (admin)</td></tr>
+                <tr><td>GET</td><td><code>/api/eventi</code></td><td>elenco eventi filtrato (admin)</td></tr>
+                <tr><td>GET</td><td><code>/api/eventi/:id</code></td><td>dettaglio evento (admin)</td></tr>
+                <tr><td>GET</td><td><code>/api/eventi/export</code></td><td>export CSV del log filtrato (admin)</td></tr>
               </tbody>
             </table>
           </div>
@@ -772,7 +826,7 @@ ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_client
           <p><code>/api/ordini*</code>, <code>/api/lookup/*</code>, <code>/api/clienti*</code>, <code>/api/utenti*</code>, <code>/api/errori*</code>: API del modulo ordini cliente, montate sul server dell'applicazione; leggono e scrivono le tabelle condivise di §4.1 (ordini cliente, clienti, articoli, giacenze, log).</p>
 
           <h3>8.3 Autenticazione</h3>
-          <p><code>/login</code> (POST), <code>/logout</code> (POST), <code>/cambia-password</code>, <code>/richiedi-reset</code>. Guard <code>requireAuth</code> su tutte le rotte app, <code>requireAdmin</code> su clienti/utenti.</p>
+          <p><code>/login</code> (POST), <code>/logout</code> (POST), <code>/cambia-password</code>, <code>/richiedi-reset</code>. Guard <code>requireAuth</code> su tutte le rotte app, <code>requireAdmin</code> su clienti/utenti/eventi.</p>
         </section>
 
         <section id="sec-9">
@@ -830,6 +884,7 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
             <li><strong>Subagenti</strong>: Bastasin, Nista (es. eccezione Bastasin <code>3</code> sullo scaglione 1 %).</li>
             <li><strong>Interscambio</strong>: cliente con riferimenti fornitore + sconto (<code>discount</code>).</li>
             <li><strong>Pratiche</strong>: esempi negli stati <code>inviato</code>, <code>confermato</code>, <code>fatturato</code>; una nota di credito (importo negativo) per validare §5.3; un ordine con conferma ridotta (7/10 articoli) per validare §5.8.</li>
+            <li><strong>Eventi</strong>: esempi di <code>eventi_app</code> coerenti con i dati sopra (login admin, creazione fornitore, modifica scaglione, cambio stato pratica, verifica bollettino, export liquidazione) + <strong>un evento di tipo <code>errore</code></strong> per collaudare filtri e dettaglio della schermata <code>/eventi</code> (§7.11, §15).</li>
           </ul>
         </section>
 
@@ -864,11 +919,185 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
                 <tr><td>Motore provvigioni / differenze bollettini (§10)</td><td>✅</td></tr>
                 <tr><td>Export liquidazione (§11)</td><td>✅</td></tr>
                 <tr><td>Dati dimostrativi (§12)</td><td>✅</td></tr>
+                <tr><td>Tracciamento eventi applicativi (V10, §4.2.11, §15)</td><td>⏳</td></tr>
                 <tr><td>Backend NestJS + frontend Next.js, database, autenticazione, upload, notifiche real-time (§3.3, §8)</td><td>⁄ in roadmap</td></tr>
                 <tr><td>Casi limite §13 (B1–B9)</td><td>⏳</td></tr>
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section id="sec-15">
+          <h2>15. Tracciamento eventi applicativi, CRUD ed errori</h2>
+
+          <h3>15.1 Principi</h3>
+          <p>L'applicazione registra su una tabella <strong>append-only</strong> (<code>eventi_app</code>, §4.2.11) gli eventi applicativi: operazioni CRUD, cambi di stato, upload/export di documenti, autenticazione ed errori. Scopo: tracciabilità (chi/cosa/quando), storico di pratiche e bollettini, diagnosi degli errori.</p>
+          <ul>
+            <li><strong>Scrittura automatica server-side</strong>: ogni operazione di scrittura sulle tabelle CRM, ogni cambio di stato, ogni upload/export e ogni evento di autenticazione produce una riga in <code>eventi_app</code>. La scrittura avviene nel <strong>service layer</strong>, mai fidandosi di ciò che dichiara il client.</li>
+            <li><strong>Nessuna modifica alle tabelle esistenti</strong> (V2): <code>eventi_app</code> è una tabella nuova del CRM; gli errori di importazione documenti restano in <code>processing_errors</code> della Gestione Ordini (§4.1) e vengono solo <strong>referenziati</strong> dagli eventi, non duplicati.</li>
+            <li><strong>Solo lettura per l'utente</strong>: gli eventi non si modificano e non si eliminano dall'interfaccia (nemmeno dagli admin). L'eventuale correzione di errori passa dalle normali operazioni di business, che generano nuovi eventi.</li>
+            <li><strong>Una riga per operazione</strong>: il catalogo §15.2 definisce <strong>esattamente</strong> quali eventi genera ogni operazione; l'implementazione non aggiunge né omette eventi "a scelta". Le <strong>GET di sola lettura</strong> (elenchi, dettagli, calcoli al volo) <strong>non</strong> generano eventi.</li>
+            <li><strong>Privacy</strong>: nei log non si scrivono mai password né dati sensibili; per l'auth si registra solo l'esito (riuscito/fallito). IP e sessione solo per eventi <code>auth</code> e tentativi <code>negato</code>. Elenco completo delle esclusioni in §15.8.</li>
+          </ul>
+
+          <h3>15.2 Catalogo eventi (cosa si traccia)</h3>
+          <p>La matrice collega <strong>ogni operazione esposta dalle API (§8.1, §8.3) al relativo evento</strong> con i valori esatti di <code>tipo</code>, <code>azione</code>, <code>entita</code>, <code>esito</code> e i campi del <code>dettaglio</code>. <code>entita_id</code> è l'id dell'entità coinvolta; il riferimento descrittivo va sempre salvato nella chiave <code>etichetta</code> del dettaglio (§15.4).</p>
+
+          <h4>15.2.1 Autenticazione e accesso (§8.3)</h4>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Operazione (API)</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
+              <tbody>
+                <tr><td>POST <code>/login</code> riuscita</td><td><code>auth</code></td><td><code>login</code></td><td><code>utente</code></td><td><code>successo</code></td><td><code>{etichetta, sessione_id}</code></td></tr>
+                <tr><td>POST <code>/login</code> fallita (password errata o utente inesistente)</td><td><code>auth</code></td><td><code>login</code></td><td><code>utente</code></td><td><code>errore</code></td><td><code>{etichetta: utente tentato, motivo}</code> (<code>utente_id</code> solo se l'account esiste; <code>ip</code> sempre)</td></tr>
+                <tr><td>POST <code>/logout</code></td><td><code>auth</code></td><td><code>logout</code></td><td><code>utente</code></td><td><code>successo</code></td><td><code>{etichetta, sessione_id}</code></td></tr>
+                <tr><td>POST <code>/cambia-password</code></td><td><code>auth</code></td><td><code>change_password</code></td><td><code>utente</code></td><td><code>successo</code></td><td><code>{etichetta}</code> (esito <code>errore</code> se la richiesta fallisce)</td></tr>
+                <tr><td>POST <code>/richiedi-reset</code></td><td><code>auth</code></td><td><code>reset_requested</code></td><td><code>utente</code></td><td><code>successo</code></td><td><code>{etichetta}</code></td></tr>
+                <tr><td>Richiesta a rotta <code>requireAdmin</code> senza il ruolo (§3.3)</td><td><code>auth</code></td><td><code>access_denied</code></td><td><code>utente</code></td><td><code>negato</code></td><td><code>{etichetta, rotta, metodo}</code> (<code>ip</code> valorizzato)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4>15.2.2 Anagrafiche — fornitori e scaglioni (§8.1)</h4>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Operazione (API)</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
+              <tbody>
+                <tr><td>POST <code>/api/fornitori</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>fornitore</code></td><td><code>successo</code></td><td><code>{etichetta: ragione_sociale, p_iva, giorni_attesa_conferma, payment_type, attivo}</code></td></tr>
+                <tr><td>PUT <code>/api/fornitori/:id</code></td><td><code>crud</code></td><td><code>update</code></td><td><code>fornitore</code></td><td><code>successo</code></td><td><code>{etichetta, prima: {…}, dopo: {…}}</code></td></tr>
+                <tr><td>POST <code>/api/fornitori/:id/scaglioni</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>scaglione</code></td><td><code>successo</code></td><td><code>{etichetta: sconto min–max, fornitore_id, sconto_min, sconto_max, pct_agente, pct_subagente}</code></td></tr>
+                <tr><td>DELETE <code>/api/scaglioni/:id</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>scaglione</code></td><td><code>successo</code></td><td><code>{etichetta, scaglione_id, fornitore_id, sconto_min, sconto_max, pct_agente, pct_subagente}</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <blockquote class="blockquote-footer mt-2 fs-6">Il fornitore <strong>non si elimina</strong> via API: si disattiva con <code>attivo=false</code> (evento <code>crud/update</code>).</blockquote>
+
+          <h4>15.2.3 Anagrafiche — agenti, subagenti, interscambio (§8.1)</h4>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Operazione (API)</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
+              <tbody>
+                <tr><td>create/update/delete agente</td><td><code>crud</code></td><td><code>create</code>/<code>update</code>/<code>delete</code></td><td><code>agente</code></td><td><code>successo</code></td><td>create/delete: <code>{etichetta: cognome, nome}</code>; update: <code>{etichetta, prima, dopo}</code></td></tr>
+                <tr><td>create/update/delete subagente</td><td><code>crud</code></td><td><code>create</code>/<code>update</code>/<code>delete</code></td><td><code>subagente</code></td><td><code>successo</code></td><td>come agente (create include <code>agente_id</code>)</td></tr>
+                <tr><td>POST <code>/api/interscambio</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>interscambio</code></td><td><code>successo</code></td><td><code>{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, discount}</code></td></tr>
+                <tr><td>DELETE <code>/api/interscambio/:id</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>interscambio</code></td><td><code>successo</code></td><td><code>{etichetta, interscambio_id, subagente_id, cliente_piva, fornitore_id, discount}</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4>15.2.4 Pratiche ordine a fornitore (§8.1)</h4>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Operazione (API)</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
+              <tbody>
+                <tr><td>POST <code>/api/ordini-fornitore</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><code>{etichetta: numero_ordine, fornitore_id, cliente_piva, ordine_cliente_id, agente_id, importo_merce, stato}</code></td></tr>
+                <tr><td>PUT <code>/api/ordini-fornitore/:id</code> <strong>senza</strong> cambio stato</td><td><code>crud</code></td><td><code>update</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><code>{etichetta, prima, dopo}</code> (lo <code>stato</code> è <strong>escluso</strong> dal diff)</td></tr>
+                <tr><td>PUT <code>/api/ordini-fornitore/:id</code> <strong>con</strong> cambio stato</td><td><code>stato</code></td><td><code>change_state</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><code>{etichetta, prima: {stato}, dopo: {stato}, motivo: note}</code></td></tr>
+                <tr><td>PUT con <strong>entrambi</strong> (cambio stato + altri campi)</td><td><code>crud</code>+<code>stato</code></td><td><code>update</code>+<code>change_state</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><strong>due eventi separati</strong>, come da righe precedenti</td></tr>
+                <tr><td>POST <code>/api/ordini-fornitore/:id/righe</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>riga_pratica</code></td><td><code>successo</code></td><td><code>{etichetta: codice · descrizione, pratica_id, riga_numero, codice, descrizione, quantita, prezzo, importo}</code></td></tr>
+                <tr><td>DELETE <code>/api/ordini-fornitore/:id/righe/:rid</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>riga_pratica</code></td><td><code>successo</code></td><td><code>{etichetta, riga_pratica_id, pratica_id, codice, descrizione}</code></td></tr>
+                <tr><td>DELETE <code>/api/ordini-fornitore/:id</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><code>{etichetta: numero_ordine, pratica_id, fornitore_id, cliente_piva, importo_merce, stato}</code></td></tr>
+                <tr><td>POST <code>/api/ordini-fornitore/:id/upload</code> (ordine/conferma/fattura)</td><td><code>documento</code></td><td><code>upload</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><code>{etichetta, pratica_id, fase, att_filename, dimensione}</code></td></tr>
+                <tr><td>upload con esito negativo (validazione/OCR non riuscita, §6)</td><td><code>documento</code></td><td><code>upload</code></td><td><code>pratica</code></td><td><code>errore</code></td><td><code>{etichetta, pratica_id, fase, att_filename, processing_errors_id}</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4>15.2.5 Bollettini e righe bollettino (§8.1)</h4>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Operazione (API)</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
+              <tbody>
+                <tr><td>POST <code>/api/bollettini</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta: trimestre/anno · fornitore, fornitore_id, trimestre, anno, att_filename}</code></td></tr>
+                <tr><td>PUT <code>/api/bollettini/:id</code> (dati/note, <strong>senza</strong> cambio stato)</td><td><code>crud</code></td><td><code>update</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, prima, dopo}</code></td></tr>
+                <tr><td>PUT <code>/api/bollettini/:id</code> <strong>con</strong> cambio stato (<code>da_verificare → verificato</code>/<code>contestato</code>)</td><td><code>stato</code></td><td><code>change_state</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, prima: {stato}, dopo: {stato}, motivo: note}</code></td></tr>
+                <tr><td><strong>Verifica</strong> del bollettino (conferma importi, congelamento % e importi §5.11)</td><td><code>calcolo</code></td><td><code>verify</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, bollettino_id, periodo: {trimestre, anno}, importo_riconosciuto, importo_calcolato, differenza_totale}</code></td></tr>
+                <tr><td>POST <code>/api/bollettini/:id/righe</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>riga_bollettino</code></td><td><code>successo</code></td><td><code>{etichetta: fattura_numero · cliente_piva, bollettino_id, fattura_numero, fattura_data, cliente_piva, importo_merce, pct_riconosciuta, importo_riconosciuto, pct_calcolata, importo_calcolato, differenza}</code></td></tr>
+                <tr><td>DELETE <code>/api/bollettini/:id/righe/:rid</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>riga_bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, riga_bollettino_id, bollettino_id, fattura_numero, importo_riconosciuto, importo_calcolato}</code></td></tr>
+                <tr><td><strong>Correzione manuale</strong> di un importo (§5.13)</td><td><code>crud</code></td><td><code>update</code></td><td><code>riga_bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, riga_bollettino_id, bollettino_id, prima, dopo}</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <blockquote class="blockquote-footer mt-2 fs-6">Quando la verifica conferma anche il passaggio a <code>verificato</code>, si generano <strong>due eventi</strong>: <code>calcolo/verify</code> + <code>stato/change_state</code>.</blockquote>
+
+          <h4>15.2.6 Liquidazione ed export (§8.1, §11)</h4>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Operazione (API)</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
+              <tbody>
+                <tr><td>GET <code>/api/liquidazione/export</code></td><td><code>export</code></td><td><code>export</code></td><td><code>liquidazione</code></td><td><code>successo</code></td><td><code>{etichetta: trimestre/anno, periodo: {trimestre, anno}, filtro: {fornitore?, subagente?}, n_righe, importo_totale}</code></td></tr>
+                <tr><td>export con errori (dati/campi mancanti)</td><td><code>export</code></td><td><code>export</code></td><td><code>liquidazione</code></td><td><code>errore</code></td><td><code>{etichetta, periodo, motivo}</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <blockquote class="blockquote-footer mt-2 fs-6">Il <strong>rendiconto</strong> §7.8 è calcolato al volo (GET = nessun evento); diventa un evento <strong>solo quando viene esportato</strong>.</blockquote>
+
+          <h4>15.2.7 Errori di sistema</h4>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Evento</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
+              <tbody>
+                <tr><td>Eccezione non gestita / errore 5xx (handler globale)</td><td><code>errore</code></td><td><code>error</code></td><td><code>sistema</code></td><td><code>errore</code></td><td><code>{rotta, metodo, http_status, errore: {classe, messaggio}}</code></td></tr>
+                <tr><td>Errore di validazione 4xx (operazione rifiutata)</td><td>tipo dell'operazione tentata (es. <code>crud</code>)</td><td>azione dell'operazione</td><td>entità dell'operazione</td><td><code>errore</code></td><td><code>{etichetta, errore: {campo, messaggio}}</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>15.3 Regole di scrittura (transazionali)</h3>
+          <ul>
+            <li><strong>Un solo helper</strong> <code>logEvent({tipo, azione, entita, entita_id, esito, etichetta, dettaglio, req})</code> nel service layer: ogni endpoint che genera eventi lo chiama; nessuna scrittura diretta dal client (<code>req</code> si usa solo per estrarre sessione e IP lato server).</li>
+            <li><strong>Stessa transazione</strong>: la riga di <code>eventi_app</code> viene scritta <strong>nella stessa transazione</strong> dell'operazione di business — se l'operazione fa rollback non resta alcun evento (coerenza). Eccezione: <code>auth</code> (login/logout) e gli eventi <code>negato</code>, che non hanno transazione di business e usano una scrittura diretta <strong>best-effort</strong>.</li>
+            <li><strong>Il log non fallisce mai l'operazione</strong>: se la scrittura di <code>eventi_app</code> va in errore fuori dalla transazione di business, l'errore viene inviato al <strong>log applicativo</strong> (file/console) e l'operazione prosegue.</li>
+            <li><strong><code>utente_id</code></strong>: l'utente autenticato della sessione; NULL solo per eventi di sistema e login non riconosciuto. <strong><code>ts</code></strong>: impostato dal server/DB, mai dal client. <strong>Append-only</strong>: l'evento nasce già completo, senza UPDATE successive.</li>
+          </ul>
+
+          <h3>15.4 Formato del <code>dettaglio</code> (JSONB)</h3>
+          <ul>
+            <li><strong>Sempre</strong> la chiave <code>etichetta</code> (stringa descrittiva per la colonna "riferimento": numero ordine, fattura, ragione sociale…), leggibile senza aprire il dettaglio.</li>
+            <li><strong>update</strong> → <code>{prima: {…}, dopo: {…}}</code> con i <strong>soli campi cambiati</strong>, nomi uguali alle colonne; numeri in formato decimale semplice, date <code>YYYY-MM-DD</code>, ore in ISO 8601 UTC, <code>null</code> se un campo passa a NULL. Lo stato <strong>non</strong> compare mai in un diff <code>crud/update</code>: è coperto dall'evento <code>stato</code> (catalogo §15.2).</li>
+            <li><strong>create/delete</strong> → i soli campi essenziali per la ricostruzione, come da catalogo §15.2 (mai l'intero record).</li>
+            <li><strong>contesto</strong> → quando l'evento riguarda una riga o un sottorecord, il dettaglio include l'id del genitore (<code>pratica_id</code>, <code>bollettino_id</code>, <code>fornitore_id</code>).</li>
+            <li><strong>riferimenti esterni</strong> → <code>processing_errors_id</code> è l'<strong>id</strong> della riga di <code>processing_errors</code>, così la UI apre il dettaglio dell'errore della Gestione Ordini.</li>
+          </ul>
+
+          <h3>15.5 Errori applicativi</h3>
+          <ul>
+            <li>Gli errori di validazione e 5xx arrivano al log tramite <strong>handler globale</strong> intermedio: nessuna eccezione gestita silenziosamente (catalogo §15.2.7).</li>
+            <li>Al frontend viene restituito solo un <strong>messaggio user-friendly</strong>; il dettaglio tecnico (classe, messaggio) resta nel log e non viene mai esposto nel browser.</li>
+            <li>Gli <strong>errori di importazione OCR/validazione</strong> restano di competenza della Gestione Ordini (<code>processing_errors</code>) e compaiono nel log come riferimento (§15.4) — non vengono duplicati nel testo dell'evento.</li>
+          </ul>
+
+          <h3>15.6 Schermata <code>/eventi</code></h3>
+          <p>Comportamento di schermata in §7.11; specifiche operative:</p>
+          <ul>
+            <li><strong>Filtri</strong>: tipo, esito, entità, utente (select), periodo <code>da/a</code> (date), testo libero su <code>etichetta</code>; combinabili. Filtro rapido "solo errori".</li>
+            <li><strong>Tabella</strong> (contenitore stabile V9): <code>ts</code> (DESC), utente, tipo, entità, azione, riferimento (<code>etichetta</code> + <code>entita_id</code>), esito; paginazione 50 righe.</li>
+            <li><strong>Dettaglio evento</strong> in modale: JSON <code>dettaglio</code> formattato + colonne rimanenti (<code>sessione_id</code>, <code>ip</code>).</li>
+            <li><strong>Export CSV</strong> (<code>GET /api/eventi/export</code>): stesse righe filtrate, colonne fisse <code>ts;utente;tipo;entita;entita_id;azione;esito;etichetta;dettaglio(JSON)</code>.</li>
+            <li>Nella <strong>dashboard</strong> (§7.1) gli admin vedono un contatore "errori di oggi" con collegamento al log filtrato.</li>
+            <li><strong>Sola lettura</strong>: nessun pulsante di modifica/eliminazione.</li>
+          </ul>
+
+          <h3>15.7 Conservazione e rotazione</h3>
+          <ul>
+            <li>Job di pulizia notturno: <code>DELETE FROM eventi_app WHERE ts &lt; now() - interval '36 months';</code> (nessuna cancellazione manuale).</li>
+            <li>Gli eventi eliminati non sono recuperabili: gli storici "permanenti" (es. verifica bollettini) sono garantiti dai dati congelati in <code>bollettini_righe</code> (§5.11), non dal log.</li>
+          </ul>
+
+          <h3>15.8 Cosa NON si traccia</h3>
+          <ul>
+            <li><strong>Password, hash, token e cookie di sessione</strong>: solo l'esito e il <code>sessione_id</code>.</li>
+            <li><strong>Contenuto dei documenti/allegati</strong>: solo <code>att_filename</code> e dimensione.</li>
+            <li><strong>Body HTTP integrale</strong>: solo i campi significativi del catalogo §15.2.</li>
+            <li><strong>Dati sensibili del cliente</strong> oltre agli identificativi di dominio (P.IVA, ragione sociale): nessun dato di pagamento o personale.</li>
+            <li><strong>Letture GET</strong> di elenco/dettaglio e <strong>calcoli al volo</strong> non esportati.</li>
+          </ul>
+
+          <h3>15.9 Dati di esempio (seed, §12)</h3>
+          <p>Il seed comprende eventi dimostrativi coerenti con i dati di §12, nell'ordine di collaudo: login <code>admin</code> (<code>auth/login</code>), creazione fornitore Gries (<code>crud/create</code>), creazione + modifica scaglione (<code>crud/create</code>/<code>crud/update</code>), creazione pratica in <code>inviato</code> (<code>crud/create</code>), upload conferma con cambio stato a <code>confermato</code> (<code>documento/upload</code> + <code>stato/change_state</code>), verifica bollettino (<code>calcolo/verify</code>), export liquidazione (<code>export/export</code>) e <strong>un evento di tipo <code>errore</code></strong> (<code>documento/upload</code> esito <code>errore</code> con <code>processing_errors_id</code>) per collaudare filtri e dettaglio.</p>
+
+          <h3>15.10 Riferimenti</h3>
+          <p>Tabella: §4.2.11 · Schermata: §7.11 · API: §8.1 · Seed: §12 · Deliverable: §14 · Requisito: V10</p>
         </section>
 
       </div>

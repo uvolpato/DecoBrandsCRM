@@ -45,7 +45,7 @@
     <li>condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, <code>requireAuth</code>/<code>requireAdmin</code>);</li>
     <li>integrare il <strong>modulo ordini cliente</strong> (ordini, upload, liste, clienti, utenti, errori) sulle rotte dell'applicazione.</li>
   </ul>
-  <p class="small text-muted">Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v1.2 (validata con il cliente, §1–§14).</p>
+  <p class="small text-muted">Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v1.5 (validata con il cliente, §1–§15).</p>
 
   <h2 id="tariffe" data-od-id="sezione-tariffe">2. Tariffe applicate (indicative, mercato Italia)</h2>
   <table class="table table-bordered bg-white">
@@ -62,15 +62,13 @@
     <table class="table table-bordered bg-white">
       <thead><tr><th>#</th><th>Attività</th><th>Ore</th><th>Tariffa</th><th>Importo</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td>Analisi del flusso provvigioni (documento <code>ANALISI_CRM_PROVVIGIONI</code>, risposte Matteo Caironi) e redazione della <strong>specifica v1.2 validata</strong> con il cliente</td><td>4</td><td>€ 80,00</td><td>€ 320,00</td></tr>
-        <tr><td>2</td><td>Prototipo HTML navigabile: launcher, login, dashboard, anagrafiche (fornitori con scaglioni, agenti/subagenti, interscambio), elenco/dettaglio pratiche, elenco/dettaglio bollettini, liquidazione</td><td>8</td><td>€ 80,00</td><td>€ 640,00</td></tr>
-        <tr><td>3</td><td>Motore di calcolo provvigioni lato client (§10): scaglioni per sconto, eccezioni subagente, associazioni interscambio, nota di credito, confronto bollettini</td><td>3</td><td>€ 80,00</td><td>€ 240,00</td></tr>
-        <tr><td>4</td><td>Export liquidazione a 8 campi (§11) e gestione trimestri</td><td>1</td><td>€ 80,00</td><td>€ 80,00</td></tr>
-        <tr><td>5</td><td>Dati dimostrativi coerenti con il seed (§12): Gries 0/1/5/10/100 %, subagenti Bastasin/Nista, nota di credito e conferma ridotta (7/10)</td><td>2</td><td>€ 80,00</td><td>€ 160,00</td></tr>
-        <tr><td>6</td><td>Stile applicato alla app esistente (Bootstrap 5.3, navbar scura, sfondo <code>#f5f6f8</code>, logo) + footer/versione</td><td>1</td><td>€ 80,00</td><td>€ 80,00</td></tr>
-        <tr><td>7</td><td>Debug e rifiniture (footer fisso, launcher, compatibilità anteprima)</td><td>1</td><td>€ 80,00</td><td>€ 80,00</td></tr>
+        <tr><td>1</td><td>Analisi del flusso provvigioni (documento <code>ANALISI_CRM_PROVVIGIONI</code>, risposte Matteo Caironi) e redazione della <strong>specifica v1.4 validata</strong> con il cliente</td><td>4</td><td>€ 80,00</td><td>€ 320,00</td></tr>
+        <tr><td>2</td><td>Prototipo HTML navigabile: launcher, login, dashboard, anagrafiche (fornitori con scaglioni, agenti/subagenti, interscambio), elenco/dettaglio pratiche, elenco/dettaglio bollettini, liquidazione; riorganizzazione a tab (dashboard, dettaglio pratica, liquidazione), strip riepilogo e regola contenitori dati stabili (v1.4 §2-V9)</td><td>8</td><td>€ 80,00</td><td>€ 640,00</td></tr>
+        <tr><td>3</td><td>Dati dimostrativi coerenti con il seed (§12): Gries 0/1/5/10/100 %, subagenti Bastasin/Nista, nota di credito e conferma ridotta (7/10)</td><td>2</td><td>€ 80,00</td><td>€ 160,00</td></tr>
+        <tr><td>4</td><td>Stile applicato alla app esistente (Bootstrap 5.3, navbar scura, sfondo <code>#f5f6f8</code>, logo) + footer/versione</td><td>1</td><td>€ 80,00</td><td>€ 80,00</td></tr>
+        <tr><td>5</td><td>Debug e rifiniture (footer fisso, launcher, compatibilità anteprima)</td><td>1</td><td>€ 80,00</td><td>€ 80,00</td></tr>
       </tbody>
-      <tfoot><tr><td></td><td><strong>Subtotale già svolto</strong></td><td><strong>20</strong></td><td></td><td><strong>€ 1.600,00</strong></td></tr></tfoot>
+      <tfoot><tr><td></td><td><strong>Subtotale già svolto</strong></td><td><strong>16</strong></td><td></td><td><strong>€ 1.280,00</strong></td></tr></tfoot>
     </table>
   </div>
 
@@ -85,11 +83,13 @@
         <tr><td>3</td><td>Schema Prisma delle <strong>nuove tabelle CRM</strong> (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe, bollettini + righe) + lettura delle tabelle esistenti condivise</td><td>6</td><td>16</td><td>€ 330,00</td></tr>
         <tr><td>4</td><td>Motore provvigioni lato server: scaglioni, eccezioni, maturazione maturato/fatturato, congelamento percentuali alla verifica, nota di credito (§4.2, §5.3, §5.5, §5.11)</td><td>5</td><td>14</td><td>€ 275,00</td></tr>
         <tr><td>5</td><td>API REST NestJS: CRUD fornitori + scaglioni, interscambio (vincolo unico), pratiche + righe + cambio stato, <strong>upload documenti PDF</strong> (multer), bollettini + righe con calcolo differenze, liquidazione</td><td>12</td><td>30</td><td>€ 660,00</td></tr>
-        <tr><td>6</td><td>Frontend Next.js viste CRM: login, dashboard (KPI + segnalazioni scadenze), anagrafiche, dettaglio pratica con <strong>3 pannelli upload</strong>, bollettini con divergenze, liquidazione + export a 8 campi</td><td>12</td><td>30</td><td>€ 660,00</td></tr>
+        <tr><td>6</td><td>Frontend Next.js viste CRM: login, dashboard (KPI + tab segnalazioni/ordini), anagrafiche, dettaglio pratica con tab per fase e upload, bollettini con divergenze, liquidazione (tab riepilogo/dettaglio), contenitori dati stabili (§2-V9)</td><td>12</td><td>30</td><td>€ 660,00</td></tr>
         <tr><td>7</td><td>Integrazione <strong>modulo ordini cliente</strong> (API <code>/api/ordini*</code>, <code>/api/lookup/*</code>, <code>/api/clienti*</code>, <code>/api/utenti*</code>, <code>/api/errori*</code> montate) + viste coerenti</td><td>6</td><td>15</td><td>€ 330,00</td></tr>
         <tr><td>8</td><td>Test end-to-end, collaudo con dati seed (§12), rifiniture responsive e anteprima produzione</td><td>5</td><td>13</td><td>€ 275,00</td></tr>
+        <tr><td>9</td><td>Motore di calcolo provvigioni lato client (§10): scaglioni per sconto, eccezioni subagente, associazioni interscambio, nota di credito, confronto bollettini riconosciuto vs calcolato</td><td>3</td><td>8</td><td>€ 165,00</td></tr>
+        <tr><td>10</td><td>Export liquidazione a 8 campi (§11) e gestione trimestri</td><td>1</td><td>3</td><td>€ 55,00</td></tr>
       </tbody>
-      <tfoot><tr><td></td><td><strong>Subtotale da svolgere</strong></td><td><strong>55</strong></td><td><strong>142</strong></td><td><strong>€ 3.025,00</strong></td></tr></tfoot>
+      <tfoot><tr><td></td><td><strong>Subtotale da svolgere</strong></td><td><strong>59</strong></td><td><strong>153</strong></td><td><strong>€ 3.245,00</strong></td></tr></tfoot>
     </table>
   </div>
 
@@ -97,21 +97,23 @@
   <table class="table table-bordered bg-white" style="max-width:520px">
     <thead><tr><th>Voce</th><th>Ore</th><th>Importo</th></tr></thead>
     <tbody>
-      <tr><td>Attività già svolte</td><td>20</td><td>€ 1.600,00</td></tr>
-      <tr><td>Attività da svolgere</td><td>55</td><td>€ 3.025,00</td></tr>
+      <tr><td>Attività già svolte</td><td>16</td><td>€ 1.280,00</td></tr>
+      <tr><td>Attività da svolgere</td><td>59</td><td>€ 3.245,00</td></tr>
     </tbody>
-    <tfoot><tr><td><strong>Totale complessivo</strong></td><td><strong>75</strong></td><td><strong>€ 4.625,00</strong></td></tr></tfoot>
+    <tfoot><tr><td><strong>Totale complessivo</strong></td><td><strong>75</strong></td><td><strong>€ 4.525,00</strong></td></tr></tfoot>
   </table>
   <div class="alert alert-success border">
     <i class="bi bi-graph-down-arrow me-1"></i>
-    <strong>Riferimento senza AI</strong> — lo sviluppo tradizionale richiederebbe <strong>142 ore</strong> (≈ 2,6× le ore assistite):
-    142 h × € 70,00 = <strong>€ 9.940,00</strong>, per un totale di <strong>€ 11.540,00</strong> (€ 1.600,00 già svolto + € 9.940,00 sviluppo).<br>
-    L'approccio assistito da AI consente un <strong>risparmio di € 6.915,00</strong> sul solo sviluppo (€ 9.940,00 → € 3.025,00, <strong>−70%</strong>).
+    <strong>Riferimento senza AI</strong> — lo sviluppo tradizionale richiederebbe <strong>153 ore</strong> (≈ 2,6× le ore assistite):
+    153 h × € 70,00 = <strong>€ 10.710,00</strong>, per un totale di <strong>€ 11.990,00</strong> (€ 1.280,00 già svolto + € 10.710,00 sviluppo).<br>
+    L'approccio assistito da AI consente un <strong>risparmio di € 7.465,00</strong> sul solo sviluppo (€ 10.710,00 → € 3.245,00, <strong>−70%</strong>).
   </div>
 
   <h2 id="note" data-od-id="sezione-note">6. Note</h2>
   <ul>
     <li>Le ore della sezione "già svolte" sono una <strong>stima</strong> del tempo impiegato in questa sessione (analisi, specifica, prototipo e iterazioni); da confermare.</li>
+    <li>Il <strong>motore di calcolo provvigioni lato client</strong> e l'<strong>export a 8 campi / gestione trimestri</strong> (già erroneamente elencati in §3) risultano <strong>da svolgere</strong>: sono stati spostati in §4 (punti 9–10) senza variazione delle ore complessive (75 h).</li>
+    <li>Il <strong>ridisegno a tab</strong> (dashboard, dettaglio pratica, liquidazione), la strip riepilogo della scheda ordine e la <strong>regola dei contenitori dati stabili</strong> (spec §2-V9) rientrano nelle attività già svolte (prototipazione) senza variazione delle ore stimate.</li>
     <li>Il costo ridotto dello sviluppo riflette la <strong>velocizzazione dell'AI</strong>, non una riduzione di qualità o delle garanzie.</li>
     <li>Tariffe indicative e personalizzabili; <strong>IVA esclusa</strong>.</li>
     <li>Il progetto <strong>condivide il database</strong> con la Gestione Ordini: le tabelle esistenti vengono riusate <strong>senza modifiche</strong>; il CRM aggiunge solo le proprie tabelle (§4.2).</li>

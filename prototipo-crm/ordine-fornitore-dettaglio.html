@@ -19,8 +19,11 @@
     </ol>
   </nav>
 
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0" id="titolo-ordine"></h4>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+      <h4 class="mb-0" id="titolo-ordine"></h4>
+      <p class="text-muted mb-0 nota-prototipo" id="sottotitolo-ordine"></p>
+    </div>
     <div class="btn-group">
       <button class="btn btn-outline-secondary btn-sm" onclick="esportaCSV()"><i class="bi bi-download me-1"></i>CSV</button>
       <a href="ordini-fornitore.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Indietro</a>
@@ -32,113 +35,186 @@
 
   <div id="box-errore" class="alert alert-danger d-none">Ordine non trovato.</div>
 
-  <div class="row g-4">
+  <div id="box-pratica">
 
-    <!-- Dati Ordine -->
-    <div class="col-lg-6">
-      <div class="card mb-4">
-        <div class="card-header bg-white fw-semibold">Dati Ordine</div>
-        <div class="card-body">
-          <form id="formOrdine">
-            <div class="row g-3">
-              <div class="col-md-8">
-                <label class="form-label">Fornitore</label>
-                <select class="form-select form-select-sm" name="fornitore_id" onchange="calcolaScadenza()"></select>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Stato</label>
-                <select class="form-select form-select-sm" name="stato">
-                  <option value="inviato">Inviato</option>
-                  <option value="confermato">Confermato</option>
-                  <option value="fatturato">Fatturato</option>
-                </select>
-              </div>
-              <div class="col-md-4"><label class="form-label">N. Ordine</label><input type="text" class="form-control form-control-sm" name="numero_ordine"></div>
-              <div class="col-md-4"><label class="form-label">Data Ordine</label><input type="date" class="form-control form-control-sm" name="data_ordine" onchange="calcolaScadenza()"></div>
-              <div class="col-md-4"><label class="form-label">Importo Merce €</label><input type="number" class="form-control form-control-sm" name="importo_merce" step="0.01"></div>
-              <div class="col-md-6"><label class="form-label">Cliente</label>
-                <select class="form-select form-select-sm" name="cliente_piva"></select>
-              </div>
-              <div class="col-md-6"><label class="form-label">Agente</label>
-                <select class="form-select form-select-sm" name="agente_id"></select>
-              </div>
-              <div class="col-12"><label class="form-label">Note</label><textarea class="form-control form-control-sm" name="note" rows="2"></textarea></div>
-            </div>
-            <button type="button" class="btn btn-primary btn-sm mt-3" onclick="salvaOrdine()">Salva</button>
-          </form>
-        </div>
+    <!-- Riepilogo -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg">
+        <div class="riep-card"><div class="riep-label"><i class="bi bi-building me-1"></i>Fornitore</div><div class="riep-value" id="rip-fornitore">—</div></div>
+      </div>
+      <div class="col-6 col-lg">
+        <div class="riep-card"><div class="riep-label"><i class="bi bi-person me-1"></i>Cliente</div><div class="riep-value" id="rip-cliente">—</div></div>
+      </div>
+      <div class="col-6 col-lg">
+        <div class="riep-card"><div class="riep-label"><i class="bi bi-people me-1"></i>Agente</div><div class="riep-value" id="rip-agente">—</div></div>
+      </div>
+      <div class="col-6 col-lg">
+        <div class="riep-card"><div class="riep-label"><i class="bi bi-cash me-1"></i>Importo merce</div><div class="riep-value" id="rip-importo">€ 0,00</div></div>
+      </div>
+      <div class="col-6 col-lg">
+        <div class="riep-card" id="rip-scadenza-card"><div class="riep-label"><i class="bi bi-clock me-1"></i>Scadenza conferma</div><div class="riep-value" id="rip-scadenza">—</div></div>
       </div>
     </div>
 
-    <!-- Colonna destra: Conferma + Fattura + Documenti -->
-    <div class="col-lg-6">
+    <!-- Tab per fase (§9): Pratica → Conferma → Fattura → Righe -->
+    <ul class="nav nav-tabs tabs-crm mb-4" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="nav-tab-pratica" data-bs-toggle="tab" data-bs-target="#tab-pratica" type="button" role="tab" aria-controls="tab-pratica" aria-selected="true">
+          <i class="bi bi-clipboard-check me-1"></i>Pratica
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="nav-tab-conferma" data-bs-toggle="tab" data-bs-target="#tab-conferma" type="button" role="tab" aria-controls="tab-conferma" aria-selected="false">
+          <i class="bi bi-check-circle me-1"></i>Conferma <span id="tab-ok-conferma"></span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="nav-tab-fattura" data-bs-toggle="tab" data-bs-target="#tab-fattura" type="button" role="tab" aria-controls="tab-fattura" aria-selected="false">
+          <i class="bi bi-receipt me-1"></i>Fattura <span id="tab-ok-fattura"></span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="nav-tab-righe" data-bs-toggle="tab" data-bs-target="#tab-righe" type="button" role="tab" aria-controls="tab-righe" aria-selected="false">
+          <i class="bi bi-list-ul me-1"></i>Righe <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1" id="tab-count-righe">0</span>
+        </button>
+      </li>
+    </ul>
 
-      <div class="card mb-4">
-        <div class="card-header bg-white fw-semibold"><i class="bi bi-check-circle me-2"></i>Conferma</div>
-        <div class="card-body">
-          <form id="formConferma">
-            <div class="row g-3">
-              <div class="col-md-4"><label class="form-label">Data Conferma</label><input type="date" class="form-control form-control-sm" name="conferma_data"></div>
-              <div class="col-md-4"><label class="form-label">N. Conferma</label><input type="text" class="form-control form-control-sm" name="conferma_numero"></div>
-              <div class="col-md-4"><label class="form-label">Scadenza Conferma</label><input type="date" class="form-control form-control-sm" name="conferma_scadenza"></div>
-            </div>
-            <div class="form-text small" id="hint-scadenza"></div>
-            <button type="button" class="btn btn-info btn-sm text-white mt-3" onclick="salvaConferma()">Salva Conferma</button>
-          </form>
-        </div>
-      </div>
-
-      <div class="card mb-4">
-        <div class="card-header bg-white fw-semibold"><i class="bi bi-receipt me-2"></i>Fattura</div>
-        <div class="card-body">
-          <form id="formFattura">
-            <div class="row g-3">
-              <div class="col-md-4"><label class="form-label">N. Fattura</label><input type="text" class="form-control form-control-sm" name="fattura_numero"></div>
-              <div class="col-md-4"><label class="form-label">Data Fattura</label><input type="date" class="form-control form-control-sm" name="fattura_data"></div>
-              <div class="col-md-4"><label class="form-label">Importo Fattura €</label><input type="number" class="form-control form-control-sm" name="fattura_importo" step="0.01"></div>
-            </div>
-            <button type="button" class="btn btn-success btn-sm mt-3" onclick="salvaFattura()">Salva Fattura</button>
-          </form>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>Documenti</div>
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-md-4"><label class="form-label small">Ordine Acquisto</label>
-              <span class="doc-chip w-100 justify-content-center"><i class="bi bi-file-earmark-pdf"></i>Non caricato</span></div>
-            <div class="col-md-4"><label class="form-label small">Conferma Ordine</label>
-              <span class="doc-chip w-100 justify-content-center"><i class="bi bi-file-earmark-pdf"></i>Non caricato</span></div>
-            <div class="col-md-4"><label class="form-label small">Fattura Fornitore</label>
-              <span class="doc-chip w-100 justify-content-center"><i class="bi bi-file-earmark-pdf"></i>Non caricato</span></div>
+    <div class="tab-content">
+      <!-- Tab: Pratica -->
+      <div class="tab-pane fade show active" id="tab-pratica" role="tabpanel" aria-labelledby="nav-tab-pratica">
+        <div class="card">
+          <div class="card-header bg-white fw-semibold"><i class="bi bi-clipboard-check me-2"></i>Dati pratica</div>
+          <div class="card-body">
+            <form id="formOrdine">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Fornitore</label>
+                  <select class="form-select form-select-sm" name="fornitore_id" onchange="calcolaScadenza()"></select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Stato</label>
+                  <select class="form-select form-select-sm" name="stato">
+                    <option value="inviato">Inviato</option>
+                    <option value="confermato">Confermato</option>
+                    <option value="fatturato">Fatturato</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">N. Ordine</label>
+                  <input type="text" class="form-control form-control-sm" name="numero_ordine" placeholder="OF/2026/041">
+                </div>
+                <div class="col-md-4"><label class="form-label">Data Ordine</label><input type="date" class="form-control form-control-sm" name="data_ordine" onchange="calcolaScadenza()"></div>
+                <div class="col-md-4"><label class="form-label">Importo Merce €</label><input type="number" class="form-control form-control-sm" name="importo_merce" step="0.01"></div>
+                <div class="col-md-4"><label class="form-label">Cliente</label>
+                  <select class="form-select form-select-sm" name="cliente_piva"></select>
+                </div>
+                <div class="col-md-6"><label class="form-label">Agente</label>
+                  <select class="form-select form-select-sm" name="agente_id"></select>
+                </div>
+                <div class="col-md-6"><label class="form-label">Subagente (da interscambio §7.6)</label>
+                  <input type="text" class="form-control form-control-sm" id="campo-subagente" readonly>
+                </div>
+                <div class="col-12"><label class="form-label">Note</label><textarea class="form-control form-control-sm" name="note" rows="2"></textarea></div>
+              </div>
+              <div class="d-flex align-items-center gap-3 mt-3">
+                <button type="button" class="btn btn-primary btn-sm" onclick="salvaOrdine()"><i class="bi bi-check-lg me-1"></i>Salva</button>
+                <span class="form-text small" id="info-subagente"></span>
+              </div>
+            </form>
           </div>
-          <div class="form-text small mt-2">In questa videata demo l'upload documentale non è attivo; nell'app gli allegati sono caricati/visualizzati qui.</div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>Documenti — Ordine</div>
+          <div class="card-body">
+            <div class="doc-chip" id="doc-ordine"></div>
+            <div class="form-text small mt-2">Allegato dell'ordine acquisito tramite importazione e validazione della Gestione Ordini (§6.1). Nell'app l'upload documentale è attivo qui.</div>
+          </div>
         </div>
       </div>
 
-    </div>
-  </div>
+      <!-- Tab: Conferma -->
+      <div class="tab-pane fade" id="tab-conferma" role="tabpanel" aria-labelledby="nav-tab-conferma">
+        <div class="card">
+          <div class="card-header bg-white fw-semibold"><i class="bi bi-check-circle me-2"></i>Dati conferma</div>
+          <div class="card-body">
+            <form id="formConferma">
+              <div class="row g-3">
+                <div class="col-md-4"><label class="form-label">Data Conferma</label><input type="date" class="form-control form-control-sm" name="conferma_data"></div>
+                <div class="col-md-4"><label class="form-label">N. Conferma</label><input type="text" class="form-control form-control-sm" name="conferma_numero" placeholder="C-2026/…"></div>
+                <div class="col-md-4"><label class="form-label">Scadenza Conferma</label><input type="date" class="form-control form-control-sm" name="conferma_scadenza"></div>
+              </div>
+              <div class="form-text small" id="hint-scadenza"></div>
+              <button type="button" class="btn btn-info btn-sm text-white mt-3" onclick="salvaConferma()"><i class="bi bi-check-lg me-1"></i>Salva Conferma</button>
+            </form>
+          </div>
+        </div>
 
-  <!-- Righe Ordine -->
-  <div class="card mt-4">
-    <div class="card-header bg-white fw-semibold d-flex justify-content-between">
-      <span><i class="bi bi-list-ul me-2"></i>Righe Ordine (<span id="n-righe">0</span>)</span>
-      <button class="btn btn-sm btn-outline-primary" onclick="apriModaleRiga()"><i class="bi bi-plus"></i> Aggiungi</button>
-    </div>
-    <div class="card-body p-0">
-      <table class="table table-hover mb-0" id="tableRighe">
-        <thead class="table-light">
-          <tr>
-            <th>#</th><th>Codice</th><th>Descrizione</th><th>UM</th>
-            <th class="text-end">Q.tà</th><th class="text-end">Prezzo Unit.</th><th class="text-end">Importo</th><th></th>
-          </tr>
-        </thead>
-        <tbody id="tbodyRighe"></tbody>
-      </table>
-    </div>
-  </div>
+        <div class="card mt-3">
+          <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>Documenti — Conferma</div>
+          <div class="card-body">
+            <div class="doc-chip" id="doc-conferma"></div>
+            <div class="form-text small mt-2">Allegato della conferma ordine acquisito tramite importazione e validazione della Gestione Ordini (§6.1). La compilazione porta la pratica da <strong>inviato</strong> a <strong>confermato</strong> (§9).</div>
+          </div>
+        </div>
+      </div>
 
+      <!-- Tab: Fattura -->
+      <div class="tab-pane fade" id="tab-fattura" role="tabpanel" aria-labelledby="nav-tab-fattura">
+        <div class="card">
+          <div class="card-header bg-white fw-semibold"><i class="bi bi-receipt me-2"></i>Dati fattura</div>
+          <div class="card-body">
+            <form id="formFattura">
+              <div class="row g-3">
+                <div class="col-md-4"><label class="form-label">N. Fattura</label><input type="text" class="form-control form-control-sm" name="fattura_numero" placeholder="F-2026/…"></div>
+                <div class="col-md-4"><label class="form-label">Data Fattura</label><input type="date" class="form-control form-control-sm" name="fattura_data"></div>
+                <div class="col-md-4"><label class="form-label">Importo Fattura €</label><input type="number" class="form-control form-control-sm" name="fattura_importo" step="0.01"></div>
+              </div>
+              <button type="button" class="btn btn-success btn-sm mt-3" onclick="salvaFattura()"><i class="bi bi-check-lg me-1"></i>Salva Fattura</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>Documenti — Fattura</div>
+          <div class="card-body">
+            <div class="doc-chip" id="doc-fattura"></div>
+            <div class="form-text small mt-2">Allegato della fattura fornitore acquisito tramite importazione e validazione della Gestione Ordini (§6.1). La compilazione porta la pratica a <strong>fatturato</strong>: da qui entra nel calcolo provvigioni e nel confronto bollettini (§9–§10).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Righe -->
+      <div class="tab-pane fade" id="tab-righe" role="tabpanel" aria-labelledby="nav-tab-righe">
+        <div class="card">
+          <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul me-2"></i>Righe Ordine (<span id="n-righe">0</span>)</span>
+            <button class="btn btn-sm btn-outline-primary" onclick="apriModaleRiga()"><i class="bi bi-plus"></i> Aggiungi</button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-hover mb-0" id="tableRighe">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th><th>Codice</th><th>Descrizione</th><th>UM</th>
+                  <th class="text-end">Q.tà</th><th class="text-end">Prezzo Unit.</th><th class="text-end">Importo</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="tbodyRighe"></tbody>
+              <tfoot class="table-light">
+                <tr>
+                  <td colspan="6" class="fw-semibold text-end">Totale merce</td>
+                  <td class="text-end fw-bold" id="tot-merce">€ 0,00</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <!-- Modal Nuova Riga -->
@@ -173,8 +249,15 @@ const idOrdine = parseInt(new URLSearchParams(location.search).get('id'), 10);
 let ordine = DATA.ordini.find(o => o.id === idOrdine);
 if (!ordine) {
   document.getElementById('box-errore').classList.remove('d-none');
-  document.querySelector('.row.g-4').classList.add('d-none');
+  document.getElementById('box-pratica').classList.add('d-none');
   document.getElementById('box-stepper').classList.add('d-none');
+}
+
+function subagentePerOrdine(o) {
+  const x = (DATA.interscambio || []).find(it => it.cliente_piva === o.cliente_piva && it.fornitore_id === o.fornitore_id && it.attivo !== false);
+  if (!x) return null;
+  const sub = (DATA.subagenti || []).find(s => s.id === x.subagente_id);
+  return sub ? { subagente: sub.nome + ' ' + sub.cognome, sconto: x.discount } : null;
 }
 
 function calcolaScadenza() {
@@ -197,6 +280,8 @@ function renderTitle() {
     '<i class="bi bi-truck me-2"></i>' + (ordine.numero_ordine || 'Ordine #' + ordine.id) +
     '<span class="badge badge-stato badge-' + ordine.stato + ' ms-2">' + ordine.stato + '</span>';
   document.getElementById('bc-ordine').textContent = ordine.numero_ordine || '#' + ordine.id;
+  document.getElementById('sottotitolo-ordine').textContent =
+    'Ordine ' + fmtData(ordine.data_ordine) + ' · ' + fornitoreNome(ordine.fornitore_id) + ' · ' + clienteNome(ordine.cliente_piva);
 }
 
 function renderStepper() {
@@ -211,7 +296,60 @@ function renderStepper() {
       (i < stati.length - 1 ? '<span class="step-arrow">\u2192</span>' : '');
   }).join('');
   el.innerHTML = '<div class="step-states">' + passo + '</div>' +
-    '<div class="form-text small mt-2">La pratica passa da <strong>inviato</strong> a <strong>confermato</strong> all\'arrivo della conferma ordine (§5.4) e a <strong>fatturato</strong> all\'emissione della fattura fornitore; solo le pratiche fatturate entrano in liquidazione e nel confronto bollettini.</div>';
+    '<div class="form-text small mt-2">La pratica passa da <strong>inviato</strong> a <strong>confermato</strong> all\'arrivo della conferma ordine (§5.4) e a <strong>fatturato</strong> all\'emissione della fattura fornitore; solo le pratiche fatturate entrano in liquidazione e nel confronto bollettini. Le fasi corrispondono ai tab sottostanti.</div>';
+}
+
+function renderRiepilogo() {
+  document.getElementById('rip-fornitore').textContent = fornitoreNome(ordine.fornitore_id);
+  document.getElementById('rip-cliente').textContent = clienteNome(ordine.cliente_piva);
+  const ag = (DATA.agenti || []).find(a => a.id === ordine.agente_id);
+  document.getElementById('rip-agente').textContent = ag ? ag.nome + ' ' + ag.cognome : '—';
+  document.getElementById('rip-importo').textContent = fmtEuro(ordine.importo_merce);
+
+  const scad = ordine.conferma_scadenza;
+  const card = document.getElementById('rip-scadenza-card');
+  const el = document.getElementById('rip-scadenza');
+  if (scad) {
+    const scaduta = ordine.stato === 'inviato' && scad < OGGI.toISOString().split('T')[0];
+    el.textContent = fmtData(scad) + (scaduta ? ' (scaduta)' : '');
+    card.classList.toggle('riep-danger', scaduta);
+    card.classList.toggle('riep-warn', !scaduta && ordine.stato === 'inviato');
+  } else {
+    el.textContent = '—';
+  }
+}
+
+function renderTabState() {
+  document.getElementById('tab-ok-conferma').innerHTML =
+    (ordine.conferma_numero || ordine.conferma_data) ? '<i class="bi bi-check-circle-fill text-success ms-1"></i>' : '';
+  document.getElementById('tab-ok-fattura').innerHTML =
+    (ordine.fattura_numero || ordine.fattura_data) ? '<i class="bi bi-check-circle-fill text-success ms-1"></i>' : '';
+  document.getElementById('tab-count-righe').textContent = (ordine.righe || []).length;
+}
+
+function renderDocChips() {
+  const chip = (field, fallback) => {
+    const f = ordine[field];
+    return f
+      ? '<span class="doc-chip"><i class="bi bi-file-earmark-pdf"></i>' + f + '</span>'
+      : '<span class="doc-chip"><i class="bi bi-paperclip"></i>' + fallback + '</span>';
+  };
+  document.getElementById('doc-ordine').innerHTML = chip('att_filename_ordine', 'Non caricato');
+  document.getElementById('doc-conferma').innerHTML = chip('att_filename_conferma', 'Non caricato');
+  document.getElementById('doc-fattura').innerHTML = chip('att_filename_fattura', 'Non caricato');
+}
+
+function renderSubagente() {
+  const legame = subagentePerOrdine(ordine);
+  const campo = document.getElementById('campo-subagente');
+  const info = document.getElementById('info-subagente');
+  if (legame) {
+    campo.value = legame.subagente + ' — sconto ' + legame.sconto + '%';
+    info.textContent = 'Derivato da interscambio (cliente × fornitore). Determina lo scaglione provvigioni (§5.1).';
+  } else {
+    campo.value = '';
+    info.textContent = 'Nessun legame in interscambio per questo cliente × fornitore: nessuna provvigione subagente (§7.6).';
+  }
 }
 
 function renderForm() {
@@ -236,9 +374,11 @@ function renderForm() {
 
 function renderRighe() {
   document.getElementById('n-righe').textContent = (ordine.righe || []).length;
+  document.getElementById('tab-count-righe').textContent = (ordine.righe || []).length;
   const tb = document.getElementById('tbodyRighe');
   if (!ordine.righe || !ordine.righe.length) {
-    tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Nessuna riga</td></tr>';
+    tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Nessuna riga. Aggiungi la prima riga dell\'ordine.</td></tr>';
+    document.getElementById('tot-merce').textContent = fmtEuro(0);
     return;
   }
   tb.innerHTML = ordine.righe.map((r, i) =>
@@ -251,6 +391,15 @@ function renderRighe() {
     '<td class="text-end">' + fmtEuro(r.prezzo_unitario) + '</td>' +
     '<td class="text-end fw-semibold">' + fmtEuro(r.importo) + '</td>' +
     '<td><button class="btn btn-sm btn-outline-danger" onclick="eliminaRiga(' + i + ')" title="Elimina"><i class="bi bi-trash"></i></button></td></tr>').join('');
+  const tot = (ordine.righe || []).reduce((s, r) => s + Number(r.importo || 0), 0);
+  document.getElementById('tot-merce').textContent = fmtEuro(tot);
+}
+
+function refresh() {
+  renderRiepilogo();
+  renderTabState();
+  renderDocChips();
+  renderSubagente();
 }
 
 function salvaOrdine() {
@@ -261,7 +410,9 @@ function salvaOrdine() {
   const nuovo = f.stato;
   delete f.stato;
   Object.assign(ordine, f);
-  if (ordine.stato !== nuovo) { ordine.stato = nuovo; renderStepper(); renderTitle(); renderForm(); }
+  if (ordine.stato !== nuovo) { ordine.stato = nuovo; renderStepper(); renderTitle(); }
+  renderForm();
+  refresh();
   showToast('Ordine salvato');
 }
 function salvaConferma() {
@@ -270,6 +421,7 @@ function salvaConferma() {
   // flusso §9: la compilazione della conferma porta la pratica da "inviato" a "confermato"
   if (ordine.stato === 'inviato' && (ordine.conferma_numero || ordine.conferma_data)) { ordine.stato = 'confermato'; renderStepper(); renderTitle(); }
   renderForm();
+  refresh();
   showToast('Conferma salvata');
 }
 function salvaFattura() {
@@ -280,6 +432,7 @@ function salvaFattura() {
     ordine.stato = 'fatturato'; renderStepper(); renderTitle();
   }
   renderForm();
+  refresh();
   showToast('Fattura salvata');
 }
 
@@ -297,6 +450,7 @@ function salvaRiga() {
   document.getElementById('formOrdine').elements.importo_merce.value = ordine.importo_merce;
   bootstrap.Modal.getInstance(document.getElementById('modalRiga')).hide();
   renderRighe();
+  renderRiepilogo();
   showToast('Riga aggiunta');
 }
 function eliminaRiga(i) {
@@ -305,6 +459,7 @@ function eliminaRiga(i) {
   ordine.importo_merce = ordine.righe.reduce((s, r) => s + Number(r.importo || 0), 0);
   document.getElementById('formOrdine').elements.importo_merce.value = ordine.importo_merce;
   renderRighe();
+  renderRiepilogo();
 }
 
 function esportaCSV() {
@@ -320,6 +475,7 @@ if (ordine) {
   renderStepper();
   renderForm();
   renderRighe();
+  refresh();
 }
 </script>
 </body>

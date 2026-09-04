@@ -17,7 +17,7 @@ Web app full-stack (**frontend Next.js + React + TypeScript**, **backend NestJS*
 - condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, `requireAuth`/`requireAdmin`);
 - integrare il **modulo ordini cliente** (ordini, upload, liste, clienti, utenti, errori) sulle rotte dell'applicazione.
 
-Riferimento tecnico: `specifica-crm-provvigioni.md` v1.2 (validata con il cliente, §1–§14).
+Riferimento tecnico: `specifica-crm-provvigioni.md` v1.4 (validata con il cliente, §1–§14).
 
 ## 2. Tariffe applicate (indicative, mercato Italia)
 
@@ -31,14 +31,12 @@ Riferimento tecnico: `specifica-crm-provvigioni.md` v1.2 (validata con il client
 
 | # | Attività | Ore | Tariffa | Importo |
 |---|---|---|---|---|
-| 1 | Analisi del flusso provvigioni (documento `ANALISI_CRM_PROVVIGIONI`, risposte Matteo Caironi) e redazione della **specifica v1.2 validata** con il cliente | 4 | € 80,00 | € 320,00 |
-| 2 | Prototipo HTML navigabile: launcher, login, dashboard, anagrafiche (fornitori con scaglioni, agenti/subagenti, interscambio), elenco/dettaglio pratiche, elenco/dettaglio bollettini, liquidazione | 8 | € 80,00 | € 640,00 |
-| 3 | Motore di calcolo provvigioni lato client (§10): scaglioni per sconto, eccezioni subagente, associazioni interscambio, nota di credito, confronto bollettini riconosciuto vs calcolato | 3 | € 80,00 | € 240,00 |
-| 4 | Export liquidazione a 8 campi (§11) e gestione trimestri | 1 | € 80,00 | € 80,00 |
-| 5 | Dati dimostrativi coerenti con il seed (§12): Gries 0/1/5/10/100 %, subagenti Bastasin/Nista, nota di credito e conferma ridotta (7/10) | 2 | € 80,00 | € 160,00 |
-| 6 | Stile applicato alla app esistente (Bootstrap 5.3, navbar scura, sfondo `#f5f6f8`, logo) + footer/versione | 1 | € 80,00 | € 80,00 |
-| 7 | Debug e rifiniture (footer fisso, launcher, compatibilità anteprima) | 1 | € 80,00 | € 80,00 |
-| **Subtotale già svolto** | | **20** | | **€ 1.600,00** |
+| 1 | Analisi del flusso provvigioni (documento `ANALISI_CRM_PROVVIGIONI`, risposte Matteo Caironi) e redazione della **specifica v1.4 validata** con il cliente | 4 | € 80,00 | € 320,00 |
+| 2 | Prototipo HTML navigabile: launcher, login, dashboard, anagrafiche (fornitori con scaglioni, agenti/subagenti, interscambio), elenco/dettaglio pratiche, elenco/dettaglio bollettini, liquidazione; riorganizzazione a tab (dashboard, dettaglio pratica, liquidazione), strip riepilogo e regola contenitori dati stabili (v1.4 §2-V9) | 8 | € 80,00 | € 640,00 |
+| 3 | Dati dimostrativi coerenti con il seed (§12): Gries 0/1/5/10/100 %, subagenti Bastasin/Nista, nota di credito e conferma ridotta (7/10) | 2 | € 80,00 | € 160,00 |
+| 4 | Stile applicato alla app esistente (Bootstrap 5.3, navbar scura, sfondo `#f5f6f8`, logo) + footer/versione | 1 | € 80,00 | € 80,00 |
+| 5 | Debug e rifiniture (footer fisso, launcher, compatibilità anteprima) | 1 | € 80,00 | € 80,00 |
+| **Subtotale già svolto** | | **16** | | **€ 1.280,00** |
 
 ## 4. Attività da svolgere (implementazione Next.js + NestJS + Prisma)
 
@@ -51,26 +49,30 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 | 3 | Schema Prisma delle **nuove tabelle CRM** (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe, bollettini + righe) + lettura delle tabelle esistenti condivise (ordini cliente, clienti, articoli, giacenze, log) | 6 | 16 | € 330,00 |
 | 4 | Motore provvigioni lato server: scaglioni, eccezioni, maturazione maturato/fatturato, congelamento percentuali alla verifica, nota di credito (§4.2, §5.3, §5.5, §5.11) | 5 | 14 | € 275,00 |
 | 5 | API REST NestJS: CRUD fornitori + scaglioni, interscambio (vincolo unico), pratiche + righe + cambio stato, **upload documenti PDF** (multer), bollettini + righe con calcolo differenze, liquidazione | 12 | 30 | € 660,00 |
-| 6 | Frontend Next.js viste CRM: login, dashboard (KPI + segnalazioni scadenze), anagrafiche, dettaglio pratica con **3 pannelli upload**, bollettini con divergenze, liquidazione + export a 8 campi | 12 | 30 | € 660,00 |
+| 6 | Frontend Next.js viste CRM: login, dashboard (KPI + tab segnalazioni/ordini), anagrafiche, dettaglio pratica con tab per fase e upload, bollettini con divergenze, liquidazione (tab riepilogo/dettaglio), contenitori dati stabili (§2-V9) | 12 | 30 | € 660,00 |
 | 7 | Integrazione **modulo ordini cliente** (API `/api/ordini*`, `/api/lookup/*`, `/api/clienti*`, `/api/utenti*`, `/api/errori*` montate) + viste ordini/upload/liste/clienti/utenti/errori coerenti | 6 | 15 | € 330,00 |
 | 8 | Test end-to-end, collaudo con dati seed (§12), rifiniture responsive e anteprima produzione | 5 | 13 | € 275,00 |
-| **Subtotale da svolgere** | | **55** | **142** | **€ 3.025,00** |
+| 9 | Motore di calcolo provvigioni lato client (§10): scaglioni per sconto, eccezioni subagente, associazioni interscambio, nota di credito, confronto bollettini riconosciuto vs calcolato | 3 | 8 | € 165,00 |
+| 10 | Export liquidazione a 8 campi (§11) e gestione trimestri | 1 | 3 | € 55,00 |
+| **Subtotale da svolgere** | | **59** | **153** | **€ 3.245,00** |
 
 ## 5. Riepilogo economico
 
 | Voce | Ore | Importo |
 |---|---|---|
-| Attività già svolte | 20 | € 1.600,00 |
-| Attività da svolgere | 55 | € 3.025,00 |
-| **Totale complessivo** | **75** | **€ 4.625,00** |
+| Attività già svolte | 16 | € 1.280,00 |
+| Attività da svolgere | 59 | € 3.245,00 |
+| **Totale complessivo** | **75** | **€ 4.525,00** |
 
-**Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **142 ore** (≈ 2,6× le ore assistite): 142 h × € 70,00 = **€ 9.940,00**, per un totale di **€ 11.540,00** (€ 1.600,00 già svolto + € 9.940,00 sviluppo).
+**Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **153 ore** (≈ 2,6× le ore assistite): 153 h × € 70,00 = **€ 10.710,00**, per un totale di **€ 11.990,00** (€ 1.280,00 già svolto + € 10.710,00 sviluppo).
 
-L'approccio assistito da AI consente un **risparmio di € 6.915,00** sul solo sviluppo (€ 9.940,00 → € 3.025,00, **−70%**).
+L'approccio assistito da AI consente un **risparmio di € 7.465,00** sul solo sviluppo (€ 10.710,00 → € 3.245,00, **−70%**).
 
 ## 6. Note
 
 - Le ore della sezione "già svolte" sono una **stima** del tempo impiegato in questa sessione (analisi, specifica, prototipo e iterazioni); da confermare.
+- Il **motore di calcolo provvigioni lato client** e l'**export a 8 campi / gestione trimestri** (già erroneamente elencati in §3) risultano **da svolgere**: sono stati spostati in §4 (punti 9–10) senza variazione delle ore complessive (75 h).
+- Il **ridisegno a tab** (dashboard, dettaglio pratica, liquidazione), la strip riepilogo della scheda ordine e la **regola dei contenitori dati stabili** (spec §2-V9) rientrano nelle attività già svolte (prototipazione) senza variazione delle ore stimate.
 - Il costo ridotto dello sviluppo riflette la **velocizzazione dell'AI**, non una riduzione di qualità o delle garanzie.
 - Tariffe indicative e personalizzabili; **IVA esclusa**.
 - Il progetto **condivide il database** con la Gestione Ordini: le tabelle esistenti vengono riusate **senza modifiche**; il CRM aggiunge solo le proprie tabelle (§4.2).

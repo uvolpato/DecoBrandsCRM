@@ -83,6 +83,28 @@ body.login { padding-bottom: 0; padding-top: 0; }
 .db-footer a:hover { text-decoration: underline; }
 .db-footer .db-footer-sep { margin: 0 .55rem; opacity: .6; }
 
+/* ---- Riepilogo pratica (dettaglio ordine) ---- */
+.riep-card { background:#fff; border:1px solid var(--db-border); border-left:4px solid var(--bs-primary); border-radius:.375rem; padding:.65rem .9rem; box-shadow:0 1px 3px rgba(0,0,0,.05); height:100%; }
+.riep-card .riep-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.4px; color:#6c757d; font-weight:600; }
+.riep-card .riep-value { font-weight:600; font-size:.95rem; margin-top:.1rem; word-break:break-word; }
+.riep-card.riep-warn { border-left-color:#ffc107; }
+.riep-card.riep-danger { border-left-color:#dc3545; }
+
+/* ---- Tab navigazione (dettaglio ordine) ---- */
+.tabs-crm .nav-link { color:#495057; font-weight:600; background:transparent; border:none; border-bottom:2px solid transparent; padding:.6rem 1rem; }
+.tabs-crm .nav-link.active { color:var(--bs-primary); border-bottom-color:var(--bs-primary); background:transparent; }
+.tabs-crm .nav-item { margin-bottom:0; }
+.tabs-crm .nav-item + .nav-item { margin-left:.25rem; }
+
+/* ---- Regola generale: contenitori dati stabili ----
+   Le tabelle e le liste alimentate da filtri non devono far "saltare" il layout
+   quando il numero di righe cambia: 'min-height' assorbe le righe vuote,
+   'max-height' + scroll interno limita la crescita. Applicare a ogni vista filtrata. */
+.table-box { min-height: 14rem; max-height: 32rem; overflow: auto; }
+.table-box .table { margin-bottom: 0; }
+.table-box .table thead th { position: sticky; top: 0; z-index: 1; background: #f8f9fa; }
+.box-stabile { min-height: 9rem; overflow-y: auto; }
+
 /* ---- Launcher ---- */
 .screen-card { border: 1px solid var(--db-border); border-left: 4px solid var(--bs-primary); border-radius: .5rem; background: #fff; padding: 1.1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); transition: transform .12s ease, box-shadow .12s ease; }
 .screen-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
