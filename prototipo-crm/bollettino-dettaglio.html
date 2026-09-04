@@ -20,7 +20,7 @@
   </nav>
 
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0" id="titolo-bollettino"></h4>
+    <h5 class="fw-bold mb-0" id="titolo-bollettino"></h5>
     <div class="btn-group">
       <a href="bollettini.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Indietro</a>
     </div>
@@ -101,7 +101,7 @@ if (!bollettino) document.getElementById('box-errore').classList.remove('d-none'
 
 function renderHeader() {
   document.getElementById('titolo-bollettino').innerHTML =
-    '<i class="bi bi-receipt me-2"></i>' + fornitoreNome(bollettino.fornitore_id) + ' \u2014 ' +
+    '<i class="bi bi-receipt me-2 text-primary"></i>' + fornitoreNome(bollettino.fornitore_id) + ' \u2014 ' +
     TRIMESTRI[bollettino.trimestre] + ' ' + bollettino.anno +
     '<span class="badge badge-stato badge-' + bollettino.stato + ' ms-2">' + bollettino.stato.replace('_', ' ') + '</span>';
   document.getElementById('bc-bollettino').textContent = fornitoreNome(bollettino.fornitore_id) + ' — ' + TRIMESTRI[bollettino.trimestre] + ' ' + bollettino.anno;

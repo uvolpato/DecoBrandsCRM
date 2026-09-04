@@ -158,18 +158,56 @@
   function navbar() {
     const slot = document.getElementById('topnav');
     if (!slot) return;
+    const active = slot.dataset.active || '';
+
+    const items = [
+      { href: 'dashboard.html', icon: 'bi-speedometer2', label: 'Dashboard' },
+      { href: 'ordini-fornitore.html', icon: 'bi-truck', label: 'Ordini Fornitore' },
+      { href: 'bollettini.html', icon: 'bi-receipt', label: 'Bollettini' },
+      { href: 'liquidazione.html', icon: 'bi-cash-stack', label: 'Liquidazione' }
+    ];
+    const anagrafiche = [
+      { href: 'fornitori.html', icon: 'bi-building', label: 'Fornitori' },
+      { href: 'agenti.html', icon: 'bi-people', label: 'Agenti' },
+      { href: 'interscambio.html', icon: 'bi-arrow-left-right', label: 'Interscambio' }
+    ];
+    const inAna = anagrafiche.some(a => a.href === active);
+
+    const voci = items.map(function (it) {
+      return '<li class="nav-item"><a class="nav-link' + (it.href === active ? ' active' : '') + '" href="' + it.href + '">' +
+        '<i class="bi ' + it.icon + ' me-1"></i>' + it.label + '</a></li>';
+    }).join('');
+
+    const vociAna = anagrafiche.map(function (it) {
+      return '<li><a class="dropdown-item' + (it.href === active ? ' active' : '') + '" href="' + it.href + '">' +
+        '<i class="bi ' + it.icon + ' me-2"></i>' + it.label + '</a></li>';
+    }).join('');
+
     slot.innerHTML =
-      '<nav class="navbar navbar-dark bg-dark px-3 py-2 d-flex justify-content-between align-items-center">' +
+      '<nav class="navbar navbar-dark bg-dark px-3 py-2 navbar-expand-lg">' +
       '<a class="navbar-brand d-flex align-items-center gap-2" href="index.html" title="Torna al launcher">' +
       '<img src="assets/img/logo-decobrands.png" alt="CRM" style="max-height:32px;max-width:120px;object-fit:contain;filter:brightness(0) invert(1)" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-block\'">' +
       '<i class="bi bi-box-seam" style="display:none"></i>' +
       'CRM</a>' +
-      '<span class="text-white-50 small d-flex align-items-center gap-2" style="font-size:.72rem">' +
-      'v' + VERSIONE_PROTOTIPO +
+      '<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Menu">' +
+      '<span class="navbar-toggler-icon"></span></button>' +
+      '<div class="collapse navbar-collapse" id="mainNav">' +
+      '<ul class="navbar-nav me-auto gap-lg-2">' +
+      voci +
+      '<li class="nav-item dropdown">' +
+      '<a class="nav-link dropdown-toggle' + (inAna ? ' active' : '') + '" href="#" data-bs-toggle="dropdown" role="button" aria-expanded="false">' +
+      '<i class="bi bi-gear me-1"></i>Anagrafiche</a>' +
+      '<ul class="dropdown-menu dropdown-menu-dark">' + vociAna + '</ul>' +
+      '</li>' +
+      '</ul>' +
+      '<span class="navbar-text text-white-50 small d-flex align-items-center gap-2" style="font-size:.72rem">' +
+      '<span class="d-flex align-items-center"><i class="bi bi-person-fill me-1"></i>admin</span>' +
       '<span class="d-inline-block opacity-50" style="border-left:1px solid rgba(255,255,255,.35);height:12px"></span>' +
-      '<a href="index.html" class="text-reset text-decoration-none" title="Torna al launcher">' +
+      'v' + VERSIONE_PROTOTIPO +
+      '<a href="index.html" class="btn btn-sm btn-outline-secondary text-white-50 border-secondary py-0 px-2" title="Torna al launcher">' +
       '<i class="bi bi-grid-fill me-1"></i>Launcher</a>' +
       '</span>' +
+      '</div>' +
       '</nav>';
   }
 

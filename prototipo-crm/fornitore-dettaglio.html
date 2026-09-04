@@ -20,7 +20,7 @@
   </nav>
 
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0" id="titolo-fornitore"></h4>
+    <h5 class="fw-bold mb-0" id="titolo-fornitore"></h5>
     <span class="badge badge-stato" id="badge-stato"></span>
   </div>
 
@@ -114,7 +114,7 @@ if (!fornitore) document.getElementById('box-errore').classList.remove('d-none')
 function scaglioni() { return DATA.scaglioni.filter(s => s.fornitore_id === fornitore.id).sort((a, b) => a.sconto_min - b.sconto_min); }
 
 function renderHeader() {
-  document.getElementById('titolo-fornitore').innerHTML = '<i class="bi bi-building me-2"></i>' + fornitore.ragione_sociale;
+  document.getElementById('titolo-fornitore').innerHTML = '<i class="bi bi-building me-2 text-primary"></i>' + fornitore.ragione_sociale;
   document.getElementById('bc-fornitore').textContent = fornitore.ragione_sociale;
   const b = document.getElementById('badge-stato');
   b.className = 'badge badge-stato ' + (fornitore.attivo ? 'badge-attivo' : 'badge-inattivo');

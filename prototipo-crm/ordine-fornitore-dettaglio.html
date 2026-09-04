@@ -21,7 +21,7 @@
 
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
     <div>
-      <h4 class="mb-0" id="titolo-ordine"></h4>
+      <h5 class="fw-bold mb-0" id="titolo-ordine"></h5>
       <p class="text-muted mb-0 nota-prototipo" id="sottotitolo-ordine"></p>
     </div>
     <div class="btn-group">
@@ -277,7 +277,7 @@ function calcolaScadenza() {
 
 function renderTitle() {
   document.getElementById('titolo-ordine').innerHTML =
-    '<i class="bi bi-truck me-2"></i>' + (ordine.numero_ordine || 'Ordine #' + ordine.id) +
+    '<i class="bi bi-truck me-2 text-primary"></i>' + (ordine.numero_ordine || 'Ordine #' + ordine.id) +
     '<span class="badge badge-stato badge-' + ordine.stato + ' ms-2">' + ordine.stato + '</span>';
   document.getElementById('bc-ordine').textContent = ordine.numero_ordine || '#' + ordine.id;
   document.getElementById('sottotitolo-ordine').textContent =
