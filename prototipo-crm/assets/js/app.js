@@ -164,7 +164,12 @@
       '<img src="assets/img/logo-decobrands.png" alt="CRM" style="max-height:32px;max-width:120px;object-fit:contain;filter:brightness(0) invert(1)" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-block\'">' +
       '<i class="bi bi-box-seam" style="display:none"></i>' +
       'CRM</a>' +
-      '<span class="text-white-50 small opacity-50" style="font-size:.72rem">v' + VERSIONE_PROTOTIPO + '</span>' +
+      '<span class="text-white-50 small d-flex align-items-center gap-2" style="font-size:.72rem">' +
+      'v' + VERSIONE_PROTOTIPO +
+      '<span class="d-inline-block opacity-50" style="border-left:1px solid rgba(255,255,255,.35);height:12px"></span>' +
+      '<a href="index.html" class="text-reset text-decoration-none" title="Torna al launcher">' +
+      '<i class="bi bi-grid-fill me-1"></i>Launcher</a>' +
+      '</span>' +
       '</nav>';
   }
 
