@@ -100,12 +100,15 @@ body.login { padding-bottom: 0; padding-top: 0; }
    Le tabelle e le liste alimentate da filtri non devono far "saltare" il layout
    quando il numero di righe cambia: 'min-height' assorbe le righe vuote,
    'max-height' + scroll interno limita la crescita. Applicare a ogni vista filtrata. */
+.table { --bs-table-bg: transparent; }
 .table-box { min-height: 14rem; max-height: 32rem; overflow: auto; }
 .table-box .table { margin-bottom: 0; }
-.table-box .table thead th { position: sticky; top: 0; z-index: 1; background: #f8f9fa; }
+.table-box .table thead th { position: sticky; top: 0; z-index: 1; background-color: var(--bs-table-bg); }
 .box-stabile { min-height: 9rem; overflow-y: auto; }
 .box-stabile .table { margin-bottom: 0; }
-.box-stabile .table thead th { position: sticky; top: 0; z-index: 1; background: #f8f9fa; }
+.box-stabile .table thead th { position: sticky; top: 0; z-index: 1; background-color: var(--bs-table-bg); }
+
+.table thead.table-dark th { color: #fff; font-weight: 600; }
 
 /* ---- Launcher ---- */
 .screen-card { border: 1px solid var(--db-border); border-left: 4px solid var(--bs-primary); border-radius: .5rem; background: #fff; padding: 1.1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); transition: transform .12s ease, box-shadow .12s ease; }
