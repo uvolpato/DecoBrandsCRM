@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Launcher - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+</head>
+<body>
+<div id="topnav" data-active=""></div>
+<div class="container-fluid px-3 px-md-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h4 class="mb-0"><i class="bi bi-grid-fill me-2"></i>Prototipo CRM — Schermate</h4>
+  </div>
+  <p class="text-muted mb-4 nota-prototipo">
+    Prototipo navigabile del sistema CRM: stesse view, stessi colori, layout e font.
+    Tutti i dati sono dimostrativi e coerenti con la specifica <code>specifica-crm-provvigioni.md</code>.<br>
+    Calcoli provvigioni e differenze bollettini ricalcolati lato client con il motore della sezione §10 della specifica.
+  </p>
+
+  <div class="row g-3">
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="dashboard.html" class="text-decoration-none text-body">
+        <div class="screen-card">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-speedometer2 big-ico"></i>
+            <div><div class="fw-bold">Dashboard</div><div class="nota-prototipo">KPI ordini, conferme scadute, bollettini da verificare</div></div>
+          </div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="ordini-fornitore.html" class="text-decoration-none text-body">
+        <div class="screen-card">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-truck big-ico"></i>
+            <div><div class="fw-bold">Ordini Fornitore</div><div class="nota-prototipo">Tracciatura ordine → conferma → fattura + dettaglio righe</div></div>
+          </div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="bollettini.html" class="text-decoration-none text-body">
+        <div class="screen-card">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-receipt big-ico"></i>
+            <div><div class="fw-bold">Bollettini</div><div class="nota-prototipo">Controllo riconosciuto vs calcolato, verifica/contestazione</div></div>
+          </div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="liquidazione.html" class="text-decoration-none text-body">
+        <div class="screen-card">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-cash-stack big-ico"></i>
+            <div><div class="fw-bold">Liquidazione Provvigioni</div><div class="nota-prototipo">Rendiconto trimestrale subagenti + export a 8 campi</div></div>
+          </div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="fornitori.html" class="text-decoration-none text-body">
+        <div class="screen-card">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-building big-ico"></i>
+            <div><div class="fw-bold">Fornitori</div><div class="nota-prototipo">Anagrafiche + scaglioni provvigioni (Gries, Gasper, Ing's)</div></div>
+          </div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="agenti.html" class="text-decoration-none text-body">
+        <div class="screen-card">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-people big-ico"></i>
+            <div><div class="fw-bold">Agenti &amp; Subagenti</div><div class="nota-prototipo">Agente unico Decobrands SRL + subagenti Bastasin, Nista, ...</div></div>
+          </div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="interscambio.html" class="text-decoration-none text-body">
+        <div class="screen-card">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-arrow-left-right big-ico"></i>
+            <div><div class="fw-bold">Interscambio</div><div class="nota-prototipo">Associazioni subagente × cliente × fornitore con sconto</div></div>
+          </div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="specifica.html" class="text-decoration-none text-body">
+        <div class="screen-card">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-file-earmark-text big-ico"></i>
+            <div><div class="fw-bold">Specifica</div><div class="nota-prototipo">Visualizzazione completa della specifica con indice (§1–§14)</div></div>
+          </div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <div class="alert alert-light border mt-4 mb-0 nota-prototipo">
+    <i class="bi bi-lightbulb me-1"></i>
+    <strong>Percorso consigliato:</strong> Dashboard → Ordini Fornitore → dettaglio ordine (passaggi di stato) →
+    Bollettini → dettaglio bollettino (differenze) → Liquidazione (rendiconto + CSV).
+    Login di facciata: <code>login.html</code>.
+  </div>
+
+</div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

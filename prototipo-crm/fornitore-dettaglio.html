@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dettaglio Fornitore - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+</head>
+<body>
+<div id="topnav" data-active="fornitori.html"></div>
+<div class="container-fluid px-3 px-md-4 py-4">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="fornitori.html">Fornitori</a></li>
+      <li class="breadcrumb-item active" id="bc-fornitore">#</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0" id="titolo-fornitore"></h4>
+    <span class="badge badge-stato" id="badge-stato"></span>
+  </div>
+
+  <div id="box-errore" class="alert alert-danger d-none">Fornitore non trovato.</div>
+
+  <div class="row g-4">
+
+    <!-- Anagrafica -->
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-header bg-white fw-semibold">Anagrafica</div>
+        <div class="card-body">
+          <form id="formAnagrafica">
+            <div class="row g-3">
+              <div class="col-md-8"><label class="form-label">Ragione Sociale</label><input type="text" class="form-control" name="ragione_sociale"></div>
+              <div class="col-md-4"><label class="form-label">P.IVA</label><input type="text" class="form-control" name="piva"></div>
+              <div class="col-md-6"><label class="form-label">Giorni attesa conferma</label><input type="number" class="form-control" name="giorni_attesa_conferma"></div>
+              <div class="col-md-6">
+                <label class="form-label">Pagamento provvigioni</label>
+                <select class="form-select" name="payment_type">
+                  <option value="matured">Maturato (su incassi clienti)</option>
+                  <option value="invoiced">Fatturato (sul fatturato)</option>
+                </select>
+              </div>
+              <div class="col-12"><label class="form-label">Stato</label>
+                <select class="form-select" name="attivo">
+                  <option value="true">Attivo</option>
+                  <option value="false">Inattivo</option>
+                </select>
+              </div>
+              <div class="col-12"><label class="form-label">Note</label><textarea class="form-control" name="note" rows="2"></textarea></div>
+            </div>
+            <div class="mt-3"><button type="button" class="btn btn-primary" onclick="salvaAnagrafica()">Salva</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scaglioni provvigioni -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+          <span>Scaglioni Provvigioni</span>
+          <button class="btn btn-sm btn-outline-primary" onclick="apriModaleScaglione()"><i class="bi bi-plus"></i> Aggiungi</button>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr><th>Sconto Min</th><th>Sconto Max</th><th class="text-center">% Agente</th><th class="text-center">% Subagente</th><th class="text-end"></th></tr>
+            </thead>
+            <tbody id="tbodyScaglioni"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="form-text mt-2 small">Gli scaglioni sono bucket discreti di sconto (§4.4, §5.11): lo sconto negoziato
+        per l'associazione cliente-fornitore (interscambio) seleziona la % agente / % subagente corrispondente.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal Scaglione -->
+<div class="modal fade" id="modalScaglione" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Nuovo Scaglione</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <form id="formScaglione">
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label">Sconto Min %</label><input type="number" class="form-control" name="sconto_min" step="0.1" required></div>
+          <div class="col-6"><label class="form-label">Sconto Max %</label><input type="number" class="form-control" name="sconto_max" step="0.1" required></div>
+          <div class="col-6"><label class="form-label">% Agente</label><input type="number" class="form-control" name="pct_agente" step="0.01" required></div>
+          <div class="col-6"><label class="form-label">% Subagente</label><input type="number" class="form-control" name="pct_subagente" step="0.01" required></div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+      <button class="btn btn-primary" onclick="salvaScaglione()">Salva</button>
+    </div>
+  </div></div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const idFornitore = parseInt(new URLSearchParams(location.search).get('id'), 10);
+let fornitore = DATA.fornitori.find(f => f.id === idFornitore);
+if (!fornitore) document.getElementById('box-errore').classList.remove('d-none');
+
+function scaglioni() { return DATA.scaglioni.filter(s => s.fornitore_id === fornitore.id).sort((a, b) => a.sconto_min - b.sconto_min); }
+
+function renderHeader() {
+  document.getElementById('titolo-fornitore').innerHTML = '<i class="bi bi-building me-2"></i>' + fornitore.ragione_sociale;
+  document.getElementById('bc-fornitore').textContent = fornitore.ragione_sociale;
+  const b = document.getElementById('badge-stato');
+  b.className = 'badge badge-stato ' + (fornitore.attivo ? 'badge-attivo' : 'badge-inattivo');
+  b.textContent = fornitore.attivo ? 'Attivo' : 'Inattivo';
+}
+function renderForm() {
+  const f = document.getElementById('formAnagrafica');
+  f.elements.ragione_sociale.value = fornitore.ragione_sociale;
+  f.elements.piva.value = fornitore.piva || '';
+  f.elements.giorni_attesa_conferma.value = fornitore.giorni_attesa_conferma || 30;
+  f.elements.payment_type.value = fornitore.payment_type || 'matured';
+  f.elements.attivo.value = fornitore.attivo ? 'true' : 'false';
+  f.elements.note.value = fornitore.note || '';
+}
+function renderScaglioni() {
+  const list = scaglioni();
+  const tb = document.getElementById('tbodyScaglioni');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nessuno scaglione definito</td></tr>'; return; }
+  tb.innerHTML = list.map(s =>
+    '<tr>' +
+    '<td>&ge; ' + fmtNum(s.sconto_min, 1) + '%</td>' +
+    '<td>&le; ' + fmtNum(s.sconto_max, 1) + '%</td>' +
+    '<td class="text-center">' + fmtNum(s.pct_agente, 2) + '%</td>' +
+    '<td class="text-center">' + fmtNum(s.pct_subagente, 2) + '%</td>' +
+    '<td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="eliminaScaglione(' + s.id + ')" title="Elimina"><i class="bi bi-trash"></i></button></td></tr>').join('');
+}
+
+function apriModaleScaglione() { document.getElementById('formScaglione').reset(); new bootstrap.Modal(document.getElementById('modalScaglione')).show(); }
+function salvaScaglione() {
+  const f = Object.fromEntries(new FormData(document.getElementById('formScaglione')));
+  if (f.sconto_min === '' || f.sconto_max === '' || f.pct_agente === '' || f.pct_subagente === '') return showToast('Compila tutti i campi', false);
+  DATA.scaglioni.push({
+    id: Math.max.apply(null, DATA.scaglioni.map(s => s.id)) + 1,
+    fornitore_id: fornitore.id,
+    sconto_min: parseFloat(f.sconto_min), sconto_max: parseFloat(f.sconto_max),
+    pct_agente: parseFloat(f.pct_agente), pct_subagente: parseFloat(f.pct_subagente),
+    ordinamento: scaglioni().length + 1
+  });
+  bootstrap.Modal.getInstance(document.getElementById('modalScaglione')).hide();
+  renderScaglioni();
+  showToast('Scaglione aggiunto');
+}
+function eliminaScaglione(id) {
+  if (!conferma('Eliminare questo scaglione?')) return;
+  const i = DATA.scaglioni.findIndex(s => s.id === id);
+  if (i >= 0) DATA.scaglioni.splice(i, 1);
+  renderScaglioni();
+}
+function salvaAnagrafica() {
+  const f = Object.fromEntries(new FormData(document.getElementById('formAnagrafica')));
+  f.attivo = f.attivo === 'true';
+  Object.assign(fornitore, f);
+  renderHeader();
+  showToast('Salvato');
+}
+
+if (fornitore) { renderHeader(); renderForm(); renderScaglioni(); }
+</script>
+</body>
+</html>

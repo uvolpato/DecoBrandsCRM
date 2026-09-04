@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Specifica - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+  <style>
+    .spec-body { font-size: .92rem; line-height: 1.6; }
+    .spec-body h2 { font-size: 1.45rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 2px solid var(--db-border); }
+    .spec-body h3 { font-size: 1.12rem; margin-top: 1.75rem; }
+    .spec-body h4 { font-size: 1rem; margin-top: 1.4rem; }
+    .spec-body section { scroll-margin-top: 1rem; }
+    #indice { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+    #indice .nav-link { padding: .2rem .6rem; font-size: .8rem; color: #495057; }
+    #indice .nav-link.active { color: var(--bs-primary); font-weight: 600; }
+    #indice .nav-item-titolo { font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; color: #6c757d; padding: .4rem .6rem .2rem; }
+    pre.spec-code { background: #f6f8fa; border: 1px solid var(--db-border); border-radius: .375rem; padding: 1rem; font-size: .8rem; overflow-x: auto; }
+    .table-wrap { overflow-x: auto; }
+    .table td, .table th { font-size: .85rem; }
+  </style>
+</head>
+<body>
+<div id="topnav" data-active=""></div>
+<div class="container-fluid px-3 px-md-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Specifica — CRM Provvigioni</h4>
+    <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
+  </div>
+  <div class="alert alert-light border nota-prototipo mb-4 py-2">
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.2, validata con il cliente.
+  </div>
+
+  <div class="row g-4">
+    <!-- Indice -->
+    <div class="col-lg-3">
+      <nav id="indice" class="card card-body p-2 bg-white">
+        <div class="nav-item-titolo">Indice</div>
+        <ul class="nav flex-column">
+          <li class="nav-item"><a class="nav-link" href="#sec-1">1. Contesto e obiettivi</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-2">2. Vincoli e requisiti</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="#sec-3">3. Architettura</a>
+            <ul class="nav flex-column ps-3">
+              <li class="nav-item"><a class="nav-link" href="#sec-3-1">3.1 Struttura</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-3-2">3.2 Avvio</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-3-3">3.3 Autenticazione</a></li>
+            </ul>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#sec-4">4. Modello dati</a>
+            <ul class="nav flex-column ps-3">
+              <li class="nav-item"><a class="nav-link" href="#sec-4-1">4.1 Tabelle esistenti riusate (DB condiviso)</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-4-2">4.2 Nuove tabelle CRM</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-4-3">4.3 Diagramma relazionale</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-4-4">4.4 Note di schema</a></li>
+            </ul>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#sec-5">5. Regole di business</a>
+            <ul class="nav flex-column ps-3">
+              <li class="nav-item"><a class="nav-link" href="#sec-5-1">5.1 Scaglioni</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-2">5.2 Eccezioni subagente</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-3">5.3 Zero, trattino, NC</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-4">5.4 Agente unico</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-5">5.5 Maturato vs fatturato</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-6">5.6 Cadenze</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-7">5.7 Riferimento cliente→fornitore</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-8">5.8 Conferma che cambia</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-9">5.9 Fatture multi-ordine</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-10">5.10 Un subagente per fornitore</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-11">5.11 % nel tempo</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-12">5.12 Alert in-app</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-5-13">5.13 Modifica manuale</a></li>
+            </ul>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#sec-6">6. Flussi funzionali</a>
+            <ul class="nav flex-column ps-3">
+              <li class="nav-item"><a class="nav-link" href="#sec-6-1">6.1 Ordine→conferma→fattura</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-6-2">6.2 Controllo bollettini</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-6-3">6.3 Liquidazione subagenti</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-6-4">6.4 Anagrafiche</a></li>
+            </ul>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#sec-7">7. Schermate</a>
+            <ul class="nav flex-column ps-3">
+              <li class="nav-item"><a class="nav-link" href="#sec-7-1">7.1 Dashboard</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-2">7.2 Elenco ordini</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-3">7.3 Dettaglio pratica</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-4">7.4 Fornitori</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-5">7.5 Agenti/subagenti</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-6">7.6 Interscambio</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-7">7.7 Bollettini</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-8">7.8 Liquidazione</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-9">7.9 Modulo ordini cliente</a></li>
+            </ul>
+          </li>
+          <li class="nav-item"><a class="nav-link" href="#sec-8">8. API endpoint</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-9">9. Stati della pratica</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-10">10. Calcolo provvigioni</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-11">11. Export liquidazione</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-12">12. Dati di esempio (seed)</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-13">13. Casi limite / backlog</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-14">14. Deliverable di riferimento</a></li>
+        </ul>
+      </nav>
+    </div>
+
+    <!-- Contenuto -->
+    <div class="col-lg-9">
+      <div id="contenuto" class="card card-body bg-white spec-body">
+
+        <section id="sec-intro">
+          <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni</h2>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.2 — <strong>Stato:</strong> validata con il cliente</p>
+          <p class="small text-muted mb-3">Fonte: <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
+        </section>
+
+        <section id="sec-1">
+          <h2>1. Contesto e obiettivi</h2>
+          <p>L'applicazione porta dentro al sistema di Decobrands tre processi oggi seguiti al di fuori di esso (Excel manuali):</p>
+          <ol>
+            <li><strong>Tracciamento automatico</strong> del percorso <em>ordine → conferma d'ordine → fattura</em> per gli ordini che Decobrands emette verso i propri fornitori.</li>
+            <li><strong>Controllo dei bollettini</strong> delle provvigioni riconosciute dai fornitori, verificando che gli importi siano corretti.</li>
+            <li><strong>Liquidazione dei subagenti</strong> ogni trimestre, con dati certi e calcolati al volo.</li>
+          </ol>
+          <p>Le tre funzioni vivono nella <strong>stessa applicazione</strong>: sono lo stesso dato — un ordine di Decobrands — osservato da tre angolazioni (pratica, bollettino, liquidazione).</p>
+          <p>Il flusso delle provvigioni va in <strong>due direzioni</strong> con percentuali indipendenti:</p>
+<pre class="spec-code"><code>FORNITORE  ──provvigione agente──►  DECOBRANDS  ──provvigione subagente──►  SUBAGENTE
+           (obiettivo 2: da controllare)         (obiettivo 3: da liquidare)</code></pre>
+          <p>L'applicazione <strong>condivide il database</strong> con la gestione degli ordini di Decobrands: stesso PostgreSQL, le stesse tabelle esistenti vengono <strong>riusate senza modificarle</strong> e il CRM aggiunge le proprie tabelle (§4). Ordini, clienti, articoli e utenti sono quindi gli stessi dati già visti dalla gestione ordini.</p>
+        </section>
+
+        <section id="sec-2">
+          <h2>2. Vincoli e requisiti generali</h2>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th style="width:70px">#</th><th style="width:180px">Vincolo</th><th>Valore</th></tr></thead>
+              <tbody>
+                <tr><td>V1</td><td>Unica applicazione</td><td>Tutte le funzioni in un'unica applicazione web</td></tr>
+                <tr><td>V2</td><td>Database condiviso</td><td>Stesso PostgreSQL (<code>decobrands</code>) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM</td></tr>
+                <tr><td>V3</td><td>Autenticazione</td><td>Tabella <code>users</code> con ruoli; utente di default <code>admin</code> (ruolo <code>admin</code>)</td></tr>
+                <tr><td>V4</td><td>Stile grafico</td><td>Bootstrap 5.3, navbar scura, sfondo <code>#f5f6f8</code>, logo Decobrands</td></tr>
+                <tr><td>V5</td><td>Lingua</td><td>Tutte le interfacce in italiano</td></tr>
+                <tr><td>V6</td><td>Responsive</td><td>Desktop + tablet + mobile</td></tr>
+                <tr><td>V7</td><td>Stack</td><td>Frontend Next.js (App Router) + React + TypeScript, backend NestJS, ORM Prisma, PostgreSQL condiviso (V2). Deploy senza Docker: frontend e backend girano come servizi/processi Node separati</td></tr>
+                <tr><td>V8</td><td>Fidelità</td><td>Alta fedeltà — dati reali, interazioni reali</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="sec-3">
+          <h2>3. Architettura dell'applicazione</h2>
+
+          <section id="sec-3-1">
+            <h3>3.1 Struttura</h3>
+            <p>L'applicazione è organizzata in viste che corrispondono alle schermate della sezione §7:</p>
+<pre class="spec-code"><code>index.html              # launcher schermate (dashboard, ordini, bollettini, liquidazione, anagrafiche)
+login.html              # accesso (facciata)
+dashboard.html          # schermata riepilogo
+ordini-fornitore.html   # pratiche ordine a fornitore
+ordine-fornitore-dettaglio.html  # dettaglio ordine: conferma/fattura/righe/documenti
+fornitori.html          # anagrafica fornitori + scaglioni
+fornitore-dettaglio.html
+agenti.html             # anagrafica agenti e subagenti
+interscambio.html       # tabella subagente × cliente × fornitore
+bollettini.html         # controllo bollettini
+bollettino-dettaglio.html
+liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></pre>
+            <p>Componenti condivise:</p>
+            <ul>
+              <li>foglio di stile comune (Bootstrap 5.3, sfondo <code>#f5f6f8</code>, navbar scura, logo);</li>
+              <li>dati dimostrativi (interamente lato client);</li>
+              <li>motore di calcolo provvigioni/bollettini (§10).</li>
+            </ul>
+          </section>
+
+          <section id="sec-3-2">
+            <h3>3.2 Avvio</h3>
+            <p>L'architettura di esercizio (frontend Next.js + backend NestJS/Prisma, PostgreSQL, autenticazione, upload documenti, notifiche real-time) è descritta in §3.3 e §8 con lo stack di §V7; riprende le stesse funzioni del collaudo e mantiene il foglio di stile comune (§V4: Bootstrap 5.3, navbar scura, logo), con il layout invariato.</p>
+            <p class="mb-0">L'implementazione di collaudo resta <strong>consultabile senza server</strong>: si apre <code>index.html</code> direttamente nel browser; nessun <code>npm install</code>, nessuna porta; Bootstrap e icone arrivano da CDN. I calcoli provvigioni e le differenze bollettini sono eseguiti <strong>lato client</strong> dal motore della sezione §10 su dati dimostrativi.</p>
+          </section>
+
+          <section id="sec-3-3">
+            <h3>3.3 Autenticazione e autorizzazione</h3>
+            <ul>
+              <li>Tabella <code>users</code> <strong>condivisa con la Gestione Ordini</strong> (stessi ruoli e flusso password/reset "resta connesso"); utente di default <code>admin</code> (ruolo <code>admin</code>).</li>
+              <li>Sessioni server-side in PostgreSQL (sessione condivisa persistita nel DB), password con hash (argon2); supporto a cambio password, reset via token, remember cookie.</li>
+              <li><code>requireAuth</code>: tutte le viste tranne login/reset.</li>
+              <li><code>requireAdmin</code>: viste sensibili (clienti, utenti).</li>
+            </ul>
+          </section>
+        </section>
+
+        <section id="sec-4">
+          <h2>4. Modello dati</h2>
+
+          <section id="sec-4-1">
+            <h3>4.1 Tabelle esistenti riusate (database condiviso)</h3>
+            <p class="small text-muted">Il CRM <strong>condivide il database</strong> con la gestione degli ordini: stesso schema PostgreSQL, nessuna tabella esistente viene modificata. Le tabelle sotto sono quelle già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Tabella</th><th>Uso nel CRM</th></tr></thead>
+                <tbody>
+                  <tr><td><code>users</code></td><td>autenticazione e ruoli (condivisa con la Gestione Ordini)</td></tr>
+                  <tr><td><code>remember_tokens</code></td><td>sessione persistente</td></tr>
+                  <tr><td><code>clienti</code></td><td>anagrafica cliente (P.IVA univoca, ragione sociale, codice Integra)</td></tr>
+                  <tr><td><code>articoli</code></td><td>catalogo (codice, descrizione, EAN, UM)</td></tr>
+                  <tr><td><code>giacenze</code></td><td>giacenza per codice (<code>qta_disponibile</code>)</td></tr>
+                  <tr><td><code>codici_alias</code></td><td>cambi codice articolo con conferma</td></tr>
+                  <tr><td><code>kit_testata</code> / <code>kit_dettaglio</code></td><td>kit di articoli</td></tr>
+                  <tr><td><code>ordini_cliente_testata</code> / <code>ordini_cliente_articoli</code></td><td>ordini dei clienti (<code>fornitore</code> è testo libero → si mappa ai fornitori CRM)</td></tr>
+                  <tr><td><code>ordini_upload_queue</code></td><td>coda di elaborazione degli upload documenti</td></tr>
+                  <tr><td><code>audit_log</code></td><td>log di tutte le scritture</td></tr>
+                  <tr><td><code>movimenti_giacenza</code></td><td>movimenti stock</td></tr>
+                  <tr><td><code>processing_errors</code></td><td>errori di elaborazione documenti</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <blockquote class="blockquote-footer mt-2 mb-0">In <code>ordini_cliente_testata</code> il fornitore è una stringa libera; il CRM aggiunge l'anagrafica <code>fornitori</code> (§4.2.1) e collega le pratiche fornitore alla stessa <code>cliente_piva</code> usata negli ordini clienti.</blockquote>
+          </section>
+
+          <section id="sec-4-2">
+            <h3>4.2 Nuove tabelle CRM</h3>
+
+            <h4>4.2.1 <code>fornitori</code></h4>
+            <p class="small text-muted">Anagrafica dei fornitori, con i giorni di attesa conferma e la modalità di pagamento delle provvigioni.</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>ragione_sociale</code></td><td>VARCHAR(255) NOT NULL</td><td></td></tr>
+                  <tr><td><code>piva</code></td><td>VARCHAR(20)</td><td>univoco se valorizzato</td></tr>
+                  <tr><td><code>giorni_attesa_conferma</code></td><td>INT DEFAULT 30</td><td>usato per le scadenze</td></tr>
+                  <tr><td><code>payment_type</code></td><td>VARCHAR(20) DEFAULT <code>'invoiced'</code></td><td><code>matured</code> | <code>invoiced</code> — maturazione provvigioni (<strong>§5.5</strong>)</td></tr>
+                  <tr><td><code>discount</code></td><td>NUMERIC(5,2) DEFAULT 0</td><td>sconto di default del fornitore (ridondante, vedi §4.4)</td></tr>
+                  <tr><td><code>note</code></td><td>TEXT</td><td></td></tr>
+                  <tr><td><code>attivo</code></td><td>BOOLEAN DEFAULT true</td><td></td></tr>
+                  <tr><td><code>created_at</code> / <code>updated_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>4.2.2 <code>provvigioni_scaglioni</code></h4>
+            <p class="small text-muted">Tabella a scaglioni per fornitore: <strong>più sconto si accorda al cliente, meno provvigione si incassa / si paga</strong>.</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>fornitore_id</code></td><td>BIGINT FK → <code>fornitori</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>sconto_min</code></td><td>NUMERIC(5,2) DEFAULT 0</td><td></td></tr>
+                  <tr><td><code>sconto_max</code></td><td>NUMERIC(5,2) DEFAULT 100</td><td></td></tr>
+                  <tr><td><code>pct_agente</code></td><td>NUMERIC(5,2) DEFAULT 0</td><td>% che incassa Decobrands dal fornitore</td></tr>
+                  <tr><td><code>pct_subagente</code></td><td>NUMERIC(5,2) DEFAULT 0</td><td>% che Decobrands paga al subagente</td></tr>
+                  <tr><td><code>ordinamento</code></td><td>INT DEFAULT 0</td><td></td></tr>
+                  <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small mt-2 mb-0 text-muted">Esempio reale (fornitore Gries):</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Sconto</th><th>pct_agente</th><th>pct_subagente</th></tr></thead>
+                <tbody>
+                  <tr><td>0 %</td><td>18</td><td>10</td></tr>
+                  <tr><td>1 %</td><td>18</td><td>0</td></tr>
+                  <tr><td>5 %</td><td>13</td><td>7</td></tr>
+                  <tr><td>10 %</td><td>5</td><td>2</td></tr>
+                  <tr><td>100 %</td><td>0</td><td>0</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>4.2.3 <code>provvigioni_eccezioni</code></h4>
+            <p class="small text-muted">Eccezioni per singolo subagente su uno scaglione (rare, gestite a mano). Se presente, il valore vince sulla percentuale standard dello scaglione.</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>scaglione_id</code></td><td>BIGINT FK → <code>provvigioni_scaglioni</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>subagente_id</code></td><td>BIGINT FK → <code>subagenti</code></td><td></td></tr>
+                  <tr><td><code>pct_override</code></td><td>NUMERIC(5,2) NOT NULL</td><td></td></tr>
+                  <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <blockquote class="blockquote-footer mt-2 fs-6">Nota: modello dati presente; la gestione UI delle eccezioni è in backlog (§13).</blockquote>
+
+            <h4>4.2.4 <code>agenti</code></h4>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>codice</code></td><td>VARCHAR(50) UNIQUE NOT NULL</td><td></td></tr>
+                  <tr><td><code>nome</code> / <code>cognome</code></td><td>VARCHAR(100) NOT NULL</td><td></td></tr>
+                  <tr><td><code>email</code> / <code>telefono</code></td><td>VARCHAR</td><td></td></tr>
+                  <tr><td><code>attivo</code></td><td>BOOLEAN DEFAULT true</td><td></td></tr>
+                  <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <blockquote class="blockquote-footer mt-2 fs-6">L'agente operativo è <strong>uno solo: Decobrands SRL</strong>. Gli altri (Schwarzmeier, Monzani) restano come valore storico (§5.4).</blockquote>
+
+            <h4>4.2.5 <code>subagenti</code></h4>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>agente_id</code></td><td>BIGINT FK → <code>agenti</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>codice</code></td><td>VARCHAR(50) UNIQUE NOT NULL</td><td></td></tr>
+                  <tr><td><code>nome</code> / <code>cognome</code></td><td>VARCHAR(100) NOT NULL</td><td></td></tr>
+                  <tr><td><code>email</code></td><td>VARCHAR(255)</td><td></td></tr>
+                  <tr><td><code>attivo</code></td><td>BOOLEAN DEFAULT true</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>4.2.6 <code>interscambio</code></h4>
+            <p class="small text-muted">Collega <strong>subagente × cliente × fornitore</strong>: definisce quale subagente segue un cliente presso un fornitore e con quale sconto.</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>subagente_id</code></td><td>BIGINT FK → <code>subagenti</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>cliente_piva</code></td><td>VARCHAR(20) NOT NULL</td><td></td></tr>
+                  <tr><td><code>fornitore_id</code></td><td>BIGINT FK → <code>fornitori</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>discount</code></td><td>NUMERIC(5,2) DEFAULT 0</td><td><strong>sconto accordato al cliente su quel fornitore</strong> — determina lo scaglione (<strong>§4.4</strong>)</td></tr>
+                  <tr><td><code>attivo</code></td><td>BOOLEAN DEFAULT true</td><td></td></tr>
+                  <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small mt-2 mb-0"><strong>Vincolo</strong> <code>UNIQUE(subagente_id, cliente_piva, fornitore_id)</code> — un solo subagente per cliente×fornitore (<strong>§5.10</strong>).</p>
+
+            <h4>4.2.7 <code>ordini_fornitore_testata</code></h4>
+            <p class="small text-muted">La <strong>pratica</strong> dell'ordine a fornitore. Si completa man mano che arrivano i documenti e attraversa gli stati <code>inviato → confermato → fatturato</code>.</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>fornitore_id</code></td><td>BIGINT FK → <code>fornitori</code></td><td></td></tr>
+                  <tr><td><code>numero_ordine</code></td><td>VARCHAR(50)</td><td>numero ordine del fornitore</td></tr>
+                  <tr><td><code>data_ordine</code></td><td>DATE</td><td></td></tr>
+                  <tr><td><code>cliente_piva</code></td><td>VARCHAR(20)</td><td>cliente finale</td></tr>
+                  <tr><td><code>cliente_ragione_sociale</code></td><td>VARCHAR(255)</td><td></td></tr>
+                  <tr><td><code>agente_id</code></td><td>BIGINT FK → <code>agenti</code></td><td>nullable</td></tr>
+                  <tr><td><code>importo_merce</code></td><td>NUMERIC(12,2)</td><td>importo merce (base del calcolo provvigioni)</td></tr>
+                  <tr><td><code>stato</code></td><td>VARCHAR(20) DEFAULT <code>'inviato'</code></td><td><code>inviato</code> | <code>confermato</code> | <code>fatturato</code></td></tr>
+                  <tr><td><code>att_filename_ordine</code></td><td>TEXT</td><td>allegato PDF ordine</td></tr>
+                  <tr><td><code>att_filename_conferma</code></td><td>TEXT</td><td>allegato PDF conferma</td></tr>
+                  <tr><td><code>att_filename_fattura</code></td><td>TEXT</td><td>allegato PDF fattura</td></tr>
+                  <tr><td><code>conferma_data</code></td><td>DATE</td><td></td></tr>
+                  <tr><td><code>conferma_numero</code></td><td>VARCHAR(50)</td><td></td></tr>
+                  <tr><td><code>conferma_scadenza</code></td><td>DATE</td><td><em>data ordine + giorni_attesa_conferma</em> del fornitore</td></tr>
+                  <tr><td><code>fattura_numero</code></td><td>VARCHAR(50)</td><td></td></tr>
+                  <tr><td><code>fattura_data</code></td><td>DATE</td><td></td></tr>
+                  <tr><td><code>fattura_importo</code></td><td>NUMERIC(12,2)</td><td></td></tr>
+                  <tr><td><code>note</code></td><td>TEXT</td><td></td></tr>
+                  <tr><td><code>created_at</code> / <code>updated_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <blockquote class="blockquote-footer mt-2 fs-6">Il supporto a <strong>ordine fatturato in più tranche</strong> e <strong>fattura che copre più ordini</strong> (§5.9) passa da qui: i riferimenti fattura vanno estesi con un modello a ponte <code>ordini_fornitore_fatture</code> (pratica ↔ fattura) — vedi §13 backlog.</blockquote>
+
+            <h4>4.2.8 <code>ordini_fornitore_righe</code></h4>
+            <p class="small text-muted">Righe dell'ordine (con la conferma può cambiare la quantità: §5.8).</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>testata_id</code></td><td>BIGINT FK → <code>ordini_fornitore_testata</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>numero_riga</code></td><td>INT</td><td></td></tr>
+                  <tr><td><code>codice</code></td><td>VARCHAR(100)</td><td></td></tr>
+                  <tr><td><code>descrizione</code></td><td>VARCHAR(255)</td><td></td></tr>
+                  <tr><td><code>um</code></td><td>VARCHAR(20)</td><td></td></tr>
+                  <tr><td><code>quantita</code></td><td>NUMERIC(12,3)</td><td></td></tr>
+                  <tr><td><code>prezzo_unitario</code></td><td>NUMERIC(12,4)</td><td></td></tr>
+                  <tr><td><code>importo</code></td><td>NUMERIC(12,2)</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>4.2.9 <code>bollettini_testata</code></h4>
+            <p class="small text-muted">Bollettino del fornitore su un trimestre/anno. Stato <code>da_verificare → verificato | contestato</code>.</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>fornitore_id</code></td><td>BIGINT FK → <code>fornitori</code></td><td></td></tr>
+                  <tr><td><code>trimestre</code></td><td>INT CHECK 1–4</td><td></td></tr>
+                  <tr><td><code>anno</code></td><td>INT</td><td></td></tr>
+                  <tr><td><code>att_filename</code></td><td>TEXT</td><td>allegato bollettino</td></tr>
+                  <tr><td><code>importo_riconosciuto</code></td><td>NUMERIC(12,2)</td><td>somma delle righe riconosciute dal fornitore</td></tr>
+                  <tr><td><code>importo_calcolato</code></td><td>NUMERIC(12,2)</td><td>somma della provvigione attesa calcolata dal sistema</td></tr>
+                  <tr><td><code>stato</code></td><td>VARCHAR(20) DEFAULT <code>'da_verificare'</code></td><td><code>da_verificare</code> | <code>verificato</code> | <code>contestato</code></td></tr>
+                  <tr><td><code>note</code></td><td>TEXT</td><td></td></tr>
+                  <tr><td><code>created_at</code> / <code>updated_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small mt-2 mb-0"><strong>Vincolo</strong> <code>UNIQUE(fornitore_id, trimestre, anno)</code> — un bollettino per fornitore/periodo.</p>
+
+            <h4>4.2.10 <code>bollettini_righe</code></h4>
+            <p class="small text-muted">Si appaia <strong>riga per riga</strong> quello che il fornitore riconosce con quello che il sistema ha calcolato.</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>testata_id</code></td><td>BIGINT FK → <code>bollettini_testata</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>fattura_numero</code></td><td>VARCHAR(50)</td><td></td></tr>
+                  <tr><td><code>fattura_data</code></td><td>DATE</td><td></td></tr>
+                  <tr><td><code>cliente_piva</code></td><td>VARCHAR(20)</td><td></td></tr>
+                  <tr><td><code>importo_merce</code></td><td>NUMERIC(12,2)</td><td></td></tr>
+                  <tr><td><code>pct_riconosciuta</code></td><td>NUMERIC(5,2)</td><td>% applicata dal fornitore</td></tr>
+                  <tr><td><code>importo_riconosciuto</code></td><td>NUMERIC(12,2)</td><td>importo riconosciuto dal fornitore</td></tr>
+                  <tr><td><code>pct_calcolata</code></td><td>NUMERIC(5,2)</td><td>% attesa dal sistema</td></tr>
+                  <tr><td><code>importo_calcolato</code></td><td>NUMERIC(12,2)</td><td>importo atteso dal sistema</td></tr>
+                  <tr><td><code>differenza</code></td><td>NUMERIC(12,2)</td><td>riconosciuto − calcolato</td></tr>
+                  <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <blockquote class="blockquote-footer mt-2 fs-6"><code>pct_calcolata</code> / <code>importo_calcolato</code> vengono <strong>congelati alla verifica</strong>: è il modo per rileggere un trimestre vecchio con le percentuali di allora (§5.11).</blockquote>
+          </section>
+
+          <section id="sec-4-3">
+            <h3>4.3 Diagramma relazionale</h3>
+<pre class="spec-code"><code>fornitori 1 ── n provvigioni_scaglioni 1 ── n provvigioni_eccezioni (→ subagenti)
+fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
+fornitori 1 ── n ordini_fornitore_testata 1 ── n ordini_fornitore_righe
+fornitori 1 ── n bollettini_testata 1 ── n bollettini_righe
+interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)</code></pre>
+          </section>
+
+          <section id="sec-4-4">
+            <h3>4.4 Note di schema</h3>
+            <ul>
+              <li><code>interscambio.discount</code> è il <strong>campo canonico</strong> dello sconto cliente su fornitore (§5.7) e determina lo scaglione; <code>fornitori.discount</code> ne è solo un default ridondante.</li>
+              <li><code>conferma_scadenza</code> viene valorizzata automaticamente alla creazione della pratica con <code>data_ordine + giorni_attesa_conferma</code> (§6.1).</li>
+              <li>Le percentuali storiche vengono congelate su <code>bollettini_righe</code> (§5.11); il versioning degli scaglioni per periodo è in backlog (§13).</li>
+            </ul>
+          </section>
+        </section>
+
+        <section id="sec-5">
+          <h2>5. Regole di business</h2>
+
+          <section id="sec-5-1">
+            <h3>5.1 Modello a scaglioni</h3>
+            <p>La provvigione si determina dallo <strong>sconto accordato al cliente sul fornitore</strong> (<code>interscambio.discount</code>): lo sconto cade in uno scaglione della tabella <code>provvigioni_scaglioni</code> del fornitore, che definisce <code>pct_agente</code> e <code>pct_subagente</code>.</p>
+          </section>
+
+          <section id="sec-5-2">
+            <h3>5.2 Eccezioni per singolo subagente</h3>
+            <p>Le eccezioni sono <strong>rarissime</strong>: tutti i subagenti hanno la stessa provvigione. Se esiste una <code>provvigioni_eccezioni</code> per lo scaglione/subagente, <code>pct_override</code> vince sulla percentuale standard. Gli sconti speciali usati solo per differire la provvigione (es. <code>1%</code> = eccezione <code>3%</code> del subagente Bastasin) si gestiscono a mano fuori dal calcolo automatico; per quei clienti le provvigioni non vengono riconosciute per ogni ordine ma <strong>solo una fattura al mese</strong>.</p>
+          </section>
+
+          <section id="sec-5-3">
+            <h3>5.3 Zero, trattino e note di credito</h3>
+            <ul>
+              <li><code>0,00 €</code> = <strong>nessuna provvigione</strong> (né agente né subagente).</li>
+              <li><code>–</code> = il subagente prende la <strong>percentuale standard dello scaglione</strong> (equivalente all'assenza di eccezione).</li>
+              <li><strong>Nota di credito</strong> (importo negativo) → la provvigione lavora allo <strong>stesso modo ma in negativo</strong>: es. 10 % di −120,00 € = −12,00 €.</li>
+            </ul>
+          </section>
+
+          <section id="sec-5-4">
+            <h3>5.4 Agente unico: Decobrands SRL</h3>
+            <p>L'agente attivo è <strong>uno solo</strong>. Schwarzmeier e Monzani sono storici (ex-socio di Marco) e non entrano nella liquidazione attuale; restano in anagrafica per non perdere il dato storico.</p>
+          </section>
+
+          <section id="sec-5-5">
+            <h3>5.5 Maturazione: maturato vs fatturato (per fornitore)</h3>
+            <p>Alcuni fornitori pagano sul <strong>maturato</strong> (quando incassano dai clienti), altri sul <strong>fatturato</strong> (all'emissione della fattura). Il criterio è <strong>informazione del fornitore</strong> (<code>payment_type</code>) e si applica coerentemente sia a ciò che incassa Decobrands sia a ciò che paga ai subagenti: maturato→maturato, fatturato→fatturato.</p>
+          </section>
+
+          <section id="sec-5-6">
+            <h3>5.6 Cadenze</h3>
+            <ul>
+              <li><strong>Subagenti</strong>: trimestri fissi <strong>Gen-Mar, Apr-Giu, Lug-Set, Ott-Dic</strong>.</li>
+              <li><strong>Fornitori</strong>: inviano i bollettini <strong>mensilmente</strong> (la verifica resta per periodi aggregabili). Un fornitore ha cadenza diversa ma sarà rimosso.</li>
+              <li>Nel modello dati il bollettino corrente è su base trimestrale; l'importazione mensile è un'estensione prevista (§13).</li>
+            </ul>
+          </section>
+
+          <section id="sec-5-7">
+            <h3>5.7 Riferimento cliente → fornitore e sconto</h3>
+            <p>Ogni cliente ha un <strong>fornitore di riferimento</strong> con un <strong>codice cliente</strong> e uno <strong>sconto</strong>, se accordato. Questa relazione vive nella pagina <strong>cliente</strong> (riferimenti completi) e si riflette in <code>interscambio</code> (<code>cliente_piva</code>, <code>fornitore_id</code>, <code>discount</code>). Lo sconto di <code>interscambio</code> è <strong>il campo canonico</strong> che determina lo scaglione in liquidazione e nel confronto bollettini.</p>
+          </section>
+
+          <section id="sec-5-8">
+            <h3>5.8 La conferma può cambiare le carte in tavola</h3>
+            <p>Il fornitore può confermare <strong>quantità/importi diversi</strong> dall'ordine (es. 10 articoli ordinati, 7 confermati). La provvigione si calcola sui dati <strong>confermati</strong>, non sull'ordine originale. Stato pratica: la riga confermata sostituisce quella ordinata.</p>
+          </section>
+
+          <section id="sec-5-9">
+            <h3>5.9 Fatture multi-ordine e ordini multi-tranche</h3>
+            <p>Entrambi i casi sono possibili e vanno supportati:</p>
+            <ul>
+              <li><strong>una fattura copre più ordini</strong> (già vista nel rendiconto: la 629 ne copre quattro);</li>
+              <li><strong>un ordine viene fatturato in più tranche</strong> (tipico di importatori come Gasper GmbH e Ing's Christmas Decor GmbH, o clienti che tengono articoli in back order).</li>
+            </ul>
+          </section>
+
+          <section id="sec-5-10">
+            <h3>5.10 Un cliente → un subagente per fornitore</h3>
+            <p>Un cliente <strong>non può</strong> avere più subagenti sullo stesso fornitore (vincolo <code>UNIQUE</code> su <code>interscambio</code>). Può invece avere subagenti diversi su fornitori diversi. I casi residui vengono risolti internamente da Marco.</p>
+          </section>
+
+          <section id="sec-5-11">
+            <h3>5.11 Le percentuali nel tempo</h3>
+            <p>Le condizioni nuove valgono <strong>dal periodo in cui vengono riviste</strong>; quelle precedenti vanno rilette con le percentuali di allora. Implementazione: <code>bollettini_righe</code> congelano <code>pct_calcolata</code>/<code>importo_calcolato</code> alla verifica; la rilettura di un trimestre passato usa i valori congelati. Versioning degli scaglioni per periodo = estensione (§13).</p>
+          </section>
+
+          <section id="sec-5-12">
+            <h3>5.12 Alert solo in-app</h3>
+            <p>Le segnalazioni (conferme in scadenza, bollettini da verificare, differenze) compaiono come <strong>alert nella dashboard / nelle schermate</strong>. <strong>Nessuna email.</strong></p>
+          </section>
+
+          <section id="sec-5-13">
+            <h3>5.13 Modifica manuale senza blocchi</h3>
+            <p>Nel controllo bollettino, quando gli importi non tornano (promozioni, condizioni particolari), l'operatore può <strong>confermare l'importo del fornitore o correggerlo manualmente</strong> senza che il flusso si blocchi. La differenza resta comunque registrata e il bollettino può passare a <code>verificato</code> o <code>contestato</code>.</p>
+          </section>
+        </section>
+
+        <section id="sec-6">
+          <h2>6. Flussi funzionali</h2>
+
+          <section id="sec-6-1">
+            <h3>6.1 Flusso documentale: ordine → conferma → fattura</h3>
+<pre class="spec-code"><code>[1] Ordine  ──carica documento + dati letti──►  pratica in stato "inviato"
+[2] Conferma ──aggancio alla pratica──►  stato "confermato"  (quantità/importi possono variare)
+[3] Fattura  ──aggancio alla pratica──►  stato "fatturato"   → entra nel calcolo provvigioni</code></pre>
+            <ul>
+              <li>Ogni fase include <strong>upload del documento PDF</strong> allegato alla pratica (<code>att_filename_ordine</code> / <code>att_filename_conferma</code> / <code>att_filename_fattura</code>).</li>
+              <li>Alla creazione della pratica si calcola <code>conferma_scadenza = data_ordine + giorni_attesa_conferma</code> del fornitore.</li>
+              <li>Passata la scadenza senza conferma, la pratica finisce nella lista <strong>segnalazioni</strong> della dashboard (alert in-app, §5.12).</li>
+              <li>La lettura automatica dei documenti propone i dati letti dal PDF; l'operatore li conferma prima del salvataggio.</li>
+            </ul>
+          </section>
+
+          <section id="sec-6-2">
+            <h3>6.2 Flusso controllo bollettini</h3>
+            <ol>
+              <li>Si imposta il bollettino (fornitore, trimestre, anno).</li>
+              <li>Si inseriscono le <strong>righe</strong> del bollettino del fornitore (fattura, importo, % e importo riconosciuti).</li>
+              <li>Il sistema calcola il <strong>corrispondente atteso</strong>: scaglione del fornitore applicato all'importo merce → <code>pct_calcolata</code> e <code>importo_calcolato</code>, e quindi <code>differenza</code>.</li>
+              <li>Le righe con differenza ≠ 0 vengono evidenziate; la testata cumula <code>importo_riconosciuto</code>, <code>importo_calcolato</code> e <code>totale_differenze</code>.</li>
+              <li>L'operatore verifica: se gli importi divergono per promozioni/condizioni, <strong>conferma o corregge manualmente</strong> (§5.13) senza bloccare.</li>
+              <li>Il bollettino passa a <strong><code>verificato</code></strong> (ok) o <strong><code>contestato</code></strong> (si comunica al fornitore e si attende la rettifica).</li>
+            </ol>
+          </section>
+
+          <section id="sec-6-3">
+            <h3>6.3 Flusso liquidazione subagenti</h3>
+            <ol>
+              <li>Filtri: fornitore, subagente, trimestre, anno.</li>
+              <li>Il <strong>rendiconto</strong> è calcolato <strong>al volo</strong> dai dati fatturati (stato = <code>fatturato</code>), usando <code>interscambio</code> per associare cliente→subagente e gli scaglioni per la percentuale (§formula in §10).</li>
+              <li>Elenco righe per subagente + <strong>riepilogo</strong> (n. fatture, totale merce, totale provvigione subagente).</li>
+              <li><strong>Esportazione</strong> con i campi concordati (§11), pronta per generare il bollettino per subagente.</li>
+            </ol>
+          </section>
+
+          <section id="sec-6-4">
+            <h3>6.4 Flusso anagrafiche</h3>
+            <ul>
+              <li><strong>Fornitori</strong>: CRUD + <code>payment_type</code> (§5.5) + giorni attesa + scaglioni provvigione.</li>
+              <li><strong>Agenti / subagenti</strong>: CRUD; l'agente attivo è Decobrands SRL (§5.4).</li>
+              <li><strong>Interscambio</strong>: associazione subagente × cliente × fornitore con sconto; vincolo unico (§5.10).</li>
+            </ul>
+          </section>
+        </section>
+
+        <section id="sec-7">
+          <h2>7. Schermate</h2>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th style="width:40px">#</th><th style="width:240px">Route</th><th>Schermata</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td><code>/login</code></td><td>Login</td></tr>
+                <tr><td>2</td><td><code>/dashboard</code></td><td>Dashboard (home dopo login)</td></tr>
+                <tr><td>3</td><td><code>/ordini-fornitore</code></td><td>Elenco pratiche ordini fornitore</td></tr>
+                <tr><td>4</td><td><code>/ordini-fornitore/:id</code></td><td>Dettaglio pratica (3 pannelli documento + righe + storico)</td></tr>
+                <tr><td>5</td><td><code>/fornitori</code></td><td>Anagrafica fornitori</td></tr>
+                <tr><td>6</td><td><code>/fornitori/:id</code></td><td>Dettaglio fornitore con scaglioni</td></tr>
+                <tr><td>7</td><td><code>/agenti</code></td><td>Agenti + subagenti</td></tr>
+                <tr><td>8</td><td><code>/interscambio</code></td><td>Tabella interscambio</td></tr>
+                <tr><td>9</td><td><code>/bollettini</code></td><td>Elenco bollettini con stato e differenze</td></tr>
+                <tr><td>10</td><td><code>/bollettini/:id</code></td><td>Dettaglio bollettino con righe e divergenze</td></tr>
+                <tr><td>11</td><td><code>/liquidazione</code></td><td>Rendiconto provvigioni subagenti</td></tr>
+                <tr><td>12</td><td><code>/cambia-password</code>, <code>/richiedi-reset</code></td><td>Gestione credenziali</td></tr>
+                <tr><td>13</td><td><code>/ordini</code>, <code>/ordini/upload</code>, <code>/liste</code></td><td>Gestione ordini cliente</td></tr>
+                <tr><td>14</td><td><code>/clienti</code>, <code>/utenti</code>, <code>/errori</code></td><td>Anagrafiche e utility (admin)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <section id="sec-7-1">
+            <h4>7.1 Dashboard (<code>/dashboard</code>)</h4>
+            <ul>
+              <li>KPI: ordini in stato <code>inviato</code> / <code>confermato</code> / <code>fatturato</code>.</li>
+              <li><strong>Segnalazioni</strong>: ordini in attesa di conferma con scadenza superata (alert §5.12).</li>
+              <li><strong>Bollettini da verificare</strong>: bollettini in stato <code>da_verificare</code>.</li>
+              <li>Ultimi ordini fornitore (8).</li>
+              <li>Riepilogo provvigioni del trimestre corrente (totale merce fatturato).</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-2">
+            <h4>7.2 Elenco ordini fornitore (<code>/ordini-fornitore</code>)</h4>
+            <ul>
+              <li>Filtri: stato (<code>inviato</code>/<code>confermato</code>/<code>fatturato</code>), testo libero (numero ordine, cliente, fornitore). Paginazione.</li>
+              <li>Colonna con n° righe; accesso al dettaglio.</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-3">
+            <h4>7.3 Dettaglio pratica (<code>/ordini-fornitore/:id</code>)</h4>
+            <ul>
+              <li>Dati testata (fornitore, numero/data ordine, cliente, agente, importo merce, stato, note).</li>
+              <li><strong>3 pannelli documento</strong>: Ordine / Conferma / Fattura, ciascuno con <strong>upload PDF</strong> e link all'allegato (<code>att_filename_*</code>).</li>
+              <li>Campi conferma (data, numero, scadenza) e fattura (numero, data, importo).</li>
+              <li>Tabella <strong>righe</strong> (numero riga, codice, descrizione, UM, q.tà, prezzo, importo) con aggiunta/eliminazione.</li>
+              <li>Cambio stato guidato: <code>inviato → confermato → fatturato</code>.</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-4">
+            <h4>7.4 Anagrafica fornitori (<code>/fornitori</code>, <code>/fornitori/:id</code>)</h4>
+            <ul>
+              <li>Elenco con n° scaglioni e ordini aperti.</li>
+              <li>CRUD fornitore: ragione sociale, P.IVA, giorni attesa conferma, <code>payment_type</code> (maturato/fatturato), note, attivo.</li>
+              <li>Dettaglio con <strong>tabella scaglioni</strong> editabile (sconto min/max, % agente, % subagente); gestione eccezioni per subagente (backlog).</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-5">
+            <h4>7.5 Agenti e subagenti (<code>/agenti</code>)</h4>
+            <ul>
+              <li>Elenco agenti (con n° subagenti) + elenco subagenti con riferimenti agente.</li>
+              <li>CRUD di entrambi.</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-6">
+            <h4>7.6 Interscambio (<code>/interscambio</code>)</h4>
+            <ul>
+              <li>Tabella: subagente (codice, cognome, nome) × agente × cliente (ragione sociale o P.IVA) × fornitore.</li>
+              <li>Nuova associazione: subagente + cliente (P.IVA) + fornitore (+ sconto); vincolo unico (§5.10). Eliminazione riga.</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-7">
+            <h4>7.7 Bollettini (<code>/bollettini</code>, <code>/bollettini/:id</code>)</h4>
+            <ul>
+              <li>Elenco con filtro stato; colonne: fornitore, trimestre/anno, n° righe, riconosciuto, calcolato, <strong>totale differenze</strong> (evidenziato se ≠ 0).</li>
+              <li>Dettaglio: righe con fattura, cliente, merce, riconosciuto/calcolato e <code>differenza</code> evidenziata; azioni: aggiungi/elimina riga, <strong>conferma importo fornitore o modifica manuale</strong> (§5.13), passa a <code>verificato</code>/<code>contestato</code>.</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-8">
+            <h4>7.8 Liquidazione (<code>/liquidazione</code>)</h4>
+            <ul>
+              <li>Filtri: fornitore, subagente, trimestre, anno.</li>
+              <li>Riepilogo per subagente (n° fatture, totale merce, totale provvigione subagente).</li>
+              <li>Rendiconto in dettaglio (riga per riga).</li>
+              <li><strong>Export</strong> con i campi §11.</li>
+            </ul>
+          </section>
+
+          <section id="sec-7-9">
+            <h4>7.9 Modulo ordini cliente</h4>
+            <p>Ordini cliente, liste, articoli, giacenze, errori, clienti, utenti: viste integrate nell'applicazione con lo stesso comportamento e lo stesso stile di tutte le altre.</p>
+          </section>
+        </section>
+
+        <section id="sec-8">
+          <h2>8. API endpoint</h2>
+
+          <h3>8.1 Rotte nuove (CRM)</h3>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th style="width:70px">Metodo</th><th>Endpoint</th><th>Funzione</th></tr></thead>
+              <tbody>
+                <tr><td>GET</td><td><code>/dashboard</code></td><td>pagina dashboard</td></tr>
+                <tr><td>GET</td><td><code>/fornitori</code> · <code>/fornitori/:id</code></td><td>elenco / dettaglio fornitori</td></tr>
+                <tr><td>POST</td><td><code>/api/fornitori</code></td><td>crea fornitore</td></tr>
+                <tr><td>PUT</td><td><code>/api/fornitori/:id</code></td><td>aggiorna fornitore</td></tr>
+                <tr><td>POST</td><td><code>/api/fornitori/:id/scaglioni</code></td><td>aggiunge scaglione</td></tr>
+                <tr><td>DELETE</td><td><code>/api/scaglioni/:id</code></td><td>elimina scaglione</td></tr>
+                <tr><td>GET</td><td><code>/api/fornitori-lista</code></td><td>dropdown fornitori attivi</td></tr>
+                <tr><td>GET</td><td><code>/agenti</code> · <code>/api/agenti-lista</code> · <code>/api/subagenti</code></td><td>anagrafica agenti/subagenti</td></tr>
+                <tr><td>GET</td><td><code>/interscambio</code></td><td>tabella interscambio</td></tr>
+                <tr><td>POST</td><td><code>/api/interscambio</code></td><td>nuova associazione</td></tr>
+                <tr><td>DELETE</td><td><code>/api/interscambio/:id</code></td><td>elimina associazione</td></tr>
+                <tr><td>GET</td><td><code>/ordini-fornitore</code> · <code>/ordini-fornitore/:id</code></td><td>elenco / dettaglio pratiche</td></tr>
+                <tr><td>POST</td><td><code>/api/ordini-fornitore</code></td><td>crea pratica</td></tr>
+                <tr><td>PUT</td><td><code>/api/ordini-fornitore/:id</code></td><td>aggiorna pratica (stati, conferma, fattura)</td></tr>
+                <tr><td>DELETE</td><td><code>/api/ordini-fornitore/:id</code></td><td>elimina pratica</td></tr>
+                <tr><td>POST</td><td><code>/api/ordini-fornitore/:id/righe</code></td><td>aggiunge riga</td></tr>
+                <tr><td>DELETE</td><td><code>/api/ordini-fornitore/:id/righe/:rid</code></td><td>elimina riga</td></tr>
+                <tr><td>POST</td><td><code>/api/ordini-fornitore/:id/upload</code></td><td>carica documento (ordine/conferma/fattura)</td></tr>
+                <tr><td>GET</td><td><code>/bollettini</code> · <code>/bollettini/:id</code></td><td>elenco / dettaglio bollettini</td></tr>
+                <tr><td>POST</td><td><code>/api/bollettini</code></td><td>crea bollettino</td></tr>
+                <tr><td>PUT</td><td><code>/api/bollettini/:id</code></td><td>aggiorna stato/note</td></tr>
+                <tr><td>POST</td><td><code>/api/bollettini/:id/righe</code></td><td>aggiunge riga (calcolo atteso + differenza)</td></tr>
+                <tr><td>DELETE</td><td><code>/api/bollettini/:id/righe/:rid</code></td><td>elimina riga</td></tr>
+                <tr><td>GET</td><td><code>/liquidazione</code></td><td>rendiconto provvigioni</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>8.2 Modulo ordini cliente</h3>
+          <p><code>/api/ordini*</code>, <code>/api/lookup/*</code>, <code>/api/clienti*</code>, <code>/api/utenti*</code>, <code>/api/errori*</code>: API del modulo ordini cliente, montate sul server dell'applicazione; leggono e scrivono le tabelle condivise di §4.1 (ordini cliente, clienti, articoli, giacenze, log).</p>
+
+          <h3>8.3 Autenticazione</h3>
+          <p><code>/login</code> (POST), <code>/logout</code> (POST), <code>/cambia-password</code>, <code>/richiedi-reset</code>. Guard <code>requireAuth</code> su tutte le rotte app, <code>requireAdmin</code> su clienti/utenti.</p>
+        </section>
+
+        <section id="sec-9">
+          <h2>9. Stati della pratica</h2>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Stato</th><th>Transizione</th><th>Condizioni</th></tr></thead>
+              <tbody>
+                <tr><td><code>inviato</code></td><td>creazione pratica</td><td>ordine caricato</td></tr>
+                <tr><td><code>confermato</code></td><td>upload/aggancio conferma</td><td>la conferma può variare quantità/importi (§5.8)</td></tr>
+                <tr><td><code>fatturato</code></td><td>upload/aggancio fattura</td><td>entra nel calcolo provvigioni</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-2 mb-0">Al passaggio a <code>fatturato</code> la pratica diventa eleggibile per la liquidazione (§10) e per il confronto del bollettino (§6.2).</p>
+        </section>
+
+        <section id="sec-10">
+          <h2>10. Calcolo delle provvigioni — formulario</h2>
+          <p>Base = <code>importo_merce</code> della pratica fatturata (o confermata, a seconda dello stato §5.8).</p>
+<pre class="spec-code"><code>Scaglione applicato:
+  sconto_cliente_fornitore (interscambio.discount)  ∈  [sconto_min, sconto_max]
+  → pct_agente, pct_subagente  (o pct_override da provvigioni_eccezioni se presente)
+
+provv_agente     = importo_merce × pct_agente / 100
+provv_subagente  = importo_merce × pct_subagente / 100
+provv_totale     = provv_agente + provv_subagente
+
+Nota di credito: importo_merce &lt; 0 → provvigioni negative (§5.3)
+pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
+          <p class="mb-0">Il rendiconto usa i dati fatturati del periodo filtrato; le percentuali sono risolte al volo dagli scaglioni correnti (o dalle eccezioni). Per i periodi passati i valori restano quelli congelati nel bollettino (§5.11).</p>
+        </section>
+
+        <section id="sec-11">
+          <h2>11. Esportazione liquidazione</h2>
+          <p>Campi dell'export (come richiesto da Matteo, punto 6):</p>
+          <ol>
+            <li>Fornitore</li>
+            <li>Numero documento (fattura)</li>
+            <li>Data documento (fattura)</li>
+            <li>Codice cliente</li>
+            <li>Ragione sociale</li>
+            <li>Importo documento</li>
+            <li>Percentuale provvigione</li>
+            <li>Importo provvigionale</li>
+          </ol>
+        </section>
+
+        <section id="sec-12">
+          <h2>12. Dati di esempio (seed)</h2>
+          <p>Anagrafiche di riferimento per il collaudo:</p>
+          <ul>
+            <li><strong>Fornitore</strong>: Gries con scaglioni 0/1/5/10/100 % (§4.2.2).</li>
+            <li><strong>Agente</strong>: Decobrands SRL (unico attivo).</li>
+            <li><strong>Subagenti</strong>: Bastasin, Nista (es. eccezione Bastasin <code>3</code> sullo scaglione 1 %).</li>
+            <li><strong>Interscambio</strong>: cliente con riferimenti fornitore + sconto (<code>discount</code>).</li>
+            <li><strong>Pratiche</strong>: esempi negli stati <code>inviato</code>, <code>confermato</code>, <code>fatturato</code>; una nota di credito (importo negativo) per validare §5.3; un ordine con conferma ridotta (7/10 articoli) per validare §5.8.</li>
+          </ul>
+        </section>
+
+        <section id="sec-13">
+          <h2>13. Casi limite e domande residue (backlog)</h2>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th style="width:50px">#</th><th>Argomento</th><th>Nota</th></tr></thead>
+              <tbody>
+                <tr><td>B1</td><td>Gestione UI delle <code>provvigioni_eccezioni</code></td><td>modello dati pronto, UI da sviluppare</td></tr>
+                <tr><td>B2</td><td>Ordine multi-tranche / fattura multi-ordine</td><td>estendere con tabella a ponte pratica↔fattura</td></tr>
+                <tr><td>B3</td><td>Importazione mensile bollettini fornitori</td><td>il modello corrente è trimestrale; i bollettini arrivano mensili (§5.6)</td></tr>
+                <tr><td>B4</td><td>Riga bollettino con solo totale cliente</td><td>supportare riga aggregata (cliente + totale) nel confronto</td></tr>
+                <tr><td>B5</td><td>Versioning scaglioni per periodo</td><td>rilettura storica automatica (§5.11)</td></tr>
+                <tr><td>B6</td><td>Consolidamento sconto</td><td><code>interscambio.discount</code> resta il campo canonico (§5.7); <code>fornitori.discount</code> è un semplice default</td></tr>
+                <tr><td>B7</td><td>Upload documenti</td><td>generare il file reale al posto del segnaposto (multer)</td></tr>
+                <tr><td>B8</td><td>Dati storici / popolamento iniziale</td><td>capire se importare le prassi dagli Excel manuali</td></tr>
+                <tr><td>B9</td><td>Casi cliente su più subagenti su fornitori diversi</td><td>risolti internamente da Marco</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="sec-14">
+          <h2>14. Deliverable di riferimento</h2>
+          <p>La specifica è accompagnata da un'implementazione navigabile in sola dimostrazione: tutte le viste della sezione §7, dati dimostrativi (§12) e motore di calcolo (§10) eseguito al volo nel browser.</p>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-light"><tr><th>Area</th><th style="width:90px">Stato</th></tr></thead>
+              <tbody>
+                <tr><td>Viste principali (login, dashboard, anagrafiche, pratiche, bollettini, liquidazione)</td><td>✅</td></tr>
+                <tr><td>Motore provvigioni / differenze bollettini (§10)</td><td>✅</td></tr>
+                <tr><td>Export liquidazione (§11)</td><td>✅</td></tr>
+                <tr><td>Dati dimostrativi (§12)</td><td>✅</td></tr>
+                <tr><td>Backend NestJS + frontend Next.js, database, autenticazione, upload, notifiche real-time (§3.3, §8)</td><td>⁄ in roadmap</td></tr>
+                <tr><td>Casi limite §13 (B1–B9)</td><td>⏳</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('#indice .nav-link'));
+  if (!links.length) return;
+  var sections = links.map(function (a) {
+    var el = document.querySelector(a.getAttribute('href'));
+    return el ? { link: a, el: el } : null;
+  }).filter(Boolean);
+  function onScroll() {
+    var pos = window.scrollY + 90;
+    var current = sections[0];
+    sections.forEach(function (s) { if (s.el.offsetTop <= pos) current = s; });
+    links.forEach(function (a) { a.classList.remove('active'); });
+    if (current) current.link.classList.add('active');
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+/* ============================================================
+   DecoBrands CRM — Prototipo
+   Foglio di stile condiviso (spec §3.1, stile app esistente:
+   Bootstrap 5.3, sfondo #f5f6f8, navbar dark, font system)
+   ============================================================ */
+
+:root {
+  --bs-primary: #0d6efd;
+  --db-bg: #f5f6f8;
+  --db-border: #dee2e6;
+}
+
+body { background: var(--db-bg); }
+.navbar-brand { font-weight: 700; }
+
+/* ---- Toast ---- */
+.toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
+
+/* ---- Badge stato CRM (dalla view _head.ejs) ---- */
+.badge-stato { font-size: .72rem; padding: .3em .6em; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+.badge-inviato { background: #ffc107; color: #000; }
+.badge-confermato { background: #0dcaf0; color: #000; }
+.badge-fatturato { background: #198754; color: #fff; }
+.badge-da_verificare { background: #ffc107; color: #000; }
+.badge-verificato { background: #198754; color: #fff; }
+.badge-contestato { background: #dc3545; color: #fff; }
+.badge-attivo { background: #198754; color: #fff; }
+.badge-inattivo { background: #6c757d; color: #fff; }
+
+/* ---- KPI cards (dalla view _head.ejs) ---- */
+.kpi-card { border-left: 4px solid var(--bs-primary); background: #fff; border-radius: .375rem; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.kpi-card .kpi-value { font-size: 1.8rem; font-weight: 700; line-height: 1.1; }
+.kpi-card .kpi-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: #6c757d; margin-top: .25rem; }
+.kpi-card.kpi-warning { border-left-color: #ffc107; }
+.kpi-card.kpi-danger { border-left-color: #dc3545; }
+.kpi-card.kpi-success { border-left-color: #198754; }
+.kpi-card.kpi-info { border-left-color: #0dcaf0; }
+
+/* ---- Alert scadenze (dalla view _head.ejs) ---- */
+.alert-scadenza { border-left: 4px solid #dc3545; background: #fff5f5; padding: .6rem 1rem; border-radius: .25rem; margin-bottom: .5rem; font-size: .88rem; }
+.alert-scadenza.scadenza-ok { border-left-color: #198754; background: #f0fdf4; }
+.alert-scadenza.scadenza-warn { border-left-color: #ffc107; background: #fffdf0; }
+
+/* ---- Utility ---- */
+.cursor-pointer { cursor: pointer; }
+.card { border-color: var(--db-border); }
+.card-header { border-color: var(--db-border); }
+.table > :not(caption) > * > * { padding: .55rem .75rem; }
+.table thead th { font-weight: 600; color: #495057; }
+td .text-muted small { font-size: .8rem; }
+
+/* ---- Login ---- */
+body.login { background: #f5f6f8; display: flex; align-items: center; justify-content: center; min-height: 100vh; position: relative; }
+.login-card { width: 100%; max-width: 360px; }
+
+/* ---- Dettaglio pratica: pannelli documento ---- */
+.doc-panel { border: 1px dashed var(--db-border); border-radius: .5rem; background: #fbfcfd; }
+.doc-panel.attached { border-style: solid; background: #fff; }
+.doc-chip { display: inline-flex; align-items: center; gap: .5rem; background: #e9f0fd; border: 1px solid #cfe0fb; color: #084298; padding: .35rem .7rem; border-radius: .4rem; font-size: .85rem; }
+
+/* ---- Stepper stati pratica ---- */
+.step-states { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.step-states .step { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; padding: .3rem .65rem; border-radius: 2rem; background: #e9ecef; color: #6c757d; font-weight: 600; }
+.step-states .step.active { background: #cfe2ff; color: #084298; }
+.step-states .step.done { background: #d1e7dd; color: #0f5132; }
+.step-arrow { color: #adb5bd; font-size: .7rem; }
+
+/* ---- Divergenze bollettino ---- */
+.diff-zero { color: #198754; }
+.diff-alert { color: #dc3545; font-weight: 600; }
+.diff-neg { color: #198754; }
+
+/* ---- Footer fisso in basso (© Ugo Volpato · Licenza BSL 1.1) ---- */
+body:not(.login) { padding-bottom: 3.25rem; }
+body.login { padding-bottom: 0; }
+.db-footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030; border-top: 1px solid var(--db-border); background: #fff; color: #6c757d; font-size: .8rem; padding: .6rem 0; }
+.db-footer a { color: #495057; text-decoration: none; }
+.db-footer a:hover { text-decoration: underline; }
+.db-footer .db-footer-sep { margin: 0 .55rem; opacity: .6; }
+
+/* ---- Launcher ---- */
+.screen-card { border: 1px solid var(--db-border); border-left: 4px solid var(--bs-primary); border-radius: .5rem; background: #fff; padding: 1.1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); transition: transform .12s ease, box-shadow .12s ease; }
+.screen-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+.screen-card .big-ico { font-size: 1.6rem; color: var(--bs-primary); }
+.nota-prototipo { font-size: .8rem; color: #6c757d; }

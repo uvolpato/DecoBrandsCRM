@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+</head>
+<body>
+<div id="topnav" data-active="dashboard.html"></div>
+<div class="container-fluid px-3 px-md-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
+    <span class="text-muted small"><span id="trimestreLabel"></span> — Mese corrente</span>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-warning"><div class="kpi-value text-warning" id="kpi-inviati">0</div><div class="kpi-label">Ordini Inviati</div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-info"><div class="kpi-value text-info" id="kpi-confermati">0</div><div class="kpi-label">Ordini Confermati</div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-success"><div class="kpi-value text-success" id="kpi-fatturati">0</div><div class="kpi-label">Ordini Fatturati</div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card"><div class="kpi-value" id="kpi-merce">€0</div><div class="kpi-label">Merce <span id="kpi-merce-q">Q3</span></div></div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Colonna sinistra: Scadenze + Bollettini -->
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-exclamation-triangle text-danger me-2"></i>Conferme scadute
+        </div>
+        <div class="card-body p-0" id="box-scadute"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-receipt text-warning me-2"></i>Bollettini da verificare
+        </div>
+        <div class="card-body p-0" id="box-bollettini"></div>
+      </div>
+    </div>
+
+    <!-- Colonna destra: Ultimi ordini -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+          <span><i class="bi bi-clock-history me-2"></i>Ultimi ordini fornitore</span>
+          <a href="ordini-fornitore.html" class="text-decoration-none small">Vedi tutti &rarr;</a>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr><th>Ordine</th><th>Fornitore</th><th>Cliente</th><th class="text-end">Importo</th><th>Stato</th></tr>
+            </thead>
+            <tbody id="tbl-ultimi"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal fade" id="modalDettaglio" tabindex="-1"><div class="modal-dialog"><div class="modal-content"></div></div></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function scadenzaOrdine(o) {
+  if (o.conferma_scadenza) return o.conferma_scadenza;
+  const f = DATA.fornitori.find(x => x.id === o.fornitore_id);
+  const d = new Date(o.data_ordine);
+  d.setDate(d.getDate() + (f ? (f.giorni_attesa_conferma || 30) : 30));
+  return d.toISOString().split('T')[0];
+}
+
+function render() {
+  const oggi = OGGI.toISOString().split('T')[0];
+  const q = trimestreCorrente();
+  const anno = OGGI.getFullYear();
+  const range = trimestreRange(q, anno);
+
+  const inviati = DATA.ordini.filter(o => o.stato === 'inviato').length;
+  const confermati = DATA.ordini.filter(o => o.stato === 'confermato').length;
+  const fatturati = DATA.ordini.filter(o => o.stato === 'fatturato').length;
+  const merceQ = DATA.ordini.filter(o => inTrimestre(o.data_ordine, q, anno)).reduce((s, o) => s + Number(o.importo_merce || 0), 0);
+
+  document.getElementById('kpi-inviati').textContent = inviati;
+  document.getElementById('kpi-confermati').textContent = confermati;
+  document.getElementById('kpi-fatturati').textContent = fatturati;
+  document.getElementById('kpi-merce').textContent = fmtEuro0(merceQ);
+  document.getElementById('kpi-merce-q').textContent = 'Q' + q;
+  document.getElementById('trimestreLabel').textContent = trimestreLabel(q) + ' ' + anno;
+
+  // Conferme scadute (ordini 'inviato' oltre il termine di attesa conferma)
+  const scadute = DATA.ordini
+    .filter(o => o.stato === 'inviato' && scadenzaOrdine(o) < oggi)
+    .sort((a, b) => scadenzaOrdine(a).localeCompare(scadenzaOrdine(b)));
+
+  const boxS = document.getElementById('box-scadute');
+  if (!scadute.length) { boxS.innerHTML = '<div class="text-center text-muted py-4">Nessuna conferma scaduta</div>'; }
+  else {
+    boxS.innerHTML = '<div class="list-group list-group-flush">' +
+      scadute.map(o => {
+        const cli = clienteNome(o.cliente_piva);
+        return '<a href="ordine-fornitore-dettaglio.html?id=' + o.id + '" class="list-group-item list-group-item-action py-3">' +
+          '<div class="d-flex justify-content-between"><div>' +
+          '<div class="fw-semibold">' + (o.numero_ordine || 'Ordine #' + o.id) + '</div>' +
+          '<small class="text-muted">' + fornitoreNome(o.fornitore_id) + '</small>' +
+          (cli !== o.cliente_piva ? '<small class="text-muted"> — ' + cli + '</small>' : '') +
+          '</div><div class="text-end"><span class="badge bg-danger">Scaduta</span><br>' +
+          '<small class="text-muted">' + fmtData(scadenzaOrdine(o)) + '</small></div></div></a>';
+      }).join('') + '</div>';
+  }
+
+  const bollettini = DATA.bollettini.filter(b => b.stato === 'da_verificare');
+  const boxB = document.getElementById('box-bollettini');
+  if (!bollettini.length) { boxB.innerHTML = '<div class="text-center text-muted py-4">Nessun bollettino in attesa</div>'; }
+  else {
+    boxB.innerHTML = '<div class="list-group list-group-flush">' +
+      bollettini.map(b =>
+        '<a href="bollettino-dettaglio.html?id=' + b.id + '" class="list-group-item list-group-item-action py-3">' +
+        '<div class="d-flex justify-content-between"><div>' +
+        '<div class="fw-semibold">' + fornitoreNome(b.fornitore_id) + '</div>' +
+        '<small class="text-muted">' + TRIMESTRI[b.trimestre] + ' ' + b.anno + '</small></div>' +
+        '<span class="badge bg-warning text-dark">Da verificare</span></div></a>').join('') + '</div>';
+  }
+
+  const ultimi = DATA.ordini.slice().sort((a, b) => b.data_ordine.localeCompare(a.data_ordine)).slice(0, 5);
+  const tb = document.getElementById('tbl-ultimi');
+  tb.innerHTML = ultimi.map(o =>
+    '<tr class="cursor-pointer" onclick="location.href=\'ordine-fornitore-dettaglio.html?id=' + o.id + '\'">' +
+    '<td class="fw-semibold">' + (o.numero_ordine || '#' + o.id) + '</td>' +
+    '<td>' + fornitoreNome(o.fornitore_id) + '</td>' +
+    '<td>' + clienteNome(o.cliente_piva) + '</td>' +
+    '<td class="text-end">' + fmtEuro(o.importo_merce) + '</td>' +
+    '<td><span class="badge badge-stato badge-' + o.stato + '">' + o.stato + '</span></td></tr>').join('');
+}
+
+render();
+</script>
+</body>
+</html>

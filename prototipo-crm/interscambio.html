@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Interscambio - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+</head>
+<body>
+<div id="topnav" data-active="interscambio.html"></div>
+<div class="container-fluid px-3 px-md-4 py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-arrow-left-right me-2"></i>Interscambio Agenti-Clienti-Fornitori</h4>
+    <button class="btn btn-primary" onclick="apriModaleNuovo()"><i class="bi bi-plus-lg me-1"></i>Nuova Associazione</button>
+  </div>
+
+  <p class="text-muted mb-3">Definisce quale subagente segue quale cliente per quale fornitore nella determinazione delle provvigioni (§5.7, §5.10).</p>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr><th>Agente</th><th>Subagente</th><th>Cliente (P.IVA)</th><th>Fornitore</th><th class="text-center">Sconto %</th><th class="text-end">Azioni</th></tr>
+        </thead>
+        <tbody id="tbodyInterscambio"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="alert alert-light border mt-3 nota-prototipo mb-0">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong>Sconto %</strong> = percentuale di sconto negoziata per l'associazione (campo previsto dalla specifica §4.4;
+    mancante in <code>init.js</code>, segnalato come gap). Seleziona lo scaglione provvigioni del fornitore (§10).
+  </div>
+</div>
+
+<!-- Modal Nuova Associazione -->
+<div class="modal fade" id="modalNuovo" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Nuova Associazione</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <form id="formNuovo">
+      <div class="mb-3">
+        <label class="form-label">Subagente *</label>
+        <select class="form-select" name="subagente_id" required></select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Cliente *</label>
+        <select class="form-select" name="cliente_piva" required></select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Fornitore *</label>
+        <select class="form-select" name="fornitore_id" required></select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Sconto % *</label>
+        <input type="number" class="form-control" name="discount" step="0.1" min="0" value="0" required>
+        <div class="form-text">Deve corrispondere a uno scaglione del fornitore, altrimenti viene usato il bucket di coda.</div>
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+    <button class="btn btn-primary" onclick="salva()">Salva</button>
+  </div>
+</div></div></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function rigaNomeAgente(x) {
+  const s = DATA.subagenti.find(v => v.id === x.subagente_id);
+  if (!s) return { agente: '\u2014', subagente: '\u2014' };
+  const a = DATA.agenti.find(v => v.id === s.agente_id);
+  return { agente: a ? a.nome + ' ' + a.cognome : '\u2014', subagente: s.nome + ' ' + s.cognome };
+}
+
+function render() {
+  const tb = document.getElementById('tbodyInterscambio');
+  if (!DATA.interscambio.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Nessuna associazione definita</td></tr>'; return; }
+  tb.innerHTML = DATA.interscambio.map(x => {
+    const n = rigaNomeAgente(x);
+    const sc = scaglionePerSconto(x.fornitore_id, x.discount);
+    return '<tr>' +
+      '<td>' + n.agente + '</td>' +
+      '<td class="fw-semibold">' + n.subagente + '</td>' +
+      '<td>' + clienteNome(x.cliente_piva) + ' <br><small class="text-muted">' + x.cliente_piva + '</small></td>' +
+      '<td>' + fornitoreNome(x.fornitore_id) + '</td>' +
+      '<td class="text-center">' + fmtNum(x.discount, 1) + '%' +
+      (sc ? ' <span class="badge bg-light text-secondary" title="Scaglione ' + fmtNum(sc.pct_agente, 2) + '% agente / ' + fmtNum(sc.pct_subagente, 2) + '% subagente">→ ' + fmtNum(sc.pct_agente, 1) + '/' + fmtNum(sc.pct_subagente, 1) + '%</span>' : '') +
+      '</td>' +
+      '<td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="elimina(' + x.id + ')" title="Elimina"><i class="bi bi-trash"></i></button></td></tr>';
+  }).join('');
+}
+
+function apriModaleNuovo() {
+  const f = document.getElementById('formNuovo');
+  f.reset();
+  f.elements.subagente_id.innerHTML = '<option value="">Seleziona subagente...</option>' +
+    DATA.subagenti.map(s => { const a = DATA.agenti.find(v => v.id === s.agente_id); return '<option value="' + s.id + '">' + (a ? a.nome + ' — ' : '') + s.nome + ' ' + s.cognome + '</option>'; }).join('');
+  f.elements.cliente_piva.innerHTML = '<option value="">Seleziona cliente...</option>' +
+    DATA.clienti.map(c => '<option value="' + c.piva + '">' + c.ragione_sociale + ' (' + c.piva + ')</option>').join('');
+  f.elements.fornitore_id.innerHTML = '<option value="">Seleziona fornitore...</option>' +
+    DATA.fornitori.map(v => '<option value="' + v.id + '">' + v.ragione_sociale + '</option>').join('');
+  // calcolo dello scaglione suggerito al cambio fornitore/sconto
+  f.elements.fornitore_id.onchange = sugestioneScaglione;
+  f.elements.discount.oninput = sugestioneScaglione;
+  new bootstrap.Modal(document.getElementById('modalNuovo')).show();
+}
+function sugestioneScaglione() {
+  const f = document.getElementById('formNuovo');
+  const fid = parseInt(f.elements.fornitore_id.value, 10);
+  const d = parseFloat(f.elements.discount.value);
+  const hint = document.getElementById('formNuovo').querySelector('.form-text');
+  if (!fid || isNaN(d)) { hint.innerHTML = 'Deve corrispondere a uno scaglione del fornitore, altrimenti viene usato il bucket di coda.'; return; }
+  const sc = scaglionePerSconto(fid, d);
+  hint.innerHTML = sc ? (sc.pct_agente === 0 ? 'Scaglione a provvigione azzerata (§5.11: ' + fmtNum(sc.sconto_min, 1) + '–' + fmtNum(sc.sconto_max, 1) + '%).' :
+      'Scaglione ' + fmtNum(sc.sconto_min, 1) + '–' + fmtNum(sc.sconto_max, 1) + '% → agente ' + fmtNum(sc.pct_agente, 2) + '%, subagente ' + fmtNum(sc.pct_subagente, 2) + '%.')
+    : 'Nessuno scaglione compatibile.';
+}
+function salva() {
+  const f = Object.fromEntries(new FormData(document.getElementById('formNuovo')));
+  if (!f.subagente_id || !f.cliente_piva || !f.fornitore_id) return showToast('Compila tutti i campi', false);
+  const dup = DATA.interscambio.find(x => x.cliente_piva === f.cliente_piva && x.fornitore_id === parseInt(f.fornitore_id, 10));
+  if (dup) return showToast('Vincolo UNIQUE §5.10: esiste già una associazione per cliente × fornitore', false);
+  DATA.interscambio.push({
+    id: Math.max.apply(null, DATA.interscambio.map(x => x.id)) + 1,
+    subagente_id: parseInt(f.subagente_id), cliente_piva: f.cliente_piva,
+    fornitore_id: parseInt(f.fornitore_id), discount: parseFloat(f.discount) || 0, attivo: true
+  });
+  bootstrap.Modal.getInstance(document.getElementById('modalNuovo')).hide();
+  showToast('Associazione creata');
+  render();
+}
+function elimina(id) {
+  if (!conferma('Eliminare questa associazione?')) return;
+  const i = DATA.interscambio.findIndex(x => x.id === id);
+  if (i >= 0) DATA.interscambio.splice(i, 1);
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

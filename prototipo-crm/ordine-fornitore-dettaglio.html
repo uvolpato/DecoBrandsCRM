@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dettaglio Ordine - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+</head>
+<body>
+<div id="topnav" data-active="ordini-fornitore.html"></div>
+<div class="container-fluid px-3 px-md-4 py-4">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="ordini-fornitore.html">Ordini Fornitore</a></li>
+      <li class="breadcrumb-item active" id="bc-ordine">#</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0" id="titolo-ordine"></h4>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary btn-sm" onclick="esportaCSV()"><i class="bi bi-download me-1"></i>CSV</button>
+      <a href="ordini-fornitore.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Indietro</a>
+    </div>
+  </div>
+
+  <!-- Stepper stato (§9) -->
+  <div class="mb-4" id="box-stepper"></div>
+
+  <div id="box-errore" class="alert alert-danger d-none">Ordine non trovato.</div>
+
+  <div class="row g-4">
+
+    <!-- Dati Ordine -->
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-header bg-white fw-semibold">Dati Ordine</div>
+        <div class="card-body">
+          <form id="formOrdine">
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label">Fornitore</label>
+                <select class="form-select form-select-sm" name="fornitore_id" onchange="calcolaScadenza()"></select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Stato</label>
+                <select class="form-select form-select-sm" name="stato">
+                  <option value="inviato">Inviato</option>
+                  <option value="confermato">Confermato</option>
+                  <option value="fatturato">Fatturato</option>
+                </select>
+              </div>
+              <div class="col-md-4"><label class="form-label">N. Ordine</label><input type="text" class="form-control form-control-sm" name="numero_ordine"></div>
+              <div class="col-md-4"><label class="form-label">Data Ordine</label><input type="date" class="form-control form-control-sm" name="data_ordine" onchange="calcolaScadenza()"></div>
+              <div class="col-md-4"><label class="form-label">Importo Merce €</label><input type="number" class="form-control form-control-sm" name="importo_merce" step="0.01"></div>
+              <div class="col-md-6"><label class="form-label">Cliente</label>
+                <select class="form-select form-select-sm" name="cliente_piva"></select>
+              </div>
+              <div class="col-md-6"><label class="form-label">Agente</label>
+                <select class="form-select form-select-sm" name="agente_id"></select>
+              </div>
+              <div class="col-12"><label class="form-label">Note</label><textarea class="form-control form-control-sm" name="note" rows="2"></textarea></div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm mt-3" onclick="salvaOrdine()">Salva</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Colonna destra: Conferma + Fattura + Documenti -->
+    <div class="col-lg-6">
+
+      <div class="card mb-4">
+        <div class="card-header bg-white fw-semibold"><i class="bi bi-check-circle me-2"></i>Conferma</div>
+        <div class="card-body">
+          <form id="formConferma">
+            <div class="row g-3">
+              <div class="col-md-4"><label class="form-label">Data Conferma</label><input type="date" class="form-control form-control-sm" name="conferma_data"></div>
+              <div class="col-md-4"><label class="form-label">N. Conferma</label><input type="text" class="form-control form-control-sm" name="conferma_numero"></div>
+              <div class="col-md-4"><label class="form-label">Scadenza Conferma</label><input type="date" class="form-control form-control-sm" name="conferma_scadenza"></div>
+            </div>
+            <div class="form-text small" id="hint-scadenza"></div>
+            <button type="button" class="btn btn-info btn-sm text-white mt-3" onclick="salvaConferma()">Salva Conferma</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header bg-white fw-semibold"><i class="bi bi-receipt me-2"></i>Fattura</div>
+        <div class="card-body">
+          <form id="formFattura">
+            <div class="row g-3">
+              <div class="col-md-4"><label class="form-label">N. Fattura</label><input type="text" class="form-control form-control-sm" name="fattura_numero"></div>
+              <div class="col-md-4"><label class="form-label">Data Fattura</label><input type="date" class="form-control form-control-sm" name="fattura_data"></div>
+              <div class="col-md-4"><label class="form-label">Importo Fattura €</label><input type="number" class="form-control form-control-sm" name="fattura_importo" step="0.01"></div>
+            </div>
+            <button type="button" class="btn btn-success btn-sm mt-3" onclick="salvaFattura()">Salva Fattura</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>Documenti</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4"><label class="form-label small">Ordine Acquisto</label>
+              <span class="doc-chip w-100 justify-content-center"><i class="bi bi-file-earmark-pdf"></i>Non caricato</span></div>
+            <div class="col-md-4"><label class="form-label small">Conferma Ordine</label>
+              <span class="doc-chip w-100 justify-content-center"><i class="bi bi-file-earmark-pdf"></i>Non caricato</span></div>
+            <div class="col-md-4"><label class="form-label small">Fattura Fornitore</label>
+              <span class="doc-chip w-100 justify-content-center"><i class="bi bi-file-earmark-pdf"></i>Non caricato</span></div>
+          </div>
+          <div class="form-text small mt-2">In questa videata demo l'upload documentale non è attivo; nell'app gli allegati sono caricati/visualizzati qui.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Righe Ordine -->
+  <div class="card mt-4">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+      <span><i class="bi bi-list-ul me-2"></i>Righe Ordine (<span id="n-righe">0</span>)</span>
+      <button class="btn btn-sm btn-outline-primary" onclick="apriModaleRiga()"><i class="bi bi-plus"></i> Aggiungi</button>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0" id="tableRighe">
+        <thead class="table-light">
+          <tr>
+            <th>#</th><th>Codice</th><th>Descrizione</th><th>UM</th>
+            <th class="text-end">Q.tà</th><th class="text-end">Prezzo Unit.</th><th class="text-end">Importo</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbodyRighe"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Nuova Riga -->
+<div class="modal fade" id="modalRiga" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Nuova Riga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <form id="formRiga">
+        <div class="row g-3">
+          <div class="col-4"><label class="form-label">N. Riga</label><input type="number" class="form-control" name="numero_riga"></div>
+          <div class="col-4"><label class="form-label">Codice</label><input type="text" class="form-control" name="codice"></div>
+          <div class="col-4"><label class="form-label">UM</label><input type="text" class="form-control" name="um" value="pz"></div>
+          <div class="col-12"><label class="form-label">Descrizione</label><input type="text" class="form-control" name="descrizione"></div>
+          <div class="col-4"><label class="form-label">Q.tà</label><input type="number" class="form-control" name="quantita" step="0.01" value="0"></div>
+          <div class="col-4"><label class="form-label">Prezzo Unit.</label><input type="number" class="form-control" name="prezzo_unitario" step="0.01" value="0"></div>
+          <div class="col-4"><label class="form-label">Importo</label><input type="number" class="form-control" name="importo" step="0.01" value="0"></div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+      <button class="btn btn-primary" onclick="salvaRiga()">Salva</button>
+    </div>
+  </div></div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const idOrdine = parseInt(new URLSearchParams(location.search).get('id'), 10);
+let ordine = DATA.ordini.find(o => o.id === idOrdine);
+if (!ordine) {
+  document.getElementById('box-errore').classList.remove('d-none');
+  document.querySelector('.row.g-4').classList.add('d-none');
+  document.getElementById('box-stepper').classList.add('d-none');
+}
+
+function calcolaScadenza() {
+  const f = document.getElementById('formOrdine');
+  const fid = f.elements.fornitore_id.value;
+  const d = f.elements.data_ordine.value;
+  if (!fid || !d) return;
+  const fornitore = DATA.fornitori.find(x => x.id === parseInt(fid, 10));
+  if (!fornitore) return;
+  const data = new Date(d);
+  data.setDate(data.getDate() + (fornitore.giorni_attesa_conferma || 30));
+  const scad = data.toISOString().split('T')[0];
+  document.getElementById('formConferma').elements.conferma_scadenza.value = scad;
+  document.getElementById('hint-scadenza').textContent = 'Scadenza auto-calcolata: ' + fmtData(scad) +
+    ' (data ordine + ' + (fornitore.giorni_attesa_conferma || 30) + ' giorni attesa ' + fornitore.ragione_sociale + ')';
+}
+
+function renderTitle() {
+  document.getElementById('titolo-ordine').innerHTML =
+    '<i class="bi bi-truck me-2"></i>' + (ordine.numero_ordine || 'Ordine #' + ordine.id) +
+    '<span class="badge badge-stato badge-' + ordine.stato + ' ms-2">' + ordine.stato + '</span>';
+  document.getElementById('bc-ordine').textContent = ordine.numero_ordine || '#' + ordine.id;
+}
+
+function renderStepper() {
+  const stati = ['inviato', 'confermato', 'fatturato'];
+  const idx = stati.indexOf(ordine.stato);
+  const el = document.getElementById('box-stepper');
+  const labels = { inviato: 'Inviato', confermato: 'Confermato', fatturato: 'Fatturato' };
+  const passo = stati.map((s, i) => {
+    const cls = i < idx ? 'step done' : i === idx ? 'step active' : 'step';
+    const icon = i < idx ? 'bi-check-circle-fill' : i === idx ? 'bi-circle-fill' : 'bi-circle';
+    return '<span class="' + cls + '"><i class="bi ' + icon + '"></i>' + labels[s] + '</span>' +
+      (i < stati.length - 1 ? '<span class="step-arrow">\u2192</span>' : '');
+  }).join('');
+  el.innerHTML = '<div class="step-states">' + passo + '</div>' +
+    '<div class="form-text small mt-2">La pratica passa da <strong>inviato</strong> a <strong>confermato</strong> all\'arrivo della conferma ordine (§5.4) e a <strong>fatturato</strong> all\'emissione della fattura fornitore; solo le pratiche fatturate entrano in liquidazione e nel confronto bollettini.</div>';
+}
+
+function renderForm() {
+  const f = document.getElementById('formOrdine');
+  f.elements.fornitore_id.innerHTML = DATA.fornitori.map(x => '<option value="' + x.id + '"' + (x.id === ordine.fornitore_id ? ' selected' : '') + '>' + x.ragione_sociale + '</option>').join('');
+  f.elements.stato.value = ordine.stato;
+  f.elements.numero_ordine.value = ordine.numero_ordine || '';
+  f.elements.data_ordine.value = ordine.data_ordine || '';
+  f.elements.importo_merce.value = ordine.importo_merce || 0;
+  f.elements.cliente_piva.innerHTML = '<option value="">—</option>' + DATA.clienti.map(c => '<option value="' + c.piva + '"' + (c.piva === ordine.cliente_piva ? ' selected' : '') + '>' + c.ragione_sociale + '</option>').join('');
+  f.elements.agente_id.innerHTML = DATA.agenti.map(a => '<option value="' + a.id + '"' + (a.id === ordine.agente_id ? ' selected' : '') + '>' + a.nome + ' ' + a.cognome + '</option>').join('');
+  f.elements.note.value = ordine.note || '';
+  document.getElementById('formConferma').elements.conferma_data.value = ordine.conferma_data || '';
+  document.getElementById('formConferma').elements.conferma_numero.value = ordine.conferma_numero || '';
+  document.getElementById('formConferma').elements.conferma_scadenza.value = ordine.conferma_scadenza || '';
+  const ff = document.getElementById('formFattura');
+  ff.elements.fattura_numero.value = ordine.fattura_numero || '';
+  ff.elements.fattura_data.value = ordine.fattura_data || '';
+  ff.elements.fattura_importo.value = ordine.fattura_importo || '';
+  calcolaScadenza();
+}
+
+function renderRighe() {
+  document.getElementById('n-righe').textContent = (ordine.righe || []).length;
+  const tb = document.getElementById('tbodyRighe');
+  if (!ordine.righe || !ordine.righe.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Nessuna riga</td></tr>';
+    return;
+  }
+  tb.innerHTML = ordine.righe.map((r, i) =>
+    '<tr>' +
+    '<td class="text-muted small">' + (r.numero_riga || i + 1) + '</td>' +
+    '<td>' + (r.codice || '\u2014') + '</td>' +
+    '<td>' + (r.descrizione || '\u2014') + '</td>' +
+    '<td>' + (r.um || '\u2014') + '</td>' +
+    '<td class="text-end">' + fmtNum(r.quantita, 0) + '</td>' +
+    '<td class="text-end">' + fmtEuro(r.prezzo_unitario) + '</td>' +
+    '<td class="text-end fw-semibold">' + fmtEuro(r.importo) + '</td>' +
+    '<td><button class="btn btn-sm btn-outline-danger" onclick="eliminaRiga(' + i + ')" title="Elimina"><i class="bi bi-trash"></i></button></td></tr>').join('');
+}
+
+function salvaOrdine() {
+  const f = Object.fromEntries(new FormData(document.getElementById('formOrdine')));
+  f.fornitore_id = parseInt(f.fornitore_id);
+  f.agente_id = parseInt(f.agente_id);
+  f.importo_merce = parseFloat(f.importo_merce) || 0;
+  const nuovo = f.stato;
+  delete f.stato;
+  Object.assign(ordine, f);
+  if (ordine.stato !== nuovo) { ordine.stato = nuovo; renderStepper(); renderTitle(); renderForm(); }
+  showToast('Ordine salvato');
+}
+function salvaConferma() {
+  const f = Object.fromEntries(new FormData(document.getElementById('formConferma')));
+  Object.assign(ordine, f);
+  // flusso §9: la compilazione della conferma porta la pratica da "inviato" a "confermato"
+  if (ordine.stato === 'inviato' && (ordine.conferma_numero || ordine.conferma_data)) { ordine.stato = 'confermato'; renderStepper(); renderTitle(); }
+  renderForm();
+  showToast('Conferma salvata');
+}
+function salvaFattura() {
+  const f = Object.fromEntries(new FormData(document.getElementById('formFattura')));
+  if (f.fattura_importo) f.fattura_importo = parseFloat(f.fattura_importo);
+  Object.assign(ordine, f);
+  if (ordine.stato !== 'fatturato' && (ordine.fattura_numero || ordine.fattura_data)) {
+    ordine.stato = 'fatturato'; renderStepper(); renderTitle();
+  }
+  renderForm();
+  showToast('Fattura salvata');
+}
+
+function apriModaleRiga() { document.getElementById('formRiga').reset(); new bootstrap.Modal(document.getElementById('modalRiga')).show(); }
+function salvaRiga() {
+  const f = Object.fromEntries(new FormData(document.getElementById('formRiga')));
+  if (!f.descrizione) return showToast('La descrizione è obbligatoria', false);
+  f.quantita = parseFloat(f.quantita) || 0;
+  f.prezzo_unitario = parseFloat(f.prezzo_unitario) || 0;
+  f.importo = parseFloat(f.importo) || 0;
+  if (!ordine.righe) ordine.righe = [];
+  if (!f.numero_riga) f.numero_riga = ordine.righe.length + 1;
+  ordine.righe.push(f);
+  ordine.importo_merce = ordine.righe.reduce((s, r) => s + Number(r.importo || 0), 0);
+  document.getElementById('formOrdine').elements.importo_merce.value = ordine.importo_merce;
+  bootstrap.Modal.getInstance(document.getElementById('modalRiga')).hide();
+  renderRighe();
+  showToast('Riga aggiunta');
+}
+function eliminaRiga(i) {
+  if (!conferma('Eliminare questa riga?')) return;
+  ordine.righe.splice(i, 1);
+  ordine.importo_merce = ordine.righe.reduce((s, r) => s + Number(r.importo || 0), 0);
+  document.getElementById('formOrdine').elements.importo_merce.value = ordine.importo_merce;
+  renderRighe();
+}
+
+function esportaCSV() {
+  if (!ordine.righe || !ordine.righe.length) return showToast('Nessuna riga da esportare', false);
+  const header = 'Riga;Codice;Descrizione;UM;Quantita;Prezzo;Importo';
+  const rows = ordine.righe.map(r => [r.numero_riga, r.codice, r.descrizione, r.um, r.quantita, r.prezzo_unitario, r.importo]);
+  exportCSV('righe_ordine_' + (ordine.numero_ordine || ordine.id) + '.csv', header, rows);
+  showToast('CSV esportato');
+}
+
+if (ordine) {
+  renderTitle();
+  renderStepper();
+  renderForm();
+  renderRighe();
+}
+</script>
+</body>
+</html>

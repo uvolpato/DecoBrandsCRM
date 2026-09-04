@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dettaglio Bollettino - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+</head>
+<body>
+<div id="topnav" data-active="bollettini.html"></div>
+<div class="container-fluid px-3 px-md-4 py-4">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="bollettini.html">Bollettini</a></li>
+      <li class="breadcrumb-item active" id="bc-bollettino">#</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0" id="titolo-bollettino"></h4>
+    <div class="btn-group">
+      <a href="bollettini.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Indietro</a>
+    </div>
+  </div>
+
+  <div id="box-errore" class="alert alert-danger d-none">Bollettino non trovato.</div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card"><div class="kpi-value" id="kpi-ricon">€0</div><div class="kpi-label">Riconosciuto</div></div></div>
+    <div class="col-md-3"><div class="kpi-card kpi-info"><div class="kpi-value" id="kpi-calc">€0</div><div class="kpi-label">Calcolato</div></div></div>
+    <div class="col-md-3"><div class="kpi-card" id="kpi-diff-container"><div class="kpi-value" id="kpi-diff">€0</div><div class="kpi-label">Differenza</div></div></div>
+    <div class="col-md-3"><div class="card h-100"><div class="card-body d-flex flex-column justify-content-center">
+      <label class="form-label small mb-1">Stato</label>
+      <select class="form-select form-select-sm" id="selStato" onchange="cambiaStato()">
+        <option value="da_verificare">Da verificare</option>
+        <option value="verificato">Verificato</option>
+        <option value="contestato">Contestato</option>
+      </select>
+    </div></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+      <span><i class="bi bi-list-ul me-2"></i>Fatture Bollettino (<span id="n-righe">0</span>)</span>
+      <button class="btn btn-sm btn-outline-primary" onclick="apriModaleRiga()"><i class="bi bi-plus"></i> Aggiungi Fattura</button>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0" id="tableRighe">
+        <thead class="table-light">
+          <tr>
+            <th>Fattura N.</th><th>Data</th><th>Cliente</th><th class="text-end">Merce</th>
+            <th class="text-end">% Ricon.</th><th class="text-end">Importo Ricon.</th>
+            <th class="text-end">% Calc.</th><th class="text-end">Importo Calc.</th>
+            <th class="text-end">Differenza</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbodyRighe"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-3" id="note-bollettino"></div>
+
+</div>
+
+<!-- Modal Nuova Fattura -->
+<div class="modal fade" id="modalRiga" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Aggiungi Fattura</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <form id="formRiga">
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">N. Fattura *</label><input type="text" class="form-control" name="fattura_numero" required></div>
+        <div class="col-md-6"><label class="form-label">Data Fattura</label><input type="date" class="form-control" name="fattura_data"></div>
+        <div class="col-md-6">
+          <label class="form-label">Cliente</label>
+          <select class="form-select" name="cliente_piva"></select>
+        </div>
+        <div class="col-md-6"><label class="form-label">Importo Merce €</label><input type="number" class="form-control" name="importo_merce" step="0.01" required></div>
+        <div class="col-md-6"><label class="form-label">% Riconosciuta</label><input type="number" class="form-control" name="pct_riconosciuta" step="0.01"></div>
+        <div class="col-md-6"><label class="form-label">Importo Riconosciuto €</label><input type="number" class="form-control" name="importo_riconosciuto" step="0.01"></div>
+      </div>
+      <div class="form-text mt-2">L'importo calcolato e la differenza vengono calcolati automaticamente in base agli scaglioni del fornitore (sezione §10).</div>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+    <button class="btn btn-primary" onclick="salvaRiga()">Salva</button>
+  </div>
+</div></div></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const idBollettino = parseInt(new URLSearchParams(location.search).get('id'), 10);
+let bollettino = DATA.bollettini.find(b => b.id === idBollettino);
+if (!bollettino) document.getElementById('box-errore').classList.remove('d-none');
+
+function renderHeader() {
+  document.getElementById('titolo-bollettino').innerHTML =
+    '<i class="bi bi-receipt me-2"></i>' + fornitoreNome(bollettino.fornitore_id) + ' \u2014 ' +
+    TRIMESTRI[bollettino.trimestre] + ' ' + bollettino.anno +
+    '<span class="badge badge-stato badge-' + bollettino.stato + ' ms-2">' + bollettino.stato.replace('_', ' ') + '</span>';
+  document.getElementById('bc-bollettino').textContent = fornitoreNome(bollettino.fornitore_id) + ' — ' + TRIMESTRI[bollettino.trimestre] + ' ' + bollettino.anno;
+  document.getElementById('selStato').value = bollettino.stato;
+}
+
+function renderKpi() {
+  const t = bollettinoTotali(bollettino);
+  document.getElementById('kpi-ricon').textContent = fmtEuro(t.riconosciuto);
+  document.getElementById('kpi-calc').textContent = fmtEuro(t.calcolato);
+  const el = document.getElementById('kpi-diff-container');
+  const v = document.getElementById('kpi-diff');
+  v.textContent = fmtEuro(t.differenza);
+  v.className = 'kpi-value ' + (t.differenza > 0 ? 'text-danger' : t.differenza < 0 ? 'text-success' : '');
+  el.className = 'kpi-card ' + (t.differenza > 0 ? 'kpi-danger' : t.differenza < 0 ? 'kpi-success' : '');
+}
+
+function renderRighe() {
+  const rows = bollettinoRighe(bollettino);
+  document.getElementById('n-righe').textContent = rows.length;
+  const tb = document.getElementById('tbodyRighe');
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">Nessuna fattura inserita</td></tr>'; return; }
+  tb.innerHTML = rows.map(r => {
+    const cls = r.differenza > 0 ? 'text-danger fw-bold' : r.differenza < 0 ? 'text-success' : '';
+    return '<tr>' +
+      '<td class="fw-semibold">' + (r.fattura_numero || '\u2014') + '</td>' +
+      '<td>' + fmtData(r.fattura_data) + '</td>' +
+      '<td>' + clienteNome(r.cliente_piva) + '</td>' +
+      '<td class="text-end">' + fmtEuro(r.importo_merce) + '</td>' +
+      '<td class="text-end">' + fmtNum(r.pct_riconosciuta, 2) + '%</td>' +
+      '<td class="text-end">' + fmtEuro(r.importo_riconosciuto) + '</td>' +
+      '<td class="text-end">' + fmtNum(r.pct_calcolata, 2) + '%</td>' +
+      '<td class="text-end">' + fmtEuro(r.importo_calcolato) + '</td>' +
+      '<td class="text-end"><span class="' + cls + '">' + fmtEuro(r.differenza) + '</span></td>' +
+      '<td><button class="btn btn-sm btn-outline-danger" onclick="eliminaRiga(\'' + (r.fattura_numero || '').replace(/'/g, '') + '\')"><i class="bi bi-trash"></i></button></td></tr>';
+  }).join('');
+  document.getElementById('note-bollettino').innerHTML = bollettino.note
+    ? '<div class="alert alert-warning py-2 small mb-0"><i class="bi bi-exclamation-triangle me-1"></i>' + bollettino.note + '</div>'
+    : '';
+}
+
+function apriModaleRiga() {
+  const f = document.getElementById('formRiga');
+  f.reset();
+  f.elements.cliente_piva.innerHTML = '<option value="">—</option>' +
+    DATA.clienti.map(c => '<option value="' + c.piva + '">' + c.ragione_sociale + '</option>').join('');
+  new bootstrap.Modal(document.getElementById('modalRiga')).show();
+}
+function salvaRiga() {
+  const f = Object.fromEntries(new FormData(document.getElementById('formRiga')));
+  if (!f.fattura_numero) return showToast('Numero fattura obbligatorio', false);
+  if (f.importo_merce) f.importo_merce = parseFloat(f.importo_merce);
+  if (f.pct_riconosciuta) f.pct_riconosciuta = parseFloat(f.pct_riconosciuta);
+  if (f.importo_riconosciuto) f.importo_riconosciuto = parseFloat(f.importo_riconosciuto);
+  if (!bollettino.righe) bollettino.righe = [];
+  bollettino.righe.push(f);
+  bootstrap.Modal.getInstance(document.getElementById('modalRiga')).hide();
+  renderKpi(); renderRighe(); renderHeader();
+  showToast('Fattura aggiunta');
+}
+function eliminaRiga(numero) {
+  if (!conferma('Eliminare questa riga?')) return;
+  bollettino.righe = (bollettino.righe || []).filter(r => r.fattura_numero !== numero);
+  renderKpi(); renderRighe();
+}
+function cambiaStato() {
+  bollettino.stato = document.getElementById('selStato').value;
+  renderHeader();
+  showToast('Stato aggiornato a "' + bollettino.stato.replace('_', ' ') + '"');
+}
+
+if (bollettino) { renderHeader(); renderKpi(); renderRighe(); }
+</script>
+</body>
+</html>
