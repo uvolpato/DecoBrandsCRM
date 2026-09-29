@@ -328,8 +328,13 @@ function renderStepper() {
     return '<span class="' + cls + '"><i class="bi ' + icon + '"></i>' + labels[s] + '</span>' +
       (i < stati.length - 1 ? '<span class="step-arrow">\u2192</span>' : '');
   }).join('');
-  el.innerHTML = '<div class="step-states">' + passo + '</div>' +
-    '<div class="form-text small mt-2">La pratica passa da <strong>inviato</strong> a <strong>confermato</strong> all\'arrivo della conferma ordine (§5.4) e a <strong>fatturato</strong> all\'emissione della fattura fornitore; solo le pratiche fatturate entrano in liquidazione e nel confronto bollettini. Le fasi corrispondono ai tab sottostanti.</div>';
+  // 4° passo: la nota di credito è un documento della pratica, non uno stato (§4.2.7.1, §6.1)
+  const nNC = documentiOrdine(ordine).filter(d => d.tipo === 'nota_credito').length;
+  const passoNC = '<span class="step-arrow">\u2192</span>' +
+    '<span class="step' + (nNC ? ' done' : '') + '" title="Documento agganciato alla pratica: riduce l\'imponibile, non cambia lo stato">' +
+    '<i class="bi ' + (nNC ? 'bi-check-circle-fill' : 'bi-file-earmark-minus') + '"></i>Nota di credito' + (nNC ? ' (' + nNC + ')' : '') + '</span>';
+  el.innerHTML = '<div class="step-states">' + passo + passoNC + '</div>' +
+    '<div class="form-text small mt-2">La pratica passa da <strong>inviato</strong> a <strong>confermato</strong> all\'arrivo della conferma ordine (§5.4) e a <strong>fatturato</strong> all\'emissione della fattura fornitore; solo le pratiche fatturate entrano in liquidazione e nel confronto bollettini. Le tre fasi corrispondono ai tab sottostanti. La <strong>nota di credito</strong> è l\'ultimo passo del flusso documentale (§6.1) ma <strong>non è uno stato</strong>: è un documento agganciato alla pratica che riduce l\'imponibile (storno parziale) o azzera la provvigione sulla fattura stornata (storno totale).</div>';
 }
 
 function renderRiepilogo() {
