@@ -58,7 +58,7 @@
     return a ? a.nome + ' ' + a.cognome : '\u2014';
   };
 
-  /* ---------- Trimestri ---------- */
+  /* ---------- Trimestri (liquidazione subagenti §6.3) ---------- */
   window.TRIMESTRI = { 1: 'Q1', 2: 'Q2', 3: 'Q3', 4: 'Q4' };
   window.trimestreLabel = function (t) {
     return ({ 1: 'Q1 (Gen-Mar)', 2: 'Q2 (Apr-Giu)', 3: 'Q3 (Lug-Set)', 4: 'Q4 (Ott-Dic)' })[Number(t)] || ('Q' + t);
@@ -77,6 +77,11 @@
   };
   function inRange(iso, r) { return iso >= r.start && iso <= r.end; }
   window.inTrimestre = function (iso, t, anno) { return inRange(iso, trimestreRange(t, anno)); };
+
+  /* ---------- Mesi (bollettini fornitori §5.6) ---------- */
+  window.MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  window.meseLabel = function (m) { return MESI[Number(m) - 1] || 'Mese ' + m; };
+  window.meseCorrente = function () { return OGGI.getMonth() + 1; };
 
   /* ---------- Motore provvigioni (spec §10) ---------- */
   /* Trova lo scaglione del fornitore che contiene lo sconto (bucket discreti) */
@@ -116,6 +121,70 @@
       provv_totale: merce * (pctA + pctS) / 100
     };
   };
+  /* ---------- Documenti fiscali e netto pratica (§4.2.7.1) ---------- */
+  window.documentiOrdine = function (ordine) {
+    if (ordine.documenti && ordine.documenti.length) return ordine.documenti;
+    if (ordine.fattura_numero || ordine.fattura_data || ordine.att_filename_fattura) {
+      const nc = /^NC/i.test(ordine.fattura_numero || '');
+      return [{
+        tipo: nc ? 'nota_credito' : 'fattura',
+        numero: ordine.fattura_numero || '',
+        data: ordine.fattura_data || '',
+        importo: Number(ordine.fattura_importo != null ? ordine.fattura_importo : ordine.importo_merce) || 0,
+        att_filename: ordine.att_filename_fattura || null
+      }];
+    }
+    return [];
+  };
+  window.importoNettoOrdine = function (ordine) {
+    const docs = documentiOrdine(ordine);
+    if (!docs.length) return Number(ordine.importo_merce || 0);
+    return docs.reduce((s, d) => s + Number(d.importo || 0), 0);
+  };
+  window.haNotaCredito = function (ordine) {
+    return documentiOrdine(ordine).some(d => d.tipo === 'nota_credito');
+  };
+
+  /* ---------- Confronto fasi ordine/conferma/fattura (§4.2.8, §5.8) ---------- */
+  window.fasiOrdine = function (ordine) {
+    const out = [];
+    if ((ordine.righe || []).length) out.push({ key: 'ordine', label: 'Ordine', righe: ordine.righe });
+    if ((ordine.righe_conferma || []).length) out.push({ key: 'conferma', label: 'Conferma', righe: ordine.righe_conferma });
+    if ((ordine.righe_fattura || []).length) out.push({ key: 'fattura', label: 'Fattura', righe: ordine.righe_fattura });
+    return out;
+  };
+  window.confrontoFasi = function (ordine) {
+    const fasi = fasiOrdine(ordine);
+    if (fasi.length < 2) return [];
+    const codici = [];
+    fasi.forEach(f => f.righe.forEach(r => { if (codici.indexOf(r.codice) < 0) codici.push(r.codice); }));
+    const qta = x => (x ? Number(x.quantita || 0) : null);
+    const pre = x => (x ? Number(x.prezzo_unitario || 0) : null);
+    const imp = x => (x ? Number(x.importo || 0) : null);
+    return codici.map(codice => {
+      const per = {};
+      fasi.forEach(f => { per[f.key] = f.righe.find(r => r.codice === codice) || null; });
+      let varia = false;
+      for (let i = 1; i < fasi.length; i++) {
+        const a = per[fasi[i - 1].key], b = per[fasi[i].key];
+        if (!!a !== !!b) varia = true;
+        else if (a && b && (qta(a) !== qta(b) || pre(a) !== pre(b))) varia = true;
+      }
+      const vals = fasi.map(f => per[f.key]).filter(Boolean);
+      const first = vals[0], last = vals[vals.length - 1];
+      return {
+        codice: codice,
+        descrizione: (first && first.descrizione) || (last && last.descrizione) || '',
+        fasi: per,
+        delta: (imp(first) != null && imp(last) != null) ? imp(last) - imp(first) : null,
+        variazione: varia
+      };
+    });
+  };
+  window.haVariazioni = function (ordine) {
+    return confrontoFasi(ordine).some(r => r.variazione);
+  };
+
   /* Riga bollettino: percentuale/importo CALCOLATI dall'app (da confrontare col riconosciuto).
      La riga fattura riferisce l'ordine corrispondente; se la fattura non è ancora saldata sull'ordine
      (ordine solo confermato, es. Ing's stagionale) ripiega sull'ordine cliente×fornitore presente. */

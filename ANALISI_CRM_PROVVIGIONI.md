@@ -5,7 +5,7 @@
 Il progetto ha tre gambe:
 
 1. **Tracciare in automatico** il percorso ordine → conferma d'ordine → fattura
-2. **Controllare i bollettini trimestrali** che vi mandano i fornitori, verificando
+2. **Controllare i bollettini mensili** che vi mandano i fornitori, verificando
    che le provvigioni riconosciute siano quelle giuste
 3. **Liquidare le provvigioni ai subagenti** ogni trimestre
 
@@ -107,7 +107,7 @@ segnalazioni. Il sistema sa già quali sono ferme al passo 1, quindi l'avviso vi
 
 Questa è la parte che oggi non esiste da nessuna parte.
 
-Ogni trimestre il fornitore vi manda un **bollettino** con le provvigioni che vi
+Ogni mese il fornitore vi manda un **bollettino** con le provvigioni che vi
 riconosce. Voi dovete poter verificare che siano quelle giuste — cioè confrontarle con
 quello che il sistema ha calcolato dalle fatture di quel periodo.
 
@@ -246,8 +246,8 @@ di provvigione), gli **agenti** e i **subagenti**, e soprattutto la **pratica
 dell'ordine a fornitore**: un'unica scheda che si porta dietro i tre documenti e
 attraversa gli stati *inviato → confermato → fatturato*.
 
-Sopra quella base stanno le due verifiche trimestrali: il **controllo dei bollettini**
-in entrata e la **liquidazione ai subagenti** in uscita. Entrambe leggono gli stessi
+Sopra quella base stanno le due verifiche: il **controllo dei bollettini** mensili
+in entrata e la **liquidazione ai subagenti** trimestrale in uscita. Entrambe leggono gli stessi
 dati, quindi non possono divergere.
 
 Per ora **non replico la parte di CRM commerciale** — contatti, attività, gruppi,

@@ -109,10 +109,14 @@ function renderTabelle() {
   if (!list.length) {
     tb.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Nessun ordine trovato</td></tr>';
   } else {
-    tb.innerHTML = list.map(o =>
-      '<tr>' +
+    tb.innerHTML = list.map(o => {
+      const segnalazioni = [];
+      if (haVariazioni(o)) segnalazioni.push('<i class="bi bi-exclamation-triangle text-warning" title="Variazioni di composizione fra fasi (§5.8)"></i>');
+      if (haNotaCredito(o)) segnalazioni.push('<i class="bi bi-file-earmark-minus text-danger" title="Nota di credito in aggancio (§5.3)"></i>');
+      const flag = segnalazioni.length ? ' ' + segnalazioni.join(' ') : '';
+      return '<tr>' +
       '<td class="text-muted small">' + o.id + '</td>' +
-      '<td class="fw-semibold"><a href="ordine-fornitore-dettaglio.html?id=' + o.id + '" class="text-decoration-none">' + (o.numero_ordine || '\u2014') + '</a></td>' +
+      '<td class="fw-semibold"><a href="ordine-fornitore-dettaglio.html?id=' + o.id + '" onclick="sessionStorage.setItem(\'ordineId\',' + o.id + ')" class="text-decoration-none">' + (o.numero_ordine || '\u2014') + '</a>' + flag + '</td>' +
       '<td>' + fmtData(o.data_ordine) + '</td>' +
       '<td>' + fornitoreNome(o.fornitore_id) + '</td>' +
       '<td>' + clienteNome(o.cliente_piva) + '</td>' +
@@ -120,9 +124,10 @@ function renderTabelle() {
       '<td class="text-center"><span class="badge bg-secondary">' + (o.righe || []).length + '</span></td>' +
       '<td><span class="badge badge-stato badge-' + o.stato + '">' + o.stato + '</span></td>' +
       '<td class="text-end">' +
-      '<a href="ordine-fornitore-dettaglio.html?id=' + o.id + '" class="btn btn-sm btn-outline-secondary" title="Dettaglio"><i class="bi bi-eye"></i></a> ' +
+      '<a href="ordine-fornitore-dettaglio.html?id=' + o.id + '" onclick="sessionStorage.setItem(\'ordineId\',' + o.id + ')" class="btn btn-sm btn-outline-secondary" title="Dettaglio"><i class="bi bi-eye"></i></a> ' +
       '<button class="btn btn-sm btn-outline-danger" onclick="elimina(' + o.id + ')" title="Elimina"><i class="bi bi-trash"></i></button>' +
-      '</td></tr>').join('');
+      '</td></tr>';
+    }).join('');
   }
   document.getElementById('conteggio').textContent = list.length + ' ordini';
 }

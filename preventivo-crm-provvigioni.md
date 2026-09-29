@@ -12,7 +12,7 @@
 Web app full-stack (**frontend Next.js + React + TypeScript**, **backend NestJS**, **ORM Prisma**, **PostgreSQL condiviso** con la Gestione Ordini — **senza modificare le tabelle esistenti**) per:
 
 - tracciare il percorso **ordine → conferma d'ordine → fattura** delle pratiche verso i fornitori, con **upload dei documenti PDF** e scadenze conferma automatiche;
-- controllare i **bollettini** trimestrali dei fornitori, confrontando riga per riga il **riconosciuto** con il **calcolato** (differenze evidenziate, verifica/contestazione);
+- controllare i **bollettini** mensili dei fornitori, confrontando riga per riga il **riconosciuto** con il **calcolato** (differenze evidenziate, verifica/contestazione);
 - **liquidare i subagenti** ogni trimestre con rendiconto calcolato al volo dagli scaglioni e **export a 8 campi**;
 - condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, `requireAuth`/`requireAdmin`);
 - integrare il **modulo ordini cliente** (ordini, upload, liste, clienti, utenti, errori) sulle rotte dell'applicazione.

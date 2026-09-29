@@ -24,7 +24,7 @@
       <div class="table-box">
       <table class="table table-hover mb-0 align-middle">
         <thead class="table-dark">
-          <tr><th>Agente</th><th>Subagente</th><th>Cliente (P.IVA)</th><th>Fornitore</th><th class="text-center">Sconto %</th><th class="text-end">Azioni</th></tr>
+          <tr><th>Agente</th><th>Subagente</th><th>Cliente (P.IVA)</th><th>Fornitore</th><th>Cod. cliente fornitore</th><th class="text-center">Sconto %</th><th class="text-end">Azioni</th></tr>
         </thead>
         <tbody id="tbodyInterscambio"></tbody>
       </table>
@@ -35,7 +35,9 @@
   <div class="alert alert-light border mt-3 nota-prototipo mb-0">
     <i class="bi bi-info-circle me-1"></i>
     <strong>Sconto %</strong> = percentuale di sconto negoziata per l'associazione (campo previsto dalla specifica §4.4;
-    mancante in <code>init.js</code>, segnalato come gap). Seleziona lo scaglione provvigioni del fornitore (§10).
+    mancante in <code>init.js</code>, segnalato come gap). Seleziona lo scaglione provvigioni del fornitore (§10).<br>
+    <strong>Codice cliente del fornitore</strong> = come il fornitore chiama quel cliente su conferma e fattura (facoltativo, univoco per fornitore).
+    È la chiave con cui, all'arrivo del documento, il sistema riconosce la pratica (§4.4); senza codice l'abbinamento resta manuale.
   </div>
 </div>
 
@@ -57,9 +59,14 @@
         <select class="form-select" name="fornitore_id" required></select>
       </div>
       <div class="mb-3">
+        <label class="form-label">Codice cliente del fornitore</label>
+        <input type="text" class="form-control" name="codice_cliente_fornitore" placeholder="es. GA-2271">
+        <div class="form-text" id="hint-codice">Come compare stampato dal fornitore su conferma e fattura: in arrivo documento il sistema lo usa per abbinare la pratica al cliente (§4.4). Facoltativo.</div>
+      </div>
+      <div class="mb-3">
         <label class="form-label">Sconto % *</label>
         <input type="number" class="form-control" name="discount" step="0.1" min="0" value="0" required>
-        <div class="form-text">Deve corrispondere a uno scaglione del fornitore, altrimenti viene usato il bucket di coda.</div>
+        <div class="form-text" id="hint-sconto">Deve corrispondere a uno scaglione del fornitore, altrimenti viene usato il bucket di coda.</div>
       </div>
     </form>
   </div>
@@ -82,7 +89,7 @@ function rigaNomeAgente(x) {
 
 function render() {
   const tb = document.getElementById('tbodyInterscambio');
-  if (!DATA.interscambio.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Nessuna associazione definita</td></tr>'; return; }
+  if (!DATA.interscambio.length) { tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Nessuna associazione definita</td></tr>'; return; }
   tb.innerHTML = DATA.interscambio.map(x => {
     const n = rigaNomeAgente(x);
     const sc = scaglionePerSconto(x.fornitore_id, x.discount);
@@ -91,6 +98,9 @@ function render() {
       '<td class="fw-semibold">' + n.subagente + '</td>' +
       '<td>' + clienteNome(x.cliente_piva) + ' <br><small class="text-muted">' + x.cliente_piva + '</small></td>' +
       '<td>' + fornitoreNome(x.fornitore_id) + '</td>' +
+      '<td>' + (x.codice_cliente_fornitore
+        ? '<span class="badge bg-light text-secondary border">' + x.codice_cliente_fornitore + '</span>'
+        : '<span class="text-muted small" title="Senza codice l\'abbinamento dei documenti resta manuale (§4.4)">n/d</span>') + '</td>' +
       '<td class="text-center">' + fmtNum(x.discount, 1) + '%' +
       (sc ? ' <span class="badge bg-light text-secondary" title="Scaglione ' + fmtNum(sc.pct_agente, 2) + '% agente / ' + fmtNum(sc.pct_subagente, 2) + '% subagente">→ ' + fmtNum(sc.pct_agente, 1) + '/' + fmtNum(sc.pct_subagente, 1) + '%</span>' : '') +
       '</td>' +
@@ -116,7 +126,7 @@ function sugestioneScaglione() {
   const f = document.getElementById('formNuovo');
   const fid = parseInt(f.elements.fornitore_id.value, 10);
   const d = parseFloat(f.elements.discount.value);
-  const hint = document.getElementById('formNuovo').querySelector('.form-text');
+  const hint = document.getElementById('hint-sconto');
   if (!fid || isNaN(d)) { hint.innerHTML = 'Deve corrispondere a uno scaglione del fornitore, altrimenti viene usato il bucket di coda.'; return; }
   const sc = scaglionePerSconto(fid, d);
   hint.innerHTML = sc ? (sc.pct_agente === 0 ? 'Scaglione a provvigione azzerata (§5.11: ' + fmtNum(sc.sconto_min, 1) + '–' + fmtNum(sc.sconto_max, 1) + '%).' :
@@ -126,12 +136,19 @@ function sugestioneScaglione() {
 function salva() {
   const f = Object.fromEntries(new FormData(document.getElementById('formNuovo')));
   if (!f.subagente_id || !f.cliente_piva || !f.fornitore_id) return showToast('Compila tutti i campi', false);
-  const dup = DATA.interscambio.find(x => x.cliente_piva === f.cliente_piva && x.fornitore_id === parseInt(f.fornitore_id, 10));
+  const fid = parseInt(f.fornitore_id, 10);
+  const codice = (f.codice_cliente_fornitore || '').trim();
+  const dup = DATA.interscambio.find(x => x.cliente_piva === f.cliente_piva && x.fornitore_id === fid);
   if (dup) return showToast('Vincolo UNIQUE §5.10: esiste già una associazione per cliente × fornitore', false);
+  if (codice) {
+    const dupCodice = DATA.interscambio.find(x => x.fornitore_id === fid && (x.codice_cliente_fornitore || '').toUpperCase() === codice.toUpperCase());
+    if (dupCodice) return showToast('Codice già assegnato a un altro cliente di ' + fornitoreNome(fid), false);
+  }
   DATA.interscambio.push({
     id: Math.max.apply(null, DATA.interscambio.map(x => x.id)) + 1,
     subagente_id: parseInt(f.subagente_id), cliente_piva: f.cliente_piva,
-    fornitore_id: parseInt(f.fornitore_id), discount: parseFloat(f.discount) || 0, attivo: true
+    fornitore_id: fid, codice_cliente_fornitore: codice || null,
+    discount: parseFloat(f.discount) || 0, attivo: true
   });
   bootstrap.Modal.getInstance(document.getElementById('modalNuovo')).hide();
   showToast('Associazione creata');

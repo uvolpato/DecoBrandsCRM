@@ -83,6 +83,18 @@
             <div class="card-body p-0 box-stabile" id="box-bollettini"></div>
           </div>
         </div>
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <span class="fw-semibold"><i class="bi bi-bar-chart-steps text-info me-2"></i>Variazioni fra fasi e note di credito</span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-info text-dark rounded-pill" id="badge-variazioni">0</span>
+                <a href="ordini-fornitore.html" class="text-decoration-none small text-nowrap">Vedi tutti &rarr;</a>
+              </div>
+            </div>
+            <div class="card-body p-0 box-stabile" id="box-variazioni"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -151,7 +163,7 @@ function render() {
     boxS.innerHTML = '<div class="list-group list-group-flush">' +
       scadute.map(o => {
         const cli = clienteNome(o.cliente_piva);
-        return '<a href="ordine-fornitore-dettaglio.html?id=' + o.id + '" class="list-group-item list-group-item-action py-3">' +
+        return '<a href="ordine-fornitore-dettaglio.html?id=' + o.id + '" onclick="sessionStorage.setItem(\'ordineId\',' + o.id + ')" class="list-group-item list-group-item-action py-3">' +
           '<div class="d-flex justify-content-between"><div>' +
           '<div class="fw-semibold">' + (o.numero_ordine || 'Ordine #' + o.id) + '</div>' +
           '<small class="text-muted">' + fornitoreNome(o.fornitore_id) + '</small>' +
@@ -163,16 +175,34 @@ function render() {
 
   const bollettini = DATA.bollettini.filter(b => b.stato === 'da_verificare');
   document.getElementById('badge-bollettini').textContent = bollettini.length;
-  document.getElementById('tab-badge-segnalazioni').textContent = scadute.length + bollettini.length;
+  // Variazioni di composizione fra fasi + note di credito (§5.8, §5.12)
+  const varSegnalazioni = DATA.ordini.filter(o => haVariazioni(o) || haNotaCredito(o));
+  document.getElementById('badge-variazioni').textContent = varSegnalazioni.length;
+  const boxV = document.getElementById('box-variazioni');
+  if (!varSegnalazioni.length) { boxV.innerHTML = '<div class="text-center text-muted py-4">Nessuna variazione o nota di credito</div>'; }
+  else {
+    boxV.innerHTML = '<div class="list-group list-group-flush">' +
+      varSegnalazioni.map(o =>
+        '<a href="ordine-fornitore-dettaglio.html?id=' + o.id + '" onclick="sessionStorage.setItem(\'ordineId\',' + o.id + ')" class="list-group-item list-group-item-action py-3">' +
+        '<div class="d-flex justify-content-between"><div>' +
+        '<div class="fw-semibold">' + (o.numero_ordine || 'Ordine #' + o.id) + '</div>' +
+        '<small class="text-muted">' + fornitoreNome(o.fornitore_id) + '</small>' +
+        '</div><div class="text-end">' +
+        (haVariazioni(o) ? '<span class="badge bg-warning text-dark">Var. fasi</span><br>' : '') +
+        (haNotaCredito(o) ? '<span class="badge bg-danger">Nota credito</span>' : '') +
+        '</div></div></a>').join('') + '</div>';
+  }
+
+  document.getElementById('tab-badge-segnalazioni').textContent = scadute.length + bollettini.length + varSegnalazioni.length;
   const boxB = document.getElementById('box-bollettini');
   if (!bollettini.length) { boxB.innerHTML = '<div class="text-center text-muted py-4">Nessun bollettino in attesa</div>'; }
   else {
     boxB.innerHTML = '<div class="list-group list-group-flush">' +
       bollettini.map(b =>
-        '<a href="bollettino-dettaglio.html?id=' + b.id + '" class="list-group-item list-group-item-action py-3">' +
+        '<a href="bollettino-dettaglio.html?id=' + b.id + '" onclick="sessionStorage.setItem(\'bollettinoId\',' + b.id + ')" class="list-group-item list-group-item-action py-3">' +
         '<div class="d-flex justify-content-between"><div>' +
         '<div class="fw-semibold">' + fornitoreNome(b.fornitore_id) + '</div>' +
-        '<small class="text-muted">' + TRIMESTRI[b.trimestre] + ' ' + b.anno + '</small></div>' +
+        '<small class="text-muted">' + meseLabel(b.mese) + ' ' + b.anno + '</small></div>' +
         '<span class="badge bg-warning text-dark">Da verificare</span></div></a>').join('') + '</div>';
   }
 
@@ -180,7 +210,7 @@ function render() {
   document.getElementById('tab-badge-ordini').textContent = ultimi.length;
   const tb = document.getElementById('tbl-ultimi');
   tb.innerHTML = ultimi.map(o =>
-    '<tr class="cursor-pointer" onclick="location.href=\'ordine-fornitore-dettaglio.html?id=' + o.id + '\'">' +
+    '<tr class="cursor-pointer" onclick="sessionStorage.setItem(\'ordineId\',' + o.id + '); location.href=\'ordine-fornitore-dettaglio.html?id=' + o.id + '\'">' +
     '<td class="fw-semibold">' + (o.numero_ordine || '#' + o.id) + '</td>' +
     '<td>' + fornitoreNome(o.fornitore_id) + '</td>' +
     '<td>' + clienteNome(o.cliente_piva) + '</td>' +

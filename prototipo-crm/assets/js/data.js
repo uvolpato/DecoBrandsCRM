@@ -62,16 +62,17 @@ window.DATA = {
     { id: 4, agente_id: 1, codice: 'SUB-PON', nome: 'Giorgio',    cognome: 'Pontoglio', email: 'giorgio.pontoglio@example.it', attivo: true }
   ],
 
-  /* Interscambio: subagente × cliente × fornitore con sconto (§5.7, §5.10). */
+  /* Interscambio: subagente × cliente × fornitore con sconto (§5.7, §5.10) e
+     codice con cui il fornitore identifica il cliente (abbinamento conferma/fattura, §4.4). */
   interscambio: [
-    { id: 1, subagente_id: 1, cliente_piva: '04235980161', fornitore_id: 1, discount: 1,  attivo: true },
-    { id: 2, subagente_id: 1, cliente_piva: '03152770962', fornitore_id: 1, discount: 0,  attivo: true },
-    { id: 3, subagente_id: 2, cliente_piva: '01826250167', fornitore_id: 1, discount: 5,  attivo: true },
-    { id: 4, subagente_id: 2, cliente_piva: '02457160341', fornitore_id: 2, discount: 0,  attivo: true },
-    { id: 5, subagente_id: 3, cliente_piva: '01573540439', fornitore_id: 1, discount: 10, attivo: true },
-    { id: 6, subagente_id: 3, cliente_piva: '05328730963', fornitore_id: 2, discount: 5,  attivo: true },
-    { id: 7, subagente_id: 4, cliente_piva: '02289430245', fornitore_id: 3, discount: 0,  attivo: true },
-    { id: 8, subagente_id: 4, cliente_piva: '02633860254', fornitore_id: 2, discount: 3,  attivo: true }
+    { id: 1, subagente_id: 1, cliente_piva: '04235980161', fornitore_id: 1, codice_cliente_fornitore: 'K-10122', discount: 1,  attivo: true },
+    { id: 2, subagente_id: 1, cliente_piva: '03152770962', fornitore_id: 1, codice_cliente_fornitore: 'K-10488', discount: 0,  attivo: true },
+    { id: 3, subagente_id: 2, cliente_piva: '01826250167', fornitore_id: 1, codice_cliente_fornitore: 'K-10915', discount: 5,  attivo: true },
+    { id: 4, subagente_id: 2, cliente_piva: '02457160341', fornitore_id: 2, codice_cliente_fornitore: 'GA-2271', discount: 0,  attivo: true },
+    { id: 5, subagente_id: 3, cliente_piva: '01573540439', fornitore_id: 1, codice_cliente_fornitore: 'K-11036', discount: 10, attivo: true },
+    { id: 6, subagente_id: 3, cliente_piva: '05328730963', fornitore_id: 2, codice_cliente_fornitore: 'GA-2304', discount: 5,  attivo: true },
+    { id: 7, subagente_id: 4, cliente_piva: '02289430245', fornitore_id: 3, codice_cliente_fornitore: 'IN-3150', discount: 0,  attivo: true },
+    { id: 8, subagente_id: 4, cliente_piva: '02633860254', fornitore_id: 2, codice_cliente_fornitore: 'GA-2389', discount: 3,  attivo: true }
   ],
 
   /* Pratiche ordini fornitore (spec §6.1). date ISO. */
@@ -107,6 +108,11 @@ window.DATA = {
         { numero_riga: 1, codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', um: 'pz', quantita: 400, prezzo_unitario: 6.40, importo: 2560.00 },
         { numero_riga: 2, codice: 'VASA-0908', descrizione: 'Vaso in terracotta Ø 9 cm (8 pz)', um: 'pz', quantita: 300, prezzo_unitario: 9.40, importo: 2820.00 },
         { numero_riga: 3, codice: 'PIAT-F25', descrizione: 'Piatto portavaso Ø 25 cm', um: 'pz', quantita: 140, prezzo_unitario: 10.00, importo: 1400.00 }
+      ],
+      righe_conferma: [
+        { numero_riga: 1, codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', um: 'pz', quantita: 360, prezzo_unitario: 6.40, importo: 2304.00 },
+        { numero_riga: 2, codice: 'PIAT-F25', descrizione: 'Piatto portavaso Ø 25 cm', um: 'pz', quantita: 140, prezzo_unitario: 10.00, importo: 1400.00 },
+        { numero_riga: 3, codice: 'VASA-3050', descrizione: 'Vaso in terracotta Ø 30 cm (sostituto)', um: 'pz', quantita: 60, prezzo_unitario: 12.30, importo: 738.00 }
       ]
     },
     {
@@ -177,6 +183,33 @@ window.DATA = {
         { numero_riga: 1, codice: 'VASA-3040', descrizione: 'Vaso in terracotta Ø 30 cm', um: 'pz', quantita: 340, prezzo_unitario: 14.00, importo: 4760.00 },
         { numero_riga: 2, codice: 'VASA-4055', descrizione: 'Vaso in terracotta Ø 40 cm', um: 'pz', quantita: 180, prezzo_unitario: 36.00, importo: 6480.00 }
       ]
+    },
+    {
+      id: 11, fornitore_id: 2, numero_ordine: 'OF/2026/046', data_ordine: '2026-08-26',
+      cliente_piva: '02457160341', agente_id: 1, importo_merce: 12000.00,
+      stato: 'fatturato', conferma_scadenza: '2026-09-25',
+      conferma_numero: 'C-2026/1044', conferma_data: '2026-08-30',
+      fattura_numero: 'F-2026-0933', fattura_data: '2026-08-31',
+      note: 'Variazione ordine→conferma→fattura con nota di credito parziale (§5.8, §5.9). Base provvigioni = netto documenti.',
+      righe: [
+        { numero_riga: 1, codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60L', um: 'pz', quantita: 250, prezzo_unitario: 29.60, importo: 7400.00 },
+        { numero_riga: 2, codice: 'GASPER-B3', descrizione: 'Cassa in legno decor 40x40', um: 'pz', quantita: 180, prezzo_unitario: 27.28, importo: 4910.00 },
+        { numero_riga: 3, codice: 'GASPER-C2', descrizione: 'Fioriera in resina 50L', um: 'pz', quantita: 100, prezzo_unitario: 12.50, importo: 1250.00 }
+      ],
+      righe_conferma: [
+        { numero_riga: 1, codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60L', um: 'pz', quantita: 240, prezzo_unitario: 29.60, importo: 7104.00 },
+        { numero_riga: 2, codice: 'GASPER-B3', descrizione: 'Cassa in legno decor 40x40', um: 'pz', quantita: 180, prezzo_unitario: 27.28, importo: 4910.00 },
+        { numero_riga: 3, codice: 'GASPER-D4', descrizione: 'Portavaso in resina (sostituto C2)', um: 'pz', quantita: 50, prezzo_unitario: 18.00, importo: 900.00 }
+      ],
+      righe_fattura: [
+        { numero_riga: 1, codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60L', um: 'pz', quantita: 240, prezzo_unitario: 29.60, importo: 7104.00 },
+        { numero_riga: 2, codice: 'GASPER-B3', descrizione: 'Cassa in legno decor 40x40', um: 'pz', quantita: 180, prezzo_unitario: 26.90, importo: 4842.00 },
+        { numero_riga: 3, codice: 'GASPER-D4', descrizione: 'Portavaso in resina (sostituto C2)', um: 'pz', quantita: 50, prezzo_unitario: 18.00, importo: 900.00 }
+      ],
+      documenti: [
+        { tipo: 'fattura', numero: 'F-2026-0933', data: '2026-08-31', importo: 12846.00, att_filename: 'fattura_F-2026-0933.pdf' },
+        { tipo: 'nota_credito', numero: 'NC-2026-007', data: '2026-09-02', importo: -846.00, storno_totale: false, fattura_riferimento: 'F-2026-0933', att_filename: 'nota_credito_NC-2026-007.pdf', note: 'Reso 30 pz GASPER-B3' }
+      ]
     }
   ],
 
@@ -184,32 +217,43 @@ window.DATA = {
      calcolati a runtime dal data.js→crm.js (stesso motore della liquidazione). */
   bollettini: [
     {
-      id: 1, fornitore_id: 1, trimestre: 3, anno: 2026, stato: 'da_verificare',
+      id: 1, fornitore_id: 1, mese: 7, anno: 2026, stato: 'da_verificare',
       note: 'Riga F-2026-0912: fornitore ha applicato promo −0,5% → differenza da verificare (§5.13).',
       righe: [
         { fattura_numero: 'F-2026-0891', fattura_data: '2026-07-02', cliente_piva: '01573540439', importo_merce: 15480.00, pct_riconosciuta: 7.00, importo_riconosciuto: 1083.60 },
-        { fattura_numero: 'F-2026-0912', fattura_data: '2026-07-28', cliente_piva: '04235980161', importo_merce: 6540.00, pct_riconosciuta: 20.50, importo_riconosciuto: 1340.70, promo: true },
-        { fattura_numero: 'NC-2026-005', fattura_data: '2026-08-22', cliente_piva: '03152770962', importo_merce: -1380.00, pct_riconosciuta: 28.00, importo_riconosciuto: -386.40 }
+        { fattura_numero: 'F-2026-0912', fattura_data: '2026-07-28', cliente_piva: '04235980161', importo_merce: 6540.00, pct_riconosciuta: 20.50, importo_riconosciuto: 1340.70, promo: true }
       ]
     },
     {
-      id: 2, fornitore_id: 2, trimestre: 3, anno: 2026, stato: 'verificato',
+      id: 2, fornitore_id: 2, mese: 7, anno: 2026, stato: 'verificato',
       righe: [
-        { fattura_numero: 'F-2026-0907', fattura_data: '2026-07-18', cliente_piva: '05328730963', importo_merce: 9312.75, pct_riconosciuta: 18.00, importo_riconosciuto: 1676.30 },
-        { fattura_numero: 'F-2026-0921', fattura_data: '2026-08-20', cliente_piva: '02633860254', importo_merce: 3980.00, pct_riconosciuta: 21.00, importo_riconosciuto: 835.80 }
+        { fattura_numero: 'F-2026-0907', fattura_data: '2026-07-18', cliente_piva: '05328730963', importo_merce: 9312.75, pct_riconosciuta: 18.00, importo_riconosciuto: 1676.30 }
       ]
     },
     {
-      id: 3, fornitore_id: 1, trimestre: 2, anno: 2026, stato: 'verificato',
+      id: 3, fornitore_id: 1, mese: 6, anno: 2026, stato: 'verificato',
       righe: [
         { fattura_numero: 'F-2026-0840', fattura_data: '2026-06-25', cliente_piva: '01573540439', importo_merce: 11240.00, pct_riconosciuta: 7.00, importo_riconosciuto: 786.80 }
       ]
     },
     {
-      id: 4, fornitore_id: 3, trimestre: 3, anno: 2026, stato: 'da_verificare',
-      note: 'Primo bollettino Ing\'s Christmas Decor per la stagione.',
+      id: 4, fornitore_id: 3, mese: 8, anno: 2026, stato: 'da_verificare',
+      note: 'Primo bollettino mensile Ing\'s Christmas Decor per la stagione.',
       righe: [
         { fattura_numero: 'F-2026-0930', fattura_data: '2026-08-31', cliente_piva: '02289430245', importo_merce: 4250.00, pct_riconosciuta: 32.00, importo_riconosciuto: 1360.00 }
+      ]
+    },
+    {
+      id: 5, fornitore_id: 2, mese: 8, anno: 2026, stato: 'verificato',
+      righe: [
+        { fattura_numero: 'F-2026-0921', fattura_data: '2026-08-20', cliente_piva: '02633860254', importo_merce: 3980.00, pct_riconosciuta: 21.00, importo_riconosciuto: 835.80 }
+      ]
+    },
+    {
+      id: 6, fornitore_id: 1, mese: 8, anno: 2026, stato: 'verificato',
+      note: 'Nota di credito — provvigioni in negativo (§5.3).',
+      righe: [
+        { fattura_numero: 'NC-2026-005', fattura_data: '2026-08-22', cliente_piva: '03152770962', importo_merce: -1380.00, pct_riconosciuta: 28.00, importo_riconosciuto: -386.40 }
       ]
     }
   ]

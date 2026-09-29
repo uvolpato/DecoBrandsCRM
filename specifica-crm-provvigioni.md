@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 1.5 — **Stato:** validata con il cliente
+**Versione:** 1.6 — **Stato:** validata con il cliente
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -244,10 +244,12 @@ presso un fornitore e con quale sconto.
 | `subagente_id` | BIGINT FK → `subagenti` | ON DELETE CASCADE |
 | `cliente_piva` | VARCHAR(20) NOT NULL | |
 | `fornitore_id` | BIGINT FK → `fornitori` | ON DELETE CASCADE |
+| `codice_cliente_fornitore` | VARCHAR(50) | nullable — **codice con cui il fornitore identifica il cliente** (quello stampato su conferma e fattura): è la chiave per abbinare il documento ricevuto alla pratica (§4.4) |
 | `discount` | NUMERIC(5,2) DEFAULT 0 | **sconto accordato al cliente su quel fornitore** — determina lo scaglione (**§4.4**) |
 | `attivo` | BOOLEAN DEFAULT true | |
 | `created_at` | TIMESTAMPTZ | |
 | Vincolo | `UNIQUE(subagente_id, cliente_piva, fornitore_id)` | un solo subagente per cliente×fornitore (**§5.10**) |
+| Vincolo | `UNIQUE(fornitore_id, codice_cliente_fornitore)` | il codice del fornitore non può essere attribuito a due clienti dello stesso fornitore (dove valorizzato) |
 
 ### 4.2.7 `ordini_fornitore_testata`
 
@@ -272,42 +274,80 @@ attraversa gli stati `inviato → confermato → fatturato`.
 | `conferma_data` | DATE | |
 | `conferma_numero` | VARCHAR(50) | |
 | `conferma_scadenza` | DATE | *data ordine + giorni_attesa_conferma* del fornitore |
-| `fattura_numero` | VARCHAR(50) | |
-| `fattura_data` | DATE | |
-| `fattura_importo` | NUMERIC(12,2) | |
+| `fattura_numero` | VARCHAR(50) | riferimento sintetico all'ultima fattura (i documenti completi stanno in §4.2.7.1) |
+| `fattura_data` | DATE | come sopra |
+| `fattura_importo` | NUMERIC(12,2) | come sopra |
 | `note` | TEXT | |
 | `created_at` / `updated_at` | TIMESTAMPTZ | |
 
-> Il supporto a **ordine fatturato in più tranche** e **fattura che copre più ordini**
-> (§5.9) passa da qui: i riferimenti fattura vanno estesi con un modello a ponte
-> `ordini_fornitore_fatture` (pratica ↔ fattura) — vedi §13 backlog.
+#### 4.2.7.1 `ordini_fornitore_documenti`
 
-### 4.2.8 `ordini_fornitore_righe`
-
-righe dell'ordine (con la conferma può cambiare la quantità: §5.8).
+Documenti fiscali **agganciati alla pratica**: fatture e **note di credito**. È il modello
+a ponte pratica ↔ documento che copre **fatture multi-ordine** e **ordini fatturati in più
+tranche** (§5.9): una pratica ha **n** documenti. Sostituisce, per i casi non banali, i campi
+singoli `fattura_*` della testata.
 
 | Colonna | Tipo | Note |
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
 | `testata_id` | BIGINT FK → `ordini_fornitore_testata` | ON DELETE CASCADE |
+| `tipo` | VARCHAR(20) | `fattura` \| `nota_credito` |
+| `numero` | VARCHAR(50) | numero documento |
+| `data` | DATE | |
+| `importo` | NUMERIC(12,2) | **positivo** per fattura, **negativo** per nota di credito |
+| `storno_totale` | BOOLEAN DEFAULT false | per una nota di credito: `true` = storna tutta la fattura, `false` = storno parziale |
+| `fattura_riferimento` | VARCHAR(50) | nullable — numero della fattura stornata (per le note di credito) |
+| `att_filename` | TEXT | allegato PDF del documento |
+| `note` | TEXT | |
+| `created_at` | TIMESTAMPTZ | |
+
+> **Importo netto della pratica** = somma algebrica degli `importo` dei documenti
+> (fatture − note di credito). È il netto la **base del calcolo provvigioni** (§5.3):
+> una nota di credito parziale riduce l'imponibile, una totale azzera la provvigione
+> sulla fattura stornata. Finché la pratica non ha documenti, la base resta
+> `importo_merce` (caso semplice: una sola fattura).
+>
+> **Fattura multi-ordine.** Il documento è sempre agganciato a **una** pratica
+> (`testata_id`); una fattura che copre più ordini è rappresentata da **una riga per
+> pratica**, con `importo` = quota attribuita a quella pratica. La somma delle quote
+> con lo stesso `numero`/`tipo` ricostruisce il totale della fattura; la provvigione
+> si calcola sulla quota di pratica, non sul totale. Stessa cosa per una nota di credito
+> che storna fatture di più pratiche.
+
+### 4.2.8 `ordini_fornitore_righe`
+
+Righe della pratica, **una fotografia per fase** (`fase`): `ordine` (come inviato),
+`conferma` (come confermato dal fornitore, §5.8) e `fattura` (come fatturato). Le tre
+fotografie non si sovrascrivono: il **confronto fra fasi** è calcolato a runtime
+allineando le righe per `codice` (§7.3, §5.8).
+
+| Colonna | Tipo | Note |
+|---------|------|------|
+| `id` | BIGSERIAL PK | |
+| `testata_id` | BIGINT FK → `ordini_fornitore_testata` | ON DELETE CASCADE |
+| `fase` | VARCHAR(20) DEFAULT `'ordine'` | `ordine` \| `conferma` \| `fattura` |
 | `numero_riga` | INT | |
-| `codice` | VARCHAR(100) | |
+| `codice` | VARCHAR(100) | chiave di allineamento nel confronto fasi |
 | `descrizione` | VARCHAR(255) | |
 | `um` | VARCHAR(20) | |
 | `quantita` | NUMERIC(12,3) | |
 | `prezzo_unitario` | NUMERIC(12,4) | |
 | `importo` | NUMERIC(12,2) | |
 
+> Vincolo `UNIQUE(testata_id, fase, numero_riga)`. Al passaggio di stato le righe
+> della fase precedente **restano**; la nuova fase ne salva una copia che l'operatore
+> (o la lettura del documento) può modificare.
+
 ### 4.2.9 `bollettini_testata`
 
-Bollettino del fornitore su un trimestre/anno. Stato `da_verificare → verificato |
+Bollettino del fornitore su un mese/anno. Stato `da_verificare → verificato |
 contestato`.
 
 | Colonna | Tipo | Note |
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
 | `fornitore_id` | BIGINT FK → `fornitori` | |
-| `trimestre` | INT CHECK 1–4 | |
+| `mese` | INT CHECK 1–12 | |
 | `anno` | INT | |
 | `att_filename` | TEXT | allegato bollettino |
 | `importo_riconosciuto` | NUMERIC(12,2) | somma delle righe riconosciute dal fornitore |
@@ -315,7 +355,7 @@ contestato`.
 | `stato` | VARCHAR(20) DEFAULT `'da_verificare'` | `da_verificare` \| `verificato` \| `contestato` |
 | `note` | TEXT | |
 | `created_at` / `updated_at` | TIMESTAMPTZ | |
-| Vincolo | `UNIQUE(fornitore_id, trimestre, anno)` | un bollettino per fornitore/periodo |
+| Vincolo | `UNIQUE(fornitore_id, mese, anno)` | un bollettino per fornitore/mese |
 
 ### 4.2.10 `bollettini_righe`
 
@@ -338,7 +378,7 @@ ha calcolato.
 | `created_at` | TIMESTAMPTZ | |
 
 > `pct_calcolata` / `importo_calcolato` vengono **congelati alla verifica**: è il modo
-> per rileggere un trimestre vecchio con le percentuali di allora (§5.11).
+> per rileggere un mese vecchio con le percentuali di allora (§5.11).
 
 ### 4.2.11 `eventi_app`
 
@@ -353,7 +393,7 @@ nessuna UPDATE/DELETE in esercizio.
 | `utente_id` | BIGINT FK → `users` | NULL per eventi di sistema / login non riuscito |
 | `sessione_id` | VARCHAR(100) | sessione server-side (per eventi `auth`) |
 | `tipo` | VARCHAR(30) | `auth` · `crud` · `stato` · `documento` · `calcolo` · `export` · `errore` |
-| `entita` | VARCHAR(50) | `fornitore`, `scaglione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `bollettino`, `riga_bollettino`, `liquidazione`, `utente`, `sistema` |
+| `entita` | VARCHAR(50) | `fornitore`, `scaglione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `documento`, `bollettino`, `riga_bollettino`, `liquidazione`, `utente`, `sistema` |
 | `entita_id` | BIGINT | id dell'entità coinvolta (dove applicabile) |
 | `azione` | VARCHAR(30) | `create` · `update` · `delete` · `upload` · `export` · `change_state` · `verify` · `login` · `logout` · `change_password` · `reset_requested` · `access_denied` · `error` |
 | `esito` | VARCHAR(10) | `successo` · `errore` · `negato` |
@@ -373,7 +413,9 @@ fornitori 1 ── n provvigioni_scaglioni 1 ── n provvigioni_eccezioni (→
 fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
 fornitori 1 ── n ordini_fornitore_testata 1 ── n ordini_fornitore_righe
 fornitori 1 ── n bollettini_testata 1 ── n bollettini_righe
+ordini_fornitore_testata 1 ── n ordini_fornitore_documenti (fatture e note di credito, §4.2.7.1)
 interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)
+interscambio (fornitore_id, codice_cliente_fornitore) → ordini_fornitore_testata (cliente_piva, fornitore_id)
 ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1)
 users 1 ── n eventi_app  (audit append-only, §15)
 ```
@@ -382,10 +424,21 @@ users 1 ── n eventi_app  (audit append-only, §15)
 
 - `interscambio.discount` è il **campo canonico** dello sconto cliente su fornitore
   (§5.7) e determina lo scaglione; `fornitori.discount` ne è solo un default ridondante.
+- **Abbinamento dei documenti del fornitore**: la conferma e la fattura riportano il
+  *codice cliente del fornitore*, non la P.IVA. `interscambio.codice_cliente_fornitore`
+  fa da traduzione verso `cliente_piva`: in arrivo documento il sistema risolve
+  `fornitore_id + codice_cliente_fornitore → cliente_piva` e propone la pratica
+  corrispondente; se il codice non è valorizzato l'abbinamento resta manuale
+  (confermato dall'operatore, §6.1).
 - `conferma_scadenza` viene valorizzata automaticamente alla creazione della pratica
   con `data_ordine + giorni_attesa_conferma` (§6.1).
 - Le percentuali storiche vengono congelate su `bollettini_righe` (§5.11); il versioning
   degli scaglioni per periodo è in backlog (§13).
+- Le **righe per fase** (`ordini_fornitore_righe.fase`) non si sovrascrivono: conservano
+  la fotografia di ordine, conferma e fattura, così il confronto fra fasi resta
+  ispezionabile a posteriori (§5.8, §7.3).
+- Gli **importi delle provvigioni** si calcolano sul **netto documenti** della pratica
+  (§4.2.7.1, §5.3): le note di credito riducono l'imponibile senza generare pratiche a sé.
 
 ---
 
@@ -411,8 +464,16 @@ automatico; per quei clienti le provvigioni non vengono riconosciute per ogni or
 - `0,00 €` = **nessuna provvigione** (né agente né subagente).
 - `–` = il subagente prende la **percentuale standard dello scaglione** (equivalente
   all'assenza di eccezione).
-- **Nota di credito** (importo negativo) → la provvigione lavora allo **stesso modo ma in
-  negativo**: es. 10 % di −120,00 € = −12,00 €.
+- **Nota di credito** → è un **documento della pratica** (`tipo = nota_credito`,
+  §4.2.7.1), con importo **negativo**, figlio di una o più fatture. La provvigione
+  lavora allo **stesso modo ma in negativo**: es. 10 % di −120,00 € = −12,00 €.
+  - **Totale** (`storno_totale = true`): storna l'intera fattura a cui si riferisce →
+    la provvigione su quella fattura va a zero.
+  - **Parziale** (`storno_totale = false`): riduce l'imponibile della parte stornata
+    per resi, abbuoni, sconti successivi.
+  - Nel flusso, la nota di credito è un **documento agganciato alla pratica**
+    (§6.1): non genera una pratica a sé. La provvigione si calcola sul **netto**
+    dei documenti (fatture − note di credito, §4.2.7.1).
 
 ### 5.4 Agente unico: Decobrands SRL
 
@@ -429,11 +490,12 @@ che paga ai subagenti: maturato→maturato, fatturato→fatturato.
 
 ### 5.6 Cadenze
 
-- **Subagenti**: trimestri fissi **Gen-Mar, Apr-Giu, Lug-Set, Ott-Dic**.
-- **Fornitori**: inviano i bollettini **mensilmente** (la verifica resta per periodi
-  aggregabili). Un fornitore ha cadenza diversa ma sarà rimosso.
-- Nel modello dati il bollettino corrente è su base trimestrale; l'importazione mensile
-  è un'estensione prevista (§13).
+- **Subagenti**: liquidazione trimestrale su trimestri fissi **Gen-Mar, Apr-Giu,
+  Lug-Set, Ott-Dic**.
+- **Fornitori**: bollettini **mensili** — un documento per fornitore e mese
+  (`fornitore_id`, `mese`, `anno`). Un fornitore con cadenza diversa sarà rimosso.
+- Il bollettino è la base **mensile**; la **liquidazione ai subagenti** resta
+  trimestrale (§6.3) aggregando i bollettini del trimestre di competenza.
 
 ### 5.7 Riferimento cliente → fornitore e sconto
 
@@ -446,15 +508,32 @@ liquidazione e nel confronto bollettini.
 ### 5.8 La conferma può cambiare le carte in tavola
 
 Il fornitore può confermare **quantità/importi diversi** dall'ordine (es. 10 articoli
-ordinati, 7 confermati). La provvigione si calcola sui dati **confermati**, non
-sull'ordine originale. Stato pratica: la riga confermata sostituisce quella ordinata.
+ordinati, 7 confermati). La provvigione si calcola sui dati **fatturati**, non
+sull'ordine originale.
+
+Le tre fasi sono tenute come **fotografie separate** delle righe (`fase = ordine |
+conferma | fattura`, §4.2.8): la riga confermata **non sostituisce** più quella ordinata.
+Il sistema calcola il **confronto fra fasi** allineando le righe per `codice` e
+segnala gli scostamenti di composizione (§7.3, §7.1):
+
+- **articoli spariti** o **comparsi** fra una fase e l'altra;
+- **variazioni di quantità** e/o **prezzo** (e quindi di importo);
+- **delta complessivo** della pratica, evidenziato quando ≠ 0.
+
+Le pratiche con scostamenti compaiono fra le **segnalazioni** della dashboard (§5.12).
 
 ### 5.9 Fatture multi-ordine e ordini multi-tranche
 
-Entrambi i casi sono possibili e vanno supportati:
-- **una fattura copre più ordini** (già vista nel rendiconto: la 629 ne copre quattro);
+Entrambi i casi sono supportati dal modello a ponte dei **documenti** (§4.2.7.1):
+- **una fattura copre più ordini** (già vista nel rendiconto: la 629 ne copre quattro):
+  la stessa fattura compare su **più pratiche**, una riga per pratica in
+  `ordini_fornitore_documenti` con la quota attribuita (§4.2.7.1);
 - **un ordine viene fatturato in più tranche** (tipico di importatori come Gasper GmbH e
   Ing's Christmas Decor GmbH, o clienti che tengono articoli in back order).
+
+Ogni documento (`fattura` o `nota_credito`) è una riga di `ordini_fornitore_documenti`
+agganciata alla pratica; l'**importo netto** della pratica è la somma algebrica dei suoi
+documenti ed è la base del calcolo provvigioni (§5.3).
 
 ### 5.10 Un cliente → un subagente per fornitore
 
@@ -466,13 +545,14 @@ residui vengono risolti internamente da Marco.
 
 Le condizioni nuove valgono **dal periodo in cui vengono riviste**; quelle precedenti
 vanno rilette con le percentuali di allora. Implementazione: `bollettini_righe` congelano
-`pct_calcolata`/`importo_calcolato` alla verifica; la rilettura di un trimestre passato
+`pct_calcolata`/`importo_calcolato` alla verifica; la rilettura di un mese passato
 usa i valori congelati. Versioning degli scaglioni per periodo = estensione (§13).
 
 ### 5.12 Alert solo in-app
 
-Le segnalazioni (conferme in scadenza, bollettini da verificare, differenze) compaiono
-come **alert nella dashboard / nelle schermate**. **Nessuna email.**
+Le segnalazioni (conferme in scadenza, bollettini da verificare, differenze, **variazioni
+di composizione fra fasi e note di credito**) compaiono come **alert nella dashboard /
+nelle schermate**. **Nessuna email.**
 
 ### 5.13 Modifica manuale senza blocchi
 
@@ -500,12 +580,18 @@ flussi sotto usano questo canale.
 [1] Ordine  ──carica documento + dati letti──►  pratica in stato "inviato"
 [2] Conferma ──aggancio alla pratica──►  stato "confermato"  (quantità/importi possono variare)
 [3] Fattura  ──aggancio alla pratica──►  stato "fatturato"   → entra nel calcolo provvigioni
+[4] Nota di credito ──documento agganciato alla fattura──►  riduce l'imponibile (totale/parziale)
 ```
 
 - La pratica può essere agganciata all'**ordine cliente di origine** via
   `ordine_cliente_id` (§4.1): la tracciabilità parte dall'ordine ricevuto dal cliente.
 - Ogni fase include **upload del documento PDF** allegato alla pratica
-  (`att_filename_ordine` / `att_filename_conferma` / `att_filename_fattura`).
+  (`att_filename_ordine` / `att_filename_conferma` / `att_filename_fattura`); fatture e
+  note di credito vivono in `ordini_fornitore_documenti` con il proprio allegato (§4.2.7.1).
+- **Variazioni di composizione**: a ogni cambio di fase le righe vengono fotografate
+  (`fase`, §4.2.8); il confronto fra ordine, conferma e fattura è calcolato a runtime e
+  gli scostamenti (articoli aggiunti/tolti, quantità, prezzi) finiscono fra le
+  **segnalazioni** (§5.8, §5.12, §7.3).
 - Alla creazione della pratica si calcola `conferma_scadenza = data_ordine +
   giorni_attesa_conferma` del fornitore.
 - Passata la scadenza senza conferma, la pratica finisce nella lista **segnalazioni**
@@ -515,7 +601,7 @@ flussi sotto usano questo canale.
 
 ### 6.2 Flusso controllo bollettini
 
-1. Si imposta il bollettino (fornitore, trimestre, anno).
+1. Si imposta il bollettino (fornitore, mese, anno).
 2. Si inseriscono le **righe** del bollettino del fornitore (fattura, importo, % e
    importo riconosciuti).
 3. Il sistema calcola il **corrispondente atteso**: scaglione del fornitore applicato
@@ -572,8 +658,9 @@ flussi sotto usano questo canale.
 - Header con titolo e **trimestre corrente**; **KPI sempre visibili**: ordini in stato
   `inviato` / `confermato` / `fatturato` e totale merce fatturata del trimestre.
 - **Organizzazione a tab** (pattern `tabs-crm`): **Segnalazioni** — conferme scadute
-  (alert §5.12) e bollettini in stato `da_verificare`, con contatore sul tab; **Ordini
-  fornitore** — ultimi ordini (8) con accesso al dettaglio.
+  (alert §5.12), bollettini in stato `da_verificare` e **pratiche con variazioni di
+  composizione fra fasi** (o con note di credito, §5.8), con contatore sul tab;
+  **Ordini fornitore** — ultimi ordini (8) con accesso al dettaglio.
 - Contenitori stabili (V9): liste segnalazioni con altezza costante, ultimi ordini in
   tabella con intestazione fissa e scroll interno.
 
@@ -582,6 +669,8 @@ flussi sotto usano questo canale.
 - Filtri: stato (`inviato`/`confermato`/`fatturato`), testo libero (numero ordine,
   cliente, fornitore). Paginazione.
 - Colonna con n° righe; accesso al dettaglio.
+- **Flag variazioni**: le pratiche con scostamenti di composizione fra fasi o con note di
+  credito mostrano un badge, così l'operatore le individua subito (§5.8).
 
 ### 7.3 Dettaglio pratica (`/ordini-fornitore/:id`)
 
@@ -591,11 +680,16 @@ flussi sotto usano questo canale.
   - **Pratica** — dati testata (fornitore, numero/data ordine, cliente, agente, importo
     merce, stato, note) + **subagente derivato da `interscambio`** (§5.10) + documento
     ordine;
-  - **Conferma** — campi data/numero/scadenza; **Fattura** — campi numero/data/importo;
-    ciascuna fase con **upload PDF** e link all'allegato (`att_filename_*`), evidenziata
-    con check quando compilata;
+  - **Conferma** — campi data/numero/scadenza; **Fattura** — campi numero/data/importo +
+    elenco **documenti** (fatture e note di credito, §4.2.7.1) con importo netto;
+    ciascuna fase con **upload PDF** e link all'allegato, evidenziata con check quando
+    compilata;
   - **Righe** — tabella (numero riga, codice, descrizione, UM, q.tà, prezzo, importo)
-    con aggiunta/eliminazione e **totale merce** in chiusura.
+    con aggiunta/eliminazione e **totale merce** in chiusura;
+  - **Confronto fasi** — tabella per articolo con le tre colonne **Ordinato /
+    Confermato / Fatturato** allineate per `codice`, delta di quantità/importo
+    evidenziato e righe di articoli aggiunti/tolti; in coda le **note di credito** e lo
+    **scostamento complessivo** della pratica (§5.8).
 - Cambio stato guidato con accesso alla fase successiva.
 
 ### 7.4 Anagrafica fornitori (`/fornitori`, `/fornitori/:id`)
@@ -614,13 +708,14 @@ flussi sotto usano questo canale.
 ### 7.6 Interscambio (`/interscambio`)
 
 - Tabella: subagente (codice, cognome, nome) × agente × cliente (ragione sociale o
-  P.IVA) × fornitore.
-- Nuova associazione: subagente + cliente (P.IVA) + fornitore (+ sconto); vincolo unico
-  (§5.10). Eliminazione riga.
+  P.IVA) × fornitore, con **codice cliente del fornitore** e sconto.
+- Nuova associazione: subagente + cliente (P.IVA) + fornitore + **codice cliente del
+  fornitore** (come compare su conferma/fattura, §4.4) + sconto; vincolo unico
+  (§5.10) e vincolo unico del codice per fornitore. Eliminazione riga.
 
 ### 7.7 Bollettini (`/bollettini`, `/bollettini/:id`)
 
-- Elenco con filtro stato; colonne: fornitore, trimestre/anno, n° righe, riconosciuto,
+- Elenco con filtro stato; colonne: fornitore, mese/anno, n° righe, riconosciuto,
   calcolato, **totale differenze** (evidenziato se ≠ 0).
 - Dettaglio: righe con fattura, cliente, merce, riconosciuto/calcolato e `differenza`
   evidenziata; azioni: aggiungi/elimina riga, **conferma importo fornitore o modifica
@@ -740,6 +835,7 @@ Considerazioni:
 | POST | `/api/ordini-fornitore/:id/righe` | aggiunge riga |
 | DELETE | `/api/ordini-fornitore/:id/righe/:rid` | elimina riga |
 | POST | `/api/ordini-fornitore/:id/upload` | carica documento (ordine/conferma/fattura) |
+| POST/PUT/DELETE | `/api/ordini-fornitore/:id/documenti(/:did)` | documenti fiscali: fatture e note di credito (§4.2.7.1) |
 | GET | `/bollettini` · `/bollettini/:id` | elenco / dettaglio bollettini |
 | POST | `/api/bollettini` | crea bollettino |
 | PUT | `/api/bollettini/:id` | aggiorna stato/note |
@@ -824,10 +920,12 @@ Anagrafiche di riferimento per il collaudo:
 - **Fornitore**: Gries con scaglioni 0/1/5/10/100 % (§4.2.2).
 - **Agente**: Decobrands SRL (unico attivo).
 - **Subagenti**: Bastasin, Nista (es. eccezione Bastasin `3` sullo scaglione 1 %).
-- **Interscambio**: cliente con riferimenti fornitore + sconto (`discount`).
-- **Pratiche**: esempi negli stati `inviato`, `confermato`, `fatturato`; una nota di
-  credito (importo negativo) per validare §5.3; un ordine con conferma ridotta (7/10
-  articoli) per validare §5.8.
+- **Interscambio**: cliente con codice cliente del fornitore + sconto (`discount`).
+- **Pratiche**: esempi negli stati `inviato`, `confermato`, `fatturato`; un ordine con
+  **conferma ridotta** (7/10 articoli, righe `fase=conferma`) per validare §5.8; una
+  pratica **fatturata in più tranche** e una con **nota di credito parziale**
+  (documento `nota_credito`, importo negativo, §5.3/§5.9) per validare il confronto fasi
+  e il netto documenti.
 - **Eventi**: esempi di `eventi_app` coerenti con i dati sopra (login admin, creazione
   fornitore, modifica scaglione, cambio stato pratica, verifica bollettino, export
   liquidazione) + **un evento di tipo `errore`** per collaudare filtri e dettaglio
@@ -840,14 +938,12 @@ Anagrafiche di riferimento per il collaudo:
 | # | Argomento | Nota |
 |---|-----------|------|
 | B1 | Gestione UI delle `provvigioni_eccezioni` | modello dati pronto, UI da sviluppare |
-| B2 | Ordine multi-tranche / fattura multi-ordine | estendere con tabella a ponte pratica↔fattura |
-| B3 | Importazione mensile bollettini fornitori | il modello corrente è trimestrale; i bollettini arrivano mensili (§5.6) |
-| B4 | Riga bollettino con solo totale cliente | supportare riga aggregata (cliente + totale) nel confronto |
-| B5 | Versioning scaglioni per periodo | rilettura storica automatica (§5.11) |
-| B6 | Consolidamento sconto | `interscambio.discount` resta il campo canonico (§5.7); `fornitori.discount` è un semplice default |
-| B7 | Upload documenti | generare il file reale al posto del segnaposto (multer) |
-| B8 | Dati storici / popolamento iniziale | capire se importare le prassi dagli Excel manuali |
-| B9 | Casi cliente su più subagenti su fornitori diversi | risolti internamente da Marco |
+| B2 | Riga bollettino con solo totale cliente | supportare riga aggregata (cliente + totale) nel confronto |
+| B3 | Versioning scaglioni per periodo | rilettura storica automatica (§5.11) |
+| B4 | Consolidamento sconto | `interscambio.discount` resta il campo canonico (§5.7); `fornitori.discount` è un semplice default |
+| B5 | Upload documenti | generare il file reale al posto del segnaposto (multer) |
+| B6 | Dati storici / popolamento iniziale | capire se importare le prassi dagli Excel manuali |
+| B7 | Casi cliente su più subagenti su fornitori diversi | risolti internamente da Marco |
 
 ---
 
@@ -865,7 +961,7 @@ eseguito al volo nel browser.
 | Dati dimostrativi (§12) | ✅ |
 | Tracciamento eventi applicativi (V10, §4.2.11, §15) | ⏳ |
 | Frontend Next.js + backend NestJS (Prisma), database, autenticazione, upload, real-time (§3.3, §8) | ⁄ in roadmap |
-| Casi limite §13 (B1–B9) | ⏳ |
+| Casi limite §13 (B1–B7) | ⏳ |
 
 ---
 
@@ -932,8 +1028,8 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 |------------------|--------|----------|----------|---------|-------------|
 | create/update/delete agente | `crud` | `create`/`update`/`delete` | `agente` | `successo` | create/delete: `{etichetta: cognome, nome}`; update: `{etichetta, prima, dopo}` |
 | create/update/delete subagente | `crud` | `create`/`update`/`delete` | `subagente` | `successo` | come agente (create include `agente_id`) |
-| POST `/api/interscambio` | `crud` | `create` | `interscambio` | `successo` | `{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, discount}` |
-| DELETE `/api/interscambio/:id` | `crud` | `delete` | `interscambio` | `successo` | `{etichetta, interscambio_id, subagente_id, cliente_piva, fornitore_id, discount}` |
+| POST `/api/interscambio` | `crud` | `create` | `interscambio` | `successo` | `{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}` |
+| DELETE `/api/interscambio/:id` | `crud` | `delete` | `interscambio` | `successo` | `{etichetta, interscambio_id, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}` |
 
 #### 15.2.4 Pratiche ordine a fornitore (§8.1)
 
@@ -948,15 +1044,19 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 | DELETE `/api/ordini-fornitore/:id` | `crud` | `delete` | `pratica` | `successo` | `{etichetta: numero_ordine, pratica_id, fornitore_id, cliente_piva, importo_merce, stato}` |
 | POST `/api/ordini-fornitore/:id/upload` (ordine/conferma/fattura) | `documento` | `upload` | `pratica` | `successo` | `{etichetta, pratica_id, fase, att_filename, dimensione}` |
 | upload con esito negativo (validazione/OCR non riuscita, §6) | `documento` | `upload` | `pratica` | `errore` | `{etichetta, pratica_id, fase, att_filename, processing_errors_id}` |
+| POST `/api/ordini-fornitore/:id/documenti` (fattura/nota di credito, §4.2.7.1) | `documento` | `create` | `documento` | `successo` | `{etichetta: numero · tipo, pratica_id, documento_id, tipo, numero, data, importo, storno_totale, fattura_riferimento}` |
+| PUT `/api/ordini-fornitore/:id/documenti/:did` | `documento` | `update` | `documento` | `successo` | `{etichetta, documento_id, pratica_id, prima, dopo}` |
+| DELETE `/api/ordini-fornitore/:id/documenti/:did` | `documento` | `delete` | `documento` | `successo` | `{etichetta, documento_id, pratica_id, tipo, numero, importo}` |
+| PUT che fa avanzare di fase le righe (ordine→conferma→fattura, §5.8) | `stato` | `snapshot_righe` | `pratica` | `successo` | `{etichetta, pratica_id, da_fase, a_fase, n_righe, importo, scostamento_vs_fase_precedente}` |
 
 #### 15.2.5 Bollettini e righe bollettino (§8.1)
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
-| POST `/api/bollettini` | `crud` | `create` | `bollettino` | `successo` | `{etichetta: trimestre/anno · fornitore, fornitore_id, trimestre, anno, att_filename}` |
+| POST `/api/bollettini` | `crud` | `create` | `bollettino` | `successo` | `{etichetta: mese/anno · fornitore, fornitore_id, mese, anno, att_filename}` |
 | PUT `/api/bollettini/:id` (dati/note, **senza** cambio stato) | `crud` | `update` | `bollettino` | `successo` | `{etichetta, prima, dopo}` |
 | PUT `/api/bollettini/:id` **con** cambio stato (`da_verificare → verificato`/`contestato`) | `stato` | `change_state` | `bollettino` | `successo` | `{etichetta, prima: {stato}, dopo: {stato}, motivo: note}` |
-| **Verifica** del bollettino (conferma importi, congelamento % e importi §5.11) | `calcolo` | `verify` | `bollettino` | `successo` | `{etichetta, bollettino_id, periodo: {trimestre, anno}, importo_riconosciuto, importo_calcolato, differenza_totale}` |
+| **Verifica** del bollettino (conferma importi, congelamento % e importi §5.11) | `calcolo` | `verify` | `bollettino` | `successo` | `{etichetta, bollettino_id, periodo: {mese, anno}, importo_riconosciuto, importo_calcolato, differenza_totale}` |
 | POST `/api/bollettini/:id/righe` | `crud` | `create` | `riga_bollettino` | `successo` | `{etichetta: fattura_numero · cliente_piva, bollettino_id, fattura_numero, fattura_data, cliente_piva, importo_merce, pct_riconosciuta, importo_riconosciuto, pct_calcolata, importo_calcolato, differenza}` |
 | DELETE `/api/bollettini/:id/righe/:rid` | `crud` | `delete` | `riga_bollettino` | `successo` | `{etichetta, riga_bollettino_id, bollettino_id, fattura_numero, importo_riconosciuto, importo_calcolato}` |
 | **Correzione manuale** di un importo (§5.13) | `crud` | `update` | `riga_bollettino` | `successo` | `{etichetta, riga_bollettino_id, bollettino_id, prima, dopo}` |

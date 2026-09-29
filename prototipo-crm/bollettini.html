@@ -13,7 +13,7 @@
 <div class="container-fluid px-3 px-md-4 py-4">
 
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-primary"></i>Bollettini Trimestrali</h5>
+    <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-primary"></i>Bollettini</h5>
     <button class="btn btn-primary" onclick="apriModaleNuovo()"><i class="bi bi-plus-lg me-1"></i>Nuovo Bollettino</button>
   </div>
 
@@ -35,7 +35,7 @@
         <table class="table table-hover mb-0 align-middle">
           <thead class="table-dark">
             <tr>
-              <th>Fornitore</th><th>Trimestre</th><th>Anno</th><th>Stato</th><th class="text-center">Righe</th>
+              <th>Fornitore</th><th>Mese</th><th>Anno</th><th>Stato</th><th class="text-center">Righe</th>
               <th class="text-end">Riconosciuto</th><th class="text-end">Calcolato</th><th class="text-end">Differenza</th><th class="text-end">Azioni</th>
             </tr>
           </thead>
@@ -64,12 +64,20 @@
       </div>
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">Trimestre *</label>
-          <select class="form-select" name="trimestre">
-            <option value="1">Q1 (Gen-Mar)</option>
-            <option value="2">Q2 (Apr-Giu)</option>
-            <option value="3" selected>Q3 (Lug-Set)</option>
-            <option value="4">Q4 (Ott-Dic)</option>
+          <label class="form-label">Mese *</label>
+          <select class="form-select" name="mese">
+            <option value="1">Gennaio</option>
+            <option value="2">Febbraio</option>
+            <option value="3">Marzo</option>
+            <option value="4">Aprile</option>
+            <option value="5">Maggio</option>
+            <option value="6">Giugno</option>
+            <option value="7">Luglio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Settembre</option>
+            <option value="10">Ottobre</option>
+            <option value="11">Novembre</option>
+            <option value="12">Dicembre</option>
           </select>
         </div>
         <div class="col-md-6"><label class="form-label">Anno *</label><input type="number" class="form-control" name="anno" value="2026" required></div>
@@ -95,15 +103,15 @@ function render() {
     const t = bollettinoTotali(b);
     const clsDiff = t.differenza > 0 ? 'text-danger' : t.differenza < 0 ? 'text-success' : '';
     return '<tr>' +
-      '<td class="fw-semibold"><a href="bollettino-dettaglio.html?id=' + b.id + '" class="text-decoration-none">' + fornitoreNome(b.fornitore_id) + '</a></td>' +
-      '<td>' + TRIMESTRI[b.trimestre] + '</td>' +
+      '<td class="fw-semibold"><a href="bollettino-dettaglio.html?id=' + b.id + '" onclick="sessionStorage.setItem(\'bollettinoId\',' + b.id + ')" class="text-decoration-none">' + fornitoreNome(b.fornitore_id) + '</a></td>' +
+      '<td>' + meseLabel(b.mese) + '</td>' +
       '<td>' + b.anno + '</td>' +
       '<td><span class="badge badge-stato badge-' + b.stato + '">' + b.stato.replace('_', ' ') + '</span></td>' +
       '<td class="text-center"><span class="badge bg-secondary">' + (b.righe || []).length + '</span></td>' +
       '<td class="text-end">' + fmtEuro(t.riconosciuto) + '</td>' +
       '<td class="text-end">' + fmtEuro(t.calcolato) + '</td>' +
       '<td class="text-end"><span class="' + clsDiff + '">' + fmtEuro(t.differenza) + '</span></td>' +
-      '<td class="text-end"><a href="bollettino-dettaglio.html?id=' + b.id + '" class="btn btn-sm btn-outline-secondary" title="Dettaglio"><i class="bi bi-eye"></i></a></td></tr>';
+      '<td class="text-end"><a href="bollettino-dettaglio.html?id=' + b.id + '" onclick="sessionStorage.setItem(\'bollettinoId\',' + b.id + ')" class="btn btn-sm btn-outline-secondary" title="Dettaglio"><i class="bi bi-eye"></i></a></td></tr>';
   }).join('');
 }
 
@@ -111,7 +119,7 @@ function apriModaleNuovo() {
   const f = document.getElementById('formNuovo');
   f.reset();
   f.querySelector('[name="anno"]').value = new Date().getFullYear();
-  f.querySelector('[name="trimestre"]').value = 3;
+  f.querySelector('[name="mese"]').value = meseCorrente();
   f.elements.fornitore_id.innerHTML = '<option value="">Seleziona...</option>' +
     DATA.fornitori.map(x => '<option value="' + x.id + '">' + x.ragione_sociale + '</option>').join('');
   new bootstrap.Modal(document.getElementById('modalNuovo')).show();
@@ -119,11 +127,11 @@ function apriModaleNuovo() {
 function salva() {
   const f = Object.fromEntries(new FormData(document.getElementById('formNuovo')));
   if (!f.fornitore_id) return showToast('Seleziona un fornitore', false);
-  const dup = DATA.bollettini.find(b => b.fornitore_id === parseInt(f.fornitore_id, 10) && b.trimestre === parseInt(f.trimestre, 10) && b.anno === parseInt(f.anno, 10));
-  if (dup) return showToast('Esiste già un bollettino per lo stesso fornitore/trimestre/anno', false);
+  const dup = DATA.bollettini.find(b => b.fornitore_id === parseInt(f.fornitore_id, 10) && b.mese === parseInt(f.mese, 10) && b.anno === parseInt(f.anno, 10));
+  if (dup) return showToast('Esiste già un bollettino per lo stesso fornitore/mese/anno', false);
   DATA.bollettini.push({
     id: Math.max.apply(null, DATA.bollettini.map(b => b.id)) + 1,
-    fornitore_id: parseInt(f.fornitore_id), trimestre: parseInt(f.trimestre), anno: parseInt(f.anno),
+    fornitore_id: parseInt(f.fornitore_id), mese: parseInt(f.mese), anno: parseInt(f.anno),
     stato: 'da_verificare', note: '', righe: []
   });
   bootstrap.Modal.getInstance(document.getElementById('modalNuovo')).hide();

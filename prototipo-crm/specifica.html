@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.5, validata con il cliente.
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.6, validata con il cliente.
   </div>
 
   <div class="row g-4">
@@ -120,7 +120,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.5 — <strong>Stato:</strong> validata con il cliente</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.6 — <strong>Stato:</strong> validata con il cliente</p>
           <p class="small text-muted mb-3">Fonte: <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -345,6 +345,7 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
                   <tr><td><code>subagente_id</code></td><td>BIGINT FK → <code>subagenti</code></td><td>ON DELETE CASCADE</td></tr>
                   <tr><td><code>cliente_piva</code></td><td>VARCHAR(20) NOT NULL</td><td></td></tr>
                   <tr><td><code>fornitore_id</code></td><td>BIGINT FK → <code>fornitori</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>codice_cliente_fornitore</code></td><td>VARCHAR(50)</td><td>nullable — <strong>codice con cui il fornitore identifica il cliente</strong> (quello stampato su conferma e fattura): è la chiave per abbinare il documento ricevuto alla pratica (§4.4)</td></tr>
                   <tr><td><code>discount</code></td><td>NUMERIC(5,2) DEFAULT 0</td><td><strong>sconto accordato al cliente su quel fornitore</strong> — determina lo scaglione (<strong>§4.4</strong>)</td></tr>
                   <tr><td><code>attivo</code></td><td>BOOLEAN DEFAULT true</td><td></td></tr>
                   <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
@@ -352,6 +353,7 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
               </table>
             </div>
             <p class="small mt-2 mb-0"><strong>Vincolo</strong> <code>UNIQUE(subagente_id, cliente_piva, fornitore_id)</code> — un solo subagente per cliente×fornitore (<strong>§5.10</strong>).</p>
+            <p class="small mt-1 mb-0"><strong>Vincolo</strong> <code>UNIQUE(fornitore_id, codice_cliente_fornitore)</code> — il codice del fornitore non può essere attribuito a due clienti dello stesso fornitore (dove valorizzato).</p>
 
             <h4>4.2.7 <code>ordini_fornitore_testata</code></h4>
             <p class="small text-muted">La <strong>pratica</strong> dell'ordine a fornitore. Si completa man mano che arrivano i documenti e attraversa gli stati <code>inviato → confermato → fatturato</code>.</p>
@@ -375,26 +377,49 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
                   <tr><td><code>conferma_data</code></td><td>DATE</td><td></td></tr>
                   <tr><td><code>conferma_numero</code></td><td>VARCHAR(50)</td><td></td></tr>
                   <tr><td><code>conferma_scadenza</code></td><td>DATE</td><td><em>data ordine + giorni_attesa_conferma</em> del fornitore</td></tr>
-                  <tr><td><code>fattura_numero</code></td><td>VARCHAR(50)</td><td></td></tr>
-                  <tr><td><code>fattura_data</code></td><td>DATE</td><td></td></tr>
-                  <tr><td><code>fattura_importo</code></td><td>NUMERIC(12,2)</td><td></td></tr>
+                  <tr><td><code>fattura_numero</code></td><td>VARCHAR(50)</td><td>riferimento sintetico all'ultima fattura (i documenti completi stanno in §4.2.7.1)</td></tr>
+                  <tr><td><code>fattura_data</code></td><td>DATE</td><td>come sopra</td></tr>
+                  <tr><td><code>fattura_importo</code></td><td>NUMERIC(12,2)</td><td>come sopra</td></tr>
                   <tr><td><code>note</code></td><td>TEXT</td><td></td></tr>
                   <tr><td><code>created_at</code> / <code>updated_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
                 </tbody>
               </table>
             </div>
-            <blockquote class="blockquote-footer mt-2 fs-6">Il supporto a <strong>ordine fatturato in più tranche</strong> e <strong>fattura che copre più ordini</strong> (§5.9) passa da qui: i riferimenti fattura vanno estesi con un modello a ponte <code>ordini_fornitore_fatture</code> (pratica ↔ fattura) — vedi §13 backlog.</blockquote>
 
-            <h4>4.2.8 <code>ordini_fornitore_righe</code></h4>
-            <p class="small text-muted">Righe dell'ordine (con la conferma può cambiare la quantità: §5.8).</p>
+            <h4>4.2.7.1 <code>ordini_fornitore_documenti</code></h4>
+            <p class="small text-muted">Documenti fiscali <strong>agganciati alla pratica</strong>: fatture e <strong>note di credito</strong>. È il modello a ponte pratica ↔ documento che copre <strong>fatture multi-ordine</strong> e <strong>ordini fatturati in più tranche</strong> (§5.9): una pratica ha <strong>n</strong> documenti. Sostituisce, per i casi non banali, i campi singoli <code>fattura_*</code> della testata.</p>
             <div class="table-wrap">
               <table class="table table-sm table-bordered align-middle mb-0">
                 <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
                 <tbody>
                   <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
                   <tr><td><code>testata_id</code></td><td>BIGINT FK → <code>ordini_fornitore_testata</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>tipo</code></td><td>VARCHAR(20)</td><td><code>fattura</code> | <code>nota_credito</code></td></tr>
+                  <tr><td><code>numero</code></td><td>VARCHAR(50)</td><td>numero documento</td></tr>
+                  <tr><td><code>data</code></td><td>DATE</td><td></td></tr>
+                  <tr><td><code>importo</code></td><td>NUMERIC(12,2)</td><td><strong>positivo</strong> per fattura, <strong>negativo</strong> per nota di credito</td></tr>
+                  <tr><td><code>storno_totale</code></td><td>BOOLEAN DEFAULT false</td><td>per una nota di credito: <code>true</code> = storna tutta la fattura, <code>false</code> = storno parziale</td></tr>
+                  <tr><td><code>fattura_riferimento</code></td><td>VARCHAR(50)</td><td>nullable — numero della fattura stornata (per le note di credito)</td></tr>
+                  <tr><td><code>att_filename</code></td><td>TEXT</td><td>allegato PDF del documento</td></tr>
+                  <tr><td><code>note</code></td><td>TEXT</td><td></td></tr>
+                  <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <blockquote class="blockquote-footer mt-2 fs-6"><strong>Importo netto della pratica</strong> = somma algebrica degli <code>importo</code> dei documenti (fatture − note di credito). È il netto la <strong>base del calcolo provvigioni</strong> (§5.3): una nota di credito parziale riduce l'imponibile, una totale azzera la provvigione sulla fattura stornata. Finché la pratica non ha documenti, la base resta <code>importo_merce</code> (caso semplice: una sola fattura).</blockquote>
+            <blockquote class="blockquote-footer mt-2 fs-6"><strong>Fattura multi-ordine.</strong> Il documento è sempre agganciato a <strong>una</strong> pratica (<code>testata_id</code>); una fattura che copre più ordini è rappresentata da <strong>una riga per pratica</strong>, con <code>importo</code> = quota attribuita a quella pratica. La somma delle quote con lo stesso <code>numero</code>/<code>tipo</code> ricostruisce il totale della fattura; la provvigione si calcola sulla quota di pratica, non sul totale. Stessa cosa per una nota di credito che storna fatture di più pratiche.</blockquote>
+
+            <h4>4.2.8 <code>ordini_fornitore_righe</code></h4>
+            <p class="small text-muted">Righe della pratica, <strong>una fotografia per fase</strong> (<code>fase</code>): <code>ordine</code> (come inviato), <code>conferma</code> (come confermato dal fornitore, §5.8) e <code>fattura</code> (come fatturato). Le tre fotografie non si sovrascrivono: il <strong>confronto fra fasi</strong> è calcolato a runtime allineando le righe per <code>codice</code> (§7.3, §5.8).</p>
+            <div class="table-wrap">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
+                  <tr><td><code>testata_id</code></td><td>BIGINT FK → <code>ordini_fornitore_testata</code></td><td>ON DELETE CASCADE</td></tr>
+                  <tr><td><code>fase</code></td><td>VARCHAR(20) DEFAULT <code>'ordine'</code></td><td><code>ordine</code> | <code>conferma</code> | <code>fattura</code></td></tr>
                   <tr><td><code>numero_riga</code></td><td>INT</td><td></td></tr>
-                  <tr><td><code>codice</code></td><td>VARCHAR(100)</td><td></td></tr>
+                  <tr><td><code>codice</code></td><td>VARCHAR(100)</td><td>chiave di allineamento nel confronto fasi</td></tr>
                   <tr><td><code>descrizione</code></td><td>VARCHAR(255)</td><td></td></tr>
                   <tr><td><code>um</code></td><td>VARCHAR(20)</td><td></td></tr>
                   <tr><td><code>quantita</code></td><td>NUMERIC(12,3)</td><td></td></tr>
@@ -403,16 +428,17 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
                 </tbody>
               </table>
             </div>
+            <blockquote class="blockquote-footer mt-2 fs-6">Vincolo <code>UNIQUE(testata_id, fase, numero_riga)</code>. Al passaggio di stato le righe della fase precedente <strong>restano</strong>; la nuova fase ne salva una copia che l'operatore (o la lettura del documento) può modificare.</blockquote>
 
             <h4>4.2.9 <code>bollettini_testata</code></h4>
-            <p class="small text-muted">Bollettino del fornitore su un trimestre/anno. Stato <code>da_verificare → verificato | contestato</code>.</p>
+            <p class="small text-muted">Bollettino del fornitore su un mese/anno. Stato <code>da_verificare → verificato | contestato</code>.</p>
             <div class="table-wrap">
               <table class="table table-sm table-bordered align-middle mb-0">
                 <thead class="table-light"><tr><th>Colonna</th><th>Tipo</th><th>Note</th></tr></thead>
                 <tbody>
                   <tr><td><code>id</code></td><td>BIGSERIAL PK</td><td></td></tr>
                   <tr><td><code>fornitore_id</code></td><td>BIGINT FK → <code>fornitori</code></td><td></td></tr>
-                  <tr><td><code>trimestre</code></td><td>INT CHECK 1–4</td><td></td></tr>
+                  <tr><td><code>mese</code></td><td>INT CHECK 1–12</td><td></td></tr>
                   <tr><td><code>anno</code></td><td>INT</td><td></td></tr>
                   <tr><td><code>att_filename</code></td><td>TEXT</td><td>allegato bollettino</td></tr>
                   <tr><td><code>importo_riconosciuto</code></td><td>NUMERIC(12,2)</td><td>somma delle righe riconosciute dal fornitore</td></tr>
@@ -423,7 +449,7 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
                 </tbody>
               </table>
             </div>
-            <p class="small mt-2 mb-0"><strong>Vincolo</strong> <code>UNIQUE(fornitore_id, trimestre, anno)</code> — un bollettino per fornitore/periodo.</p>
+            <p class="small mt-2 mb-0"><strong>Vincolo</strong> <code>UNIQUE(fornitore_id, mese, anno)</code> — un bollettino per fornitore/mese.</p>
 
             <h4>4.2.10 <code>bollettini_righe</code></h4>
             <p class="small text-muted">Si appaia <strong>riga per riga</strong> quello che il fornitore riconosce con quello che il sistema ha calcolato.</p>
@@ -446,7 +472,7 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
                 </tbody>
               </table>
             </div>
-            <blockquote class="blockquote-footer mt-2 fs-6"><code>pct_calcolata</code> / <code>importo_calcolato</code> vengono <strong>congelati alla verifica</strong>: è il modo per rileggere un trimestre vecchio con le percentuali di allora (§5.11).</blockquote>
+            <blockquote class="blockquote-footer mt-2 fs-6"><code>pct_calcolata</code> / <code>importo_calcolato</code> vengono <strong>congelati alla verifica</strong>: è il modo per rileggere un mese vecchio con le percentuali di allora (§5.11).</blockquote>
           </section>
 
           <section id="sec-4-2-11">
@@ -461,7 +487,7 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
                   <tr><td><code>utente_id</code></td><td>BIGINT FK → <code>users</code></td><td>NULL per eventi di sistema / login non riuscito</td></tr>
                   <tr><td><code>sessione_id</code></td><td>VARCHAR(100)</td><td>sessione server-side (per eventi <code>auth</code>)</td></tr>
                   <tr><td><code>tipo</code></td><td>VARCHAR(30)</td><td><code>auth</code> · <code>crud</code> · <code>stato</code> · <code>documento</code> · <code>calcolo</code> · <code>export</code> · <code>errore</code></td></tr>
-                  <tr><td><code>entita</code></td><td>VARCHAR(50)</td><td><code>fornitore</code>, <code>scaglione</code>, <code>agente</code>, <code>subagente</code>, <code>interscambio</code>, <code>pratica</code>, <code>riga_pratica</code>, <code>bollettino</code>, <code>riga_bollettino</code>, <code>liquidazione</code>, <code>utente</code>, <code>sistema</code></td></tr>
+                  <tr><td><code>entita</code></td><td>VARCHAR(50)</td><td><code>fornitore</code>, <code>scaglione</code>, <code>agente</code>, <code>subagente</code>, <code>interscambio</code>, <code>pratica</code>, <code>riga_pratica</code>, <code>documento</code>, <code>bollettino</code>, <code>riga_bollettino</code>, <code>liquidazione</code>, <code>utente</code>, <code>sistema</code></td></tr>
                   <tr><td><code>entita_id</code></td><td>BIGINT</td><td>id dell'entità coinvolta (dove applicabile)</td></tr>
                   <tr><td><code>azione</code></td><td>VARCHAR(30)</td><td><code>create</code> · <code>update</code> · <code>delete</code> · <code>upload</code> · <code>export</code> · <code>change_state</code> · <code>verify</code> · <code>login</code> · <code>logout</code> · <code>change_password</code> · <code>reset_requested</code> · <code>access_denied</code> · <code>error</code></td></tr>
                   <tr><td><code>esito</code></td><td>VARCHAR(10)</td><td><code>successo</code> · <code>errore</code> · <code>negato</code></td></tr>
@@ -480,7 +506,9 @@ liquidazione.html       # rendiconto provvigioni subagenti + export CSV</code></
 fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
 fornitori 1 ── n ordini_fornitore_testata 1 ── n ordini_fornitore_righe
 fornitori 1 ── n bollettini_testata 1 ── n bollettini_righe
+ordini_fornitore_testata 1 ── n ordini_fornitore_documenti (fatture e note di credito, §4.2.7.1)
 interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)
+interscambio (fornitore_id, codice_cliente_fornitore) → ordini_fornitore_testata (cliente_piva, fornitore_id)
 ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1)
 users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
           </section>
@@ -489,8 +517,11 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
             <h3>4.4 Note di schema</h3>
             <ul>
               <li><code>interscambio.discount</code> è il <strong>campo canonico</strong> dello sconto cliente su fornitore (§5.7) e determina lo scaglione; <code>fornitori.discount</code> ne è solo un default ridondante.</li>
+<li><strong>Abbinamento dei documenti del fornitore</strong>: la conferma e la fattura riportano il <em>codice cliente del fornitore</em>, non la P.IVA. <code>interscambio.codice_cliente_fornitore</code> fa da traduzione verso <code>cliente_piva</code>: in arrivo documento il sistema risolve <code>fornitore_id + codice_cliente_fornitore → cliente_piva</code> e propone la pratica corrispondente; se il codice non è valorizzato l'abbinamento resta manuale (confermato dall'operatore, §6.1).</li>
               <li><code>conferma_scadenza</code> viene valorizzata automaticamente alla creazione della pratica con <code>data_ordine + giorni_attesa_conferma</code> (§6.1).</li>
               <li>Le percentuali storiche vengono congelate su <code>bollettini_righe</code> (§5.11); il versioning degli scaglioni per periodo è in backlog (§13).</li>
+              <li>Le <strong>righe per fase</strong> (<code>ordini_fornitore_righe.fase</code>) non si sovrascrivono: conservano la fotografia di ordine, conferma e fattura, così il confronto fra fasi resta ispezionabile a posteriori (§5.8, §7.3).</li>
+              <li>Gli <strong>importi delle provvigioni</strong> si calcolano sul <strong>netto documenti</strong> della pratica (§4.2.7.1, §5.3): le note di credito riducono l'imponibile senza generare pratiche a sé.</li>
             </ul>
           </section>
         </section>
@@ -513,7 +544,13 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
             <ul>
               <li><code>0,00 €</code> = <strong>nessuna provvigione</strong> (né agente né subagente).</li>
               <li><code>–</code> = il subagente prende la <strong>percentuale standard dello scaglione</strong> (equivalente all'assenza di eccezione).</li>
-              <li><strong>Nota di credito</strong> (importo negativo) → la provvigione lavora allo <strong>stesso modo ma in negativo</strong>: es. 10 % di −120,00 € = −12,00 €.</li>
+              <li><strong>Nota di credito</strong> → è un <strong>documento della pratica</strong> (<code>tipo = nota_credito</code>, §4.2.7.1), con importo <strong>negativo</strong>, figlio di una o più fatture. La provvigione lavora allo <strong>stesso modo ma in negativo</strong>: es. 10 % di −120,00 € = −12,00 €.
+                <ul>
+                  <li><strong>Totale</strong> (<code>storno_totale = true</code>): storna l'intera fattura a cui si riferisce → la provvigione su quella fattura va a zero.</li>
+                  <li><strong>Parziale</strong> (<code>storno_totale = false</code>): riduce l'imponibile della parte stornata per resi, abbuoni, sconti successivi.</li>
+                </ul>
+              </li>
+              <li>Nel flusso la nota di credito è un <strong>documento agganciato alla pratica</strong> (§6.1): non genera una pratica a sé. La provvigione si calcola sul <strong>netto</strong> dei documenti (fatture − note di credito, §4.2.7.1).</li>
             </ul>
           </section>
 
@@ -530,9 +567,9 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
           <section id="sec-5-6">
             <h3>5.6 Cadenze</h3>
             <ul>
-              <li><strong>Subagenti</strong>: trimestri fissi <strong>Gen-Mar, Apr-Giu, Lug-Set, Ott-Dic</strong>.</li>
-              <li><strong>Fornitori</strong>: inviano i bollettini <strong>mensilmente</strong> (la verifica resta per periodi aggregabili). Un fornitore ha cadenza diversa ma sarà rimosso.</li>
-              <li>Nel modello dati il bollettino corrente è su base trimestrale; l'importazione mensile è un'estensione prevista (§13).</li>
+<li><strong>Subagenti</strong>: liquidazione trimestrale su trimestri fissi <strong>Gen-Mar, Apr-Giu, Lug-Set, Ott-Dic</strong>.</li>
+            <li><strong>Fornitori</strong>: bollettini <strong>mensili</strong> — un documento per fornitore e mese (<code>fornitore_id</code>, <code>mese</code>, <code>anno</code>). Un fornitore con cadenza diversa sarà rimosso.</li>
+            <li>Il bollettino è la base <strong>mensile</strong>; la <strong>liquidazione ai subagenti</strong> resta trimestrale (§6.3) aggregando i bollettini del trimestre di competenza.</li>
             </ul>
           </section>
 
@@ -543,16 +580,24 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
 
           <section id="sec-5-8">
             <h3>5.8 La conferma può cambiare le carte in tavola</h3>
-            <p>Il fornitore può confermare <strong>quantità/importi diversi</strong> dall'ordine (es. 10 articoli ordinati, 7 confermati). La provvigione si calcola sui dati <strong>confermati</strong>, non sull'ordine originale. Stato pratica: la riga confermata sostituisce quella ordinata.</p>
+            <p>Il fornitore può confermare <strong>quantità/importi diversi</strong> dall'ordine (es. 10 articoli ordinati, 7 confermati). La provvigione si calcola sui dati <strong>fatturati</strong>, non sull'ordine originale.</p>
+            <p>Le tre fasi sono tenute come <strong>fotografie separate</strong> delle righe (<code>fase = ordine | conferma | fattura</code>, §4.2.8): la riga confermata <strong>non sostituisce</strong> più quella ordinata. Il sistema calcola il <strong>confronto fra fasi</strong> allineando le righe per <code>codice</code> e segnala gli scostamenti di composizione (§7.3, §7.1):</p>
+            <ul>
+              <li><strong>articoli spariti</strong> o <strong>comparsi</strong> fra una fase e l'altra;</li>
+              <li><strong>variazioni di quantità</strong> e/o <strong>prezzo</strong> (e quindi di importo);</li>
+              <li><strong>delta complessivo</strong> della pratica, evidenziato quando ≠ 0.</li>
+            </ul>
+            <p>Le pratiche con scostamenti compaiono fra le <strong>segnalazioni</strong> della dashboard (§5.12).</p>
           </section>
 
           <section id="sec-5-9">
             <h3>5.9 Fatture multi-ordine e ordini multi-tranche</h3>
-            <p>Entrambi i casi sono possibili e vanno supportati:</p>
+            <p>Entrambi i casi sono supportati dal modello a ponte dei <strong>documenti</strong> (§4.2.7.1):</p>
             <ul>
-              <li><strong>una fattura copre più ordini</strong> (già vista nel rendiconto: la 629 ne copre quattro);</li>
+              <li><strong>una fattura copre più ordini</strong> (già vista nel rendiconto: la 629 ne copre quattro): la stessa fattura compare su <strong>più pratiche</strong>, una riga per pratica in <code>ordini_fornitore_documenti</code> con la quota attribuita (§4.2.7.1);</li>
               <li><strong>un ordine viene fatturato in più tranche</strong> (tipico di importatori come Gasper GmbH e Ing's Christmas Decor GmbH, o clienti che tengono articoli in back order).</li>
             </ul>
+            <p>Ogni documento (<code>fattura</code> o <code>nota_credito</code>) è una riga di <code>ordini_fornitore_documenti</code> agganciata alla pratica; l'<strong>importo netto</strong> della pratica è la somma algebrica dei suoi documenti ed è la base del calcolo provvigioni (§5.3).</p>
           </section>
 
           <section id="sec-5-10">
@@ -562,12 +607,12 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
 
           <section id="sec-5-11">
             <h3>5.11 Le percentuali nel tempo</h3>
-            <p>Le condizioni nuove valgono <strong>dal periodo in cui vengono riviste</strong>; quelle precedenti vanno rilette con le percentuali di allora. Implementazione: <code>bollettini_righe</code> congelano <code>pct_calcolata</code>/<code>importo_calcolato</code> alla verifica; la rilettura di un trimestre passato usa i valori congelati. Versioning degli scaglioni per periodo = estensione (§13).</p>
+            <p>Le condizioni nuove valgono <strong>dal periodo in cui vengono riviste</strong>; quelle precedenti vanno rilette con le percentuali di allora. Implementazione: <code>bollettini_righe</code> congelano <code>pct_calcolata</code>/<code>importo_calcolato</code> alla verifica; la rilettura di un mese passato usa i valori congelati. Versioning degli scaglioni per periodo = estensione (§13).</p>
           </section>
 
           <section id="sec-5-12">
             <h3>5.12 Alert solo in-app</h3>
-            <p>Le segnalazioni (conferme in scadenza, bollettini da verificare, differenze) compaiono come <strong>alert nella dashboard / nelle schermate</strong>. <strong>Nessuna email.</strong></p>
+            <p>Le segnalazioni (conferme in scadenza, bollettini da verificare, differenze, <strong>variazioni di composizione fra fasi e note di credito</strong>) compaiono come <strong>alert nella dashboard / nelle schermate</strong>. <strong>Nessuna email.</strong></p>
           </section>
 
           <section id="sec-5-13">
@@ -584,10 +629,12 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
             <h3>6.1 Flusso documentale: ordine → conferma → fattura</h3>
 <pre class="spec-code"><code>[1] Ordine  ──carica documento + dati letti──►  pratica in stato "inviato"
 [2] Conferma ──aggancio alla pratica──►  stato "confermato"  (quantità/importi possono variare)
-[3] Fattura  ──aggancio alla pratica──►  stato "fatturato"   → entra nel calcolo provvigioni</code></pre>
+[3] Fattura  ──aggancio alla pratica──►  stato "fatturato"   → entra nel calcolo provvigioni
+[4] Nota di credito ──documento agganciato alla fattura──►  riduce l'imponibile (totale/parziale)</code></pre>
             <ul>
               <li>La pratica può essere agganciata all'<strong>ordine cliente di origine</strong> via <code>ordine_cliente_id</code> (§4.1): la tracciabilità parte dall'ordine ricevuto dal cliente.</li>
-              <li>Ogni fase include <strong>upload del documento PDF</strong> allegato alla pratica (<code>att_filename_ordine</code> / <code>att_filename_conferma</code> / <code>att_filename_fattura</code>).</li>
+              <li>Ogni fase include <strong>upload del documento PDF</strong> allegato alla pratica (<code>att_filename_ordine</code> / <code>att_filename_conferma</code> / <code>att_filename_fattura</code>); fatture e note di credito vivono in <code>ordini_fornitore_documenti</code> con il proprio allegato (§4.2.7.1).</li>
+              <li><strong>Variazioni di composizione</strong>: a ogni cambio di fase le righe vengono fotografate (<code>fase</code>, §4.2.8); il confronto fra ordine, conferma e fattura è calcolato a runtime e gli scostamenti (articoli aggiunti/tolti, quantità, prezzi) finiscono fra le <strong>segnalazioni</strong> (§5.8, §5.12, §7.3).</li>
               <li>Alla creazione della pratica si calcola <code>conferma_scadenza = data_ordine + giorni_attesa_conferma</code> del fornitore.</li>
               <li>Passata la scadenza senza conferma, la pratica finisce nella lista <strong>segnalazioni</strong> della dashboard (alert in-app, §5.12).</li>
               <li>La <strong>lettura automatica</strong> dei documenti propone i dati letti dal PDF (canale §6: importazione + validazione); l'operatore li <strong>conferma</strong> prima del salvataggio.</li>
@@ -597,7 +644,7 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
           <section id="sec-6-2">
             <h3>6.2 Flusso controllo bollettini</h3>
             <ol>
-              <li>Si imposta il bollettino (fornitore, trimestre, anno).</li>
+              <li>Si imposta il bollettino (fornitore, mese, anno).</li>
               <li>Si inseriscono le <strong>righe</strong> del bollettino del fornitore (fattura, importo, % e importo riconosciuti).</li>
               <li>Il sistema calcola il <strong>corrispondente atteso</strong>: scaglione del fornitore applicato all'importo merce → <code>pct_calcolata</code> e <code>importo_calcolato</code>, e quindi <code>differenza</code>.</li>
               <li>Le righe con differenza ≠ 0 vengono evidenziate; la testata cumula <code>importo_riconosciuto</code>, <code>importo_calcolato</code> e <code>totale_differenze</code>.</li>
@@ -635,7 +682,7 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
                 <tr><td>1</td><td><code>/login</code></td><td>Login</td></tr>
                 <tr><td>2</td><td><code>/dashboard</code></td><td>Dashboard (home dopo login)</td></tr>
                 <tr><td>3</td><td><code>/ordini-fornitore</code></td><td>Elenco pratiche ordini fornitore</td></tr>
-                <tr><td>4</td><td><code>/ordini-fornitore/:id</code></td><td>Dettaglio pratica (tab per fase + strip riepilogo + righe + storico)</td></tr>
+                <tr><td>4</td><td><code>/ordini-fornitore/:id</code></td><td>Dettaglio pratica (tab per fase + strip riepilogo + righe + confronto fasi + storico)</td></tr>
                 <tr><td>5</td><td><code>/fornitori</code></td><td>Anagrafica fornitori</td></tr>
                 <tr><td>6</td><td><code>/fornitori/:id</code></td><td>Dettaglio fornitore con scaglioni</td></tr>
                 <tr><td>7</td><td><code>/agenti</code></td><td>Agenti + subagenti</td></tr>
@@ -655,7 +702,7 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
             <h4>7.1 Dashboard (<code>/dashboard</code>)</h4>
             <ul>
               <li>Header con titolo e <strong>trimestre corrente</strong>; <strong>KPI sempre visibili</strong>: ordini in stato <code>inviato</code> / <code>confermato</code> / <code>fatturato</code> e totale merce fatturata del trimestre.</li>
-              <li><strong>Organizzazione a tab</strong> (pattern <code>tabs-crm</code>): <strong>Segnalazioni</strong> — conferme scadute (alert §5.12) e bollettini in stato <code>da_verificare</code>, con contatore sul tab; <strong>Ordini fornitore</strong> — ultimi ordini (8) con accesso al dettaglio.</li>
+              <li><strong>Organizzazione a tab</strong> (pattern <code>tabs-crm</code>): <strong>Segnalazioni</strong> — conferme scadute (alert §5.12), bollettini in stato <code>da_verificare</code> e <strong>pratiche con variazioni di composizione fra fasi</strong> (o con note di credito, §5.8), con contatore sul tab; <strong>Ordini fornitore</strong> — ultimi ordini (8) con accesso al dettaglio.</li>
               <li>Contenitori stabili (V9): liste segnalazioni con altezza costante, ultimi ordini in tabella con intestazione fissa e scroll interno.</li>
             </ul>
           </section>
@@ -665,6 +712,7 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
             <ul>
               <li>Filtri: stato (<code>inviato</code>/<code>confermato</code>/<code>fatturato</code>), testo libero (numero ordine, cliente, fornitore). Paginazione.</li>
               <li>Colonna con n° righe; accesso al dettaglio.</li>
+              <li><strong>Flag variazioni</strong>: le pratiche con scostamenti di composizione fra fasi o con note di credito mostrano un badge, così l'operatore le individua subito (§5.8).</li>
             </ul>
           </section>
 
@@ -676,8 +724,9 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
               <li><strong>Tab a flusso</strong>:
                 <ul>
                   <li><strong>Pratica</strong> — dati testata (fornitore, numero/data ordine, cliente, agente, importo merce, stato, note) + <strong>subagente derivato da <code>interscambio</code></strong> (§5.10) + documento ordine;</li>
-                  <li><strong>Conferma</strong> — campi data/numero/scadenza; <strong>Fattura</strong> — campi numero/data/importo; ciascuna fase con <strong>upload PDF</strong> e link all'allegato (<code>att_filename_*</code>), evidenziata con check quando compilata;</li>
-                  <li><strong>Righe</strong> — tabella (numero riga, codice, descrizione, UM, q.tà, prezzo, importo) con aggiunta/eliminazione e <strong>totale merce</strong> in chiusura.</li>
+                  <li><strong>Conferma</strong> — campi data/numero/scadenza; <strong>Fattura</strong> — campi numero/data/importo + elenco <strong>documenti</strong> (fatture e note di credito, §4.2.7.1) con importo netto; ciascuna fase con <strong>upload PDF</strong> e link all'allegato, evidenziata con check quando compilata;</li>
+                  <li><strong>Righe</strong> — tabella (numero riga, codice, descrizione, UM, q.tà, prezzo, importo) con aggiunta/eliminazione e <strong>totale merce</strong> in chiusura;</li>
+                  <li><strong>Confronto fasi</strong> — tabella per articolo con le tre colonne <strong>Ordinato / Confermato / Fatturato</strong> allineate per <code>codice</code>, delta di quantità/importo evidenziato e righe di articoli aggiunti/tolti; in coda le <strong>note di credito</strong> e lo <strong>scostamento complessivo</strong> della pratica (§5.8).</li>
                 </ul>
               </li>
               <li>Cambio stato guidato con accesso alla fase successiva.</li>
@@ -704,15 +753,15 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
           <section id="sec-7-6">
             <h4>7.6 Interscambio (<code>/interscambio</code>)</h4>
             <ul>
-              <li>Tabella: subagente (codice, cognome, nome) × agente × cliente (ragione sociale o P.IVA) × fornitore.</li>
-              <li>Nuova associazione: subagente + cliente (P.IVA) + fornitore (+ sconto); vincolo unico (§5.10). Eliminazione riga.</li>
+              <li>Tabella: subagente (codice, cognome, nome) × agente × cliente (ragione sociale o P.IVA) × fornitore, con <strong>codice cliente del fornitore</strong> e sconto.</li>
+              <li>Nuova associazione: subagente + cliente (P.IVA) + fornitore + <strong>codice cliente del fornitore</strong> (come compare su conferma/fattura, §4.4) + sconto; vincolo unico (§5.10) e vincolo unico del codice per fornitore. Eliminazione riga.</li>
             </ul>
           </section>
 
           <section id="sec-7-7">
             <h4>7.7 Bollettini (<code>/bollettini</code>, <code>/bollettini/:id</code>)</h4>
             <ul>
-              <li>Elenco con filtro stato; colonne: fornitore, trimestre/anno, n° righe, riconosciuto, calcolato, <strong>totale differenze</strong> (evidenziato se ≠ 0).</li>
+              <li>Elenco con filtro stato; colonne: fornitore, mese/anno, n° righe, riconosciuto, calcolato, <strong>totale differenze</strong> (evidenziato se ≠ 0).</li>
               <li>Dettaglio: righe con fattura, cliente, merce, riconosciuto/calcolato e <code>differenza</code> evidenziata; azioni: aggiungi/elimina riga, <strong>conferma importo fornitore o modifica manuale</strong> (§5.13), passa a <code>verificato</code>/<code>contestato</code>.</li>
             </ul>
           </section>
@@ -806,7 +855,8 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
                 <tr><td>DELETE</td><td><code>/api/ordini-fornitore/:id</code></td><td>elimina pratica</td></tr>
                 <tr><td>POST</td><td><code>/api/ordini-fornitore/:id/righe</code></td><td>aggiunge riga</td></tr>
                 <tr><td>DELETE</td><td><code>/api/ordini-fornitore/:id/righe/:rid</code></td><td>elimina riga</td></tr>
-                <tr><td>POST</td><td><code>/api/ordini-fornitore/:id/upload</code></td><td>carica documento (ordine/conferma/fattura)</td></tr>
+                <tr><td>POST/PUT/DELETE</td><td><code>/api/ordini-fornitore/:id/documenti(/:did)</code></td><td>documenti fiscali: fatture e note di credito (§4.2.7.1)</td></tr>
+            <tr><td>POST</td><td><code>/api/ordini-fornitore/:id/upload</code></td><td>carica documento (ordine/conferma/fattura)</td></tr>
                 <tr><td>GET</td><td><code>/bollettini</code> · <code>/bollettini/:id</code></td><td>elenco / dettaglio bollettini</td></tr>
                 <tr><td>POST</td><td><code>/api/bollettini</code></td><td>crea bollettino</td></tr>
                 <tr><td>PUT</td><td><code>/api/bollettini/:id</code></td><td>aggiorna stato/note</td></tr>
@@ -882,8 +932,8 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
             <li><strong>Fornitore</strong>: Gries con scaglioni 0/1/5/10/100 % (§4.2.2).</li>
             <li><strong>Agente</strong>: Decobrands SRL (unico attivo).</li>
             <li><strong>Subagenti</strong>: Bastasin, Nista (es. eccezione Bastasin <code>3</code> sullo scaglione 1 %).</li>
-            <li><strong>Interscambio</strong>: cliente con riferimenti fornitore + sconto (<code>discount</code>).</li>
-            <li><strong>Pratiche</strong>: esempi negli stati <code>inviato</code>, <code>confermato</code>, <code>fatturato</code>; una nota di credito (importo negativo) per validare §5.3; un ordine con conferma ridotta (7/10 articoli) per validare §5.8.</li>
+            <li><strong>Interscambio</strong>: cliente con <strong>codice cliente del fornitore</strong> + sconto (<code>discount</code>).</li>
+            <li><strong>Pratiche</strong>: esempi negli stati <code>inviato</code>, <code>confermato</code>, <code>fatturato</code>; un ordine con <strong>conferma ridotta</strong> (7/10 articoli, righe <code>fase=conferma</code>) per validare §5.8; una pratica <strong>fatturata in più tranche</strong> e una con <strong>nota di credito parziale</strong> (documento <code>nota_credito</code>, importo negativo, §5.3/§5.9) per validare il confronto fasi e il netto documenti.</li>
             <li><strong>Eventi</strong>: esempi di <code>eventi_app</code> coerenti con i dati sopra (login admin, creazione fornitore, modifica scaglione, cambio stato pratica, verifica bollettino, export liquidazione) + <strong>un evento di tipo <code>errore</code></strong> per collaudare filtri e dettaglio della schermata <code>/eventi</code> (§7.11, §15).</li>
           </ul>
         </section>
@@ -895,14 +945,12 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
               <thead class="table-light"><tr><th style="width:50px">#</th><th>Argomento</th><th>Nota</th></tr></thead>
               <tbody>
                 <tr><td>B1</td><td>Gestione UI delle <code>provvigioni_eccezioni</code></td><td>modello dati pronto, UI da sviluppare</td></tr>
-                <tr><td>B2</td><td>Ordine multi-tranche / fattura multi-ordine</td><td>estendere con tabella a ponte pratica↔fattura</td></tr>
-                <tr><td>B3</td><td>Importazione mensile bollettini fornitori</td><td>il modello corrente è trimestrale; i bollettini arrivano mensili (§5.6)</td></tr>
-                <tr><td>B4</td><td>Riga bollettino con solo totale cliente</td><td>supportare riga aggregata (cliente + totale) nel confronto</td></tr>
-                <tr><td>B5</td><td>Versioning scaglioni per periodo</td><td>rilettura storica automatica (§5.11)</td></tr>
-                <tr><td>B6</td><td>Consolidamento sconto</td><td><code>interscambio.discount</code> resta il campo canonico (§5.7); <code>fornitori.discount</code> è un semplice default</td></tr>
-                <tr><td>B7</td><td>Upload documenti</td><td>generare il file reale al posto del segnaposto (multer)</td></tr>
-                <tr><td>B8</td><td>Dati storici / popolamento iniziale</td><td>capire se importare le prassi dagli Excel manuali</td></tr>
-                <tr><td>B9</td><td>Casi cliente su più subagenti su fornitori diversi</td><td>risolti internamente da Marco</td></tr>
+                <tr><td>B2</td><td>Riga bollettino con solo totale cliente</td><td>supportare riga aggregata (cliente + totale) nel confronto</td></tr>
+                <tr><td>B3</td><td>Versioning scaglioni per periodo</td><td>rilettura storica automatica (§5.11)</td></tr>
+                <tr><td>B4</td><td>Consolidamento sconto</td><td><code>interscambio.discount</code> resta il campo canonico (§5.7); <code>fornitori.discount</code> è un semplice default</td></tr>
+                <tr><td>B5</td><td>Upload documenti</td><td>generare il file reale al posto del segnaposto (multer)</td></tr>
+                <tr><td>B6</td><td>Dati storici / popolamento iniziale</td><td>capire se importare le prassi dagli Excel manuali</td></tr>
+                <tr><td>B7</td><td>Casi cliente su più subagenti su fornitori diversi</td><td>risolti internamente da Marco</td></tr>
               </tbody>
             </table>
           </div>
@@ -921,7 +969,7 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
                 <tr><td>Dati dimostrativi (§12)</td><td>✅</td></tr>
                 <tr><td>Tracciamento eventi applicativi (V10, §4.2.11, §15)</td><td>⏳</td></tr>
                 <tr><td>Backend NestJS + frontend Next.js, database, autenticazione, upload, notifiche real-time (§3.3, §8)</td><td>⁄ in roadmap</td></tr>
-                <tr><td>Casi limite §13 (B1–B9)</td><td>⏳</td></tr>
+                <tr><td>Casi limite §13 (B1–B7)</td><td>⏳</td></tr>
               </tbody>
             </table>
           </div>
@@ -979,8 +1027,8 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
               <tbody>
                 <tr><td>create/update/delete agente</td><td><code>crud</code></td><td><code>create</code>/<code>update</code>/<code>delete</code></td><td><code>agente</code></td><td><code>successo</code></td><td>create/delete: <code>{etichetta: cognome, nome}</code>; update: <code>{etichetta, prima, dopo}</code></td></tr>
                 <tr><td>create/update/delete subagente</td><td><code>crud</code></td><td><code>create</code>/<code>update</code>/<code>delete</code></td><td><code>subagente</code></td><td><code>successo</code></td><td>come agente (create include <code>agente_id</code>)</td></tr>
-                <tr><td>POST <code>/api/interscambio</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>interscambio</code></td><td><code>successo</code></td><td><code>{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, discount}</code></td></tr>
-                <tr><td>DELETE <code>/api/interscambio/:id</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>interscambio</code></td><td><code>successo</code></td><td><code>{etichetta, interscambio_id, subagente_id, cliente_piva, fornitore_id, discount}</code></td></tr>
+<tr><td>POST <code>/api/interscambio</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>interscambio</code></td><td><code>successo</code></td><td><code>{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}</code></td></tr>
+<tr><td>DELETE <code>/api/interscambio/:id</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>interscambio</code></td><td><code>successo</code></td><td><code>{etichetta, interscambio_id, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}</code></td></tr>
               </tbody>
             </table>
           </div>
@@ -999,6 +1047,10 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
                 <tr><td>DELETE <code>/api/ordini-fornitore/:id</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><code>{etichetta: numero_ordine, pratica_id, fornitore_id, cliente_piva, importo_merce, stato}</code></td></tr>
                 <tr><td>POST <code>/api/ordini-fornitore/:id/upload</code> (ordine/conferma/fattura)</td><td><code>documento</code></td><td><code>upload</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><code>{etichetta, pratica_id, fase, att_filename, dimensione}</code></td></tr>
                 <tr><td>upload con esito negativo (validazione/OCR non riuscita, §6)</td><td><code>documento</code></td><td><code>upload</code></td><td><code>pratica</code></td><td><code>errore</code></td><td><code>{etichetta, pratica_id, fase, att_filename, processing_errors_id}</code></td></tr>
+                <tr><td>POST <code>/api/ordini-fornitore/:id/documenti</code> (fattura/nota di credito, §4.2.7.1)</td><td><code>documento</code></td><td><code>create</code></td><td><code>documento</code></td><td><code>successo</code></td><td><code>{etichetta: numero · tipo, pratica_id, documento_id, tipo, numero, data, importo, storno_totale, fattura_riferimento}</code></td></tr>
+                <tr><td>PUT <code>/api/ordini-fornitore/:id/documenti/:did</code></td><td><code>documento</code></td><td><code>update</code></td><td><code>documento</code></td><td><code>successo</code></td><td><code>{etichetta, documento_id, pratica_id, prima, dopo}</code></td></tr>
+                <tr><td>DELETE <code>/api/ordini-fornitore/:id/documenti/:did</code></td><td><code>documento</code></td><td><code>delete</code></td><td><code>documento</code></td><td><code>successo</code></td><td><code>{etichetta, documento_id, pratica_id, tipo, numero, importo}</code></td></tr>
+                <tr><td>PUT che fa avanzare di fase le righe (ordine→conferma→fattura, §5.8)</td><td><code>stato</code></td><td><code>snapshot_righe</code></td><td><code>pratica</code></td><td><code>successo</code></td><td><code>{etichetta, pratica_id, da_fase, a_fase, n_righe, importo, scostamento_vs_fase_precedente}</code></td></tr>
               </tbody>
             </table>
           </div>
@@ -1008,10 +1060,10 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
             <table class="table table-sm table-bordered align-middle mb-0">
               <thead class="table-light"><tr><th>Operazione (API)</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
               <tbody>
-                <tr><td>POST <code>/api/bollettini</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta: trimestre/anno · fornitore, fornitore_id, trimestre, anno, att_filename}</code></td></tr>
+                <tr><td>POST <code>/api/bollettini</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta: mese/anno · fornitore, fornitore_id, mese, anno, att_filename}</code></td></tr>
                 <tr><td>PUT <code>/api/bollettini/:id</code> (dati/note, <strong>senza</strong> cambio stato)</td><td><code>crud</code></td><td><code>update</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, prima, dopo}</code></td></tr>
                 <tr><td>PUT <code>/api/bollettini/:id</code> <strong>con</strong> cambio stato (<code>da_verificare → verificato</code>/<code>contestato</code>)</td><td><code>stato</code></td><td><code>change_state</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, prima: {stato}, dopo: {stato}, motivo: note}</code></td></tr>
-                <tr><td><strong>Verifica</strong> del bollettino (conferma importi, congelamento % e importi §5.11)</td><td><code>calcolo</code></td><td><code>verify</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, bollettino_id, periodo: {trimestre, anno}, importo_riconosciuto, importo_calcolato, differenza_totale}</code></td></tr>
+                <tr><td><strong>Verifica</strong> del bollettino (conferma importi, congelamento % e importi §5.11)</td><td><code>calcolo</code></td><td><code>verify</code></td><td><code>bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, bollettino_id, periodo: {mese, anno}, importo_riconosciuto, importo_calcolato, differenza_totale}</code></td></tr>
                 <tr><td>POST <code>/api/bollettini/:id/righe</code></td><td><code>crud</code></td><td><code>create</code></td><td><code>riga_bollettino</code></td><td><code>successo</code></td><td><code>{etichetta: fattura_numero · cliente_piva, bollettino_id, fattura_numero, fattura_data, cliente_piva, importo_merce, pct_riconosciuta, importo_riconosciuto, pct_calcolata, importo_calcolato, differenza}</code></td></tr>
                 <tr><td>DELETE <code>/api/bollettini/:id/righe/:rid</code></td><td><code>crud</code></td><td><code>delete</code></td><td><code>riga_bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, riga_bollettino_id, bollettino_id, fattura_numero, importo_riconosciuto, importo_calcolato}</code></td></tr>
                 <tr><td><strong>Correzione manuale</strong> di un importo (§5.13)</td><td><code>crud</code></td><td><code>update</code></td><td><code>riga_bollettino</code></td><td><code>successo</code></td><td><code>{etichetta, riga_bollettino_id, bollettino_id, prima, dopo}</code></td></tr>
