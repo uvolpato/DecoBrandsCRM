@@ -723,7 +723,9 @@ flussi sotto usano questo canale.
 
 ### 7.8 Liquidazione (`/liquidazione`)
 
-- **Filtri in card**: fornitore, subagente, trimestre, anno.
+- **Filtri in card**: fornitore (**multifiltro a checkbox**: selezione multipla,
+  "Tutti i fornitori" di default, etichetta con contatore; nessun fornitore
+  selezionato = nessuna riga), subagente, trimestre, anno.
 - **KPI del periodo**: documenti liquidabili, totale merce, provvigione agente,
   provvigione subagenti (solo pratiche `fatturato` del periodo, §5.5; V9).
 - **Tab Riepilogo / Dettaglio rendiconto**: riepilogo per subagente (n° fatture, totale
@@ -1068,7 +1070,7 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
-| GET `/api/liquidazione/export` | `export` | `export` | `liquidazione` | `successo` | `{etichetta: trimestre/anno, periodo: {trimestre, anno}, filtro: {fornitore?, subagente?}, n_righe, importo_totale}` |
+| GET `/api/liquidazione/export` | `export` | `export` | `liquidazione` | `successo` | `{etichetta: trimestre/anno, periodo: {trimestre, anno}, filtro: {fornitori?: number[], subagente?}, n_righe, importo_totale}` |
 | export con errori (dati/campi mancanti) | `export` | `export` | `liquidazione` | `errore` | `{etichetta, periodo, motivo}` |
 
 > Il **rendiconto** §7.8 è calcolato al volo (GET = nessun evento); diventa un evento

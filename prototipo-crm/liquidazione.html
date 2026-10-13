@@ -29,9 +29,13 @@
       <form class="row g-3 justify-content-between align-items-end" onsubmit="event.preventDefault(); render();">
         <div class="col-md-3">
           <label class="form-label small text-muted text-uppercase fw-semibold" style="letter-spacing:.4px">Fornitore</label>
-          <select id="filtroFornitore" class="form-select form-select-sm">
-            <option value="">Tutti i fornitori</option>
-          </select>
+          <div class="dropdown">
+            <button type="button" class="btn btn-sm bg-white border w-100 d-flex justify-content-between align-items-center dropdown-toggle text-start"
+                    id="btnFornitore" data-bs-toggle="dropdown" aria-expanded="false">
+              <span id="lblFornitore">Tutti i fornitori</span>
+            </button>
+            <ul class="dropdown-menu p-2 w-100" id="menuFornitori" style="max-height:240px;overflow-y:auto"></ul>
+          </div>
         </div>
         <div class="col-md-3">
           <label class="form-label small text-muted text-uppercase fw-semibold" style="letter-spacing:.4px">Subagente</label>
@@ -158,13 +162,41 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function initFiltri() {
-  const f = document.getElementById('filtroFornitore');
-  f.innerHTML = '<option value="">Tutti i fornitori</option>' + DATA.fornitori.map(x => '<option value="' + x.id + '">' + x.ragione_sociale + '</option>').join('');
+  const menu = document.getElementById('menuFornitori');
+  menu.innerHTML =
+    '<li><label class="dropdown-item d-flex align-items-center gap-2 fw-semibold"><input type="checkbox" class="form-check-input mt-0" id="chkFornTutti" checked> Tutti i fornitori</label></li>' +
+    '<li><hr class="dropdown-divider my-1"></li>' +
+    DATA.fornitori.map(x => '<li><label class="dropdown-item d-flex align-items-center gap-2"><input type="checkbox" class="form-check-input mt-0 chk-forn" value="' + x.id + '" checked> ' + x.ragione_sociale + '</label></li>').join('');
+  menu.addEventListener('change', onFornitoriChange);
   const s = document.getElementById('filtroSubagente');
   s.innerHTML = '<option value="">Tutti i subagenti</option>' + DATA.subagenti.map(x => '<option value="' + x.id + '">' + x.nome + ' ' + x.cognome + '</option>').join('');
 }
+function onFornitoriChange(e) {
+  const tutti = document.getElementById('chkFornTutti');
+  const chks = Array.from(document.querySelectorAll('.chk-forn'));
+  if (e.target === tutti) {
+    chks.forEach(c => c.checked = tutti.checked);
+  } else {
+    const on = chks.filter(c => c.checked).length;
+    tutti.checked = on === chks.length;
+    tutti.indeterminate = on > 0 && on < chks.length;
+  }
+  aggiornaLabelFornitori();
+}
+function fornitoriSelezionati() {
+  return Array.from(document.querySelectorAll('.chk-forn:checked')).map(c => Number(c.value));
+}
+function aggiornaLabelFornitori() {
+  const tot = DATA.fornitori.length;
+  const n = fornitoriSelezionati().length;
+  document.getElementById('lblFornitore').textContent =
+    n === tot ? 'Tutti i fornitori' : (n === 0 ? 'Nessun fornitore' : 'Fornitori (' + n + ')');
+}
 function resetFiltri() {
-  document.getElementById('filtroFornitore').value = '';
+  document.getElementById('chkFornTutti').checked = true;
+  document.getElementById('chkFornTutti').indeterminate = false;
+  document.querySelectorAll('.chk-forn').forEach(c => c.checked = true);
+  aggiornaLabelFornitori();
   document.getElementById('filtroSubagente').value = '';
   document.getElementById('filtroTrimestre').value = 3;
   document.getElementById('filtroAnno').value = new Date().getFullYear();
@@ -172,7 +204,7 @@ function resetFiltri() {
 }
 function filtriCorrenti() {
   return {
-    fornitore: document.getElementById('filtroFornitore').value,
+    fornitori: fornitoriSelezionati(),
     subagente: document.getElementById('filtroSubagente').value,
     trimestre: document.getElementById('filtroTrimestre').value,
     anno: parseInt(document.getElementById('filtroAnno').value, 10) || new Date().getFullYear()
@@ -183,7 +215,7 @@ function righeRendiconto() {
   const out = [];
   DATA.ordini.forEach(o => {
     if (o.stato !== 'fatturato') return;
-    if (filt.fornitore && o.fornitore_id !== parseInt(filt.fornitore, 10)) return;
+    if (filt.fornitori.length < DATA.fornitori.length && !filt.fornitori.includes(Number(o.fornitore_id))) return;
     if (filt.trimestre && !inTrimestre(o.data_ordine, filt.trimestre, filt.anno)) return;
     const c = commissionePerOrdine(o);
     if (!c) return;

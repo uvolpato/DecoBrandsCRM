@@ -769,7 +769,7 @@ users 1 ── n eventi_app  (audit append-only, §15)</code></pre>
           <section id="sec-7-8">
             <h4>7.8 Liquidazione (<code>/liquidazione</code>)</h4>
             <ul>
-              <li><strong>Filtri in card</strong>: fornitore, subagente, trimestre, anno.</li>
+              <li><strong>Filtri in card</strong>: fornitore (<strong>multifiltro a checkbox</strong>: selezione multipla, "Tutti i fornitori" di default, etichetta con contatore; nessun fornitore selezionato = nessuna riga), subagente, trimestre, anno.</li>
               <li><strong>KPI del periodo</strong>: documenti liquidabili, totale merce, provvigione agente, provvigione subagenti (solo pratiche <code>fatturato</code> del periodo, §5.5; V9).</li>
               <li><strong>Tab Riepilogo / Dettaglio rendiconto</strong>: riepilogo per subagente (n° fatture, totale merce, totale provvigione subagente) con riga totale; dettaglio riga per riga.</li>
               <li><strong>Export</strong> con i campi §11 nell'header del dettaglio.</li>
@@ -1077,7 +1077,7 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
             <table class="table table-sm table-bordered align-middle mb-0">
               <thead class="table-light"><tr><th>Operazione (API)</th><th><code>tipo</code></th><th><code>azione</code></th><th><code>entita</code></th><th><code>esito</code></th><th><code>dettaglio</code></th></tr></thead>
               <tbody>
-                <tr><td>GET <code>/api/liquidazione/export</code></td><td><code>export</code></td><td><code>export</code></td><td><code>liquidazione</code></td><td><code>successo</code></td><td><code>{etichetta: trimestre/anno, periodo: {trimestre, anno}, filtro: {fornitore?, subagente?}, n_righe, importo_totale}</code></td></tr>
+                <tr><td>GET <code>/api/liquidazione/export</code></td><td><code>export</code></td><td><code>export</code></td><td><code>liquidazione</code></td><td><code>successo</code></td><td><code>{etichetta: trimestre/anno, periodo: {trimestre, anno}, filtro: {fornitori?: number[], subagente?}, n_righe, importo_totale}</code></td></tr>
                 <tr><td>export con errori (dati/campi mancanti)</td><td><code>export</code></td><td><code>export</code></td><td><code>liquidazione</code></td><td><code>errore</code></td><td><code>{etichetta, periodo, motivo}</code></td></tr>
               </tbody>
             </table>
