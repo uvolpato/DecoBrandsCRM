@@ -8,135 +8,81 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="assets/css/crm.css" rel="stylesheet">
 </head>
-<body>
+<body class="crm-app">
 <div id="topnav" data-active="bollettini.html"></div>
-<div class="container-fluid px-3 px-md-4 py-4">
-
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-primary"></i>Bollettini</h5>
-    <button class="btn btn-primary" onclick="apriModaleNuovo()"><i class="bi bi-plus-lg me-1"></i>Nuovo Bollettino</button>
-  </div>
-
-  <!-- Filtri -->
-  <form class="row g-2 mb-3" onsubmit="event.preventDefault(); render();">
-    <div class="col-auto">
-      <select id="filtroStato" class="form-select form-select-sm" onchange="render()">
-        <option value="">Tutti gli stati</option>
-        <option value="da_verificare">Da verificare</option>
-        <option value="verificato">Verificato</option>
-        <option value="contestato">Contestato</option>
-      </select>
-    </div>
-  </form>
-
-  <div class="card">
-    <div class="card-body p-0">
-      <div class="table-box">
-        <table class="table table-hover mb-0 align-middle">
-          <thead class="table-dark">
-            <tr>
-              <th>Fornitore</th><th>Mese</th><th>Anno</th><th>Stato</th><th class="text-center">Righe</th>
-              <th class="text-end">Riconosciuto</th><th class="text-end">Calcolato</th><th class="text-end">Differenza</th><th class="text-end">Azioni</th>
-            </tr>
-          </thead>
-          <tbody id="tbodyBollettini"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <div class="alert alert-light border mt-3 nota-prototipo mb-0">
-    <i class="bi bi-info-circle me-1"></i>
-    <strong>Confronto (§6.2):</strong> la colonna <em>Calcolato</em> è ricalcolata a runtime dall'app tramite gli
-    scaglioni del fornitore (sezione §10); la <em>Differenza</em> = Riconosciuto − Calcolato evidenzia in rosso gli
-    importi maggiori del calcolato (da verificare) e in verde i minori.
-  </div>
-</div>
-
-<!-- Modal Nuovo Bollettino -->
-<div class="modal fade" id="modalNuovo" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-  <div class="modal-header"><h5 class="modal-title">Nuovo Bollettino</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-  <div class="modal-body">
-    <form id="formNuovo">
-      <div class="mb-3">
-        <label class="form-label">Fornitore *</label>
-        <select class="form-select" name="fornitore_id" required></select>
-      </div>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Mese *</label>
-          <select class="form-select" name="mese">
-            <option value="1">Gennaio</option>
-            <option value="2">Febbraio</option>
-            <option value="3">Marzo</option>
-            <option value="4">Aprile</option>
-            <option value="5">Maggio</option>
-            <option value="6">Giugno</option>
-            <option value="7">Luglio</option>
-            <option value="8">Agosto</option>
-            <option value="9">Settembre</option>
-            <option value="10">Ottobre</option>
-            <option value="11">Novembre</option>
-            <option value="12">Dicembre</option>
-          </select>
-        </div>
-        <div class="col-md-6"><label class="form-label">Anno *</label><input type="number" class="form-control" name="anno" value="2026" required></div>
-      </div>
-    </form>
-  </div>
-  <div class="modal-footer">
-    <button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-    <button class="btn btn-primary" onclick="salva()">Crea</button>
-  </div>
-</div></div></div>
+<main class="crm-pagina" id="pagina"></main>
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="assets/js/componenti.js"></script>
 <script>
+/* Composizione: Intestazione + FilterBar + DataTable + Nota */
+CRM.Intestazione('#pagina', {
+  titolo: 'Bollettini', icona: 'bi-receipt',
+  azioni: [{ etichetta: 'Nuovo Bollettino', icona: 'bi-plus-lg', onClick: apriModaleNuovo }]
+});
+
+const filtri = CRM.FilterBar('#pagina', {
+  card: false,
+  campi: [{ nome: 'stato', tipo: 'select', col: 'col-auto', opzioni: [
+    { value: '', label: 'Tutti gli stati' }, { value: 'da_verificare', label: 'Da verificare' },
+    { value: 'verificato', label: 'Verificato' }, { value: 'contestato', label: 'Contestato' }] }],
+  onChange: render
+});
+
+const tot = b => bollettinoTotali(b);
+const clsDiff = v => v > 0 ? 'text-danger' : v < 0 ? 'text-success' : '';
+
+const tabella = CRM.DataTable(CRM.blocco('#pagina', { riempi: true }), {
+  colonne: [
+    { key: 'fornitore', header: 'Fornitore', grow: true, valore: b => fornitoreNome(b.fornitore_id),
+      cell: b => '<a href="bollettino-dettaglio.html?id=' + b.id + '" onclick="sessionStorage.setItem(\'bollettinoId\',' + b.id + ')" class="text-decoration-none fw-semibold">' + CRM.esc(fornitoreNome(b.fornitore_id)) + '</a>' },
+    { key: 'mese', header: 'Mese', sortValue: b => b.mese, cell: b => meseLabel(b.mese) },
+    { key: 'anno', header: 'Anno', tipo: 'numero', align: 'left', cell: b => b.anno },
+    { key: 'stato', header: 'Stato', tipo: 'stato' },
+    { key: 'righe', header: 'Righe', tipo: 'conteggio', valore: b => (b.righe || []).length },
+    { key: 'riconosciuto', header: 'Riconosciuto', tipo: 'euro', valore: b => tot(b).riconosciuto },
+    { key: 'calcolato', header: 'Calcolato', tipo: 'euro', valore: b => tot(b).calcolato },
+    { key: 'differenza', header: 'Differenza', tipo: 'euro', valore: b => tot(b).differenza,
+      cell: b => { const d = tot(b).differenza; return '<span class="' + clsDiff(d) + '">' + fmtEuro(d) + '</span>'; } }
+  ],
+  azioni: [{ icona: 'bi-eye', tooltip: 'Dettaglio', onClick: b => CRM.apriBollettino(b.id) }],
+  onRowClick: b => CRM.apriBollettino(b.id),
+  emptyText: 'Nessun bollettino presente'
+});
+
+CRM.Nota('#pagina',
+  '<strong>Confronto (§6.2):</strong> la colonna <em>Calcolato</em> è ricalcolata a runtime dall\'app tramite gli ' +
+  'scaglioni del fornitore (sezione §10); la <em>Differenza</em> = Riconosciuto − Calcolato evidenzia in rosso gli ' +
+  'importi maggiori del calcolato (da verificare) e in verde i minori.');
+
 function render() {
-  const stato = document.getElementById('filtroStato').value;
-  const list = DATA.bollettini.filter(b => !stato || b.stato === stato);
-  const tb = document.getElementById('tbodyBollettini');
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Nessun bollettino presente</td></tr>'; return; }
-  tb.innerHTML = list.map(b => {
-    const t = bollettinoTotali(b);
-    const clsDiff = t.differenza > 0 ? 'text-danger' : t.differenza < 0 ? 'text-success' : '';
-    return '<tr>' +
-      '<td class="fw-semibold"><a href="bollettino-dettaglio.html?id=' + b.id + '" onclick="sessionStorage.setItem(\'bollettinoId\',' + b.id + ')" class="text-decoration-none">' + fornitoreNome(b.fornitore_id) + '</a></td>' +
-      '<td>' + meseLabel(b.mese) + '</td>' +
-      '<td>' + b.anno + '</td>' +
-      '<td><span class="badge badge-stato badge-' + b.stato + '">' + b.stato.replace('_', ' ') + '</span></td>' +
-      '<td class="text-center"><span class="badge bg-secondary">' + (b.righe || []).length + '</span></td>' +
-      '<td class="text-end">' + fmtEuro(t.riconosciuto) + '</td>' +
-      '<td class="text-end">' + fmtEuro(t.calcolato) + '</td>' +
-      '<td class="text-end"><span class="' + clsDiff + '">' + fmtEuro(t.differenza) + '</span></td>' +
-      '<td class="text-end"><a href="bollettino-dettaglio.html?id=' + b.id + '" onclick="sessionStorage.setItem(\'bollettinoId\',' + b.id + ')" class="btn btn-sm btn-outline-secondary" title="Dettaglio"><i class="bi bi-eye"></i></a></td></tr>';
-  }).join('');
+  const s = filtri.valori().stato;
+  tabella.aggiorna(DATA.bollettini.filter(b => !s || b.stato === s));
 }
 
 function apriModaleNuovo() {
-  const f = document.getElementById('formNuovo');
-  f.reset();
-  f.querySelector('[name="anno"]').value = new Date().getFullYear();
-  f.querySelector('[name="mese"]').value = meseCorrente();
-  f.elements.fornitore_id.innerHTML = '<option value="">Seleziona...</option>' +
-    DATA.fornitori.map(x => '<option value="' + x.id + '">' + x.ragione_sociale + '</option>').join('');
-  new bootstrap.Modal(document.getElementById('modalNuovo')).show();
-}
-function salva() {
-  const f = Object.fromEntries(new FormData(document.getElementById('formNuovo')));
-  if (!f.fornitore_id) return showToast('Seleziona un fornitore', false);
-  const dup = DATA.bollettini.find(b => b.fornitore_id === parseInt(f.fornitore_id, 10) && b.mese === parseInt(f.mese, 10) && b.anno === parseInt(f.anno, 10));
-  if (dup) return showToast('Esiste già un bollettino per lo stesso fornitore/mese/anno', false);
-  DATA.bollettini.push({
-    id: Math.max.apply(null, DATA.bollettini.map(b => b.id)) + 1,
-    fornitore_id: parseInt(f.fornitore_id), mese: parseInt(f.mese), anno: parseInt(f.anno),
-    stato: 'da_verificare', note: '', righe: []
+  CRM.FormModal({
+    titolo: 'Nuovo Bollettino', conferma: 'Crea',
+    campi: [
+      { nome: 'fornitore_id', etichetta: 'Fornitore', obbligatorio: true, tipo: 'select', opzioni: () => CRM.opz.fornitori('Seleziona...') },
+      { nome: 'mese', etichetta: 'Mese', obbligatorio: true, tipo: 'select', opzioni: CRM.opz.mesi, valore: meseCorrente(), col: 'col-md-6' },
+      { nome: 'anno', etichetta: 'Anno', obbligatorio: true, tipo: 'numero', valore: new Date().getFullYear(), col: 'col-md-6' }
+    ],
+    onConferma: function (f) {
+      if (!f.fornitore_id) { showToast('Seleziona un fornitore', false); return false; }
+      const dup = DATA.bollettini.find(b => b.fornitore_id === parseInt(f.fornitore_id, 10) && b.mese === parseInt(f.mese, 10) && b.anno === parseInt(f.anno, 10));
+      if (dup) { showToast('Esiste già un bollettino per lo stesso fornitore/mese/anno', false); return false; }
+      DATA.bollettini.push({
+        id: CRM.nuovoId(DATA.bollettini),
+        fornitore_id: parseInt(f.fornitore_id), mese: parseInt(f.mese), anno: parseInt(f.anno),
+        stato: 'da_verificare', note: '', righe: []
+      });
+      showToast('Bollettino creato');
+      render();
+    }
   });
-  bootstrap.Modal.getInstance(document.getElementById('modalNuovo')).hide();
-  showToast('Bollettino creato');
-  render();
 }
 
 render();

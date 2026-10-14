@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 1.8 — **Stato:** validata con il cliente; stack confermato, allineato al Portale B2B Luis (§16.3)
+**Versione:** 1.9 — **Stato:** validata con il cliente; stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -53,7 +53,7 @@ quel sistema (`ordini_upload_queue`, `processing_errors`, §4.1, §6).
 | V6 | Responsive | Desktop + tablet + mobile |
 | V7 | Stack | **Stesso stack del Portale B2B Luis**: Node 24, frontend Next.js 16 (App Router) + React 19 + TypeScript, backend NestJS 11, ORM Prisma 7 (adapter `pg`), PostgreSQL condiviso (V2). Due processi Node dietro Caddy; Docker solo in sviluppo (§3.4) |
 | V8 | Fidelità | Alta fedeltà — dati reali, interazioni reali |
-| V9 | Contenitori dati stabili | Le viste con tabelle o liste filtrate usano contenitori stabili (altezza minima e massima, scroll interno, intestazione fissa): il layout non cambia al variare del numero di righe |
+| V9 | Contenitori dati stabili | Ogni tabella è una **DataTable standard** (§16.4): occupa tutto lo spazio disponibile, intestazione fissa, righe scorrevoli, intestazioni ordinabili; il layout non cambia al variare del numero di righe |
 | V10 | Tracciamento eventi | Il sistema registra automaticamente gli eventi applicativi (CRUD, cambi di stato, upload/export, autenticazione) ed errori su `eventi_app` (§4.2.11), consultabili in sola lettura da `/eventi` (§7.11, §15); le tabelle della Gestione Ordini non vengono modificate (V2) |
 
 ---
@@ -1230,7 +1230,7 @@ HTML e confronto numerico sul seed §12, **prima del merge**:
 
 1. **Struttura/navigazione** — stesse aree e ordine: navbar fissa (§4.2), contenuto, footer fisso centrato; stesse rotte (§7).
 2. **Layout** — stesse card/tabelle nello stesso ordine; `.table-box`/`.box-stabile` con altezze e thead sticky; `thead class="table-dark"`.
-3. **Componenti/stile** — Bootstrap 5.3.2 + bootstrap-icons identichi; `crm.css` **copiato, non riscritto**.
+3. **Componenti/stile** — schermata composta **solo** dai componenti standard §16.4 con gli stessi parametri del prototipo; Bootstrap 5.3.2 + bootstrap-icons identichi; `crm.css` **copiato, non riscritto**.
 4. **Testi** — etichette, empty state, avvisi e note: italiano identico parola per parola al file di prototipo.
 5. **Interazioni** — filtri (incl. multifiltro checkbox §7.8), tab, modali, stepper, conferme, toast, export: stesso comportamento e stessi messaggi.
 6. **Dati** — seed §12 identico → stessi numeri in KPI e tabelle (prova oggettiva).
@@ -1239,13 +1239,13 @@ HTML e confronto numerico sul seed §12, **prima del merge**:
 
 | Fase | Ambito | Attività | Agenti paralleli | Ore |
 |---|---|---|---|---|
-| F0 | Fondamenta: scaffold, DB/seed, auth, shell, motore §10 + `logEvent()`, prova lettura documenti fornitore | A1–A6 | 1 → fino a 4 | 25 |
+| F0 | Fondamenta: scaffold, DB/seed, auth, shell + componenti standard §16.4, motore §10 + `logEvent()`, prova lettura documenti fornitore | A1–A6 | 1 → fino a 4 | 28 |
 | F1 | Anagrafiche (fornitori, agenti, interscambio) | A1–A3 | 3 | 6 |
-| F2 | Pratiche ordini (lista, dettaglio, documenti, upload) | A1–A3 | 3 | 7 |
+| F2 | Pratiche ordini (lista, dettaglio, documenti, upload) | A1–A3 | 3 | 6 |
 | F3 | Bollettini mensili | A1–A2 | 2 | 4 |
-| F4 | Liquidazione (filtri, dettaglio, export) | A1–A3 | 2–3 | 4 |
+| F4 | Liquidazione (filtri, dettaglio, export) | A1–A3 | 2–3 | 3 |
 | F5 | Dashboard + log eventi (`/eventi`) | A1–A2 | 2 | 2 |
-| F6 | Modulo ordini cliente (§7.9) | A1–A2 | 1–2 | 6 |
+| F6 | Modulo ordini cliente (§7.9) | A1–A2 | 1–2 | 5 |
 | F7 | Collaudo, replicazione, rilascio | A1–A2 | 1–2 | 5 |
 | | | **20** | | **59** (preventivo §4) |
 | — | Margine di rischio 25 % (riserva, usata solo se necessaria) | — | — | 15 |
@@ -1297,7 +1297,38 @@ next-intl, socket.io, moduli di dominio (catalogo, carrello, checkout, AI, lead,
 Lo schema Prisma copre solo le tabelle CRM (§4.2); le
 tabelle esistenti si leggono in sola lettura (V2), mai migrate.
 
-### 16.4 Regole di consegna
+### 16.4 Componenti standard
+
+Ogni schermata è una **composizione di componenti standard** configurati con parametri,
+mai codice di interfaccia scritto a mano pagina per pagina. Nel prototipo la libreria è
+`prototipo-crm/assets/js/componenti.js` (stili in `crm.css`), con catalogo dal vivo in
+`componenti.html`; nell'app gli stessi componenti diventano componenti React **con gli
+stessi nomi e gli stessi parametri** (attività F0-A4).
+
+| Componente | Uso | Parametri principali |
+|---|---|---|
+| **DataTable** | ogni tabella dell'app (modello DataTable di Luis B2B) | colonne (`key`, `header`, `tipo` testo/numero/euro/pct/data/stato/conteggio, `align`, `width`, `grow`, `valore`, `cell`, `sortable`, `totale`), righe, azioni di riga, testata (titolo, contatore, azioni, link), selezione, paginazione facoltativa, `onRowClick`, testo "nessun dato" |
+| **FilterBar** | filtri sopra le tabelle | campi `select` / `multi` (selezione multipla con "Tutti") / `cerca` / `numero`, `onChange`, Reset |
+| **KpiRow** | riquadri numerici | voci (etichetta, valore, variante colore) |
+| **Riepilogo** | schede compatte del dettaglio pratica | voci (etichetta, icona, valore, variante) |
+| **Tabs** | schede | id, etichetta, icona, badge |
+| **Pannello** | card con testata | titolo, icona, azioni, piede |
+| **Form / FormModal** | moduli e finestre modali | campi (`nome`, `etichetta`, `tipo`, `opzioni`, `col`, `obbligatorio`, `aiuto`, `onChange`), pulsante / `onConferma` |
+| **Intestazione** | testata pagina | titolo, icona, sottotitolo, briciole, azioni |
+| **Stepper**, **Nota**, badge | passi di stato, note, stati | — |
+
+**Comportamento fisso della DataTable** (uguale in ogni schermata):
+- occupa **sempre tutto lo spazio** a disposizione del suo contenitore;
+- **intestazione fissa**, **solo le righe scorrono**; riga totali fissa in fondo;
+- **intestazioni ordinabili** (clic: crescente ▲ / decrescente ▼), ordinamento corretto per numeri, importi e date;
+- piede con conteggio ("N righe" o "1–20 di N" con paginazione);
+- non scende mai sotto ~3 righe visibili: se lo spazio manca scorre la scheda o la pagina.
+
+**Layout:** la pagina è alta quanto lo schermo; intestazione, filtri, KPI e note hanno
+altezza propria, l'elemento "riempi" (di norma la DataTable) prende il resto. Sotto i
+992 px la pagina torna a flusso naturale e le tabelle hanno altezza massima 65vh.
+
+### 16.5 Regole di consegna
 
 Ogni attività è una slice con ownership disgiunta (nessun file toccato da due agenti);
 una PR per attività con checklist §16.1 allegata; testi e stile presi dal prototipo,

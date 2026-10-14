@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Componenti - CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/crm.css" rel="stylesheet">
+  <style>
+    .cat-codice { background: #f6f8fa; border: 1px solid var(--db-border); border-radius: .375rem; padding: .75rem 1rem; font-size: .78rem; white-space: pre; overflow-x: auto; margin: 0; }
+    .cat-demo { height: 22rem; display: flex; flex-direction: column; }
+  </style>
+</head>
+<body class="crm-app">
+<div id="topnav" data-active=""></div>
+<main class="crm-pagina" id="pagina"></main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="assets/js/componenti.js"></script>
+<script>
+/* Catalogo dei componenti standard: ogni scheda mostra il componente dal vivo e i suoi parametri.
+   È il riferimento per riportarli 1:1 in React (spec §16.4). */
+CRM.Intestazione('#pagina', {
+  titolo: 'Componenti standard', icona: 'bi-grid-3x3-gap',
+  sottotitolo: 'Ogni schermata è una composizione di questi oggetti configurati con parametri (assets/js/componenti.js — spec §16.4)',
+  azioni: [{ etichetta: 'Launcher', icona: 'bi-arrow-left', variante: 'outline-secondary', piccolo: true, href: 'index.html' }]
+});
+
+const tabs = CRM.Tabs('#pagina', [
+  { id: 'datatable', etichetta: 'DataTable', icona: 'bi-table' },
+  { id: 'filtri', etichetta: 'FilterBar', icona: 'bi-funnel' },
+  { id: 'kpi', etichetta: 'KpiRow · Riepilogo · Stepper', icona: 'bi-speedometer2' },
+  { id: 'form', etichetta: 'Form · FormModal · Pannello', icona: 'bi-ui-checks' },
+  { id: 'layout', etichetta: 'Layout', icona: 'bi-layout-three-columns' }
+]);
+function codice(host, testo) { const p = document.createElement('pre'); p.className = 'cat-codice'; p.textContent = testo.trim(); CRM.el && host.appendChild(p); return p; }
+
+/* --- DataTable --- */
+const gDt = CRM.blocco(tabs.pane('datatable'), { riempi: true, griglia: 2 });
+const demo = CRM.DataTable(CRM.blocco(gDt), {
+  titolo: 'Ordini (esempio completo)', icona: 'bi-truck', contatore: true,
+  azioniTestata: [{ etichetta: 'Nuovo', icona: 'bi-plus', onClick: () => showToast('azioniTestata → onClick') }],
+  colonne: [
+    { key: 'numero_ordine', header: 'Ordine', classe: 'fw-semibold' },
+    { key: 'data_ordine', header: 'Data', tipo: 'data' },
+    { key: 'fornitore', header: 'Fornitore', grow: true, valore: o => fornitoreNome(o.fornitore_id) },
+    { key: 'importo_merce', header: 'Importo', tipo: 'euro', totale: 'somma' },
+    { key: 'stato', header: 'Stato', tipo: 'stato' }
+  ],
+  righe: DATA.ordini,
+  azioni: [
+    { icona: 'bi-eye', tooltip: 'Dettaglio', onClick: o => showToast('Dettaglio ' + o.numero_ordine) },
+    { icona: 'bi-trash', tooltip: 'Elimina', variante: 'danger', hidden: o => o.stato === 'fatturato', onClick: o => showToast('Elimina ' + o.numero_ordine) }
+  ],
+  selezionabile: true, onSelezione: k => showToast(k.size + ' righe selezionate'),
+  pageSize: 8, emptyText: 'Nessun ordine'
+});
+codice(CRM.blocco(gDt, { classe: 'overflow-auto' }), `
+CRM.DataTable(host, {
+  titolo, icona, contatore: true,                // testata della card
+  azioniTestata: [{ etichetta, icona, variante, onClick, disabilitato(righe) }],
+  linkTestata: { href, etichetta },              // "Vedi tutti →"
+  colonne: [{
+    key, header,
+    tipo: 'testo'|'numero'|'numero2'|'euro'|'pct'|'data'|'stato'|'conteggio',
+    align, width, minWidth, grow, mono,
+    valore(row), cell(row) → html, classe(row),
+    sortable (default true), sortValue(row),
+    totale: 'somma' | fn(righe)                  // riga totali fissa in fondo
+  }],
+  righe, rowKey(row),
+  azioni: [{ icona, tooltip, onClick(row) | href(row), variante: 'danger', hidden(row) }],
+  onRowClick(row) | rowHref(row), rowClass(row),
+  selezionabile, onSelezione(chiavi), rigaSelezionabile(row),
+  pageSize,                                      // paginazione facoltativa
+  ordinamentoIniziale: { key, dir },
+  emptyText, loading, compatta, etichettaTotale, piede
+})
+→ { aggiorna(righe, { colonne, ... }), righe(), ordina(key, dir), selezione() }
+
+Comportamento fisso: riempie il contenitore · intestazione fissa ·
+righe scorrevoli · intestazioni ordinabili (▲▼) · totali fissi · piede "N righe".`);
+
+/* --- FilterBar --- */
+const fPane = tabs.pane('filtri');
+const out = document.createElement('div');
+CRM.FilterBar(fPane, {
+  reset: true,
+  campi: [
+    { nome: 'fornitori', tipo: 'multi', etichetta: 'Fornitore', etichettaTutti: 'Tutti i fornitori', etichettaParziale: 'Fornitori', opzioni: DATA.fornitori.map(x => ({ value: x.id, label: x.ragione_sociale })) },
+    { nome: 'stato', tipo: 'select', etichetta: 'Stato', opzioni: [{ value: '', label: 'Tutti' }, { value: 'inviato', label: 'Inviato' }] },
+    { nome: 'anno', tipo: 'numero', etichetta: 'Anno', col: 'col-md-2', valore: 2026 },
+    { nome: 'q', tipo: 'cerca', etichetta: 'Ricerca', placeholder: 'Cerca...' }
+  ],
+  onChange: v => { out.textContent = 'onChange(valori) → ' + JSON.stringify(v); }
+});
+out.className = 'small text-muted font-monospace';
+fPane.appendChild(out);
+codice(fPane, `
+CRM.FilterBar(host, {
+  campi: [{ nome, tipo: 'select'|'multi'|'cerca'|'numero', etichetta, opzioni: [{ value, label }],
+            valore, placeholder, col, etichettaTutti, etichettaNessuno, etichettaParziale }],
+  onChange(valori), reset: true, card: true
+}) → { valori(), imposta(valori) }
+
+Filtra subito a ogni modifica; 'multi' = selezione multipla con "Tutti"; Reset riporta ai valori iniziali.`);
+
+/* --- KPI / Riepilogo / Stepper --- */
+const kPane = tabs.pane('kpi');
+CRM.KpiRow(kPane, [
+  { id: 'a', etichetta: 'Ordini Inviati', valore: 2, variante: 'warning' },
+  { id: 'b', etichetta: 'Ordini Confermati', valore: 2, variante: 'info' },
+  { id: 'c', etichetta: 'Ordini Fatturati', valore: 7, variante: 'success' },
+  { id: 'd', etichetta: 'Merce Q3', valore: '€62.738' }
+]);
+CRM.Riepilogo(kPane, [
+  { id: 'f', etichetta: 'Fornitore', icona: 'bi-building', valore: 'Gries GmbH & Co. KG' },
+  { id: 'i', etichetta: 'Importo merce', icona: 'bi-cash', valore: '€8.945,50' },
+  { id: 's', etichetta: 'Scadenza conferma', icona: 'bi-clock', valore: '18/08/2026 (scaduta)', variante: 'danger' }
+]);
+CRM.Stepper(kPane, { passi: [{ etichetta: 'Inviato', stato: 'done' }, { etichetta: 'Confermato', stato: 'active' }, { etichetta: 'Fatturato' }] });
+codice(kPane, `
+CRM.KpiRow(host, [{ id, etichetta, valore, variante: 'warning'|'info'|'success'|'danger', colorato, contenuto }])
+  → { aggiorna(id, valore, variante), etichetta(id, html) }
+CRM.Riepilogo(host, [{ id, etichetta, icona, valore, variante: 'warn'|'danger' }]) → { aggiorna(id, valore, variante) }
+CRM.Stepper(host, { passi: [{ etichetta, stato: 'done'|'active'|'', icona, title }], nota }) → { aggiorna(opz) }`);
+
+/* --- Form / FormModal / Pannello --- */
+const gForm = CRM.blocco(tabs.pane('form'), { griglia: 2 });
+const pan = CRM.Pannello(CRM.blocco(gForm), { titolo: 'Pannello con Form', icona: 'bi-ui-checks',
+  azioni: [{ etichetta: 'Apri FormModal', icona: 'bi-window', onClick: () => CRM.FormModal({
+    titolo: 'Nuovo Bollettino', conferma: 'Crea',
+    campi: [
+      { nome: 'fornitore_id', etichetta: 'Fornitore', obbligatorio: true, tipo: 'select', opzioni: () => CRM.opz.fornitori('Seleziona...') },
+      { nome: 'mese', etichetta: 'Mese', tipo: 'select', opzioni: CRM.opz.mesi, valore: 9, col: 'col-md-6' },
+      { nome: 'anno', etichetta: 'Anno', tipo: 'numero', valore: 2026, col: 'col-md-6' }],
+    onConferma: v => { showToast('onConferma → ' + JSON.stringify(v)); }
+  }) }] });
+CRM.Form(pan.corpo, {
+  campi: [
+    { nome: 'ragione_sociale', etichetta: 'Ragione Sociale', col: 'col-md-8', valore: 'Gries GmbH & Co. KG' },
+    { nome: 'piva', etichetta: 'P.IVA', col: 'col-md-4', valore: 'DE123456789' },
+    { nome: 'payment_type', etichetta: 'Pagamento provvigioni', tipo: 'select', opzioni: CRM.opz.pagamento, col: 'col-md-6', aiuto: 'Testo di aiuto sotto il campo' },
+    { nome: 'giorni', etichetta: 'Giorni attesa', tipo: 'numero', valore: 21, col: 'col-md-6' }
+  ],
+  pulsante: { etichetta: 'Salva', onClick: v => showToast('pulsante.onClick → ' + JSON.stringify(v)) }
+});
+codice(CRM.blocco(gForm), `
+CRM.Form(host, {
+  campi: [{ nome, etichetta, tipo: 'testo'|'numero'|'data'|'email'|'select'|'area'|'nascosto'|'sola-lettura',
+            opzioni | fn(), col, obbligatorio, passo, min, placeholder, aiuto, righe, valore, onChange(form) }],
+  valori, piccolo, pulsante: { etichetta, icona, variante, onClick(valori) }
+}) → { valori(), imposta(v), campo(nome), opzioni(nome, ops), aiuto(nome, html), info(testo), reset() }
+
+CRM.FormModal({ titolo, campi, valori, dimensione: 'lg', conferma: 'Salva', nota,
+                onConferma(valori, form) → false per lasciarla aperta, onApri(form) })
+
+CRM.Pannello(host, { titolo, icona, extra, destra, azioni: [{ etichetta, icona, variante, onClick }], piede, riempi })
+  → { corpo, extra(html), destra(html) }`);
+
+/* --- Layout --- */
+codice(tabs.pane('layout'), `
+<body class="crm-app">                     pagina alta quanto lo schermo
+<div id="topnav" data-active="…"></div>    navbar (app.js)
+<main class="crm-pagina" id="pagina"></main>
+
+CRM.Intestazione('#pagina', { titolo, icona, sottotitolo, badge, destra, briciole: [{ etichetta, href }],
+                              azioni: [{ etichetta, icona, variante, piccolo, onClick | href }], gruppo })
+CRM.blocco(parent, { riempi: true })       prende tutto lo spazio rimasto
+CRM.blocco(parent, { riempi: true, griglia: 2 | 3 })   colonne affiancate che riempiono
+CRM.Tabs(parent, [{ id, etichetta, icona, badge }])     → { pane(id), badge(id, html), mostra(id) }
+CRM.Nota(parent, html, 'avviso'?)          nota informativa in fondo
+CRM.badgeStato(stato) · CRM.badgeAttivo(bool) · CRM.badgeConteggio(n) · CRM.docChip(nome)
+
+Regole:
+· un solo elemento "riempi" per livello: le DataTable lo occupano tutto;
+· intestazioni, filtri, KPI e note hanno altezza propria;
+· se lo spazio non basta, scorre la scheda o la pagina (mai la tabella sotto ~3 righe);
+· sotto i 992 px la pagina torna a flusso naturale e le tabelle hanno altezza massima 65vh.`);
+</script>
+</body>
+</html>

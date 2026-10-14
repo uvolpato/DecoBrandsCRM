@@ -1,7 +1,7 @@
 # Piano di lavoro — CRM Decobrands (fasi e attività parallele)
 
-**Versione:** 1.1 · **Data:** 14/10/2026 (stack confermato: Portale B2B Luis)
-**Derivato da:** `specifica-crm-provvigioni.md` v1.8 (§16) · **Ore:** 59 h di attività + 15 h di margine = 74 h (preventivo §4)
+**Versione:** 1.2 · **Data:** 14/10/2026 (stack Luis B2B; componenti standard)
+**Derivato da:** `specifica-crm-provvigioni.md` v1.9 (§16) · **Ore:** 59 h di attività + 15 h di margine = 74 h (preventivo §4)
 **Scopo:** suddividere l'implementazione in fasi e attività indipendenti, assegnabili ad **agenti in parallelo**, con **replicazione maniacale** del prototipo navigabile.
 
 ---
@@ -16,7 +16,7 @@ superare questa checklist prima del merge (6 criteri, tutti obbligatori):
 
 1. **Struttura e navigazione** — stesse aree nella stesso ordine: navbar fissa (logo + "CRM" → launcher, versione, link Launcher, voci di sezione §4.2), contenuto, footer fisso centrato; stesse rotte e breadcrumb (§7).
 2. **Layout** — stesse card/sezioni/tabelle nello stesso ordine e con le stesse proporzioni; tabelle avvolte in `.table-box`/`.box-stabile` (altezze, scroll, thead sticky) con `thead class="table-dark"` (§2-V9); nessun elemento sovrapposto o tagliato.
-3. **Componenti e stile** — Bootstrap 5.3.2 + bootstrap-icons identichi e `crm.css` **copiato, non riscritto** (token, `.kpi-card`, `.tabs-crm`, `.badge-stato`, `.riep-card`, `.doc-chip`, `.db-footer`, bottoni e stati).
+3. **Componenti e stile** — schermata composta **solo** dai componenti standard (spec §16.4: DataTable, FilterBar, KpiRow, Tabs, Pannello, Form/FormModal…) con gli stessi parametri del prototipo; Bootstrap 5.3.2 + bootstrap-icons identichi e `crm.css` **copiato, non riscritto** (token, `.kpi-card`, `.tabs-crm`, `.badge-stato`, `.riep-card`, `.doc-chip`, `.db-footer`, bottoni e stati).
 4. **Testi** — etichette, titoli, empty state, avvisi, note (es. nota regole §5 in Liquidazione): **italiano identico parola per parola** rispetto al file HTML del prototipo.
 5. **Interazioni** — filtri (incl. multifiltro checkbox), tab, modali, stepper 4 passi, conferme, toast, export CSV, stati hover/focus/disabled: stesso comportamento e stessi messaggi.
 6. **Dati** — seed §12 identico (`pratica`: stesso set di ordini/bollettini/anagrafiche) → **stessi numeri** in KPI, tabelle e totali; la verifica numerica è la prova oggettiva di replicazione.
@@ -58,13 +58,13 @@ migrate**.
 
 | Fase | Ambito | Attività | Agenti paralleli | Ore | Dipende da |
 |---|---|---|---|---|---|
-| **F0** | Fondamenta: scaffold, DB, auth, shell, motore, prova documenti | 6 (A1–A6) | 1 → fino a 4 dopo A1 | **25** | — |
+| **F0** | Fondamenta: scaffold, DB, auth, shell + componenti, motore, prova documenti | 6 (A1–A6) | 1 → fino a 4 dopo A1 | **28** | — |
 | **F1** | Anagrafiche (fornitori, agenti, interscambio) | 3 | **3 in parallelo** | **6** | F0 |
-| **F2** | Pratiche ordini (lista, dettaglio, documenti, upload) | 3 | **3 in parallelo** | **7** | F0 |
+| **F2** | Pratiche ordini (lista, dettaglio, documenti, upload) | 3 | **3 in parallelo** | **6** | F0 |
 | **F3** | Bollettini mensili | 2 | **2 in parallelo** | **4** | F0 |
-| **F4** | Liquidazione (riepilogo, dettaglio, export) | 3 | **2–3 in parallelo** | **4** | F0 |
+| **F4** | Liquidazione (riepilogo, dettaglio, export) | 3 | **2–3 in parallelo** | **3** | F0 |
 | **F5** | Dashboard + log eventi (`/eventi`) | 2 | **2 in parallelo** | **2** | F0 |
-| **F6** | Modulo ordini cliente (§7.9) | 1 (2 sottofasi) | 1–2 | **6** | F0 |
+| **F6** | Modulo ordini cliente (§7.9) | 1 (2 sottofasi) | 1–2 | **5** | F0 |
 | **F7** | Collaudo, replicazione, rilascio | 1 (2 sottofasi) | 1–2 | **5** | merged F1–F6 |
 | | | **20** | | **59** | |
 | — | Margine di rischio 25 % (riserva, preventivo §4 att. 12) | — | — | **15** | — |
@@ -73,7 +73,7 @@ migrate**.
 ```
 F0-A1 (scaffold, modello Luis B2B)
         ├─ F0-A2 (DB + seed) ──┐
-        ├─ F0-A3 (auth)        ├── F0-A4 (shell) + F0-A5 (motore + logEvent)
+        ├─ F0-A3 (auth)        ├── F0-A4 (shell + componenti) + F0-A5 (motore + logEvent)
         │                       │
         ▼                       ▼
    ┌──────────── Fase 0 chiusa (contratti congelati) ────────────┐
@@ -84,11 +84,11 @@ F0-A1 (scaffold, modello Luis B2B)
               F7 collaudo + replicazione + rilascio
 ```
 
-Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** di attività + **15 h** di margine = **74 h** = preventivo §4. Il margine non è assegnato a una fase: si usa dove emergono imprevisti e si rendiconta a ore.
+Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 5 + 5 = **59 h** di attività + **15 h** di margine = **74 h** = preventivo §4. Il margine non è assegnato a una fase: si usa dove emergono imprevisti e si rendiconta a ore.
 
 ---
 
-## 4. Fase 0 — Fondamenta (bloccante, 25 h)
+## 4. Fase 0 — Fondamenta (bloccante, 28 h)
 
 #### F0-A1 · Scaffold applicativo — 3 h
 - **Dipende da:** — · **Blocca:** tutte le attività
@@ -111,12 +111,12 @@ Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** di attività + 
 - **Output:** moduli di accesso ripresi da Luis B2B (sessioni, CSRF, Helmet, throttler) sulla tabella `users` condivisa; login/logout/reset/cambio password, guard admin, UI login identica; **verifica compatibilità sessioni con la Gestione Ordini** (se incompatibili: login separato, stesse credenziali — spec §3.3).
 - **DoD:** accesso con utenti della Gestione Ordini; UI login = prototipo (checklist §11.1); eventi `auth/*` §15.2.1 scritti da `logEvent()` (F0-A5).
 
-#### F0-A4 · Shell layout comune — 2 h
+#### F0-A4 · Shell layout comune + componenti standard — 5 h
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate
-- **Riferimenti:** spec §4.2 (navbar), §7.10; STILE-GUIDA §4.2
-- **Sorgente prototipo:** `assets/js/app.js` → `navbar()` (voci, dropdown Anagrafiche, `data-active`, versione, Launcher), `footer()`; `crm.css` → `.db-footer`, `.table-box`, `.box-stabile`, `#topnav` fixed
-- **Output:** layout route (navbar fissa + footer fisso centrato + toast + breadcrumb), macro-componenti condivisi (card, header tabella, empty state).
-- **DoD:** ogni rotta eredita la shell senza duplicarla; navbar/footer identici parola per parola; focus-visible e stati bottoni conformi.
+- **Riferimenti:** spec §4.2 (navbar), §7.10, **§16.4 (componenti standard)**; STILE-GUIDA §4.2
+- **Sorgente prototipo:** `assets/js/app.js` → `navbar()`, `footer()`; **`assets/js/componenti.js`** (intero: Intestazione, DataTable, FilterBar, KpiRow, Riepilogo, Tabs, Pannello, Form, FormModal, Stepper, Nota, badge) e catalogo `componenti.html`; `crm.css` (layout a tutta altezza `.crm-pagina`/`.crm-riempi`, `.dt-*`)
+- **Output:** layout route (navbar fissa + footer fisso + toast) e **libreria componenti React** con gli stessi nomi e parametri di `componenti.js`; pagina catalogo `/componenti` (solo admin) equivalente a `componenti.html`.
+- **DoD:** ogni rotta eredita la shell senza duplicarla; ogni componente supera il confronto con il catalogo del prototipo (DataTable: riempie lo spazio, intestazione fissa, righe scorrevoli, ordinamento ▲▼, totali fissi, piede); nessuna tabella o modale scritta a mano fuori dalla libreria.
 
 #### F0-A5 · Motore di calcolo §10 + contratto eventi — 7 h
 - **Dipende da:** F0-A1, F0-A2 · **Blocca:** F2, F3, F4 (calcoli)
@@ -144,12 +144,12 @@ Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** di attività + 
 - **Output per ciascuna:** rotta pagina + API CRUD + eventi §15.2 + test delle regole univocità.
 - **DoD comune:** checklist §11.1 superata; CRUD completo; eventi esatti (es. fornitore non eliminabile ma `attivo=false` §15.2.2).
 
-## 6. Fase 2 — Pratiche ordini (7 h, 3 agenti in parallelo)
+## 6. Fase 2 — Pratiche ordini (6 h, 3 agenti in parallelo)
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
 | **F2-A1** Elenco ordini fornitore (filtri, icone variazioni/NC, `.table-box`) | 2 | F0 | `ordini-fornitore.html` | §7.2, §8.1, §15.2.4 |
-| **F2-A2** Dettaglio pratica: stepper 4 passi, strip riepilogo, tab Pratica/Conferma/Fattura/Righe/Confronto | 3 | F0, F2-A1 | `ordine-fornitore-dettaglio.html` (intero: tab `tabs-crm`, check fase, subagente da interscambio, documenti per fase) | §7.3, §6.1, §5.8, §5.9, §5.10, §15.2.4 |
+| **F2-A2** Dettaglio pratica: stepper 4 passi, strip riepilogo, tab Pratica/Conferma/Fattura/Righe/Confronto | 2 | F0, F2-A1 | `ordine-fornitore-dettaglio.html` (intero: tab `tabs-crm`, check fase, subagente da interscambio, documenti per fase) | §7.3, §6.1, §5.8, §5.9, §5.10, §15.2.4 |
 | **F2-A3** Documenti fiscali (fatture/NC, netto) + canale comune upload/validazione §6 | 2 | F0 | card "Documenti fiscali", modale NC (§6 canale: upload → coda → validazione → salvataggio) | §4.2.7.1, §5.3, §6, §8.1 (`/api/pratiche/:id/documenti`), §15.2.4 |
 
 - **Nota:** il confronto fasi non si salva: calcolato al volo da `F0-A5` sugli snapshot per fase (§4.2.8 `fase = ordine|conferma|fattura`).
@@ -164,11 +164,11 @@ Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** di attività + 
 
 - **DoD:** bollettino unico per `(fornitore, mese, anno)`; differenze = calcolo `F0-A5`; verifica/contestazione genera `calcolo/verify` + `stato/change_state` (§15.2.5).
 
-## 8. Fase 4 — Liquidazione (4 h, 2–3 agenti in parallelo)
+## 8. Fase 4 — Liquidazione (3 h, 2–3 agenti in parallelo)
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
-| **F4-A1** Filtri (incl. **multifiltro fornitori**), KPI periodo, tab Riepilogo per subagente | 2 | F0 | `liquidazione.html` (dropdown checkbox "Tutti/Fornitori (n)/Nessun", `.table-box`, `tfoot` totale) | §7.8, §6.3, §15.2.6 |
+| **F4-A1** Filtri (incl. **multifiltro fornitori**), KPI periodo, tab Riepilogo per subagente | 1 | F0 | `liquidazione.html` (dropdown checkbox "Tutti/Fornitori (n)/Nessun", `.table-box`, `tfoot` totale) | §7.8, §6.3, §15.2.6 |
 | **F4-A2** Tab Dettaglio rendiconto (13 colonne, contatore, `.table-box`) | 1 | F0, F4-A1 | `liquidazione.html` tab dettaglio | §7.8, §15.2.6 |
 | **F4-A3** Export CSV 8 campi (§11) + trimestri | 1 | F4-A2 | `esportaCSV()` di `liquidazione.html` | §11, §8.1 (`/api/liquidazione/export`), §15.2.6 |
 
@@ -183,12 +183,12 @@ Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** di attività + 
 
 - **Nota:** la scrittura degli eventi **non** è di F5: la fa l'attività che implementa ogni operazione (§15.2 tassativo). F5 costruisce solo lettura/filtri/export.
 
-## 10. Fase 6 — Modulo ordini cliente (6 h, 1–2 agenti)
+## 10. Fase 6 — Modulo ordini cliente (5 h, 1–2 agenti)
 
 | Attività | Ore | Dipende da | Sorgente prototipo | Riferimenti spec |
 |---|---|---|---|---|
 | **F6-A1** API modulo (ordini, lookup, clienti, utenti, errori — letture sulle tabelle legacy) | 3 | F0 | — | §7.9, §8.2, §4.1 |
-| **F6-A2** Viste modulo (liste, upload, errori — stesso stile e stesse regole delle altre schermate) | 3 | F6-A1 | stile generale (STILE-GUIDA §7, `.table-box`, thead scuro) | §7.9, §6 |
+| **F6-A2** Viste modulo (liste, upload, errori — composte con i componenti standard) | 2 | F6-A1 | stile generale (STILE-GUIDA §7, `.table-box`, thead scuro) | §7.9, §6 |
 
 - **DoD:** zero scrittura su tabelle legacy oltre a quelle consentite (V2); UI indistinguibile dal resto dell'app.
 
@@ -217,5 +217,5 @@ Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** di attività + 
 
 ## 13. Riferimenti
 
-Specifica: `specifica-crm-provvigioni.md` v1.8 (§16) · Preventivo: `preventivo-crm-provvigioni.md` (74 h da svolgere, margine incluso) ·
+Specifica: `specifica-crm-provvigioni.md` v1.9 (§16) · Preventivo: `preventivo-crm-provvigioni.md` (74 h da svolgere, margine incluso) ·
 Prototipo sorgente: `prototipo-crm/` · Stile: `STILE-GUIDA-DECOBRANDS.md` · Seed: spec §12 · Eventi: spec §15

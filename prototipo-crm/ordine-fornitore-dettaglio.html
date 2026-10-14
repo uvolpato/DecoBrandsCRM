@@ -8,571 +8,328 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="assets/css/crm.css" rel="stylesheet">
 </head>
-<body>
+<body class="crm-app">
 <div id="topnav" data-active="ordini-fornitore.html"></div>
-<div class="container-fluid px-3 px-md-4 py-4">
-
-  <nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="ordini-fornitore.html">Ordini Fornitore</a></li>
-      <li class="breadcrumb-item active" id="bc-ordine">#</li>
-    </ol>
-  </nav>
-
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-    <div>
-      <h5 class="fw-bold mb-0" id="titolo-ordine"></h5>
-      <p class="text-muted mb-0 nota-prototipo" id="sottotitolo-ordine"></p>
-    </div>
-    <div class="btn-group">
-      <button class="btn btn-outline-secondary btn-sm" onclick="esportaCSV()"><i class="bi bi-download me-1"></i>CSV</button>
-      <a href="ordini-fornitore.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Indietro</a>
-    </div>
-  </div>
-
-  <!-- Stepper stato (§9) -->
-  <div class="mb-4" id="box-stepper"></div>
-
-  <div id="box-errore" class="alert alert-danger d-none">Ordine non trovato.</div>
-
-  <div id="box-pratica">
-
-    <!-- Riepilogo -->
-    <div class="row g-3 mb-4">
-      <div class="col-6 col-lg">
-        <div class="riep-card"><div class="riep-label"><i class="bi bi-building me-1"></i>Fornitore</div><div class="riep-value" id="rip-fornitore">—</div></div>
-      </div>
-      <div class="col-6 col-lg">
-        <div class="riep-card"><div class="riep-label"><i class="bi bi-person me-1"></i>Cliente</div><div class="riep-value" id="rip-cliente">—</div></div>
-      </div>
-      <div class="col-6 col-lg">
-        <div class="riep-card"><div class="riep-label"><i class="bi bi-people me-1"></i>Agente</div><div class="riep-value" id="rip-agente">—</div></div>
-      </div>
-      <div class="col-6 col-lg">
-        <div class="riep-card"><div class="riep-label"><i class="bi bi-cash me-1"></i>Importo merce</div><div class="riep-value" id="rip-importo">€ 0,00</div></div>
-      </div>
-      <div class="col-6 col-lg">
-        <div class="riep-card" id="rip-scadenza-card"><div class="riep-label"><i class="bi bi-clock me-1"></i>Scadenza conferma</div><div class="riep-value" id="rip-scadenza">—</div></div>
-      </div>
-    </div>
-
-    <!-- Tab per fase (§9): Pratica → Conferma → Fattura → Righe -->
-    <ul class="nav nav-tabs tabs-crm mb-4" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="nav-tab-pratica" data-bs-toggle="tab" data-bs-target="#tab-pratica" type="button" role="tab" aria-controls="tab-pratica" aria-selected="true">
-          <i class="bi bi-clipboard-check me-1"></i>Pratica
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="nav-tab-conferma" data-bs-toggle="tab" data-bs-target="#tab-conferma" type="button" role="tab" aria-controls="tab-conferma" aria-selected="false">
-          <i class="bi bi-check-circle me-1"></i>Conferma <span id="tab-ok-conferma"></span>
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="nav-tab-fattura" data-bs-toggle="tab" data-bs-target="#tab-fattura" type="button" role="tab" aria-controls="tab-fattura" aria-selected="false">
-          <i class="bi bi-receipt me-1"></i>Fattura <span id="tab-ok-fattura"></span>
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="nav-tab-righe" data-bs-toggle="tab" data-bs-target="#tab-righe" type="button" role="tab" aria-controls="tab-righe" aria-selected="false">
-          <i class="bi bi-list-ul me-1"></i>Righe <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1" id="tab-count-righe">0</span>
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="nav-tab-confronto" data-bs-toggle="tab" data-bs-target="#tab-confronto" type="button" role="tab" aria-controls="tab-confronto" aria-selected="false">
-          <i class="bi bi-bar-chart-steps me-1"></i>Confronto fasi <span id="tab-warn-confronto"></span>
-        </button>
-      </li>
-    </ul>
-
-    <div class="tab-content">
-      <!-- Tab: Pratica -->
-      <div class="tab-pane fade show active" id="tab-pratica" role="tabpanel" aria-labelledby="nav-tab-pratica">
-        <div class="card">
-          <div class="card-header bg-white fw-semibold"><i class="bi bi-clipboard-check me-2"></i>Dati pratica</div>
-          <div class="card-body">
-            <form id="formOrdine">
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label">Fornitore</label>
-                  <select class="form-select form-select-sm" name="fornitore_id" onchange="calcolaScadenza()"></select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label">Stato</label>
-                  <select class="form-select form-select-sm" name="stato">
-                    <option value="inviato">Inviato</option>
-                    <option value="confermato">Confermato</option>
-                    <option value="fatturato">Fatturato</option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label">N. Ordine</label>
-                  <input type="text" class="form-control form-control-sm" name="numero_ordine" placeholder="OF/2026/041">
-                </div>
-                <div class="col-md-4"><label class="form-label">Data Ordine</label><input type="date" class="form-control form-control-sm" name="data_ordine" onchange="calcolaScadenza()"></div>
-                <div class="col-md-4"><label class="form-label">Importo Merce €</label><input type="number" class="form-control form-control-sm" name="importo_merce" step="0.01"></div>
-                <div class="col-md-4"><label class="form-label">Cliente</label>
-                  <select class="form-select form-select-sm" name="cliente_piva"></select>
-                </div>
-                <div class="col-md-6"><label class="form-label">Agente</label>
-                  <select class="form-select form-select-sm" name="agente_id"></select>
-                </div>
-                <div class="col-md-6"><label class="form-label">Subagente (da interscambio §7.6)</label>
-                  <input type="text" class="form-control form-control-sm" id="campo-subagente" readonly>
-                </div>
-                <div class="col-12"><label class="form-label">Note</label><textarea class="form-control form-control-sm" name="note" rows="2"></textarea></div>
-              </div>
-              <div class="d-flex align-items-center gap-3 mt-3">
-                <button type="button" class="btn btn-primary btn-sm" onclick="salvaOrdine()"><i class="bi bi-check-lg me-1"></i>Salva</button>
-                <span class="form-text small" id="info-subagente"></span>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <div class="card mt-3">
-          <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>Documenti — Ordine</div>
-          <div class="card-body">
-            <div class="doc-chip" id="doc-ordine"></div>
-            <div class="form-text small mt-2">Allegato dell'ordine acquisito tramite importazione e validazione della Gestione Ordini (§6.1). Nell'app l'upload documentale è attivo qui.</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab: Conferma -->
-      <div class="tab-pane fade" id="tab-conferma" role="tabpanel" aria-labelledby="nav-tab-conferma">
-        <div class="card">
-          <div class="card-header bg-white fw-semibold"><i class="bi bi-check-circle me-2"></i>Dati conferma</div>
-          <div class="card-body">
-            <form id="formConferma">
-              <div class="row g-3">
-                <div class="col-md-4"><label class="form-label">Data Conferma</label><input type="date" class="form-control form-control-sm" name="conferma_data"></div>
-                <div class="col-md-4"><label class="form-label">N. Conferma</label><input type="text" class="form-control form-control-sm" name="conferma_numero" placeholder="C-2026/…"></div>
-                <div class="col-md-4"><label class="form-label">Scadenza Conferma</label><input type="date" class="form-control form-control-sm" name="conferma_scadenza"></div>
-              </div>
-              <div class="form-text small" id="hint-scadenza"></div>
-              <button type="button" class="btn btn-info btn-sm text-white mt-3" onclick="salvaConferma()"><i class="bi bi-check-lg me-1"></i>Salva Conferma</button>
-            </form>
-          </div>
-        </div>
-
-        <div class="card mt-3">
-          <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>Documenti — Conferma</div>
-          <div class="card-body">
-            <div class="doc-chip" id="doc-conferma"></div>
-            <div class="form-text small mt-2">Allegato della conferma ordine acquisito tramite importazione e validazione della Gestione Ordini (§6.1). La compilazione porta la pratica da <strong>inviato</strong> a <strong>confermato</strong> (§9).</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab: Fattura -->
-      <div class="tab-pane fade" id="tab-fattura" role="tabpanel" aria-labelledby="nav-tab-fattura">
-        <div class="card">
-          <div class="card-header bg-white fw-semibold"><i class="bi bi-receipt me-2"></i>Dati fattura</div>
-          <div class="card-body">
-            <form id="formFattura">
-              <div class="row g-3">
-                <div class="col-md-4"><label class="form-label">N. Fattura</label><input type="text" class="form-control form-control-sm" name="fattura_numero" placeholder="F-2026/…"></div>
-                <div class="col-md-4"><label class="form-label">Data Fattura</label><input type="date" class="form-control form-control-sm" name="fattura_data"></div>
-                <div class="col-md-4"><label class="form-label">Importo Fattura €</label><input type="number" class="form-control form-control-sm" name="fattura_importo" step="0.01"></div>
-              </div>
-              <button type="button" class="btn btn-success btn-sm mt-3" onclick="salvaFattura()"><i class="bi bi-check-lg me-1"></i>Salva Fattura</button>
-            </form>
-          </div>
-        </div>
-
-        <div class="card mt-3">
-          <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-files me-2"></i>Documenti fiscali <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1" id="doc-count">0</span></span>
-            <span class="small text-muted">Netto pratica: <strong id="doc-netto">€ 0,00</strong></span>
-          </div>
-          <div class="card-body p-0">
-            <table class="table table-sm table-hover mb-0 align-middle" id="tableDocumenti">
-              <thead class="table-light"><tr><th>Tipo</th><th>Numero</th><th>Data</th><th class="text-end">Importo</th><th>Allegato</th></tr></thead>
-              <tbody id="tbodyDocumenti"></tbody>
-            </table>
-          </div>
-          <div class="card-footer bg-white form-text small">Fatture e note di credito agganciate alla pratica (§4.2.7.1). Il <strong>netto</strong> è la base provvigioni; una nota di credito totale azzera la provvigione sulla fattura stornata.</div>
-        </div>
-
-        <div class="card mt-3">
-          <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>Documenti — Fattura</div>
-          <div class="card-body">
-            <div class="doc-chip" id="doc-fattura"></div>
-            <div class="form-text small mt-2">Allegato della fattura fornitore acquisito tramite importazione e validazione della Gestione Ordini (§6.1). La compilazione porta la pratica a <strong>fatturato</strong>: da qui entra nel calcolo provvigioni e nel confronto bollettini (§9–§10).</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab: Righe -->
-      <div class="tab-pane fade" id="tab-righe" role="tabpanel" aria-labelledby="nav-tab-righe">
-        <div class="card">
-          <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-list-ul me-2"></i>Righe Ordine (<span id="n-righe">0</span>)</span>
-            <button class="btn btn-sm btn-outline-primary" onclick="apriModaleRiga()"><i class="bi bi-plus"></i> Aggiungi</button>
-          </div>
-          <div class="card-body p-0">
-            <div class="box-stabile">
-              <table class="table table-hover mb-0" id="tableRighe">
-                <thead class="table-dark">
-                  <tr>
-                    <th>#</th><th>Codice</th><th>Descrizione</th><th>UM</th>
-                    <th class="text-end">Q.tà</th><th class="text-end">Prezzo Unit.</th><th class="text-end">Importo</th><th></th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyRighe"></tbody>
-                <tfoot class="table-light">
-                  <tr>
-                    <td colspan="6" class="fw-semibold text-end">Totale merce</td>
-                    <td class="text-end fw-bold" id="tot-merce">€ 0,00</td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab: Confronto fasi -->
-      <div class="tab-pane fade" id="tab-confronto" role="tabpanel" aria-labelledby="nav-tab-confronto">
-        <div class="card">
-          <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-bar-chart-steps me-2"></i>Confronto fasi <span id="confronto-esito"></span></span>
-          </div>
-          <div class="card-body p-0 box-stabile" id="box-confronto"></div>
-          <div class="card-footer bg-white form-text small">Righe allineate per <strong>codice</strong> tra ordine, conferma e fattura (§5.8): articoli comparsi/spariti, variazioni di quantità e prezzo. Gli scostamenti alimentano le segnalazioni della dashboard (§5.12).</div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- Modal Nuova Riga -->
-<div class="modal fade" id="modalRiga" tabindex="-1">
-  <div class="modal-dialog"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title">Nuova Riga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <form id="formRiga">
-        <div class="row g-3">
-          <div class="col-4"><label class="form-label">N. Riga</label><input type="number" class="form-control" name="numero_riga"></div>
-          <div class="col-4"><label class="form-label">Codice</label><input type="text" class="form-control" name="codice"></div>
-          <div class="col-4"><label class="form-label">UM</label><input type="text" class="form-control" name="um" value="pz"></div>
-          <div class="col-12"><label class="form-label">Descrizione</label><input type="text" class="form-control" name="descrizione"></div>
-          <div class="col-4"><label class="form-label">Q.tà</label><input type="number" class="form-control" name="quantita" step="0.01" value="0"></div>
-          <div class="col-4"><label class="form-label">Prezzo Unit.</label><input type="number" class="form-control" name="prezzo_unitario" step="0.01" value="0"></div>
-          <div class="col-4"><label class="form-label">Importo</label><input type="number" class="form-control" name="importo" step="0.01" value="0"></div>
-        </div>
-      </form>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-      <button class="btn btn-primary" onclick="salvaRiga()">Salva</button>
-    </div>
-  </div></div>
-</div>
+<main class="crm-pagina" id="pagina"></main>
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="assets/js/componenti.js"></script>
 <script>
+/* Composizione: Intestazione + Stepper + Riepilogo + Tabs
+   (Pratica: Pannello Form + Pannello documento | Conferma: idem | Fattura: Pannello Form + DataTable documenti fiscali + Pannello documento |
+    Righe: DataTable con totale | Confronto fasi: DataTable a colonne dinamiche) */
 const idOrdine = parseInt(new URLSearchParams(location.search).get('id'), 10)
   || parseInt(sessionStorage.getItem('ordineId'), 10);
-let ordine = DATA.ordini.find(o => o.id === idOrdine);
+const ordine = DATA.ordini.find(o => o.id === idOrdine);
+const nomeOrdine = o => o.numero_ordine || 'Ordine #' + o.id;
+
+const intestazione = CRM.Intestazione('#pagina', {
+  briciole: [{ etichetta: 'Ordini Fornitore', href: 'ordini-fornitore.html' }, { etichetta: ordine ? (ordine.numero_ordine || '#' + ordine.id) : '#' }],
+  icona: 'bi-truck', titolo: ordine ? nomeOrdine(ordine) : '', gruppo: true,
+  azioni: [
+    { etichetta: 'CSV', icona: 'bi-download', variante: 'outline-secondary', piccolo: true, onClick: esportaCSV },
+    { etichetta: 'Indietro', icona: 'bi-arrow-left', variante: 'outline-secondary', piccolo: true, href: 'ordini-fornitore.html' }
+  ]
+});
+
 if (!ordine) {
-  document.getElementById('box-errore').classList.remove('d-none');
-  document.getElementById('box-pratica').classList.add('d-none');
-  document.getElementById('box-stepper').classList.add('d-none');
-}
+  CRM.Errore('#pagina', 'Ordine non trovato.');
+} else {
+  const stepper = CRM.Stepper('#pagina', { passi: [] });
+  const riepilogo = CRM.Riepilogo('#pagina', [
+    { id: 'fornitore', etichetta: 'Fornitore', icona: 'bi-building' },
+    { id: 'cliente', etichetta: 'Cliente', icona: 'bi-person' },
+    { id: 'agente', etichetta: 'Agente', icona: 'bi-people' },
+    { id: 'importo', etichetta: 'Importo merce', icona: 'bi-cash' },
+    { id: 'scadenza', etichetta: 'Scadenza conferma', icona: 'bi-clock' }
+  ]);
 
-function subagentePerOrdine(o) {
-  const x = (DATA.interscambio || []).find(it => it.cliente_piva === o.cliente_piva && it.fornitore_id === o.fornitore_id && it.attivo !== false);
-  if (!x) return null;
-  const sub = (DATA.subagenti || []).find(s => s.id === x.subagente_id);
-  return sub ? { subagente: sub.nome + ' ' + sub.cognome, sconto: x.discount } : null;
-}
+  const tabs = CRM.Tabs('#pagina', [
+    { id: 'pratica', etichetta: 'Pratica', icona: 'bi-clipboard-check' },
+    { id: 'conferma', etichetta: 'Conferma', icona: 'bi-check-circle' },
+    { id: 'fattura', etichetta: 'Fattura', icona: 'bi-receipt' },
+    { id: 'righe', etichetta: 'Righe', icona: 'bi-list-ul' },
+    { id: 'confronto', etichetta: 'Confronto fasi', icona: 'bi-bar-chart-steps' }
+  ]);
 
-function calcolaScadenza() {
-  const f = document.getElementById('formOrdine');
-  const fid = f.elements.fornitore_id.value;
-  const d = f.elements.data_ordine.value;
-  if (!fid || !d) return;
-  const fornitore = DATA.fornitori.find(x => x.id === parseInt(fid, 10));
-  if (!fornitore) return;
-  const data = new Date(d);
-  data.setDate(data.getDate() + (fornitore.giorni_attesa_conferma || 30));
-  const scad = data.toISOString().split('T')[0];
-  document.getElementById('formConferma').elements.conferma_scadenza.value = scad;
-  document.getElementById('hint-scadenza').textContent = 'Scadenza auto-calcolata: ' + fmtData(scad) +
-    ' (data ordine + ' + (fornitore.giorni_attesa_conferma || 30) + ' giorni attesa ' + fornitore.ragione_sociale + ')';
-}
+  /* --- Tab Pratica --- */
+  const formOrdine = CRM.Form(CRM.Pannello(tabs.pane('pratica'), { titolo: 'Dati pratica', icona: 'bi-clipboard-check' }).corpo, {
+    piccolo: true,
+    campi: [
+      { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'select', opzioni: () => CRM.opz.fornitori(), col: 'col-md-6', onChange: calcolaScadenza },
+      { nome: 'stato', etichetta: 'Stato', tipo: 'select', col: 'col-md-3', opzioni: [
+        { value: 'inviato', label: 'Inviato' }, { value: 'confermato', label: 'Confermato' }, { value: 'fatturato', label: 'Fatturato' }] },
+      { nome: 'numero_ordine', etichetta: 'N. Ordine', placeholder: 'OF/2026/041', col: 'col-md-3' },
+      { nome: 'data_ordine', etichetta: 'Data Ordine', tipo: 'data', col: 'col-md-4', onChange: calcolaScadenza },
+      { nome: 'importo_merce', etichetta: 'Importo Merce €', tipo: 'numero', passo: '0.01', col: 'col-md-4' },
+      { nome: 'cliente_piva', etichetta: 'Cliente', tipo: 'select', opzioni: () => CRM.opz.clienti('—'), col: 'col-md-4' },
+      { nome: 'agente_id', etichetta: 'Agente', tipo: 'select', opzioni: () => CRM.opz.agenti(), col: 'col-md-6' },
+      { nome: 'subagente', etichetta: 'Subagente (da interscambio §7.6)', tipo: 'sola-lettura', col: 'col-md-6' },
+      { nome: 'note', etichetta: 'Note', tipo: 'area' }
+    ],
+    pulsante: { etichetta: 'Salva', icona: 'bi-check-lg', onClick: salvaOrdine }
+  });
+  const docOrdine = CRM.Pannello(tabs.pane('pratica'), { titolo: 'Documenti — Ordine', icona: 'bi-paperclip' });
 
-function renderTitle() {
-  document.getElementById('titolo-ordine').innerHTML =
-    '<i class="bi bi-truck me-2 text-primary"></i>' + (ordine.numero_ordine || 'Ordine #' + ordine.id) +
-    '<span class="badge badge-stato badge-' + ordine.stato + ' ms-2">' + ordine.stato + '</span>';
-  document.getElementById('bc-ordine').textContent = ordine.numero_ordine || '#' + ordine.id;
-  document.getElementById('sottotitolo-ordine').textContent =
-    'Ordine ' + fmtData(ordine.data_ordine) + ' · ' + fornitoreNome(ordine.fornitore_id) + ' · ' + clienteNome(ordine.cliente_piva);
-}
+  /* --- Tab Conferma --- */
+  const formConferma = CRM.Form(CRM.Pannello(tabs.pane('conferma'), { titolo: 'Dati conferma', icona: 'bi-check-circle' }).corpo, {
+    piccolo: true,
+    campi: [
+      { nome: 'conferma_data', etichetta: 'Data Conferma', tipo: 'data', col: 'col-md-4' },
+      { nome: 'conferma_numero', etichetta: 'N. Conferma', placeholder: 'C-2026/…', col: 'col-md-4' },
+      { nome: 'conferma_scadenza', etichetta: 'Scadenza Conferma', tipo: 'data', col: 'col-md-4' }
+    ],
+    pulsante: { etichetta: 'Salva Conferma', icona: 'bi-check-lg', variante: 'info text-white', onClick: salvaConferma }
+  });
+  const docConferma = CRM.Pannello(tabs.pane('conferma'), { titolo: 'Documenti — Conferma', icona: 'bi-paperclip' });
 
-function renderStepper() {
-  const stati = ['inviato', 'confermato', 'fatturato'];
-  const idx = stati.indexOf(ordine.stato);
-  const el = document.getElementById('box-stepper');
-  const labels = { inviato: 'Inviato', confermato: 'Confermato', fatturato: 'Fatturato' };
-  const passo = stati.map((s, i) => {
-    const cls = i < idx ? 'step done' : i === idx ? 'step active' : 'step';
-    const icon = i < idx ? 'bi-check-circle-fill' : i === idx ? 'bi-circle-fill' : 'bi-circle';
-    return '<span class="' + cls + '"><i class="bi ' + icon + '"></i>' + labels[s] + '</span>' +
-      (i < stati.length - 1 ? '<span class="step-arrow">\u2192</span>' : '');
-  }).join('');
-  // 4° passo: la nota di credito è un documento della pratica, non uno stato (§4.2.7.1, §6.1)
-  const nNC = documentiOrdine(ordine).filter(d => d.tipo === 'nota_credito').length;
-  const passoNC = '<span class="step-arrow">\u2192</span>' +
-    '<span class="step' + (nNC ? ' done' : '') + '" title="Documento agganciato alla pratica: riduce l\'imponibile, non cambia lo stato">' +
-    '<i class="bi ' + (nNC ? 'bi-check-circle-fill' : 'bi-file-earmark-minus') + '"></i>Nota di credito' + (nNC ? ' (' + nNC + ')' : '') + '</span>';
-  el.innerHTML = '<div class="step-states">' + passo + passoNC + '</div>' +
-    '<div class="form-text small mt-2">La pratica passa da <strong>inviato</strong> a <strong>confermato</strong> all\'arrivo della conferma ordine (§5.4) e a <strong>fatturato</strong> all\'emissione della fattura fornitore; solo le pratiche fatturate entrano in liquidazione e nel confronto bollettini. Le tre fasi corrispondono ai tab sottostanti. La <strong>nota di credito</strong> è l\'ultimo passo del flusso documentale (§6.1) ma <strong>non è uno stato</strong>: è un documento agganciato alla pratica che riduce l\'imponibile (storno parziale) o azzera la provvigione sulla fattura stornata (storno totale).</div>';
-}
+  /* --- Tab Fattura --- */
+  const formFattura = CRM.Form(CRM.Pannello(tabs.pane('fattura'), { titolo: 'Dati fattura', icona: 'bi-receipt' }).corpo, {
+    piccolo: true,
+    campi: [
+      { nome: 'fattura_numero', etichetta: 'N. Fattura', placeholder: 'F-2026/…', col: 'col-md-4' },
+      { nome: 'fattura_data', etichetta: 'Data Fattura', tipo: 'data', col: 'col-md-4' },
+      { nome: 'fattura_importo', etichetta: 'Importo Fattura €', tipo: 'numero', passo: '0.01', col: 'col-md-4' }
+    ],
+    pulsante: { etichetta: 'Salva Fattura', icona: 'bi-check-lg', variante: 'success', onClick: salvaFattura }
+  });
+  const tabDocumenti = CRM.DataTable(CRM.blocco(tabs.pane('fattura'), { riempi: true }), {
+    titolo: 'Documenti fiscali', icona: 'bi-files', contatore: true, compatta: true,
+    colonne: [
+      { key: 'tipo', header: 'Tipo', cell: d => {
+        const nc = d.tipo === 'nota_credito';
+        return '<span class="badge ' + (nc ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success') + '">' + (nc ? 'Nota di credito' : 'Fattura') + '</span>' +
+          (nc && d.fattura_riferimento ? ' <small class="text-muted">storna ' + CRM.esc(d.fattura_riferimento) + (d.storno_totale ? ' (totale)' : ' (parziale)') + '</small>' : '');
+      } },
+      { key: 'numero', header: 'Numero' },
+      { key: 'data', header: 'Data', tipo: 'data' },
+      { key: 'importo', header: 'Importo', tipo: 'euro', classe: d => 'fw-semibold' + (Number(d.importo) < 0 ? ' text-danger' : '') },
+      { key: 'att_filename', header: 'Allegato', grow: true, cell: d => d.att_filename ? CRM.docChip(d.att_filename) : '<span class="text-muted small">—</span>' }
+    ],
+    rowKey: (d, i) => (d.numero || '') + '-' + i,
+    emptyText: 'Nessun documento registrato.',
+    piede: 'Fatture e note di credito agganciate alla pratica (§4.2.7.1). Il <strong>netto</strong> è la base provvigioni; una nota di credito totale azzera la provvigione sulla fattura stornata.'
+  });
+  const docFattura = CRM.Pannello(tabs.pane('fattura'), { titolo: 'Documenti — Fattura', icona: 'bi-paperclip' });
 
-function renderRiepilogo() {
-  document.getElementById('rip-fornitore').textContent = fornitoreNome(ordine.fornitore_id);
-  document.getElementById('rip-cliente').textContent = clienteNome(ordine.cliente_piva);
-  const ag = (DATA.agenti || []).find(a => a.id === ordine.agente_id);
-  document.getElementById('rip-agente').textContent = ag ? ag.nome + ' ' + ag.cognome : '—';
-  document.getElementById('rip-importo').textContent = fmtEuro(ordine.importo_merce);
+  /* --- Tab Righe --- */
+  const tabRighe = CRM.DataTable(CRM.blocco(tabs.pane('righe'), { riempi: true }), {
+    titolo: 'Righe Ordine', icona: 'bi-list-ul', contatore: true,
+    azioniTestata: [{ etichetta: 'Aggiungi', icona: 'bi-plus', onClick: apriModaleRiga }],
+    colonne: [
+      { key: 'numero_riga', header: '#', tipo: 'numero', align: 'left', width: '56px', classe: 'text-muted small', valore: r => r.numero_riga || r._i + 1 },
+      { key: 'codice', header: 'Codice' },
+      { key: 'descrizione', header: 'Descrizione', grow: true },
+      { key: 'um', header: 'UM' },
+      { key: 'quantita', header: 'Q.tà', tipo: 'numero' },
+      { key: 'prezzo_unitario', header: 'Prezzo Unit.', tipo: 'euro' },
+      { key: 'importo', header: 'Importo', tipo: 'euro', classe: 'fw-semibold', totale: 'somma' }
+    ],
+    rowKey: r => r._i,
+    etichettaTotale: 'Totale merce',
+    azioni: [{ icona: 'bi-trash', tooltip: 'Elimina', variante: 'danger', onClick: r => eliminaRiga(r._i) }],
+    emptyText: 'Nessuna riga. Aggiungi la prima riga dell\'ordine.'
+  });
 
-  const scad = ordine.conferma_scadenza;
-  const card = document.getElementById('rip-scadenza-card');
-  const el = document.getElementById('rip-scadenza');
-  if (scad) {
-    const scaduta = ordine.stato === 'inviato' && scad < OGGI.toISOString().split('T')[0];
-    el.textContent = fmtData(scad) + (scaduta ? ' (scaduta)' : '');
-    card.classList.toggle('riep-danger', scaduta);
-    card.classList.toggle('riep-warn', !scaduta && ordine.stato === 'inviato');
-  } else {
-    el.textContent = '—';
+  /* --- Tab Confronto fasi --- */
+  const tabConfronto = CRM.DataTable(CRM.blocco(tabs.pane('confronto'), { riempi: true }), {
+    titolo: 'Confronto fasi', icona: 'bi-bar-chart-steps', compatta: true, colonne: [],
+    rowKey: r => r.codice, rowClass: r => r.variazione ? 'table-warning' : '',
+    emptyText: 'Confronto disponibile da due fasi in poi (ordine → conferma → fattura).',
+    piede: 'Righe allineate per <strong>codice</strong> tra ordine, conferma e fattura (§5.8): articoli comparsi/spariti, variazioni di quantità e prezzo. Gli scostamenti alimentano le segnalazioni della dashboard (§5.12).'
+  });
+
+  /* ---------- Disegno ---------- */
+  function subagentePerOrdine(o) {
+    const x = (DATA.interscambio || []).find(it => it.cliente_piva === o.cliente_piva && it.fornitore_id === o.fornitore_id && it.attivo !== false);
+    if (!x) return null;
+    const sub = (DATA.subagenti || []).find(s => s.id === x.subagente_id);
+    return sub ? { subagente: sub.nome + ' ' + sub.cognome, sconto: x.discount } : null;
   }
-}
-
-function renderTabState() {
-  document.getElementById('tab-ok-conferma').innerHTML =
-    (ordine.conferma_numero || ordine.conferma_data) ? '<i class="bi bi-check-circle-fill text-success ms-1"></i>' : '';
-  document.getElementById('tab-ok-fattura').innerHTML =
-    (ordine.fattura_numero || ordine.fattura_data) ? '<i class="bi bi-check-circle-fill text-success ms-1"></i>' : '';
-  document.getElementById('tab-count-righe').textContent = (ordine.righe || []).length;
-}
-
-function renderDocChips() {
-  const chip = (field, fallback) => {
-    const f = ordine[field];
-    return f
-      ? '<span class="doc-chip"><i class="bi bi-file-earmark-pdf"></i>' + f + '</span>'
-      : '<span class="doc-chip"><i class="bi bi-paperclip"></i>' + fallback + '</span>';
-  };
-  document.getElementById('doc-ordine').innerHTML = chip('att_filename_ordine', 'Non caricato');
-  document.getElementById('doc-conferma').innerHTML = chip('att_filename_conferma', 'Non caricato');
-  document.getElementById('doc-fattura').innerHTML = chip('att_filename_fattura', 'Non caricato');
-}
-
-function renderDocumenti() {
-  const docs = documentiOrdine(ordine);
-  document.getElementById('doc-count').textContent = docs.length;
-  document.getElementById('doc-netto').textContent = fmtEuro(importoNettoOrdine(ordine));
-  const tb = document.getElementById('tbodyDocumenti');
-  if (!docs.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nessun documento registrato.</td></tr>'; return; }
-  tb.innerHTML = docs.map(d => {
-    const nc = d.tipo === 'nota_credito';
-    return '<tr>' +
-      '<td><span class="badge ' + (nc ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success') + '">' + (nc ? 'Nota di credito' : 'Fattura') + '</span>' +
-      (nc && d.fattura_riferimento ? ' <small class="text-muted">storna ' + d.fattura_riferimento + (d.storno_totale ? ' (totale)' : ' (parziale)') + '</small>' : '') + '</td>' +
-      '<td>' + (d.numero || '—') + '</td>' +
-      '<td>' + fmtData(d.data) + '</td>' +
-      '<td class="text-end fw-semibold' + (Number(d.importo) < 0 ? ' text-danger' : '') + '">' + fmtEuro(d.importo) + '</td>' +
-      '<td>' + (d.att_filename ? '<span class="doc-chip"><i class="bi bi-file-earmark-pdf"></i>' + d.att_filename + '</span>' : '<span class="text-muted small">—</span>') + '</td>' +
-      '</tr>';
-  }).join('');
-}
-
-function renderConfronto() {
-  const fasi = fasiOrdine(ordine);
-  const warn = document.getElementById('tab-warn-confronto');
-  const esito = document.getElementById('confronto-esito');
-  const box = document.getElementById('box-confronto');
-  if (fasi.length < 2) {
-    warn.innerHTML = '';
-    esito.innerHTML = '';
-    box.innerHTML = '<div class="text-center text-muted py-4">Confronto disponibile da due fasi in poi (ordine → conferma → fattura).</div>';
-    return;
+  function calcolaScadenza() {
+    const fid = formOrdine.campo('fornitore_id').value;
+    const d = formOrdine.campo('data_ordine').value;
+    if (!fid || !d) return;
+    const fornitore = DATA.fornitori.find(x => x.id === parseInt(fid, 10));
+    if (!fornitore) return;
+    const data = new Date(d);
+    data.setDate(data.getDate() + (fornitore.giorni_attesa_conferma || 30));
+    const scad = data.toISOString().split('T')[0];
+    formConferma.imposta({ conferma_scadenza: scad });
+    formConferma.aiuto('conferma_scadenza', 'Scadenza auto-calcolata: ' + fmtData(scad) +
+      ' (data ordine + ' + (fornitore.giorni_attesa_conferma || 30) + ' giorni attesa ' + CRM.esc(fornitore.ragione_sociale) + ')');
   }
-  const rows = confrontoFasi(ordine);
-  const nVar = rows.filter(r => r.variazione).length;
-  warn.innerHTML = nVar ? '<span class="badge bg-warning text-dark rounded-pill ms-1">' + nVar + '</span>' : '';
-  esito.innerHTML = nVar
-    ? '<span class="badge bg-warning text-dark ms-2">' + nVar + ' variazioni</span>'
-    : '<span class="badge bg-success-subtle text-success ms-2">Nessuna variazione</span>';
-  const th = fasi.map(f => '<th class="text-end">' + f.label + '</th>').join('');
-  box.innerHTML = '<table class="table table-sm table-hover mb-0 align-middle">' +
-    '<thead class="table-dark"><tr><th>Codice</th><th>Descrizione</th>' + th + '<th class="text-end">Delta</th><th></th></tr></thead><tbody>' +
-    rows.map(r => {
-      const cells = fasi.map(f => {
-        const x = r.fasi[f.key];
-        if (!x) return '<td class="text-end text-muted">assente</td>';
-        return '<td class="text-end">' + fmtNum(x.quantita, 0) + ' × ' + fmtEuro(x.prezzo_unitario) +
-          '<br><small class="text-muted">' + fmtEuro(x.importo) + '</small></td>';
-      }).join('');
-      const delta = r.delta == null ? '<span class="text-muted">—</span>'
-        : (Math.round(r.delta * 100) === 0 ? '<span class="text-muted">' + fmtEuro(0) + '</span>'
-          : '<span class="' + (r.delta < 0 ? 'text-danger' : 'text-success') + ' fw-semibold">' + fmtEuro(r.delta) + '</span>');
-      return '<tr' + (r.variazione ? ' class="table-warning"' : '') + '>' +
-        '<td class="fw-semibold">' + r.codice + '</td>' +
-        '<td>' + (r.descrizione || '—') + '</td>' + cells +
-        '<td class="text-end">' + delta + '</td>' +
-        '<td>' + (r.variazione ? '<i class="bi bi-exclamation-triangle text-warning" title="Variazione fra fasi"></i>' : '') + '</td></tr>';
-    }).join('') + '</tbody></table>';
-}
-
-function renderSubagente() {
-  const legame = subagentePerOrdine(ordine);
-  const campo = document.getElementById('campo-subagente');
-  const info = document.getElementById('info-subagente');
-  if (legame) {
-    campo.value = legame.subagente + ' — sconto ' + legame.sconto + '%';
-    info.textContent = 'Derivato da interscambio (cliente × fornitore). Determina lo scaglione provvigioni (§5.1).';
-  } else {
-    campo.value = '';
-    info.textContent = 'Nessun legame in interscambio per questo cliente × fornitore: nessuna provvigione subagente (§7.6).';
+  function renderTitolo() {
+    intestazione.aggiorna({ titolo: nomeOrdine(ordine), badge: CRM.badgeStato(ordine.stato),
+      sottotitolo: 'Ordine ' + fmtData(ordine.data_ordine) + ' · ' + fornitoreNome(ordine.fornitore_id) + ' · ' + clienteNome(ordine.cliente_piva),
+      briciole: [{ etichetta: 'Ordini Fornitore', href: 'ordini-fornitore.html' }, { etichetta: ordine.numero_ordine || '#' + ordine.id }] });
   }
-}
-
-function renderForm() {
-  const f = document.getElementById('formOrdine');
-  f.elements.fornitore_id.innerHTML = DATA.fornitori.map(x => '<option value="' + x.id + '"' + (x.id === ordine.fornitore_id ? ' selected' : '') + '>' + x.ragione_sociale + '</option>').join('');
-  f.elements.stato.value = ordine.stato;
-  f.elements.numero_ordine.value = ordine.numero_ordine || '';
-  f.elements.data_ordine.value = ordine.data_ordine || '';
-  f.elements.importo_merce.value = ordine.importo_merce || 0;
-  f.elements.cliente_piva.innerHTML = '<option value="">—</option>' + DATA.clienti.map(c => '<option value="' + c.piva + '"' + (c.piva === ordine.cliente_piva ? ' selected' : '') + '>' + c.ragione_sociale + '</option>').join('');
-  f.elements.agente_id.innerHTML = DATA.agenti.map(a => '<option value="' + a.id + '"' + (a.id === ordine.agente_id ? ' selected' : '') + '>' + a.nome + ' ' + a.cognome + '</option>').join('');
-  f.elements.note.value = ordine.note || '';
-  document.getElementById('formConferma').elements.conferma_data.value = ordine.conferma_data || '';
-  document.getElementById('formConferma').elements.conferma_numero.value = ordine.conferma_numero || '';
-  document.getElementById('formConferma').elements.conferma_scadenza.value = ordine.conferma_scadenza || '';
-  const ff = document.getElementById('formFattura');
-  ff.elements.fattura_numero.value = ordine.fattura_numero || '';
-  ff.elements.fattura_data.value = ordine.fattura_data || '';
-  ff.elements.fattura_importo.value = ordine.fattura_importo || '';
-  calcolaScadenza();
-}
-
-function renderRighe() {
-  document.getElementById('n-righe').textContent = (ordine.righe || []).length;
-  document.getElementById('tab-count-righe').textContent = (ordine.righe || []).length;
-  const tb = document.getElementById('tbodyRighe');
-  if (!ordine.righe || !ordine.righe.length) {
-    tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Nessuna riga. Aggiungi la prima riga dell\'ordine.</td></tr>';
-    document.getElementById('tot-merce').textContent = fmtEuro(0);
-    return;
+  function renderStepper() {
+    const stati = ['inviato', 'confermato', 'fatturato'];
+    const etichette = { inviato: 'Inviato', confermato: 'Confermato', fatturato: 'Fatturato' };
+    const idx = stati.indexOf(ordine.stato);
+    const nNC = documentiOrdine(ordine).filter(d => d.tipo === 'nota_credito').length;
+    stepper.aggiorna({
+      passi: stati.map((s, i) => ({ etichetta: etichette[s], stato: i < idx ? 'done' : i === idx ? 'active' : '' })).concat([{
+        etichetta: 'Nota di credito' + (nNC ? ' (' + nNC + ')' : ''), stato: nNC ? 'done' : '', icona: nNC ? 'bi-check-circle-fill' : 'bi-file-earmark-minus',
+        title: 'Documento agganciato alla pratica: riduce l\'imponibile, non cambia lo stato' }]),
+      nota: 'La pratica passa da <strong>inviato</strong> a <strong>confermato</strong> all\'arrivo della conferma ordine (§5.4) e a <strong>fatturato</strong> all\'emissione della fattura fornitore; solo le pratiche fatturate entrano in liquidazione e nel confronto bollettini. Le tre fasi corrispondono ai tab sottostanti. La <strong>nota di credito</strong> è l\'ultimo passo del flusso documentale (§6.1) ma <strong>non è uno stato</strong>: è un documento agganciato alla pratica che riduce l\'imponibile (storno parziale) o azzera la provvigione sulla fattura stornata (storno totale).'
+    });
   }
-  tb.innerHTML = ordine.righe.map((r, i) =>
-    '<tr>' +
-    '<td class="text-muted small">' + (r.numero_riga || i + 1) + '</td>' +
-    '<td>' + (r.codice || '\u2014') + '</td>' +
-    '<td>' + (r.descrizione || '\u2014') + '</td>' +
-    '<td>' + (r.um || '\u2014') + '</td>' +
-    '<td class="text-end">' + fmtNum(r.quantita, 0) + '</td>' +
-    '<td class="text-end">' + fmtEuro(r.prezzo_unitario) + '</td>' +
-    '<td class="text-end fw-semibold">' + fmtEuro(r.importo) + '</td>' +
-    '<td><button class="btn btn-sm btn-outline-danger" onclick="eliminaRiga(' + i + ')" title="Elimina"><i class="bi bi-trash"></i></button></td></tr>').join('');
-  const tot = (ordine.righe || []).reduce((s, r) => s + Number(r.importo || 0), 0);
-  document.getElementById('tot-merce').textContent = fmtEuro(tot);
-}
-
-function refresh() {
-  renderRiepilogo();
-  renderTabState();
-  renderDocChips();
-  renderDocumenti();
-  renderConfronto();
-  renderSubagente();
-}
-
-function salvaOrdine() {
-  const f = Object.fromEntries(new FormData(document.getElementById('formOrdine')));
-  f.fornitore_id = parseInt(f.fornitore_id);
-  f.agente_id = parseInt(f.agente_id);
-  f.importo_merce = parseFloat(f.importo_merce) || 0;
-  const nuovo = f.stato;
-  delete f.stato;
-  Object.assign(ordine, f);
-  if (ordine.stato !== nuovo) { ordine.stato = nuovo; renderStepper(); renderTitle(); }
-  renderForm();
-  refresh();
-  showToast('Ordine salvato');
-}
-function salvaConferma() {
-  const f = Object.fromEntries(new FormData(document.getElementById('formConferma')));
-  Object.assign(ordine, f);
-  // flusso §9: la compilazione della conferma porta la pratica da "inviato" a "confermato"
-  if (ordine.stato === 'inviato' && (ordine.conferma_numero || ordine.conferma_data)) { ordine.stato = 'confermato'; renderStepper(); renderTitle(); }
-  renderForm();
-  refresh();
-  showToast('Conferma salvata');
-}
-function salvaFattura() {
-  const f = Object.fromEntries(new FormData(document.getElementById('formFattura')));
-  if (f.fattura_importo) f.fattura_importo = parseFloat(f.fattura_importo);
-  Object.assign(ordine, f);
-  if (ordine.stato !== 'fatturato' && (ordine.fattura_numero || ordine.fattura_data)) {
-    ordine.stato = 'fatturato'; renderStepper(); renderTitle();
+  function renderRiepilogo() {
+    riepilogo.aggiorna('fornitore', fornitoreNome(ordine.fornitore_id));
+    riepilogo.aggiorna('cliente', clienteNome(ordine.cliente_piva));
+    const ag = (DATA.agenti || []).find(a => a.id === ordine.agente_id);
+    riepilogo.aggiorna('agente', ag ? ag.nome + ' ' + ag.cognome : '');
+    riepilogo.aggiorna('importo', fmtEuro(ordine.importo_merce));
+    const scad = ordine.conferma_scadenza;
+    if (scad) {
+      const scaduta = ordine.stato === 'inviato' && scad < OGGI.toISOString().split('T')[0];
+      riepilogo.aggiorna('scadenza', fmtData(scad) + (scaduta ? ' (scaduta)' : ''), scaduta ? 'danger' : ordine.stato === 'inviato' ? 'warn' : '');
+    } else {
+      riepilogo.aggiorna('scadenza', '');
+    }
   }
-  renderForm();
-  refresh();
-  showToast('Fattura salvata');
-}
+  function renderSchede() {
+    const ok = '<i class="bi bi-check-circle-fill text-success ms-1"></i>';
+    tabs.badge('conferma', (ordine.conferma_numero || ordine.conferma_data) ? ok : '');
+    tabs.badge('fattura', (ordine.fattura_numero || ordine.fattura_data) ? ok : '');
+    tabs.badge('righe', CRM.badgeConteggio((ordine.righe || []).length));
+  }
+  function renderDocumenti() {
+    const testo = {
+      ordine: 'Allegato dell\'ordine acquisito tramite importazione e validazione della Gestione Ordini (§6.1). Nell\'app l\'upload documentale è attivo qui.',
+      conferma: 'Allegato della conferma ordine acquisito tramite importazione e validazione della Gestione Ordini (§6.1). La compilazione porta la pratica da <strong>inviato</strong> a <strong>confermato</strong> (§9).',
+      fattura: 'Allegato della fattura fornitore acquisito tramite importazione e validazione della Gestione Ordini (§6.1). La compilazione porta la pratica a <strong>fatturato</strong>: da qui entra nel calcolo provvigioni e nel confronto bollettini (§9–§10).'
+    };
+    [[docOrdine, 'att_filename_ordine', 'ordine'], [docConferma, 'att_filename_conferma', 'conferma'], [docFattura, 'att_filename_fattura', 'fattura']].forEach(([p, campo, k]) => {
+      p.corpo.innerHTML = CRM.docChip(ordine[campo]) + '<div class="form-text small mt-2">' + testo[k] + '</div>';
+    });
+    tabDocumenti.aggiorna(documentiOrdine(ordine), { testataDestra: '<span class="small text-muted">Netto pratica: <strong>' + fmtEuro(importoNettoOrdine(ordine)) + '</strong></span>' });
+  }
+  function renderConfronto() {
+    const fasi = fasiOrdine(ordine);
+    if (fasi.length < 2) {
+      tabs.badge('confronto', '');
+      tabConfronto.aggiorna([], { testataExtra: '', colonne: [{ key: 'codice', header: 'Codice' }, { key: 'descrizione', header: 'Descrizione' }] });
+      return;
+    }
+    const rows = confrontoFasi(ordine);
+    const nVar = rows.filter(r => r.variazione).length;
+    tabs.badge('confronto', nVar ? '<span class="badge bg-warning text-dark rounded-pill ms-1">' + nVar + '</span>' : '');
+    const colFasi = fasi.map(f => ({
+      key: 'fase_' + f.key, header: f.label, align: 'right', sortValue: r => r.fasi[f.key] ? Number(r.fasi[f.key].importo || 0) : -Infinity,
+      classe: r => r.fasi[f.key] ? '' : 'text-muted',
+      cell: r => { const x = r.fasi[f.key]; return x ? fmtNum(x.quantita, 0) + ' × ' + fmtEuro(x.prezzo_unitario) + '<br><small class="text-muted">' + fmtEuro(x.importo) + '</small>' : 'assente'; }
+    }));
+    tabConfronto.aggiorna(rows, {
+      testataExtra: nVar ? '<span class="badge bg-warning text-dark ms-2">' + nVar + ' variazioni</span>' : '<span class="badge bg-success-subtle text-success ms-2">Nessuna variazione</span>',
+      colonne: [{ key: 'codice', header: 'Codice', classe: 'fw-semibold' }, { key: 'descrizione', header: 'Descrizione', grow: true }]
+        .concat(colFasi).concat([
+          { key: 'delta', header: 'Delta', align: 'right', sortValue: r => r.delta == null ? -Infinity : r.delta,
+            cell: r => r.delta == null ? '<span class="text-muted">—</span>'
+              : (Math.round(r.delta * 100) === 0 ? '<span class="text-muted">' + fmtEuro(0) + '</span>'
+                : '<span class="' + (r.delta < 0 ? 'text-danger' : 'text-success') + ' fw-semibold">' + fmtEuro(r.delta) + '</span>') },
+          { key: 'variazione', header: '', sortable: false, width: '40px', cell: r => r.variazione ? '<i class="bi bi-exclamation-triangle text-warning" title="Variazione fra fasi"></i>' : '' }])
+    });
+  }
+  function renderSubagente() {
+    const legame = subagentePerOrdine(ordine);
+    formOrdine.imposta({ subagente: legame ? legame.subagente + ' — sconto ' + legame.sconto + '%' : '' });
+    formOrdine.info(legame
+      ? 'Derivato da interscambio (cliente × fornitore). Determina lo scaglione provvigioni (§5.1).'
+      : 'Nessun legame in interscambio per questo cliente × fornitore: nessuna provvigione subagente (§7.6).');
+  }
+  function renderForm() {
+    formOrdine.imposta({
+      fornitore_id: ordine.fornitore_id, stato: ordine.stato, numero_ordine: ordine.numero_ordine || '',
+      data_ordine: ordine.data_ordine || '', importo_merce: ordine.importo_merce || 0,
+      cliente_piva: ordine.cliente_piva || '', agente_id: ordine.agente_id, note: ordine.note || ''
+    });
+    formConferma.imposta({ conferma_data: ordine.conferma_data || '', conferma_numero: ordine.conferma_numero || '', conferma_scadenza: ordine.conferma_scadenza || '' });
+    formFattura.imposta({ fattura_numero: ordine.fattura_numero || '', fattura_data: ordine.fattura_data || '', fattura_importo: ordine.fattura_importo || '' });
+    calcolaScadenza();
+  }
+  function renderRighe() {
+    tabRighe.aggiorna((ordine.righe || []).map((r, i) => Object.assign({ _i: i }, r)));
+  }
+  function refresh() {
+    renderRiepilogo(); renderSchede(); renderDocumenti(); renderConfronto(); renderSubagente();
+  }
 
-function apriModaleRiga() { document.getElementById('formRiga').reset(); new bootstrap.Modal(document.getElementById('modalRiga')).show(); }
-function salvaRiga() {
-  const f = Object.fromEntries(new FormData(document.getElementById('formRiga')));
-  if (!f.descrizione) return showToast('La descrizione è obbligatoria', false);
-  f.quantita = parseFloat(f.quantita) || 0;
-  f.prezzo_unitario = parseFloat(f.prezzo_unitario) || 0;
-  f.importo = parseFloat(f.importo) || 0;
-  if (!ordine.righe) ordine.righe = [];
-  if (!f.numero_riga) f.numero_riga = ordine.righe.length + 1;
-  ordine.righe.push(f);
-  ordine.importo_merce = ordine.righe.reduce((s, r) => s + Number(r.importo || 0), 0);
-  document.getElementById('formOrdine').elements.importo_merce.value = ordine.importo_merce;
-  bootstrap.Modal.getInstance(document.getElementById('modalRiga')).hide();
-  renderRighe();
-  renderRiepilogo();
-  showToast('Riga aggiunta');
-}
-function eliminaRiga(i) {
-  if (!conferma('Eliminare questa riga?')) return;
-  ordine.righe.splice(i, 1);
-  ordine.importo_merce = ordine.righe.reduce((s, r) => s + Number(r.importo || 0), 0);
-  document.getElementById('formOrdine').elements.importo_merce.value = ordine.importo_merce;
-  renderRighe();
-  renderRiepilogo();
+  /* ---------- Azioni ---------- */
+  function cambiaStato(nuovo) { if (ordine.stato !== nuovo) { ordine.stato = nuovo; renderStepper(); renderTitolo(); } }
+  function salvaOrdine(f) {
+    delete f.subagente;
+    f.fornitore_id = parseInt(f.fornitore_id);
+    f.agente_id = parseInt(f.agente_id);
+    f.importo_merce = parseFloat(f.importo_merce) || 0;
+    const nuovo = f.stato; delete f.stato;
+    Object.assign(ordine, f);
+    cambiaStato(nuovo);
+    renderForm(); refresh();
+    showToast('Ordine salvato');
+  }
+  function salvaConferma(f) {
+    Object.assign(ordine, f);
+    /* flusso §9: la compilazione della conferma porta la pratica da "inviato" a "confermato" */
+    if (ordine.stato === 'inviato' && (ordine.conferma_numero || ordine.conferma_data)) cambiaStato('confermato');
+    renderForm(); refresh();
+    showToast('Conferma salvata');
+  }
+  function salvaFattura(f) {
+    if (f.fattura_importo) f.fattura_importo = parseFloat(f.fattura_importo);
+    Object.assign(ordine, f);
+    if (ordine.stato !== 'fatturato' && (ordine.fattura_numero || ordine.fattura_data)) cambiaStato('fatturato');
+    renderForm(); refresh();
+    showToast('Fattura salvata');
+  }
+  function apriModaleRiga() {
+    CRM.FormModal({
+      titolo: 'Nuova Riga',
+      campi: [
+        { nome: 'numero_riga', etichetta: 'N. Riga', tipo: 'numero', col: 'col-4' },
+        { nome: 'codice', etichetta: 'Codice', col: 'col-4' },
+        { nome: 'um', etichetta: 'UM', valore: 'pz', col: 'col-4' },
+        { nome: 'descrizione', etichetta: 'Descrizione' },
+        { nome: 'quantita', etichetta: 'Q.tà', tipo: 'numero', passo: '0.01', valore: 0, col: 'col-4' },
+        { nome: 'prezzo_unitario', etichetta: 'Prezzo Unit.', tipo: 'numero', passo: '0.01', valore: 0, col: 'col-4' },
+        { nome: 'importo', etichetta: 'Importo', tipo: 'numero', passo: '0.01', valore: 0, col: 'col-4' }
+      ],
+      onConferma: function (f) {
+        if (!f.descrizione) { showToast('La descrizione è obbligatoria', false); return false; }
+        f.quantita = parseFloat(f.quantita) || 0;
+        f.prezzo_unitario = parseFloat(f.prezzo_unitario) || 0;
+        f.importo = parseFloat(f.importo) || 0;
+        if (!ordine.righe) ordine.righe = [];
+        if (!f.numero_riga) f.numero_riga = ordine.righe.length + 1;
+        ordine.righe.push(f);
+        ordine.importo_merce = ordine.righe.reduce((s, r) => s + Number(r.importo || 0), 0);
+        formOrdine.imposta({ importo_merce: ordine.importo_merce });
+        renderRighe(); renderRiepilogo(); renderSchede();
+        showToast('Riga aggiunta');
+      }
+    });
+  }
+  function eliminaRiga(i) {
+    if (!conferma('Eliminare questa riga?')) return;
+    ordine.righe.splice(i, 1);
+    ordine.importo_merce = ordine.righe.reduce((s, r) => s + Number(r.importo || 0), 0);
+    formOrdine.imposta({ importo_merce: ordine.importo_merce });
+    renderRighe(); renderRiepilogo(); renderSchede();
+  }
+
+  renderTitolo(); renderStepper(); renderForm(); renderRighe(); refresh();
 }
 
 function esportaCSV() {
-  if (!ordine.righe || !ordine.righe.length) return showToast('Nessuna riga da esportare', false);
+  if (!ordine || !ordine.righe || !ordine.righe.length) return showToast('Nessuna riga da esportare', false);
   const header = 'Riga;Codice;Descrizione;UM;Quantita;Prezzo;Importo';
   const rows = ordine.righe.map(r => [r.numero_riga, r.codice, r.descrizione, r.um, r.quantita, r.prezzo_unitario, r.importo]);
   exportCSV('righe_ordine_' + (ordine.numero_ordine || ordine.id) + '.csv', header, rows);
   showToast('CSV esportato');
-}
-
-if (ordine) {
-  renderTitle();
-  renderStepper();
-  renderForm();
-  renderRighe();
-  refresh();
 }
 </script>
 </body>

@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 1.8 — Stato: validata con il cliente; stack confermato, allineato al Portale B2B Luis (§16.3) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 1.9 — Stato: validata con il cliente; stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -138,7 +138,8 @@
               <li class="nav-item"><a class="nav-link" href="#sec-16-1">16.1 Replicazione maniacale del prototipo</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-16-2">16.2 Fasi e attività parallele</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-16-3">16.3 Stack confermato (V7)</a></li>
-              <li class="nav-item"><a class="nav-link" href="#sec-16-4">16.4 Regole di consegna</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-16-4">16.4 Componenti standard</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-16-5">16.5 Regole di consegna</a></li>
             </ul>
           </li>
         </ul>
@@ -151,7 +152,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.8 — <strong>Stato:</strong> validata con il cliente; stack confermato, allineato al Portale B2B Luis (§16.3)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 1.9 — <strong>Stato:</strong> validata con il cliente; stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -239,7 +240,7 @@ quel sistema (<code>ordini_upload_queue</code>, <code>processing_errors</code>, 
 <tr>
 <td>V9</td>
 <td>Contenitori dati stabili</td>
-<td>Le viste con tabelle o liste filtrate usano contenitori stabili (altezza minima e massima, scroll interno, intestazione fissa): il layout non cambia al variare del numero di righe</td>
+<td>Ogni tabella è una <strong>DataTable standard</strong> (§16.4): occupa tutto lo spazio disponibile, intestazione fissa, righe scorrevoli, intestazioni ordinabili; il layout non cambia al variare del numero di righe</td>
 </tr>
 <tr>
 <td>V10</td>
@@ -2612,7 +2613,7 @@ HTML e confronto numerico sul seed §12, <strong>prima del merge</strong>:</p>
 <ol>
 <li><strong>Struttura/navigazione</strong> — stesse aree e ordine: navbar fissa (§4.2), contenuto, footer fisso centrato; stesse rotte (§7).</li>
 <li><strong>Layout</strong> — stesse card/tabelle nello stesso ordine; <code>.table-box</code>/<code>.box-stabile</code> con altezze e thead sticky; <code>thead class="table-dark"</code>.</li>
-<li><strong>Componenti/stile</strong> — Bootstrap 5.3.2 + bootstrap-icons identichi; <code>crm.css</code> <strong>copiato, non riscritto</strong>.</li>
+<li><strong>Componenti/stile</strong> — schermata composta <strong>solo</strong> dai componenti standard §16.4 con gli stessi parametri del prototipo; Bootstrap 5.3.2 + bootstrap-icons identichi; <code>crm.css</code> <strong>copiato, non riscritto</strong>.</li>
 <li><strong>Testi</strong> — etichette, empty state, avvisi e note: italiano identico parola per parola al file di prototipo.</li>
 <li><strong>Interazioni</strong> — filtri (incl. multifiltro checkbox §7.8), tab, modali, stepper, conferme, toast, export: stesso comportamento e stessi messaggi.</li>
 <li><strong>Dati</strong> — seed §12 identico → stessi numeri in KPI e tabelle (prova oggettiva).</li>
@@ -2631,10 +2632,10 @@ HTML e confronto numerico sul seed §12, <strong>prima del merge</strong>:</p>
 <tbody>
 <tr>
 <td>F0</td>
-<td>Fondamenta: scaffold, DB/seed, auth, shell, motore §10 + <code>logEvent()</code>, prova lettura documenti fornitore</td>
+<td>Fondamenta: scaffold, DB/seed, auth, shell + componenti standard §16.4, motore §10 + <code>logEvent()</code>, prova lettura documenti fornitore</td>
 <td>A1–A6</td>
 <td>1 → fino a 4</td>
-<td>25</td>
+<td>28</td>
 </tr>
 <tr>
 <td>F1</td>
@@ -2648,7 +2649,7 @@ HTML e confronto numerico sul seed §12, <strong>prima del merge</strong>:</p>
 <td>Pratiche ordini (lista, dettaglio, documenti, upload)</td>
 <td>A1–A3</td>
 <td>3</td>
-<td>7</td>
+<td>6</td>
 </tr>
 <tr>
 <td>F3</td>
@@ -2662,7 +2663,7 @@ HTML e confronto numerico sul seed §12, <strong>prima del merge</strong>:</p>
 <td>Liquidazione (filtri, dettaglio, export)</td>
 <td>A1–A3</td>
 <td>2–3</td>
-<td>4</td>
+<td>3</td>
 </tr>
 <tr>
 <td>F5</td>
@@ -2676,7 +2677,7 @@ HTML e confronto numerico sul seed §12, <strong>prima del merge</strong>:</p>
 <td>Modulo ordini cliente (§7.9)</td>
 <td>A1–A2</td>
 <td>1–2</td>
-<td>6</td>
+<td>5</td>
 </tr>
 <tr>
 <td>F7</td>
@@ -2819,7 +2820,78 @@ next-intl, socket.io, moduli di dominio (catalogo, carrello, checkout, AI, lead,
 <code>crm.css</code>, §16.1): le schermate Next.js riproducono l'HTML del prototipo con Bootstrap 5.3.2.</p>
 <p>Lo schema Prisma copre solo le tabelle CRM (§4.2); le
 tabelle esistenti si leggono in sola lettura (V2), mai migrate.</p>
-<h3 id="sec-16-4">16.4 Regole di consegna</h3>
+<h3 id="sec-16-4">16.4 Componenti standard</h3>
+<p>Ogni schermata è una <strong>composizione di componenti standard</strong> configurati con parametri,
+mai codice di interfaccia scritto a mano pagina per pagina. Nel prototipo la libreria è
+<code>prototipo-crm/assets/js/componenti.js</code> (stili in <code>crm.css</code>), con catalogo dal vivo in
+<code>componenti.html</code>; nell'app gli stessi componenti diventano componenti React <strong>con gli
+stessi nomi e gli stessi parametri</strong> (attività F0-A4).</p>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Componente</th>
+<th>Uso</th>
+<th>Parametri principali</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DataTable</strong></td>
+<td>ogni tabella dell'app (modello DataTable di Luis B2B)</td>
+<td>colonne (<code>key</code>, <code>header</code>, <code>tipo</code> testo/numero/euro/pct/data/stato/conteggio, <code>align</code>, <code>width</code>, <code>grow</code>, <code>valore</code>, <code>cell</code>, <code>sortable</code>, <code>totale</code>), righe, azioni di riga, testata (titolo, contatore, azioni, link), selezione, paginazione facoltativa, <code>onRowClick</code>, testo "nessun dato"</td>
+</tr>
+<tr>
+<td><strong>FilterBar</strong></td>
+<td>filtri sopra le tabelle</td>
+<td>campi <code>select</code> / <code>multi</code> (selezione multipla con "Tutti") / <code>cerca</code> / <code>numero</code>, <code>onChange</code>, Reset</td>
+</tr>
+<tr>
+<td><strong>KpiRow</strong></td>
+<td>riquadri numerici</td>
+<td>voci (etichetta, valore, variante colore)</td>
+</tr>
+<tr>
+<td><strong>Riepilogo</strong></td>
+<td>schede compatte del dettaglio pratica</td>
+<td>voci (etichetta, icona, valore, variante)</td>
+</tr>
+<tr>
+<td><strong>Tabs</strong></td>
+<td>schede</td>
+<td>id, etichetta, icona, badge</td>
+</tr>
+<tr>
+<td><strong>Pannello</strong></td>
+<td>card con testata</td>
+<td>titolo, icona, azioni, piede</td>
+</tr>
+<tr>
+<td><strong>Form / FormModal</strong></td>
+<td>moduli e finestre modali</td>
+<td>campi (<code>nome</code>, <code>etichetta</code>, <code>tipo</code>, <code>opzioni</code>, <code>col</code>, <code>obbligatorio</code>, <code>aiuto</code>, <code>onChange</code>), pulsante / <code>onConferma</code></td>
+</tr>
+<tr>
+<td><strong>Intestazione</strong></td>
+<td>testata pagina</td>
+<td>titolo, icona, sottotitolo, briciole, azioni</td>
+</tr>
+<tr>
+<td><strong>Stepper</strong>, <strong>Nota</strong>, badge</td>
+<td>passi di stato, note, stati</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Comportamento fisso della DataTable</strong> (uguale in ogni schermata):
+- occupa <strong>sempre tutto lo spazio</strong> a disposizione del suo contenitore;
+- <strong>intestazione fissa</strong>, <strong>solo le righe scorrono</strong>; riga totali fissa in fondo;
+- <strong>intestazioni ordinabili</strong> (clic: crescente ▲ / decrescente ▼), ordinamento corretto per numeri, importi e date;
+- piede con conteggio ("N righe" o "1–20 di N" con paginazione);
+- non scende mai sotto ~3 righe visibili: se lo spazio manca scorre la scheda o la pagina.</p>
+<p><strong>Layout:</strong> la pagina è alta quanto lo schermo; intestazione, filtri, KPI e note hanno
+altezza propria, l'elemento "riempi" (di norma la DataTable) prende il resto. Sotto i
+992 px la pagina torna a flusso naturale e le tabelle hanno altezza massima 65vh.</p>
+<h3 id="sec-16-5">16.5 Regole di consegna</h3>
 <p>Ogni attività è una slice con ownership disgiunta (nessun file toccato da due agenti);
 una PR per attività con checklist §16.1 allegata; testi e stile presi dal prototipo,
 non inventati; prima del merge: checklist superata + test numerici seed §12 + eventi

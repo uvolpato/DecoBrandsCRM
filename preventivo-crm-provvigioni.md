@@ -17,7 +17,7 @@ Web app full-stack con **lo stesso stack del Portale B2B Luis** (**Next.js 16 + 
 - condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, `requireAuth`/`requireAdmin`);
 - integrare il **modulo ordini cliente** (ordini, upload, liste, clienti, utenti, errori) sulle rotte dell'applicazione.
 
-Riferimento tecnico: `specifica-crm-provvigioni.md` v1.8 (validata con il cliente; stack §3.4, §16.3) · piano: `piano-lavoro-crm.md`.
+Riferimento tecnico: `specifica-crm-provvigioni.md` v1.9 (validata con il cliente; stack §3.4, §16.3) · piano: `piano-lavoro-crm.md`.
 
 ## 2. Tariffe applicate (indicative, mercato Italia)
 

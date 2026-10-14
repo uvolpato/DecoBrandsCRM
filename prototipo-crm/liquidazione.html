@@ -8,206 +8,93 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="assets/css/crm.css" rel="stylesheet">
 </head>
-<body>
+<body class="crm-app">
 <div id="topnav" data-active="liquidazione.html"></div>
-<div class="container-fluid px-3 px-md-4 py-4">
-
-  <!-- Intestazione -->
-  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
-    <div>
-      <h5 class="fw-bold mb-1"><i class="bi bi-cash-stack me-2 text-primary"></i>Liquidazione Provvigioni</h5>
-      <p class="text-muted mb-0 nota-prototipo">Rendiconto provvigioni subagenti per pratiche fatturate, periodo per periodo</p>
-    </div>
-    <span class="badge bg-white text-dark border px-3 py-2 fw-semibold">
-      <i class="bi bi-calendar3 me-1"></i><span id="periodoLabel">Tutti i periodi</span>
-    </span>
-  </div>
-
-  <!-- Filtri (stabili: non modificano l'area KPI) -->
-  <div class="card mb-4">
-    <div class="card-body py-3">
-      <form class="row g-3 justify-content-between align-items-end" onsubmit="event.preventDefault(); render();">
-        <div class="col-md-3">
-          <label class="form-label small text-muted text-uppercase fw-semibold" style="letter-spacing:.4px">Fornitore</label>
-          <div class="dropdown">
-            <button type="button" class="btn btn-sm bg-white border w-100 d-flex justify-content-between align-items-center dropdown-toggle text-start"
-                    id="btnFornitore" data-bs-toggle="dropdown" aria-expanded="false">
-              <span id="lblFornitore">Tutti i fornitori</span>
-            </button>
-            <ul class="dropdown-menu p-2 w-100" id="menuFornitori" style="max-height:240px;overflow-y:auto"></ul>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label small text-muted text-uppercase fw-semibold" style="letter-spacing:.4px">Subagente</label>
-          <select id="filtroSubagente" class="form-select form-select-sm">
-            <option value="">Tutti i subagenti</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label small text-muted text-uppercase fw-semibold" style="letter-spacing:.4px">Trimestre</label>
-          <select id="filtroTrimestre" class="form-select form-select-sm">
-            <option value="">Tutti i trimestri</option>
-            <option value="1">Q1</option>
-            <option value="2">Q2</option>
-            <option value="3" selected>Q3</option>
-            <option value="4">Q4</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label small text-muted text-uppercase fw-semibold" style="letter-spacing:.4px">Anno</label>
-          <input type="number" class="form-control form-control-sm" id="filtroAnno" placeholder="Anno" value="2026">
-        </div>
-        <div class="col-auto d-flex gap-2">
-          <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Filtra</button>
-          <button class="btn btn-sm btn-outline-secondary" type="button" onclick="resetFiltri()">Reset</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Tab: Riepilogo / Dettaglio -->
-  <ul class="nav nav-tabs tabs-crm mb-4" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="nav-tab-riepilogo" data-bs-toggle="tab" data-bs-target="#tab-riepilogo" type="button" role="tab" aria-controls="tab-riepilogo" aria-selected="true">
-        <i class="bi bi-bar-chart me-1"></i>Riepilogo
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="nav-tab-dettaglio" data-bs-toggle="tab" data-bs-target="#tab-dettaglio" type="button" role="tab" aria-controls="tab-dettaglio" aria-selected="false">
-        <i class="bi bi-list-ul me-1"></i>Dettaglio Rendiconto
-        <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1" id="n-rendiconto">0</span>
-      </button>
-    </li>
-  </ul>
-
-  <div class="tab-content">
-    <!-- Tab: Riepilogo -->
-    <div class="tab-pane fade show active" id="tab-riepilogo" role="tabpanel" aria-labelledby="nav-tab-riepilogo">
-
-      <!-- KPI del periodo -->
-      <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-          <div class="kpi-card kpi-info"><div class="kpi-value text-info" id="kpi-doc">0</div><div class="kpi-label">Documenti liquidabili</div></div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="kpi-card kpi-warning"><div class="kpi-value text-warning" id="kpi-merce">€0</div><div class="kpi-label">Totale merce</div></div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="kpi-card"><div class="kpi-value" id="kpi-agente">€0</div><div class="kpi-label">Provvigione agente</div></div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="kpi-card kpi-success"><div class="kpi-value text-success" id="kpi-subagente">€0</div><div class="kpi-label">Provvigione subagenti</div></div>
-        </div>
-      </div>
-
-      <!-- Riepilogo per Subagente -->
-      <div class="card">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <span class="fw-semibold"><i class="bi bi-people me-2"></i>Riepilogo per Subagente</span>
-          <span class="text-muted small">provvigioni da liquidare per subagente</span>
-        </div>
-        <div class="table-box">
-          <table class="table table-hover mb-0">
-            <thead class="table-dark">
-              <tr><th>Subagente</th><th class="text-center">N. Fatture</th><th class="text-end">Totale Merce</th><th class="text-end">Provvigione Subagente</th></tr>
-            </thead>
-            <tbody id="tbodyRiepilogo"></tbody>
-            <tfoot class="table-light">
-              <tr>
-                <td class="fw-semibold">Totale</td>
-                <td class="text-center fw-semibold" id="tot-rio-num">0</td>
-                <td class="text-end fw-semibold" id="tot-rio-merce">€ 0,00</td>
-                <td class="text-end fw-bold" id="tot-rio-provv">€ 0,00</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab: Dettaglio -->
-    <div class="tab-pane fade" id="tab-dettaglio" role="tabpanel" aria-labelledby="nav-tab-dettaglio">
-      <div class="card">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <span class="fw-semibold"><i class="bi bi-list-ul me-2"></i>Rendiconto in dettaglio</span>
-          <button class="btn btn-sm btn-outline-success" id="btn-esporta" onclick="esportaCSV()" disabled><i class="bi bi-download me-1"></i>Esporta CSV (§11)</button>
-        </div>
-        <div class="table-box">
-          <table class="table table-hover mb-0 align-middle" id="tableRendiconto">
-            <thead class="table-dark">
-              <tr>
-                <th>Subagente</th><th>Agente</th><th>Fornitore</th><th>Fattura</th><th>Data</th><th>Cliente</th>
-                <th class="text-end">Merce</th><th class="text-end">% Agente</th><th class="text-end">% Sub.</th><th class="text-end">% Tot.</th>
-                <th class="text-end">Provv Agente</th><th class="text-end">Provv Sub.</th><th class="text-end">Provv Totale</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyRendiconto"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="alert alert-light border mt-3 nota-prototipo mb-0">
-    <i class="bi bi-info-circle me-1"></i>
-    <strong>Regole base (§5.4, §5.6, §5.9):</strong> entrano in liquidazione solo le pratiche <strong>fatturate</strong>.
-    Il periodo di riferimento è il trimestre stabilito del subagente (gen-mar / apr-giu / lug-set / ott-dic), calcolato sulla
-    data ordine. L'export segue i <strong>8 campi</strong> concordati col cliente (§11): fornitore, n° documento, data documento,
-    codice cliente, ragione sociale, importo documento, % provvigione, importo provvigionale.
-  </div>
-</div>
+<main class="crm-pagina" id="pagina"></main>
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="assets/js/componenti.js"></script>
 <script>
-function initFiltri() {
-  const menu = document.getElementById('menuFornitori');
-  menu.innerHTML =
-    '<li><label class="dropdown-item d-flex align-items-center gap-2 fw-semibold"><input type="checkbox" class="form-check-input mt-0" id="chkFornTutti" checked> Tutti i fornitori</label></li>' +
-    '<li><hr class="dropdown-divider my-1"></li>' +
-    DATA.fornitori.map(x => '<li><label class="dropdown-item d-flex align-items-center gap-2"><input type="checkbox" class="form-check-input mt-0 chk-forn" value="' + x.id + '" checked> ' + x.ragione_sociale + '</label></li>').join('');
-  menu.addEventListener('change', onFornitoriChange);
-  const s = document.getElementById('filtroSubagente');
-  s.innerHTML = '<option value="">Tutti i subagenti</option>' + DATA.subagenti.map(x => '<option value="' + x.id + '">' + x.nome + ' ' + x.cognome + '</option>').join('');
-}
-function onFornitoriChange(e) {
-  const tutti = document.getElementById('chkFornTutti');
-  const chks = Array.from(document.querySelectorAll('.chk-forn'));
-  if (e.target === tutti) {
-    chks.forEach(c => c.checked = tutti.checked);
-  } else {
-    const on = chks.filter(c => c.checked).length;
-    tutti.checked = on === chks.length;
-    tutti.indeterminate = on > 0 && on < chks.length;
-  }
-  aggiornaLabelFornitori();
-}
-function fornitoriSelezionati() {
-  return Array.from(document.querySelectorAll('.chk-forn:checked')).map(c => Number(c.value));
-}
-function aggiornaLabelFornitori() {
-  const tot = DATA.fornitori.length;
-  const n = fornitoriSelezionati().length;
-  document.getElementById('lblFornitore').textContent =
-    n === tot ? 'Tutti i fornitori' : (n === 0 ? 'Nessun fornitore' : 'Fornitori (' + n + ')');
-}
-function resetFiltri() {
-  document.getElementById('chkFornTutti').checked = true;
-  document.getElementById('chkFornTutti').indeterminate = false;
-  document.querySelectorAll('.chk-forn').forEach(c => c.checked = true);
-  aggiornaLabelFornitori();
-  document.getElementById('filtroSubagente').value = '';
-  document.getElementById('filtroTrimestre').value = 3;
-  document.getElementById('filtroAnno').value = new Date().getFullYear();
-  render();
-}
+/* Composizione: Intestazione + FilterBar + Tabs (KpiRow + DataTable riepilogo | DataTable dettaglio) + Nota */
+const intestazione = CRM.Intestazione('#pagina', {
+  titolo: 'Liquidazione Provvigioni', icona: 'bi-cash-stack',
+  sottotitolo: 'Rendiconto provvigioni subagenti per pratiche fatturate, periodo per periodo'
+});
+
+const filtri = CRM.FilterBar('#pagina', {
+  reset: true,
+  campi: [
+    { nome: 'fornitori', tipo: 'multi', etichetta: 'Fornitore', etichettaTutti: 'Tutti i fornitori', etichettaNessuno: 'Nessun fornitore', etichettaParziale: 'Fornitori',
+      opzioni: DATA.fornitori.map(x => ({ value: x.id, label: x.ragione_sociale })) },
+    { nome: 'subagente', tipo: 'select', etichetta: 'Subagente', opzioni: CRM.opz.subagenti('Tutti i subagenti') },
+    { nome: 'trimestre', tipo: 'select', etichetta: 'Trimestre', col: 'col-md-2', valore: 3, opzioni: [
+      { value: '', label: 'Tutti i trimestri' }, { value: 1, label: 'Q1' }, { value: 2, label: 'Q2' }, { value: 3, label: 'Q3' }, { value: 4, label: 'Q4' }] },
+    { nome: 'anno', tipo: 'numero', etichetta: 'Anno', col: 'col-md-2', placeholder: 'Anno', valore: 2026 }
+  ],
+  onChange: render
+});
+
+const tabs = CRM.Tabs('#pagina', [
+  { id: 'riepilogo', etichetta: 'Riepilogo', icona: 'bi-bar-chart' },
+  { id: 'dettaglio', etichetta: 'Dettaglio Rendiconto', icona: 'bi-list-ul' }
+]);
+
+const kpi = CRM.KpiRow(tabs.pane('riepilogo'), [
+  { id: 'doc', etichetta: 'Documenti liquidabili', variante: 'info' },
+  { id: 'merce', etichetta: 'Totale merce', variante: 'warning' },
+  { id: 'agente', etichetta: 'Provvigione agente' },
+  { id: 'subagente', etichetta: 'Provvigione subagenti', variante: 'success' }
+]);
+
+const tabRiepilogo = CRM.DataTable(CRM.blocco(tabs.pane('riepilogo'), { riempi: true }), {
+  titolo: 'Riepilogo per Subagente', icona: 'bi-people', testataDestra: '<span class="text-muted small">provvigioni da liquidare per subagente</span>',
+  colonne: [
+    { key: 'subagente', header: 'Subagente', classe: 'fw-semibold', grow: true },
+    { key: 'num', header: 'N. Fatture', tipo: 'numero', align: 'center', totale: 'somma' },
+    { key: 'merce', header: 'Totale Merce', tipo: 'euro', totale: 'somma' },
+    { key: 'provvSub', header: 'Provvigione Subagente', tipo: 'euro', classe: 'fw-bold', totale: 'somma' }
+  ],
+  rowKey: r => r.subagente,
+  emptyText: 'Nessun dato per i filtri selezionati'
+});
+
+const tabDettaglio = CRM.DataTable(CRM.blocco(tabs.pane('dettaglio'), { riempi: true }), {
+  titolo: 'Rendiconto in dettaglio', icona: 'bi-list-ul',
+  azioniTestata: [{ etichetta: 'Esporta CSV (§11)', icona: 'bi-download', variante: 'outline-success', id: 'btn-esporta', onClick: esportaCSV, disabilitato: righe => !righe.length }],
+  colonne: [
+    { key: 'subagente', header: 'Subagente' },
+    { key: 'agente', header: 'Agente' },
+    { key: 'fornitore', header: 'Fornitore' },
+    { key: 'fattura', header: 'Fattura' },
+    { key: 'fattura_data', header: 'Data', tipo: 'data' },
+    { key: 'cliente', header: 'Cliente' },
+    { key: 'merce', header: 'Merce', tipo: 'euro' },
+    { key: 'pct_agente', header: '% Agente', tipo: 'pct' },
+    { key: 'pct_subagente', header: '% Sub.', tipo: 'pct' },
+    { key: 'pct_totale', header: '% Tot.', tipo: 'pct', classe: 'fw-semibold' },
+    { key: 'provv_agente', header: 'Provv Agente', tipo: 'euro' },
+    { key: 'provv_subagente', header: 'Provv Sub.', tipo: 'euro' },
+    { key: 'provv_totale', header: 'Provv Totale', tipo: 'euro', classe: 'fw-bold' }
+  ],
+  rowKey: (r, i) => r.fattura + '-' + i,
+  emptyText: 'Nessun dato per i filtri selezionati'
+});
+
+CRM.Nota('#pagina',
+  '<strong>Regole base (§5.4, §5.6, §5.9):</strong> entrano in liquidazione solo le pratiche <strong>fatturate</strong>. ' +
+  'Il periodo di riferimento è il trimestre stabilito del subagente (gen-mar / apr-giu / lug-set / ott-dic), calcolato sulla ' +
+  'data ordine. L\'export segue i <strong>8 campi</strong> concordati col cliente (§11): fornitore, n° documento, data documento, ' +
+  'codice cliente, ragione sociale, importo documento, % provvigione, importo provvigionale.');
+
 function filtriCorrenti() {
+  const f = filtri.valori();
   return {
-    fornitori: fornitoriSelezionati(),
-    subagente: document.getElementById('filtroSubagente').value,
-    trimestre: document.getElementById('filtroTrimestre').value,
-    anno: parseInt(document.getElementById('filtroAnno').value, 10) || new Date().getFullYear()
+    fornitori: f.fornitori.map(Number),
+    subagente: f.subagente,
+    trimestre: f.trimestre,
+    anno: parseInt(f.anno, 10) || new Date().getFullYear()
   };
 }
 function righeRendiconto() {
@@ -222,93 +109,41 @@ function righeRendiconto() {
     if (filt.subagente && c.subagenteId !== parseInt(filt.subagente, 10)) return;
     const s = DATA.subagenti.find(x => x.id === c.subagenteId);
     const a = s ? DATA.agenti.find(x => x.id === s.agente_id) : null;
-    out.push({
-      subagente: s ? s.nome + ' ' + s.cognome : '\u2014',
-      agente: a ? a.nome + ' ' + a.cognome : '\u2014',
+    out.push(Object.assign({
+      subagente: s ? s.nome + ' ' + s.cognome : '—',
+      agente: a ? a.nome + ' ' + a.cognome : '—',
       fornitore: fornitoreNome(o.fornitore_id),
-      fattura: o.fattura_numero || '\u2014',
+      fattura: o.fattura_numero || '—',
       fattura_data: o.fattura_data || o.data_ordine,
       cliente: clienteNome(o.cliente_piva),
       cliente_piva: o.cliente_piva,
-      merce: Number(o.importo_merce || 0),
-      ...c
-    });
+      merce: Number(o.importo_merce || 0)
+    }, c));
   });
   return out;
 }
 
-function renderPeriodo() {
-  const p = filtriCorrenti();
-  const el = document.getElementById('periodoLabel');
-  if (!p.trimestre) el.textContent = 'Tutti i periodi';
-  else el.textContent = trimestreLabel(parseInt(p.trimestre, 10)) + ' ' + p.anno;
-}
-
-function renderKpi(righe) {
-  const totMerce = righe.reduce((s, r) => s + r.merce, 0);
-  const totAg = righe.reduce((s, r) => s + r.provv_agente, 0);
-  const totSub = righe.reduce((s, r) => s + r.provv_subagente, 0);
-  document.getElementById('kpi-doc').textContent = righe.length;
-  document.getElementById('kpi-merce').textContent = fmtEuro0(totMerce);
-  document.getElementById('kpi-agente').textContent = fmtEuro0(totAg);
-  document.getElementById('kpi-subagente').textContent = fmtEuro0(totSub);
-}
-
 function render() {
+  const p = filtriCorrenti();
   const righe = righeRendiconto();
-  renderPeriodo();
-  renderKpi(righe);
+  intestazione.aggiorna({ destra: '<span class="badge bg-white text-dark border px-3 py-2 fw-semibold"><i class="bi bi-calendar3 me-1"></i>' +
+    (p.trimestre ? trimestreLabel(parseInt(p.trimestre, 10)) + ' ' + p.anno : 'Tutti i periodi') + '</span>' });
 
-  // Riepilogo per subagente
+  kpi.aggiorna('doc', righe.length);
+  kpi.aggiorna('merce', fmtEuro0(righe.reduce((s, r) => s + r.merce, 0)));
+  kpi.aggiorna('agente', fmtEuro0(righe.reduce((s, r) => s + r.provv_agente, 0)));
+  kpi.aggiorna('subagente', fmtEuro0(righe.reduce((s, r) => s + r.provv_subagente, 0)));
+
   const map = {};
   righe.forEach(r => {
-    const k = r.subagente;
-    if (!map[k]) map[k] = { num: 0, merce: 0, provvSub: 0 };
-    map[k].num += 1;
-    map[k].merce += r.merce;
-    map[k].provvSub += r.provv_subagente;
+    if (!map[r.subagente]) map[r.subagente] = { subagente: r.subagente, num: 0, merce: 0, provvSub: 0 };
+    map[r.subagente].num += 1;
+    map[r.subagente].merce += r.merce;
+    map[r.subagente].provvSub += r.provv_subagente;
   });
-  const keys = Object.keys(map);
-  const tbR = document.getElementById('tbodyRiepilogo');
-  if (!keys.length) {
-    tbR.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Nessun dato per i filtri selezionati</td></tr>';
-    document.getElementById('tot-rio-num').textContent = '0';
-    document.getElementById('tot-rio-merce').textContent = fmtEuro(0);
-    document.getElementById('tot-rio-provv').textContent = fmtEuro(0);
-  } else {
-    tbR.innerHTML = keys.map(k =>
-      '<tr><td class="fw-semibold">' + k + '</td>' +
-      '<td class="text-center">' + map[k].num + '</td>' +
-      '<td class="text-end">' + fmtEuro(map[k].merce) + '</td>' +
-      '<td class="text-end fw-bold">' + fmtEuro(map[k].provvSub) + '</td></tr>').join('');
-    document.getElementById('tot-rio-num').textContent = keys.reduce((s, k) => s + map[k].num, 0);
-    document.getElementById('tot-rio-merce').textContent = fmtEuro(keys.reduce((s, k) => s + map[k].merce, 0));
-    document.getElementById('tot-rio-provv').textContent = fmtEuro(keys.reduce((s, k) => s + map[k].provvSub, 0));
-  }
-
-  // Dettaglio
-  document.getElementById('n-rendiconto').textContent = righe.length;
-  const tb = document.getElementById('tbodyRendiconto');
-  if (!righe.length) {
-    tb.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-4">Nessun dato per i filtri selezionati</td></tr>';
-  } else {
-    tb.innerHTML = righe.map(r =>
-      '<tr>' +
-      '<td>' + r.subagente + '</td>' +
-      '<td>' + r.agente + '</td>' +
-      '<td>' + r.fornitore + '</td>' +
-      '<td>' + r.fattura + '</td>' +
-      '<td>' + fmtData(r.fattura_data) + '</td>' +
-      '<td>' + r.cliente + '</td>' +
-      '<td class="text-end">' + fmtEuro(r.merce) + '</td>' +
-      '<td class="text-end">' + fmtNum(r.pct_agente, 2) + '%</td>' +
-      '<td class="text-end">' + fmtNum(r.pct_subagente, 2) + '%</td>' +
-      '<td class="text-end fw-semibold">' + fmtNum(r.pct_totale, 2) + '%</td>' +
-      '<td class="text-end">' + fmtEuro(r.provv_agente) + '</td>' +
-      '<td class="text-end">' + fmtEuro(r.provv_subagente) + '</td>' +
-      '<td class="text-end fw-bold">' + fmtEuro(r.provv_totale) + '</td></tr>').join('');
-  }
-  document.getElementById('btn-esporta').disabled = !righe.length;
+  tabRiepilogo.aggiorna(Object.values(map));
+  tabDettaglio.aggiorna(righe);
+  tabs.badge('dettaglio', CRM.badgeConteggio(righe.length));
 }
 
 /* Export §11: 8 campi concordati col cliente */
@@ -324,7 +159,6 @@ function esportaCSV() {
   showToast('CSV esportato (' + rows.length + ' righe)');
 }
 
-initFiltri();
 render();
 </script>
 </body>
