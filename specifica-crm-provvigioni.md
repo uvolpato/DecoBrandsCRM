@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 1.6 — **Stato:** validata con il cliente
+**Versione:** 1.8 — **Stato:** validata con il cliente; stack confermato, allineato al Portale B2B Luis (§16.3)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -47,11 +47,11 @@ quel sistema (`ordini_upload_queue`, `processing_errors`, §4.1, §6).
 |---|---------|--------|
 | V1 | Unica applicazione | Tutte le funzioni in un'unica applicazione web |
 | V2 | Database condiviso | Stesso PostgreSQL (`decobrands`) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM. **Tutti i documenti entrano tramite lo stesso sistema della Gestione Ordini**: importazione (upload + OCR) e validazione dei dati letti; vengono poi letti dal CRM (§6) |
-| V3 | Autenticazione | Tabella `users` con ruoli; utente di default `admin` (ruolo `admin`) |
+| V3 | Autenticazione | Tabella `users` con ruoli; utente di default `admin` (ruolo `admin`); sessione su cookie HttpOnly/Secure/SameSite + protezione CSRF (§3.3) |
 | V4 | Stile grafico | Bootstrap 5.3, navbar scura, sfondo `#f5f6f8`, logo Decobrands |
 | V5 | Lingua | Tutte le interfacce in italiano |
 | V6 | Responsive | Desktop + tablet + mobile |
-| V7 | Stack | Frontend Next.js (App Router) + React + TypeScript, backend NestJS, ORM Prisma, PostgreSQL condiviso (V2). Deploy senza Docker: frontend e backend girano come servizi/processi Node separati |
+| V7 | Stack | **Stesso stack del Portale B2B Luis**: Node 24, frontend Next.js 16 (App Router) + React 19 + TypeScript, backend NestJS 11, ORM Prisma 7 (adapter `pg`), PostgreSQL condiviso (V2). Due processi Node dietro Caddy; Docker solo in sviluppo (§3.4) |
 | V8 | Fidelità | Alta fedeltà — dati reali, interazioni reali |
 | V9 | Contenitori dati stabili | Le viste con tabelle o liste filtrate usano contenitori stabili (altezza minima e massima, scroll interno, intestazione fissa): il layout non cambia al variare del numero di righe |
 | V10 | Tracciamento eventi | Il sistema registra automaticamente gli eventi applicativi (CRUD, cambi di stato, upload/export, autenticazione) ed errori su `eventi_app` (§4.2.11), consultabili in sola lettura da `/eventi` (§7.11, §15); le tabelle della Gestione Ordini non vengono modificate (V2) |
@@ -88,7 +88,7 @@ Componenti condivise:
 ### 3.2 Avvio
 
 L'architettura di esercizio (frontend Next.js + backend NestJS/Prisma, PostgreSQL,
-autenticazione, upload documenti, real-time) è descritta in §3.3 e §8; riprende le
+autenticazione, upload documenti, lavori pianificati) è descritta in §3.3, §3.4 e §8; riprende le
 stesse funzioni del collaudo e mantiene il foglio di stile comune (§V4: Bootstrap 5.3,
 navbar scura, logo), con il layout invariato.
 
@@ -99,12 +99,45 @@ motore della sezione §10 su dati dimostrativi.
 
 ### 3.3 Autenticazione e autorizzazione
 
-- Tabella `users` **condivisa con la Gestione Ordini** (stessi ruoli e flusso
-  password/reset "resta connesso"); utente di default `admin` (ruolo `admin`).
-- Sessioni server-side in PostgreSQL (sessione condivisa persistita nel DB),
-  password con hash (argon2); supporto a cambio password, reset via token, remember cookie.
+Moduli ripresi dal Portale B2B Luis:
+
+- Tabella `users` **condivisa con la Gestione Ordini** (stessi ruoli); utente di default
+  `admin` (ruolo `admin`).
+- Sessioni server-side in PostgreSQL (`express-session` + `connect-pg-simple`), password
+  con hash argon2; cambio password, reset via token, "resta connesso".
+- Cookie di sessione HttpOnly + Secure + SameSite, protezione CSRF sulle richieste che
+  modificano dati, Helmet, limite tentativi sul login (`@nestjs/throttler`), CORS
+  ristretto all'origine del frontend, validazione input con DTO (`class-validator`).
 - `requireAuth`: tutte le viste tranne login/reset.
-- `requireAdmin`: viste sensibili (clienti, utenti).
+- `requireAdmin`: viste sensibili (clienti, utenti, eventi).
+
+**Accesso unico con la Gestione Ordini (da verificare in F0-A3):** se la Gestione Ordini
+salva le sessioni nello stesso formato, la sessione è condivisa; altrimenti il CRM ha un
+proprio accesso sulla **stessa** tabella `users` (stesse credenziali, login separato).
+
+### 3.4 Esercizio
+
+Stessa architettura del Portale B2B Luis, su server Windows con PostgreSQL già presente:
+
+```
+Browser ──HTTPS 443──► Caddy (certificato automatico)
+                          │
+                          ▼
+                 Frontend Next.js  (localhost:8001)
+                          │  inoltra /api/* (stessa origine: cookie e CSRF)
+                          ▼
+                 Backend NestJS    (localhost:8002)
+                          │
+                          ▼
+                 PostgreSQL `decobrands` (condiviso, V2)
+```
+
+- Esposte solo le porte 80/443; frontend, backend e database restano locali.
+- Porte 8001/8002 per non collidere con la Gestione Ordini e con altre applicazioni sul server.
+- Lavori pianificati (`@nestjs/schedule`): controllo giornaliero delle conferme scadute (§5.12).
+- File Excel (lettura bollettini, export) con `exceljs`; upload documenti con `multer`
+  (incluso in NestJS).
+- Test: Jest + supertest (motore §10 e API).
 
 ---
 
@@ -815,6 +848,9 @@ Considerazioni:
 
 ### 8.1 Rotte nuove (CRM)
 
+Le pagine (`GET /dashboard`, `/fornitori`, …) sono servite da Next.js; le rotte `/api/*`
+da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
+
 | Metodo | Endpoint | Funzione |
 |--------|----------|----------|
 | GET | `/dashboard` | pagina dashboard |
@@ -853,7 +889,7 @@ Considerazioni:
 ### 8.2 Modulo ordini cliente
 
 `/api/ordini*`, `/api/lookup/*`, `/api/clienti*`, `/api/utenti*`, `/api/errori*`: API del
-modulo ordini cliente, montate sul server dell'applicazione; leggono e scrivono le
+modulo ordini cliente, montate sul backend NestJS; leggono e scrivono le
 tabelle condivise di §4.1 (ordini cliente, clienti, articoli, giacenze, log).
 
 ### 8.3 Autenticazione
@@ -894,7 +930,8 @@ Nota di credito: importo_merce < 0 → provvigioni negative (§5.3)
 pct_agente = 0 e pct_subagente = 0 → nessuna provvigione
 ```
 
-Il rendiconto usa i dati fatturati del periodo filtrato; le percentuali sono risolte
+Il motore gira **solo lato server** (servizio NestJS): l'interfaccia mostra i valori
+calcolati, non li ricalcola. Il rendiconto usa i dati fatturati del periodo filtrato; le percentuali sono risolte
 al volo dagli scaglioni correnti (o dalle eccezioni). Per i periodi passati i valori
 restano quelli congelati nel bollettino (§5.11).
 
@@ -943,7 +980,7 @@ Anagrafiche di riferimento per il collaudo:
 | B2 | Riga bollettino con solo totale cliente | supportare riga aggregata (cliente + totale) nel confronto |
 | B3 | Versioning scaglioni per periodo | rilettura storica automatica (§5.11) |
 | B4 | Consolidamento sconto | `interscambio.discount` resta il campo canonico (§5.7); `fornitori.discount` è un semplice default |
-| B5 | Upload documenti | generare il file reale al posto del segnaposto (multer) |
+| B5 | ~~Upload documenti~~ | chiuso: incluso nell'implementazione (multer, §3.4) |
 | B6 | Dati storici / popolamento iniziale | capire se importare le prassi dagli Excel manuali |
 | B7 | Casi cliente su più subagenti su fornitori diversi | risolti internamente da Marco |
 
@@ -962,7 +999,8 @@ eseguito al volo nel browser.
 | Export liquidazione (§11) | ✅ |
 | Dati dimostrativi (§12) | ✅ |
 | Tracciamento eventi applicativi (V10, §4.2.11, §15) | ⏳ |
-| Frontend Next.js + backend NestJS (Prisma), database, autenticazione, upload, real-time (§3.3, §8) | ⁄ in roadmap |
+| Frontend Next.js + backend NestJS (Prisma), database, autenticazione, upload, lavori pianificati (§3.3, §3.4, §8) — stack confermato: §16.3 | ⁄ in roadmap |
+| Piano di lavoro a fasi e attività parallele (`piano-lavoro-crm.md`, §16) | ✅ |
 | Casi limite §13 (B1–B7) | ⏳ |
 
 ---
@@ -1175,3 +1213,91 @@ filtri e dettaglio.
 
 Tabella: §4.2.11 · Schermata: §7.11 · API: §8.1 · Seed: §12 · Deliverable: §14 ·
 Requisito: V10
+
+---
+
+## 16. Piano di lavoro, replicazione del prototipo e stack
+
+Il dettaglio delle attività (ore, dipendenze, DoD, file sorgente per ciascuna) è in
+`piano-lavoro-crm.md`; questa sezione ne fissa i vincoli.
+
+### 16.1 Replicazione maniacale del prototipo
+
+Il prototipo navigabile (`prototipo-crm/*.html` + `assets/css/crm.css` +
+`assets/js/app.js`) è la **sorgente di verità**. Ogni schermata implementata deve
+superare tutti e sei i criteri, verificati con confronto side-by-side con la sorgente
+HTML e confronto numerico sul seed §12, **prima del merge**:
+
+1. **Struttura/navigazione** — stesse aree e ordine: navbar fissa (§4.2), contenuto, footer fisso centrato; stesse rotte (§7).
+2. **Layout** — stesse card/tabelle nello stesso ordine; `.table-box`/`.box-stabile` con altezze e thead sticky; `thead class="table-dark"`.
+3. **Componenti/stile** — Bootstrap 5.3.2 + bootstrap-icons identichi; `crm.css` **copiato, non riscritto**.
+4. **Testi** — etichette, empty state, avvisi e note: italiano identico parola per parola al file di prototipo.
+5. **Interazioni** — filtri (incl. multifiltro checkbox §7.8), tab, modali, stepper, conferme, toast, export: stesso comportamento e stessi messaggi.
+6. **Dati** — seed §12 identico → stessi numeri in KPI e tabelle (prova oggettiva).
+
+### 16.2 Fasi e attività parallele
+
+| Fase | Ambito | Attività | Agenti paralleli | Ore |
+|---|---|---|---|---|
+| F0 | Fondamenta: scaffold, DB/seed, auth, shell, motore §10 + `logEvent()`, prova lettura documenti fornitore | A1–A6 | 1 → fino a 4 | 25 |
+| F1 | Anagrafiche (fornitori, agenti, interscambio) | A1–A3 | 3 | 6 |
+| F2 | Pratiche ordini (lista, dettaglio, documenti, upload) | A1–A3 | 3 | 7 |
+| F3 | Bollettini mensili | A1–A2 | 2 | 4 |
+| F4 | Liquidazione (filtri, dettaglio, export) | A1–A3 | 2–3 | 4 |
+| F5 | Dashboard + log eventi (`/eventi`) | A1–A2 | 2 | 2 |
+| F6 | Modulo ordini cliente (§7.9) | A1–A2 | 1–2 | 6 |
+| F7 | Collaudo, replicazione, rilascio | A1–A2 | 1–2 | 5 |
+| | | **20** | | **59** (preventivo §4) |
+
+**F0 è bloccante** (scaffold A1 → DB/auth/shell/motore/prova documenti); da F0
+avanti **F1–F6 procedono in parallelo** (slice disgiunte, ownership per file), F7
+chiude. Regole: contratti (schema §4.2, API §8, motore §10, `logEvent()` §15.3,
+seed §12) congelati in F0; eventi §15.2 a carico dell'attività che implementa
+l'operazione; tabelle legacy in sola lettura (V2).
+
+### 16.3 Stack confermato (V7)
+
+Lo stack **ricalca il Portale B2B Luis** (opzione B del confronto precedente; le opzioni
+A — solo Next.js — e C — Express + EJS — sono scartate):
+
+| Livello | Scelta |
+|---|---|
+| Node | 24.15 (`.nvmrc`), npm ≥ 11 |
+| Frontend | Next.js 16 (App Router) + React 19 + TypeScript |
+| Backend | NestJS 11 (Express), DTO con `class-validator` |
+| Accesso ai dati | Prisma 7 + `@prisma/adapter-pg` |
+| Database | PostgreSQL condiviso `decobrands` (V2) |
+| Accesso | `express-session` + `connect-pg-simple`, argon2, CSRF, Helmet, throttler (§3.3) |
+| Esercizio | Caddy + due processi Node (8001/8002), Docker solo in sviluppo (§3.4) |
+| Lavori pianificati / Excel / test | `@nestjs/schedule` · `exceljs` · Jest + supertest |
+| Grafica | **Bootstrap 5.3.2 + `crm.css` del prototipo** (V4): coerenza con la Gestione Ordini, non con la grafica di Luis |
+
+**Riuso da Luis B2B — solo infrastruttura, nessuna interfaccia:**
+
+| Da Luis (`backend/src`, `frontend/`) | Uso nel CRM |
+|---|---|
+| `main.ts` (Helmet, CORS, cookie, sessione su PostgreSQL, controllo CSRF) | copiato, adattato a porte e origini del CRM |
+| `auth/` (login, logout, cambio password, guard autenticazione/ruoli) | adattato alla tabella `users` della Gestione Ordini e ai ruoli `admin`/utente; tolti i gruppi di permessi |
+| `prisma/` (servizio Prisma) | copiato |
+| `common/`: `password.ts`, `http-error.filter.ts`, `request-context*`, `access-log.interceptor.ts`, `env.ts`, `xlsx.ts`, `audit.extension.ts` | copiati; `audit.extension` e `xlsx` alla base di §15 e di bollettini/export |
+| `audit/`, `events/` | base del registro eventi `eventi_app` e di `/eventi` (§15) |
+| `health/` | copiato (controllo stato servizio) |
+| Throttler in `app.module.ts` | copiato |
+| `frontend/next.config.ts` (inoltro `/api/*`, intestazioni di sicurezza) | copiato |
+| `frontend/lib/api.ts`, `use-auth.ts`, `version.ts` (chiamate con token CSRF, utente corrente, versione) | copiati |
+| `DEPLOY.md`, Caddyfile, `avvia.bat`, `.env.example` | adattati |
+
+**Non si prende da Luis:** componenti React, `globals.css` e qualsiasi CSS, layout,
+next-intl, socket.io, moduli di dominio (catalogo, carrello, checkout, AI, lead, mail).
+**Layout, grafica e testi restano quelli del prototipo** (`prototipo-crm/*.html` +
+`crm.css`, §16.1): le schermate Next.js riproducono l'HTML del prototipo con Bootstrap 5.3.2.
+
+Lo schema Prisma copre solo le tabelle CRM (§4.2); le
+tabelle esistenti si leggono in sola lettura (V2), mai migrate.
+
+### 16.4 Regole di consegna
+
+Ogni attività è una slice con ownership disgiunta (nessun file toccato da due agenti);
+una PR per attività con checklist §16.1 allegata; testi e stile presi dal prototipo,
+non inventati; prima del merge: checklist superata + test numerici seed §12 + eventi
+§15.2 completi. Casi limite §13 restano backlog, non toccati dal piano.

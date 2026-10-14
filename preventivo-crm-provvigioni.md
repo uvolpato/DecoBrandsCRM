@@ -1,7 +1,7 @@
 # Preventivo — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
 **Redatto da:** Ugo Volpato — AI Consultant
-**Data:** 04/09/2026
+**Data:** 04/09/2026 — aggiornato il 14/10/2026 (stack allineato al Portale B2B Luis)
 **Cliente:** Decobrands S.r.l. (da confermare)
 **Modalità di sviluppo:** assistita da AI (analisi, generazione e codifica tramite modelli AI)
 
@@ -9,7 +9,7 @@
 
 ## 1. Oggetto
 
-Web app full-stack (**frontend Next.js + React + TypeScript**, **backend NestJS**, **ORM Prisma**, **PostgreSQL condiviso** con la Gestione Ordini — **senza modificare le tabelle esistenti**) per:
+Web app full-stack con **lo stesso stack del Portale B2B Luis** (**Next.js 16 + React 19 + TypeScript**, **NestJS 11**, **Prisma 7**, **PostgreSQL condiviso** con la Gestione Ordini — **senza modificare le tabelle esistenti** —, pubblicazione con **Caddy** e due processi Node) per:
 
 - tracciare il percorso **ordine → conferma d'ordine → fattura** delle pratiche verso i fornitori, con **upload dei documenti PDF** e scadenze conferma automatiche;
 - controllare i **bollettini** mensili dei fornitori, confrontando riga per riga il **riconosciuto** con il **calcolato** (differenze evidenziate, verifica/contestazione);
@@ -17,7 +17,7 @@ Web app full-stack (**frontend Next.js + React + TypeScript**, **backend NestJS*
 - condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, `requireAuth`/`requireAdmin`);
 - integrare il **modulo ordini cliente** (ordini, upload, liste, clienti, utenti, errori) sulle rotte dell'applicazione.
 
-Riferimento tecnico: `specifica-crm-provvigioni.md` v1.4 (validata con il cliente, §1–§14).
+Riferimento tecnico: `specifica-crm-provvigioni.md` v1.8 (validata con il cliente; stack §3.4, §16.3) · piano: `piano-lavoro-crm.md`.
 
 ## 2. Tariffe applicate (indicative, mercato Italia)
 
@@ -44,17 +44,18 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 
 | # | Attività | Ore (AI) | Ore (senza AI) | Importo (AI) |
 |---|---|---|---|---|
-| 1 | Setup monorepo (Next.js App Router + NestJS + Prisma), collegamento al **PostgreSQL condiviso** `decobrands`, deploy senza Docker (processi Node separati) | 4 | 10 | € 220,00 |
-| 2 | Autenticazione **condivisa** con la Gestione Ordini: riuso tabella `users`, sessioni server-side nel DB, argon2, remember cookie, cambio password / reset token, guard `requireAuth`/`requireAdmin` | 5 | 14 | € 275,00 |
-| 3 | Schema Prisma delle **nuove tabelle CRM** (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe, bollettini + righe) + lettura delle tabelle esistenti condivise (ordini cliente, clienti, articoli, giacenze, log) | 6 | 16 | € 330,00 |
-| 4 | Motore provvigioni lato server: scaglioni, eccezioni, maturazione maturato/fatturato, congelamento percentuali alla verifica, nota di credito (§4.2, §5.3, §5.5, §5.11) | 5 | 14 | € 275,00 |
-| 5 | API REST NestJS: CRUD fornitori + scaglioni, interscambio (vincolo unico), pratiche + righe + cambio stato, **upload documenti PDF** (multer), bollettini + righe con calcolo differenze, liquidazione | 12 | 30 | € 660,00 |
-| 6 | Frontend Next.js viste CRM: login, dashboard (KPI + tab segnalazioni/ordini), anagrafiche, dettaglio pratica con tab per fase e upload, bollettini con divergenze, liquidazione (tab riepilogo/dettaglio), contenitori dati stabili (§2-V9) | 12 | 30 | € 660,00 |
-| 7 | Integrazione **modulo ordini cliente** (API `/api/ordini*`, `/api/lookup/*`, `/api/clienti*`, `/api/utenti*`, `/api/errori*` montate) + viste ordini/upload/liste/clienti/utenti/errori coerenti | 6 | 15 | € 330,00 |
-| 8 | Test end-to-end, collaudo con dati seed (§12), rifiniture responsive e anteprima produzione | 5 | 13 | € 275,00 |
-| 9 | Motore di calcolo provvigioni lato client (§10): scaglioni per sconto, eccezioni subagente, associazioni interscambio, nota di credito, confronto bollettini riconosciuto vs calcolato | 3 | 8 | € 165,00 |
+| 1 | Setup progetto sul modello Luis B2B (Next.js + NestJS + Prisma), collegamento al **PostgreSQL condiviso** `decobrands`, Caddy + due processi Node (8001/8002), Docker solo in sviluppo | 3 | 8 | € 165,00 |
+| 2 | Autenticazione **ripresa da Luis B2B** sulla tabella `users` condivisa: sessioni nel DB, argon2, CSRF, Helmet, limite tentativi, cambio password / reset, guard `requireAuth`/`requireAdmin`; verifica accesso unico con la Gestione Ordini | 3 | 8 | € 165,00 |
+| 3 | Schema Prisma delle **nuove tabelle CRM** (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe + documenti, bollettini + righe, eventi) + lettura delle tabelle esistenti condivise (ordini cliente, clienti, articoli, giacenze, log) | 6 | 16 | € 330,00 |
+| 4 | Motore provvigioni **solo lato server**: scaglioni, eccezioni, maturato/fatturato, congelamento percentuali alla verifica, note di credito, confronto bollettini riconosciuto vs calcolato (§4.2, §5.3, §5.5, §5.11, §10) | 5 | 14 | € 275,00 |
+| 5 | API REST NestJS: CRUD fornitori + scaglioni, interscambio (vincolo unico), pratiche + righe + documenti + cambio stato, **upload documenti** (multer), bollettini + righe con calcolo differenze, liquidazione, controllo pianificato conferme scadute | 12 | 30 | € 660,00 |
+| 6 | Frontend Next.js viste CRM (Bootstrap 5.3 + `crm.css` del prototipo): login, dashboard (KPI + tab segnalazioni/ordini), anagrafiche, dettaglio pratica con tab per fase e upload, bollettini con divergenze, liquidazione (tab riepilogo/dettaglio), contenitori dati stabili (§2-V9) | 12 | 30 | € 660,00 |
+| 7 | Integrazione **modulo ordini cliente** (API `/api/ordini*`, `/api/lookup/*`, `/api/clienti*`, `/api/utenti*`, `/api/errori*`) + viste ordini/upload/liste/clienti/utenti/errori coerenti | 6 | 15 | € 330,00 |
+| 8 | Test (Jest + supertest) ed end-to-end, collaudo con dati seed (§12), rifiniture responsive, pubblicazione | 5 | 13 | € 275,00 |
+| 9 | Registro eventi (§15) adattato dai moduli `audit`/`events` di Luis B2B + schermata `/eventi` | 2 | 5 | € 110,00 |
 | 10 | Export liquidazione a 8 campi (§11) e gestione trimestri | 1 | 3 | € 55,00 |
-| **Subtotale da svolgere** | | **59** | **153** | **€ 3.245,00** |
+| 11 | **Prova di lettura automatica dei documenti fornitore** (conferme, fatture, bollettini) su 2–3 fornitori reali tramite la pipeline OCR della Gestione Ordini: esito e stima dell'adattamento | 4 | 10 | € 220,00 |
+| **Subtotale da svolgere** | | **59** | **152** | **€ 3.245,00** |
 
 ## 5. Riepilogo economico
 
@@ -64,16 +65,20 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 | Attività da svolgere | 59 | € 3.245,00 |
 | **Totale complessivo** | **75** | **€ 4.525,00** |
 
-**Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **153 ore** (≈ 2,6× le ore assistite): 153 h × € 70,00 = **€ 10.710,00**, per un totale di **€ 11.990,00** (€ 1.280,00 già svolto + € 10.710,00 sviluppo).
+**Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **152 ore** (≈ 2,6× le ore assistite): 152 h × € 70,00 = **€ 10.640,00**, per un totale di **€ 11.920,00** (€ 1.280,00 già svolto + € 10.640,00 sviluppo).
 
-L'approccio assistito da AI consente un **risparmio di € 7.465,00** sul solo sviluppo (€ 10.710,00 → € 3.245,00, **−70%**).
+L'approccio assistito da AI consente un **risparmio di € 7.395,00** sul solo sviluppo (€ 10.640,00 → € 3.245,00, **−70%**).
 
 ## 6. Note
 
-- Le ore della sezione "già svolte" sono una **stima** del tempo impiegato in questa sessione (analisi, specifica, prototipo e iterazioni); da confermare.
-- Il **motore di calcolo provvigioni lato client** e l'**export a 8 campi / gestione trimestri** (già erroneamente elencati in §3) risultano **da svolgere**: sono stati spostati in §4 (punti 9–10) senza variazione delle ore complessive (75 h).
-- Il **ridisegno a tab** (dashboard, dettaglio pratica, liquidazione), la strip riepilogo della scheda ordine e la **regola dei contenitori dati stabili** (spec §2-V9) rientrano nelle attività già svolte (prototipazione) senza variazione delle ore stimate.
+- Le ore della sezione "già svolte" sono una **stima** del tempo impiegato (analisi, specifica, prototipo e iterazioni); da confermare.
+- **Stack allineato al Portale B2B Luis** (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di **5 ore**, reinvestite nella **prova di lettura dei documenti fornitore** (attività 11), principale rischio tecnico del progetto. Totale invariato: 59 h.
+- Il motore di calcolo è **solo lato server** (spec §10): eliminata la voce "motore lato client" della versione precedente.
+- **Accesso unico con la Gestione Ordini**: confermato se le sessioni sono compatibili (verifica nell'attività 2); in caso contrario login separato sulla stessa tabella utenti, senza variazione di ore.
+- **Grafica**: Bootstrap 5.3 + `crm.css` del prototipo, coerente con la Gestione Ordini.
+- L'esito dell'attività 11 può richiedere una **stima aggiuntiva** per adattare la lettura ai formati dei singoli fornitori; sarà quotata a parte prima di procedere.
 - Il costo ridotto dello sviluppo riflette la **velocizzazione dell'AI**, non una riduzione di qualità o delle garanzie.
 - Tariffe indicative e personalizzabili; **IVA esclusa**.
 - Il progetto **condivide il database** con la Gestione Ordini: le tabelle esistenti vengono riusate **senza modifiche**; il CRM aggiunge solo le proprie tabelle (§4.2).
-- Esclusioni (casi limite §13 della specifica, in backlog): gestione UI delle eccezioni subagente (B1), pratiche multi-tranche / fatture multi-ordine con tabella a ponte (B2), importazione mensile dei bollettini (B3), riga bollettino per totale cliente (B4), versioning degli scaglioni per periodo (B5), **popolamento dei dati storici reali dagli Excel manuali** (B8). Il consolidamento sconto (B6) è già definito nella specifica.
+- Fatture su più ordini e ordini fatturati in più tranche sono **inclusi** (spec §5.9, documenti a ponte).
+- **Esclusioni** (backlog spec §13): interfaccia delle eccezioni per singolo subagente (B1), riga bollettino con solo totale cliente (B2), versioning degli scaglioni per periodo (B3), **popolamento dei dati storici dagli Excel manuali** (B6). Il consolidamento sconto (B4) è già definito nella specifica.

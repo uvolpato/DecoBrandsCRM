@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.6, validata con il cliente.
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — versione 1.7, validata con il cliente (§16.3 revisione stack in corso, da confermare in Fase 0).
   </div>
 
   <div class="row g-4">
@@ -110,6 +110,7 @@
           <li class="nav-item"><a class="nav-link" href="#sec-13">13. Casi limite / backlog</a></li>
           <li class="nav-item"><a class="nav-link" href="#sec-14">14. Deliverable di riferimento</a></li>
           <li class="nav-item"><a class="nav-link" href="#sec-15">15. Tracciamento eventi applicativi</a></li>
+          <li class="nav-item"><a class="nav-link" href="#sec-16">16. Piano di lavoro e stack</a></li>
         </ul>
       </nav>
     </div>
@@ -152,7 +153,7 @@
                 <tr><td>V4</td><td>Stile grafico</td><td>Bootstrap 5.3, navbar scura, sfondo <code>#f5f6f8</code>, logo Decobrands</td></tr>
                 <tr><td>V5</td><td>Lingua</td><td>Tutte le interfacce in italiano</td></tr>
                 <tr><td>V6</td><td>Responsive</td><td>Desktop + tablet + mobile</td></tr>
-                <tr><td>V7</td><td>Stack</td><td>Frontend Next.js (App Router) + React + TypeScript, backend NestJS, ORM Prisma, PostgreSQL condiviso (V2). Deploy senza Docker: frontend e backend girano come servizi/processi Node separati</td></tr>
+                <tr><td>V7</td><td>Stack</td><td>Frontend Next.js (App Router) + React + TypeScript, backend NestJS, ORM Prisma, PostgreSQL condiviso (V2). Deploy senza Docker: frontend e backend girano come servizi/processi Node separati. <strong>In revisione: vedi §16.3</strong> (scelta prevista su una sola app o su due processi, da confermare in Fase 0)</td></tr>
                 <tr><td>V8</td><td>Fidelità</td><td>Alta fedeltà — dati reali, interazioni reali</td></tr>
                 <tr><td>V9</td><td>Contenitori dati stabili</td><td>Le viste con tabelle o liste filtrate usano contenitori stabili (altezza minima e massima, scroll interno, intestazione fissa): il layout non cambia al variare del numero di righe</td></tr>
                 <tr><td>V10</td><td>Tracciamento eventi</td><td>Il sistema registra automaticamente gli eventi applicativi (CRUD, cambi di stato, upload/export, autenticazione) ed errori su <code>eventi_app</code> (§4.2.11), consultabili in sola lettura da <code>/eventi</code> (§7.11, §15); le tabelle della Gestione Ordini non vengono modificate (V2)</td></tr>
@@ -968,7 +969,8 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
                 <tr><td>Export liquidazione (§11)</td><td>✅</td></tr>
                 <tr><td>Dati dimostrativi (§12)</td><td>✅</td></tr>
                 <tr><td>Tracciamento eventi applicativi (V10, §4.2.11, §15)</td><td>⏳</td></tr>
-                <tr><td>Backend NestJS + frontend Next.js, database, autenticazione, upload, notifiche real-time (§3.3, §8)</td><td>⁄ in roadmap</td></tr>
+                <tr><td>Backend NestJS + frontend Next.js, database, autenticazione, upload, notifiche real-time (§3.3, §8) — stack in revisione: §16.3</td><td>⁄ in roadmap</td></tr>
+                <tr><td>Piano di lavoro a fasi e attività parallele (<code>piano-lavoro-crm.md</code>, §16)</td><td>✅</td></tr>
                 <tr><td>Casi limite §13 (B1–B7)</td><td>⏳</td></tr>
               </tbody>
             </table>
@@ -1150,6 +1152,66 @@ pct_agente = 0 e pct_subagente = 0 → nessuna provvigione</code></pre>
 
           <h3>15.10 Riferimenti</h3>
           <p>Tabella: §4.2.11 · Schermata: §7.11 · API: §8.1 · Seed: §12 · Deliverable: §14 · Requisito: V10</p>
+        </section>
+
+        <section id="sec-16">
+          <h2>16. Piano di lavoro, replicazione del prototipo e stack</h2>
+          <p>Il dettaglio delle attività (ore, dipendenze, DoD, file sorgente per ciascuna) è in <code>piano-lavoro-crm.md</code>; questa sezione ne fissa i vincoli.</p>
+
+          <h3>16.1 Replicazione maniacale del prototipo</h3>
+          <p>Il prototipo navigabile (<code>prototipo-crm/*.html</code> + <code>assets/css/crm.css</code> + <code>assets/js/app.js</code>) è la <strong>sorgente di verità</strong>. Ogni schermata implementata deve superare tutti e sei i criteri, verificati con confronto side-by-side con la sorgente HTML e confronto numerico sul seed §12, <strong>prima del merge</strong>:</p>
+          <ol>
+            <li><strong>Struttura/navigazione</strong> — stesse aree e ordine: navbar fissa (§4.2), contenuto, footer fisso centrato; stesse rotte (§7).</li>
+            <li><strong>Layout</strong> — stesse card/tabelle nello stesso ordine; <code>.table-box</code>/<code>.box-stabile</code> con altezze e thead sticky; <code>thead class="table-dark"</code>.</li>
+            <li><strong>Componenti/stile</strong> — Bootstrap 5.3.2 + bootstrap-icons identichi; <code>crm.css</code> <strong>copiato, non riscritto</strong>.</li>
+            <li><strong>Testi</strong> — etichette, empty state, avvisi e note: italiano identico parola per parola al file di prototipo.</li>
+            <li><strong>Interazioni</strong> — filtri (incl. multifiltro checkbox §7.8), tab, modali, stepper, conferme, toast, export: stesso comportamento e stessi messaggi.</li>
+            <li><strong>Dati</strong> — seed §12 identico → stessi numeri in KPI e tabelle (prova oggettiva).</li>
+          </ol>
+
+          <h3>16.2 Fasi e attività parallele</h3>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-2">
+              <thead class="table-light"><tr><th>Fase</th><th>Ambito</th><th>Attività</th><th>Agenti paralleli</th><th>Ore</th></tr></thead>
+              <tbody>
+                <tr><td>F0</td><td>Fondamenta: stack, DB/seed, auth, shell, motore §10 + <code>logEvent()</code></td><td>A0–A5</td><td>1 → fino a 3</td><td>25</td></tr>
+                <tr><td>F1</td><td>Anagrafiche (fornitori, agenti, interscambio)</td><td>A1–A3</td><td>3</td><td>6</td></tr>
+                <tr><td>F2</td><td>Pratiche ordini (lista, dettaglio, documenti, upload)</td><td>A1–A3</td><td>3</td><td>7</td></tr>
+                <tr><td>F3</td><td>Bollettini mensili</td><td>A1–A2</td><td>2</td><td>4</td></tr>
+                <tr><td>F4</td><td>Liquidazione (filtri, dettaglio, export)</td><td>A1–A3</td><td>2–3</td><td>4</td></tr>
+                <tr><td>F5</td><td>Dashboard + log eventi (<code>/eventi</code>)</td><td>A1–A2</td><td>2</td><td>2</td></tr>
+                <tr><td>F6</td><td>Modulo ordini cliente (§7.9)</td><td>A1–A2</td><td>1–2</td><td>6</td></tr>
+                <tr><td>F7</td><td>Collaudo, replicazione, rilascio</td><td>A1–A2</td><td>1–2</td><td>5</td></tr>
+                <tr class="fw-bold"><td>—</td><td>Totale (preventivo §4)</td><td>19+1</td><td>—</td><td>59</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><strong>F0 è bloccante</strong> (conferma stack A0 → scaffold A1 → DB/auth/shell/motore); da F0 avanti <strong>F1–F6 procedono in parallelo</strong> (slice disgiunte, ownership per file), F7 chiude. Regole: contratti (schema §4.2, API §8, motore §10, <code>logEvent()</code> §15.3, seed §12) congelati in F0; eventi §15.2 a carico dell'attività che implementa l'operazione; tabelle legacy in sola lettura (V2).</p>
+
+          <h3>16.3 Revisione dello stack (V7 in revisione)</h3>
+          <p>Confronto delle opzioni prima dello scaffold (gate F0-A0, nessun codice prima):</p>
+          <div class="table-wrap">
+            <table class="table table-sm table-bordered align-middle mb-2">
+              <thead class="table-light"><tr><th>Criterio</th><th><strong>A — Next.js full-stack</strong></th><th>B — Next + NestJS (V7 attuale)</th><th>C — Express + EJS</th></tr></thead>
+              <tbody>
+                <tr><td>Processi/deploy</td><td>1 app, 1 processo (8001)</td><td>2 app, 2 processi</td><td>1 app, 1 processo</td></tr>
+                <tr><td>Replica prototipo (<code>crm.css</code> + Bootstrap)</td><td>✓ diretta</td><td>✓ diretta</td><td>✓✓ HTML letterale</td></tr>
+                <tr><td>Tipi condivisi FE/BE</td><td>✓ end-to-end</td><td>parziale</td><td>✗</td></tr>
+                <tr><td>Boilerplate API/auth</td><td>basso</td><td>alto</td><td>medio</td></tr>
+                <tr><td>Skill team (webapp = Express + EJS)</td><td>curva media</td><td>curva alta</td><td>curva minima</td></tr>
+                <tr><td>UI complesse (tab, modali, filtri) a lungo termine</td><td>✓ componenti React</td><td>✓</td><td>✗ JS vanilla fragile</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><strong>Scelta proposta: A — Next.js full-stack</strong> (App Router + Route Handlers + Prisma, Bootstrap 5.3.2, porta 8001): un solo processo (V3), tipi end-to-end, replicazione fedele del prototipo. B resta alternativa se servissero deploy/scaling indipendenti. <strong>Stato: da confermare dal cliente in Fase 0.</strong> Se confermata: si aggiorna V7 (§2) e la dicitura di preventivo §4 attività 1, <strong>ore invariate</strong> (59 h). Con A o B lo schema Prisma copre solo le tabelle CRM (§4.2); le tabelle esistenti si leggono in read-only (V2), mai migrate.</p>
+
+          <h3>16.4 Regole di consegna</h3>
+          <ul>
+            <li>Ogni attività è una slice con ownership disgiunta (nessun file toccato da due agenti); una PR per attività con checklist §16.1 allegata.</li>
+            <li>Testi e stile presi dal prototipo, non inventati.</li>
+            <li>Prima del merge: checklist superata + test numerici seed §12 + eventi §15.2 completi.</li>
+            <li>Casi limite §13 restano backlog, non toccati dal piano.</li>
+          </ul>
         </section>
 
       </div>
