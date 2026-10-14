@@ -264,7 +264,7 @@
     const sub = ab ? M.subagente(ab.subagente_id) : null;
     const s = M.statoPratica(p);
     const corpo = CRM.Pagina({
-      voce: 'pratiche', titolo: p.numero, badge: CRM.statoPratica(p),
+      voce: 'pratiche', pieno: true, titolo: p.numero, badge: CRM.statoPratica(p),
       briciole: [{ etichetta: 'Pratiche', href: '#/pratiche' }, { etichetta: p.numero }],
       sottotitolo: e(M.nomeCliente(p.cliente_piva)) + ' · ' + e(f.nome) + (sub ? ' · seguita da ' + e(sub.nome) : ' · nessun subagente abbinato'),
       azioni: [{ etichetta: 'Carica un documento', icona: 'carica', variante: 'sec', onClick: () => CRM.scegliFile({ accetta: ACCETTA, onFile: f => carica(f) }) }]
@@ -285,26 +285,26 @@
       nc.length ? { titolo: 'Nota di credito', fatta: true, numero: nc[0].numero, data: nc[0].data, importo: imp(nc) } : { titolo: 'Nota di credito', assente: true, testo: 'Nessuna' }
     ]);
 
-    const col = CRM.blocco(corpo, 'colonne');
+    const col = CRM.blocco(corpo, 'colonne riempi');
     const fasi = M.fasi(p);
-    const conf2 = CRM.Pannello(col, { titolo: 'Righe a confronto', senzaMargine: true,
+    const conf2 = CRM.Pannello(col, { titolo: 'Righe a confronto', senzaMargine: true, riempi: true,
       nota: fasi.length > 1 ? (M.haVariazioni(p) ? 'le righe evidenziate cambiano fra le fasi' : 'nessuna variazione fra le fasi') : 'il confronto parte quando arriva la conferma' });
     const tutte = M.confronto(p), variate = tutte.filter(r => r.varia);
     if (variate.length) {
       const fb = CRM.FilterBar(conf2.corpo, { campi: [{ nome: 'vista', tipo: 'segmenti', valore: 'variate', opzioni: [
         { value: 'variate', label: 'Solo righe che cambiano', n: variate.length }, { value: 'tutte', label: 'Tutte le righe', n: tutte.length }] }],
         onChange: v => tabConf.aggiorna(v.vista === 'tutte' ? tutte : variate) });
-      fb.el.style.padding = '10px 14px';
+      fb.el.style.cssText = 'padding:10px 14px;flex:none';
     }
     const tabConf = CRM.DataTable(conf2.corpo, {
-      compatta: true, naturale: true, righe: variate.length ? variate : tutte, rowClass: r => r.varia ? 'evidenzia' : '',
+      compatta: true, righe: variate.length ? variate : tutte, rowClass: r => r.varia ? 'evidenzia' : '',
       colonne: [{ key: 'codice', header: 'Articolo', grow: true, cell: r => '<b>' + e(r.codice) + '</b><span class="sec-riga">' + e(r.descrizione) + '</span>' }]
         .concat(fasi.map((d, i) => ({ key: 'f' + i, header: M.TIPI[d.tipo], align: 'right', sortValue: r => r.per[i] ? M.importoRiga(r.per[i]) : -1,
           cell: r => r.per[i] ? M.num(r.per[i].qta) + ' × ' + M.euro(r.per[i].prezzo) + '<span class="sec-riga">' + M.euro(M.importoRiga(r.per[i])) + '</span>' : '<span class="testo-tenue">assente</span>' })))
         .concat(fasi.length > 1 ? [{ key: 'delta', header: 'Differenza', tipo: 'euro', cell: r => Math.abs(r.delta) < 0.01 ? '<span class="testo-tenue">—</span>' : '<b class="' + CRM.classeSegno(r.delta) + '">' + CRM.euroSegno(r.delta) + '</b>' }] : [])
     });
 
-    const destra = CRM.blocco(col, 'pila');
+    const destra = CRM.blocco(col, 'pila', 'overflow:auto');
     const perc = M.percentuali(p, (fatture[0] || ordine).data);
     const base = M.importoPratica(p);
     const prov = CRM.Pannello(destra, { titolo: 'Provvigione', nota: M.fiscali(p).length ? 'sul netto fatturato' : 'prevista' });
