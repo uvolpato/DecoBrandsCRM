@@ -212,11 +212,25 @@
 <td>€ 220,00</td>
 </tr>
 <tr>
+<td></td>
+<td><em>Subtotale attività</em></td>
+<td><em>59</em></td>
+<td><em>152</em></td>
+<td><em>€ 3.245,00</em></td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>Margine di rischio (25 %)</strong>: imprevisti su lettura documenti, accesso condiviso e dati reali. Riserva usata solo se necessaria e rendicontata a ore</td>
+<td>15</td>
+<td>38</td>
+<td>€ 825,00</td>
+</tr>
+<tr>
 <td><strong>Subtotale da svolgere</strong></td>
 <td></td>
-<td><strong>59</strong></td>
-<td><strong>152</strong></td>
-<td><strong>€ 3.245,00</strong></td>
+<td><strong>74</strong></td>
+<td><strong>190</strong></td>
+<td><strong>€ 4.070,00</strong></td>
 </tr>
 </tbody>
 </table>
@@ -236,23 +250,24 @@
 <td>€ 1.280,00</td>
 </tr>
 <tr>
-<td>Attività da svolgere</td>
-<td>59</td>
-<td>€ 3.245,00</td>
+<td>Attività da svolgere (incluso margine 15 h)</td>
+<td>74</td>
+<td>€ 4.070,00</td>
 </tr>
 <tr>
 <td><strong>Totale complessivo</strong></td>
-<td><strong>75</strong></td>
-<td><strong>€ 4.525,00</strong></td>
+<td><strong>90</strong></td>
+<td><strong>€ 5.350,00</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>Riferimento senza AI</strong> — lo sviluppo tradizionale richiederebbe <strong>152 ore</strong> (≈ 2,6× le ore assistite): 152 h × € 70,00 = <strong>€ 10.640,00</strong>, per un totale di <strong>€ 11.920,00</strong> (€ 1.280,00 già svolto + € 10.640,00 sviluppo).</p>
-<p>L'approccio assistito da AI consente un <strong>risparmio di € 7.395,00</strong> sul solo sviluppo (€ 10.640,00 → € 3.245,00, <strong>−70%</strong>).</p>
+<p><strong>Riferimento senza AI</strong> — lo sviluppo tradizionale richiederebbe <strong>190 ore</strong> (≈ 2,6× le ore assistite, margine incluso): 190 h × € 70,00 = <strong>€ 13.300,00</strong>, per un totale di <strong>€ 14.580,00</strong> (€ 1.280,00 già svolto + € 13.300,00 sviluppo).</p>
+<p>L'approccio assistito da AI consente un <strong>risparmio di € 9.230,00</strong> sul solo sviluppo (€ 13.300,00 → € 4.070,00, <strong>−69%</strong>).</p>
 <h2 id="sez-6">6. Note</h2>
 <ul>
 <li>Le ore della sezione "già svolte" sono una <strong>stima</strong> del tempo impiegato (analisi, specifica, prototipo e iterazioni); da confermare.</li>
-<li><strong>Stack allineato al Portale B2B Luis</strong> (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di <strong>5 ore</strong>, reinvestite nella <strong>prova di lettura dei documenti fornitore</strong> (attività 11), principale rischio tecnico del progetto. Totale invariato: 59 h.</li>
+<li><strong>Stack allineato al Portale B2B Luis</strong> (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di <strong>5 ore</strong>, reinvestite nella <strong>prova di lettura dei documenti fornitore</strong> (attività 11), principale rischio tecnico del progetto. Totale attività invariato: 59 h.</li>
+<li><strong>Margine di rischio 25 % (15 h, € 825,00)</strong>: copre gli imprevisti più probabili (formati dei documenti fornitore, compatibilità dell'accesso con la Gestione Ordini, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.</li>
 <li>Il motore di calcolo è <strong>solo lato server</strong> (spec §10): eliminata la voce "motore lato client" della versione precedente.</li>
 <li><strong>Accesso unico con la Gestione Ordini</strong>: confermato se le sessioni sono compatibili (verifica nell'attività 2); in caso contrario login separato sulla stessa tabella utenti, senza variazione di ore.</li>
 <li><strong>Grafica</strong>: Bootstrap 5.3 + <code>crm.css</code> del prototipo, coerente con la Gestione Ordini.</li>

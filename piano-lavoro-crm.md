@@ -1,7 +1,7 @@
 # Piano di lavoro — CRM Decobrands (fasi e attività parallele)
 
 **Versione:** 1.1 · **Data:** 14/10/2026 (stack confermato: Portale B2B Luis)
-**Derivato da:** `specifica-crm-provvigioni.md` v1.8 (§16) · **Ore:** 59 h da svolgere (preventivo §4)
+**Derivato da:** `specifica-crm-provvigioni.md` v1.8 (§16) · **Ore:** 59 h di attività + 15 h di margine = 74 h (preventivo §4)
 **Scopo:** suddividere l'implementazione in fasi e attività indipendenti, assegnabili ad **agenti in parallelo**, con **replicazione maniacale** del prototipo navigabile.
 
 ---
@@ -67,6 +67,8 @@ migrate**.
 | **F6** | Modulo ordini cliente (§7.9) | 1 (2 sottofasi) | 1–2 | **6** | F0 |
 | **F7** | Collaudo, replicazione, rilascio | 1 (2 sottofasi) | 1–2 | **5** | merged F1–F6 |
 | | | **20** | | **59** | |
+| — | Margine di rischio 25 % (riserva, preventivo §4 att. 12) | — | — | **15** | — |
+| | | | | **74** | |
 
 ```
 F0-A1 (scaffold, modello Luis B2B)
@@ -82,7 +84,7 @@ F0-A1 (scaffold, modello Luis B2B)
               F7 collaudo + replicazione + rilascio
 ```
 
-Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** = preventivo §4.
+Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** di attività + **15 h** di margine = **74 h** = preventivo §4. Il margine non è assegnato a una fase: si usa dove emergono imprevisti e si rendiconta a ore.
 
 ---
 
@@ -215,5 +217,5 @@ Totale ore verificato: 25 + 6 + 7 + 4 + 4 + 2 + 6 + 5 = **59 h** = preventivo §
 
 ## 13. Riferimenti
 
-Specifica: `specifica-crm-provvigioni.md` v1.8 (§16) · Preventivo: `preventivo-crm-provvigioni.md` (59 h da svolgere) ·
+Specifica: `specifica-crm-provvigioni.md` v1.8 (§16) · Preventivo: `preventivo-crm-provvigioni.md` (74 h da svolgere, margine incluso) ·
 Prototipo sorgente: `prototipo-crm/` · Stile: `STILE-GUIDA-DECOBRANDS.md` · Seed: spec §12 · Eventi: spec §15

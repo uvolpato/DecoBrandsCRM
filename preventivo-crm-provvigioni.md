@@ -55,24 +55,27 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 | 9 | Registro eventi (§15) adattato dai moduli `audit`/`events` di Luis B2B + schermata `/eventi` | 2 | 5 | € 110,00 |
 | 10 | Export liquidazione a 8 campi (§11) e gestione trimestri | 1 | 3 | € 55,00 |
 | 11 | **Prova di lettura automatica dei documenti fornitore** (conferme, fatture, bollettini) su 2–3 fornitori reali tramite la pipeline OCR della Gestione Ordini: esito e stima dell'adattamento | 4 | 10 | € 220,00 |
-| **Subtotale da svolgere** | | **59** | **152** | **€ 3.245,00** |
+| | *Subtotale attività* | *59* | *152* | *€ 3.245,00* |
+| 12 | **Margine di rischio (25 %)**: imprevisti su lettura documenti, accesso condiviso e dati reali. Riserva usata solo se necessaria e rendicontata a ore | 15 | 38 | € 825,00 |
+| **Subtotale da svolgere** | | **74** | **190** | **€ 4.070,00** |
 
 ## 5. Riepilogo economico
 
 | Voce | Ore | Importo |
 |---|---|---|
 | Attività già svolte | 16 | € 1.280,00 |
-| Attività da svolgere | 59 | € 3.245,00 |
-| **Totale complessivo** | **75** | **€ 4.525,00** |
+| Attività da svolgere (incluso margine 15 h) | 74 | € 4.070,00 |
+| **Totale complessivo** | **90** | **€ 5.350,00** |
 
-**Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **152 ore** (≈ 2,6× le ore assistite): 152 h × € 70,00 = **€ 10.640,00**, per un totale di **€ 11.920,00** (€ 1.280,00 già svolto + € 10.640,00 sviluppo).
+**Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **190 ore** (≈ 2,6× le ore assistite, margine incluso): 190 h × € 70,00 = **€ 13.300,00**, per un totale di **€ 14.580,00** (€ 1.280,00 già svolto + € 13.300,00 sviluppo).
 
-L'approccio assistito da AI consente un **risparmio di € 7.395,00** sul solo sviluppo (€ 10.640,00 → € 3.245,00, **−70%**).
+L'approccio assistito da AI consente un **risparmio di € 9.230,00** sul solo sviluppo (€ 13.300,00 → € 4.070,00, **−69%**).
 
 ## 6. Note
 
 - Le ore della sezione "già svolte" sono una **stima** del tempo impiegato (analisi, specifica, prototipo e iterazioni); da confermare.
-- **Stack allineato al Portale B2B Luis** (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di **5 ore**, reinvestite nella **prova di lettura dei documenti fornitore** (attività 11), principale rischio tecnico del progetto. Totale invariato: 59 h.
+- **Stack allineato al Portale B2B Luis** (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di **5 ore**, reinvestite nella **prova di lettura dei documenti fornitore** (attività 11), principale rischio tecnico del progetto. Totale attività invariato: 59 h.
+- **Margine di rischio 25 % (15 h, € 825,00)**: copre gli imprevisti più probabili (formati dei documenti fornitore, compatibilità dell'accesso con la Gestione Ordini, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.
 - Il motore di calcolo è **solo lato server** (spec §10): eliminata la voce "motore lato client" della versione precedente.
 - **Accesso unico con la Gestione Ordini**: confermato se le sessioni sono compatibili (verifica nell'attività 2); in caso contrario login separato sulla stessa tabella utenti, senza variazione di ore.
 - **Grafica**: Bootstrap 5.3 + `crm.css` del prototipo, coerente con la Gestione Ordini.

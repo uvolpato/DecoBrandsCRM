@@ -1248,6 +1248,8 @@ HTML e confronto numerico sul seed §12, **prima del merge**:
 | F6 | Modulo ordini cliente (§7.9) | A1–A2 | 1–2 | 6 |
 | F7 | Collaudo, replicazione, rilascio | A1–A2 | 1–2 | 5 |
 | | | **20** | | **59** (preventivo §4) |
+| — | Margine di rischio 25 % (riserva, usata solo se necessaria) | — | — | 15 |
+| | | | | **74** |
 
 **F0 è bloccante** (scaffold A1 → DB/auth/shell/motore/prova documenti); da F0
 avanti **F1–F6 procedono in parallelo** (slice disgiunte, ownership per file), F7
