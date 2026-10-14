@@ -314,7 +314,25 @@
     const p3 = M.pratica(3);
     if (p3 && !M.fiscali(p3).length && !giaLetto('F-2026-0951')) esempi.push(() => ({ tipo: 'fattura', fornitore_id: 1, numero: 'F-2026-0951', data: M.oggi(), codice_cliente: 'K-10915', righe: clona(M.doc(p3, 'conferma').righe) }));
     if (!M.S.pratiche.some(p => p.numero === 'OF/2026/052') && !giaLetto('OF/2026/052')) esempi.push(() => ({ tipo: 'ordine', fornitore_id: 3, numero: 'OF/2026/052', data: M.oggi(), codice_cliente: 'IN-3150',
-      righe: [{ codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 60, prezzo: 18.5 }, { codice: 'XMAS-STL', descrizione: 'Stella luminosa da esterno', qta: 40, prezzo: 32 }] }));
+      righe: [
+        { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 60, prezzo: 18.50 },
+        { codice: 'XMAS-STL', descrizione: 'Stella luminosa da esterno', qta: 40, prezzo: 32.00 },
+        { codice: 'XMAS-CA38', descrizione: 'Candele LED, conf. 6', qta: 48, prezzo: 11.90 },
+        { codice: 'XMAS-NA103', descrizione: 'Nastro decorativo 10 m', qta: 200, prezzo: 3.50 },
+        { codice: 'XMAS-RE404', descrizione: 'Renna luminosa da esterno 40 cm', qta: 15, prezzo: 40.00 },
+        { codice: 'XMAS-FL107', descrizione: 'Filo luminoso LED 10 m', qta: 100, prezzo: 14.00 },
+        { codice: 'XMAS-AL2105', descrizione: 'Albero artificiale 210 cm', qta: 8, prezzo: 103.50 },
+        { codice: 'XMAS-NA258', descrizione: 'Nastro decorativo 25 m', qta: 200, prezzo: 5.75 },
+        { codice: 'XMAS-PU99', descrizione: 'Puntale in vetro soffiato', qta: 150, prezzo: 7.50 },
+        { codice: 'XMAS-PV607', descrizione: 'Palline in vetro Ø 60 mm, conf. 12', qta: 60, prezzo: 10.80 },
+        { codice: 'XMAS-FL204', descrizione: 'Filo luminoso LED 20 m', qta: 60, prezzo: 23.00 },
+        { codice: 'XMAS-PV804', descrizione: 'Palline in vetro Ø 80 mm, conf. 12', qta: 36, prezzo: 12.40 },
+        { codice: 'XMAS-PV1007', descrizione: 'Palline in vetro Ø 100 mm, conf. 12', qta: 100, prezzo: 14.00 },
+        { codice: 'XMAS-RE901', descrizione: 'Renna luminosa da esterno 90 cm', qta: 20, prezzo: 65.00 },
+        { codice: 'XMAS-AL1808', descrizione: 'Albero artificiale 180 cm', qta: 15, prezzo: 93.00 },
+        { codice: 'XMAS-AL1501', descrizione: 'Albero artificiale 150 cm', qta: 12, prezzo: 82.50 },
+        { codice: 'XMAS-AL1205', descrizione: 'Albero artificiale 120 cm', qta: 20, prezzo: 72.00 },
+        { codice: 'XMAS-FL57', descrizione: 'Filo luminoso LED 5 m', qta: 80, prezzo: 14.08 } ] }));
     if (!M.bollettinoDi(2, 2026, 6) && !M.S.in_arrivo.some(d => d.tipo === 'bollettino')) esempi.push(() => ({ tipo: 'bollettino', fornitore_id: 2, numero: 'giugno 2026', anno: 2026, mese: 6,
       righe: M.fiscaliDelMese(2, 2026, 6).map(x => { const pc = M.percentuali(x.pratica, x.doc.data); const imp = M.importoDoc(x.doc); return { numero: x.doc.numero, data: x.doc.data, imponibile: imp, pct: pc.dal_fornitore, importo: M.r2(imp * pc.dal_fornitore / 100) }; }) }));
     if (!esempi.length) return null;
