@@ -1,6 +1,6 @@
 # Decobrands — prototipo alternativo
 
-Prototipo indipendente dal primo (`prototipo-crm/`): stessa materia, ma costruito sui **flussi di lavoro** invece che sulle tabelle, e con un'identità grafica propria. Si apre con `index.html` (doppio clic, nessun server, nessuna libreria esterna).
+Prototipo indipendente dal primo (`prototipo-crm/`): stessa materia, ma costruito sui **flussi di lavoro** invece che sulle tabelle, con la palette Decobrands e gli stessi componenti standard del primo. Si apre con `index.html` (doppio clic, nessun server, nessuna libreria esterna).
 
 ## Idea
 
@@ -13,7 +13,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | | **Pratiche** | Elenco filtrabile; la scheda mostra il **binario** ordine → conferma → fattura → nota di credito con le differenze fra le fasi |
 | Ogni mese | **Bollettini** | Matrice fornitore × mese: verificato, da decidere, pronto, non arrivato (con sollecito) |
 | | Bollettino | Riconciliazione **a cerniera**: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura |
-| Ogni trimestre | **Liquidazioni** | Trimestri fissi, schede per subagente, documenti liquidabili o in attesa, prospetti CSV a 8 campi, chiusura |
+| Ogni trimestre | **Liquidazioni** | Trimestri fissi, riquadri per subagente (fanno da filtro), documenti liquidabili o in attesa, prospetti CSV a 8 campi, chiusura |
 | Anagrafiche | Fornitori, Subagenti, Clienti e abbinamenti | Condizioni, percentuali **datate**, eccezioni, abbinamento cliente × fornitore con codice |
 
 ## Regole di flusso applicate
@@ -39,15 +39,25 @@ Le modifiche restano salvate nel browser; *Ripristina i dati di prova* (in basso
 
 ## Grafica
 
+Palette Decobrands da `STILE-GUIDA-DECOBRANDS.md` §2, la stessa del primo prototipo.
+
 | Token | Valore | Uso |
 |---|---|---|
-| Carta | `#ECEFEC` | sfondo |
-| Inchiostro | `#1F2522` | testo |
-| Abete | `#1E4D3F` | barra laterale, azioni principali |
-| Ottone | `#B8913A` | solo la cerniera del bollettino e la voce attiva |
-| Ambra / rosso / abete tenue | `#8E5400` · `#A3243B` · `#DFEBE5` | stati: in attesa, problema, a posto |
+| Primario | `#0d6efd` (hover `#0b5ed7`) | azioni principali, voce attiva, selezione |
+| Scuro | `#212529` | barra laterale, testo |
+| Sfondo · bordi | `#f5f6f8` · `#dee2e6` · intestazioni tabella `#e9ecef` / `#495057` | superfici |
+| Stati | success `#198754` · warning `#ffc107` · danger `#dc3545` · info `#0dcaf0`, ognuno col suo fondo tenue | fatturata / in attesa / problema / confermata |
 
-Carattere **Public Sans** (licenza OFL, incorporato in `assets/font/public-sans.css`), cifre tabellari per allineare gli importi. Importi in formato italiano (`1.234,56 €`).
+Logo monocromatico, bianco sulla barra scura. Carattere **Public Sans** (OFL, incorporato in `assets/font/public-sans.css`), cifre tabellari; la guida prevede il carattere di sistema: si può tornare a quello cambiando una riga di `stile.css`. Importi in formato italiano (`1.234,56 €`).
+
+## Componenti
+
+Ogni vista è **solo composizione** di componenti `CRM.*` parametrizzati (`assets/componenti.js`); il catalogo con esempi dal vivo e parametri è nella voce **Componenti** della barra.
+
+- Stessi nomi e parametri del primo prototipo: `Pagina`, `Pannello`, `DataTable`, `FilterBar`, `KpiRow`, `Form`, `FormModal`, `Modale`, `Conferma`, `Avviso`, `stato`.
+- Propri di questi flussi: `ListaDaFare`, `ElencoSelezionabile`, `Scelte`, `Binario`, `Matrice`, `Cerniera`, `Periodi`, `Cifre`, `Dettagli`, `Elenco`, `TestoDaInviare`.
+
+`DataTable` occupa sempre lo spazio disponibile, con intestazione fissa, righe scorrevoli, intestazioni ordinabili e totali fissi; con `naturale` prende l'altezza del contenuto (righe di un documento).
 
 ## File
 
@@ -55,9 +65,11 @@ Carattere **Public Sans** (licenza OFL, incorporato in `assets/font/public-sans.
 index.html                    pagina unica
 assets/dati.js                dati di prova organizzati per flusso
 assets/motore.js              regole: stato pratica, scaglioni datati, riconciliazione, liquidazione, abbinamento
-assets/componenti.js          tabella standard, finestra modale, avvisi, icone, rotte
+assets/componenti.js          libreria CRM.*: componenti standard, icone, rotte
 assets/viste-giorno.js        Oggi, Documenti in arrivo, Pratiche, Pratica
 assets/viste-periodo.js       Bollettini, Bollettino, Liquidazioni
 assets/viste-anagrafiche.js   Fornitori, Subagenti, Clienti e abbinamenti
-assets/stile.css              stile e token
+assets/viste-componenti.js    catalogo dei componenti
+assets/stile.css              palette Decobrands e stile dei componenti
+assets/logo-decobrands.png    logo
 ```
