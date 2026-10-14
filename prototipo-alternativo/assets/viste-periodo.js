@@ -11,7 +11,8 @@
   /* ---------- Bollettini: Matrice fornitore × mese ---------- */
   CRM.rotta(/^\/bollettini$/, function () {
     const corpo = CRM.Pagina({ voce: 'bollettini', titolo: 'Bollettini',
-      sottotitolo: 'Ogni mese ogni fornitore ci comunica le provvigioni che ci riconosce. Qui vedi quali sono arrivati e quali vanno ancora verificati.' });
+      sottotitolo: 'Ogni mese ogni fornitore ci comunica le provvigioni che ci riconosce. Qui vedi quali sono arrivati e quali vanno ancora verificati.',
+      azioni: [{ etichetta: 'Carica un bollettino', icona: 'carica', onClick: () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.caricaDocumenti(f, 'bollettino') }) }] });
     const imp = b => M.euro(b.righe.reduce((s, r) => s + r.importo, 0));
     CRM.Matrice(corpo, {
       angolo: 'Fornitore',

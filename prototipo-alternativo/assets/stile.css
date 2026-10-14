@@ -54,6 +54,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .marchio { padding: 0 10px 22px; display: flex; flex-direction: column; gap: 6px; }
 .marchio img { width: 150px; filter: brightness(0) invert(1); }
 .marchio span { font-size: 12.5px; color: rgba(255,255,255,.5); }
+.carica-barra { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 18px; padding: 9px 12px; border-radius: var(--r-piccolo); border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.carica-barra:hover { background: rgba(255,255,255,.1); border-color: #fff; }
+.carica-barra:focus-visible { outline: 2px solid var(--primario-chiaro); outline-offset: 2px; }
+.caricamento { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 16px 14px; border: 2px dashed var(--bordo); border-radius: var(--r-medio); background: var(--superficie); color: var(--testo-tenue); cursor: pointer; flex: none; position: relative; }
+.caricamento > .icona { width: 24px; height: 24px; color: var(--primario); }
+.caricamento b { color: var(--testo); }
+.caricamento span { font-size: 12.5px; }
+.caricamento .btn { margin-top: 6px; }
+.caricamento input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.caricamento:hover, .caricamento.sopra { border-color: var(--primario); background: var(--primario-tenue); }
+.caricamento:focus-within { outline: 2px solid var(--primario); outline-offset: 2px; }
 .gruppo { margin-bottom: 16px; }
 .gruppo-nome { font-size: 12px; color: rgba(255,255,255,.45); padding: 0 10px 6px; }
 .voce { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-piccolo); color: rgba(255,255,255,.78); text-decoration: none; position: relative; font-weight: 500; }
@@ -225,6 +236,8 @@ button.kpi[aria-pressed="true"] { background: var(--primario-tenue); outline: 2p
 .selezionabile a:hover { background: #f8f9fa; }
 .selezionabile a.attivo { background: var(--primario-tenue); border-color: var(--primario-chiaro); }
 .selezionabile .r1 { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.selezionabile .r1 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.selezionabile .r1 > span:last-child { white-space: nowrap; }
 .selezionabile .r2 { display: block; color: var(--testo-tenue); font-size: 13px; margin-top: 2px; }
 .selezionabile .r3 { display: block; margin-top: 6px; }
 .scelta { border: 1px solid var(--bordo); border-radius: var(--r-medio); padding: 14px 16px; display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; align-items: center; }
@@ -343,6 +356,7 @@ a.m-cella:hover { background: #f1f6ff; }
   body { display: block; overflow: auto; }
   .barra { flex-direction: row; overflow-x: auto; padding: 10px 12px; gap: 4px; position: sticky; top: 0; z-index: 10; }
   .marchio, .gruppo-nome, .barra-piede { display: none; }
+  .carica-barra { margin: 0 6px 0 0; white-space: nowrap; flex: none; }
   .gruppo { display: flex; margin: 0; gap: 2px; }
   .voce { white-space: nowrap; }
   .principale { height: auto; overflow: visible; padding: 18px 16px; }

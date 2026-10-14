@@ -66,6 +66,9 @@
     { nome: 'stato', gruppo: 'Dati', testo: 'Etichetta di stato. Sei varianti, sempre con testo: il colore non porta da solo il significato.',
       firma: 'CRM.stato(variante: ok|attesa|errore|info|primario|neutro, testo) → html',
       demo: h => { h.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap">' + [['ok', 'Fatturata'], ['info', 'Confermata'], ['attesa', 'Attesa conferma'], ['errore', 'In ritardo'], ['primario', 'Pronto da chiudere'], ['neutro', 'Al prossimo bollettino']].map(x => CRM.stato(x[0], x[1])).join('') + '</div>'; } },
+    { nome: 'Caricamento', gruppo: 'Flussi', testo: 'Area dove trascinare i file o sceglierli. È il punto d’ingresso di tutti i documenti; scegliFile apre la stessa scelta da un pulsante qualsiasi (barra laterale, Bollettini, Pratica).',
+      firma: 'CRM.Caricamento(host, { titolo, testo, accetta, onFile(files) })\nCRM.scegliFile({ accetta, onFile(files) })',
+      demo: h => CRM.Caricamento(h, { titolo: 'Trascina qui i documenti', testo: 'PDF o Excel', onFile: f => CRM.Avviso(f.length + (f.length === 1 ? ' file scelto: ' + f[0].name : ' file scelti')) }) },
     { nome: 'ListaDaFare', gruppo: 'Flussi', testo: 'Attività in ordine di urgenza, ognuna con il pulsante che porta dove si risolve.',
       firma: 'CRM.ListaDaFare(host, [{ tipo: errore|attesa|primario, titolo, dettaglio, href, azione }], vuoto: { titolo, testo })',
       demo: h => CRM.ListaDaFare(h, [

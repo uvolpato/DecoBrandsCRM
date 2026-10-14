@@ -9,7 +9,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | Cadenza | Pagina | A cosa serve |
 |---|---|---|
 | Ogni giorno | **Oggi** | Lista unica "Da fare" in ordine di urgenza, cifre del trimestre, ultime operazioni |
-| | **Documenti in arrivo** | Conferme e fatture lette in automatico: il sistema propone la pratica (codice cliente del fornitore + articoli in comune), tu confermi |
+| | **Documenti** | Unico ingresso di **tutti** i documenti (ordini, conferme, fatture, note di credito, bollettini): si caricano trascinandoli o con *Carica documenti* nella barra, da qualsiasi pagina. Lettura automatica, controllo dei dati letti (*Correggi i dati letti*), poi: l'ordine apre una pratica, conferme e fatture si abbinano alla pratica proposta (codice cliente + articoli in comune), il bollettino si registra e si verifica |
 | | **Pratiche** | Elenco filtrabile; la scheda mostra il **binario** ordine → conferma → fattura → nota di credito con le differenze fra le fasi |
 | Ogni mese | **Bollettini** | Matrice fornitore × mese: verificato, da decidere, pronto, non arrivato (con sollecito) |
 | | Bollettino | Riconciliazione **a cerniera**: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura |
@@ -19,7 +19,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 ## Regole di flusso applicate
 
 - **Lo stato della pratica non si scrive a mano**: si ricava dai documenti (ordine → in attesa/in ritardo; conferma → confermata; fattura → fatturata). La nota di credito è un documento, non uno stato.
-- **I documenti entrano solo da "Documenti in arrivo"** e si abbinano alla pratica; un codice cliente sconosciuto richiede la scelta manuale.
+- **I documenti entrano solo da "Documenti"** (caricamento → lettura automatica → controllo → abbinamento), come nella Gestione Ordini; un codice cliente sconosciuto si corregge o richiede la scelta manuale. Nel prototipo la lettura è simulata: qualsiasi file produce uno dei documenti di esempio.
 - **Bollettino**: ogni riga che non quadra va accettata (con motivo) o contestata (motivo obbligatorio); "manca nel bollettino" si può rimandare al mese dopo. Si chiude come verificato o contestato; per la contestazione viene preparato il testo da inviare.
 - **Dal fornitore ci aspettiamo** % agente + % subagente dello scaglione; **al subagente liquidiamo** la sua %, con eventuale eccezione personale. Se il fornitore riconosce un importo diverso, al subagente resta quello calcolato sull'imponibile.
 - **Maturato / fatturato**: per chi paga sul fatturato (Gasper, Ing's) la provvigione entra nel trimestre del documento; per chi paga sul maturato (Gries) entra quando il bollettino che la riconosce è verificato.
@@ -29,11 +29,12 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 ## Prova consigliata (5 minuti)
 
 1. **Oggi**: 10 cose da fare, in ordine di urgenza.
-2. **Documenti in arrivo** → fattura F-2026-0930 di Ing's → *Abbina*: la pratica diventa fatturata e la riga del bollettino di agosto quadra.
+2. **Documenti** → fattura F-2026-0930 di Ing's → *Abbina*: la pratica diventa fatturata e la riga del bollettino di agosto quadra.
 3. **Bollettini** → Ing's agosto è "pronto da chiudere" → *Segna come verificato*.
 4. **Bollettini** → Gries luglio → *Accetta il loro importo* sulla riga con la promozione → *Segna come verificato*: si sbloccano 505,80 € ai subagenti.
 5. **Liquidazioni**: il 3° trimestre si aggiorna; prova *Scarica i prospetti*.
 6. **Bollettini** → Gasper agosto: la fattura F-2026-0933 manca → *Contesta* → *Prepara la contestazione*.
+7. **Carica documenti** (barra a sinistra) con un file qualsiasi: arriva la fattura F-2026-0951 → abbinala. Ricarica: arriva l'ordine OF/2026/052 → *Apri la pratica*. In **Bollettini** → *Carica un bollettino*: Gasper giugno → *Registra e verifica*.
 
 Le modifiche restano salvate nel browser; *Ripristina i dati di prova* (in basso a sinistra) riporta tutto all'inizio. Data simulata: 4 settembre 2026.
 
@@ -55,7 +56,7 @@ Logo monocromatico, bianco sulla barra scura. Carattere **Public Sans** (OFL, in
 Ogni vista è **solo composizione** di componenti `CRM.*` parametrizzati (`assets/componenti.js`); il catalogo con esempi dal vivo e parametri è nella voce **Componenti** della barra.
 
 - Stessi nomi e parametri del primo prototipo: `Pagina`, `Pannello`, `DataTable`, `FilterBar`, `KpiRow`, `Form`, `FormModal`, `Modale`, `Conferma`, `Avviso`, `stato`.
-- Propri di questi flussi: `ListaDaFare`, `ElencoSelezionabile`, `Scelte`, `Binario`, `Matrice`, `Cerniera`, `Periodi`, `Cifre`, `Dettagli`, `Elenco`, `TestoDaInviare`.
+- Propri di questi flussi: `Caricamento`, `ListaDaFare`, `ElencoSelezionabile`, `Scelte`, `Binario`, `Matrice`, `Cerniera`, `Periodi`, `Cifre`, `Dettagli`, `Elenco`, `TestoDaInviare`.
 
 `DataTable` occupa sempre lo spazio disponibile, con intestazione fissa, righe scorrevoli, intestazioni ordinabili e totali fissi; con `naturale` prende l'altezza del contenuto (righe di un documento).
 

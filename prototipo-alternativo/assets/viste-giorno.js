@@ -40,46 +40,80 @@
     CRM.Elenco(reg.corpo, M.S.registro.slice(0, 8).map(x => ({ testo: e(x.testo) })), 'Qui compaiono le operazioni fatte: abbinamenti, verifiche, liquidazioni.');
   });
 
-  /* ---------- Documenti in arrivo: ElencoSelezionabile + Dettagli + DataTable + Scelte ---------- */
-  const ESITO = { certo: ['ok', 'Abbinamento sicuro'], probabile: ['attesa', 'Abbinamento da confermare'], ambiguo: ['attesa', 'Da scegliere'], nessuno: ['errore', 'Cliente non riconosciuto'] };
+  /* ---------- Documenti: Caricamento + ElencoSelezionabile + Dettagli + DataTable + Scelte ----------
+     Tutti i documenti entrano da qui: caricamento → lettura automatica → controllo dei dati letti → abbinamento. */
+  const ESITO = { certo: ['ok', 'Abbinamento sicuro'], probabile: ['attesa', 'Abbinamento da confermare'], ambiguo: ['attesa', 'Da scegliere'], nessuno: ['errore', 'Cliente non riconosciuto'],
+    nuova: ['info', 'Nuova pratica'], bollettino: ['info', 'Bollettino da registrare'], doppio: ['errore', 'Già registrato'] };
+  const ACCETTA = '.pdf,.xlsx,.xls,.csv';
+  function carica(files, preferenza) {
+    let primo = null, letti = 0;
+    files.forEach(f => { const d = M.leggiDocumento(f.name, preferenza); if (d) { letti++; primo = primo || d; } });
+    M.salva();
+    if (!primo) { CRM.Avviso('Nel prototipo la lettura è simulata e i documenti di esempio sono finiti: ripristina i dati di prova per ricominciare.'); return; }
+    CRM.Avviso(letti === 1 ? 'Letto ' + M.TIPI[primo.tipo].toLowerCase() + ' ' + primo.numero + ' di ' + M.fornitore(primo.fornitore_id).breve + ': controlla i dati e abbinalo.' : letti + ' documenti letti: controllali e abbinali.');
+    location.hash = '#/documenti/' + primo.id;
+  }
+  CRM.caricaDocumenti = carica;
+  CRM.alCaricamento = files => carica(files);
+
   function vistaDocumenti(idSel) {
     const docs = M.S.in_arrivo;
     const corpo = CRM.Pagina({
-      voce: 'documenti', titolo: 'Documenti in arrivo', pieno: true,
-      sottotitolo: 'Conferme e fatture lette in automatico. Controlla l’abbinamento proposto e conferma: la pratica avanza da sola.',
-      azioni: [{ etichetta: 'Simula l’arrivo di un documento', icona: 'carica', variante: 'sec', onClick: () => {
-        const d = M.simulaArrivo();
-        if (!d) return CRM.Avviso('Nel prototipo è previsto un solo arrivo simulato: è già stato usato.');
-        M.salva(); CRM.Avviso('Arrivata la fattura ' + d.numero + ' di Gries'); location.hash = '#/documenti/' + d.id;
-      } }]
+      voce: 'documenti', titolo: 'Documenti', pieno: true,
+      sottotitolo: 'Qui entrano tutti i documenti dei fornitori: ordini, conferme, fatture, note di credito e bollettini. Caricali, controlla i dati letti e abbinali: la pratica avanza da sola.'
     });
+    const col = CRM.blocco(corpo, 'colonne posta riempi');
+    const sx = CRM.Pannello(col, { titolo: 'Da controllare', nota: String(docs.length), riempi: true });
+    CRM.Caricamento(sx.corpo, { titolo: 'Trascina qui i documenti', testo: 'PDF di ordini, conferme, fatture e note di credito; bollettini in PDF o Excel', accetta: ACCETTA, onFile: f => carica(f) });
     if (!docs.length) {
-      const p = CRM.Pannello(corpo, {});
-      p.corpo.innerHTML = '<div class="vuoto"><b>Nessun documento da abbinare</b>I documenti dei fornitori compaiono qui appena letti. Puoi simularne uno con il pulsante in alto.</div>';
+      CRM.Nota(sx.corpo, 'Nessun documento da controllare.').style.marginTop = '12px';
+      const dx = CRM.Pannello(col, { titolo: 'Come entrano i documenti', riempi: true });
+      CRM.Elenco(dx.corpo, [
+        { testo: '<b>Carica</b> il file qui o con <b>Carica documenti</b> nella barra a sinistra, da qualsiasi pagina.' },
+        { testo: '<b>Lettura automatica</b>: il sistema riconosce fornitore, tipo, numero, data, codice cliente e righe.' },
+        { testo: '<b>Controlla</b> i dati letti e correggili se serve.' },
+        { testo: '<b>Abbina</b>: un ordine apre una nuova pratica; conferme, fatture e note di credito si agganciano alla pratica proposta; un bollettino si registra e si verifica riga per riga.' }
+      ]);
+      CRM.Nota(dx.corpo, 'Nel prototipo la lettura è simulata: qualsiasi file produce uno dei documenti di esempio.').style.marginTop = '12px';
       return;
     }
     const sel = docs.find(d => d.id === Number(idSel)) || docs[0];
-    const col = CRM.blocco(corpo, 'colonne posta riempi');
-    const sx = CRM.Pannello(col, { titolo: 'Da abbinare', nota: String(docs.length), riempi: true, senzaMargine: true });
+    CRM.blocco(sx.corpo, '', 'height:12px');
     CRM.ElencoSelezionabile(sx.corpo, docs.map(d => {
       const pr = M.proposta(d);
       return { id: d.id, href: '#/documenti/' + d.id, titolo: M.TIPI[d.tipo] + ' ' + d.numero, valore: M.euro(pr.importo),
-        sotto: M.fornitore(d.fornitore_id).breve + ' · arrivato il ' + M.data(d.ricevuto), stato: CRM.stato(ESITO[pr.esito][0], ESITO[pr.esito][1]) };
+        sotto: M.fornitore(d.fornitore_id).breve + ' · caricato il ' + M.data(d.ricevuto), stato: CRM.stato(ESITO[pr.esito][0], ESITO[pr.esito][1]) };
     }), sel.id);
 
     const pr = M.proposta(sel);
     const f = M.fornitore(sel.fornitore_id);
     const ab = pr.abbinamento;
-    const dx = CRM.Pannello(col, { titolo: M.TIPI[sel.tipo] + ' ' + sel.numero + ' · ' + f.breve, nota: CRM.icona('file') + ' ' + e(sel.file), riempi: true });
+    const boll = sel.tipo === 'bollettino';
+    const dx = CRM.Pannello(col, { titolo: M.TIPI[sel.tipo] + ' ' + sel.numero + ' · ' + f.breve, riempi: true,
+      azioni: [{ etichetta: 'Correggi i dati letti', onClick: () => correggi(sel) }] });
     dx.corpo.insertAdjacentHTML('beforeend', '<h3>Letto dal documento</h3>');
-    CRM.Dettagli(dx.corpo, [
+    CRM.Dettagli(dx.corpo, (boll ? [
       { etichetta: 'Fornitore', valore: e(f.nome) },
+      { etichetta: 'Mese', valore: M.mese(sel.mese, sel.anno) },
+      { etichetta: 'Totale riconosciuto', valore: M.euro(pr.importo) }
+    ] : [
+      { etichetta: 'Fornitore', valore: e(f.nome) },
+      { etichetta: 'Tipo', valore: M.TIPI[sel.tipo] },
       { etichetta: 'Data del documento', valore: M.data(sel.data) },
       { etichetta: 'Codice cliente', valore: e(sel.codice_cliente) + ' ' + (ab ? '<span class="testo-tenue">= ' + e(M.nomeCliente(ab.cliente_piva)) + '</span>' : CRM.stato('errore', 'non trovato fra i clienti ' + f.breve)) },
       { etichetta: 'Importo', valore: M.euro(pr.importo) }
-    ]);
+    ]).concat([{ etichetta: 'File', valore: CRM.icona('file') + ' ' + e(sel.file) }]));
     CRM.blocco(dx.corpo, '', 'height:14px');
-    CRM.DataTable(dx.corpo, {
+    CRM.DataTable(dx.corpo, boll ? {
+      compatta: true, naturale: true, righe: sel.righe, etichettaTotale: 'Totale',
+      colonne: [
+        { key: 'numero', header: 'Documento', grow: true },
+        { key: 'data', header: 'Data', tipo: 'data' },
+        { key: 'imponibile', header: 'Imponibile', tipo: 'euro' },
+        { key: 'pct', header: '%', tipo: 'pct' },
+        { key: 'importo', header: 'Provvigione', tipo: 'euro', totale: 'somma' }
+      ]
+    } : {
       compatta: true, naturale: true, righe: sel.righe, etichettaTotale: 'Totale',
       colonne: [
         { key: 'codice', header: 'Articolo' },
@@ -89,33 +123,85 @@
         { key: 'importo', header: 'Importo', tipo: 'euro', valore: r => M.importoRiga(r), totale: 'somma' }
       ]
     });
-    dx.corpo.insertAdjacentHTML('beforeend', '<h3>' + (pr.esito === 'nessuno' ? 'A quale pratica appartiene?' : 'Pratica proposta') + '</h3>');
-    if (pr.esito === 'nessuno') CRM.Nota(dx.corpo, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
-      '. Scegli la pratica a mano oppure, se è un cliente nuovo, aggiungi il codice in <a href="#/abbinamenti">Clienti e abbinamenti</a>.').style.marginBottom = '12px';
 
-    let candidati = pr.candidati;
-    if (pr.esito === 'nessuno') candidati = M.S.pratiche.filter(p => p.fornitore_id === sel.fornitore_id && (sel.tipo === 'conferma' ? !M.doc(p, 'conferma') : !M.fiscali(p).some(d => d.tipo === 'fattura')))
-      .map(p => ({ pratica: p, motivi: ['pratica ' + f.breve + ' ancora aperta'], delta: M.r2(pr.importo - M.importoDoc(M.doc(p, 'conferma') || M.doc(p, 'ordine'))) }));
-    CRM.Scelte(dx.corpo, candidati.map((c, i) => {
-      const p = c.pratica;
-      const prima = M.statoPratica(p).etichetta;
-      const dopo = sel.tipo === 'conferma' ? 'Confermata' : sel.tipo === 'fattura' ? 'Fatturata' : prima;
-      const rif = M.doc(p, 'conferma') ? 'alla conferma' : 'all’ordine';
-      return {
-        titolo: p.numero + ' · ' + M.nomeCliente(p.cliente_piva),
-        sottotitolo: CRM.statoPratica(p) + (prima !== dopo ? ' › ' + CRM.stato(dopo === 'Fatturata' ? 'ok' : 'info', dopo) : ''),
-        punti: c.motivi.map(e).concat([Math.abs(c.delta) < 0.01 ? 'importo uguale ' + rif : '<span class="' + CRM.classeSegno(c.delta) + '">' + CRM.euroSegno(c.delta) + '</span> rispetto ' + rif]),
-        consigliata: i === 0 && pr.esito !== 'nessuno',
-        azione: { etichetta: 'Abbina a ' + p.numero, onClick: () => abbina(sel, p) }
-      };
-    }), 'Nessuna pratica aperta di ' + f.breve + ' a cui abbinarlo.');
+    if (boll) {
+      dx.corpo.insertAdjacentHTML('beforeend', '<h3>Cosa farne</h3>');
+      if (pr.esito === 'doppio') CRM.Nota(dx.corpo, 'Il bollettino di ' + M.meseMin(sel.mese) + ' di ' + e(f.breve) + ' è già registrato: <a href="#/bollettini/' + pr.esistente.id + '">aprilo</a>. Se questo è la versione rettificata, correggi il mese o scartalo.');
+      else CRM.Scelte(dx.corpo, [{
+        titolo: 'Registra il bollettino di ' + M.mese(sel.mese, sel.anno), consigliata: true,
+        punti: [sel.righe.length + (sel.righe.length === 1 ? ' riga letta' : ' righe lette') + ', totale ' + M.euro(pr.importo),
+          'dopo la registrazione lo confronti riga per riga con le nostre pratiche'],
+        azione: { etichetta: 'Registra e verifica', onClick: () => { const b = M.registraBollettino(sel.id); M.salva(); CRM.Avviso('Bollettino registrato: ora verificalo'); location.hash = '#/bollettini/' + b.id; } }
+      }]);
+    } else if (sel.tipo === 'ordine') {
+      dx.corpo.insertAdjacentHTML('beforeend', '<h3>Nuova pratica</h3>');
+      if (pr.esito === 'doppio') CRM.Nota(dx.corpo, 'Esiste già la pratica <a href="#/pratiche/' + pr.esistente.id + '">' + e(pr.esistente.numero) + '</a>: controlla il numero letto o scarta il documento.');
+      else if (pr.esito === 'nessuno') CRM.Nota(dx.corpo, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
+        '. Correggi il codice letto oppure, se è un cliente nuovo, aggiungilo in <a href="#/abbinamenti">Clienti e abbinamenti</a>.');
+      else {
+        const sub = M.subagente(ab.subagente_id);
+        CRM.Scelte(dx.corpo, [{
+          titolo: sel.numero + ' · ' + M.nomeCliente(ab.cliente_piva), sottotitolo: CRM.stato('attesa', 'Attesa conferma'), consigliata: true,
+          punti: ['codice cliente ' + e(ab.codice) + ' = ' + e(M.nomeCliente(ab.cliente_piva)), 'seguita da ' + e(sub.nome) + ', sconto ' + M.pct(ab.sconto),
+            'conferma attesa entro ' + f.giorni_conferma + ' giorni, poi parte il sollecito'],
+          azione: { etichetta: 'Apri la pratica', onClick: () => { const p = M.apriPratica(sel.id); M.salva(); CRM.Avviso('Aperta la pratica ' + p.numero); location.hash = '#/pratiche/' + p.id; } }
+        }]);
+      }
+    } else {
+      dx.corpo.insertAdjacentHTML('beforeend', '<h3>' + (pr.esito === 'nessuno' ? 'A quale pratica appartiene?' : 'Pratica proposta') + '</h3>');
+      if (pr.esito === 'nessuno') CRM.Nota(dx.corpo, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
+        '. Scegli la pratica a mano oppure, se è un cliente nuovo, aggiungi il codice in <a href="#/abbinamenti">Clienti e abbinamenti</a>.').style.marginBottom = '12px';
+      let candidati = pr.candidati;
+      if (pr.esito === 'nessuno') candidati = M.S.pratiche.filter(p => p.fornitore_id === sel.fornitore_id && (sel.tipo === 'conferma' ? !M.doc(p, 'conferma') : !M.fiscali(p).some(d => d.tipo === 'fattura')))
+        .map(p => ({ pratica: p, motivi: ['pratica ' + f.breve + ' ancora aperta'], delta: M.r2(pr.importo - M.importoDoc(M.doc(p, 'conferma') || M.doc(p, 'ordine'))) }));
+      CRM.Scelte(dx.corpo, candidati.map((c, i) => {
+        const p = c.pratica;
+        const prima = M.statoPratica(p).etichetta;
+        const dopo = sel.tipo === 'conferma' ? 'Confermata' : sel.tipo === 'fattura' ? 'Fatturata' : prima;
+        const rif = M.doc(p, 'conferma') ? 'alla conferma' : 'all’ordine';
+        return {
+          titolo: p.numero + ' · ' + M.nomeCliente(p.cliente_piva),
+          sottotitolo: CRM.statoPratica(p) + (prima !== dopo ? ' › ' + CRM.stato(dopo === 'Fatturata' ? 'ok' : 'info', dopo) : ''),
+          punti: c.motivi.map(e).concat([Math.abs(c.delta) < 0.01 ? 'importo uguale ' + rif : '<span class="' + CRM.classeSegno(c.delta) + '">' + CRM.euroSegno(c.delta) + '</span> rispetto ' + rif]),
+          consigliata: i === 0 && pr.esito !== 'nessuno',
+          azione: { etichetta: 'Abbina a ' + p.numero, onClick: () => abbina(sel, p) }
+        };
+      }), 'Nessuna pratica aperta di ' + f.breve + ' a cui abbinarlo.');
+    }
     CRM.blocco(dx.corpo, '', 'margin-top:20px;padding-top:14px;border-top:1px solid var(--bordo-tenue)').innerHTML =
       '<button type="button" class="btn pericolo piccolo" id="scarta">Scarta il documento</button> <span class="testo-tenue piccolo">se è un doppione o non riguarda Decobrands</span>';
     CRM.$('#scarta').addEventListener('click', async () => {
-      if (!(await CRM.Conferma('Scartare ' + M.TIPI[sel.tipo].toLowerCase() + ' ' + sel.numero + '?', 'Il documento esce da questo elenco e non viene abbinato a nessuna pratica.', 'Scarta', true))) return;
+      if (!(await CRM.Conferma('Scartare ' + M.TIPI[sel.tipo].toLowerCase() + ' ' + sel.numero + '?', 'Il documento esce da questo elenco e non viene registrato.', 'Scarta', true))) return;
       M.scarta(sel.id); M.salva(); CRM.Avviso('Documento ' + sel.numero + ' scartato'); location.hash = '#/documenti';
     });
   }
+
+  /* Controllo dei dati letti: l'operatore conferma o corregge prima di abbinare. */
+  function correggi(d) {
+    const boll = d.tipo === 'bollettino';
+    CRM.FormModal({
+      titolo: 'Correggi i dati letti', testo: 'Correggi solo ciò che la lettura automatica ha sbagliato: l’abbinamento proposto si ricalcola.', conferma: 'Salva', colonne: 2,
+      campi: (boll ? [
+        { nome: 'mese', etichetta: 'Mese', tipo: 'select', valore: d.mese, opzioni: M.MESI.map((m, i) => ({ value: i + 1, label: m[0].toUpperCase() + m.slice(1) })) },
+        { nome: 'anno', etichetta: 'Anno', tipo: 'numero', valore: d.anno }
+      ] : [
+        { nome: 'tipo', etichetta: 'Tipo', tipo: 'select', valore: d.tipo, opzioni: ['ordine', 'conferma', 'fattura', 'nota_credito'].map(t => ({ value: t, label: M.TIPI[t] })) },
+        { nome: 'numero', etichetta: 'Numero', valore: d.numero },
+        { nome: 'data', etichetta: 'Data del documento', tipo: 'data', valore: d.data },
+        { nome: 'codice_cliente', etichetta: 'Codice cliente', valore: d.codice_cliente }
+      ]).concat([{ nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'select', valore: d.fornitore_id, opzioni: M.S.fornitori.map(f => ({ value: f.id, label: f.nome })) }]),
+      onConferma: (v, form) => {
+        if (boll) { d.mese = Number(v.mese); d.anno = Number(v.anno) || d.anno; d.numero = M.MESI[d.mese - 1].toLowerCase() + ' ' + d.anno; }
+        else {
+          if (!v.numero) { form.aiuto('numero', 'Il numero è obbligatorio.', true); return false; }
+          Object.assign(d, { tipo: v.tipo, numero: v.numero, data: v.data || d.data, codice_cliente: v.codice_cliente });
+        }
+        d.fornitore_id = Number(v.fornitore_id);
+        M.annota('Corretti i dati letti di ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero); M.salva(); CRM.Avviso('Dati corretti'); CRM.naviga();
+      }
+    });
+  }
+
   function abbina(doc, p) {
     const esito = M.abbina(doc.id, p.id);
     let extra = '';
@@ -181,7 +267,8 @@
       voce: 'pratiche', titolo: p.numero, badge: CRM.statoPratica(p),
       briciole: [{ etichetta: 'Pratiche', href: '#/pratiche' }, { etichetta: p.numero }],
       sottotitolo: e(M.nomeCliente(p.cliente_piva)) + ' · ' + e(f.nome) + (sub ? ' · seguita da ' + e(sub.nome) : ' · nessun subagente abbinato'),
-      azioni: s.chiave === 'scaduta' || s.chiave === 'attesa' ? [{ etichetta: 'Prepara il sollecito', icona: 'posta', variante: s.chiave === 'scaduta' ? 'primario' : 'sec', onClick: () => sollecito(p) }] : []
+      azioni: [{ etichetta: 'Carica un documento', icona: 'carica', variante: 'sec', onClick: () => CRM.scegliFile({ accetta: ACCETTA, onFile: f => carica(f) }) }]
+        .concat(s.chiave === 'scaduta' || s.chiave === 'attesa' ? [{ etichetta: 'Prepara il sollecito', icona: 'posta', variante: s.chiave === 'scaduta' ? 'primario' : 'sec', onClick: () => sollecito(p) }] : [])
     });
 
     const ordine = M.doc(p, 'ordine'), conf = M.doc(p, 'conferma');

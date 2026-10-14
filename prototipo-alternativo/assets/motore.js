@@ -231,8 +231,17 @@
   };
 
   /* ---------- Documenti in arrivo: proposta di abbinamento ---------- */
+  M.importoLetto = d => d.tipo === 'bollettino' ? M.r2(d.righe.reduce((s, r) => s + r.importo, 0)) : M.importoDoc(d);
   M.proposta = function (doc) {
+    if (doc.tipo === 'bollettino') {
+      const gia = M.bollettinoDi(doc.fornitore_id, doc.anno, doc.mese);
+      return { esito: gia ? 'doppio' : 'bollettino', candidati: [], importo: M.importoLetto(doc), esistente: gia };
+    }
     const ab = M.abbinamentoPerCodice(doc.fornitore_id, doc.codice_cliente);
+    if (doc.tipo === 'ordine') {
+      const gia = M.S.pratiche.find(p => p.numero === doc.numero);
+      return { abbinamento: ab, candidati: [], esito: gia ? 'doppio' : ab ? 'nuova' : 'nessuno', importo: M.importoDoc(doc), esistente: gia };
+    }
     const imp = M.importoDoc(doc);
     const codiciDoc = doc.righe.map(r => r.codice);
     let pool = M.S.pratiche.filter(p => p.fornitore_id === doc.fornitore_id && (!ab || p.cliente_piva === ab.cliente_piva));
@@ -273,15 +282,46 @@
   };
   M.TIPI = { ordine: 'Ordine', conferma: 'Conferma', fattura: 'Fattura', nota_credito: 'Nota di credito', bollettino: 'Bollettino' };
 
-  /* Simula l'arrivo di un nuovo documento (lettura automatica già fatta). */
-  M.simulaArrivo = function () {
-    const p = M.pratica(3);
-    if (M.fiscali(p).length || M.S.in_arrivo.some(d => d.numero === 'F-2026-0951')) return null;
-    const conf = M.doc(p, 'conferma');
-    const d = { id: Date.now(), tipo: 'fattura', fornitore_id: 1, numero: 'F-2026-0951', data: M.oggi(), ricevuto: M.oggi(), codice_cliente: 'K-10915',
-      file: 'Gries_F-2026-0951.pdf', righe: clona(conf.righe) };
+  /* Apre una nuova pratica da un ordine caricato. */
+  M.apriPratica = function (docId) {
+    const i = M.S.in_arrivo.findIndex(d => d.id === docId);
+    const doc = M.S.in_arrivo[i];
+    const ab = M.abbinamentoPerCodice(doc.fornitore_id, doc.codice_cliente);
+    const p = { id: Math.max.apply(null, M.S.pratiche.map(x => x.id)) + 1, numero: doc.numero, fornitore_id: doc.fornitore_id, cliente_piva: ab.cliente_piva, data: doc.data,
+      documenti: [{ id: doc.id, tipo: 'ordine', numero: doc.numero, data: doc.data, file: doc.file, righe: doc.righe }] };
+    M.S.pratiche.push(p);
+    M.S.in_arrivo.splice(i, 1);
+    M.annota('Aperta la pratica ' + p.numero + ' · ' + M.nomeCliente(p.cliente_piva) + ' · ' + M.fornitore(p.fornitore_id).breve);
+    return p;
+  };
+  /* Registra un bollettino caricato: poi si verifica a cerniera. */
+  M.registraBollettino = function (docId) {
+    const i = M.S.in_arrivo.findIndex(d => d.id === docId);
+    const doc = M.S.in_arrivo[i];
+    const b = { id: Math.max.apply(null, M.S.bollettini.map(x => x.id)) + 1, fornitore_id: doc.fornitore_id, anno: doc.anno, mese: doc.mese, ricevuto: doc.ricevuto,
+      stato: 'da_verificare', file: doc.file, decisioni: {}, righe: doc.righe };
+    M.S.bollettini.push(b);
+    M.S.in_arrivo.splice(i, 1);
+    M.annota('Registrato il bollettino di ' + M.meseMin(b.mese) + ' di ' + M.fornitore(b.fornitore_id).breve);
+    return b;
+  };
+
+  /* Caricamento di un file: nel prototipo la lettura automatica è simulata con documenti di esempio.
+     preferenza: tipo da proporre per primo (es. 'bollettino' dalla pagina Bollettini). */
+  M.leggiDocumento = function (nome, preferenza) {
+    const giaLetto = n => M.S.in_arrivo.some(d => d.numero === n);
+    const esempi = [];
+    const p3 = M.pratica(3);
+    if (p3 && !M.fiscali(p3).length && !giaLetto('F-2026-0951')) esempi.push(() => ({ tipo: 'fattura', fornitore_id: 1, numero: 'F-2026-0951', data: M.oggi(), codice_cliente: 'K-10915', righe: clona(M.doc(p3, 'conferma').righe) }));
+    if (!M.S.pratiche.some(p => p.numero === 'OF/2026/052') && !giaLetto('OF/2026/052')) esempi.push(() => ({ tipo: 'ordine', fornitore_id: 3, numero: 'OF/2026/052', data: M.oggi(), codice_cliente: 'IN-3150',
+      righe: [{ codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 60, prezzo: 18.5 }, { codice: 'XMAS-STL', descrizione: 'Stella luminosa da esterno', qta: 40, prezzo: 32 }] }));
+    if (!M.bollettinoDi(2, 2026, 6) && !M.S.in_arrivo.some(d => d.tipo === 'bollettino')) esempi.push(() => ({ tipo: 'bollettino', fornitore_id: 2, numero: 'giugno 2026', anno: 2026, mese: 6,
+      righe: M.fiscaliDelMese(2, 2026, 6).map(x => { const pc = M.percentuali(x.pratica, x.doc.data); const imp = M.importoDoc(x.doc); return { numero: x.doc.numero, data: x.doc.data, imponibile: imp, pct: pc.dal_fornitore, importo: M.r2(imp * pc.dal_fornitore / 100) }; }) }));
+    if (!esempi.length) return null;
+    const scelto = esempi.map(f => f()).sort((a, b) => (b.tipo === preferenza) - (a.tipo === preferenza))[0];
+    const d = Object.assign({ id: Date.now() + Math.floor(Math.random() * 1000), ricevuto: M.oggi(), file: nome }, scelto);
     M.S.in_arrivo.unshift(d);
-    M.annota('Arrivata fattura F-2026-0951 di Gries');
+    M.annota('Caricato ' + nome + ': letto ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero + ' di ' + M.fornitore(d.fornitore_id).breve);
     return d;
   };
 
@@ -290,6 +330,11 @@
     const out = [];
     M.S.in_arrivo.forEach(d => {
       const pr = M.proposta(d);
+      const f = M.fornitore(d.fornitore_id).breve;
+      if (d.tipo === 'bollettino') return out.push({ peso: 2, tipo: 'documento', titolo: 'Registra il bollettino di ' + M.meseMin(d.mese) + ' di ' + f,
+        dettaglio: f + ' · ' + d.righe.length + (d.righe.length === 1 ? ' riga letta' : ' righe lette'), link: '#/documenti/' + d.id, azione: 'Apri' });
+      if (d.tipo === 'ordine') return out.push({ peso: 2, tipo: 'documento', titolo: 'Apri la pratica dell’ordine ' + d.numero,
+        dettaglio: f + ' · ' + (pr.abbinamento ? M.nomeCliente(pr.abbinamento.cliente_piva) : 'codice cliente ' + d.codice_cliente + ' non riconosciuto'), link: '#/documenti/' + d.id, azione: 'Apri' });
       out.push({ peso: pr.esito === 'certo' ? 2 : 3, tipo: 'documento', esito: pr.esito, titolo: 'Abbina ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero,
         dettaglio: M.fornitore(d.fornitore_id).breve + ' · ' + (pr.esito === 'certo' || pr.esito === 'probabile' ? 'proposta: ' + pr.candidati[0].pratica.numero : pr.esito === 'nessuno' ? 'codice cliente ' + d.codice_cliente + ' non riconosciuto' : 'da scegliere fra ' + pr.candidati.length + ' pratiche'),
         link: '#/documenti/' + d.id, azione: 'Abbina' });

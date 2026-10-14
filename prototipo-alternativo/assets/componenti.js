@@ -494,12 +494,37 @@
   };
 
   /* =========================================================
+     Caricamento: area dove trascinare i file o sceglierli
+     opz: { titolo, testo, accetta ('.pdf,.xlsx'), onFile(files) }
+     scegliFile({ accetta, onFile }) apre la scelta dei file da un pulsante qualsiasi
+     ========================================================= */
+  CRM.Caricamento = function (host, opz) {
+    const z = el('label', 'caricamento');
+    z.innerHTML = CRM.icona('carica') + '<b>' + esc(opz.titolo || 'Trascina qui i file') + '</b><span>' + (opz.testo || '') + '</span>' +
+      '<span class="btn sec piccolo">Scegli i file</span><input type="file" multiple accept="' + esc(opz.accetta || '') + '">';
+    const inp = $('input', z);
+    inp.addEventListener('change', () => { if (inp.files.length) opz.onFile(Array.from(inp.files)); inp.value = ''; });
+    z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('sopra'); });
+    z.addEventListener('dragleave', () => z.classList.remove('sopra'));
+    z.addEventListener('drop', e => { e.preventDefault(); z.classList.remove('sopra'); if (e.dataTransfer.files.length) opz.onFile(Array.from(e.dataTransfer.files)); });
+    ospite(host).appendChild(z);
+    return z;
+  };
+  CRM.scegliFile = function (opz) {
+    const inp = el('input'); inp.type = 'file'; inp.multiple = true; if (opz.accetta) inp.accept = opz.accetta;
+    inp.addEventListener('change', () => { if (inp.files.length) opz.onFile(Array.from(inp.files)); });
+    inp.click();
+  };
+  /* Aggancio impostato dalle viste: cosa fare con i file caricati dalla barra. */
+  CRM.alCaricamento = null;
+
+  /* =========================================================
      Barra laterale: navigazione per cadenza di lavoro
      ========================================================= */
   const VOCI = [
     { gruppo: 'Ogni giorno', voci: [
       { id: 'oggi', href: '#/', t: 'Oggi', icona: 'oggi' },
-      { id: 'documenti', href: '#/documenti', t: 'Documenti in arrivo', icona: 'arrivo' },
+      { id: 'documenti', href: '#/documenti', t: 'Documenti', icona: 'arrivo' },
       { id: 'pratiche', href: '#/pratiche', t: 'Pratiche', icona: 'pratiche' }] },
     { gruppo: 'Ogni mese', voci: [{ id: 'bollettini', href: '#/bollettini', t: 'Bollettini', icona: 'bollettini' }] },
     { gruppo: 'Ogni trimestre', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni' }] },
@@ -514,17 +539,20 @@
     const conta = {
       oggi: { n: fare.length },
       documenti: { n: M.S.in_arrivo.length, urgente: M.S.in_arrivo.length > 0 },
+      // la voce si chiama "Documenti": qui si caricano e si abbinano
       pratiche: { n: M.S.pratiche.filter(p => M.statoPratica(p).chiave === 'scaduta').length, urgente: true },
       bollettini: { n: fare.filter(x => x.tipo === 'bollettino' || x.tipo === 'mancante').length }
     };
     const b = $('#barra');
     b.innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Pratiche e provvigioni</span></div>' +
+      '<button type="button" class="carica-barra" id="carica-barra">' + CRM.icona('carica') + 'Carica documenti</button>' +
       VOCI.map(g => '<nav class="gruppo" aria-label="' + g.gruppo + '"><div class="gruppo-nome">' + g.gruppo + '</div>' + g.voci.map(v => {
         const k = conta[v.id];
         return '<a class="voce' + (v.id === attiva ? ' attiva' : '') + '" href="' + v.href + '"' + (v.id === attiva ? ' aria-current="page"' : '') + '>' + CRM.icona(v.icona) + '<span>' + v.t + '</span>' +
           (k && k.n ? '<span class="conta' + (k.urgente ? ' urgente' : '') + '">' + k.n + '</span>' : '') + '</a>';
       }).join('') + '</nav>').join('') +
       '<div class="barra-piede">Data simulata: ' + M.dataLunga(M.oggi()) + '<br><button type="button" id="ripristina">Ripristina i dati di prova</button></div>';
+    $('#carica-barra').addEventListener('click', () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.alCaricamento && CRM.alCaricamento(f) }));
     $('#ripristina').addEventListener('click', async () => {
       if (!(await CRM.Conferma('Ripristinare i dati di prova?', 'Le modifiche fatte in questa demo andranno perse.', 'Ripristina', true))) return;
       M.ripristina(); CRM.Avviso('Dati di prova ripristinati'); CRM.naviga();
