@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 2.4 — bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 2.5 — liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -1084,8 +1084,15 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
   selezionato = nessuna riga), subagente, trimestre, anno.
 - **KPI del periodo**: documenti liquidabili, totale merce, provvigione agente,
   provvigione subagenti (solo pratiche `fatturato` del periodo, §5.5; V9).
-- **Tab Riepilogo / Dettaglio rendiconto**: riepilogo per subagente (n° fatture, totale
-  merce, totale provvigione subagente) con riga totale; dettaglio riga per riga.
+- **Riepilogo e dettaglio affiancati** (prototipo `prototipo-alternativo/`, pagina
+  Liquidazioni): a sinistra l'**elenco dei subagenti** (DataTable: nome, n° documenti,
+  da liquidare / liquidato, in attesa dei bollettini; riga totale; ordinabile), a destra
+  i **documenti del trimestre** (documento, cliente con subagente e codice, provvigione
+  con % e imponibile, stato liquidabile / in attesa con motivo).
+  - Clic su un subagente = filtra i documenti; secondo clic = tutti.
+  - **Qualsiasi numero di subagenti**: l'elenco scorre e mostra **solo chi ha
+    documenti nel trimestre**; gli altri sono contati nella testata ("4 con documenti ·
+    8 senza"). Niente riquadri per subagente: con più di 4 non entrano in larghezza.
 - **Export** con i campi §11 nell'header del dettaglio.
 
 ### 7.9 Documenti (`/documenti`)

@@ -13,7 +13,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | | **Pratiche** | Elenco filtrabile; la scheda mostra il **binario** ordine → conferma → fattura → nota di credito con le differenze fra le fasi. I documenti si consultano **affiancati**: a sinistra il documento, a destra il confronto riga per riga con un altro documento della pratica (clic su un documento, su *Consulta affiancati* o su una riga a confronto) |
 | Ogni mese | **Bollettini** | Matrice fornitore × mese: verificato, da decidere, pronto, atteso (fino al giorno del fornitore), non arrivato (con sollecito) |
 | | Bollettino | Riconciliazione **a cerniera**: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura |
-| Ogni trimestre | **Liquidazioni** | Trimestri fissi, riquadri per subagente (fanno da filtro), documenti liquidabili o in attesa, prospetti CSV a 8 campi, chiusura |
+| Ogni trimestre | **Liquidazioni** | Trimestri fissi, elenco dei subagenti con documenti nel trimestre (clic = filtro, regge qualsiasi numero), documenti liquidabili o in attesa, prospetti CSV a 8 campi, chiusura |
 | Anagrafiche | Fornitori, Subagenti, Clienti | Clienti e fornitori da Integra in **sola lettura**; nel CRM condizioni, percentuali **datate**, eccezioni, subagenti e **agenzie del cliente** (fornitore, codice, subagente, sconto) |
 
 ## Controllo dei dati letti

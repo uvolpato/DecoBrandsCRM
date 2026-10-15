@@ -155,7 +155,7 @@
     });
   }
 
-  /* ---------- Liquidazioni: Periodi + KpiRow (filtro per subagente) + DataTable ---------- */
+  /* ---------- Liquidazioni: Periodi + elenco subagenti (filtro, qualsiasi numero) + DataTable documenti ---------- */
   let subSel = null;
   CRM.rotta(/^\/liquidazioni$/, () => { location.hash = '#/liquidazioni/' + ANNO + '/' + M.trimestre(M.oggi()); });
   CRM.rotta(/^\/liquidazioni\/(\d{4})\/([1-4])$/, function (aS, tS) {
@@ -187,26 +187,41 @@
       CRM.Pannello(corpo, {}).corpo.innerHTML = '<div class="vuoto"><b>Trimestre non ancora iniziato</b>Le provvigioni compariranno qui con le prime fatture di ' + M.nomeTrimestre(t).split('–')[0] + '.</div>';
       return;
     }
-    CRM.KpiRow(corpo, M.S.subagenti.map(s => {
+    // Subagenti: elenco che regge qualsiasi numero (DataTable), solo chi ha documenti nel trimestre; clic = filtro
+    const perSub = M.S.subagenti.map(s => {
       const rr = righe.filter(x => x.subagente_id === s.id);
-      const liq = rr.filter(x => x.liquidabile).reduce((x, r) => x + r.provvigione, 0);
-      const att = rr.filter(x => !x.liquidabile).reduce((x, r) => x + r.provvigione, 0);
-      return { id: String(s.id), etichetta: s.nome, valore: liq, variante: att ? 'attesa' : 'ok',
-        dettagli: [{ testo: (st.chiave === 'chiusa' ? 'liquidati' : 'da liquidare') + ' · ' + rr.length + (rr.length === 1 ? ' documento' : ' documenti') }].concat(att ? [{ testo: M.euro(att) + ' in attesa del bollettino', variante: 'attesa' }] : []) };
-    }), { selezionata: subSel, onSeleziona: id => { subSel = id; CRM.$('h2', pan.el).textContent = titolo(); tab.aggiorna(filtra()); } });
+      return { id: s.id, nome: s.nome, attivo: s.attivo !== false, documenti: rr.length,
+        liq: M.r2(rr.filter(x => x.liquidabile).reduce((x, r) => x + r.provvigione, 0)),
+        att: M.r2(rr.filter(x => !x.liquidabile).reduce((x, r) => x + r.provvigione, 0)) };
+    });
+    const conDoc = perSub.filter(x => x.documenti), senza = perSub.length - conDoc.length;
+    if (subSel && !conDoc.some(x => String(x.id) === subSel)) subSel = null;
+    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(300px,0.8fr) minmax(0,2.2fr)');
+    const ps = CRM.Pannello(col, { titolo: 'Subagenti', riempi: true, senzaMargine: true,
+      nota: conDoc.length + (conDoc.length === 1 ? ' con documenti' : ' con documenti') + (senza ? ' · ' + senza + ' senza' : '') });
+    const tabSub = CRM.DataTable(ps.corpo, {
+      compatta: true, righe: conDoc, ordinamentoIniziale: { key: 'liq', dir: 'desc' },
+      rowClass: x => String(x.id) === subSel ? 'selezionata' : '',
+      colonne: [
+        { key: 'nome', header: 'Subagente', cell: x => '<b>' + e(x.nome) + '</b><span class="sec-riga">' + x.documenti + (x.documenti === 1 ? ' documento' : ' documenti') + (x.attivo ? '' : ' · non attivo') + '</span>' },
+        { key: 'liq', header: st.chiave === 'chiusa' ? 'Liquidato' : 'Da liquidare', tipo: 'euro', totale: 'somma',
+          cell: x => '<b class="' + CRM.classeSegno(Math.min(0, x.liq)) + '">' + M.euro(x.liq) + '</b>' + (x.att ? '<span class="sec-riga testo-attesa">' + M.euro(x.att) + ' in attesa</span>' : '') }
+      ],
+      etichettaTotale: 'Totale',
+      piede: 'Clic su un subagente per vedere i suoi documenti, di nuovo per tutti.',
+      onRowClick: x => { subSel = String(x.id) === subSel ? null : String(x.id); tabSub.aggiorna(conDoc); CRM.$('h2', pan.el).textContent = titolo(); tab.aggiorna(filtra()); },
+      emptyText: 'Nessun subagente', emptyHint: 'Nessun documento nel trimestre.'
+    });
 
     const filtra = () => subSel ? righe.filter(x => String(x.subagente_id) === subSel) : righe;
     const titolo = () => subSel ? 'Documenti di ' + M.subagente(Number(subSel)).nome : 'Tutti i documenti del trimestre';
-    const pan = CRM.Pannello(corpo, { titolo: titolo(), riempi: true, senzaMargine: true,
+    const pan = CRM.Pannello(col, { titolo: titolo(), riempi: true, senzaMargine: true,
       nota: 'Totale da liquidare <b>' + M.euro(totLiq) + '</b>' + (inAttesa.length ? ' · ' + inAttesa.length + ' documenti in attesa · <a href="#/bollettini">vai ai bollettini</a>' : '') });
     const tab = CRM.DataTable(pan.corpo, {
       colonne: [
         { key: 'numero', header: 'Documento', valore: r => r.doc.numero, cell: r => '<a href="#/pratiche/' + r.pratica.id + '">' + e(r.doc.numero) + '</a><span class="sec-riga">' + e(r.fornitore.breve) + ' · ' + M.data(r.doc.data) + '</span>' },
-        { key: 'cliente', header: 'Cliente', grow: true, valore: r => M.nomeCliente(r.cliente), cell: r => e(M.nomeCliente(r.cliente)) + '<span class="sec-riga">codice ' + e(r.codice_cliente) + '</span>' },
-        { key: 'sub', header: 'Subagente', valore: r => M.subagente(r.subagente_id).nome },
-        { key: 'importo', header: 'Imponibile', tipo: 'euro' },
-        { key: 'pct', header: 'Provvigione %', tipo: 'pct', cell: r => M.pct(r.pct) + (r.eccezione ? '<span class="sec-riga">eccezione</span>' : '') },
-        { key: 'provvigione', header: 'Provvigione', tipo: 'euro', totale: 'somma', cell: r => '<b class="' + CRM.classeSegno(Math.min(0, r.provvigione)) + '">' + M.euro(r.provvigione) + '</b>' },
+        { key: 'cliente', header: 'Cliente · subagente', grow: true, valore: r => M.nomeCliente(r.cliente), cell: r => e(M.nomeCliente(r.cliente)) + '<span class="sec-riga">' + e(M.subagente(r.subagente_id).nome) + ' · codice ' + e(r.codice_cliente) + '</span>' },
+        { key: 'provvigione', header: 'Provvigione', tipo: 'euro', totale: 'somma', cell: r => '<b class="' + CRM.classeSegno(Math.min(0, r.provvigione)) + '">' + M.euro(r.provvigione) + '</b><span class="sec-riga">' + M.pct(r.pct) + (r.eccezione ? ' (eccezione)' : '') + ' di ' + M.euro(r.importo) + '</span>' },
         { key: 'stato', header: 'Stato', grow: true, sortValue: r => r.liquidabile ? 1 : 0,
           cell: r => r.liquidabile ? CRM.stato('ok', st.chiave === 'chiusa' ? 'Liquidata' : 'Liquidabile') : CRM.stato('attesa', 'In attesa') + '<span class="sec-riga">' + e(r.motivo) + '</span>' }
       ],

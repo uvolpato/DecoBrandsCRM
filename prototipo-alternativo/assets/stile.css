@@ -561,3 +561,5 @@ a.m-cella:hover { background: #f1f6ff; }
 .solleciti-schede { margin-bottom: 10px; }
 .pannello.compatto .pannello-testa h2 { font-size: 14px; }
 .pannello.compatto .elenco li { font-size: 12.5px; padding: 6px 0; }
+
+.testo-attesa { color: var(--attesa-testo); }
