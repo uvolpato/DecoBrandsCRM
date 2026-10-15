@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 2.1 — **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 2.2 — **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -174,7 +174,8 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
 > indirizzo, codice Integra) arrivano **solo da Integra**, come tutti i dati anagrafici: il
 > CRM non li crea né li modifica, e un cliente nuovo si censisce in Integra. Il CRM gestisce
 > soltanto i **propri** dati: condizioni e percentuali dei fornitori (§4.2.1–4.2.2), agenzie
-> dei clienti (`interscambio`, §4.2.6) e subagenti. L'import da Integra è periodico e
+> dei clienti (`interscambio`, §4.2.6) e subagenti. **I subagenti non sono in Integra**: la
+> loro anagrafica si gestisce per intero nel CRM (CRUD completo). L'import da Integra è periodico e
 > aggiorna i campi anagrafici senza toccare i dati del CRM.
 
 > **Ordini cliente vs ordini fornitore: restano separati.** Gli ordini dei clienti
@@ -840,6 +841,22 @@ verificata nella prova F0-A6. Il server è a carico del cliente.
     evidenziato e righe di articoli aggiunti/tolti; in coda le **note di credito** e lo
     **scostamento complessivo** della pratica (§5.8).
 - Cambio stato guidato con accesso alla fase successiva.
+- **Consultazione dei documenti affiancata al confronto** (componente FinestraAffiancata,
+  stesso schema di "Correggi i dati letti", §6.5, ma in sola lettura):
+  - si apre con clic su un documento dell'elenco, con *Consulta affiancati* o con clic su
+    una riga del confronto fasi (in quel caso apre l'ultimo documento con la riga già
+    evidenziata);
+  - **a sinistra** il PDF originale, sopra di esso le **schede dei documenti** della
+    pratica (ordine, conferma, fatture, note di credito) per passare dall'uno all'altro
+    senza chiudere la finestra (anche con ← →);
+  - **a destra** i dati del documento (numero, data, importo) e il **confronto riga per
+    riga** con un altro documento della pratica, scelto in "Confrontato con": di norma la
+    fase precedente (conferma ↔ ordine, fattura ↔ conferma, nota di credito ↔ fattura
+    stornata indicata nel riferimento); differenza totale e numero di righe che cambiano;
+    segmenti *Solo righe che cambiano / Tutte le righe*; DataTable con le colonne dei due
+    documenti (q.tà × prezzo e importo) e la differenza;
+  - **selezionando una riga** la si vede evidenziata nel documento a sinistra (posizione
+    restituita dalla lettura, §6.5); divisore trascinabile; Esc chiude.
 
 ### 7.4 Anagrafica fornitori (`/fornitori`, `/fornitori/:id`)
 
@@ -981,6 +998,34 @@ Considerazioni:
 - Dettagli di progettazione in §15.
 
 ---
+
+### 7.12 Navigazione: ritorno alla schermata precedente, nello stesso punto
+
+Regola valida per **tutte** le schermate. Da qualunque schermata si apre un'altra (es.
+da Clienti si apre una pratica, da una pratica un documento, dal fornitore un cliente) si
+deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'era**.
+
+- **Pulsante "‹ Torna a <schermata precedente>"** in testa alla pagina, sopra le briciole,
+  presente quando esiste una schermata precedente dell'app; equivale al tasto Indietro del
+  browser (Alt + ←), che deve dare lo stesso risultato.
+- **Cosa si ripristina:** filtri (FilterBar: segmenti, ricerca, select), riquadri KPI
+  selezionati, **ordinamento** di ogni DataTable, **posizione di scorrimento** di ogni area
+  scorrevole (righe della DataTable, pannelli, pagina) ed elemento selezionato (già
+  nell'indirizzo, es. `/clienti/:piva`).
+- **Ogni passo della cronologia ha la sua memoria**: la stessa schermata aperta due volte
+  in momenti diversi ricorda due stati distinti. Lo stato vale per la sessione del
+  browser (sopravvive al ricaricamento della pagina, non al login successivo).
+- Dopo un **salvataggio** che ridisegna la schermata (es. aggiungi agenzia) filtri,
+  ordinamento e scorrimento restano dove erano.
+- I reindirizzamenti (es. vecchi indirizzi) **sostituiscono** il passo nella cronologia,
+  non ne aggiungono uno, così Indietro non rimbalza.
+- **Implementazione nell'app (React):** lo stato di filtri, ordinamento e selezioni sta
+  nell'indirizzo (query string, es. `?stato=aperte&q=OF&ord=importo.desc`) oppure in un
+  archivio per voce di cronologia (`history.state` / `location.key` di React Router);
+  lo scorrimento si salva all'uscita e si ripristina dopo il disegno dei dati, per ogni
+  area scorrevole (non solo la finestra). I componenti standard (§16.4) lo fanno da soli:
+  nessuna schermata scrive codice proprio per questo. Nel prototipo: `CRM.naviga`,
+  `CRM.registra`, `CRM.indietro` in `componenti.js`.
 
 ## 8. API endpoint
 
@@ -1463,8 +1508,10 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 | **Tabs** | schede | id, etichetta, icona, badge |
 | **Pannello** | card con testata | titolo, icona, azioni, piede |
 | **Form / FormModal** | moduli e finestre modali | campi (`nome`, `etichetta`, `tipo`, `opzioni`, `col`, `obbligatorio`, `aiuto`, `onChange`), pulsante / `onConferma` |
-| **Intestazione** | testata pagina | titolo, icona, sottotitolo, briciole, azioni |
+| **Intestazione** | testata pagina | titolo, icona, sottotitolo, briciole, azioni; pulsante **"Torna a …"** automatico (§7.12) |
 | **Stepper**, **Nota**, badge | passi di stato, note, stati | — |
+| **FinestraAffiancata** | documento a sinistra, dati a destra, divisore trascinabile; usata da "Correggi i dati letti" (§6.5) e dalla consultazione dei documenti della pratica (§7.3) | titolo, sottotitolo, larghezza iniziale, `sinistra(host)`, `destra(host)`, azioni del piede |
+| **Elenco** | liste semplici (documenti, registro) | voci (testo, destra, `onClick` facoltativo: voce cliccabile anche da tastiera) |
 | **CampoRicerca** + **RicercaEntita** | ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, articolo (articoli già usati dal fornitore: un articolo nuovo è ammesso col pallino rosso), pratica, fattura/nota di credito | autocompletamento con le prime 5 voci, lente / F4 che apre la maschera di ricerca (FilterBar + DataTable), pallino verde/rosso se il valore esiste in anagrafica; entità definite una volta (voci da `/api/lookup/*`, chiave, testo, colonne, filtri, contesto) |
 
 **Comportamento fisso della DataTable** (uguale in ogni schermata):
@@ -1472,7 +1519,9 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 - **intestazione fissa**, **solo le righe scorrono**; riga totali fissa in fondo;
 - **intestazioni ordinabili** (clic: crescente ▲ / decrescente ▼), ordinamento corretto per numeri, importi e date;
 - piede con conteggio ("N righe" o "1–20 di N" con paginazione);
-- non scende mai sotto ~3 righe visibili: se lo spazio manca scorre la scheda o la pagina.
+- non scende mai sotto ~3 righe visibili: se lo spazio manca scorre la scheda o la pagina;
+- **ricorda ordinamento e scorrimento** per ogni passo della cronologia; FilterBar e KpiRow
+  ricordano i valori scelti (§7.12).
 
 **Layout:** la pagina è alta quanto lo schermo; intestazione, filtri, KPI e note hanno
 altezza propria, l'elemento "riempi" (di norma la DataTable) prende il resto. Sotto i

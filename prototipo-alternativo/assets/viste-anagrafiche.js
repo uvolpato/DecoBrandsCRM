@@ -256,7 +256,7 @@
   }
   CRM.rotta(/^\/clienti$/, () => vistaClienti(null));
   CRM.rotta(/^\/clienti\/(\w+)$/, piva => vistaClienti(piva));
-  CRM.rotta(/^\/abbinamenti$/, () => { location.hash = '#/clienti'; });
+  CRM.rotta(/^\/abbinamenti$/, () => { location.replace('#/clienti'); });
 
   /* Agenzia del cliente: il cliente è fisso, si sceglie fornitore e subagente con i campi di ricerca. */
   function modificaAgenzia(c, a) {

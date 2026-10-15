@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.1 — Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.2 — Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -102,6 +102,7 @@
               <li class="nav-item"><a class="nav-link" href="#sec-7-9">7.9 Documenti (/documenti)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-10">7.10 Schema dei flussi e navigazione tra le schermate</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-11">7.11 Log eventi applicativi (/eventi)</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-12">7.12 Navigazione: ritorno alla schermata precedente, nello stesso punto</a></li>
             </ul>
           </li>
           <li class="nav-item">
@@ -154,7 +155,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.1 — <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.2 — <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -402,7 +403,8 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).</p>
 indirizzo, codice Integra) arrivano <strong>solo da Integra</strong>, come tutti i dati anagrafici: il
 CRM non li crea né li modifica, e un cliente nuovo si censisce in Integra. Il CRM gestisce
 soltanto i <strong>propri</strong> dati: condizioni e percentuali dei fornitori (§4.2.1–4.2.2), agenzie
-dei clienti (<code>interscambio</code>, §4.2.6) e subagenti. L'import da Integra è periodico e
+dei clienti (<code>interscambio</code>, §4.2.6) e subagenti. <strong>I subagenti non sono in Integra</strong>: la
+loro anagrafica si gestisce per intero nel CRM (CRUD completo). L'import da Integra è periodico e
 aggiorna i campi anagrafici senza toccare i dati del CRM.</p>
 <p><strong>Ordini cliente vs ordini fornitore: restano separati.</strong> Gli ordini dei clienti
 (<code>ordini_cliente_testata</code> / <code>ordini_cliente_articoli</code>) e le pratiche ordine a fornitore
@@ -1831,6 +1833,22 @@ verificata nella prova F0-A6. Il server è a carico del cliente.</p>
     evidenziato e righe di articoli aggiunti/tolti; in coda le <strong>note di credito</strong> e lo
     <strong>scostamento complessivo</strong> della pratica (§5.8).</li>
 <li>Cambio stato guidato con accesso alla fase successiva.</li>
+<li><strong>Consultazione dei documenti affiancata al confronto</strong> (componente FinestraAffiancata,
+  stesso schema di "Correggi i dati letti", §6.5, ma in sola lettura):</li>
+<li>si apre con clic su un documento dell'elenco, con <em>Consulta affiancati</em> o con clic su
+    una riga del confronto fasi (in quel caso apre l'ultimo documento con la riga già
+    evidenziata);</li>
+<li><strong>a sinistra</strong> il PDF originale, sopra di esso le <strong>schede dei documenti</strong> della
+    pratica (ordine, conferma, fatture, note di credito) per passare dall'uno all'altro
+    senza chiudere la finestra (anche con ← →);</li>
+<li><strong>a destra</strong> i dati del documento (numero, data, importo) e il <strong>confronto riga per
+    riga</strong> con un altro documento della pratica, scelto in "Confrontato con": di norma la
+    fase precedente (conferma ↔ ordine, fattura ↔ conferma, nota di credito ↔ fattura
+    stornata indicata nel riferimento); differenza totale e numero di righe che cambiano;
+    segmenti <em>Solo righe che cambiano / Tutte le righe</em>; DataTable con le colonne dei due
+    documenti (q.tà × prezzo e importo) e la differenza;</li>
+<li><strong>selezionando una riga</strong> la si vede evidenziata nel documento a sinistra (posizione
+    restituita dalla lettura, §6.5); divisore trascinabile; Esc chiude.</li>
 </ul>
 <h3 id="sec-7-4">7.4 Anagrafica fornitori (<code>/fornitori</code>, <code>/fornitori/:id</code>)</h3>
 <ul>
@@ -1964,6 +1982,33 @@ comune di ingresso documenti del CRM (§6.5).</p>
 <li>Dettagli di progettazione in §15.</li>
 </ul>
 
+<h3 id="sec-7-12">7.12 Navigazione: ritorno alla schermata precedente, nello stesso punto</h3>
+<p>Regola valida per <strong>tutte</strong> le schermate. Da qualunque schermata si apre un'altra (es.
+da Clienti si apre una pratica, da una pratica un documento, dal fornitore un cliente) si
+deve <strong>poter sempre tornare indietro e ritrovare la schermata esattamente com'era</strong>.</p>
+<ul>
+<li><strong>Pulsante "‹ Torna a <schermata precedente>"</strong> in testa alla pagina, sopra le briciole,
+  presente quando esiste una schermata precedente dell'app; equivale al tasto Indietro del
+  browser (Alt + ←), che deve dare lo stesso risultato.</li>
+<li><strong>Cosa si ripristina:</strong> filtri (FilterBar: segmenti, ricerca, select), riquadri KPI
+  selezionati, <strong>ordinamento</strong> di ogni DataTable, <strong>posizione di scorrimento</strong> di ogni area
+  scorrevole (righe della DataTable, pannelli, pagina) ed elemento selezionato (già
+  nell'indirizzo, es. <code>/clienti/:piva</code>).</li>
+<li><strong>Ogni passo della cronologia ha la sua memoria</strong>: la stessa schermata aperta due volte
+  in momenti diversi ricorda due stati distinti. Lo stato vale per la sessione del
+  browser (sopravvive al ricaricamento della pagina, non al login successivo).</li>
+<li>Dopo un <strong>salvataggio</strong> che ridisegna la schermata (es. aggiungi agenzia) filtri,
+  ordinamento e scorrimento restano dove erano.</li>
+<li>I reindirizzamenti (es. vecchi indirizzi) <strong>sostituiscono</strong> il passo nella cronologia,
+  non ne aggiungono uno, così Indietro non rimbalza.</li>
+<li><strong>Implementazione nell'app (React):</strong> lo stato di filtri, ordinamento e selezioni sta
+  nell'indirizzo (query string, es. <code>?stato=aperte&amp;q=OF&amp;ord=importo.desc</code>) oppure in un
+  archivio per voce di cronologia (<code>history.state</code> / <code>location.key</code> di React Router);
+  lo scorrimento si salva all'uscita e si ripristina dopo il disegno dei dati, per ogni
+  area scorrevole (non solo la finestra). I componenti standard (§16.4) lo fanno da soli:
+  nessuna schermata scrive codice proprio per questo. Nel prototipo: <code>CRM.naviga</code>,
+  <code>CRM.registra</code>, <code>CRM.indietro</code> in <code>componenti.js</code>.</li>
+</ul>
 </section>
 <section id="sec-8">
 <h2>8. API endpoint</h2>
@@ -3218,12 +3263,22 @@ stessi nomi e gli stessi parametri</strong> (attività F0-A4).</p>
 <tr>
 <td><strong>Intestazione</strong></td>
 <td>testata pagina</td>
-<td>titolo, icona, sottotitolo, briciole, azioni</td>
+<td>titolo, icona, sottotitolo, briciole, azioni; pulsante <strong>"Torna a …"</strong> automatico (§7.12)</td>
 </tr>
 <tr>
 <td><strong>Stepper</strong>, <strong>Nota</strong>, badge</td>
 <td>passi di stato, note, stati</td>
 <td>—</td>
+</tr>
+<tr>
+<td><strong>FinestraAffiancata</strong></td>
+<td>documento a sinistra, dati a destra, divisore trascinabile; usata da "Correggi i dati letti" (§6.5) e dalla consultazione dei documenti della pratica (§7.3)</td>
+<td>titolo, sottotitolo, larghezza iniziale, <code>sinistra(host)</code>, <code>destra(host)</code>, azioni del piede</td>
+</tr>
+<tr>
+<td><strong>Elenco</strong></td>
+<td>liste semplici (documenti, registro)</td>
+<td>voci (testo, destra, <code>onClick</code> facoltativo: voce cliccabile anche da tastiera)</td>
 </tr>
 <tr>
 <td><strong>CampoRicerca</strong> + <strong>RicercaEntita</strong></td>
@@ -3237,7 +3292,9 @@ stessi nomi e gli stessi parametri</strong> (attività F0-A4).</p>
 - <strong>intestazione fissa</strong>, <strong>solo le righe scorrono</strong>; riga totali fissa in fondo;
 - <strong>intestazioni ordinabili</strong> (clic: crescente ▲ / decrescente ▼), ordinamento corretto per numeri, importi e date;
 - piede con conteggio ("N righe" o "1–20 di N" con paginazione);
-- non scende mai sotto ~3 righe visibili: se lo spazio manca scorre la scheda o la pagina.</p>
+- non scende mai sotto ~3 righe visibili: se lo spazio manca scorre la scheda o la pagina;
+- <strong>ricorda ordinamento e scorrimento</strong> per ogni passo della cronologia; FilterBar e KpiRow
+  ricordano i valori scelti (§7.12).</p>
 <p><strong>Layout:</strong> la pagina è alta quanto lo schermo; intestazione, filtri, KPI e note hanno
 altezza propria, l'elemento "riempi" (di norma la DataTable) prende il resto. Sotto i
 992 px la pagina torna a flusso naturale e le tabelle hanno altezza massima 65vh.</p>

@@ -82,6 +82,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .testa h1 { font-size: 22px; font-weight: 700; }
 .testa .testa-badge { display: inline-block; vertical-align: 4px; }
 .testa .sotto { color: var(--testo-tenue); margin-top: 4px; max-width: 90ch; }
+.torna { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 6px -6px; padding: 3px 8px 3px 4px; border: 0; border-radius: 6px; background: none; color: var(--primario); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.torna:hover { background: var(--primario-tenue, rgba(0,102,255,.08)); }
+.torna:focus-visible { outline: 2px solid var(--primario); outline-offset: 1px; }
+.torna svg { width: 16px; height: 16px; }
+.torna + .percorso { display: inline-block; margin-left: 10px; }
 .percorso { font-size: 13px; color: var(--testo-tenue); margin-bottom: 6px; }
 .percorso a { color: var(--testo-tenue); }
 .testa-azioni { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -490,3 +495,15 @@ a.m-cella:hover { background: #f1f6ff; }
 .abbina-altra .ricerca { flex: 1 1 280px; max-width: 420px; }
 .abbina-altra .ricerca-testo { font: inherit; padding: 6px 8px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); }
 .ricerca > .pallino { width: 9px; height: 9px; min-height: 0; align-self: center; padding: 0; }
+
+/* Elenco con voci cliccabili */
+.elenco li.cliccabile { cursor: pointer; border-radius: 6px; margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+.elenco li.cliccabile:hover { background: var(--primario-tenue); }
+.elenco li.cliccabile:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; }
+/* Consulta documenti: schede dei documenti sopra la pagina */
+.aff-schede { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.aff-schede button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 12px; border: 1px solid var(--bordo, #dee2e6); border-radius: 8px; background: #fff; font: inherit; font-size: 12px; color: var(--testo-tenue); cursor: pointer; }
+.aff-schede button span { font-size: 13px; font-weight: 600; color: var(--testo, #212529); }
+.aff-schede button[aria-selected="true"] { border-color: var(--primario); background: var(--primario-tenue); color: var(--primario-testo); }
+.aff-schede button:focus-visible { outline: 2px solid var(--primario); outline-offset: 1px; }
+.dt tbody tr.selezionata td { background: var(--primario-tenue); }

@@ -35,6 +35,7 @@
     abbinamenti: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
     componenti: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     cerca: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    indietro: '<path d="M15 18l-6-6 6-6"/>',
     spunta: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
     scarica: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
@@ -339,10 +340,13 @@
      ========================================================= */
   CRM.Intestazione = function (host, opz) {
     const h = el('header', 'testa');
+    const ind = CRM.indietro();
     h.innerHTML = '<div>' +
+      (ind ? '<button type="button" class="torna" title="Torna alla schermata precedente, con filtri e posizione (Alt + ←)">' + CRM.icona('indietro') + 'Torna a ' + esc(ind.titolo) + '</button>' : '') +
       (opz.briciole ? '<nav class="percorso" aria-label="Percorso">' + opz.briciole.map(x => x.href ? '<a href="' + x.href + '">' + esc(x.etichetta) + '</a>' : '<span>' + esc(x.etichetta) + '</span>').join(' › ') + '</nav>' : '') +
       '<h1>' + (opz.titoloHtml || esc(opz.titolo)) + (opz.badge ? ' <span class="testa-badge">' + opz.badge + '</span>' : '') + '</h1>' +
       (opz.sottotitolo ? '<div class="sotto">' + opz.sottotitolo + '</div>' : '') + '</div><div class="testa-azioni"></div>';
+    if (ind) $('.torna', h).addEventListener('click', ind.vai);
     const az = $('.testa-azioni', h);
     (opz.azioni || []).forEach(a => {
       const b = el(a.href ? 'a' : 'button', 'btn ' + (a.variante && a.variante !== 'primario' ? a.variante : ''), (a.icona ? CRM.icona(a.icona) : '') + esc(a.etichetta));
@@ -410,6 +414,8 @@
     ospite(host).appendChild(box);
     let righe = opz.righe || [];
     let ord = opz.ordinamentoIniziale || null;
+    const ordR = CRM.registra('ord', () => ord);
+    if (ordR !== undefined) ord = ordR;
     const cols = opz.colonne.map(c => {
       const t = TIPI[c.tipo || 'testo'];
       const val = c.valore || (r => r[c.key]);
@@ -462,8 +468,11 @@
   CRM.FilterBar = function (host, opz) {
     const bar = el('div', 'filtri');
     const val = {};
+    const rip = CRM.registra('filtri', () => Object.assign({}, val));
+    let cambiati = false;
     opz.campi.forEach(c => {
       val[c.nome] = c.valore != null ? String(c.valore) : (c.tipo === 'segmenti' ? String(c.opzioni[0].value) : '');
+      if (rip && rip[c.nome] != null && rip[c.nome] !== val[c.nome] && (c.tipo === 'cerca' || c.opzioni.some(o => String(o.value) === rip[c.nome]))) { val[c.nome] = rip[c.nome]; cambiati = true; }
       if (c.tipo === 'segmenti') {
         const g = el('div', 'segmenti');
         g.setAttribute('role', 'tablist');
@@ -486,6 +495,7 @@
       }
     });
     ospite(host).appendChild(bar);
+    if (cambiati) CRM.dopoDisegno(() => opz.onChange(Object.assign({}, val)));
     return { el: bar, valori: () => Object.assign({}, val) };
   };
 
@@ -504,6 +514,12 @@
         '<span class="kpi-etichetta">' + esc(v.etichetta) + '</span><span class="kpi-valore ' + (typeof v.valore === 'number' ? CRM.classeSegno(Math.min(0, v.valore)) : '') + '">' + (typeof v.valore === 'number' ? M.euro(v.valore) : esc(v.valore)) + '</span>' +
         (v.dettagli || []).map(d => '<span class="kpi-dettaglio' + (d.variante ? ' d-' + d.variante : '') + '">' + esc(d.testo) + '</span>').join('') + '</' + tag + '>';
     }).join('');
+    if (opz.onSeleziona) {
+      const sel = () => { const b = $('button.kpi[aria-pressed="true"]', row); return b ? b.dataset.id : null; };
+      const rip = CRM.registra('kpi', sel);
+      if (rip !== undefined && rip !== (opz.selezionata == null ? null : String(opz.selezionata)) && (rip === null || $('button.kpi[data-id="' + rip + '"]', row)))
+        CRM.dopoDisegno(() => { $$('button.kpi', row).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.id === rip))); opz.onSeleziona(rip); });
+    }
     if (opz.onSeleziona) $$('button.kpi', row).forEach(b => b.addEventListener('click', () => {
       const id = b.getAttribute('aria-pressed') === 'true' ? null : b.dataset.id;
       $$('button.kpi', row).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.id === id)));
@@ -534,7 +550,8 @@
   /* ---------- Elenco semplice (registro, documenti) ----------
      voci: [{ testo (html), destra (html) }], vuoto */
   CRM.Elenco = function (host, voci, vuoto) {
-    const ul = el('ul', 'elenco', voci.length ? voci.map(v => '<li><span>' + v.testo + '</span>' + (v.destra != null ? '<span class="destra">' + v.destra + '</span>' : '') + '</li>').join('') : '<li class="testo-tenue">' + esc(vuoto || 'Nessun elemento') + '</li>');
+    const ul = el('ul', 'elenco', voci.length ? voci.map((v, i) => '<li' + (v.onClick ? ' class="cliccabile" tabindex="0" role="button" data-i="' + i + '"' + (v.titolo ? ' title="' + esc(v.titolo) + '"' : '') : '') + '><span>' + v.testo + '</span>' + (v.destra != null ? '<span class="destra">' + v.destra + '</span>' : '') + '</li>').join('') : '<li class="testo-tenue">' + esc(vuoto || 'Nessun elemento') + '</li>');
+    $$('li[data-i]', ul).forEach(li => { const v = voci[Number(li.dataset.i)]; li.addEventListener('click', ev => { if (!ev.target.closest('a')) v.onClick(); }); li.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); v.onClick(); } }); });
     ospite(host).appendChild(ul);
     return ul;
   };
@@ -745,10 +762,49 @@
   /* ---------- Rotte (#/percorso) ---------- */
   const ROTTE = [];
   CRM.rotta = (re, fn) => ROTTE.push({ re: re, fn: fn });
+  /* ---------- Memoria della schermata ----------
+     Ogni passo della cronologia (history.state.crm = n) ricorda come l'utente ha lasciato la
+     schermata: filtri (FilterBar), riquadri selezionati (KpiRow), ordinamento (DataTable) e
+     posizione di scorrimento di ogni area. Tornando indietro (pulsante "Torna a…", tasto
+     Indietro del browser o ridisegno dopo un salvataggio) tutto viene ripristinato.
+     I componenti si registrano in ordine di creazione: stessa schermata → stesso indice. */
+  const MEM = (() => { try { return JSON.parse(sessionStorage.getItem('crm-memoria')) || {}; } catch (e) { return {}; } })();
+  let contatore = Object.keys(MEM).reduce((x, k) => Math.max(x, Number(k) || 0), 0);
+  let voce = null, registro = [], differiti = [];
+  CRM._mem = { ripristino: null };
+  CRM.registra = (tipo, leggi) => { const i = registro.filter(x => x.tipo === tipo).length; registro.push({ tipo: tipo, leggi: leggi }); const r = CRM._mem.ripristino; return r && r[tipo] ? r[tipo][i] : undefined; };
+  CRM.dopoDisegno = fn => differiti.push(fn);
+  const percorso = n => { const out = []; const radice = $('#principale'); while (n && n !== radice) { out.unshift(Array.prototype.indexOf.call(n.parentNode.children, n)); n = n.parentNode; } return out; };
+  const risolvi = p => p.reduce((n, i) => n && n.children[i], $('#principale'));
+  function cattura() {
+    const st = { scorri: [] };
+    registro.forEach(x => { (st[x.tipo] = st[x.tipo] || []).push(x.leggi()); });
+    $$('#principale *').forEach(n => { if (n.scrollTop || n.scrollLeft) st.scorri.push({ p: percorso(n), t: n.scrollTop, l: n.scrollLeft }); });
+    st.pagina = (document.scrollingElement || document.documentElement).scrollTop;
+    return st;
+  }
+  function salvaMemoria() { try { sessionStorage.setItem('crm-memoria', JSON.stringify(MEM)); } catch (e) { /* memoria solo per la sessione */ } }
+  CRM.indietro = () => { const st = history.state; return st && st.prec && MEM[st.prec] ? { titolo: MEM[st.prec].titolo, vai: () => history.back() } : null; };
   CRM.naviga = function () {
+    if (voce && MEM[voce.n]) { MEM[voce.n].stato = cattura(); }
     const h = (location.hash || '#/').slice(1);
-    for (const r of ROTTE) { const m = h.match(r.re); if (m) { r.fn.apply(null, m.slice(1)); return; } }
-    location.hash = '#/';
+    let st = history.state, n;
+    if (st && st.crm) n = st.crm;
+    else { n = ++contatore; history.replaceState({ crm: n, prec: voce ? voce.n : null }, ''); }
+    const ritorno = MEM[n] && MEM[n].hash === h ? MEM[n].stato : null;
+    CRM._mem.ripristino = ritorno; registro = []; differiti = [];
+    const r = ROTTE.find(x => h.match(x.re));
+    if (!r) { location.replace('#/'); return; }
+    r.fn.apply(null, h.match(r.re).slice(1));
+    differiti.forEach(fn => fn());
+    if (ritorno) {
+      ritorno.scorri.forEach(x => { const el = risolvi(x.p); if (el) { el.scrollTop = x.t; el.scrollLeft = x.l; } });
+      (document.scrollingElement || document.documentElement).scrollTop = ritorno.pagina || 0;
+    }
+    CRM._mem.ripristino = null;
+    voce = { n: n }; MEM[n] = { hash: h, titolo: (document.title || '').replace(/ · Decobrands$/, ''), stato: MEM[n] && MEM[n].stato };
+    salvaMemoria();
   };
+  window.addEventListener('beforeunload', () => { if (voce && MEM[voce.n]) { MEM[voce.n].stato = cattura(); salvaMemoria(); } });
   window.addEventListener('hashchange', CRM.naviga);
 })();
