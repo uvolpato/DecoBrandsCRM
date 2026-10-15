@@ -27,6 +27,7 @@
             case 'da_verificare': return { href: '#/bollettini/' + c.b.id, stato: CRM.stato('attesa', c.aperte + (c.aperte === 1 ? ' riga da decidere' : ' righe da decidere')), valore: imp(c.b) };
             case 'pronto': return { href: '#/bollettini/' + c.b.id, stato: CRM.stato('primario', 'Pronto da chiudere'), valore: imp(c.b) };
             case 'mancante': return { stato: CRM.stato('errore', 'Non arrivato'), azione: { etichetta: 'Sollecita', onClick: () => sollecitoBollettino(f, m) } };
+            case 'atteso': return { stato: CRM.stato('neutro', 'Atteso entro il ' + M.data(c.entro).slice(0, 5)) };
             case 'in_corso': return { vuota: 'Mese in corso' };
             default: return { vuota: 'Nessuna fattura' };
           }

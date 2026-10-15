@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 2.3 — pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 2.4 — bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -209,6 +209,7 @@ delle provvigioni.
 | `piva` | VARCHAR(20) | univoco se valorizzato; da Integra, sola lettura |
 | `codice_integra` | VARCHAR(20) UNIQUE | codice del fornitore in Integra, chiave dell'import |
 | `giorni_attesa_conferma` | INT DEFAULT 30 | usato per le scadenze |
+| `giorno_bollettino` | SMALLINT DEFAULT 10, CHECK 1–28 | giorno del **mese successivo** entro cui il fornitore manda il bollettino; prima è "atteso", dopo "non arrivato" con sollecito (§5.6) |
 | `payment_type` | VARCHAR(20) DEFAULT `'invoiced'` | `matured` \| `invoiced` — maturazione provvigioni (**§5.5**) |
 | `discount` | NUMERIC(5,2) DEFAULT 0 | sconto di default del fornitore (ridondante, vedi §4.4) |
 | `note` | TEXT | |
@@ -586,6 +587,16 @@ che paga ai subagenti: maturato→maturato, fatturato→fatturato.
   (`fornitore_id`, `mese`, `anno`). Un fornitore con cadenza diversa sarà rimosso.
 - Il bollettino è la base **mensile**; la **liquidazione ai subagenti** resta
   trimestrale (§6.3) aggregando i bollettini del trimestre di competenza.
+- **Quando si aspetta il bollettino.** Il bollettino del mese *m* è atteso entro il
+  giorno `fornitori.giorno_bollettino` (1–28, iniziale **10** per tutti, modificabile
+  nelle condizioni del fornitore) del mese *m + 1*. Stato del mese per fornitore, quando
+  ci sono documenti fiscali del mese e il bollettino non è registrato:
+  - mese non finito → *in corso* (nessuna segnalazione);
+  - mese finito, oggi ≤ data attesa → **atteso** (compare in "Prossime scadenze", §7.1,
+    e nella matrice bollettini come "Atteso entro il gg/mm"; **nessun sollecito**);
+  - oggi > data attesa → **non arrivato**: compare in "Da fare" come *Sollecita il
+    bollettino* e nella matrice con l'azione *Sollecita*.
+  Senza documenti fiscali nel mese il bollettino non è atteso.
 
 ### 5.7 Riferimento cliente → fornitore e sconto
 
@@ -964,10 +975,11 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
     controllare, da scegliere o verificare) e **solo** i documenti che chiedono una
     decisione (abbinamento non sicuro, cliente non riconosciuto, doppioni, lettura non
     affidabile); azione *Apri la coda* (§7.9);
-  - **Bollettini**: da verificare, pronti da chiudere, mancanti da sollecitare.
+  - **Bollettini**: da verificare, pronti da chiudere, **non arrivati** dopo il giorno
+    atteso del fornitore, da sollecitare (§5.6).
 - **Colonna destra rivolta al futuro**:
   - **Prossime scadenze** (15 giorni): conferme attese, bollettini del mese precedente
-    attesi entro il 10, fine del trimestre; ogni voce porta alla pagina relativa;
+    attesi entro il giorno del fornitore (§5.6), fine del trimestre; ogni voce porta alla pagina relativa;
   - **trimestre in corso**: atteso dai fornitori, già riconosciuto, da liquidare,
     bloccato in attesa dei bollettini;
   - **ultime operazioni** (5, compatte).
@@ -1022,8 +1034,8 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
 
 - Elenco con n° scaglioni e ordini aperti.
 - Anagrafica (ragione sociale, P.IVA, codice Integra) **da Integra in sola lettura**;
-  nel CRM si modificano solo le condizioni: giorni attesa conferma, `payment_type`
-  (maturato/fatturato), note, attivo.
+  nel CRM si modificano solo le condizioni: giorni attesa conferma, **giorno entro cui
+  arriva il bollettino** (§5.6), `payment_type` (maturato/fatturato), note, attivo.
 - Tabella in sola lettura **"Clienti seguiti per <fornitore>"** (vista inversa delle
   agenzie, §7.6).
 - Dettaglio con **tabella scaglioni** editabile (sconto min/max, % agente, % subagente);
@@ -1059,6 +1071,8 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
 
 - Elenco con filtro stato; colonne: fornitore, mese/anno, n° righe, riconosciuto,
   calcolato, **totale differenze** (evidenziato se ≠ 0).
+- Matrice fornitore × mese (prototipo): verificato, da decidere, pronto da chiudere,
+  **atteso entro il gg/mm**, **non arrivato** con *Sollecita*, mese in corso (§5.6).
 - Dettaglio: righe con fattura, cliente, merce, riconosciuto/calcolato e `differenza`
   evidenziata; azioni: aggiungi/elimina riga, **conferma importo fornitore o modifica
   manuale** (§5.13), passa a `verificato`/`contestato`.
@@ -1404,7 +1418,7 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
-| POST `/api/fornitori` | `crud` | `create` | `fornitore` | `successo` | `{etichetta: ragione_sociale, p_iva, giorni_attesa_conferma, payment_type, attivo}` |
+| POST `/api/fornitori` | `crud` | `create` | `fornitore` | `successo` | `{etichetta: ragione_sociale, p_iva, giorni_attesa_conferma, giorno_bollettino, payment_type, attivo}` |
 | PUT `/api/fornitori/:id` | `crud` | `update` | `fornitore` | `successo` | `{etichetta, prima: {…campi cambiati}, dopo: {…}}` |
 | POST `/api/fornitori/:id/scaglioni` | `crud` | `create` | `scaglione` | `successo` | `{etichetta: sconto min–max, fornitore_id, sconto_min, sconto_max, pct_agente, pct_subagente}` |
 | DELETE `/api/scaglioni/:id` | `crud` | `delete` | `scaglione` | `successo` | `{etichetta, scaglione_id, fornitore_id, sconto_min, sconto_max, pct_agente, pct_subagente}` |

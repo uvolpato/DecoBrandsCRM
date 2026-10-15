@@ -31,9 +31,9 @@ window.DATI_DEMO = {
   /* maturazione: 'maturato' = il fornitore paga quando incassa (la provvigione matura quando
      la riconosce nel bollettino); 'fatturato' = paga sull'emissione della fattura. */
   fornitori: [
-    { id: 1, nome: 'Gries GmbH & Co. KG', breve: 'Gries', piva: 'DE123456789', codice_integra: 'F00031', paese: 'Germania', giorni_conferma: 21, maturazione: 'maturato', attivo: true },
-    { id: 2, nome: 'Gasper GmbH', breve: 'Gasper', piva: 'DE987654321', codice_integra: 'F00047', paese: 'Germania', giorni_conferma: 30, maturazione: 'fatturato', attivo: true },
-    { id: 3, nome: 'Ing\'s Christmas Decor GmbH', breve: 'Ing\'s', piva: 'DE555111222', codice_integra: 'F00052', paese: 'Germania', giorni_conferma: 14, maturazione: 'fatturato', attivo: true }
+    { id: 1, nome: 'Gries GmbH & Co. KG', breve: 'Gries', piva: 'DE123456789', codice_integra: 'F00031', paese: 'Germania', giorni_conferma: 21, giorno_bollettino: 10, maturazione: 'maturato', attivo: true },
+    { id: 2, nome: 'Gasper GmbH', breve: 'Gasper', piva: 'DE987654321', codice_integra: 'F00047', paese: 'Germania', giorni_conferma: 30, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true },
+    { id: 3, nome: 'Ing\'s Christmas Decor GmbH', breve: 'Ing\'s', piva: 'DE555111222', codice_integra: 'F00052', paese: 'Germania', giorni_conferma: 14, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true }
   ],
 
   /* Scaglioni: per sconto concesso al cliente, con data di validità (le percentuali possono

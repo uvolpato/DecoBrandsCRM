@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.3 — pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.4 — bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -156,7 +156,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.3 — pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.4 — bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -460,6 +460,11 @@ delle provvigioni.</p>
 <td><code>giorni_attesa_conferma</code></td>
 <td>INT DEFAULT 30</td>
 <td>usato per le scadenze</td>
+</tr>
+<tr>
+<td><code>giorno_bollettino</code></td>
+<td>SMALLINT DEFAULT 10, CHECK 1–28</td>
+<td>giorno del <strong>mese successivo</strong> entro cui il fornitore manda il bollettino; prima è "atteso", dopo "non arrivato" con sollecito (§5.6)</td>
 </tr>
 <tr>
 <td><code>payment_type</code></td>
@@ -1516,6 +1521,16 @@ che paga ai subagenti: maturato→maturato, fatturato→fatturato.</p>
   (<code>fornitore_id</code>, <code>mese</code>, <code>anno</code>). Un fornitore con cadenza diversa sarà rimosso.</li>
 <li>Il bollettino è la base <strong>mensile</strong>; la <strong>liquidazione ai subagenti</strong> resta
   trimestrale (§6.3) aggregando i bollettini del trimestre di competenza.</li>
+<li><strong>Quando si aspetta il bollettino.</strong> Il bollettino del mese <em>m</em> è atteso entro il
+  giorno <code>fornitori.giorno_bollettino</code> (1–28, iniziale <strong>10</strong> per tutti, modificabile
+  nelle condizioni del fornitore) del mese <em>m + 1</em>. Stato del mese per fornitore, quando
+  ci sono documenti fiscali del mese e il bollettino non è registrato:</li>
+<li>mese non finito → <em>in corso</em> (nessuna segnalazione);</li>
+<li>mese finito, oggi ≤ data attesa → <strong>atteso</strong> (compare in "Prossime scadenze", §7.1,
+    e nella matrice bollettini come "Atteso entro il gg/mm"; <strong>nessun sollecito</strong>);</li>
+<li>oggi &gt; data attesa → <strong>non arrivato</strong>: compare in "Da fare" come <em>Sollecita il
+    bollettino</em> e nella matrice con l'azione <em>Sollecita</em>.
+  Senza documenti fiscali nel mese il bollettino non è atteso.</li>
 </ul>
 <h3 id="sec-5-7">5.7 Riferimento cliente → fornitore e sconto</h3>
 <p>Ogni cliente ha un <strong>fornitore di riferimento</strong> con un <strong>codice cliente</strong> e uno
@@ -2040,10 +2055,11 @@ cruscotto di numeri (prototipo: <code>prototipo-alternativo/</code>, pagina Oggi
     controllare, da scegliere o verificare) e <strong>solo</strong> i documenti che chiedono una
     decisione (abbinamento non sicuro, cliente non riconosciuto, doppioni, lettura non
     affidabile); azione <em>Apri la coda</em> (§7.9);</li>
-<li><strong>Bollettini</strong>: da verificare, pronti da chiudere, mancanti da sollecitare.</li>
+<li><strong>Bollettini</strong>: da verificare, pronti da chiudere, <strong>non arrivati</strong> dopo il giorno
+    atteso del fornitore, da sollecitare (§5.6).</li>
 <li><strong>Colonna destra rivolta al futuro</strong>:</li>
 <li><strong>Prossime scadenze</strong> (15 giorni): conferme attese, bollettini del mese precedente
-    attesi entro il 10, fine del trimestre; ogni voce porta alla pagina relativa;</li>
+    attesi entro il giorno del fornitore (§5.6), fine del trimestre; ogni voce porta alla pagina relativa;</li>
 <li><strong>trimestre in corso</strong>: atteso dai fornitori, già riconosciuto, da liquidare,
     bloccato in attesa dei bollettini;</li>
 <li><strong>ultime operazioni</strong> (5, compatte).</li>
@@ -2098,8 +2114,8 @@ cruscotto di numeri (prototipo: <code>prototipo-alternativo/</code>, pagina Oggi
 <ul>
 <li>Elenco con n° scaglioni e ordini aperti.</li>
 <li>Anagrafica (ragione sociale, P.IVA, codice Integra) <strong>da Integra in sola lettura</strong>;
-  nel CRM si modificano solo le condizioni: giorni attesa conferma, <code>payment_type</code>
-  (maturato/fatturato), note, attivo.</li>
+  nel CRM si modificano solo le condizioni: giorni attesa conferma, <strong>giorno entro cui
+  arriva il bollettino</strong> (§5.6), <code>payment_type</code> (maturato/fatturato), note, attivo.</li>
 <li>Tabella in sola lettura <strong>"Clienti seguiti per <fornitore>"</strong> (vista inversa delle
   agenzie, §7.6).</li>
 <li>Dettaglio con <strong>tabella scaglioni</strong> editabile (sconto min/max, % agente, % subagente);
@@ -2134,6 +2150,8 @@ sono le sue <strong>agenzie</strong>: i fornitori per cui Decobrands fa da agent
 <ul>
 <li>Elenco con filtro stato; colonne: fornitore, mese/anno, n° righe, riconosciuto,
   calcolato, <strong>totale differenze</strong> (evidenziato se ≠ 0).</li>
+<li>Matrice fornitore × mese (prototipo): verificato, da decidere, pronto da chiudere,
+  <strong>atteso entro il gg/mm</strong>, <strong>non arrivato</strong> con <em>Sollecita</em>, mese in corso (§5.6).</li>
 <li>Dettaglio: righe con fattura, cliente, merce, riconosciuto/calcolato e <code>differenza</code>
   evidenziata; azioni: aggiungi/elimina riga, <strong>conferma importo fornitore o modifica
   manuale</strong> (§5.13), passa a <code>verificato</code>/<code>contestato</code>.</li>
@@ -2778,7 +2796,7 @@ sempre salvato nella chiave <code>etichetta</code> del dettaglio (§15.4).</p>
 <td><code>create</code></td>
 <td><code>fornitore</code></td>
 <td><code>successo</code></td>
-<td><code>{etichetta: ragione_sociale, p_iva, giorni_attesa_conferma, payment_type, attivo}</code></td>
+<td><code>{etichetta: ragione_sociale, p_iva, giorni_attesa_conferma, giorno_bollettino, payment_type, attivo}</code></td>
 </tr>
 <tr>
 <td>PUT <code>/api/fornitori/:id</code></td>

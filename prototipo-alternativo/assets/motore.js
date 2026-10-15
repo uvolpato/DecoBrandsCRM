@@ -166,6 +166,12 @@
   };
 
   /* Stato della casella fornitore × mese nella vista Bollettini. */
+  /* Data entro cui è atteso il bollettino del mese m: giorno_bollettino del mese successivo (default 10). */
+  M.bollettinoAtteso = function (fid, a, m) {
+    const g = Math.min(28, Math.max(1, Number(M.fornitore(fid).giorno_bollettino) || 10));
+    const am = m === 12 ? a + 1 : a, mm = m === 12 ? 1 : m + 1;
+    return am + '-' + String(mm).padStart(2, '0') + '-' + String(g).padStart(2, '0');
+  };
   M.casellaBollettino = function (fid, a, m) {
     const b = M.bollettinoDi(fid, a, m);
     const docs = M.fiscaliDelMese(fid, a, m);
@@ -177,7 +183,10 @@
       return { tipo: r.aperte ? 'da_verificare' : 'pronto', b: b, aperte: r.aperte };
     }
     if (!finito) return { tipo: 'in_corso', documenti: docs.length };
-    return docs.length ? { tipo: 'mancante', documenti: docs.length } : { tipo: 'non_atteso' };
+    if (!docs.length) return { tipo: 'non_atteso' };
+    // il bollettino si sollecita solo dopo il giorno in cui il fornitore lo manda di solito (condizioni del fornitore)
+    const entro = M.bollettinoAtteso(fid, a, m);
+    return M.oggi() <= entro ? { tipo: 'atteso', documenti: docs.length, entro: entro } : { tipo: 'mancante', documenti: docs.length, entro: entro };
   };
 
   /* Il documento è riconosciuto dal fornitore in un bollettino verificato? (serve per il maturato) */
@@ -405,12 +414,11 @@
       const s = M.statoPratica(p);
       if (s.chiave === 'attesa' && s.scadenza <= fino) out.push({ data: s.scadenza, testo: 'Conferma attesa di ' + p.numero, dettaglio: M.fornitore(p.fornitore_id).breve + ' · ' + M.nomeCliente(p.cliente_piva), link: '#/pratiche/' + p.id });
     });
-    // bollettino del mese scorso: atteso entro il 10 del mese
+    // bollettino del mese scorso: atteso entro il giorno indicato nelle condizioni del fornitore
     const a = Number(oggi.slice(0, 4)), m = Number(oggi.slice(5, 7)), am = m === 1 ? a - 1 : a, mm = m === 1 ? 12 : m - 1;
-    const entro = oggi.slice(0, 8) + '10';
     M.S.fornitori.forEach(f => {
       const c = M.casellaBollettino(f.id, am, mm);
-      if (c.tipo === 'mancante' && entro >= oggi) out.push({ data: entro, testo: 'Bollettino di ' + M.meseMin(mm) + ' di ' + f.breve, dettaglio: c.documenti + (c.documenti === 1 ? ' documento atteso' : ' documenti attesi'), link: '#/bollettini' });
+      if (c.tipo === 'atteso' && c.entro <= fino) out.push({ data: c.entro, testo: 'Bollettino di ' + M.meseMin(mm) + ' di ' + f.breve, dettaglio: c.documenti + (c.documenti === 1 ? ' documento atteso' : ' documenti attesi'), link: '#/bollettini' });
     });
     const t = M.trimestre(oggi), lim = M.limiti(a, t);
     if (lim.a <= M.piuGiorni(oggi, 31)) out.push({ data: lim.a, testo: 'Fine del ' + t + '° trimestre', dettaglio: 'poi si chiude la liquidazione ai subagenti', link: '#/liquidazioni/' + a + '/' + t });

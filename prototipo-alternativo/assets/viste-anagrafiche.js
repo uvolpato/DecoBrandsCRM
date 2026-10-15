@@ -17,6 +17,7 @@
       colonne: [
         { key: 'nome', header: 'Fornitore', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === f.id ? ' ' + CRM.stato('primario', 'aperto') : '') },
         { key: 'giorni_conferma', header: 'Attesa conferma', tipo: 'numero', cell: x => x.giorni_conferma + ' giorni' },
+        { key: 'giorno_bollettino', header: 'Bollettino entro', tipo: 'numero', cell: x => 'il ' + (x.giorno_bollettino || 10) },
         { key: 'maturazione', header: 'Paga sul' },
         { key: 'pratiche', header: 'Pratiche aperte', tipo: 'numero', valore: x => M.S.pratiche.filter(p => p.fornitore_id === x.id && M.statoPratica(p).chiave !== 'fatturata').length }
       ],
@@ -33,6 +34,7 @@
       { etichetta: 'Partita IVA', valore: e(f.piva) + ' <span class="testo-tenue">· ' + e(f.paese || '') + '</span>' },
       { etichetta: 'Codice Integra', valore: e(f.codice_integra || '—') },
       { etichetta: 'Attesa della conferma', valore: f.giorni_conferma + ' giorni dall’ordine, poi parte il sollecito' },
+      { etichetta: 'Bollettino mensile', valore: 'atteso entro il ' + (f.giorno_bollettino || 10) + ' del mese successivo, poi parte il sollecito' },
       { etichetta: 'Pagamento provvigioni', valore: 'sul ' + f.maturazione + (f.maturazione === 'maturato' ? ' (quando incassa dai clienti)' : ' (all’emissione della fattura)') }
     ]);
     const perc = CRM.Pannello(dx.corpo, { titolo: 'Percentuali in vigore dal ' + M.data(vigente), senzaMargine: true,
@@ -70,10 +72,12 @@
       titolo: 'Condizioni di ' + f.breve, conferma: 'Salva condizioni', colonne: 2,
       campi: [
         { nome: 'giorni_conferma', etichetta: 'Giorni di attesa della conferma', tipo: 'numero', valore: f.giorni_conferma },
+        { nome: 'giorno_bollettino', etichetta: 'Bollettino atteso entro il giorno', tipo: 'numero', valore: f.giorno_bollettino || 10, aiuto: 'del mese successivo (1–28); dopo questa data in Oggi compare il sollecito' },
         { nome: 'maturazione', etichetta: 'Pagamento provvigioni', tipo: 'select', valore: f.maturazione, opzioni: [{ value: 'maturato', label: 'Sul maturato (incassi)' }, { value: 'fatturato', label: 'Sul fatturato' }] }
       ],
       onConferma: v => {
         f.giorni_conferma = Number(v.giorni_conferma) || f.giorni_conferma; f.maturazione = v.maturazione;
+        f.giorno_bollettino = Math.min(28, Math.max(1, Number(v.giorno_bollettino) || 10));
         M.annota('Condizioni di ' + f.breve + ' aggiornate'); M.salva(); CRM.Avviso('Condizioni salvate'); CRM.naviga();
       }
     });
