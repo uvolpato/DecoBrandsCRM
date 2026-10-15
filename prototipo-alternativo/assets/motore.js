@@ -38,6 +38,7 @@
     { id: 'chiudi', testo: 'Chiudere la liquidazione del trimestre', ruoli: ['amministratore', 'operatore'] },
     { id: 'scartati', testo: 'Vedere e recuperare i documenti scartati', ruoli: ['amministratore', 'operatore'] },
     { id: 'sistema', testo: 'Vedere lo stato del sistema e segnare i problemi come visti', ruoli: ['amministratore', 'operatore'] },
+    { id: 'magazzino', testo: 'Alias e kit: creare, modificare, eliminare', ruoli: ['amministratore'] },
     { id: 'gestione', testo: 'Utenti e ruoli, impostazioni, eliminazione definitiva degli scartati', ruoli: ['amministratore'] }
   ];
   M.utente = () => M.S.utenti.find(u => u.id === M.S.utente_corrente) || M.S.utenti[0];

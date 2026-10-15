@@ -908,12 +908,12 @@ window.DATI_DEMO = {
     servizi: [
       { id: 'casella', nome: 'Casella dei documenti', icona: 'posta', stato: 'ok', dove: 'documenti@decobrands.it · cartella Fornitori', ultimo: '2026-09-04T09:58', ritmo: 'ogni 2 minuti', nota: '6 allegati letti oggi' },
       { id: 'lettura', nome: 'Server di lettura (GLM-OCR)', icona: 'arrivo', stato: 'attesa', dove: 'gpu-decobrands:8080', ultimo: '2026-09-04T09:57', ritmo: 'a ogni documento', nota: 'lento: 9,8 s per pagina (di solito 4 s)' },
-      { id: 'integra', nome: 'Import anagrafiche da Integra', icona: 'abbinamenti', stato: 'errore', dove: 'cartella condivisa Integra · clienti e fornitori', ultimo: '2026-09-04T06:00', ritmo: 'ogni giorno alle 06:00', nota: '2 clienti non importati' },
+      { id: 'integra', nome: 'Sincronizzazione da Integra', icona: 'abbinamenti', stato: 'errore', dove: 'viste sul database di Integra · clienti, fornitori, articoli, giacenze, registrazioni', ultimo: '2026-09-04T09:59:40', ritmo: 'ogni 60 secondi (giacenze ogni 15)', nota: '2 clienti non sincronizzati' },
       { id: 'posta', nome: 'Posta in uscita', icona: 'posta', stato: 'ok', dove: 'smtp.office365.com · noreply@decobrands.it', ultimo: '2026-09-03T16:20', ritmo: 'a ogni invio', nota: 'ultimo invio riuscito' }
     ],
     problemi: [
-      { id: 1, quando: '2026-09-04T06:00', servizio: 'integra', livello: 'errore', testo: 'Cliente non importato: P.IVA mancante', dettaglio: 'Codice Integra C00931 «Serra Bella di Rossi M.» senza partita IVA: correggere in Integra, al prossimo import entra da solo.', visto: false },
-      { id: 2, quando: '2026-09-04T06:00', servizio: 'integra', livello: 'errore', testo: 'Cliente non importato: P.IVA già usata', dettaglio: 'Codice Integra C00944 ha la stessa P.IVA di C00412 (Vivaio Verde Azzurro): unire o correggere in Integra.', visto: false },
+      { id: 1, quando: '2026-09-04T09:12:40', servizio: 'integra', livello: 'errore', testo: 'Cliente non sincronizzato: P.IVA mancante', dettaglio: 'Codice Integra C00931 «Serra Bella di Rossi M.» senza partita IVA: correggere in Integra, alla sincronizzazione successiva entra da solo.', visto: false },
+      { id: 2, quando: '2026-09-04T09:12:40', servizio: 'integra', livello: 'errore', testo: 'Cliente non sincronizzato: P.IVA già usata', dettaglio: 'Codice Integra C00944 ha la stessa P.IVA di C00412 (Vivaio Verde Azzurro): unire o correggere in Integra.', visto: false },
       { id: 3, quando: '2026-09-04T09:41', servizio: 'lettura', livello: 'attenzione', testo: 'Lettura lenta', dettaglio: 'Ings_F-2026-0961_scansione.pdf: 3 pagine in 29 s. Se si ripete, controllare il carico della scheda video.', visto: false },
       { id: 4, quando: '2026-09-03T11:02', servizio: 'casella', livello: 'attenzione', testo: 'Allegato non leggibile', dettaglio: 'Email di ordini@gasper.de del 03/09 alle 11:01: allegato «Lieferschein.zip» non è PDF né Excel; ignorato.', visto: false },
       { id: 5, quando: '2026-08-29T08:15', servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: 'Password a luca.bianchi@decobrands.it: casella inesistente (550 5.1.1).', visto: true },
@@ -923,10 +923,10 @@ window.DATI_DEMO = {
       { quando: '2026-09-04T09:58', servizio: 'casella', esito: 'ok', testo: '1 email, 1 allegato (Gries_AB-77120.pdf)' },
       { quando: '2026-09-04T09:57', servizio: 'lettura', esito: 'attenzione', testo: 'Gries_AB-77120.pdf · 2 pagine · 19,6 s' },
       { quando: '2026-09-04T09:41', servizio: 'lettura', esito: 'attenzione', testo: 'Ings_F-2026-0961_scansione.pdf · 3 pagine · 29,4 s' },
-      { quando: '2026-09-04T06:00', servizio: 'integra', esito: 'errore', testo: '412 clienti, 18 fornitori · 3 aggiornati · 2 non importati' },
+      { quando: '2026-09-04T09:59:40', servizio: 'integra', esito: 'errore', testo: 'giacenze: 2 variazioni · clienti: 2 non sincronizzati (vedi problemi)' },
       { quando: '2026-09-03T16:20', servizio: 'posta', esito: 'ok', testo: 'Sollecito conferme a Gries GmbH & Co. KG' },
       { quando: '2026-09-03T11:01', servizio: 'casella', esito: 'attenzione', testo: '1 email · 1 allegato ignorato (Lieferschein.zip)' },
-      { quando: '2026-09-03T06:00', servizio: 'integra', esito: 'ok', testo: '412 clienti, 18 fornitori · nessuna variazione' }
+      { quando: '2026-09-04T09:58:40', servizio: 'integra', esito: 'ok', testo: 'giacenze: nessuna variazione · registrazioni: nessuna nuova' }
     ]
   },
 
@@ -936,9 +936,100 @@ window.DATI_DEMO = {
     casella: { server: 'outlook.office365.com', porta: 993, utente: 'documenti@decobrands.it', password: true, cartella: 'Fornitori', cartella_lette: 'Fornitori/Letti', minuti: 2 },
     lettura: { indirizzo: 'http://gpu-decobrands:8080/v1', modello: 'zai-org/GLM-OCR', soglia_ok: 0.90, soglia_bassa: 0.70, attesa_s: 120 },
     posta: { server: 'smtp.office365.com', porta: 587, utente: 'noreply@decobrands.it', password: true, mittente: 'Decobrands CRM <noreply@decobrands.it>' },
-    integra: { percorso: '\\\\srv-integra\\export\\anagrafiche', ora: '06:00', clienti: true, fornitori: true },
+    integra: { server: 'srv-integra', database: 'INTEGRA_DECOBRANDS', utente: 'crm_lettura', password: true, schema: 'crm_viste', secondi: 60, secondi_giacenze: 15 },
     conservazione: { eventi_mesi: 36, scartati_giorni: 90, righe_pagina: 25 }
   },
+
+  /* ---------- Vendita diretta (dalla Gestione Ordini, spec §7.18–§7.21) ----------
+     Anagrafiche da Integra (articoli, giacenze) e tabelle di conversione (alias, kit) usate
+     dall'esportazione degli ordini cliente/fornitore verso Integra. */
+  articoli: [
+    { codice: 'VASA-3050', descrizione: 'Vaso in terracotta Ø 30 cm', ean: '8001234500301', um: 'PZ' },
+    { codice: 'VASA-3050N', descrizione: 'Vaso in terracotta Ø 30 cm (nuovo codice)', ean: '8001234500318', um: 'PZ' },
+    { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', ean: '8001234500226', um: 'PZ' },
+    { codice: 'VASA-4055', descrizione: 'Vaso in terracotta Ø 40 cm', ean: '8001234500400', um: 'PZ' },
+    { codice: 'VASA-4055N', descrizione: 'Vaso in terracotta Ø 40 cm (nuovo codice)', ean: '8001234500417', um: 'PZ' },
+    { codice: 'SOGG-040', descrizione: 'Sottovaso Ø 40 cm', ean: '8001234510409', um: 'PZ' },
+    { codice: 'SOGG-0285', descrizione: 'Sottovaso in terracotta Ø 28 cm', ean: '8001234510287', um: 'PZ' },
+    { codice: 'SOGG-0332', descrizione: 'Sottovaso in terracotta Ø 33 cm', ean: '8001234510331', um: 'PZ' },
+    { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', ean: '8001234520309', um: 'PZ' },
+    { codice: 'CACH-156', descrizione: 'Coprivaso smaltato Ø 15 cm', ean: '8001234520156', um: 'PZ' },
+    { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', ean: '8001234530605', um: 'PZ' },
+    { codice: 'BALC-801', descrizione: 'Balconetta in terracotta 80 cm', ean: '8001234530803', um: 'PZ' },
+    { codice: 'KIT-BALC60', descrizione: 'Kit balconetta 60 cm con sottovaso', ean: '8001234590609', um: 'KIT' },
+    { codice: 'SOBA-60', descrizione: 'Sottobalconetta 60 cm', ean: '8001234540604', um: 'PZ' },
+    { codice: 'KIT-ORTO', descrizione: 'Kit orto rialzato completo', ean: '8001234590807', um: 'KIT' },
+    { codice: 'ORTO-TAV', descrizione: 'Tavolo da lavoro per orto rialzato', ean: '8001234550801', um: 'PZ' },
+    { codice: 'ORTO-CMP', descrizione: 'Compostiera 320 L', ean: '8001234550825', um: 'PZ' },
+    { codice: 'ORTO-TER7', descrizione: 'Terriccio universale 50 L', ean: '8001234550849', um: 'SAC' },
+    { codice: 'ANFO-448', descrizione: 'Anfora in terracotta h 44 cm', ean: '8001234560442', um: 'PZ' },
+    { codice: 'CIOT-416', descrizione: 'Ciotola in terracotta Ø 41 cm', ean: '8001234570410', um: 'PZ' },
+    { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', ean: '8001234580106', um: 'CF' },
+    { codice: 'XMAS-GHO', descrizione: 'Ghirlanda natalizia 150 cm', ean: '8001234580151', um: 'PZ' }
+  ],
+  sincronizzato: '2026-09-04T09:59:40',   // ultima sincronizzazione dalle viste di Integra
+  giacenze: [
+    { codice: 'VASA-3050', qta: 20 },
+    { codice: 'VASA-3050N', qta: 340 },
+    { codice: 'VASA-2210', qta: 180 },
+    { codice: 'VASA-4055', qta: 0 },
+    { codice: 'VASA-4055N', qta: 60 },
+    { codice: 'SOGG-040', qta: 410 },
+    { codice: 'SOGG-0285', qta: 95 },
+    { codice: 'SOGG-0332', qta: 0 },
+    { codice: 'CACH-306', qta: 42 },
+    { codice: 'CACH-156', qta: -6 },
+    { codice: 'BALC-601', qta: 130 },
+    { codice: 'BALC-801', qta: 28 },
+    { codice: 'KIT-BALC60', qta: 0 },
+    { codice: 'SOBA-60', qta: 150 },
+    { codice: 'KIT-ORTO', qta: 2 },
+    { codice: 'ORTO-TAV', qta: 14 },
+    { codice: 'ORTO-CMP', qta: 22 },
+    { codice: 'ORTO-TER7', qta: 300 },
+    { codice: 'ANFO-448', qta: 9 },
+    { codice: 'CIOT-416', qta: 36 },
+    { codice: 'XMAS-LED', qta: 500 },
+    { codice: 'XMAS-GHO', qta: 80 }
+  ],
+  /* Impegni: quantità esportate verso Integra e non ancora registrate da Integra. La giacenza
+     di Integra arriva dalla sincronizzazione; il CRM sottrae solo gli impegni ancora aperti. */
+  impegni: [
+    { quando: '2026-09-02T15:10', codice: 'VASA-2210', qta: 24, ordine: 'OC-2026-112', stato: 'registrato', registrato: '2026-09-02T15:12:20' },
+    { quando: '2026-09-02T15:10', codice: 'SOGG-040', qta: 40, ordine: 'OC-2026-112', stato: 'registrato', registrato: '2026-09-02T15:12:20' },
+    { quando: '2026-09-02T15:10', codice: 'BALC-801', qta: 12, ordine: 'OC-2026-112', stato: 'registrato', registrato: '2026-09-02T15:12:20' }
+  ],
+  alias: [
+    { id: 1, vecchio: 'VASA-3050', nuovo: 'VASA-3050N', descrizione: 'Vaso in terracotta Ø 30 cm', ean: '8001234500318', conferma: true },
+    { id: 2, vecchio: 'VASA-4055', nuovo: 'VASA-4055N', descrizione: 'Vaso in terracotta Ø 40 cm', ean: '8001234500417', conferma: false },
+    { id: 3, vecchio: 'SOGG-0332', nuovo: 'SOGG-040', descrizione: 'Sottovaso Ø 33 sostituito dal Ø 40', ean: '', conferma: true },
+    { id: 4, vecchio: 'CACH-155', nuovo: 'CACH-156', descrizione: 'Coprivaso smaltato Ø 15 cm', ean: '8001234520156', conferma: false }
+  ],
+  kit: [
+    { codice: 'KIT-BALC60', descrizione: 'Kit balconetta 60 cm con sottovaso', attivo: true, componenti: [ { codice: 'BALC-601', qta: 1 }, { codice: 'SOBA-60', qta: 1 } ] },
+    { codice: 'KIT-ORTO', descrizione: 'Kit orto rialzato completo', attivo: true, componenti: [ { codice: 'ORTO-TAV', qta: 1 }, { codice: 'ORTO-CMP', qta: 1 }, { codice: 'ORTO-TER7', qta: 4 } ] }
+  ],
+  /* Ordini dei clienti (vendita diretta): entrano dall'ingresso documenti come tipo ordine_cliente (§17). */
+  ordini_cliente: [
+    { id: 1, numero: 'OC-2026-118', data: '2026-09-03', cliente_piva: '03312450135', fornitore: 'Gries', rif_fornitore: '', ricevuto: '2026-09-03', file: 'ordine_GardenLario_118.pdf', esportato: null, righe: [
+      { n: 1, codice: 'VASA-3050', descrizione: 'Vaso in terracotta Ø 30 cm', um: 'PZ', qta: 60, prezzo: 13.90 },
+      { n: 2, codice: 'SOGG-040', descrizione: 'Sottovaso Ø 40 cm', um: 'PZ', qta: 60, prezzo: 9.90 },
+      { n: 3, codice: 'KIT-BALC60', descrizione: 'Kit balconetta 60 cm con sottovaso', um: 'KIT', qta: 10, prezzo: 24.50 },
+      { n: 4, codice: 'VASA-4055', descrizione: 'Vaso in terracotta Ø 40 cm', um: 'PZ', qta: 12, prezzo: 38.00 },
+      { n: 5, codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', um: 'PZ', qta: 20, prezzo: 16.80 } ] },
+    { id: 2, numero: 'OC-2026-119', data: '2026-09-04', cliente_piva: '04120990983', fornitore: 'Gasper', rif_fornitore: 'GA-PO-5521', ricevuto: '2026-09-04', file: 'Serre_Garda_ordine_119.pdf', esportato: null, righe: [
+      { n: 1, codice: 'KIT-ORTO', descrizione: 'Kit orto rialzato completo', um: 'KIT', qta: 6, prezzo: 289.00 },
+      { n: 2, codice: 'ORTO-TER7', descrizione: 'Terriccio universale 50 L', um: 'SAC', qta: 40, prezzo: 6.90 },
+      { n: 3, codice: 'SOGG-0332', descrizione: 'Sottovaso in terracotta Ø 33 cm', um: 'PZ', qta: 30, prezzo: 5.40 } ] },
+    { id: 3, numero: 'OC-2026-120', data: '2026-09-04', cliente_piva: '01573540439', fornitore: 'Ing\'s', rif_fornitore: '', ricevuto: '2026-09-04', file: 'Floricoltura_CI_0904.pdf', esportato: null, righe: [
+      { n: 1, codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', um: 'CF', qta: 48, prezzo: 21.50 },
+      { n: 2, codice: '', descrizione: 'Stella luminosa da esterno (codice non letto)', um: 'PZ', qta: 12, prezzo: 36.00 },
+      { n: 3, codice: 'XMAS-GHO', descrizione: 'Ghirlanda natalizia 150 cm', um: 'PZ', qta: 20, prezzo: 29.00 } ] },
+    { id: 4, numero: 'OC-2026-112', data: '2026-09-01', cliente_piva: '03152770962', fornitore: 'Gries', rif_fornitore: '', ricevuto: '2026-09-01', file: 'GiardiniForme_112.pdf', esportato: { quando: '2026-09-02T15:10', da: 'Matteo Caironi', file: ['20260901_C00387_001_OC.xlsx'] }, righe: [
+      { n: 1, codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', um: 'PZ', qta: 24, prezzo: 7.40 },
+      { n: 2, codice: 'SOGG-040', descrizione: 'Sottovaso Ø 40 cm', um: 'PZ', qta: 40, prezzo: 9.90 },
+      { n: 3, codice: 'BALC-801', descrizione: 'Balconetta in terracotta 80 cm', um: 'PZ', qta: 12, prezzo: 19.90 } ] }
+  ],
 
   /* Documenti scartati: recuperabili per il tempo fissato nelle impostazioni. */
   scartati: [

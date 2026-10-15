@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.9 — idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 3.0 — vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -58,6 +58,7 @@
               <li class="nav-item"><a class="nav-link" href="#sec-4-2">4.2 Nuove tabelle CRM</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-4-3">4.3 Diagramma relazionale</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-4-4">4.4 Note di schema</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-4-5">4.5 Sincronizzazione da Integra</a></li>
             </ul>
           </li>
           <li class="nav-item">
@@ -109,13 +110,17 @@
               <li class="nav-item"><a class="nav-link" href="#sec-7-15">7.15 Impostazioni (/impostazioni/:sezione) — solo amministratore</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-16">7.16 Documenti scartati (/scartati) — amministratore e operatore</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-17">7.17 Guida (/guida/:argomento) — tutti</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-18">7.18 Ordini cliente (/ordini-cliente, /ordini-cliente/:id) — vendita diretta</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-19">7.19 Articoli (/articoli) — sola lettura</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-20">7.20 Giacenze (/giacenze, /giacenze/:codice) — sola lettura</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-21">7.21 Alias e kit (/alias-kit/alias, /alias-kit/kit/:codice) — modifica solo amministratore</a></li>
             </ul>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="#sec-8">8. API endpoint</a>
             <ul class="nav flex-column ps-3">
               <li class="nav-item"><a class="nav-link" href="#sec-8-1">8.1 Rotte nuove (CRM)</a></li>
-              <li class="nav-item"><a class="nav-link" href="#sec-8-2">8.2 Modulo ordini cliente (fase successiva, §17)</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-8-2">8.2 Vendita diretta (§7.18–§7.21)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-8-3">8.3 Autenticazione</a></li>
             </ul>
           </li>
@@ -172,7 +177,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.9 — idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 3.0 — vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -379,19 +384,19 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).</p>
 </tr>
 <tr>
 <td><code>articoli</code></td>
-<td>catalogo (codice, descrizione, EAN, UM)</td>
+<td>catalogo (codice, descrizione, EAN, UM) <strong>sincronizzato dalle viste di Integra</strong> (§4.5): sola lettura</td>
 </tr>
 <tr>
 <td><code>giacenze</code></td>
-<td>giacenza per codice (<code>qta_disponibile</code>)</td>
+<td>giacenza di Integra per codice, <strong>sincronizzata</strong> (§4.5): sola lettura. Il disponibile mostrato dal CRM = giacenza − impegni aperti (§4.2.16)</td>
 </tr>
 <tr>
 <td><code>codici_alias</code></td>
-<td>cambi codice articolo con conferma</td>
+<td>cambi codice articolo (vecchio → nuovo) con conferma: <strong>tabella del CRM</strong>, si gestisce in Alias e kit (§7.21)</td>
 </tr>
 <tr>
 <td><code>kit_testata</code> / <code>kit_dettaglio</code></td>
-<td>kit di articoli</td>
+<td>kit di articoli (articolo → componenti × quantità, attivo): <strong>tabella del CRM</strong>, §7.21</td>
 </tr>
 <tr>
 <td><code>ordini_cliente_testata</code> / <code>ordini_cliente_articoli</code></td>
@@ -407,7 +412,7 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).</p>
 </tr>
 <tr>
 <td><code>movimenti_giacenza</code></td>
-<td>movimenti stock</td>
+<td><strong>non usata dal CRM</strong>: lo scarico locale della Gestione Ordini è sostituito dagli impegni (§4.2.16), perché la giacenza vera è quella di Integra</td>
 </tr>
 <tr>
 <td><code>processing_errors</code></td>
@@ -421,8 +426,12 @@ indirizzo, codice Integra) arrivano <strong>solo da Integra</strong>, come tutti
 CRM non li crea né li modifica, e un cliente nuovo si censisce in Integra. Il CRM gestisce
 soltanto i <strong>propri</strong> dati: condizioni e percentuali dei fornitori (§4.2.1–4.2.2), agenzie
 dei clienti (<code>interscambio</code>, §4.2.6) e subagenti. <strong>I subagenti non sono in Integra</strong>: la
-loro anagrafica si gestisce per intero nel CRM (CRUD completo). L'import da Integra è periodico e
-aggiorna i campi anagrafici senza toccare i dati del CRM.</p>
+loro anagrafica si gestisce per intero nel CRM (CRUD completo).</p>
+<p><strong>Come arrivano i dati di Integra.</strong> Tutto ciò che viene da Integra (clienti, fornitori,
+articoli, giacenze, ordini registrati) si legge da <strong>viste dirette sul database di Integra</strong>
+con processi di <strong>sincronizzazione periodici, nell'ordine dei secondi o del minuto</strong>
+(§4.5). Niente file da importare. La sincronizzazione aggiorna i campi che arrivano da
+Integra senza toccare i dati del CRM.</p>
 <p><strong>Ordini cliente vs ordini fornitore: restano separati.</strong> Gli ordini dei clienti
 (<code>ordini_cliente_testata</code> / <code>ordini_cliente_articoli</code>) e le pratiche ordine a fornitore
 (<code>ordini_fornitore_testata</code> / <code>ordini_fornitore_righe</code>, §4.2.7) sono <strong>oggetti di
@@ -1256,7 +1265,7 @@ nessuna UPDATE/DELETE in esercizio.</p>
 <tr>
 <td><code>entita</code></td>
 <td>VARCHAR(50)</td>
-<td><code>fornitore</code>, <code>scaglione</code>, <code>agente</code>, <code>subagente</code>, <code>interscambio</code>, <code>pratica</code>, <code>riga_pratica</code>, <code>documento</code>, <code>bollettino</code>, <code>riga_bollettino</code>, <code>liquidazione</code>, <code>utente</code>, <code>sistema</code></td>
+<td><code>fornitore</code>, <code>scaglione</code>, <code>agente</code>, <code>subagente</code>, <code>interscambio</code>, <code>pratica</code>, <code>riga_pratica</code>, <code>documento</code>, <code>bollettino</code>, <code>riga_bollettino</code>, <code>liquidazione</code>, <code>ordine_cliente</code>, <code>alias</code>, <code>kit</code>, <code>utente</code>, <code>sistema</code></td>
 </tr>
 <tr>
 <td><code>entita_id</code></td>
@@ -1467,6 +1476,77 @@ alla <strong>taratura</strong> delle soglie sui documenti reali.</p>
 <p>Una riga per sezione (<code>chiave</code> = <code>azienda</code> · <code>casella</code> · <code>lettura</code> · <code>posta</code> · <code>integra</code> · <code>conservazione</code>), <code>valore</code> JSONB, <code>aggiornato_il</code>, <code>aggiornato_da</code>. Le password (casella IMAP, posta in uscita) sono <strong>cifrate</strong> (chiave nel file d'ambiente del server) e <strong>non vengono mai restituite</strong> dalle API: si sostituiscono soltanto. Ogni modifica scrive un evento (§15).</p>
 <h3 id="sec-4-2-15">4.2.15 <code>servizi_esecuzioni</code> e <code>servizi_problemi</code></h3>
 <p>Registro dei servizi automatici (§7.14): <code>servizi_esecuzioni</code> (<code>servizio</code> = <code>casella</code> · <code>lettura</code> · <code>integra</code> · <code>posta</code>, <code>inizio</code>, <code>fine</code>, <code>esito</code> <code>ok</code>·<code>attenzione</code>·<code>errore</code>, <code>testo</code>); <code>servizi_problemi</code> (<code>servizio</code>, <code>quando</code>, <code>livello</code> <code>errore</code>·<code>attenzione</code>, <code>testo</code>, <code>dettaglio</code> con cosa fare, <code>visto_il</code>, <code>visto_da</code>). Conservazione come il registro eventi.</p>
+<h3 id="sec-4-2-16">4.2.16 <code>impegni_giacenza</code></h3>
+<p>Quantità esportate verso Integra (§7.18) e <strong>non ancora registrate</strong> da Integra. Servono a
+non vendere due volte la stessa merce nell'intervallo fra l'esportazione e la
+registrazione dell'ordine in Integra.</p>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Colonna</th>
+<th>Tipo</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>BIGSERIAL PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ordine_cliente_id</code></td>
+<td>BIGINT FK → <code>ordini_cliente_testata</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>codice_articolo</code></td>
+<td>VARCHAR(50)</td>
+<td>codice esportato (dopo alias e kit)</td>
+</tr>
+<tr>
+<td><code>qta</code></td>
+<td>NUMERIC(12,2)</td>
+<td></td>
+</tr>
+<tr>
+<td><code>stato</code></td>
+<td>VARCHAR(12)</td>
+<td><code>impegnato</code> · <code>registrato</code> · <code>rilasciato</code></td>
+</tr>
+<tr>
+<td><code>nota</code></td>
+<td>VARCHAR(200)</td>
+<td>es. "alias VASA-3050 → VASA-3050N (nuovo)", "componente del kit KIT-ORTO"</td>
+</tr>
+<tr>
+<td><code>creato_il</code> · <code>creato_da</code></td>
+<td>TIMESTAMPTZ · BIGINT FK → <code>users</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>chiuso_il</code></td>
+<td>TIMESTAMPTZ</td>
+<td>quando è passato a <code>registrato</code> o <code>rilasciato</code></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>Disponibile</strong> = giacenza di Integra − somma degli impegni <code>impegnato</code> del codice.</li>
+<li>Si crea alla <strong>prima</strong> esportazione dell'ordine; esportare di nuovo lo stesso ordine
+  rigenera i file senza impegnare due volte.</li>
+<li>Passa a <code>registrato</code> quando la sincronizzazione trova l'ordine fra quelli registrati
+  in Integra (vista degli ordini, chiave = numero ordine + codice cliente); da quel momento
+  la giacenza di Integra lo comprende già.</li>
+<li>Passa a <code>rilasciato</code> con <strong>Annulla esportazione</strong>.</li>
+<li>Indici: <code>(codice_articolo, stato)</code>, <code>(ordine_cliente_id)</code>.</li>
+</ul>
+<h3 id="sec-4-2-17">4.2.17 <code>ordini_cliente_esportazioni</code></h3>
+<p>Una riga per esportazione verso Integra (le tabelle della Gestione Ordini non si modificano):
+<code>id</code>, <code>ordine_cliente_id</code>, <code>quando</code>, <code>utente_id</code>, <code>tipi</code> (<code>OC</code>, <code>OF</code> o entrambi), <code>file</code>
+(nomi generati), <code>righe</code> JSONB (righe finali dopo alias e kit, con le decisioni
+dell'operatore), <code>annullata_il</code>, <code>annullata_da</code>. L'ordine è "esportato" se ha
+un'esportazione non annullata.</p>
 <h3 id="sec-4-3">4.3 Diagramma relazionale</h3>
 <pre class="spec-code"><code>fornitori 1 ── n provvigioni_scaglioni 1 ── n provvigioni_eccezioni (→ subagenti)
 fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
@@ -1480,8 +1560,16 @@ users 1 ── n eventi_app  (audit append-only, §15)
 </code></pre>
 <h3 id="sec-4-4">4.4 Note di schema</h3>
 <ul>
-<li><code>interscambio.discount</code> è il <strong>campo canonico</strong> dello sconto cliente su fornitore
-  (§5.7) e determina lo scaglione; <code>fornitori.discount</code> ne è solo un default ridondante.</li>
+<li>
+<p><strong>Vendita diretta</strong>: <code>ordini_cliente_testata 1 ── n ordini_cliente_esportazioni</code>,
+  <code>ordini_cliente_testata 1 ── n impegni_giacenza</code>, <code>codici_alias</code> e <code>kit_*</code> riferiscono
+  <code>articoli</code> per codice (testo, non FK: un codice nuovo può arrivare dalla
+  sincronizzazione dopo la creazione dell'alias).</p>
+</li>
+<li>
+<p><code>interscambio.discount</code> è il <strong>campo canonico</strong> dello sconto cliente su fornitore
+  (§5.7) e determina lo scaglione; <code>fornitori.discount</code> ne è solo un default ridondante.</p>
+</li>
 <li><strong>Abbinamento dei documenti del fornitore</strong>: la conferma e la fattura riportano il
   <em>codice cliente del fornitore</em>, non la P.IVA. <code>interscambio.codice_cliente_fornitore</code>
   fa da traduzione verso <code>cliente_piva</code>: in arrivo documento il sistema risolve
@@ -1497,6 +1585,60 @@ users 1 ── n eventi_app  (audit append-only, §15)
   ispezionabile a posteriori (§5.8, §7.3).</li>
 <li>Gli <strong>importi delle provvigioni</strong> si calcolano sul <strong>netto documenti</strong> della pratica
   (§4.2.7.1, §5.3): le note di credito riducono l'imponibile senza generare pratiche a sé.</li>
+</ul>
+<h3 id="sec-4-5">4.5 Sincronizzazione da Integra</h3>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Dato</th>
+<th>Vista su Integra (schema <code>crm_viste</code>)</th>
+<th>Ogni</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Clienti</td>
+<td><code>v_clienti</code> (P.IVA, ragione sociale, indirizzo, codice cliente)</td>
+<td>60 s</td>
+<td>un cliente senza P.IVA valida è segnalato in Stato del sistema</td>
+</tr>
+<tr>
+<td>Fornitori</td>
+<td><code>v_fornitori</code> (P.IVA, ragione sociale, paese, codice fornitore)</td>
+<td>60 s</td>
+<td></td>
+</tr>
+<tr>
+<td>Articoli</td>
+<td><code>v_articoli</code> (codice, descrizione, EAN, UM, attivo)</td>
+<td>60 s</td>
+<td></td>
+</tr>
+<tr>
+<td>Giacenze</td>
+<td><code>v_giacenze</code> (codice, quantità)</td>
+<td>15 s</td>
+<td>la più frequente: serve al disponibile</td>
+</tr>
+<tr>
+<td>Ordini registrati</td>
+<td><code>v_ordini_registrati</code> (numero, codice cliente, data)</td>
+<td>60 s</td>
+<td>chiude gli impegni (§4.2.16)</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>Accesso</strong>: utente del database <strong>in sola lettura</strong> (<code>crm_lettura</code>), solo sulle viste;
+  le viste le crea chi gestisce Integra. Parametri in Impostazioni → Sincronizzazione da
+  Integra (§7.15).</li>
+<li><strong>Incrementale</strong>: dove la vista ha la data di ultima modifica si leggono solo le righe
+  cambiate; le giacenze si leggono intere (sono poche migliaia di righe).</li>
+<li><strong>Un solo processo</strong> sul server del CRM, con un passo per vista; ogni giro scrive in
+  <code>servizi_esecuzioni</code> (§4.2.15); se un giro fallisce si riprova al successivo e dopo 3
+  fallimenti di fila si apre un problema (§7.14).</li>
+<li>In ogni pagina che mostra dati di Integra c'è l'ora dell'ultima sincronizzazione.</li>
 </ul>
 
 </section>
@@ -2326,7 +2468,7 @@ deve <strong>poter sempre tornare indietro e ritrovare la schermata esattamente 
 <h3 id="sec-7-14">7.14 Stato del sistema (<code>/sistema</code>) — amministratore e operatore</h3>
 <ul>
 <li><strong>Riquadri per servizio</strong> (KpiRow, fanno da filtro): <em>Casella dei documenti</em>, <em>Server di
-  lettura (GLM-OCR)</em>, <em>Import anagrafiche da Integra</em>, <em>Posta in uscita</em>; per ognuno stato
+  lettura (GLM-OCR)</em>, <em>Sincronizzazione da Integra</em>, <em>Posta in uscita</em>; per ognuno stato
   (<em>Funziona</em> · <em>Da tenere d'occhio</em> · <em>Problema</em>), nota (es. "lento: 9,8 s per pagina"),
   ultima esecuzione e ritmo, problemi da vedere.</li>
 <li><strong>Problemi</strong> (sinistra): quando, livello (<em>Errore</em> · <em>Attenzione</em>), servizio, testo e
@@ -2365,8 +2507,8 @@ dove serve, <em>Prova la connessione</em>.</p>
 <td>server SMTP, porta, utente, password, mittente</td>
 </tr>
 <tr>
-<td>Import da Integra</td>
-<td>cartella dei file esportati da Integra, ora giornaliera, cosa importare (clienti e/o fornitori)</td>
+<td>Sincronizzazione da Integra</td>
+<td>server del database, nome del database, utente in sola lettura, password, schema delle viste, ogni quanti secondi (anagrafiche, 10–3600), ogni quanti secondi le giacenze (5–600) (§4.5)</td>
 </tr>
 <tr>
 <td>Conservazione dei dati</td>
@@ -2375,7 +2517,7 @@ dove serve, <em>Prova la connessione</em>.</p>
 </tbody>
 </table></div>
 <p>Le <strong>password non si rileggono</strong>: il campo mostra "impostata", si scrive solo per
-sostituirla. Controlli: numeri validi, soglie 0 &lt; bassa &lt; affidabile ≤ 1, ora <code>hh:mm</code>.
+sostituirla. Controlli: numeri validi, soglie 0 &lt; bassa &lt; affidabile ≤ 1, intervalli di sincronizzazione nei limiti indicati.
 Ogni salvataggio scrive un evento con i campi cambiati (mai le password).</p>
 <h3 id="sec-7-16">7.16 Documenti scartati (<code>/scartati</code>) — amministratore e operatore</h3>
 <ul>
@@ -2390,10 +2532,82 @@ Ogni salvataggio scrive un evento con i campi cambiati (mai le password).</p>
 </ul>
 <h3 id="sec-7-17">7.17 Guida (<code>/guida/:argomento</code>) — tutti</h3>
 <ul>
-<li>Argomenti a sinistra (ricerca nel testo), raggruppati <em>Lavoro · Anagrafiche ·
-  Gestione</em>; testo a destra con <em>Apri la pagina</em> e <strong>chi può modificare</strong> (dai ruoli).</li>
+<li>Argomenti a sinistra (ricerca nel testo), raggruppati <em>Lavoro · Vendita diretta ·
+  Anagrafiche · Gestione</em>; testo a destra con <em>Apri la pagina</em> e <strong>chi può modificare</strong> (dai ruoli).</li>
 <li><strong>Aiuto contestuale</strong>: ogni pagina con un argomento ha in testata il pulsante <em>Guida</em>
   che apre l'argomento giusto. Gli argomenti di gestione si vedono solo con il permesso.</li>
+</ul>
+<h3 id="sec-7-18">7.18 Ordini cliente (<code>/ordini-cliente</code>, <code>/ordini-cliente/:id</code>) — vendita diretta</h3>
+<p>Replica la Gestione Ordini per gli ordini dei clienti in <strong>vendita diretta</strong> (articoli che
+Decobrands vende in proprio). Gli ordini entrano dall'ingresso documenti (§6.5) con il
+tipo <code>ordine_cliente</code> (§17).</p>
+<ul>
+<li><strong>Elenco</strong> (sinistra, ElencoSelezionabile): segmenti <em>Da esportare · Esportati · Tutti</em>,
+  ricerca per numero o cliente; per ordine numero, cliente, totale, data, righe, fornitore
+  e stati (<em>Da esportare</em>, <em>N problemi</em>, <em>N alias</em>, <em>N kit</em>, <em>Esportato il …</em>). La voce
+  della barra conta gli ordini da esportare.</li>
+<li><strong>Scheda</strong> (destra): cliente con P.IVA, <strong>codice Integra</strong> (rosso se manca), data,
+  fornitore e riferimento, totale, stato dell'esportazione (quando, chi, file); i
+  problemi bloccanti in un riquadro rosso.</li>
+<li><strong>Righe</strong>: articolo con pallino (verde = in anagrafica Integra, rosso = no), descrizione,
+  segni <em>alias → nuovo</em> e <em>kit di N componenti</em>, quantità con UM, prezzo, importo, totale,
+  <strong>disponibile</strong> (giacenza − impegni).</li>
+<li><strong>Esporta per Integra</strong> (finestra larga):
+  1. <strong>Codici vecchio → nuovo</strong>: per ogni riga con alias il caso proposto — <em>A</em> disponibile
+     il vecchio (nessun cambio), <em>B</em> disponibile in parte (divide la riga: il disponibile
+     sul vecchio, il resto sul nuovo), <em>C</em> vecchio esaurito (tutto sul nuovo) — con
+     <em>Applica</em> e quantità modificabili su vecchio e nuovo (la somma resta l'ordinato);
+     "chiede conferma" se l'alias lo prevede.
+  2. <strong>Kit</strong>: articolo con disponibile ≤ 0 (o assente) e kit attivo → righe dei componenti
+     × quantità ordinata, con il disponibile di ciascuno; <em>Applica</em> per riga. Le righe dei
+     componenti escono senza prezzo (Integra lo reperisce).
+  3. <strong>File da generare</strong>: <em>Ordine cliente (OC)</em> e/o <em>Ordine fornitore (OF)</em>, con i nomi
+     <code>aaaammgg_codiceIntegra_progressivo_TIPO.xlsx</code> (progressivo del giorno per cliente).
+  4. <strong>Controlli bloccanti</strong>: data, codice cliente Integra, almeno una riga, codice e
+     quantità di ogni riga, almeno un file scelto. <strong>Avvisi</strong>: articolo non in anagrafica,
+     disponibile minore dell'esportato.
+  5. <em>Genera i file</em>: scarica i file (uno per tipo), crea gli impegni (solo la prima
+     volta, §4.2.16), registra l'esportazione (§4.2.17) e l'evento (§15).</li>
+<li><strong>Tracciato del file</strong> (uguale alla Gestione Ordini): foglio <code>Ordine</code>, una riga per
+  articolo, 28 colonne <code>mvt_mdtcod</code> … <code>mvr_reperisciprezzo</code>; documento <code>OC0000</code> o
+  <code>OF0000</code>, serie <code>OC</code>/<code>OF</code>, tipo anagrafica <code>C</code>/<code>F</code>, numero <code>999999</code>, codice cliente
+  Integra, valuta EUR, riferimento = numero ordine, ordinamento a passi di 5, codice
+  articolo, quantità, prezzo, <code>SI</code> in reperisci prezzo; date <code>gg/mm/aaaa</code>.</li>
+<li><em>Esporta di nuovo</em> (ordine già esportato): rigenera i file senza nuovi impegni.
+  <em>Annulla esportazione</em>: l'ordine torna da esportare e gli impegni aperti si
+  rilasciano; se Integra lo ha già registrato va annullato anche lì.</li>
+</ul>
+<h3 id="sec-7-19">7.19 Articoli (<code>/articoli</code>) — sola lettura</h3>
+<p>Dati di Integra (§4.5) con l'ora dell'ultima sincronizzazione. Ricerca per codice,
+descrizione o EAN; filtro per UM; segmenti <em>Tutti · Con alias · Kit · Esauriti</em>.
+Colonne codice, descrizione (con <em>alias → nuovo</em>, <em>sostituisce …</em>, <em>kit · componenti</em>),
+EAN, UM, disponibile. Il clic apre le giacenze dell'articolo. Gli articoli nuovi si
+creano in Integra.</p>
+<h3 id="sec-7-20">7.20 Giacenze (<code>/giacenze</code>, <code>/giacenze/:codice</code>) — sola lettura</h3>
+<ul>
+<li>Riquadri-filtro: <em>Esauriti</em> (disponibile 0), <em>Negativi</em> (esportato più del disponibile),
+  <em>Con impegni aperti</em>. La voce della barra conta i negativi.</li>
+<li>Elenco: articolo e descrizione, giacenza di Integra, impegnato, disponibile.</li>
+<li>Articolo scelto: giacenza in Integra − impegnato dal CRM = disponibile, e i movimenti
+  del CRM (data, ordine con collegamento, quantità, stato <em>Impegnato</em> · <em>Registrato in
+  Integra</em> · <em>Rilasciato</em>).</li>
+</ul>
+<h3 id="sec-7-21">7.21 Alias e kit (<code>/alias-kit/alias</code>, <code>/alias-kit/kit/:codice</code>) — modifica solo amministratore</h3>
+<p>Due schede nella stessa pagina (segmenti <em>Codici vecchio → nuovo · Kit</em>).</p>
+<ul>
+<li><strong>Alias</strong>: codice vecchio e nuovo con pallino e disponibile, descrizione ed EAN,
+  <em>Chiede conferma</em> (casella modificabile in tabella), <em>Modifica</em>, <em>Elimina</em> (con
+  conferma). Nuovo/modifica: codice vecchio, codice nuovo (campo di ricerca sugli
+  articoli, compila descrizione ed EAN), conferma. Controlli: entrambi i codici, diversi,
+  un solo alias per codice vecchio, <strong>nessuna catena</strong> (il nuovo non può essere a sua
+  volta un codice vecchio). Il codice nuovo non ancora in Integra è ammesso con avviso.</li>
+<li><strong>Kit</strong>: elenco (kit, descrizione, componenti, disponibile, <em>Spento</em>) e scheda con
+  <em>Spegni/Accendi</em>, <em>Aggiungi componente</em>, <em>Elimina</em>; componenti con pallino,
+  descrizione, quantità per kit, disponibile, <em>Modifica</em>, <em>Togli</em>. Controlli: quantità<blockquote>
+<p>0, un kit non contiene se stesso, nessun componente doppio, un solo kit per articolo.</p>
+</blockquote>
+</li>
+<li>Permesso <code>magazzino</code> (§8.3); gli altri ruoli vedono senza modificare.</li>
 </ul>
 </section>
 <section id="sec-8">
@@ -2481,9 +2695,9 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).</p>
 <td>elimina agenzia</td>
 </tr>
 <tr>
-<td>POST</td>
-<td><code>/api/import-integra</code></td>
-<td>import periodico clienti e fornitori da Integra (job, admin)</td>
+<td>GET</td>
+<td><code>/api/integra/stato</code></td>
+<td>ultima sincronizzazione per vista (§4.5)</td>
 </tr>
 <tr>
 <td>GET</td>
@@ -2612,9 +2826,55 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).</p>
 </tr>
 </tbody>
 </table></div>
-<h3 id="sec-8-2">8.2 Modulo ordini cliente (fase successiva, §17)</h3>
-<p><code>/api/ordini*</code>, <code>/api/lookup/*</code>, <code>/api/clienti*</code>, <code>/api/utenti*</code>: API del futuro modulo
-ordini cliente, che sostituirà la Gestione Ordini; non incluse in questa fase.</p>
+<h3 id="sec-8-2">8.2 Vendita diretta (§7.18–§7.21)</h3>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Metodo</th>
+<th>Rotta</th>
+<th>Descrizione</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/ordini-cliente</code> · <code>/api/ordini-cliente/:id</code></td>
+<td>elenco (filtro esportati) / scheda con righe e disponibile</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ordini-cliente/:id/proposte</code></td>
+<td>proposte alias e kit (casi A/B/C) calcolate sul disponibile del momento</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ordini-cliente/:id/esporta</code></td>
+<td><code>{tipi: ['OC','OF'], alias: [...], kit: [...]}</code> → controlli, file xlsx (zip se più di uno), impegni, esportazione (<code>modifica</code>)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ordini-cliente/:id/annulla-esportazione</code></td>
+<td>rilascia gli impegni aperti (<code>modifica</code>)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/articoli</code> · <code>/api/giacenze</code> · <code>/api/giacenze/:codice</code></td>
+<td>sola lettura, con disponibile e impegni</td>
+</tr>
+<tr>
+<td>GET · POST · PUT · DELETE</td>
+<td><code>/api/alias</code> · <code>/api/alias/:id</code></td>
+<td>alias (<code>magazzino</code> per le scritture)</td>
+</tr>
+<tr>
+<td>GET · POST · PUT · DELETE</td>
+<td><code>/api/kit</code> · <code>/api/kit/:codice</code> · <code>/api/kit/:codice/componenti/:i</code></td>
+<td>kit e componenti (<code>magazzino</code> per le scritture)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Il resto della Gestione Ordini (ingresso degli ordini cliente, errori di lettura) resta
+nella fase successiva (§17).</p>
 <h3 id="sec-8-3">8.3 Autenticazione</h3>
 <p><code>/login</code> (POST), <code>/logout</code> (POST), <code>/cambia-password</code>, <code>/richiedi-reset</code>,
 <code>/reset-password</code> (stessi della Gestione Ordini). Guard <code>requireAuth</code> su tutte le
@@ -2671,6 +2931,12 @@ rotte; ogni rotta dichiara il <strong>permesso</strong> richiesto, verificato la
 <td>Stato del sistema, segnare i problemi come visti (<code>sistema</code>)</td>
 <td style="text-align: center;">✓</td>
 <td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td>Alias e kit: creare, modificare, eliminare (<code>magazzino</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
 <td style="text-align: center;">—</td>
 </tr>
 <tr>
@@ -3396,6 +3662,53 @@ eventi</strong>: <code>calcolo/verify</code> + <code>stato/change_state</code>.<
 <p>Il <strong>rendiconto</strong> §7.8 è calcolato al volo (GET = nessun evento); diventa un evento
 <strong>solo quando viene esportato</strong>.</p>
 </blockquote>
+<h4 id="sec-15-2-6-1">15.2.6.1 Vendita diretta (§8.2)</h4>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Operazione (API)</th>
+<th><code>tipo</code></th>
+<th><code>azione</code></th>
+<th><code>entita</code></th>
+<th><code>esito</code></th>
+<th><code>dettaglio</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST <code>/esporta</code></td>
+<td><code>export</code></td>
+<td><code>export</code></td>
+<td><code>ordine_cliente</code></td>
+<td><code>successo</code></td>
+<td><code>{etichetta: numero, tipi, file, n_righe, alias_applicati, kit_applicati, impegni_creati}</code></td>
+</tr>
+<tr>
+<td>POST <code>/annulla-esportazione</code></td>
+<td><code>stato</code></td>
+<td><code>change_state</code></td>
+<td><code>ordine_cliente</code></td>
+<td><code>successo</code></td>
+<td><code>{etichetta, impegni_rilasciati}</code></td>
+</tr>
+<tr>
+<td>CRUD alias / kit / componenti</td>
+<td><code>crud</code></td>
+<td><code>create</code>·<code>update</code>·<code>delete</code></td>
+<td><code>alias</code> · <code>kit</code></td>
+<td><code>successo</code></td>
+<td><code>{etichetta, prima, dopo}</code></td>
+</tr>
+<tr>
+<td>Sincronizzazione che chiude impegni</td>
+<td><code>stato</code></td>
+<td><code>change_state</code></td>
+<td><code>ordine_cliente</code></td>
+<td><code>successo</code></td>
+<td><code>{etichetta, impegni_registrati}</code> (utente di sistema)</td>
+</tr>
+</tbody>
+</table></div>
 <h4 id="sec-15-2-7">15.2.7 Errori di sistema</h4>
 <div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
 <thead class="table-light">
@@ -3859,7 +4172,7 @@ Fino ad allora resta in esercizio, invariata, sullo stesso database.</p>
 </tr>
 <tr>
 <td>Ambito</td>
-<td>ordini cliente (testata + righe), controllo P.IVA e codici articolo (anagrafica, alias, kit), giacenze, esportazione CSV verso Integra, errori di lettura, anagrafiche clienti/articoli/utenti</td>
+<td>ingresso degli ordini cliente dall'ingresso documenti, errori di lettura, spegnimento di n8n. <strong>Già progettato nel prototipo</strong> (§7.18–§7.21, da approvare nel piano): ordini cliente con esportazione OC/OF per Integra, articoli, giacenze con impegni, alias e kit</td>
 </tr>
 <tr>
 <td>Ingresso</td>
@@ -3875,7 +4188,7 @@ Fino ad allora resta in esercizio, invariata, sullo stesso database.</p>
 </tr>
 <tr>
 <td>Esportazione verso Integra</td>
-<td><strong>da analizzare</strong>: per la sola <strong>commercializzazione diretta</strong> (fatture cliente o fornitore di articoli che Decobrands vende in proprio) i documenti vanno esportati verso Integra come fa oggi la Gestione Ordini, con <strong>sostituzione dei codici articolo (alias)</strong> e <strong>esplosione dei kit</strong>; qui servono l'anagrafica articoli e il relativo controllo, assenti nel giro agenzia (§6.5)</td>
+<td>definita in §7.18: file Ordine cliente (OC) e Ordine fornitore (OF) con il tracciato della Gestione Ordini, alias e kit applicati, impegni sul disponibile fino alla registrazione in Integra</td>
 </tr>
 <tr>
 <td>Passaggio</td>

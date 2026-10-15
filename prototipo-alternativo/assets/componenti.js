@@ -49,7 +49,11 @@
     carica: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
     piu: '<path d="M12 5v14M5 12h14"/>',
     posta: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
-    avviso: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.5"/>'
+    avviso: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.5"/>',
+    carrello: '<path d="M3 4h2l2.4 11h11l2-8H6.2"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/>',
+    scatola: '<path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>',
+    magazzino: '<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
+    catena: '<rect x="3" y="9" width="8" height="6" rx="3"/><rect x="13" y="9" width="8" height="6" rx="3"/><path d="M9 12h6"/>'
   };
   CRM.icona = (nome, classe) => '<svg class="icona' + (classe ? ' ' + classe : '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (PERCORSI[nome] || '') + '</svg>';
 
@@ -780,6 +784,11 @@
       { id: 'pratiche', href: '#/pratiche', t: 'Pratiche', icona: 'pratiche' }] },
     { gruppo: 'Ogni mese', voci: [{ id: 'bollettini', href: '#/bollettini', t: 'Bollettini', icona: 'bollettini' }] },
     { gruppo: 'Ogni trimestre', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni' }] },
+    { gruppo: 'Vendita diretta', voci: [
+      { id: 'ordini-cliente', href: '#/ordini-cliente', t: 'Ordini cliente', icona: 'carrello' },
+      { id: 'articoli', href: '#/articoli', t: 'Articoli', icona: 'scatola' },
+      { id: 'giacenze', href: '#/giacenze', t: 'Giacenze', icona: 'magazzino' },
+      { id: 'alias-kit', href: '#/alias-kit', t: 'Alias e kit', icona: 'catena' }] },
     { gruppo: 'Anagrafiche', voci: [
       { id: 'fornitori', href: '#/fornitori', t: 'Fornitori', icona: 'fornitori' },
       { id: 'subagenti', href: '#/subagenti', t: 'Subagenti', icona: 'subagenti' },
@@ -800,6 +809,8 @@
       // la voce si chiama "Documenti": qui si caricano e si abbinano
       pratiche: { n: M.S.pratiche.filter(p => M.statoPratica(p).chiave === 'scaduta').length, urgente: true },
       bollettini: { n: fare.filter(x => x.tipo === 'bollettino' || x.tipo === 'mancante').length },
+      'ordini-cliente': { n: (M.S.ordini_cliente || []).filter(o => !o.esportato).length },
+      giacenze: { n: (M.S.giacenze || []).filter(g => M.disponibile && M.disponibile(g.codice) < 0).length, urgente: true },
       sistema: { n: M.S.sistema.problemi.filter(x => !x.visto).length, urgente: M.S.sistema.problemi.some(x => !x.visto && x.livello === 'errore') }
     };
     const io = M.utente();

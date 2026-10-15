@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 2.9 — idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.0 — vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -160,14 +160,14 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
 | `users` | autenticazione e ruoli (condivisa con la Gestione Ordini). Il CRM legge il ruolo da una tabella propria `crm_ruoli_utente` (`user_id`, `ruolo` = `amministratore` \| `operatore` \| `lettura`): i ruoli della Gestione Ordini (`admin`/`operator`) non cambiano (§8.3) |
 | `remember_tokens` | sessione persistente |
 | `clienti` | anagrafica cliente importata da Integra (P.IVA univoca, ragione sociale, indirizzo, codice Integra, flag vendita diretta): **sola lettura** nel CRM |
-| `articoli` | catalogo (codice, descrizione, EAN, UM) |
-| `giacenze` | giacenza per codice (`qta_disponibile`) |
-| `codici_alias` | cambi codice articolo con conferma |
-| `kit_testata` / `kit_dettaglio` | kit di articoli |
+| `articoli` | catalogo (codice, descrizione, EAN, UM) **sincronizzato dalle viste di Integra** (§4.5): sola lettura |
+| `giacenze` | giacenza di Integra per codice, **sincronizzata** (§4.5): sola lettura. Il disponibile mostrato dal CRM = giacenza − impegni aperti (§4.2.16) |
+| `codici_alias` | cambi codice articolo (vecchio → nuovo) con conferma: **tabella del CRM**, si gestisce in Alias e kit (§7.21) |
+| `kit_testata` / `kit_dettaglio` | kit di articoli (articolo → componenti × quantità, attivo): **tabella del CRM**, §7.21 |
 | `ordini_cliente_testata` / `ordini_cliente_articoli` | ordini dei clienti (`fornitore` è testo libero → si mappa ai fornitori CRM) |
 | `ordini_upload_queue` | **non usata dal CRM**: resta della Gestione Ordini fino alla sua sostituzione (§17) |
 | `audit_log` | log di tutte le scritture |
-| `movimenti_giacenza` | movimenti stock |
+| `movimenti_giacenza` | **non usata dal CRM**: lo scarico locale della Gestione Ordini è sostituito dagli impegni (§4.2.16), perché la giacenza vera è quella di Integra |
 | `processing_errors` | **non usata dal CRM**: gli errori di lettura del CRM stanno in `documenti_in_arrivo` (§4.2.12) |
 
 > **Anagrafiche da Integra, sola lettura.** Clienti e fornitori (ragione sociale, P.IVA,
@@ -175,8 +175,13 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
 > CRM non li crea né li modifica, e un cliente nuovo si censisce in Integra. Il CRM gestisce
 > soltanto i **propri** dati: condizioni e percentuali dei fornitori (§4.2.1–4.2.2), agenzie
 > dei clienti (`interscambio`, §4.2.6) e subagenti. **I subagenti non sono in Integra**: la
-> loro anagrafica si gestisce per intero nel CRM (CRUD completo). L'import da Integra è periodico e
-> aggiorna i campi anagrafici senza toccare i dati del CRM.
+> loro anagrafica si gestisce per intero nel CRM (CRUD completo).
+>
+> **Come arrivano i dati di Integra.** Tutto ciò che viene da Integra (clienti, fornitori,
+> articoli, giacenze, ordini registrati) si legge da **viste dirette sul database di Integra**
+> con processi di **sincronizzazione periodici, nell'ordine dei secondi o del minuto**
+> (§4.5). Niente file da importare. La sincronizzazione aggiorna i campi che arrivano da
+> Integra senza toccare i dati del CRM.
 
 > **Ordini cliente vs ordini fornitore: restano separati.** Gli ordini dei clienti
 > (`ordini_cliente_testata` / `ordini_cliente_articoli`) e le pratiche ordine a fornitore
@@ -442,7 +447,7 @@ nessuna UPDATE/DELETE in esercizio.
 | `utente_id` | BIGINT FK → `users` | NULL per eventi di sistema / login non riuscito |
 | `sessione_id` | VARCHAR(100) | sessione server-side (per eventi `auth`) |
 | `tipo` | VARCHAR(30) | `auth` · `crud` · `stato` · `documento` · `calcolo` · `export` · `errore` |
-| `entita` | VARCHAR(50) | `fornitore`, `scaglione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `documento`, `bollettino`, `riga_bollettino`, `liquidazione`, `utente`, `sistema` |
+| `entita` | VARCHAR(50) | `fornitore`, `scaglione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `documento`, `bollettino`, `riga_bollettino`, `liquidazione`, `ordine_cliente`, `alias`, `kit`, `utente`, `sistema` |
 | `entita_id` | BIGINT | id dell'entità coinvolta (dove applicabile) |
 | `azione` | VARCHAR(30) | `create` · `update` · `delete` · `upload` · `export` · `change_state` · `verify` · `login` · `logout` · `change_password` · `reset_requested` · `access_denied` · `error` |
 | `esito` | VARCHAR(10) | `successo` · `errore` · `negato` |
@@ -506,6 +511,40 @@ Una riga per sezione (`chiave` = `azienda` · `casella` · `lettura` · `posta` 
 
 Registro dei servizi automatici (§7.14): `servizi_esecuzioni` (`servizio` = `casella` · `lettura` · `integra` · `posta`, `inizio`, `fine`, `esito` `ok`·`attenzione`·`errore`, `testo`); `servizi_problemi` (`servizio`, `quando`, `livello` `errore`·`attenzione`, `testo`, `dettaglio` con cosa fare, `visto_il`, `visto_da`). Conservazione come il registro eventi.
 
+### 4.2.16 `impegni_giacenza`
+
+Quantità esportate verso Integra (§7.18) e **non ancora registrate** da Integra. Servono a
+non vendere due volte la stessa merce nell'intervallo fra l'esportazione e la
+registrazione dell'ordine in Integra.
+
+| Colonna | Tipo | Note |
+|---------|------|------|
+| `id` | BIGSERIAL PK | |
+| `ordine_cliente_id` | BIGINT FK → `ordini_cliente_testata` | |
+| `codice_articolo` | VARCHAR(50) | codice esportato (dopo alias e kit) |
+| `qta` | NUMERIC(12,2) | |
+| `stato` | VARCHAR(12) | `impegnato` · `registrato` · `rilasciato` |
+| `nota` | VARCHAR(200) | es. "alias VASA-3050 → VASA-3050N (nuovo)", "componente del kit KIT-ORTO" |
+| `creato_il` · `creato_da` | TIMESTAMPTZ · BIGINT FK → `users` | |
+| `chiuso_il` | TIMESTAMPTZ | quando è passato a `registrato` o `rilasciato` |
+
+- **Disponibile** = giacenza di Integra − somma degli impegni `impegnato` del codice.
+- Si crea alla **prima** esportazione dell'ordine; esportare di nuovo lo stesso ordine
+  rigenera i file senza impegnare due volte.
+- Passa a `registrato` quando la sincronizzazione trova l'ordine fra quelli registrati
+  in Integra (vista degli ordini, chiave = numero ordine + codice cliente); da quel momento
+  la giacenza di Integra lo comprende già.
+- Passa a `rilasciato` con **Annulla esportazione**.
+- Indici: `(codice_articolo, stato)`, `(ordine_cliente_id)`.
+
+### 4.2.17 `ordini_cliente_esportazioni`
+
+Una riga per esportazione verso Integra (le tabelle della Gestione Ordini non si modificano):
+`id`, `ordine_cliente_id`, `quando`, `utente_id`, `tipi` (`OC`, `OF` o entrambi), `file`
+(nomi generati), `righe` JSONB (righe finali dopo alias e kit, con le decisioni
+dell'operatore), `annullata_il`, `annullata_da`. L'ordine è "esportato" se ha
+un'esportazione non annullata.
+
 ### 4.3 Diagramma relazionale
 
 ```
@@ -521,6 +560,11 @@ users 1 ── n eventi_app  (audit append-only, §15)
 ```
 
 ### 4.4 Note di schema
+
+- **Vendita diretta**: `ordini_cliente_testata 1 ── n ordini_cliente_esportazioni`,
+  `ordini_cliente_testata 1 ── n impegni_giacenza`, `codici_alias` e `kit_*` riferiscono
+  `articoli` per codice (testo, non FK: un codice nuovo può arrivare dalla
+  sincronizzazione dopo la creazione dell'alias).
 
 - `interscambio.discount` è il **campo canonico** dello sconto cliente su fornitore
   (§5.7) e determina lo scaglione; `fornitori.discount` ne è solo un default ridondante.
@@ -539,6 +583,26 @@ users 1 ── n eventi_app  (audit append-only, §15)
   ispezionabile a posteriori (§5.8, §7.3).
 - Gli **importi delle provvigioni** si calcolano sul **netto documenti** della pratica
   (§4.2.7.1, §5.3): le note di credito riducono l'imponibile senza generare pratiche a sé.
+
+### 4.5 Sincronizzazione da Integra
+
+| Dato | Vista su Integra (schema `crm_viste`) | Ogni | Note |
+|---|---|---|---|
+| Clienti | `v_clienti` (P.IVA, ragione sociale, indirizzo, codice cliente) | 60 s | un cliente senza P.IVA valida è segnalato in Stato del sistema |
+| Fornitori | `v_fornitori` (P.IVA, ragione sociale, paese, codice fornitore) | 60 s | |
+| Articoli | `v_articoli` (codice, descrizione, EAN, UM, attivo) | 60 s | |
+| Giacenze | `v_giacenze` (codice, quantità) | 15 s | la più frequente: serve al disponibile |
+| Ordini registrati | `v_ordini_registrati` (numero, codice cliente, data) | 60 s | chiude gli impegni (§4.2.16) |
+
+- **Accesso**: utente del database **in sola lettura** (`crm_lettura`), solo sulle viste;
+  le viste le crea chi gestisce Integra. Parametri in Impostazioni → Sincronizzazione da
+  Integra (§7.15).
+- **Incrementale**: dove la vista ha la data di ultima modifica si leggono solo le righe
+  cambiate; le giacenze si leggono intere (sono poche migliaia di righe).
+- **Un solo processo** sul server del CRM, con un passo per vista; ogni giro scrive in
+  `servizi_esecuzioni` (§4.2.15); se un giro fallisce si riprova al successivo e dopo 3
+  fallimenti di fila si apre un problema (§7.14).
+- In ogni pagina che mostra dati di Integra c'è l'ora dell'ultima sincronizzazione.
 
 ---
 
@@ -1240,7 +1304,7 @@ deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'er
 ### 7.14 Stato del sistema (`/sistema`) — amministratore e operatore
 
 - **Riquadri per servizio** (KpiRow, fanno da filtro): *Casella dei documenti*, *Server di
-  lettura (GLM-OCR)*, *Import anagrafiche da Integra*, *Posta in uscita*; per ognuno stato
+  lettura (GLM-OCR)*, *Sincronizzazione da Integra*, *Posta in uscita*; per ognuno stato
   (*Funziona* · *Da tenere d'occhio* · *Problema*), nota (es. "lento: 9,8 s per pagina"),
   ultima esecuzione e ritmo, problemi da vedere.
 - **Problemi** (sinistra): quando, livello (*Errore* · *Attenzione*), servizio, testo e
@@ -1262,11 +1326,11 @@ dove serve, *Prova la connessione*.
 | Casella dei documenti | server IMAP, porta, utente, password, cartella da leggere, cartella dove spostare le email lette, ogni quanti minuti (1–60) |
 | Server di lettura | indirizzo, modello, tempo massimo per documento, **soglie di affidabilità** (affidabile da, bassa sotto; §6.5) |
 | Posta in uscita | server SMTP, porta, utente, password, mittente |
-| Import da Integra | cartella dei file esportati da Integra, ora giornaliera, cosa importare (clienti e/o fornitori) |
+| Sincronizzazione da Integra | server del database, nome del database, utente in sola lettura, password, schema delle viste, ogni quanti secondi (anagrafiche, 10–3600), ogni quanti secondi le giacenze (5–600) (§4.5) |
 | Conservazione dei dati | registro eventi (mesi), documenti scartati (giorni), righe per pagina |
 
 Le **password non si rileggono**: il campo mostra "impostata", si scrive solo per
-sostituirla. Controlli: numeri validi, soglie 0 < bassa < affidabile ≤ 1, ora `hh:mm`.
+sostituirla. Controlli: numeri validi, soglie 0 < bassa < affidabile ≤ 1, intervalli di sincronizzazione nei limiti indicati.
 Ogni salvataggio scrive un evento con i campi cambiati (mai le password).
 
 ### 7.16 Documenti scartati (`/scartati`) — amministratore e operatore
@@ -1282,10 +1346,84 @@ Ogni salvataggio scrive un evento con i campi cambiati (mai le password).
 
 ### 7.17 Guida (`/guida/:argomento`) — tutti
 
-- Argomenti a sinistra (ricerca nel testo), raggruppati *Lavoro · Anagrafiche ·
-  Gestione*; testo a destra con *Apri la pagina* e **chi può modificare** (dai ruoli).
+- Argomenti a sinistra (ricerca nel testo), raggruppati *Lavoro · Vendita diretta ·
+  Anagrafiche · Gestione*; testo a destra con *Apri la pagina* e **chi può modificare** (dai ruoli).
 - **Aiuto contestuale**: ogni pagina con un argomento ha in testata il pulsante *Guida*
   che apre l'argomento giusto. Gli argomenti di gestione si vedono solo con il permesso.
+
+### 7.18 Ordini cliente (`/ordini-cliente`, `/ordini-cliente/:id`) — vendita diretta
+
+Replica la Gestione Ordini per gli ordini dei clienti in **vendita diretta** (articoli che
+Decobrands vende in proprio). Gli ordini entrano dall'ingresso documenti (§6.5) con il
+tipo `ordine_cliente` (§17).
+
+- **Elenco** (sinistra, ElencoSelezionabile): segmenti *Da esportare · Esportati · Tutti*,
+  ricerca per numero o cliente; per ordine numero, cliente, totale, data, righe, fornitore
+  e stati (*Da esportare*, *N problemi*, *N alias*, *N kit*, *Esportato il …*). La voce
+  della barra conta gli ordini da esportare.
+- **Scheda** (destra): cliente con P.IVA, **codice Integra** (rosso se manca), data,
+  fornitore e riferimento, totale, stato dell'esportazione (quando, chi, file); i
+  problemi bloccanti in un riquadro rosso.
+- **Righe**: articolo con pallino (verde = in anagrafica Integra, rosso = no), descrizione,
+  segni *alias → nuovo* e *kit di N componenti*, quantità con UM, prezzo, importo, totale,
+  **disponibile** (giacenza − impegni).
+- **Esporta per Integra** (finestra larga):
+  1. **Codici vecchio → nuovo**: per ogni riga con alias il caso proposto — *A* disponibile
+     il vecchio (nessun cambio), *B* disponibile in parte (divide la riga: il disponibile
+     sul vecchio, il resto sul nuovo), *C* vecchio esaurito (tutto sul nuovo) — con
+     *Applica* e quantità modificabili su vecchio e nuovo (la somma resta l'ordinato);
+     "chiede conferma" se l'alias lo prevede.
+  2. **Kit**: articolo con disponibile ≤ 0 (o assente) e kit attivo → righe dei componenti
+     × quantità ordinata, con il disponibile di ciascuno; *Applica* per riga. Le righe dei
+     componenti escono senza prezzo (Integra lo reperisce).
+  3. **File da generare**: *Ordine cliente (OC)* e/o *Ordine fornitore (OF)*, con i nomi
+     `aaaammgg_codiceIntegra_progressivo_TIPO.xlsx` (progressivo del giorno per cliente).
+  4. **Controlli bloccanti**: data, codice cliente Integra, almeno una riga, codice e
+     quantità di ogni riga, almeno un file scelto. **Avvisi**: articolo non in anagrafica,
+     disponibile minore dell'esportato.
+  5. *Genera i file*: scarica i file (uno per tipo), crea gli impegni (solo la prima
+     volta, §4.2.16), registra l'esportazione (§4.2.17) e l'evento (§15).
+- **Tracciato del file** (uguale alla Gestione Ordini): foglio `Ordine`, una riga per
+  articolo, 28 colonne `mvt_mdtcod` … `mvr_reperisciprezzo`; documento `OC0000` o
+  `OF0000`, serie `OC`/`OF`, tipo anagrafica `C`/`F`, numero `999999`, codice cliente
+  Integra, valuta EUR, riferimento = numero ordine, ordinamento a passi di 5, codice
+  articolo, quantità, prezzo, `SI` in reperisci prezzo; date `gg/mm/aaaa`.
+- *Esporta di nuovo* (ordine già esportato): rigenera i file senza nuovi impegni.
+  *Annulla esportazione*: l'ordine torna da esportare e gli impegni aperti si
+  rilasciano; se Integra lo ha già registrato va annullato anche lì.
+
+### 7.19 Articoli (`/articoli`) — sola lettura
+
+Dati di Integra (§4.5) con l'ora dell'ultima sincronizzazione. Ricerca per codice,
+descrizione o EAN; filtro per UM; segmenti *Tutti · Con alias · Kit · Esauriti*.
+Colonne codice, descrizione (con *alias → nuovo*, *sostituisce …*, *kit · componenti*),
+EAN, UM, disponibile. Il clic apre le giacenze dell'articolo. Gli articoli nuovi si
+creano in Integra.
+
+### 7.20 Giacenze (`/giacenze`, `/giacenze/:codice`) — sola lettura
+
+- Riquadri-filtro: *Esauriti* (disponibile 0), *Negativi* (esportato più del disponibile),
+  *Con impegni aperti*. La voce della barra conta i negativi.
+- Elenco: articolo e descrizione, giacenza di Integra, impegnato, disponibile.
+- Articolo scelto: giacenza in Integra − impegnato dal CRM = disponibile, e i movimenti
+  del CRM (data, ordine con collegamento, quantità, stato *Impegnato* · *Registrato in
+  Integra* · *Rilasciato*).
+
+### 7.21 Alias e kit (`/alias-kit/alias`, `/alias-kit/kit/:codice`) — modifica solo amministratore
+
+Due schede nella stessa pagina (segmenti *Codici vecchio → nuovo · Kit*).
+
+- **Alias**: codice vecchio e nuovo con pallino e disponibile, descrizione ed EAN,
+  *Chiede conferma* (casella modificabile in tabella), *Modifica*, *Elimina* (con
+  conferma). Nuovo/modifica: codice vecchio, codice nuovo (campo di ricerca sugli
+  articoli, compila descrizione ed EAN), conferma. Controlli: entrambi i codici, diversi,
+  un solo alias per codice vecchio, **nessuna catena** (il nuovo non può essere a sua
+  volta un codice vecchio). Il codice nuovo non ancora in Integra è ammesso con avviso.
+- **Kit**: elenco (kit, descrizione, componenti, disponibile, *Spento*) e scheda con
+  *Spegni/Accendi*, *Aggiungi componente*, *Elimina*; componenti con pallino,
+  descrizione, quantità per kit, disponibile, *Modifica*, *Togli*. Controlli: quantità
+  > 0, un kit non contiene se stesso, nessun componente doppio, un solo kit per articolo.
+- Permesso `magazzino` (§8.3); gli altri ruoli vedono senza modificare.
 
 ## 8. API endpoint
 
@@ -1310,7 +1448,7 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
 | POST | `/api/interscambio` | nuova agenzia del cliente |
 | PUT | `/api/interscambio/:id` | modifica agenzia (codice, subagente, sconto) |
 | DELETE | `/api/interscambio/:id` | elimina agenzia |
-| POST | `/api/import-integra` | import periodico clienti e fornitori da Integra (job, admin) |
+| GET | `/api/integra/stato` | ultima sincronizzazione per vista (§4.5) |
 | GET | `/ordini-fornitore` · `/ordini-fornitore/:id` | elenco / dettaglio pratiche |
 | POST | `/api/ordini-fornitore` | crea pratica |
 | PUT | `/api/ordini-fornitore/:id` | aggiorna pratica (stati, conferma, fattura) |
@@ -1337,10 +1475,20 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
 | GET | `/api/eventi/:id` | dettaglio evento (admin) |
 | GET | `/api/eventi/export` | export CSV del log filtrato (admin) |
 
-### 8.2 Modulo ordini cliente (fase successiva, §17)
+### 8.2 Vendita diretta (§7.18–§7.21)
 
-`/api/ordini*`, `/api/lookup/*`, `/api/clienti*`, `/api/utenti*`: API del futuro modulo
-ordini cliente, che sostituirà la Gestione Ordini; non incluse in questa fase.
+| Metodo | Rotta | Descrizione |
+|--------|-------|-------------|
+| GET | `/api/ordini-cliente` · `/api/ordini-cliente/:id` | elenco (filtro esportati) / scheda con righe e disponibile |
+| POST | `/api/ordini-cliente/:id/proposte` | proposte alias e kit (casi A/B/C) calcolate sul disponibile del momento |
+| POST | `/api/ordini-cliente/:id/esporta` | `{tipi: ['OC','OF'], alias: [...], kit: [...]}` → controlli, file xlsx (zip se più di uno), impegni, esportazione (`modifica`) |
+| POST | `/api/ordini-cliente/:id/annulla-esportazione` | rilascia gli impegni aperti (`modifica`) |
+| GET | `/api/articoli` · `/api/giacenze` · `/api/giacenze/:codice` | sola lettura, con disponibile e impegni |
+| GET · POST · PUT · DELETE | `/api/alias` · `/api/alias/:id` | alias (`magazzino` per le scritture) |
+| GET · POST · PUT · DELETE | `/api/kit` · `/api/kit/:codice` · `/api/kit/:codice/componenti/:i` | kit e componenti (`magazzino` per le scritture) |
+
+Il resto della Gestione Ordini (ingresso degli ordini cliente, errori di lettura) resta
+nella fase successiva (§17).
 
 ### 8.3 Autenticazione
 
@@ -1360,6 +1508,7 @@ rotte; ogni rotta dichiara il **permesso** richiesto, verificato lato server
 | Chiudere la liquidazione del trimestre (`chiudi`) | ✓ | ✓ | — |
 | Vedere e recuperare i documenti scartati (`scartati`) | ✓ | ✓ | — |
 | Stato del sistema, segnare i problemi come visti (`sistema`) | ✓ | ✓ | — |
+| Alias e kit: creare, modificare, eliminare (`magazzino`) | ✓ | — | — |
 | Utenti e ruoli, impostazioni, eliminazione definitiva degli scartati (`gestione`) | ✓ | — | — |
 
 **Sola lettura** nell'interfaccia: fascia "Profilo in sola lettura: puoi consultare ed
@@ -1632,6 +1781,15 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 > Il **rendiconto** §7.8 è calcolato al volo (GET = nessun evento); diventa un evento
 > **solo quando viene esportato**.
 
+#### 15.2.6.1 Vendita diretta (§8.2)
+
+| Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
+|------------------|--------|----------|----------|---------|-------------|
+| POST `/esporta` | `export` | `export` | `ordine_cliente` | `successo` | `{etichetta: numero, tipi, file, n_righe, alias_applicati, kit_applicati, impegni_creati}` |
+| POST `/annulla-esportazione` | `stato` | `change_state` | `ordine_cliente` | `successo` | `{etichetta, impegni_rilasciati}` |
+| CRUD alias / kit / componenti | `crud` | `create`·`update`·`delete` | `alias` · `kit` | `successo` | `{etichetta, prima, dopo}` |
+| Sincronizzazione che chiude impegni | `stato` | `change_state` | `ordine_cliente` | `successo` | `{etichetta, impegni_registrati}` (utente di sistema) |
+
 #### 15.2.7 Errori di sistema
 
 | Evento | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
@@ -1871,11 +2029,11 @@ Fino ad allora resta in esercizio, invariata, sullo stesso database.
 | Aspetto | Indicazione |
 |---|---|
 | Prerequisito | ingresso documenti (§6.5) in esercizio e tarato sui documenti reali |
-| Ambito | ordini cliente (testata + righe), controllo P.IVA e codici articolo (anagrafica, alias, kit), giacenze, esportazione CSV verso Integra, errori di lettura, anagrafiche clienti/articoli/utenti |
+| Ambito | ingresso degli ordini cliente dall'ingresso documenti, errori di lettura, spegnimento di n8n. **Già progettato nel prototipo** (§7.18–§7.21, da approvare nel piano): ordini cliente con esportazione OC/OF per Integra, articoli, giacenze con impegni, alias e kit |
 | Ingresso | gli ordini cliente entrano dallo **stesso ingresso documenti** del CRM, con un nuovo tipo `ordine_cliente` e il suo schema; si spegne il flusso n8n + LlamaIndex |
 | Interfaccia | stile e componenti standard del CRM (§16.4); la finestra di correzione di §6.5 sostituisce la vista ordine attuale (PDF a sinistra, dati a destra) |
 | Dati | tabelle esistenti (`ordini_cliente_*`, `clienti`, `articoli`, …) riusate; migrazione solo se servono colonne nuove (affidabilità, riferimento a `documenti_in_arrivo`) |
-| Esportazione verso Integra | **da analizzare**: per la sola **commercializzazione diretta** (fatture cliente o fornitore di articoli che Decobrands vende in proprio) i documenti vanno esportati verso Integra come fa oggi la Gestione Ordini, con **sostituzione dei codici articolo (alias)** e **esplosione dei kit**; qui servono l'anagrafica articoli e il relativo controllo, assenti nel giro agenzia (§6.5) |
+| Esportazione verso Integra | definita in §7.18: file Ordine cliente (OC) e Ordine fornitore (OF) con il tracciato della Gestione Ordini, alias e kit applicati, impegni sul disponibile fino alla registrazione in Integra |
 | Passaggio | i due sistemi in parallelo per un periodo di prova, poi spegnimento di n8n e della vecchia app |
 | Stima | da quotare a parte dopo la messa in esercizio del CRM |
 

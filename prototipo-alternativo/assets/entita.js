@@ -120,4 +120,16 @@
     filtri: ctx => [{ nome: 'mese', tipo: 'select', valore: ctx.mese ? String(ctx.mese) : '', opzioni: [{ value: '', label: 'Tutti i mesi' }].concat(M.MESI.map((m, i) => ({ value: String(i + 1), label: m[0].toUpperCase() + m.slice(1) }))) }],
     filtra: (x, v) => (!v.mese || Number(x.doc.data.slice(5, 7)) === Number(v.mese))
   });
+  /* Articoli dell'anagrafica Integra (vendita diretta, sincronizzati dalle viste): per kit e alias. */
+  CRM.Entita('articoloAnag', {
+    titolo: 'Articolo (anagrafica Integra)',
+    voci: () => M.S.articoli, chiave: a => a.codice, testo: a => a.codice,
+    dettaglio: a => a.descrizione + ' · ' + a.um + (M.disponibile(a.codice) != null ? ' · disponibile ' + M.num(M.disponibile(a.codice)) : ''), cerca: a => a.descrizione + ' ' + (a.ean || ''),
+    colonne: [
+      { key: 'codice', header: 'Codice' },
+      { key: 'descrizione', header: 'Descrizione', grow: true },
+      { key: 'um', header: 'UM' },
+      { key: 'disp', header: 'Disponibile', tipo: 'numero', valore: a => M.disponibile(a.codice) }
+    ]
+  });
 })();

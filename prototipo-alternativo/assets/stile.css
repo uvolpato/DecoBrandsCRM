@@ -621,3 +621,15 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .barra-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 3px; }
 .barra > .marchio, .barra > .carica-barra, .barra > .barra-piede { flex: none; }
 @media (max-width: 860px) { .barra { height: auto; overflow: visible; } .barra-menu { display: contents; } }
+
+/* ---------- Vendita diretta (ordini cliente, articoli, giacenze, alias e kit) ---------- */
+.testo-attesa { color: var(--attesa-testo); font-weight: 600; }
+.cod-anag { display: inline-flex; align-items: center; gap: 6px; }
+.nota.nota-errore { background: var(--errore-tenue, #fdecec); color: var(--errore-testo, #842029); border-radius: 8px; padding: 8px 12px; margin-top: 10px; }
+.nota.nota-attesa { background: var(--attesa-tenue, #fff4d6); color: var(--attesa-testo); border-radius: 8px; padding: 8px 12px; margin-top: 10px; }
+.esp-titolo { font-size: 14px; font-weight: 600; margin: 16px 0 8px; }
+.esp-titolo:first-child { margin-top: 0; }
+.scelte-tipi { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qta-cella { width: 80px; text-align: right; padding: 3px 6px; }
+.qta-cella:disabled { opacity: .45; }
+.modale.larga .modale-corpo { flex: 1 1 auto; min-height: 0; }

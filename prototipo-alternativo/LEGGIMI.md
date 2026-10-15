@@ -14,10 +14,13 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | Ogni mese | **Bollettini** | Matrice fornitore × mese: verificato, da decidere, pronto, atteso (fino al giorno del fornitore), non arrivato (con sollecito) |
 | | Bollettino | Riconciliazione **a cerniera**: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura |
 | Ogni trimestre | **Liquidazioni** | Trimestri fissi, elenco dei subagenti con documenti nel trimestre (clic = filtro, regge qualsiasi numero), documenti liquidabili o in attesa, esportazione (completa per subagente, un solo subagente, solo riepilogo) in Excel, PDF identico all'Excel o CSV di soli dati, chiusura |
+| Vendita diretta | **Ordini cliente** | Come la Gestione Ordini: ordini dei clienti con controllo degli articoli (pallino), disponibile per riga, *Esporta per Integra* con alias (casi A/B/C, quantità modificabili), kit, file **Ordine cliente (OC)** e/o **Ordine fornitore (OF)** nel tracciato di Integra; le quantità esportate restano impegnate finché Integra non registra l'ordine; *Annulla esportazione* le rilascia |
+| | **Articoli**, **Giacenze** | Da Integra in sola lettura (viste sul database, sincronizzazione ogni 15–60 secondi). Disponibile = giacenza di Integra − impegni; riquadri esauriti, negativi, con impegni aperti |
+| | **Alias e kit** | Codici vecchio → nuovo (con "chiede conferma") e kit (articolo → componenti × quantità, acceso/spento); modifiche solo all'amministratore |
 | Anagrafiche | Fornitori, Subagenti, Clienti | Clienti e fornitori da Integra in **sola lettura**; nel CRM condizioni, percentuali **datate**, eccezioni, subagenti e **agenzie del cliente** (fornitore, codice, subagente, sconto) |
 | Gestione (gruppo richiudibile) | **Utenti e ruoli** | Utenti condivisi con la Gestione Ordini; ruoli *Amministratore*, *Operatore*, *Sola lettura*; nuova password via email; tabella di cosa può fare ogni ruolo |
-| | **Stato del sistema** | Casella dei documenti, server di lettura, import da Integra, posta in uscita: stato, problemi da vedere (contatore nella barra), ultime esecuzioni |
-| | **Impostazioni** | Dati azienda, casella IMAP, server di lettura e soglie, posta in uscita, import Integra, conservazione; password mai rilette |
+| | **Stato del sistema** | Casella dei documenti, server di lettura, sincronizzazione da Integra, posta in uscita: stato, problemi da vedere (contatore nella barra), ultime esecuzioni |
+| | **Impostazioni** | Dati azienda, casella IMAP, server di lettura e soglie, posta in uscita, sincronizzazione da Integra (database, viste, ogni quanti secondi), conservazione; password mai rilette |
 | | **Documenti scartati** | Scarto con motivo; recupero (operatore) o eliminazione definitiva (amministratore) |
 | | **Guida** | Argomenti per pagina con ricerca; pulsante *Guida* in testata a ogni pagina |
 
@@ -37,7 +40,7 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 ## Regole di flusso applicate
 
 - **Si torna sempre indietro, nello stesso punto**: ogni schermata aperta da un'altra ha *‹ Torna a …* in testa (come il tasto Indietro del browser); al ritorno filtri, riquadri scelti, ordinamento delle tabelle e scorrimento sono come li avevi lasciati. Prova: Pratiche → filtra, ordina, scorri → apri una pratica → *Torna a Pratiche*.
-- **Anagrafiche**: clienti e fornitori arrivano da Integra (sola lettura); i subagenti si gestiscono per intero nel CRM.
+- **Dati di Integra**: clienti, fornitori, articoli e giacenze si leggono da viste sul database di Integra, sincronizzate ogni pochi secondi (sola lettura, niente file da importare); i subagenti, alias e kit si gestiscono nel CRM.
 - **Bollettino atteso**: ogni fornitore ha nelle condizioni il giorno del mese successivo entro cui manda il bollettino (iniziale 10). Fino a quel giorno il bollettino è *atteso* (Prossime scadenze), dopo diventa *non arrivato* e in Oggi compare il sollecito.
 
 - **Lo stato della pratica non si scrive a mano**: si ricava dai documenti (ordine → in attesa/in ritardo; conferma → confermata; fattura → fatturata). La nota di credito è un documento, non uno stato.
@@ -56,7 +59,8 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 4. **Bollettini** → Gries luglio → *Accetta il loro importo* sulla riga con la promozione → *Segna come verificato*: si sbloccano 505,80 € ai subagenti.
 5. **Liquidazioni**: il 3° trimestre si aggiorna; prova *Esporta in Excel* con le tre scelte e i tre formati.
 6. **Bollettini** → Gasper agosto: la fattura F-2026-0933 manca → *Contesta* → *Prepara la contestazione*.
-7. **Carica documenti** (barra a sinistra) con un file qualsiasi: arriva la fattura F-2026-0951 → abbinala. Ricarica: arriva l'ordine OF/2026/052 → *Apri la pratica*. In **Bollettini** → *Carica un bollettino*: Gasper giugno → *Registra e verifica*.
+7. **Ordini cliente** → OC-2026-118 → *Esporta per Integra*: VASA-3050 si divide 20 sul vecchio e 40 sul nuovo, KIT-BALC60 esaurito diventa balconetta + sottobalconetta; scegli OC e OF → *Genera i file*. In **Giacenze** → BALC-601 compare l'impegno; *Prototipo: simula la registrazione in Integra* lo chiude.
+8. **Carica documenti** (barra a sinistra) con un file qualsiasi: arriva la fattura F-2026-0951 → abbinala. Ricarica: arriva l'ordine OF/2026/052 → *Apri la pratica*. In **Bollettini** → *Carica un bollettino*: Gasper giugno → *Registra e verifica*.
 
 Le modifiche restano salvate nel browser; *Ripristina i dati di prova* (in basso a sinistra) riporta tutto all'inizio. Data simulata: 4 settembre 2026.
 

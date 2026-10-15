@@ -46,16 +46,31 @@
     { id: 'clienti', titolo: 'Clienti', gruppo: 'Anagrafiche', vai: '#/clienti', testo: [
       'Anagrafica da Integra, in sola lettura. Per ogni cliente le agenzie: i fornitori per cui Decobrands fa da agente, con codice cliente del fornitore, subagente e sconto.',
       'Il codice cliente del fornitore serve ad abbinare in automatico i documenti.'] },
+    { id: 'ordini-cliente', titolo: 'Ordini cliente', gruppo: 'Vendita diretta', vai: '#/ordini-cliente', testo: [
+      'Gli ordini dei clienti in vendita diretta, da controllare ed esportare per Integra. Il pallino verde dice che l’articolo è nell’anagrafica di Integra.',
+      '<b>Esporta per Integra</b> mostra i cambi di codice (alias) e i kit da applicare: puoi spegnerli o spostare le quantità fra codice vecchio e nuovo. Poi scegli i file: <b>Ordine cliente (OC)</b>, <b>Ordine fornitore (OF)</b> o entrambi.',
+      'L’esportazione si blocca se mancano data, codice cliente di Integra, codici o quantità delle righe.',
+      'Le quantità esportate restano <b>impegnate</b> finché la sincronizzazione vede l’ordine registrato in Integra. <b>Annulla esportazione</b> rilascia gli impegni ancora aperti.'] },
+    { id: 'articoli', titolo: 'Articoli', gruppo: 'Vendita diretta', vai: '#/articoli', testo: [
+      'Anagrafica degli articoli letta da Integra (viste sul database, sincronizzazione ogni minuto): in sola lettura.',
+      'Per ogni articolo: UM, EAN, disponibile, eventuale alias o kit. Un clic apre le giacenze dell’articolo.'] },
+    { id: 'giacenze', titolo: 'Giacenze', gruppo: 'Vendita diretta', vai: '#/giacenze', testo: [
+      'La giacenza arriva da Integra ogni pochi secondi. Il CRM sottrae le quantità già esportate e non ancora registrate: il risultato è il <b>disponibile</b>.',
+      'I riquadri filtrano gli articoli esauriti, negativi o con impegni aperti; un articolo mostra gli ordini che lo hanno impegnato.'] },
+    { id: 'alias-kit', titolo: 'Alias e kit', gruppo: 'Vendita diretta', vai: '#/alias-kit', testo: [
+      '<b>Alias</b>: quando un articolo cambia codice. All’esportazione si usa il vecchio finché è disponibile, poi il nuovo (con divisione della riga se serve). "Chiede conferma" fa comparire il cambio per essere confermato.',
+      '<b>Kit</b>: un articolo esaurito si sostituisce con i suoi componenti, ognuno moltiplicato per la quantità ordinata. Un kit spento non si applica.',
+      'Modificare alias e kit è riservato agli amministratori.'] },
     { id: 'utenti', titolo: 'Utenti e ruoli', gruppo: 'Gestione', vai: '#/utenti', testo: [
       'Gli utenti sono gli stessi della Gestione Ordini: stesse credenziali.',
       'Ruoli: <b>Amministratore</b> (tutto), <b>Operatore</b> (lavoro quotidiano e anagrafiche del CRM), <b>Sola lettura</b> (consulta ed esporta, non modifica).',
       '<b>Invia nuova password</b> manda un’email con una password temporanea da cambiare al primo accesso.',
       'Deve restare almeno un amministratore attivo; non puoi cambiare il tuo ruolo né disattivarti.'] },
     { id: 'sistema', titolo: 'Stato del sistema', gruppo: 'Gestione', vai: '#/sistema', testo: [
-      'Lo stato dei servizi che girano da soli: casella dei documenti, server di lettura, import da Integra, posta in uscita.',
+      'Lo stato dei servizi che girano da soli: casella dei documenti, server di lettura, sincronizzazione da Integra, posta in uscita.',
       'I problemi nuovi hanno il contatore nella barra; aprili per leggere cosa è successo e cosa fare, poi segnali come visti.'] },
     { id: 'impostazioni', titolo: 'Impostazioni', gruppo: 'Gestione', vai: '#/impostazioni', testo: [
-      'Dati dell’azienda per i prospetti, casella dei documenti, server di lettura e soglie di affidabilità, posta in uscita, import da Integra, conservazione dei dati.',
+      'Dati dell’azienda per i prospetti, casella dei documenti, server di lettura e soglie di affidabilità, posta in uscita, sincronizzazione da Integra, conservazione dei dati.',
       'Le password non si rileggono: si sostituiscono. Ogni modifica resta nel registro eventi.'] },
     { id: 'scartati', titolo: 'Documenti scartati', gruppo: 'Gestione', vai: '#/scartati', testo: [
       'I documenti scartati restano qui per il numero di giorni fissato nelle impostazioni, con motivo e autore.',
@@ -106,7 +121,7 @@
       { etichetta: 'Password', valore: u.cambio_password ? CRM.stato('attesa', 'da cambiare al prossimo accesso') : 'impostata dall’utente' },
       { etichetta: 'Ultimo invio password', valore: u.ultimo_invio ? quando(u.ultimo_invio.quando) + (u.ultimo_invio.errore ? '<span class="sec-riga negativo">' + e(u.ultimo_invio.errore) + '</span>' : '') : '—' }
     ], { inColonne: true });
-    if (protetto) CRM.Nota(p.corpo, 'Utente usato dai servizi automatici (lettura della casella, import da Integra): non si modifica e non accede all’app.').style.marginTop = '10px';
+    if (protetto) CRM.Nota(p.corpo, 'Utente usato dai servizi automatici (lettura della casella, sincronizzazione da Integra): non si modifica e non accede all’app.').style.marginTop = '10px';
     else {
       const az = CRM.blocco(p.corpo, 'azioni-riga');
       const b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'btn sec piccolo'; b1.textContent = u.attivo ? 'Disattiva' : 'Riattiva';
@@ -190,7 +205,7 @@
     const S = M.S.sistema, nome = id => (S.servizi.find(x => x.id === id) || {}).nome || id;
     const nuovi = S.problemi.filter(x => !x.visto);
     const corpo = CRM.Pagina({ voce: 'sistema', titolo: 'Stato del sistema', pieno: true,
-      sottotitolo: 'I servizi che lavorano da soli: lettura della casella, lettura dei documenti, import da Integra, invio email.',
+      sottotitolo: 'I servizi che lavorano da soli: lettura della casella, lettura dei documenti, sincronizzazione da Integra, invio email.',
       azioni: [{ etichetta: 'Controlla adesso', icona: 'sistema', variante: 'sec', onClick: () => {
         const ora = M.oggi() + 'T' + new Date().toTimeString().slice(0, 5);
         S.servizi.forEach(s => { s.ultimo = ora; }); S.esecuzioni.unshift({ quando: ora, servizio: 'casella', esito: 'ok', testo: 'controllo manuale: nessuna email nuova' });
@@ -256,10 +271,12 @@
       { nome: 'server', etichetta: 'Server (SMTP)', valore: s.server }, { nome: 'porta', etichetta: 'Porta', tipo: 'numero', valore: s.porta },
       { nome: 'utente', etichetta: 'Utente', valore: s.utente }, { nome: 'password', etichetta: 'Password', tipo: 'password', impostata: s.password },
       { nome: 'mittente', etichetta: 'Mittente', valore: s.mittente, largo: true }] },
-    { id: 'integra', titolo: 'Import da Integra', sotto: 'anagrafiche clienti e fornitori', campi: s => [
-      { nome: 'percorso', etichetta: 'Cartella dei file esportati da Integra', valore: s.percorso, largo: true },
-      { nome: 'ora', etichetta: 'Ogni giorno alle', valore: s.ora, placeholder: 'hh:mm' },
-      { nome: 'cosa', etichetta: 'Importa', tipo: 'select', valore: s.clienti && s.fornitori ? 'entrambi' : s.clienti ? 'clienti' : 'fornitori', opzioni: [{ value: 'entrambi', label: 'Clienti e fornitori' }, { value: 'clienti', label: 'Solo clienti' }, { value: 'fornitori', label: 'Solo fornitori' }] }] },
+    { id: 'integra', titolo: 'Sincronizzazione da Integra', sotto: 'viste sul database di Integra', campi: s => [
+      { nome: 'server', etichetta: 'Server del database', valore: s.server }, { nome: 'database', etichetta: 'Database', valore: s.database },
+      { nome: 'utente', etichetta: 'Utente (sola lettura)', valore: s.utente }, { nome: 'password', etichetta: 'Password', tipo: 'password', impostata: s.password },
+      { nome: 'schema', etichetta: 'Schema delle viste', valore: s.schema, aiuto: 'Clienti, fornitori, articoli, giacenze, registrazioni degli ordini.' },
+      { nome: 'secondi', etichetta: 'Anagrafiche ogni (secondi)', tipo: 'numero', valore: s.secondi, aiuto: 'Da 10 a 3600.' },
+      { nome: 'secondi_giacenze', etichetta: 'Giacenze e registrazioni ogni (secondi)', tipo: 'numero', valore: s.secondi_giacenze, aiuto: 'Da 5 a 600.' }] },
     { id: 'conservazione', titolo: 'Conservazione dei dati', sotto: 'per quanto restano registro e scartati', campi: s => [
       { nome: 'eventi_mesi', etichetta: 'Registro eventi (mesi)', tipo: 'numero', valore: s.eventi_mesi, aiuto: 'Poi le righe più vecchie vengono eliminate in automatico.' },
       { nome: 'scartati_giorni', etichetta: 'Documenti scartati (giorni)', tipo: 'numero', valore: s.scartati_giorni },
@@ -286,7 +303,7 @@
     az.appendChild(salva);
     if (sez.id === 'casella' || sez.id === 'lettura' || sez.id === 'posta' || sez.id === 'integra') {
       const prova = document.createElement('button'); prova.type = 'button'; prova.className = 'btn sec consentito'; prova.textContent = 'Prova la connessione';
-      prova.addEventListener('click', () => CRM.Avviso(sez.id === 'lettura' ? 'Server di lettura raggiungibile · modello ' + (dati.modello || '') : sez.id === 'integra' ? 'Cartella raggiungibile · ultimo file del 04/09/2026 06:00' : 'Connessione riuscita'));
+      prova.addEventListener('click', () => CRM.Avviso(sez.id === 'lettura' ? 'Server di lettura raggiungibile · modello ' + (dati.modello || '') : sez.id === 'integra' ? 'Database di Integra raggiungibile · 6 viste lette · ultima sincronizzazione ' + quando(M.S.sincronizzato) : 'Connessione riuscita'));
       az.appendChild(prova);
     }
     salva.addEventListener('click', () => {
@@ -295,10 +312,9 @@
       for (const c of numeri) if (v[c.nome] === '' || isNaN(Number(v[c.nome]))) { form.errore(c.etichetta + ': inserisci un numero.'); return; }
       if (sez.id === 'lettura' && !(Number(v.soglia_bassa) > 0 && Number(v.soglia_bassa) < Number(v.soglia_ok) && Number(v.soglia_ok) <= 1)) { form.errore('Le soglie devono essere fra 0 e 1, con "bassa" minore di "affidabile".'); return; }
       if (sez.id === 'casella' && !(Number(v.minuti) >= 1 && Number(v.minuti) <= 60)) { form.errore('Controlla ogni: da 1 a 60 minuti.'); return; }
-      if (sez.id === 'integra' && !/^\d{2}:\d{2}$/.test(v.ora)) { form.errore('Ora nel formato hh:mm, per esempio 06:00.'); return; }
+      if (sez.id === 'integra' && !(Number(v.secondi) >= 10 && Number(v.secondi) <= 3600 && Number(v.secondi_giacenze) >= 5 && Number(v.secondi_giacenze) <= 600)) { form.errore('Anagrafiche: da 10 a 3600 secondi; giacenze: da 5 a 600.'); return; }
       sez.campi(dati).forEach(c => {
         if (c.tipo === 'password') { if (v[c.nome]) dati[c.nome] = true; return; }
-        if (c.nome === 'cosa') { dati.clienti = v.cosa !== 'fornitori'; dati.fornitori = v.cosa !== 'clienti'; return; }
         dati[c.nome] = c.tipo === 'numero' ? Number(v[c.nome]) : v[c.nome];
       });
       if (sez.id === 'lettura') M.soglie();
