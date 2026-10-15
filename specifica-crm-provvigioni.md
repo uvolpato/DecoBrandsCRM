@@ -901,6 +901,28 @@ giusta, e decidere se proporre la funzione al cliente (e in che forma).
    funzione. Se un evidenziatore sbagliato è più frequente della soglia, è meglio non
    mostrarlo: un riquadro nel punto sbagliato confonde più di nessun riquadro.
 
+#### 6.6.4 Fonti (consultate il 15/10/2026)
+
+Cosa è stato verificato su ciascuna fonte e cosa resta da confermare nella prova F0-A7.
+
+| Fonte | Cosa dice | Uso nel §6.6 |
+|---|---|---|
+| [GLM-OCR — repository ufficiale (zai-org)](https://github.com/zai-org/GLM-OCR) | Analisi in due fasi: **analisi della pagina con PP-DocLayout-V3** e lettura in parallelo dei blocchi; l'SDK restituisce Markdown + **JSON con i dettagli dei blocchi** (`result.json_result`); opzione `pipeline.layout.use_polygon`; servizio in proprio con **vLLM ≥ 0.19** (`vllm serve zai-org/GLM-OCR`) o SGLang. | Fonte (b) del punto 4 della prova; installazione del server (F0-A6). |
+| [GLM-OCR — scheda del modello (Hugging Face)](https://huggingface.co/zai-org/GLM-OCR) | Due modalità: **lettura del documento** (richieste "Text Recognition:", "Table Recognition:", "Formula Recognition:") ed **estrazione di informazioni**, con richiesta che "deve seguire uno schema JSON rigoroso". L'esempio di estrazione **non contiene coordinate**. | Conferma che l'estrazione con schema (§6.5 punto 3) dà **solo i valori**: la posizione va ricavata a parte. |
+| [Z.AI — Layout Parsing, documentazione API](https://docs.z.ai/api-reference/tools/layout-parsing) | Ogni blocco (`layout_details`) ha `index`, `label` (`text`, `table`, `formula`, `image`), `content` (testo o **HTML della tabella**), `bbox_2d` = `[x1, y1, x2, y2]` **normalizzati 0–1**, larghezza e altezza della pagina. **Nessuna coordinata per riga o parola.** | Esito `approssimata` sul blocco (§6.6.1); motivo per cui serve una fonte parola per parola. |
+| [DebuggerCafe — GLM-OCR in proprio con vLLM](https://debuggercafe.com/self-hosting-glm-ocr-using-vllm-document-layout-and-ocr/) | Esempio di uscita del pacchetto in proprio: blocchi con `index`, `label`, `content` (tabella in Markdown), `bbox_2d` **in interi** (es. `[90, 66, 940, 966]`, verosimilmente scala 0–1000) e `polygon` a 4 punti. | **Da verificare** nella prova: scala e origine delle coordinate in proprio (diverse dall'API, che usa 0–1). |
+| [GLM-OCR — segnalazione #241](https://github.com/zai-org/GLM-OCR/issues/241) | Su una tabella letta **ritagliata** dal suo `bbox_2d` si sono persi i separatori decimali (10,72 → 1072) in un'installazione su Apple/MLX; non riprodotto con vLLM; causa non confermata. | Rischio da controllare nella prova sui numeri con la virgola (importi tedeschi/italiani). |
+| [PaddleOCR — analisi della pagina (PP-DocLayout)](https://www.paddleocr.ai/latest/en/version3.x/module_usage/layout_analysis.html) | Modulo che riconosce i blocchi della pagina e ne restituisce i riquadri; fa parte della stessa famiglia di strumenti che offre il rilevamento e la lettura **a livello di riga/parola** (PP-OCR). | Fonte (c) per gli scansionati, da valutare nella prova. |
+| [PDF.js (Mozilla)](https://mozilla.github.io/pdf.js/) | Disegna le pagine PDF nel browser ed espone il testo della pagina con la posizione di ogni pezzo di testo. | Visualizzazione (§6.6.1) e fonte (a) lato server con `pdfjs-dist`. |
+| [pdfplumber](https://github.com/jsvine/pdfplumber) | Estrae da un PDF digitale parole e caratteri con le coordinate. | Alternativa alla fonte (a). |
+| [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) | Lettore con uscita **hOCR** (testo con riquadro per parola). | Alternativa alla fonte (c). |
+| [exceljs](https://github.com/exceljs/exceljs) | Legge e scrive file xlsx: celle, formati, celle unite, larghezze di colonna. | Bollettini Excel (§6.6.2 C), già previsto in §6.5. |
+
+**Non ancora verificato** (da chiudere nella prova F0-A7): scala e origine di
+`bbox_2d` nel pacchetto in proprio; possibilità di ottenere dal pacchetto GLM-OCR
+coordinate più fini del blocco; quota reale di PDF digitali e scansionati nei documenti
+di Decobrands; tempi e memoria video con analisi della pagina attiva.
+
 ## 7. Schermate
 
 | # | Route | Schermata |

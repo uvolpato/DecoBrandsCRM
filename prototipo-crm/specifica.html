@@ -1864,6 +1864,73 @@ giusta, e decidere se proporre la funzione al cliente (e in che forma).</p>
    funzione. Se un evidenziatore sbagliato è più frequente della soglia, è meglio non
    mostrarlo: un riquadro nel punto sbagliato confonde più di nessun riquadro.</li>
 </ol>
+<h4 id="sec-6-6-4">6.6.4 Fonti (consultate il 15/10/2026)</h4>
+<p>Cosa è stato verificato su ciascuna fonte e cosa resta da confermare nella prova F0-A7.</p>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Fonte</th>
+<th>Cosa dice</th>
+<th>Uso nel §6.6</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/zai-org/GLM-OCR">GLM-OCR — repository ufficiale (zai-org)</a></td>
+<td>Analisi in due fasi: <strong>analisi della pagina con PP-DocLayout-V3</strong> e lettura in parallelo dei blocchi; l'SDK restituisce Markdown + <strong>JSON con i dettagli dei blocchi</strong> (<code>result.json_result</code>); opzione <code>pipeline.layout.use_polygon</code>; servizio in proprio con <strong>vLLM ≥ 0.19</strong> (<code>vllm serve zai-org/GLM-OCR</code>) o SGLang.</td>
+<td>Fonte (b) del punto 4 della prova; installazione del server (F0-A6).</td>
+</tr>
+<tr>
+<td><a href="https://huggingface.co/zai-org/GLM-OCR">GLM-OCR — scheda del modello (Hugging Face)</a></td>
+<td>Due modalità: <strong>lettura del documento</strong> (richieste "Text Recognition:", "Table Recognition:", "Formula Recognition:") ed <strong>estrazione di informazioni</strong>, con richiesta che "deve seguire uno schema JSON rigoroso". L'esempio di estrazione <strong>non contiene coordinate</strong>.</td>
+<td>Conferma che l'estrazione con schema (§6.5 punto 3) dà <strong>solo i valori</strong>: la posizione va ricavata a parte.</td>
+</tr>
+<tr>
+<td><a href="https://docs.z.ai/api-reference/tools/layout-parsing">Z.AI — Layout Parsing, documentazione API</a></td>
+<td>Ogni blocco (<code>layout_details</code>) ha <code>index</code>, <code>label</code> (<code>text</code>, <code>table</code>, <code>formula</code>, <code>image</code>), <code>content</code> (testo o <strong>HTML della tabella</strong>), <code>bbox_2d</code> = <code>[x1, y1, x2, y2]</code> <strong>normalizzati 0–1</strong>, larghezza e altezza della pagina. <strong>Nessuna coordinata per riga o parola.</strong></td>
+<td>Esito <code>approssimata</code> sul blocco (§6.6.1); motivo per cui serve una fonte parola per parola.</td>
+</tr>
+<tr>
+<td><a href="https://debuggercafe.com/self-hosting-glm-ocr-using-vllm-document-layout-and-ocr/">DebuggerCafe — GLM-OCR in proprio con vLLM</a></td>
+<td>Esempio di uscita del pacchetto in proprio: blocchi con <code>index</code>, <code>label</code>, <code>content</code> (tabella in Markdown), <code>bbox_2d</code> <strong>in interi</strong> (es. <code>[90, 66, 940, 966]</code>, verosimilmente scala 0–1000) e <code>polygon</code> a 4 punti.</td>
+<td><strong>Da verificare</strong> nella prova: scala e origine delle coordinate in proprio (diverse dall'API, che usa 0–1).</td>
+</tr>
+<tr>
+<td><a href="https://github.com/zai-org/GLM-OCR/issues/241">GLM-OCR — segnalazione #241</a></td>
+<td>Su una tabella letta <strong>ritagliata</strong> dal suo <code>bbox_2d</code> si sono persi i separatori decimali (10,72 → 1072) in un'installazione su Apple/MLX; non riprodotto con vLLM; causa non confermata.</td>
+<td>Rischio da controllare nella prova sui numeri con la virgola (importi tedeschi/italiani).</td>
+</tr>
+<tr>
+<td><a href="https://www.paddleocr.ai/latest/en/version3.x/module_usage/layout_analysis.html">PaddleOCR — analisi della pagina (PP-DocLayout)</a></td>
+<td>Modulo che riconosce i blocchi della pagina e ne restituisce i riquadri; fa parte della stessa famiglia di strumenti che offre il rilevamento e la lettura <strong>a livello di riga/parola</strong> (PP-OCR).</td>
+<td>Fonte (c) per gli scansionati, da valutare nella prova.</td>
+</tr>
+<tr>
+<td><a href="https://mozilla.github.io/pdf.js/">PDF.js (Mozilla)</a></td>
+<td>Disegna le pagine PDF nel browser ed espone il testo della pagina con la posizione di ogni pezzo di testo.</td>
+<td>Visualizzazione (§6.6.1) e fonte (a) lato server con <code>pdfjs-dist</code>.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jsvine/pdfplumber">pdfplumber</a></td>
+<td>Estrae da un PDF digitale parole e caratteri con le coordinate.</td>
+<td>Alternativa alla fonte (a).</td>
+</tr>
+<tr>
+<td><a href="https://github.com/tesseract-ocr/tesseract">Tesseract OCR</a></td>
+<td>Lettore con uscita <strong>hOCR</strong> (testo con riquadro per parola).</td>
+<td>Alternativa alla fonte (c).</td>
+</tr>
+<tr>
+<td><a href="https://github.com/exceljs/exceljs">exceljs</a></td>
+<td>Legge e scrive file xlsx: celle, formati, celle unite, larghezze di colonna.</td>
+<td>Bollettini Excel (§6.6.2 C), già previsto in §6.5.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Non ancora verificato</strong> (da chiudere nella prova F0-A7): scala e origine di
+<code>bbox_2d</code> nel pacchetto in proprio; possibilità di ottenere dal pacchetto GLM-OCR
+coordinate più fini del blocco; quota reale di PDF digitali e scansionati nei documenti
+di Decobrands; tempi e memoria video con analisi della pagina attiva.</p>
 </section>
 <section id="sec-7">
 <h2>7. Schermate</h2>
