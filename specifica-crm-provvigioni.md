@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 2.5 — liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 2.6 — esportazione della liquidazione in Excel: completa, un subagente, solo riepilogo (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -82,7 +82,7 @@ agenti.html             # anagrafica agenti e subagenti
 clienti.html            # clienti (da Integra) con le loro agenzie (interscambio)
 bollettini.html         # controllo bollettini
 bollettino-dettaglio.html
-liquidazione.html       # rendiconto provvigioni subagenti + export CSV
+liquidazione.html       # rendiconto provvigioni subagenti + esportazione Excel (§11)
 ```
 
 Componenti condivise:
@@ -1246,7 +1246,7 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
 | POST | `/api/bollettini/:id/righe` | aggiunge riga (calcolo atteso + differenza) |
 | DELETE | `/api/bollettini/:id/righe/:rid` | elimina riga |
 | GET | `/liquidazione` | rendiconto provvigioni |
-| GET | `/api/liquidazione/export` | export CSV della liquidazione (§11) |
+| GET | `/api/liquidazione/export?anno&trimestre&scelta=tutto\|uno\|riepilogo&subagente` | file Excel della liquidazione (§11) |
 | GET | `/documenti` · `/api/documenti` | ingresso documenti: elenco da controllare (§7.9) |
 | POST | `/api/documenti/carica` | caricamento manuale (uno o più file) → coda |
 | GET | `/api/documenti/:id` · `/api/documenti/:id/file` | dati letti con affidabilità e posizioni · file originale |
@@ -1310,7 +1310,38 @@ restano quelli congelati nel bollettino (§5.11).
 
 ## 11. Esportazione liquidazione
 
-Campi dell'export (come richiesto da Matteo, punto 6):
+L'esportazione è sempre **di un trimestre** ed è un **file Excel** (.xlsx) curato nella
+presentazione. Dalla pagina Liquidazioni, pulsante *Esporta in Excel*, si sceglie:
+
+| Scelta | Contenuto del file | Nome file |
+|---|---|---|
+| **Tutto il trimestre, diviso per subagente** | foglio **Riepilogo** + **un foglio per subagente** con il dettaglio dei documenti e il suo totale | `Liquidazione_<anno>_T<n>_completa.xlsx` |
+| **Un solo subagente** (preselezionato se filtrato nella pagina) | il foglio di quel subagente: dettaglio + totale | `Liquidazione_<anno>_T<n>_<Nome_Cognome>.xlsx` |
+| **Solo il riepilogo** | il foglio **Riepilogo** | `Liquidazione_<anno>_T<n>_riepilogo.xlsx` |
+
+Compaiono solo i subagenti con documenti nel trimestre.
+
+**Foglio Riepilogo** — una riga per subagente: subagente, **numero documenti**,
+**imponibile**, **provvigione da liquidare** e, solo a trimestre aperto, **in attesa dei
+bollettini**; riga **Totale** con formule `SUM`; nel file completo il nome del
+subagente è un collegamento al suo foglio.
+
+**Foglio del subagente** — i **documenti liquidabili** con gli 8 campi qui sotto, ordinati
+per data; riga **Totale** (importo documento e provvigione, formule `SUM`); se ci sono
+documenti **in attesa dei bollettini** (fornitori sul maturato, §5.5) seguono in una
+sezione a parte, **non** compresi nel totale, con il motivo.
+
+**Presentazione** (uguale in tutti i fogli): titolo, periodo, riga di contesto
+(Decobrands SRL, stato del trimestre, data di generazione) con filetto blu; intestazione
+della tabella su fondo azzurro chiaro, testo blu scuro; importi `#,##0.00 €` con
+negativi in rosso e zero come trattino; date come date Excel (`gg/mm/aaaa`);
+percentuale come `0,00%`; riga totale su fondo grigio chiaro con filetto; griglia
+nascosta, intestazione bloccata e filtro automatico; stampa orizzontale A4 adattata in
+larghezza, intestazione ripetuta e piè di pagina "Decobrands SRL · foglio · pagina n di
+N". Nell'app il file si genera lato server con la stessa libreria (`exceljs`); nel
+prototipo: `prototipo-alternativo/assets/esporta-liquidazione.js`.
+
+Campi del dettaglio (come richiesto da Matteo, punto 6):
 
 1. Fornitore
 2. Numero documento (fattura)
@@ -1482,7 +1513,7 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
-| GET `/api/liquidazione/export` | `export` | `export` | `liquidazione` | `successo` | `{etichetta: trimestre/anno, periodo: {trimestre, anno}, filtro: {fornitori?: number[], subagente?}, n_righe, importo_totale}` |
+| GET `/api/liquidazione/export` | `export` | `export` | `liquidazione` | `successo` | `{etichetta: trimestre/anno, periodo: {trimestre, anno}, scelta: tutto|uno|riepilogo, subagente?, n_righe, importo_totale}` |
 | export con errori (dati/campi mancanti) | `export` | `export` | `liquidazione` | `errore` | `{etichetta, periodo, motivo}` |
 
 > Il **rendiconto** §7.8 è calcolato al volo (GET = nessun evento); diventa un evento

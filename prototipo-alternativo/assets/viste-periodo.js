@@ -171,7 +171,7 @@
       voce: 'liquidazioni', titolo: 'Liquidazioni', pieno: true,
       sottotitolo: 'Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre.',
       azioni: [
-        { etichetta: 'Scarica i prospetti', icona: 'scarica', variante: 'sec', disabilitato: !liquidabili.length, onClick: () => scarica(a, t, liquidabili) },
+        { etichetta: 'Esporta in Excel', icona: 'scarica', variante: 'sec', disabilitato: !righe.length, titolo: righe.length ? '' : 'Nessun documento nel trimestre', onClick: () => esporta(a, t, righe) },
         { etichetta: st.chiave === 'chiusa' ? 'Liquidazione chiusa' : 'Chiudi il trimestre', icona: 'spunta', disabilitato: !puoChiudere, titolo: perche, onClick: async () => {
           if (!(await CRM.Conferma('Chiudere la liquidazione del ' + t + '° trimestre?', 'Gli importi vengono fissati: ' + M.euro(totLiq) + ' a ' + new Set(liquidabili.map(r => r.subagente_id)).size + ' subagenti.', 'Chiudi il trimestre'))) return;
           M.chiudiTrimestre(a, t); M.salva(); CRM.Avviso('Liquidazione del ' + t + '° trimestre chiusa'); CRM.naviga();
@@ -230,11 +230,36 @@
       emptyText: 'Nessun documento', emptyHint: 'Nessuna fattura o nota di credito con data in questo trimestre.'
     });
   });
-  function scarica(a, t, righe) {
-    M.S.subagenti.forEach(s => {
-      const rr = righe.filter(r => r.subagente_id === s.id);
-      if (rr.length) CRM.scarica('liquidazione_' + a + '_T' + t + '_' + s.nome.replace(/\s+/g, '_') + '.csv', M.csvLiquidazione(rr));
+  /* Esporta in Excel: tutto il trimestre (riepilogo + un foglio per subagente), un solo subagente, o solo il riepilogo. */
+  function esporta(a, t, righe) {
+    const subs = M.S.subagenti.filter(s => righe.some(r => r.subagente_id === s.id)).sort((x, y) => x.nome.localeCompare(y.nome));
+    let scelta = subSel ? 'uno' : 'tutto';
+    const SCELTE = [
+      { v: 'tutto', t: 'Tutto il trimestre, diviso per subagente', d: 'Foglio Riepilogo + un foglio per ognuno dei ' + subs.length + ' subagenti con il dettaglio dei documenti e il totale.' },
+      { v: 'uno', t: 'Un solo subagente', d: 'Il dettaglio dei suoi documenti e il suo totale.' },
+      { v: 'riepilogo', t: 'Solo il riepilogo', d: 'Una riga per subagente: documenti, imponibile, provvigione da liquidare' + (M.statoTrimestre(a, t).chiave !== 'chiusa' ? ' e in attesa dei bollettini.' : '.') }
+    ];
+    CRM.Modale({
+      titolo: 'Esporta la liquidazione del ' + t + '° trimestre ' + a, testo: 'File Excel con i campi concordati: fornitore, numero e data documento, codice cliente, ragione sociale, importo, % e importo provvigionale.',
+      corpo: c => {
+        c.innerHTML = '<div class="scelte-esporta" role="radiogroup" aria-label="Cosa esportare">' + SCELTE.map(x =>
+          '<label class="scelta-esporta"><input type="radio" name="esporta" value="' + x.v + '"' + (x.v === scelta ? ' checked' : '') + '><span><b>' + e(x.t) + '</b><span>' + e(x.d) + '</span>' +
+          (x.v === 'uno' ? '<select class="filtro-select" id="esporta-sub" aria-label="Subagente">' + subs.map(s => '<option value="' + s.id + '"' + (String(s.id) === subSel ? ' selected' : '') + '>' + e(s.nome) + '</option>').join('') + '</select>' : '') +
+          '</span></label>').join('') + '</div>';
+        const sel = CRM.$('#esporta-sub', c);
+        const agg = () => { sel.disabled = scelta !== 'uno'; };
+        CRM.$$('input[name=esporta]', c).forEach(i => i.addEventListener('change', () => { scelta = i.value; agg(); }));
+        sel.addEventListener('focus', () => { scelta = 'uno'; CRM.$('input[value=uno]', c).checked = true; agg(); });
+        agg();
+      },
+      azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Scarica l’Excel', onClick: (chiudi, corpo) => {
+        const sub = CRM.$('#esporta-sub', corpo).value;
+        CRM.esportaLiquidazione(a, t, scelta, sub).then(nome => {
+          if (!nome) return;
+          M.annota('Esportata la liquidazione del ' + t + '° trimestre ' + a + (scelta === 'uno' ? ' di ' + M.subagente(Number(sub)).nome : scelta === 'riepilogo' ? ' (riepilogo)' : ' (completa)')); M.salva();
+          CRM.Avviso('Scaricato ' + nome);
+        });
+      } }]
     });
-    CRM.Avviso('Prospetti scaricati: uno per subagente, con gli 8 campi concordati');
   }
 })();

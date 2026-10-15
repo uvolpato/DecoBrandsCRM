@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.5 — liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.6 — esportazione della liquidazione in Excel: completa, un subagente, solo riepilogo (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -156,7 +156,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.5 — liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.6 — esportazione della liquidazione in Excel: completa, un subagente, solo riepilogo (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -279,7 +279,7 @@ agenti.html             # anagrafica agenti e subagenti
 clienti.html            # clienti (da Integra) con le loro agenzie (interscambio)
 bollettini.html         # controllo bollettini
 bollettino-dettaglio.html
-liquidazione.html       # rendiconto provvigioni subagenti + export CSV
+liquidazione.html       # rendiconto provvigioni subagenti + esportazione Excel (§11)
 </code></pre>
 <p>Componenti condivise:</p>
 <ul>
@@ -2440,8 +2440,8 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).</p>
 </tr>
 <tr>
 <td>GET</td>
-<td><code>/api/liquidazione/export</code></td>
-<td>export CSV della liquidazione (§11)</td>
+<td><code>/api/liquidazione/export?anno&amp;trimestre&amp;scelta=tutto\|uno\|riepilogo&amp;subagente</code></td>
+<td>file Excel della liquidazione (§11)</td>
 </tr>
 <tr>
 <td>GET</td>
@@ -2558,7 +2558,53 @@ restano quelli congelati nel bollettino (§5.11).</p>
 </section>
 <section id="sec-11">
 <h2>11. Esportazione liquidazione</h2>
-<p>Campi dell'export (come richiesto da Matteo, punto 6):</p>
+<p>L'esportazione è sempre <strong>di un trimestre</strong> ed è un <strong>file Excel</strong> (.xlsx) curato nella
+presentazione. Dalla pagina Liquidazioni, pulsante <em>Esporta in Excel</em>, si sceglie:</p>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Scelta</th>
+<th>Contenuto del file</th>
+<th>Nome file</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Tutto il trimestre, diviso per subagente</strong></td>
+<td>foglio <strong>Riepilogo</strong> + <strong>un foglio per subagente</strong> con il dettaglio dei documenti e il suo totale</td>
+<td><code>Liquidazione_&lt;anno&gt;_T&lt;n&gt;_completa.xlsx</code></td>
+</tr>
+<tr>
+<td><strong>Un solo subagente</strong> (preselezionato se filtrato nella pagina)</td>
+<td>il foglio di quel subagente: dettaglio + totale</td>
+<td><code>Liquidazione_&lt;anno&gt;_T&lt;n&gt;_&lt;Nome_Cognome&gt;.xlsx</code></td>
+</tr>
+<tr>
+<td><strong>Solo il riepilogo</strong></td>
+<td>il foglio <strong>Riepilogo</strong></td>
+<td><code>Liquidazione_&lt;anno&gt;_T&lt;n&gt;_riepilogo.xlsx</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Compaiono solo i subagenti con documenti nel trimestre.</p>
+<p><strong>Foglio Riepilogo</strong> — una riga per subagente: subagente, <strong>numero documenti</strong>,
+<strong>imponibile</strong>, <strong>provvigione da liquidare</strong> e, solo a trimestre aperto, <strong>in attesa dei
+bollettini</strong>; riga <strong>Totale</strong> con formule <code>SUM</code>; nel file completo il nome del
+subagente è un collegamento al suo foglio.</p>
+<p><strong>Foglio del subagente</strong> — i <strong>documenti liquidabili</strong> con gli 8 campi qui sotto, ordinati
+per data; riga <strong>Totale</strong> (importo documento e provvigione, formule <code>SUM</code>); se ci sono
+documenti <strong>in attesa dei bollettini</strong> (fornitori sul maturato, §5.5) seguono in una
+sezione a parte, <strong>non</strong> compresi nel totale, con il motivo.</p>
+<p><strong>Presentazione</strong> (uguale in tutti i fogli): titolo, periodo, riga di contesto
+(Decobrands SRL, stato del trimestre, data di generazione) con filetto blu; intestazione
+della tabella su fondo azzurro chiaro, testo blu scuro; importi <code>#,##0.00 €</code> con
+negativi in rosso e zero come trattino; date come date Excel (<code>gg/mm/aaaa</code>);
+percentuale come <code>0,00%</code>; riga totale su fondo grigio chiaro con filetto; griglia
+nascosta, intestazione bloccata e filtro automatico; stampa orizzontale A4 adattata in
+larghezza, intestazione ripetuta e piè di pagina "Decobrands SRL · foglio · pagina n di
+N". Nell'app il file si genera lato server con la stessa libreria (<code>exceljs</code>); nel
+prototipo: <code>prototipo-alternativo/assets/esporta-liquidazione.js</code>.</p>
+<p>Campi del dettaglio (come richiesto da Matteo, punto 6):</p>
 <ol>
 <li>Fornitore</li>
 <li>Numero documento (fattura)</li>
@@ -3119,7 +3165,7 @@ eventi</strong>: <code>calcolo/verify</code> + <code>stato/change_state</code>.<
 <td><code>export</code></td>
 <td><code>liquidazione</code></td>
 <td><code>successo</code></td>
-<td><code>{etichetta: trimestre/anno, periodo: {trimestre, anno}, filtro: {fornitori?: number[], subagente?}, n_righe, importo_totale}</code></td>
+<td><code>{etichetta: trimestre/anno, periodo: {trimestre, anno}, scelta: tutto|uno|riepilogo, subagente?, n_righe, importo_totale}</code></td>
 </tr>
 <tr>
 <td>export con errori (dati/campi mancanti)</td>

@@ -563,3 +563,12 @@ a.m-cella:hover { background: #f1f6ff; }
 .pannello.compatto .elenco li { font-size: 12.5px; padding: 6px 0; }
 
 .testo-attesa { color: var(--attesa-testo); }
+
+/* Esporta liquidazione: scelte */
+.scelte-esporta { display: flex; flex-direction: column; gap: 8px; }
+.scelta-esporta { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--bordo); border-radius: 8px; cursor: pointer; }
+.scelta-esporta:has(input:checked) { border-color: var(--primario); background: var(--primario-tenue); }
+.scelta-esporta input { margin-top: 3px; accent-color: var(--primario); }
+.scelta-esporta > span { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.scelta-esporta > span > span { font-size: 13px; color: var(--testo-tenue); }
+.scelta-esporta select { margin-top: 6px; max-width: 260px; }

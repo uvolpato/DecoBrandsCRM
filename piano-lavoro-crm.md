@@ -178,7 +178,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 |---|---|---|---|---|
 | **F4-A1** Filtri (incl. **multifiltro fornitori**), KPI periodo, tab Riepilogo per subagente | 1 | F0 | `liquidazione.html` (dropdown checkbox "Tutti/Fornitori (n)/Nessun", `.table-box`, `tfoot` totale) | §7.8, §6.3, §15.2.6 |
 | **F4-A2** Tab Dettaglio rendiconto (13 colonne, contatore, `.table-box`) | 1 | F0, F4-A1 | `liquidazione.html` tab dettaglio | §7.8, §15.2.6 |
-| **F4-A3** Export CSV 8 campi (§11) + trimestri | 1 | F4-A2 | `esportaCSV()` di `liquidazione.html` | §11, §8.1 (`/api/liquidazione/export`), §15.2.6 |
+| **F4-A3** Esportazione Excel (§11): completa per subagente, un subagente, solo riepilogo; 8 campi, totali con formule, presentazione curata + trimestri | 3 (era 1: +2 h da approvare) | F4-A2 | `prototipo-alternativo/assets/esporta-liquidazione.js` | §11, §8.1 (`/api/liquidazione/export`), §15.2.6 |
 
 - **DoD:** solo pratiche `fatturate` del trimestre del subagente; KPI = somma righe; export = 8 campi §11; evento `export/export` solo al download.
 

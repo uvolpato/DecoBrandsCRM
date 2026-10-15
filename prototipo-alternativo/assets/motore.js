@@ -237,13 +237,6 @@
     M.S.liquidazioni_chiuse.push({ anno: a, trimestre: t, chiusa_il: M.oggi() });
     M.annota('Liquidazione ' + t + '° trimestre ' + a + ' chiusa');
   };
-  M.csvLiquidazione = function (righe) {
-    const q = v => '"' + String(v).replace(/"/g, '""') + '"';
-    const intest = ['Fornitore', 'N. documento', 'Data documento', 'Codice cliente', 'Ragione sociale', 'Importo documento', '% provvigione', 'Importo provvigionale'];
-    const corpo = righe.map(r => [r.fornitore.nome, r.doc.numero, M.data(r.doc.data), r.codice_cliente, M.nomeCliente(r.cliente),
-      r.importo.toFixed(2).replace('.', ','), String(r.pct).replace('.', ','), r.provvigione.toFixed(2).replace('.', ',')].map(q).join(';'));
-    return '﻿' + intest.map(q).join(';') + '\n' + corpo.join('\n');
-  };
 
   /* ---------- Documenti in arrivo: proposta di abbinamento ---------- */
   M.importoLetto = d => d.tipo === 'bollettino' ? M.r2(d.righe.reduce((s, r) => s + r.importo, 0)) : M.importoDoc(d);
