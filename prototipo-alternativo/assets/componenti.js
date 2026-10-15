@@ -36,6 +36,7 @@
     componenti: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     cerca: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
     indietro: '<path d="M15 18l-6-6 6-6"/>',
+    chiudi: '<path d="M6 6l12 12M18 6L6 18"/>',
     spunta: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
     scarica: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
@@ -112,7 +113,7 @@
     const velo = el('div', 'velo velo-pieno');
     velo.innerHTML = '<div class="affiancata" role="dialog" aria-modal="true" aria-labelledby="aff-t">' +
       '<div class="modale-testa aff-testa"><div><h2 id="aff-t">' + esc(opz.titolo) + '</h2>' + (opz.sottotitolo ? '<p>' + opz.sottotitolo + '</p>' : '') + '</div>' +
-      '<button type="button" class="btn testo aff-chiudi" aria-label="Chiudi">✕</button></div>' +
+      '<button type="button" class="btn-chiudi aff-chiudi" aria-label="Chiudi" title="Chiudi (Esc)">' + CRM.icona('chiudi') + '</button></div>' +
       '<div class="aff-corpo"><div class="aff-sx"></div><div class="aff-divisore" role="separator" aria-orientation="vertical" tabindex="0" title="Trascina per allargare"></div><div class="aff-dx"></div></div>' +
       '<div class="modale-piede aff-piede"><div class="aff-piede-info"></div></div></div>';
     const sx = $('.aff-sx', velo), dx = $('.aff-dx', velo), piede = $('.aff-piede', velo), info = $('.aff-piede-info', velo);

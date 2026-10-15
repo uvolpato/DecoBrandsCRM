@@ -25,6 +25,8 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 - Le righe sono una **DataTable** standard (ordinabile, totale fisso) con celle modificabili. Il codice articolo è un campo di ricerca sugli articoli già usati dal fornitore nei documenti registrati (nel giro agenzia gli articoli non sono nell'anagrafica Decobrands): pallino verde se noto, rosso se nuovo; un articolo nuovo si inserisce lo stesso e non conta fra i punti da controllare. *Aggiungi riga* apre una finestra modale: scegliendo un articolo noto propone descrizione e ultimo prezzo.
 - **Prova:** conferma AB-77120 di Gries → quantità della riga 3 letta 12 ma stampata 18 (il totale non torna) e codice della riga 8 letto CI0T-387 con lo zero (affidabilità 86 %) → correggi in 18 e CIOT-387, conferma data e prezzo della riga 5 → lettura affidabile.
 
+> ⚠ **Evidenziazione nel documento: funzione da verificare.** Nel prototipo il documento a sinistra è una pagina simulata, quindi l'evidenziazione è sempre precisa. Con i file reali dipende dal file: attesa precisa sui PDF da gestionale e sugli Excel, possibile approssimata o assente sugli scansionati. La fattibilità si misura con la prova F0-A7 (specifica §6.6) prima di confermarla al cliente.
+
 ## Regole di flusso applicate
 
 - **Si torna sempre indietro, nello stesso punto**: ogni schermata aperta da un'altra ha *‹ Torna a …* in testa (come il tasto Indietro del browser); al ritorno filtri, riquadri scelti, ordinamento delle tabelle e scorrimento sono come li avevi lasciati. Prova: Pratiche → filtra, ordina, scorri → apri una pratica → *Torna a Pratiche*.

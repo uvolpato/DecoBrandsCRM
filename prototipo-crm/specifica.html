@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.2 — Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.2 — Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -86,6 +86,7 @@
               <li class="nav-item"><a class="nav-link" href="#sec-6-3">6.3 Flusso liquidazione subagenti</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-6-4">6.4 Flusso anagrafiche</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-6-5">6.5 Ingresso documenti (senza n8n, GLM-OCR in locale)</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-6-6">6.6 Evidenziazione del valore nel documento — DA VERIFICARE</a></li>
             </ul>
           </li>
           <li class="nav-item">
@@ -155,7 +156,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.2 — <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.2 — <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -1415,9 +1416,14 @@ alla <strong>taratura</strong> delle soglie sui documenti reali.</p>
 <td>0–1 (§6.5)</td>
 </tr>
 <tr>
-<td><code>pagina</code> · <code>riquadro</code></td>
-<td>INT · JSONB</td>
-<td>posizione nel PDF (<code>x, y, w, h</code> normalizzati) per l'evidenziazione</td>
+<td><code>posizione</code></td>
+<td>JSONB</td>
+<td>dove si trova il valore nel file, per l'evidenziazione (§6.6): PDF <code>{tipo:'pdf', pagina, x0, y0, x1, y1}</code> normalizzati 0–1; Excel <code>{tipo:'excel', foglio, cella}</code> o <code>{…, riga}</code>; <code>null</code> se non trovato</td>
+</tr>
+<tr>
+<td><code>precisione</code></td>
+<td>VARCHAR(12)</td>
+<td><code>esatta</code> | <code>approssimata</code> | <code>assente</code> — come è stata trovata la posizione (§6.6)</td>
 </tr>
 <tr>
 <td><code>verificato</code></td>
@@ -1644,8 +1650,8 @@ caricamento manuale ──┴─► coda `documenti_in_arrivo` ─► lettura GL
    - prompt di estrazione e <strong>uscita vincolata allo schema JSON</strong> del tipo di documento
      (testata + righe; bollettino: righe documento/imponibile/%/importo);
    - <code>logprobs</code> attivi, per calcolare l'affidabilità;
-   - pipeline di riconoscimento dei blocchi di pagina per ricavare la posizione dei
-     valori nel PDF.
+   - la <strong>posizione dei valori</strong> nel file si ricava a parte, con il metodo e i limiti
+     descritti in §6.6 (funzione da verificare).
    I documenti su più pagine si leggono pagina per pagina e le righe si uniscono.
    Gli Excel dei bollettini si leggono direttamente con <code>exceljs</code>, senza modello.</li>
 <li><strong>Affidabilità per campo</strong> (0–1), calcolata dal backend dalle probabilità dei
@@ -1696,8 +1702,8 @@ caricamento manuale ──┴─► coda `documenti_in_arrivo` ─► lettura GL
 <li><strong>Correzione.</strong> "Correggi i dati letti" apre una finestra a tutto schermo: a
    sinistra il PDF (divisore trascinabile), a destra testata e righe modificabili
    (aggiungi/elimina riga); i campi incerti hanno bordo giallo/rosso con l'affidabilità
-   al passaggio del mouse; selezionando un campo si evidenzia nel PDF il blocco da cui è
-   stato letto; ogni campo corretto o confermato diventa <code>verificato</code>. Salvando si
+   al passaggio del mouse; selezionando un campo si evidenzia nel PDF il punto da cui è
+   stato letto, <strong>se la posizione è stata trovata</strong> (§6.6, funzione da verificare); ogni campo corretto o confermato diventa <code>verificato</code>. Salvando si
    ricalcolano controlli e abbinamento proposto.</li>
 <li><strong>Taratura.</strong> Ogni correzione resta in <code>documenti_campi</code> (letto, finale,
    affidabilità): dopo le prime centinaia di documenti si fissano le soglie per
@@ -1706,6 +1712,158 @@ caricamento manuale ──┴─► coda `documenti_in_arrivo` ─► lettura GL
 <p><strong>Requisiti del server di lettura:</strong> GPU NVIDIA con driver CUDA, vLLM e modello
 <code>zai-org/GLM-OCR</code> (0,9 miliardi di parametri); la memoria video necessaria va
 verificata nella prova F0-A6. Il server è a carico del cliente.</p>
+<h3 id="sec-6-6">6.6 Evidenziazione del valore nel documento — DA VERIFICARE</h3>
+<blockquote>
+<p>⚠ <strong>Funzione non garantita.</strong> Evidenziare nel PDF (o nell'Excel) il punto da cui è
+stato letto un valore dipende dal tipo e dalla qualità del file. Sui PDF generati da
+gestionale ci si aspetta che funzioni bene; sui documenti <strong>scansionati o fotografati</strong>
+l'evidenziazione può risultare <strong>approssimata o mancare</strong>. La correzione dei dati
+funziona comunque: l'evidenziazione è un aiuto, non un requisito per salvare.
+La fattibilità si decide con la <strong>prova F0-A7</strong> (sotto) su documenti reali, <strong>prima</strong>
+di impegnarsi con il cliente; l'esito (percentuali misurate) gli viene comunicato.</p>
+</blockquote>
+<p><strong>Perché serve una soluzione a parte.</strong> GLM-OCR in modalità <em>estrazione con schema JSON</em>
+(quella usata per leggere i dati, §6.5 punto 3) restituisce <strong>solo i valori</strong>, senza
+posizione. La modalità <em>analisi della pagina</em> dello stesso pacchetto restituisce i
+<strong>blocchi</strong> della pagina (testo, tabella, immagine) con il loro riquadro (<code>bbox_2d</code>,
+coordinate normalizzate) ma <strong>non</strong> la posizione di singole parole, righe o celle: il
+contenuto di un blocco tabella è HTML/Markdown senza coordinate. La posizione del
+singolo valore va quindi ricavata <strong>cercando il valore letto</strong> in una fonte che abbia
+le coordinate parola per parola.</p>
+<h4 id="sec-6-6-1">6.6.1 Visualizzazione (uguale per tutti i casi)</h4>
+<ul>
+<li><strong>PDF:</strong> ogni pagina si disegna con <strong>PDF.js</strong> come immagine nel browser; sopra c'è
+  uno <strong>strato trasparente</strong> della stessa dimensione dove si disegnano i rettangoli di
+  evidenziazione, posizionati in <strong>percentuale</strong> della pagina (restano allineati a ogni
+  ingrandimento). Il file originale non si tocca.</li>
+<li><strong>Excel:</strong> il foglio si ricostruisce come tabella HTML (larghezze di colonna, celle
+  unite, formato dei numeri) con <code>exceljs</code>; l'evidenziazione colora la <strong>cella</strong> o la
+  <strong>riga</strong> (indirizzo esatto, nessuna coordinata da calcolare).</li>
+<li><strong>Tre esiti</strong>, visibili all'operatore:</li>
+</ul>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th><code>precisione</code></th>
+<th>Come appare</th>
+<th>Quando</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>esatta</code></td>
+<td>rettangolo pieno sul valore (o sulla riga)</td>
+<td>valore trovato nelle parole del file o nella cella Excel</td>
+</tr>
+<tr>
+<td><code>approssimata</code></td>
+<td>rettangolo tratteggiato sul <strong>blocco</strong> (es. tabella) o sulla <strong>fascia</strong> della riga</td>
+<td>trovato solo il blocco o la riga, non il valore</td>
+</tr>
+<tr>
+<td><code>assente</code></td>
+<td>nessun rettangolo; scritta "posizione non trovata"</td>
+<td>valore non trovato</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="sec-6-6-2">6.6.2 Come si trova la posizione</h4>
+<p><strong>A. PDF digitale</strong> (con strato di testo: quasi tutte le conferme e fatture da
+gestionale). Si estraggono le <strong>parole con le coordinate</strong> dallo strato di testo
+(<code>pdfjs-dist</code> lato server, oppure <code>pdfplumber</code>), si <strong>normalizza</strong> il valore letto e lo
+si cerca:
+- importi: varianti <code>1.234,56</code> / <code>1234,56</code> / <code>1,234.56</code> / <code>1234.56</code>; date: <code>03.09.2026</code>,
+  <code>03/09/2026</code>, <code>2026-09-03</code>, <code>3. Sep. 2026</code>; codici: maiuscole, senza spazi, con le
+  confusioni tipiche <code>O/0</code>, <code>I/1</code>, <code>S/5</code>, <code>B/8</code>;
+- se il valore compare più volte, si sceglie l'occorrenza <strong>vicina all'etichetta</strong>
+  attesa (testata: "Datum", "Rechnung Nr.", "Kunden-Nr.", "Summe", "Gesamtbetrag"…;
+  dizionario per fornitore) oppure <strong>sulla riga giusta</strong> (righe: vedi sotto);
+- <strong>righe:</strong> si cerca il <strong>codice articolo</strong> della riga N; le parole con la stessa
+  ordinata (±½ altezza di riga) formano la fascia della riga; quantità e prezzo si
+  cercano dentro quella fascia. Il rettangolo della riga è l'unione delle sue parole.</p>
+<p><strong>B. PDF scansionato o foto</strong> (nessuno strato di testo). Serve una lettura che dia le
+<strong>parole con il riquadro</strong>: si valuta nella prova, in quest'ordine,
+1. un lettore a livello di parola affiancato a GLM-OCR solo per le posizioni
+   (<strong>PaddleOCR</strong> PP-OCRv5 rilevamento + riconoscimento, oppure <strong>Tesseract</strong> con uscita
+   hOCR), poi la stessa ricerca del punto A con confronto <strong>tollerante</strong> (distanza di
+   modifica ≤ 1–2 caratteri sui codici, numeri uguali dopo la normalizzazione);
+2. in mancanza, i <strong>blocchi</strong> dell'analisi della pagina GLM-OCR (<code>bbox_2d</code>): esito
+   <code>approssimata</code> sul blocco (es. intera tabella o riquadro dei totali); per le righe
+   la fascia si stima dividendo il blocco tabella per il numero di righe (solo se le
+   righe hanno altezza regolare).</p>
+<p><strong>C. Excel</strong> (bollettini). Il valore è certo e l'indirizzo è noto: si legge con
+<code>exceljs</code> e per ogni campo si salva <code>{foglio, cella}</code>; per una riga <code>{foglio, riga}</code>.
+Il rischio non è la lettura ma l'<strong>interpretazione</strong> del foglio:
+- <strong>mappa delle colonne per fornitore</strong> (nuova colonna <code>fornitori.mappa_excel</code> JSONB:
+  foglio, riga di intestazione, colonna → campo, righe da saltare): proposta in
+  automatico dalle intestazioni ("Rechnung", "Netto", "Provision", "%"), <strong>confermata
+  la prima volta</strong> dall'operatore e riusata dalle volte successive;
+- <strong>punti da controllare</strong> al posto dell'affidabilità di lettura: colonna non
+  riconosciuta, intestazioni diverse dalla mappa salvata, righe scartate (subtotali,
+  note), celle con testo al posto di un numero (<code>"1.234,50"</code>), celle unite nelle righe
+  dati, totale del foglio ≠ somma delle righe;
+- la finestra "Correggi i dati letti" resta la stessa (foglio a sinistra, dati a
+  destra, clic su un punto → cella evidenziata).</p>
+<h4 id="sec-6-6-3">6.6.3 Prova di fattibilità F0-A7 — cosa estrarre e come</h4>
+<p>Obiettivo: <strong>misurare</strong> su documenti reali quanto spesso la posizione si trova e se è
+giusta, e decidere se proporre la funzione al cliente (e in che forma).</p>
+<ol>
+<li><strong>Campione</strong> (fornito dal cliente): per Gries, Gasper, Ing's e un altro fornitore,
+   10 conferme + 10 fatture + 3 note di credito + 3 bollettini PDF + 3 bollettini Excel,
+   <strong>includendo</strong> tutti gli scansionati disponibili. Totale indicativo 100–120 file.</li>
+<li><strong>Classificazione:</strong> per ogni PDF si verifica se ha lo strato di testo (parole
+   estraibili). La quota di <strong>digitali</strong> decide gran parte dell'esito.</li>
+<li><strong>Estrazione dei valori</strong> (già prevista in F0-A6): GLM-OCR via vLLM, schema JSON per
+   tipo documento, <code>logprobs</code> → valori + affidabilità per campo.</li>
+<li><strong>Estrazione delle posizioni</strong>, tre fonti a confronto sullo stesso campione:
+   - (a) parole + coordinate dallo strato di testo (<code>pdfjs-dist</code>/<code>pdfplumber</code>);
+   - (b) GLM-OCR <strong>analisi della pagina</strong> (SDK <code>glmocr</code> con PP-DocLayoutV3): blocchi con
+     etichetta e <code>bbox_2d</code>, HTML delle tabelle; si annota formato e sistema di
+     coordinate effettivi, tempi per pagina e memoria video;
+   - (c) per gli scansionati: PaddleOCR (o Tesseract hOCR) parole + riquadri.</li>
+<li><strong>Abbinamento valore → posizione</strong> con lo script di ricerca del §6.6.2
+   (normalizzazione, etichette, ancora sul codice articolo) per ogni campo di testata e
+   ogni riga.</li>
+<li><strong>Verifica a mano</strong> su ~300 campi estratti a caso: la posizione evidenziata è quella
+   giusta? Si classificano <code>esatta</code> corretta / <code>esatta</code> sbagliata / <code>approssimata</code> /
+   <code>assente</code>.</li>
+<li><strong>Misure</strong> per tipo di file (digitale, scansionato, Excel) e per campo (testata,
+   righe): % trovati, % <strong>errati</strong> (il caso peggiore: evidenzia il punto sbagliato),
+   tempo aggiuntivo per documento.</li>
+<li><strong>Soglie di decisione</strong> (proposte):</li>
+</ol>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Esito</th>
+<th>Criterio</th>
+<th>Decisione</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Verde</td>
+<td>digitali: testata ≥ 95 % e righe ≥ 90 % <code>esatta</code> corretta, errati ≤ 1 %</td>
+<td>funzione inclusa per i PDF digitali e gli Excel</td>
+</tr>
+<tr>
+<td>Giallo</td>
+<td>scansionati: ≥ 70 % <code>esatta</code> o <code>approssimata</code> corretta, errati ≤ 3 %</td>
+<td>inclusa come aiuto "approssimato" per gli scansionati, con la scritta di avviso</td>
+</tr>
+<tr>
+<td>Rosso</td>
+<td>sotto le soglie o errati &gt; 3 %</td>
+<td>sugli scansionati nessuna evidenziazione: solo il PDF a fianco e la ricerca manuale</td>
+</tr>
+</tbody>
+</table></div>
+<ol start="9">
+<li><strong>Consegna:</strong> tabella dei risultati, esempi visivi (buoni e cattivi), raccomandazione
+   e impatto sulle ore di F6-A2/F6-A4. <strong>Solo dopo</strong> si conferma al cliente cosa farà la
+   funzione. Se un evidenziatore sbagliato è più frequente della soglia, è meglio non
+   mostrarlo: un riquadro nel punto sbagliato confonde più di nessun riquadro.</li>
+</ol>
 </section>
 <section id="sec-7">
 <h2>7. Schermate</h2>

@@ -132,6 +132,13 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **Output:** GLM-OCR servito da vLLM sul server GPU del cliente; conferme, fatture e bollettini di 2–3 fornitori reali (Gries + un importatore) letti con lo schema e i `logprobs`; tabella esito per campo (valore atteso, letto, affidabilità); memoria video e tempi per pagina misurati.
 - **DoD:** esito documentato; prime soglie di affidabilità proposte; stima dell'adattamento per fornitore consegnata al cliente prima di F6-A2.
 
+#### F0-A7 · Prova di fattibilità: evidenziazione del valore nel documento — 6 h · **FUORI PREVENTIVO, DA APPROVARE**
+- **Dipende da:** F0-A6 (stesso campione e stesso server) · **Blocca:** la parte "posizione" di F6-A2 e l'evidenziazione di F6-A4
+- **Riferimenti:** spec §6.6 (in particolare §6.6.3), §4.2.13 `posizione` / `precisione`
+- **Output:** classificazione dei PDF del campione (digitali / scansionati); posizioni ricavate da tre fonti (strato di testo con `pdfjs-dist`/`pdfplumber`; analisi della pagina GLM-OCR con PP-DocLayoutV3; PaddleOCR o Tesseract per gli scansionati); script di abbinamento valore → posizione; verifica a mano su ~300 campi; mappa delle colonne per i bollettini Excel di ogni fornitore.
+- **DoD:** tabella esiti per tipo di file e per campo (% esatta corretta, approssimata, assente, **errata**); esito verde/giallo/rosso secondo le soglie §6.6.3; raccomandazione scritta da consegnare al cliente **prima** di confermare la funzione; ore di F6-A2/F6-A4 riviste di conseguenza.
+- **Nota:** finché la prova non è fatta, la funzione è presentata al cliente come **da verificare** (avviso nel prototipo e in specifica §6.6).
+
 ---
 
 ## 5. Fase 1 — Anagrafiche (6 h, 3 agenti in parallelo)

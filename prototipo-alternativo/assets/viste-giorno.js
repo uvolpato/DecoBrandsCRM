@@ -229,10 +229,11 @@
     const fmt = (c, v) => c.data ? M.data(v) : c.k === 'pct' ? M.num(v) + '%' : c.k === 'qta' ? M.num(v) : c.n ? M.dec(v) : e(v);
     const righe = d.righe.map((r, i) => '<tr data-riga="' + i + '" data-codice="' + e(r.codice || r.numero || '') + '">' + cols.map(c => '<td' + (c.n ? ' class="dx"' : '') + ' data-campo="righe.' + i + '.' + c.k + '">' + fmt(c, o('righe.' + i + '.' + c.k, r[c.k])) + '</td>').join('') +
       (boll ? '' : '<td class="dx">' + M.dec(o('righe.' + i + '.qta', r.qta) * o('righe.' + i + '.prezzo', r.prezzo)) + '</td>') + '</tr>').join('');
-    return '<div class="doc-pagina" aria-label="Anteprima del documento originale"><div class="doc-intest"><div><b class="doc-marchio">' + e(f.nome) + '</b><span>' + e(f.piva ? 'P.IVA ' + f.piva : '') + '</span></div><span class="doc-file">' + CRM.icona('file') + ' ' + e(d.file || '') + '</span></div>' +
+    return '<p class="avviso-verifica">' + CRM.icona('avviso') + '<span><b>Funzione da verificare.</b> L’evidenziazione nel documento dipende dal file: sui PDF da gestionale e sugli Excel è attesa precisa, sugli scansionati può essere approssimata o mancare. La fattibilità si misura su documenti reali prima di confermarla (specifica §6.6).</span></p>' +
+      '<div class="doc-pagina" aria-label="Anteprima del documento originale"><div class="doc-intest"><div><b class="doc-marchio">' + e(f.nome) + '</b><span>' + e(f.piva ? 'P.IVA ' + f.piva : '') + '</span></div><span class="doc-file">' + CRM.icona('file') + ' ' + e(d.file || '') + '</span></div>' +
       intest + (d.nota ? '<p class="doc-meta">' + e(d.nota) + '</p>' : '') + '<table class="doc-tab"><thead><tr>' + th + '</tr></thead><tbody>' + righe + '</tbody>' +
       '<tfoot><tr><td colspan="' + (cols.length + (boll ? 0 : 1) - 1) + '">Totale' + (boll ? ' provvigioni' : ' documento') + '</td><td class="dx" data-campo="totale"><b>' + M.dec(M.totaleStampato(d)) + '</b></td></tr></tfoot></table>' +
-      '<p class="doc-nota">Anteprima simulata del PDF. Nell\'app qui c\'è il file originale; l\'evidenziazione usa la posizione restituita dalla lettura.</p></div>';
+      '<p class="doc-nota">Anteprima simulata del PDF. Nell\'app qui c\'è il file originale (PDF.js) con l\'evidenziazione disegnata sopra, se la posizione del valore è stata trovata.</p></div>';
   }
 
   /* ---------- Consulta i documenti di una pratica: FinestraAffiancata in sola lettura ----------
