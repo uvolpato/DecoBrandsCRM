@@ -10,15 +10,16 @@
   /* ---------- Oggi: ListaDaFare + Cifre del trimestre + Elenco operazioni ---------- */
   CRM.rotta(/^\/$/, function () {
     const fare = M.daFare();
-    const corpo = CRM.Pagina({ voce: 'oggi', titolo: 'Oggi',
+    const corpo = CRM.Pagina({ voce: 'oggi', titolo: 'Oggi', pieno: true,
       sottotitolo: M.dataLunga(M.oggi()) + ' · ' + (fare.length ? fare.length + (fare.length === 1 ? ' cosa da fare' : ' cose da fare') : 'niente in sospeso') });
-    const col = CRM.blocco(corpo, 'colonne');
+    const col = CRM.blocco(corpo, 'colonne riempi');
 
-    const daFare = CRM.Pannello(col, { titolo: 'Da fare', nota: 'in ordine di urgenza', senzaMargine: true });
+    // la lista scorre dentro il suo riquadro: intestazione fissa, righe scorrevoli
+    const daFare = CRM.Pannello(col, { titolo: 'Da fare', nota: 'in ordine di urgenza', senzaMargine: true, riempi: true });
     CRM.ListaDaFare(daFare.corpo, fare.map(x => ({ tipo: VARIANTE_FARE[x.tipo], titolo: x.titolo, dettaglio: x.dettaglio, href: x.link, azione: x.azione })),
       { titolo: 'Tutto in ordine', testo: 'Nessun documento da abbinare, nessuna conferma in ritardo, nessun bollettino da verificare.' });
 
-    const destra = CRM.blocco(col, 'pila');
+    const destra = CRM.blocco(col, 'pila', 'overflow:auto;min-height:0');
     const a = 2026, t = M.trimestre(M.oggi());
     const st = M.statoTrimestre(a, t);
     const righe = M.righeLiquidazione(a, t);
