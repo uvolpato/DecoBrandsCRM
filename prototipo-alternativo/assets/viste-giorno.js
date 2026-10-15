@@ -343,7 +343,7 @@
         lettura: { campi: campi, verificati: verificati, totale: Number(b.totale) || 0 } };
     };
 
-    let fin;
+    let fin, riepAperto = false;   // elenco dei punti da controllare: chiuso, si apre sopra il contenuto
     const anteprima = host => { host.innerHTML = paginaDocumento(d, d.fornitore_id); };
     const evidenzia = campo => {
       const pag = CRM.$('.doc-pagina', fin.sinistra);
@@ -413,8 +413,10 @@
       // riepilogo: livello, controlli falliti e campi incerti, con salto al campo
       const riep = CRM.$('#aff-riep', host);
       const LIV = { affidabile: ['ok', 'Lettura affidabile'], da_controllare: ['attesa', 'Da controllare'], bassa: ['errore', 'Affidabilità bassa'] }[st.livello];
-      riep.innerHTML = '<div class="riep-testa">' + CRM.stato(LIV[0], LIV[1]) + ' <span>' + (st.n ? st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') : 'tutti i campi sono controllati') + '</span></div>' +
-        (st.n ? '<ul>' + st.controlli.map(c => '<li class="' + (c.grave ? 'grave' : '') + '"><button type="button" class="btn testo piccolo" data-vai="' + c.campo + '">' + e(c.testo) + '</button></li>').join('') +
+      if (!st.n) riepAperto = false;
+      riep.innerHTML = '<button type="button" class="riep-testa"' + (st.n ? ' aria-expanded="' + riepAperto + '" aria-controls="aff-riep-elenco" data-riep' : ' disabled') + '>' + CRM.stato(LIV[0], LIV[1]) +
+        ' <span>' + (st.n ? st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') : 'tutti i campi sono controllati') + '</span>' + (st.n ? '<span class="riep-freccia">' + CRM.icona('indietro') + '</span>' : '') + '</button>' +
+        (st.n ? '<ul id="aff-riep-elenco"' + (riepAperto ? '' : ' hidden') + '>' + st.controlli.map(c => '<li class="' + (c.grave ? 'grave' : '') + '"><button type="button" class="btn testo piccolo" data-vai="' + c.campo + '">' + e(c.testo) + '</button></li>').join('') +
           st.campi.map(c => '<li><button type="button" class="btn testo piccolo" data-vai="' + c + '">' + e(nomeCampo(c, boll)) + ': letto con affidabilità ' + Math.round(M.affidabilita(comeDoc(), c) * 100) + '%</button></li>').join('') + '</ul>' : '');
       fin.piede.innerHTML = st.n ? '<b>' + st.n + '</b> ' + (st.n === 1 ? 'punto da controllare' : 'punti da controllare') : '<span style="color:var(--ok-testo)">Tutto controllato</span>';
     };
@@ -438,10 +440,18 @@
         const x = ev.target.closest('[data-campo]'); if (!x) return;
         valoreDa(x.dataset.campo, x.value); ridisegna(); const n = trovaCampo(x.dataset.campo); if (n) n.focus();
       });
+      const apriRiep = si => {
+        riepAperto = si;
+        const r = CRM.$('#aff-riep', host), ul = r && CRM.$('ul', r), bt = r && CRM.$('[data-riep]', r);
+        if (ul) ul.hidden = !si; if (bt) bt.setAttribute('aria-expanded', String(si));
+      };
+      host.addEventListener('keydown', ev => { if (ev.key === 'Escape' && riepAperto) { ev.stopPropagation(); apriRiep(false); CRM.$('[data-riep]', host).focus(); } });
       host.addEventListener('click', ev => {
-        const t = ev.target.closest('[data-conferma], [data-vai], [data-elimina], [data-aggiungi]'); if (!t) return;
-        if (t.dataset.conferma) { conferma(t.dataset.conferma); ridisegna(); }
-        else if (t.dataset.vai) vai(t.dataset.vai);
+        if (!ev.target.closest('#aff-riep') && riepAperto) apriRiep(false);   // clic fuori: si chiude
+        const t = ev.target.closest('[data-riep], [data-conferma], [data-vai], [data-elimina], [data-aggiungi]'); if (!t) return;
+        if (t.hasAttribute('data-riep')) apriRiep(!riepAperto);
+        else if (t.dataset.conferma) { conferma(t.dataset.conferma); ridisegna(); }
+        else if (t.dataset.vai) { apriRiep(false); vai(t.dataset.vai); }
         else if (t.dataset.elimina != null) { b.righe.splice(Number(t.dataset.elimina), 1); b.toccati.righe = true; ridisegna(); }
         else nuovaRiga();
       });
