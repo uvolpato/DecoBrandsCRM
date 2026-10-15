@@ -685,7 +685,51 @@ window.DATI_DEMO = {
         { codice: 'GASPER-S368', descrizione: 'Sottovaso in resina Ø 36 cm', qta: 20, prezzo: 5.10 },
         { codice: 'GASPER-F805', descrizione: 'Fioriera rettangolare in resina 80 cm', qta: 2, prezzo: 36.00 },
         { codice: 'GASPER-C409', descrizione: 'Contenitore in resina 40 L', qta: 2, prezzo: 15.75 },
-        { codice: 'ORTO-SAC', descrizione: 'Sacco terriccio 70 L', qta: 40, prezzo: 15.00 } ] } ] }
+        { codice: 'ORTO-SAC', descrizione: 'Sacco terriccio 70 L', qta: 40, prezzo: 15.00 } ] } ] },
+    /* ---- altre pratiche aperte: più solleciti nella lista Da fare ---- */
+    { id: 13, numero: 'OF/2026/047', fornitore_id: 1, cliente_piva: '03152770962', data: '2026-08-08', documenti: [
+      { id: 1301, tipo: 'ordine', numero: 'OF/2026/047', data: '2026-08-08', file: 'ordine_OF-2026-047.pdf', righe: [
+        { codice: 'VASA-2597', descrizione: 'Vaso in terracotta Ø 25 cm', qta: 24, prezzo: 10.75 },
+        { codice: 'VASA-3216', descrizione: 'Vaso in terracotta Ø 32 cm', qta: 18, prezzo: 13.20 },
+        { codice: 'SOGG-0297', descrizione: 'Sottovaso in terracotta Ø 29 cm', qta: 60, prezzo: 4.48 },
+        { codice: 'CACH-194', descrizione: 'Coprivaso smaltato Ø 19 cm', qta: 30, prezzo: 10.60 },
+        { codice: 'VASA-4783', descrizione: 'Vaso in terracotta Ø 47 cm', qta: 10, prezzo: 18.45 },
+        { codice: 'VASA-5779', descrizione: 'Vaso in terracotta Ø 57 cm', qta: 6, prezzo: 21.95 },
+        { codice: 'CIOT-319', descrizione: 'Ciotola in terracotta Ø 31 cm', qta: 20, prezzo: 13.30 },
+        { codice: 'BALC-403', descrizione: 'Balconetta in terracotta 40 cm', qta: 40, prezzo: 10.20 },
+        { codice: 'ANFO-677', descrizione: 'Anfora in terracotta h 67 cm', qta: 3, prezzo: 70.30 } ] } ] },
+    { id: 14, numero: 'OF/2026/048', fornitore_id: 3, cliente_piva: '02289430245', data: '2026-08-14', documenti: [
+      { id: 1401, tipo: 'ordine', numero: 'OF/2026/048', data: '2026-08-14', file: 'ordine_OF-2026-048.pdf', righe: [
+        { codice: 'XMAS-AL1808', descrizione: 'Albero artificiale 180 cm', qta: 10, prezzo: 93.00 },
+        { codice: 'XMAS-FL204', descrizione: 'Filo luminoso LED 20 m', qta: 40, prezzo: 23.00 },
+        { codice: 'XMAS-PV804', descrizione: 'Palline in vetro Ø 80 mm, conf. 12', qta: 30, prezzo: 12.40 },
+        { codice: 'XMAS-RE901', descrizione: 'Renna luminosa da esterno 90 cm', qta: 6, prezzo: 65.00 },
+        { codice: 'XMAS-NA258', descrizione: 'Nastro decorativo 25 m', qta: 60, prezzo: 5.75 },
+        { codice: 'XMAS-CA38', descrizione: 'Candele LED, conf. 6', qta: 48, prezzo: 11.90 },
+        { codice: 'XMAS-PU99', descrizione: 'Puntale in vetro soffiato', qta: 50, prezzo: 7.50 },
+        { codice: 'XMAS-STL', descrizione: 'Stella luminosa da esterno', qta: 12, prezzo: 32.00 } ] } ] },
+    { id: 15, numero: 'OF/2026/049', fornitore_id: 2, cliente_piva: '02633860254', data: '2026-08-01', documenti: [
+      { id: 1501, tipo: 'ordine', numero: 'OF/2026/049', data: '2026-08-01', file: 'ordine_OF-2026-049.pdf', righe: [
+        { codice: 'GASPER-F805', descrizione: 'Fioriera rettangolare in resina 80 cm', qta: 12, prezzo: 36.00 },
+        { codice: 'GASPER-F1209', descrizione: 'Fioriera rettangolare in resina 120 cm', qta: 6, prezzo: 48.00 },
+        { codice: 'GASPER-S338', descrizione: 'Sottovaso in resina Ø 33 cm', qta: 80, prezzo: 4.80 },
+        { codice: 'GASPER-S472', descrizione: 'Sottovaso in resina Ø 47 cm', qta: 40, prezzo: 7.96 },
+        { codice: 'GASPER-C401', descrizione: 'Contenitore in resina 40 L', qta: 20, prezzo: 20.00 },
+        { codice: 'GASPER-H805', descrizione: 'Vaso alto in resina 80 cm', qta: 8, prezzo: 78.00 },
+        { codice: 'ORTO-RAC4', descrizione: 'Terriccio universale 50 L', qta: 30, prezzo: 45.00 },
+        { codice: 'GASPER-K502', descrizione: 'Cassa in legno decor 50x50', qta: 12, prezzo: 29.00 },
+        { codice: 'ORTO-GRA2', descrizione: 'Raccoglitore acqua 200 L', qta: 6, prezzo: 28.00 },
+        { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 15, prezzo: 29.60 } ] } ] },
+    { id: 16, numero: 'OF/2026/050', fornitore_id: 2, cliente_piva: '05328730963', data: '2026-08-20', documenti: [
+      { id: 1601, tipo: 'ordine', numero: 'OF/2026/050', data: '2026-08-20', file: 'ordine_OF-2026-050.pdf', righe: [
+        { codice: 'ORTO-TAV', descrizione: 'Tavolo da lavoro per orto rialzato', qta: 6, prezzo: 135.00 },
+        { codice: 'ORTO-CMP', descrizione: 'Compostiera 320 L', qta: 12, prezzo: 92.50 },
+        { codice: 'GASPER-S307', descrizione: 'Sottovaso in resina Ø 30 cm', qta: 100, prezzo: 4.50 },
+        { codice: 'GASPER-C503', descrizione: 'Contenitore in resina 50 L', qta: 24, prezzo: 22.10 },
+        { codice: 'GASPER-K304', descrizione: 'Cassa in legno decor 30x30', qta: 20, prezzo: 23.00 },
+        { codice: 'ORTO-GRA8', descrizione: 'Pacciamatura in corteccia 50 L', qta: 40, prezzo: 11.00 },
+        { codice: 'GASPER-H604', descrizione: 'Vaso alto in resina 60 cm', qta: 6, prezzo: 66.00 },
+        { codice: 'GASPER-F1206', descrizione: 'Fioriera rettangolare in resina 120 cm', qta: 4, prezzo: 48.00 } ] } ] }
   ],
 
   /* Documenti caricati e letti in automatico, da controllare e abbinare a una pratica.
@@ -768,7 +812,57 @@ window.DATI_DEMO = {
       { codice: 'GASPER-C409', descrizione: 'Contenitore in resina 40 L', qta: 25, prezzo: 20.00 },
       { codice: 'GASPER-H1007', descrizione: 'Vaso alto in resina 100 cm', qta: 6, prezzo: 90.00 },
       { codice: 'GASPER-S479', descrizione: 'Sottovaso in resina Ø 47 cm', qta: 150, prezzo: 6.20 },
-      { codice: 'GASPER-S344', descrizione: 'Sottovaso in resina Ø 34 cm', qta: 200, prezzo: 5.91 } ] }
+      { codice: 'GASPER-S344', descrizione: 'Sottovaso in resina Ø 34 cm', qta: 200, prezzo: 5.91 } ] },
+    /* ---- altri documenti in coda, per vedere come si comporta con più file ---- */
+    { id: 9005, tipo: 'ordine', fornitore_id: 1, numero: 'OF/2026/053', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'K-10488', file: 'ordine_OF-2026-053.pdf', righe: [
+      { codice: 'VASA-3050', descrizione: 'Vaso in terracotta Ø 30 cm', qta: 80, prezzo: 12.30 },
+      { codice: 'VASA-2266', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 24, prezzo: 9.70 },
+      { codice: 'SOGG-0285', descrizione: 'Sottovaso in terracotta Ø 28 cm', qta: 80, prezzo: 4.36 },
+      { codice: 'SOGG-0332', descrizione: 'Sottovaso in terracotta Ø 33 cm', qta: 60, prezzo: 4.96 },
+      { codice: 'VASA-5034', descrizione: 'Vaso in terracotta Ø 50 cm', qta: 12, prezzo: 19.50 },
+      { codice: 'CACH-156', descrizione: 'Coprivaso smaltato Ø 15 cm', qta: 36, prezzo: 9.00 },
+      { codice: 'CACH-289', descrizione: 'Coprivaso smaltato Ø 28 cm', qta: 18, prezzo: 14.20 },
+      { codice: 'CIOT-416', descrizione: 'Ciotola in terracotta Ø 41 cm', qta: 12, prezzo: 16.30 },
+      { codice: 'ANFO-448', descrizione: 'Anfora in terracotta h 44 cm', qta: 4, prezzo: 49.60 },
+      { codice: 'VASA-6086', descrizione: 'Vaso in terracotta Ø 60 cm', qta: 6, prezzo: 26.41 },
+      { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 },
+      { codice: 'SOGG-040', descrizione: 'Sottovaso Ø 40 cm', qta: 150, prezzo: 9.55 } ] },
+    { id: 9006, tipo: 'ordine', fornitore_id: 2, numero: 'OF/2026/054', data: '2026-09-03', ricevuto: '2026-09-03', codice_cliente: 'GA-2389', file: 'ordine_OF-2026-054.pdf',
+      lettura: { campi: { 'righe.3.prezzo': 0.79, 'righe.8.qta': 0.88 } }, righe: [
+      { codice: 'GASPER-S307', descrizione: 'Sottovaso in resina Ø 30 cm', qta: 150, prezzo: 4.50 },
+      { codice: 'GASPER-S425', descrizione: 'Sottovaso in resina Ø 42 cm', qta: 80, prezzo: 5.70 },
+      { codice: 'GASPER-C402', descrizione: 'Contenitore in resina 40 L', qta: 30, prezzo: 20.00 },
+      { codice: 'GASPER-C808', descrizione: 'Contenitore in resina 80 L', qta: 12, prezzo: 34.00 },
+      { codice: 'GASPER-H604', descrizione: 'Vaso alto in resina 60 cm', qta: 10, prezzo: 66.00 },
+      { codice: 'GASPER-H1006', descrizione: 'Vaso alto in resina 100 cm', qta: 4, prezzo: 90.00 },
+      { codice: 'GASPER-F1206', descrizione: 'Fioriera rettangolare in resina 120 cm', qta: 8, prezzo: 48.00 },
+      { codice: 'GASPER-K304', descrizione: 'Cassa in legno decor 30x30', qta: 20, prezzo: 23.00 },
+      { codice: 'GASPER-K507', descrizione: 'Cassa in legno decor 50x50', qta: 20, prezzo: 29.00 },
+      { codice: 'ORTO-CMP', descrizione: 'Compostiera 320 L', qta: 10, prezzo: 92.50 } ] },
+    { id: 9007, tipo: 'nota_credito', fornitore_id: 2, numero: 'NC-2026-009', data: '2026-09-01', ricevuto: '2026-09-02', codice_cliente: 'GA-2304', file: 'Gasper_NC-2026-009.pdf',
+      riferimento: 'F-2026-0907', nota: 'Reso merce rotta in consegna', righe: [
+      { codice: 'GASPER-C808', descrizione: 'Contenitore in resina 80 L (reso)', qta: -3, prezzo: 34.00 },
+      { codice: 'ORTO-CMP', descrizione: 'Compostiera 320 L (reso)', qta: -2, prezzo: 92.50 } ] },
+    { id: 9008, tipo: 'bollettino', fornitore_id: 1, numero: 'agosto 2026', anno: 2026, mese: 8, ricevuto: '2026-09-04', file: 'Gries_bollettino_2026-08_rettifica.pdf', righe: [
+      { numero: 'NC-2026-005', data: '2026-08-22', imponibile: -1311.00, pct: 28.00, importo: -367.08 } ] },
+    { id: 9009, tipo: 'bollettino', fornitore_id: 3, numero: 'luglio 2026', anno: 2026, mese: 7, ricevuto: '2026-09-01', file: 'Ings_provvigioni_2026-07.xlsx', righe: [
+      { numero: 'F-2026-0874', data: '2026-07-14', imponibile: 2140.00, pct: 32.00, importo: 684.80 },
+      { numero: 'F-2026-0886', data: '2026-07-29', imponibile: 1185.50, pct: 30.00, importo: 355.65 } ] },
+    { id: 9010, tipo: 'fattura', fornitore_id: 1, numero: 'F-2026-0958', data: '2026-09-03', ricevuto: '2026-09-04', codice_cliente: 'K-11036', file: 'Gries_F-2026-0958.pdf',
+      lettura: { campi: { numero: 0.81 } }, righe: [
+      { codice: 'VASA-3040', descrizione: 'Vaso in terracotta Ø 30 cm', qta: 40, prezzo: 14.00 },
+      { codice: 'VASA-4055', descrizione: 'Vaso in terracotta Ø 40 cm', qta: 12, prezzo: 36.00 },
+      { codice: 'BALC-801', descrizione: 'Balconetta in terracotta 80 cm', qta: 10, prezzo: 17.40 },
+      { codice: 'ANFO-811', descrizione: 'Anfora in terracotta h 81 cm', qta: 2, prezzo: 82.90 },
+      { codice: 'CACH-178', descrizione: 'Coprivaso smaltato Ø 17 cm', qta: 24, prezzo: 9.80 } ] },
+    { id: 9011, tipo: 'fattura', fornitore_id: 3, numero: 'F-2026-0961', data: '2026-09-02', ricevuto: '2026-09-03', codice_cliente: 'IN-4020', file: 'Ings_F-2026-0961_scansione.pdf',
+      lettura: { campi: { data: 0.66, 'righe.1.prezzo': 0.69, 'righe.4.qta': 0.77 } }, righe: [
+      { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 12, prezzo: 18.50 },
+      { codice: 'XMAS-STL', descrizione: 'Stella luminosa da esterno', qta: 10, prezzo: 32.00 },
+      { codice: 'XMAS-GHO', descrizione: 'Ghirlanda natalizia 150 cm', qta: 20, prezzo: 25.375 },
+      { codice: 'XMAS-PV607', descrizione: 'Palline in vetro Ø 60 mm, conf. 12', qta: 24, prezzo: 10.80 },
+      { codice: 'XMAS-FL107', descrizione: 'Filo luminoso LED 10 m', qta: 30, prezzo: 14.00 },
+      { codice: 'XMAS-AL1501', descrizione: 'Albero artificiale 150 cm', qta: 3, prezzo: 82.50 } ] }
   ],
 
   /* Bollettini: quello che il fornitore ci riconosce, mese per mese.

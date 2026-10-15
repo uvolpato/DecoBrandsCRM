@@ -164,7 +164,7 @@
         return {
           titolo: p.numero + ' · ' + M.nomeCliente(p.cliente_piva),
           sottotitolo: CRM.statoPratica(p) + (prima !== dopo ? ' › ' + CRM.stato(dopo === 'Fatturata' ? 'ok' : 'info', dopo) : ''),
-          punti: c.motivi.map(e).concat([Math.abs(c.delta) < 0.01 ? 'importo uguale ' + rif : '<span class="' + CRM.classeSegno(c.delta) + '">' + CRM.euroSegno(c.delta) + '</span> rispetto ' + rif]),
+          punti: c.motivi.map(e).concat(sel.tipo === 'nota_credito' ? ['riduce il fatturato della pratica di <b class="negativo">' + M.euro(Math.abs(pr.importo)) + '</b>'] : [Math.abs(c.delta) < 0.01 ? 'importo uguale ' + rif : '<span class="' + CRM.classeSegno(c.delta) + '">' + CRM.euroSegno(c.delta) + '</span> rispetto ' + rif]),
           consigliata: i === 0 && pr.esito !== 'nessuno',
           azione: { etichetta: 'Abbina a ' + p.numero, onClick: () => seAffidabile(sel, () => abbina(sel, p)) }
         };

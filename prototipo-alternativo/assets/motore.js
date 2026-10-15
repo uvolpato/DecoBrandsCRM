@@ -303,6 +303,16 @@
       if (giaFatt) motivi.push('pratica già fatturata');
       return { pratica: p, punteggio: quota - (giaFatt ? 0.5 : 0), motivi: motivi, delta: M.r2(imp - M.importoDoc(rif)) };
     }).sort((x, y) => y.punteggio - x.punteggio);
+    // nota di credito con riferimento alla fattura stornata: la pratica di quella fattura è certa
+    if (doc.riferimento) {
+      const k = candidati.findIndex(c => M.fiscali(c.pratica).some(d => d.numero === doc.riferimento));
+      if (k >= 0) {
+        const c = candidati.splice(k, 1)[0];
+        c.motivi.unshift('storna la fattura ' + doc.riferimento + ' di questa pratica');
+        candidati.unshift(c);
+        return { abbinamento: ab, candidati: candidati, esito: 'certo', importo: imp };
+      }
+    }
     let esito = 'nessuno';
     if (candidati.length && !ab) esito = candidati[0].punteggio > 0 ? 'probabile' : 'nessuno';
     else if (candidati.length === 1) esito = 'certo';
@@ -314,7 +324,7 @@
     const doc = M.S.in_arrivo[i];
     const p = M.pratica(praticaId);
     const prima = M.statoPratica(p).etichetta;
-    p.documenti.push({ id: doc.id, tipo: doc.tipo, numero: doc.numero, data: doc.data, file: doc.file, righe: doc.righe });
+    p.documenti.push(Object.assign({ id: doc.id, tipo: doc.tipo, numero: doc.numero, data: doc.data, file: doc.file, righe: doc.righe }, doc.riferimento ? { riferimento: doc.riferimento, nota: doc.nota } : {}));
     M.S.in_arrivo.splice(i, 1);
     const dopo = M.statoPratica(p).etichetta;
     M.annota(M.TIPI[doc.tipo] + ' ' + doc.numero + ' abbinata a ' + p.numero + (prima !== dopo ? ' · ' + prima.toLowerCase() + ' → ' + dopo.toLowerCase() : ''));
@@ -378,7 +388,7 @@
         { codice: 'XMAS-AL1501', descrizione: 'Albero artificiale 150 cm', qta: 12, prezzo: 82.50 },
         { codice: 'XMAS-AL1205', descrizione: 'Albero artificiale 120 cm', qta: 20, prezzo: 72.00 },
         { codice: 'XMAS-FL57', descrizione: 'Filo luminoso LED 5 m', qta: 80, prezzo: 14.08 } ] }));
-    if (!M.bollettinoDi(2, 2026, 6) && !M.S.in_arrivo.some(d => d.tipo === 'bollettino')) esempi.push(() => ({ tipo: 'bollettino', fornitore_id: 2, numero: 'giugno 2026', anno: 2026, mese: 6, lettura: { campi: { 'righe.0.importo': 0.88 } },
+    if (!M.bollettinoDi(2, 2026, 6) && !M.S.in_arrivo.some(d => d.tipo === 'bollettino' && d.fornitore_id === 2 && d.mese === 6)) esempi.push(() => ({ tipo: 'bollettino', fornitore_id: 2, numero: 'giugno 2026', anno: 2026, mese: 6, lettura: { campi: { 'righe.0.importo': 0.88 } },
       righe: M.fiscaliDelMese(2, 2026, 6).map(x => { const pc = M.percentuali(x.pratica, x.doc.data); const imp = M.importoDoc(x.doc); return { numero: x.doc.numero, data: x.doc.data, imponibile: imp, pct: pc.dal_fornitore, importo: M.r2(imp * pc.dal_fornitore / 100) }; }) }));
     if (!esempi.length) return null;
     const scelto = esempi.map(f => f()).sort((a, b) => (b.tipo === preferenza) - (a.tipo === preferenza))[0];
@@ -394,6 +404,8 @@
     M.S.in_arrivo.forEach(d => {
       const pr = M.proposta(d);
       const f = M.fornitore(d.fornitore_id).breve;
+      if (d.tipo === 'bollettino' && pr.esito === 'doppio') return out.push({ peso: 3, tipo: 'documento', esito: 'doppio', titolo: 'Controlla il bollettino di ' + M.meseMin(d.mese) + ' di ' + f + ': è già registrato',
+        dettaglio: f + ' · rettifica o doppione da scartare', link: '#/documenti/' + d.id, azione: 'Apri' });
       if (d.tipo === 'bollettino') return out.push({ peso: 2, tipo: 'documento', titolo: 'Registra il bollettino di ' + M.meseMin(d.mese) + ' di ' + f,
         dettaglio: f + ' · ' + d.righe.length + (d.righe.length === 1 ? ' riga letta' : ' righe lette'), link: '#/documenti/' + d.id, azione: 'Apri' });
       if (d.tipo === 'ordine') return out.push({ peso: 2, tipo: 'documento', titolo: 'Apri la pratica dell’ordine ' + d.numero,
