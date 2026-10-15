@@ -689,9 +689,6 @@ window.DATI_DEMO = {
      lettura: affidabilità (0–1) dei soli campi incerti (gli altri sono ≥ 0,95), valori
      realmente stampati sul documento quando la lettura ha sbagliato (originale) e
      totale stampato (totale) per il controllo con la somma delle righe. */
-  /* Codici letti male che non esistono in anagrafica articoli (es. lettera O letta come zero). */
-  articoli_non_in_anagrafica: ['CI0T-387'],
-
   in_arrivo: [
     { id: 9001, tipo: 'conferma', fornitore_id: 1, numero: 'AB-77120', data: '2026-09-03', ricevuto: '2026-09-03', codice_cliente: 'K-10122', file: 'Gries_AB-77120.pdf',
       lettura: { campi: { data: 0.84, 'righe.2.qta': 0.61, 'righe.4.prezzo': 0.71, 'righe.7.codice': 0.86 }, originale: { 'righe.2.qta': 18, 'righe.7.codice': 'CIOT-387' }, totale: 8294.80 }, righe: [

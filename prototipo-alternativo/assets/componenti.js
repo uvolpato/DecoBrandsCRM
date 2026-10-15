@@ -80,7 +80,7 @@
     const corpo = $('.modale-corpo', velo);
     if (typeof opz.corpo === 'function') opz.corpo(corpo); else if (opz.corpo) corpo.innerHTML = opz.corpo; else corpo.remove();
     const chiudi = () => { velo.remove(); document.removeEventListener('keydown', tasto); };
-    const tasto = e => { if (e.key === 'Escape') chiudi(); };
+    const tasto = e => { if (e.key !== 'Escape') return; const aperte = $$('.velo'); if (aperte[aperte.length - 1] === velo) chiudi(); };   // Esc chiude solo la finestra in primo piano
     document.addEventListener('keydown', tasto);
     velo.addEventListener('click', e => { if (e.target === velo) chiudi(); });
     const piede = $('.modale-piede', velo);
@@ -117,7 +117,7 @@
     const sx = $('.aff-sx', velo), dx = $('.aff-dx', velo), piede = $('.aff-piede', velo), info = $('.aff-piede-info', velo);
     sx.style.flexBasis = (opz.larghezza || 46) + '%';
     const chiudi = () => { velo.remove(); document.removeEventListener('keydown', tasto); };
-    const tasto = e => { if (e.key === 'Escape') chiudi(); };
+    const tasto = e => { if (e.key !== 'Escape') return; const aperte = $$('.velo'); if (aperte[aperte.length - 1] === velo) chiudi(); };   // Esc chiude solo la finestra in primo piano
     document.addEventListener('keydown', tasto);
     $('.aff-chiudi', velo).addEventListener('click', chiudi);
     // divisore: trascinamento con il mouse o frecce da tastiera
@@ -160,14 +160,15 @@
 
   /* =========================================================
      Form
-     opz: { campi: [{ nome, etichetta, tipo: 'testo'|'numero'|'data'|'select'|'area', opzioni: [{ value, label }],
+     opz: { campi: [{ nome, etichetta, tipo: 'testo'|'numero'|'data'|'select'|'area'|'ricerca' (con entita), opzioni: [{ value, label }],
                       valore, aiuto, largo, passo, placeholder }], colonne: 1|2|3 }
      → { el, valori(), campo(nome), aiuto(nome, html, errore), errore(testo) }
      ========================================================= */
   function campoHtml(c) {
     const id = 'c-' + c.nome;
     let ctl;
-    if (c.tipo === 'select') ctl = '<select id="' + id + '" name="' + c.nome + '">' + c.opzioni.map(o => '<option value="' + esc(o.value) + '"' + (String(o.value) === String(c.valore) ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>';
+    if (c.tipo === 'ricerca') ctl = CRM.campoRicercaHtml({ nome: c.nome, entita: c.entita, valore: c.valore, id: id, placeholder: c.placeholder });
+    else if (c.tipo === 'select') ctl = '<select id="' + id + '" name="' + c.nome + '">' + c.opzioni.map(o => '<option value="' + esc(o.value) + '"' + (String(o.value) === String(c.valore) ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>';
     else if (c.tipo === 'area') ctl = '<textarea id="' + id + '" name="' + c.nome + '" rows="' + (c.righe || 3) + '">' + esc(c.valore || '') + '</textarea>';
     else ctl = '<input id="' + id + '" name="' + c.nome + '" type="' + ({ numero: 'number', data: 'date' }[c.tipo] || 'text') + '"' + (c.passo ? ' step="' + c.passo + '"' : '') +
       ' value="' + esc(c.valore == null ? '' : c.valore) + '"' + (c.placeholder ? ' placeholder="' + esc(c.placeholder) + '"' : '') + '>';
@@ -179,6 +180,7 @@
     f.addEventListener('submit', e => e.preventDefault());
     f.innerHTML = opz.campi.map(campoHtml).join('') + '<p class="modulo-errore" role="alert" hidden></p>';
     ospite(host).appendChild(f);
+    CRM.attivaRicerche(f, opz.contesto);
     return {
       el: f,
       valori: () => { const v = {}; $$('[name]', f).forEach(x => { v[x.name] = x.value.trim(); }); return v; },
@@ -193,11 +195,137 @@
      opz: { titolo, testo, campi, colonne, conferma ('Salva'), pericolo, azioniExtra: [{ etichetta, variante, onClick(chiudi) }],
             onConferma(valori, form) → false per lasciarla aperta }
      ========================================================= */
+  /* =========================================================
+     Campi di ricerca collegati alle entità
+     CRM.Entita(nome, def) registra un'entità una volta sola:
+       def: { titolo, voci(ctx) → righe, chiave(r), testo(r), dettaglio(r), cerca(r) (testo su cui cercare),
+              colonne: [colonne DataTable], filtri(ctx) → [campi FilterBar], filtra(r, valori) → boolean }
+     CRM.campoRicercaHtml({ nome, entita, valore, id, placeholder, campo }) → html del campo
+       (autocompletamento con le prime 5 voci, lente che apre la maschera, pallino verde/rosso)
+     CRM.attivaRicerche(contenitore, contesto()) attiva i campi presenti (eventi delegati):
+       alla scelta aggiorna il valore nascosto, emette 'change' e l'evento 'ricerca-scelta' { campo, voce }
+     CRM.RicercaEntita({ entita, contesto, testo, onScelta(voce) }) → maschera di ricerca completa
+     ========================================================= */
+  const ENTITA = CRM.ENTITA = {};
+  CRM.Entita = (nome, def) => { ENTITA[nome] = def; };
+  const trovaVoce = (ent, ctx, valore) => {
+    if (valore == null || valore === '') return null;
+    const v = String(valore).toLowerCase(), voci = ent.voci(ctx);
+    return voci.find(r => String(ent.chiave(r)).toLowerCase() === v) || voci.find(r => String(ent.testo(r)).toLowerCase() === v) || null;
+  };
+  CRM.campoRicercaHtml = function (o) {
+    const ent = ENTITA[o.entita];
+    const voce = trovaVoce(ent, o.contesto || {}, o.valore);  // contesto: restringe le voci (es. fornitore)
+    const testo = voce ? ent.testo(voce) : (o.valore == null ? '' : o.valore);
+    return '<div class="ricerca" data-entita="' + o.entita + '">' +
+      '<span class="pallino ' + (voce ? 'ok' : o.valore ? 'ko' : 'vuoto') + '" title="' + (voce ? esc(ent.titolo) + ' trovato in anagrafica' : o.valore ? 'Valore non trovato in anagrafica' : '') + '"></span>' +
+      '<input class="ricerca-testo"' + (o.id ? ' id="' + o.id + '"' : '') + (o.campo ? ' data-evidenzia="' + o.campo + '"' : '') + ' type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" value="' + esc(testo) + '" placeholder="' + esc(o.placeholder || 'Scrivi per cercare') + '">' +
+      '<input type="hidden"' + (o.nome ? ' name="' + o.nome + '"' : '') + (o.campo ? ' data-campo="' + o.campo + '"' : '') + ' value="' + esc(o.valore == null ? '' : o.valore) + '">' +
+      '<button type="button" class="ricerca-lente" title="Apri la ricerca di ' + esc(ent.titolo.toLowerCase()) + ' (F4)" aria-label="Apri la ricerca">' + CRM.icona('cerca') + '</button>' +
+      '<ul class="ricerca-menu" role="listbox" hidden></ul></div>';
+  };
+  CRM.attivaRicerche = function (cont, contesto) {
+    if (!cont || cont._ricerche) return; cont._ricerche = true;
+    const ctx = () => (contesto ? contesto() : {}) || {};
+    const parti = box => ({ ent: ENTITA[box.dataset.entita], testo: $('.ricerca-testo', box), nascosto: $('input[type=hidden]', box), menu: $('.ricerca-menu', box), pallino: $('.pallino', box) });
+    const chiudiMenu = box => { const p = parti(box); p.menu.hidden = true; p.testo.setAttribute('aria-expanded', 'false'); };
+    const imposta = (box, voce, testoLibero) => {
+      const p = parti(box), vecchio = p.nascosto.value;
+      if (voce) { p.testo.value = p.ent.testo(voce); p.nascosto.value = p.ent.chiave(voce); }
+      else p.nascosto.value = testoLibero || '';
+      p.pallino.className = 'pallino ' + (voce ? 'ok' : testoLibero ? 'ko' : 'vuoto');
+      p.pallino.title = voce ? p.ent.titolo + ' trovato in anagrafica' : testoLibero ? 'Valore non trovato in anagrafica' : '';
+      chiudiMenu(box);
+      if (voce) box.dispatchEvent(new CustomEvent('ricerca-scelta', { bubbles: true, detail: { campo: p.nascosto.dataset.campo || p.nascosto.name, voce: voce } }));
+      if (String(vecchio) !== String(p.nascosto.value)) p.nascosto.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const apriMaschera = box => {
+      const p = parti(box), noto = trovaVoce(p.ent, ctx(), p.nascosto.value);
+      CRM.RicercaEntita({ entita: box.dataset.entita, contesto: ctx(), testo: noto ? '' : p.testo.value, onScelta: v => { imposta(box, v); p.testo.focus(); } });
+    };
+    const mostra = box => {
+      const p = parti(box), q = p.testo.value.trim().toLowerCase();
+      const punteggio = r => {
+        const k = String(p.ent.chiave(r)).toLowerCase(), t = String(p.ent.testo(r)).toLowerCase(), c = String(p.ent.cerca ? p.ent.cerca(r) : '').toLowerCase();
+        if (!q) return 3; if (t.startsWith(q) || k.startsWith(q)) return 0; if (t.indexOf(q) >= 0) return 1; if (c.indexOf(q) >= 0 || k.indexOf(q) >= 0) return 2; return -1;
+      };
+      const trovate = p.ent.voci(ctx()).map(r => ({ r: r, s: punteggio(r) })).filter(x => x.s >= 0).sort((a, b) => a.s - b.s);
+      const prime = trovate.slice(0, 5);
+      p.menu._voci = prime.map(x => x.r); p.menu._attiva = prime.length ? 0 : -1;
+      p.menu.innerHTML = (prime.length ? prime.map((x, i) => '<li role="option" data-i="' + i + '"' + (i === 0 ? ' class="attiva" aria-selected="true"' : '') + '><b>' + esc(p.ent.testo(x.r)) + '</b><span>' + esc(p.ent.dettaglio ? p.ent.dettaglio(x.r) : '') + '</span></li>').join('')
+        : '<li class="nessuna">Nessun risultato</li>') +
+        '<li class="altre" data-maschera="1">' + CRM.icona('cerca') + (trovate.length > 5 ? 'Altri ' + (trovate.length - 5) + ' risultati: ' : '') + 'apri la ricerca di ' + esc(p.ent.titolo.toLowerCase()) + '</li>';
+      const r = p.testo.getBoundingClientRect();   // posizione fissa: il menu non viene tagliato da tabelle e finestre che scorrono
+      Object.assign(p.menu.style, { top: (r.bottom + 2) + 'px', left: r.left + 'px', width: Math.max(r.width + 40, 280) + 'px' });
+      p.menu.hidden = false; p.testo.setAttribute('aria-expanded', 'true');
+    };
+    const spostaVoce = (box, i) => {
+      const p = parti(box), li = $$('li[data-i]', p.menu); if (!li.length) return;
+      p.menu._attiva = (i + li.length) % li.length;
+      li.forEach((x, j) => { x.classList.toggle('attiva', j === p.menu._attiva); x.setAttribute('aria-selected', String(j === p.menu._attiva)); });
+    };
+    const eTesto = t => t && t.classList && t.classList.contains('ricerca-testo');
+    cont.addEventListener('input', ev => { if (eTesto(ev.target)) mostra(ev.target.closest('.ricerca')); });
+    cont.addEventListener('change', ev => { if (eTesto(ev.target)) ev.stopPropagation(); }, true);   // il valore vero è quello nascosto
+    cont.addEventListener('keydown', ev => {
+      if (!eTesto(ev.target)) return;
+      const box = ev.target.closest('.ricerca'), p = parti(box);
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); if (p.menu.hidden) mostra(box); else spostaVoce(box, p.menu._attiva + (ev.key === 'ArrowDown' ? 1 : -1)); }
+      else if (ev.key === 'Enter') { if (!p.menu.hidden && p.menu._attiva >= 0) { ev.preventDefault(); imposta(box, p.menu._voci[p.menu._attiva]); } }
+      else if (ev.key === 'Escape') { if (!p.menu.hidden) { ev.stopPropagation(); chiudiMenu(box); } }
+      else if (ev.key === 'F4') { ev.preventDefault(); chiudiMenu(box); apriMaschera(box); }
+    });
+    cont.addEventListener('mousedown', ev => {
+      const li = ev.target.closest('.ricerca-menu li'); if (!li) return;
+      ev.preventDefault(); const box = li.closest('.ricerca'), p = parti(box);
+      if (li.dataset.maschera) { chiudiMenu(box); apriMaschera(box); } else if (li.dataset.i != null) imposta(box, p.menu._voci[Number(li.dataset.i)]);
+    });
+    cont.addEventListener('click', ev => { const b = ev.target.closest('.ricerca-lente'); if (b) apriMaschera(b.closest('.ricerca')); });
+    cont.addEventListener('focusout', ev => {
+      if (!eTesto(ev.target)) return;
+      const box = ev.target.closest('.ricerca'), p = parti(box);
+      setTimeout(() => {
+        if (!box.isConnected) return;
+        chiudiMenu(box);
+        const t = p.testo.value.trim(), noto = trovaVoce(p.ent, ctx(), p.nascosto.value);
+        if (noto && p.ent.testo(noto) === t) return;          // nessun cambiamento
+        imposta(box, trovaVoce(p.ent, ctx(), t), t);           // testo scritto a mano: cerca corrispondenza esatta, altrimenti valore libero
+      }, 120);
+    });
+  };
+  CRM.RicercaEntita = function (o) {
+    const ent = ENTITA[o.entita], ctx = o.contesto || {};
+    let tab, valori = {}, scelta = null;
+    const filtra = () => ent.voci(ctx).filter(r => {
+      const q = (valori.q || '').trim().toLowerCase();
+      const testo = [ent.chiave(r), ent.testo(r), ent.dettaglio ? ent.dettaglio(r) : '', ent.cerca ? ent.cerca(r) : ''].join(' ').toLowerCase();
+      return (!q || testo.indexOf(q) >= 0) && (!ent.filtra || ent.filtra(r, valori));
+    });
+    const m = CRM.Modale({
+      titolo: 'Cerca ' + ent.titolo.toLowerCase(), testo: 'Filtra e fai doppio clic su una riga, oppure selezionala e premi Seleziona.',
+      corpo: c => {
+        c.classList.add('ricerca-corpo');
+        const campi = [{ nome: 'q', tipo: 'cerca', valore: o.testo || '', placeholder: 'Cerca ' + ent.titolo.toLowerCase() }].concat(ent.filtri ? ent.filtri(ctx) : []);
+        const fb = CRM.FilterBar(c, { campi: campi, onChange: v => { valori = v; tab.aggiorna(filtra()); } });
+        valori = fb.valori();
+        tab = CRM.DataTable(CRM.blocco(c, 'riempi'), { compatta: true, colonne: ent.colonne, righe: filtra(), rowClass: r => r === scelta ? 'selezionata' : '',
+          onRowClick: r => { scelta = r; }, emptyText: 'Nessun risultato', emptyHint: 'Cambia la ricerca o i filtri.' });
+        // selezione senza ridisegnare la tabella, così il doppio clic resta sulla stessa riga
+        c.addEventListener('click', ev => { const tr = ev.target.closest('tbody tr[data-i]'); if (!tr) return; $$('tbody tr.selezionata', c).forEach(x => x.classList.remove('selezionata')); tr.classList.add('selezionata'); });
+        c.addEventListener('dblclick', ev => { const tr = ev.target.closest('tbody tr[data-i]'); if (tr && scelta) { o.onScelta(scelta); m.chiudi(); } });
+        setTimeout(() => { const i = $('.cerca input', c); if (i) { i.focus(); i.select(); } }, 0);
+      },
+      azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Seleziona', onClick: () => { if (!scelta) { CRM.Avviso('Seleziona una riga'); return false; } o.onScelta(scelta); } }]
+    });
+    m.corpo.closest('.modale').classList.add('larga');
+    return m;
+  };
+
   CRM.FormModal = function (opz) {
     let form;
     return CRM.Modale({
       titolo: opz.titolo, testo: opz.testo,
-      corpo: c => { form = CRM.Form(c, { campi: opz.campi, colonne: opz.colonne }); },
+      corpo: c => { form = CRM.Form(c, { campi: opz.campi, colonne: opz.colonne, contesto: () => form ? form.valori() : {} }); },
       azioni: (opz.azioniExtra || []).concat([{ etichetta: 'Annulla', variante: 'sec' },
         { etichetta: opz.conferma || 'Salva', variante: opz.pericolo ? 'pericolo' : 'primario', onClick: () => opz.onConferma(form.valori(), form) }])
     });

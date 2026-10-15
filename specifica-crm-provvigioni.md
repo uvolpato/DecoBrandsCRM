@@ -744,6 +744,10 @@ caricamento manuale ──┴─► coda `documenti_in_arrivo` ─► lettura GL
    quantità × prezzo ≠ totale riga; codice cliente non presente fra i clienti del
    fornitore (`interscambio`); articolo assente nella pratica proposta; data fuori dal
    periodo della pratica; bollettino già registrato per fornitore e mese.
+   **Nessun controllo sull'anagrafica articoli**: nel giro dei bollettini Decobrands
+   fa da agente e gli articoli dei fornitori non sono (né saranno) nella sua
+   anagrafica; il codice articolo resta testo libero, verificato solo dall'affidabilità
+   della lettura e dal confronto con le fasi della pratica.
 6. **Livello** del documento, mostrato in "Documenti" e sul pulsante "Correggi i dati
    letti" (numero di campi da controllare):
 
@@ -1431,6 +1435,7 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 | **Form / FormModal** | moduli e finestre modali | campi (`nome`, `etichetta`, `tipo`, `opzioni`, `col`, `obbligatorio`, `aiuto`, `onChange`), pulsante / `onConferma` |
 | **Intestazione** | testata pagina | titolo, icona, sottotitolo, briciole, azioni |
 | **Stepper**, **Nota**, badge | passi di stato, note, stati | — |
+| **CampoRicerca** + **RicercaEntita** | ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, pratica, fattura/nota di credito (non gli articoli: nel giro agenzia non sono in anagrafica) | autocompletamento con le prime 5 voci, lente / F4 che apre la maschera di ricerca (FilterBar + DataTable), pallino verde/rosso se il valore esiste in anagrafica; entità definite una volta (voci da `/api/lookup/*`, chiave, testo, colonne, filtri, contesto) |
 
 **Comportamento fisso della DataTable** (uguale in ogni schermata):
 - occupa **sempre tutto lo spazio** a disposizione del suo contenitore;
@@ -1465,6 +1470,7 @@ Fino ad allora resta in esercizio, invariata, sullo stesso database.
 | Ingresso | gli ordini cliente entrano dallo **stesso ingresso documenti** del CRM, con un nuovo tipo `ordine_cliente` e il suo schema; si spegne il flusso n8n + LlamaIndex |
 | Interfaccia | stile e componenti standard del CRM (§16.4); la finestra di correzione di §6.5 sostituisce la vista ordine attuale (PDF a sinistra, dati a destra) |
 | Dati | tabelle esistenti (`ordini_cliente_*`, `clienti`, `articoli`, …) riusate; migrazione solo se servono colonne nuove (affidabilità, riferimento a `documenti_in_arrivo`) |
+| Esportazione verso Integra | **da analizzare**: per la sola **commercializzazione diretta** (fatture cliente o fornitore di articoli che Decobrands vende in proprio) i documenti vanno esportati verso Integra come fa oggi la Gestione Ordini, con **sostituzione dei codici articolo (alias)** e **esplosione dei kit**; qui servono l'anagrafica articoli e il relativo controllo, assenti nel giro agenzia (§6.5) |
 | Passaggio | i due sistemi in parallelo per un periodo di prova, poi spegnimento di n8n e della vecchia app |
 | Stima | da quotare a parte dopo la messa in esercizio del CRM |
 

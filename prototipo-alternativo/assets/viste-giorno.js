@@ -169,6 +169,15 @@
           azione: { etichetta: 'Abbina a ' + p.numero, onClick: () => seAffidabile(sel, () => abbina(sel, p)) }
         };
       }), 'Nessuna pratica aperta di ' + f.breve + ' a cui abbinarlo.');
+      const altra = CRM.blocco(dx.corpo, 'abbina-altra');
+      altra.innerHTML = '<span class="testo-tenue">Oppure abbina a un’altra pratica di ' + e(f.breve) + ':</span>' + CRM.campoRicercaHtml({ entita: 'pratica', placeholder: 'Numero pratica o cliente', contesto: { fornitore_id: sel.fornitore_id } }) +
+        '<button type="button" class="btn sec" disabled>Abbina</button>';
+      CRM.attivaRicerche(altra, () => ({ fornitore_id: sel.fornitore_id }));
+      let scelta = null;
+      const btn = CRM.$('.btn', altra);
+      altra.addEventListener('ricerca-scelta', ev => { scelta = ev.detail.voce; btn.disabled = false; btn.textContent = 'Abbina a ' + scelta.numero; });
+      altra.addEventListener('change', () => { if (!CRM.$('input[type=hidden]', altra).value || !M.pratica(Number(CRM.$('input[type=hidden]', altra).value))) { scelta = null; btn.disabled = true; btn.textContent = 'Abbina'; } });
+      btn.addEventListener('click', () => { if (scelta) seAffidabile(sel, () => abbina(sel, scelta)); });
     }
   }
   /* Stato della lettura per l'elenco e conferma prima di usare dati poco affidabili. */
@@ -201,10 +210,6 @@
     if (!m) return ETICHETTE[c] || c;
     const col = COLONNE_RIGHE[boll ? 'bollettino' : 'articoli'].find(x => x.k === m[2]);
     return (col ? col.t : m[2]) + ' riga ' + (Number(m[1]) + 1);
-  };
-  const pallinoArticolo = codice => {
-    const ok = M.inAnagrafica(codice);
-    return '<span class="pallino ' + (ok ? 'ok' : 'ko') + '" title="' + (ok ? 'Articolo presente in anagrafica' : 'Codice non presente in anagrafica articoli') + '" aria-label="' + (ok ? 'in anagrafica' : 'non in anagrafica') + '"></span>';
   };
   const classeAff = (a, ver) => ver ? 'campo-verificato' : a < M.SOGLIA_BASSA ? 'incerto-errore' : a < M.SOGLIA_OK ? 'incerto-attesa' : '';
 
@@ -260,7 +265,9 @@
 
     const campoTestata = (c, tipoInput, valore, opzioni, extra) => {
       const a = affT(c), ver = !!b.ver[c];
-      const ctl = tipoInput === 'select'
+      const ctl = tipoInput === 'ricerca'
+        ? CRM.campoRicercaHtml({ entita: opzioni, campo: c, valore: valore, contesto: { fornitore_id: b.fornitore_id } })
+        : tipoInput === 'select'
         ? '<select data-campo="' + c + '">' + opzioni.map(x => '<option value="' + e(x.value) + '"' + (String(x.value) === String(valore) ? ' selected' : '') + '>' + e(x.label) + '</option>').join('') + '</select>'
         : '<input data-campo="' + c + '" type="' + (tipoInput || 'text') + '"' + (tipoInput === 'number' ? ' step="0.01"' : '') + ' value="' + e(valore == null ? '' : valore) + '"' + (extra === 'sola' ? ' readonly tabindex="-1"' : '') + '>';
       const incerto = a < M.SOGLIA_OK && !ver;
@@ -275,14 +282,14 @@
       const somma = M.importoLetto(comeDoc());
       host.innerHTML = '<div class="aff-riepilogo" id="aff-riep"></div>' +
         '<h3>Testata</h3><div class="griglia-letti">' + (boll
-          ? campoTestata('fornitore_id', 'select', b.fornitore_id, opF) +
+          ? campoTestata('fornitore_id', 'ricerca', b.fornitore_id, 'fornitore') +
             campoTestata('mese', 'select', b.mese, M.MESI.map((m, i) => ({ value: i + 1, label: m[0].toUpperCase() + m.slice(1) }))) +
             campoTestata('anno', 'number', b.anno)
           : campoTestata('tipo', 'select', b.tipo, ['ordine', 'conferma', 'fattura', 'nota_credito'].map(t => ({ value: t, label: M.TIPI[t] }))) +
             campoTestata('numero', 'text', b.numero) +
             campoTestata('data', 'date', b.data) +
-            campoTestata('fornitore_id', 'select', b.fornitore_id, opF) +
-            campoTestata('codice_cliente', 'text', b.codice_cliente, null, '<span class="esito-campo">' + (ab ? '<span class="pallino ok"></span>' + e(M.nomeCliente(ab.cliente_piva)) : '<span class="pallino ko"></span>non trovato fra i clienti del fornitore') + '</span>') +
+            campoTestata('fornitore_id', 'ricerca', b.fornitore_id, 'fornitore') +
+            campoTestata('codice_cliente', 'ricerca', b.codice_cliente, 'codiceCliente', '<span class="esito-campo">' + (ab ? '<span class="pallino ok"></span>' + e(M.nomeCliente(ab.cliente_piva)) : '<span class="pallino ko"></span>non trovato fra i clienti del fornitore') + '</span>') +
             campoTestata('totale', 'number', b.totale, null, '<span class="esito-campo">' + (Math.abs((Number(b.totale) || 0) - somma) < 0.01
               ? '<span class="pallino ok"></span>uguale alla somma delle righe' : '<span class="pallino ko"></span>somma delle righe ' + M.euro(somma)) + '</span>')) +
         '</div><div class="righe-testa"><h3>Righe <span class="testo-tenue">' + b.righe.length + '</span></h3><button type="button" class="btn sec piccolo" data-aggiungi="1">' + CRM.icona('piu') + 'Aggiungi riga</button></div>';
@@ -292,7 +299,9 @@
       const cella = c => r => {
         const a = affR(r, c.k), incerto = a < M.SOGLIA_OK && !r._ver[c.k], v = r[c.k];
         const val = v == null ? '' : (c.n && c.k !== 'qta' && v !== '' ? Number(v).toFixed(2) : v);
-        return '<div class="campo-riga">' + (c.k === 'codice' ? pallinoArticolo(v) : '') +
+        if (boll && c.k === 'numero') return '<div class="campo-riga">' + CRM.campoRicercaHtml({ entita: 'documentoFiscale', campo: 'righe.' + r._i + '.numero', valore: v, contesto: { fornitore_id: b.fornitore_id } }) +
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.numero" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
+        return '<div class="campo-riga">' +
           '<input data-campo="righe.' + r._i + '.' + c.k + '"' + (c.largo ? ' title="' + e(v || '') + '"' : '') + ' type="' + (c.data ? 'date' : c.n ? 'number' : 'text') + '"' + (c.n ? ' step="any"' : '') + ' value="' + e(val) + '"' +
           (incerto ? ' title="Affidabilità della lettura ' + Math.round(a * 100) + '%"' : '') + '>' +
           (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.' + c.k + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
@@ -322,12 +331,19 @@
     const valoreDa = (campo, v) => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) { b.righe[m[1]][m[2]] = v; b.righe[m[1]]._ver[m[2]] = true; } else { b[campo] = v; b.ver[campo] = true; } b.toccati[campo] = true; };
     const conferma = campo => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) b.righe[m[1]]._ver[m[2]] = true; else b.ver[campo] = true; };
     // eventi delegati sul pannello destro: restano validi anche quando la DataTable si ridisegna (ordinamento)
+    const trovaCampo = c => CRM.$('[data-evidenzia="' + c + '"]', fin.destra) || CRM.$('[data-campo="' + c + '"]', fin.destra);
     function collega(host) {
-      const vai = c => { const n = CRM.$('[data-campo="' + c + '"]', host); if (n) { n.focus(); n.scrollIntoView({ block: 'center', behavior: 'smooth' }); } };
-      host.addEventListener('focusin', ev => { const x = ev.target.closest('[data-campo]'); if (x) evidenzia(x.dataset.campo); });
+      const vai = c => { const n = trovaCampo(c); if (n) { n.focus(); n.scrollIntoView({ block: 'center', behavior: 'smooth' }); } };
+      CRM.attivaRicerche(host, () => ({ fornitore_id: b.fornitore_id, mese: b.mese, anno: b.anno }));
+      host.addEventListener('focusin', ev => { const x = ev.target.closest('[data-campo], [data-evidenzia]'); if (x) evidenzia(x.dataset.campo || x.dataset.evidenzia); });
+      host.addEventListener('ricerca-scelta', ev => {
+        const m = /^righe\.(\d+)\.numero$/.exec(ev.detail.campo || ''); if (!m || !boll) return;
+        const r = b.righe[m[1]], x = ev.detail.voce;
+        r.data = x.doc.data; r.imponibile = M.importoDoc(x.doc); r._ver.data = true; r._ver.imponibile = true;
+      });
       host.addEventListener('change', ev => {
         const x = ev.target.closest('[data-campo]'); if (!x) return;
-        valoreDa(x.dataset.campo, x.value); ridisegna(); const n = CRM.$('[data-campo="' + x.dataset.campo + '"]', host); if (n) n.focus();
+        valoreDa(x.dataset.campo, x.value); ridisegna(); const n = trovaCampo(x.dataset.campo); if (n) n.focus();
       });
       host.addEventListener('click', ev => {
         const t = ev.target.closest('[data-conferma], [data-vai], [data-elimina], [data-aggiungi]'); if (!t) return;
@@ -360,7 +376,7 @@
     });
     collega(fin.destra);
     destra(fin.destra);
-    const primo = CRM.$('.incerto-errore [data-campo], .incerto-attesa [data-campo]', fin.destra);
+    const primo = CRM.$('.incerto-errore .ricerca-testo, .incerto-errore [data-campo]:not([type=hidden]), .incerto-attesa .ricerca-testo, .incerto-attesa [data-campo]:not([type=hidden])', fin.destra);
     if (primo) primo.focus();
   }
 

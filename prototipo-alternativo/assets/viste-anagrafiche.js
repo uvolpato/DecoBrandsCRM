@@ -148,9 +148,9 @@
       titolo: nuovo ? 'Nuovo abbinamento' : M.nomeCliente(a.cliente_piva) + ' · ' + M.fornitore(a.fornitore_id).breve,
       conferma: nuovo ? 'Crea abbinamento' : 'Salva', colonne: 2,
       campi: [
-        { nome: 'cliente_piva', etichetta: 'Cliente', tipo: 'select', largo: true, valore: v0.cliente_piva, opzioni: [{ value: '', label: 'Scegli il cliente' }].concat(M.S.clienti.map(c => ({ value: c.piva, label: c.nome }))) },
-        { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'select', valore: v0.fornitore_id, opzioni: [{ value: '', label: 'Scegli il fornitore' }].concat(M.S.fornitori.map(f => ({ value: f.id, label: f.nome }))) },
-        { nome: 'subagente_id', etichetta: 'Seguito da', tipo: 'select', valore: v0.subagente_id, opzioni: [{ value: '', label: 'Scegli il subagente' }].concat(M.S.subagenti.map(s => ({ value: s.id, label: s.nome }))) },
+        { nome: 'cliente_piva', etichetta: 'Cliente', tipo: 'ricerca', entita: 'cliente', largo: true, valore: v0.cliente_piva, placeholder: 'Ragione sociale o P.IVA' },
+        { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: 'fornitore', valore: v0.fornitore_id, placeholder: 'Nome del fornitore' },
+        { nome: 'subagente_id', etichetta: 'Seguito da', tipo: 'ricerca', entita: 'subagente', valore: v0.subagente_id, placeholder: 'Nome del subagente' },
         { nome: 'codice', etichetta: 'Codice del fornitore', valore: v0.codice, placeholder: 'es. GA-2271', aiuto: 'Come il fornitore chiama il cliente su conferme e fatture: serve ad abbinare i documenti in automatico.' },
         { nome: 'sconto', etichetta: 'Sconto al cliente %', tipo: 'select', valore: v0.sconto, opzioni: sconti.map(x => ({ value: x, label: M.pct(x) })) }
       ],
@@ -161,6 +161,7 @@
       } }],
       onConferma: (v, form) => {
         if (!v.cliente_piva || !v.fornitore_id || !v.subagente_id) { form.errore('Scegli cliente, fornitore e subagente.'); return false; }
+        if (!M.cliente(v.cliente_piva) || !M.fornitore(Number(v.fornitore_id)) || !M.subagente(Number(v.subagente_id))) { form.errore('Scegli cliente, fornitore e subagente dall’elenco: i valori con il pallino rosso non esistono in anagrafica.'); return false; }
         const fid = Number(v.fornitore_id);
         const dup = M.S.abbinamenti.find(x => x !== a && x.cliente_piva === v.cliente_piva && x.fornitore_id === fid);
         if (dup) { form.errore(M.nomeCliente(v.cliente_piva) + ' con ' + M.fornitore(fid).breve + ' è già seguito da ' + M.subagente(dup.subagente_id).nome + '.'); return false; }

@@ -1642,7 +1642,11 @@ caricamento manuale ──┴─► coda `documenti_in_arrivo` ─► lettura GL
 <li><strong>Controlli fissi</strong>, indipendenti dal modello: totale letto ≠ somma righe;
    quantità × prezzo ≠ totale riga; codice cliente non presente fra i clienti del
    fornitore (<code>interscambio</code>); articolo assente nella pratica proposta; data fuori dal
-   periodo della pratica; bollettino già registrato per fornitore e mese.</li>
+   periodo della pratica; bollettino già registrato per fornitore e mese.
+   <strong>Nessun controllo sull'anagrafica articoli</strong>: nel giro dei bollettini Decobrands
+   fa da agente e gli articoli dei fornitori non sono (né saranno) nella sua
+   anagrafica; il codice articolo resta testo libero, verificato solo dall'affidabilità
+   della lettura e dal confronto con le fasi della pratica.</li>
 <li><strong>Livello</strong> del documento, mostrato in "Documenti" e sul pulsante "Correggi i dati
    letti" (numero di campi da controllare):</li>
 </ol>
@@ -3174,6 +3178,11 @@ stessi nomi e gli stessi parametri</strong> (attività F0-A4).</p>
 <td>passi di stato, note, stati</td>
 <td>—</td>
 </tr>
+<tr>
+<td><strong>CampoRicerca</strong> + <strong>RicercaEntita</strong></td>
+<td>ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, pratica, fattura/nota di credito (non gli articoli: nel giro agenzia non sono in anagrafica)</td>
+<td>autocompletamento con le prime 5 voci, lente / F4 che apre la maschera di ricerca (FilterBar + DataTable), pallino verde/rosso se il valore esiste in anagrafica; entità definite una volta (voci da <code>/api/lookup/*</code>, chiave, testo, colonne, filtri, contesto)</td>
+</tr>
 </tbody>
 </table></div>
 <p><strong>Comportamento fisso della DataTable</strong> (uguale in ogni schermata):
@@ -3224,6 +3233,10 @@ Fino ad allora resta in esercizio, invariata, sullo stesso database.</p>
 <tr>
 <td>Dati</td>
 <td>tabelle esistenti (<code>ordini_cliente_*</code>, <code>clienti</code>, <code>articoli</code>, …) riusate; migrazione solo se servono colonne nuove (affidabilità, riferimento a <code>documenti_in_arrivo</code>)</td>
+</tr>
+<tr>
+<td>Esportazione verso Integra</td>
+<td><strong>da analizzare</strong>: per la sola <strong>commercializzazione diretta</strong> (fatture cliente o fornitore di articoli che Decobrands vende in proprio) i documenti vanno esportati verso Integra come fa oggi la Gestione Ordini, con <strong>sostituzione dei codici articolo (alias)</strong> e <strong>esplosione dei kit</strong>; qui servono l'anagrafica articoli e il relativo controllo, assenti nel giro agenzia (§6.5)</td>
 </tr>
 <tr>
 <td>Passaggio</td>

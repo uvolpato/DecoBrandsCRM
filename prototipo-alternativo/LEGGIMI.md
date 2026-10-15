@@ -18,12 +18,12 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 
 ## Controllo dei dati letti
 
-Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-OCR, qui è simulata) e passa da **controlli fissi** (codice cliente presente fra i clienti del fornitore, articoli presenti in anagrafica, totale del documento uguale alla somma delle righe, bollettino non già registrato).
+Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-OCR, qui è simulata) e passa da **controlli fissi** (codice cliente presente fra i clienti del fornitore, totale del documento uguale alla somma delle righe, bollettino non già registrato).
 
 - **Livello:** affidabile (tutto ≥ 90 %) · da controllare (un campo fra 70 e 90 % o un controllo fallito) · bassa (un campo sotto 70 % o un controllo grave). Compare nell'elenco e come contatore su *Correggi i dati letti*; con livello basso l'abbinamento chiede conferma.
 - **Correggi i dati letti** apre una finestra a tutto schermo: a sinistra il documento com'è stampato, a destra testata e righe modificabili. I campi incerti sono bordati (giallo / rosso con la percentuale); selezionando un campo si evidenzia nel documento; ✓ conferma un valore giusto; si possono aggiungere ed eliminare righe. Il riepilogo in alto elenca i punti da controllare e porta al campo.
-- Le righe sono una **DataTable** standard (ordinabile, totale fisso) con celle modificabili; accanto al codice articolo un **pallino verde** se il codice è in anagrafica articoli, **rosso** se non c'è (anche questo è un punto da controllare).
-- **Prova:** conferma AB-77120 di Gries → quantità della riga 3 letta 12 ma stampata 18 (il totale non torna) e codice della riga 8 letto CI0T-387 con lo zero (pallino rosso) → correggi in 18 e CIOT-387, conferma data e prezzo della riga 5 → lettura affidabile.
+- Le righe sono una **DataTable** standard (ordinabile, totale fisso) con celle modificabili; nessun controllo sull'anagrafica articoli: nel giro agenzia gli articoli dei fornitori non sono nell'anagrafica Decobrands.
+- **Prova:** conferma AB-77120 di Gries → quantità della riga 3 letta 12 ma stampata 18 (il totale non torna) e codice della riga 8 letto CI0T-387 con lo zero (affidabilità 86 %) → correggi in 18 e CIOT-387, conferma data e prezzo della riga 5 → lettura affidabile.
 
 ## Regole di flusso applicate
 
@@ -65,7 +65,7 @@ Logo monocromatico, bianco sulla barra scura. Carattere **Public Sans** (OFL, in
 Ogni vista è **solo composizione** di componenti `CRM.*` parametrizzati (`assets/componenti.js`); il catalogo con esempi dal vivo e parametri è nella voce **Componenti** della barra.
 
 - Stessi nomi e parametri del primo prototipo: `Pagina`, `Pannello`, `DataTable`, `FilterBar`, `KpiRow`, `Form`, `FormModal`, `Modale`, `Conferma`, `Avviso`, `stato`.
-- Propri di questi flussi: `Caricamento`, `FinestraAffiancata`, `ListaDaFare`, `ElencoSelezionabile`, `Scelte`, `Binario`, `Matrice`, `Cerniera`, `Periodi`, `Cifre`, `Dettagli`, `Elenco`, `TestoDaInviare`.
+- Propri di questi flussi: `Caricamento`, `FinestraAffiancata`, `CampoRicerca` + `RicercaEntita` (campi collegati a entità: autocompletamento con 5 voci, lente / F4 per la maschera di ricerca, pallino se il valore esiste; entità in `assets/entita.js`), `ListaDaFare`, `ElencoSelezionabile`, `Scelte`, `Binario`, `Matrice`, `Cerniera`, `Periodi`, `Cifre`, `Dettagli`, `Elenco`, `TestoDaInviare`.
 
 `DataTable` occupa sempre lo spazio disponibile, con intestazione fissa, righe scorrevoli, intestazioni ordinabili e totali fissi; con `naturale` prende l'altezza del contenuto (righe di un documento).
 
@@ -76,6 +76,7 @@ index.html                    pagina unica
 assets/dati.js                dati di prova organizzati per flusso
 assets/motore.js              regole: stato pratica, scaglioni datati, riconciliazione, liquidazione, abbinamento
 assets/componenti.js          libreria CRM.*: componenti standard, icone, rotte
+assets/entita.js              entità dei campi di ricerca (fornitore, cliente, subagente, codice cliente, pratica, fattura)
 assets/viste-giorno.js        Oggi, Documenti in arrivo, Pratiche, Pratica
 assets/viste-periodo.js       Bollettini, Bollettino, Liquidazioni
 assets/viste-anagrafiche.js   Fornitori, Subagenti, Clienti e abbinamenti

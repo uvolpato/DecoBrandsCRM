@@ -254,20 +254,9 @@
   /* Valore realmente stampato sul documento (per l'anteprima): diverso dal letto solo se la lettura ha sbagliato. */
   M.originale = (d, campo, letto) => { const o = d.lettura && d.lettura.originale; return o && o[campo] != null ? o[campo] : letto; };
   M.totaleStampato = d => d.lettura && d.lettura.totale != null ? d.lettura.totale : M.importoLetto(d);
-  /* Anagrafica articoli: nel prototipo sono i codici già presenti nei documenti di prova
-     (meno quelli letti male), più quelli dei documenti caricati. Nell'app è la tabella `articoli`. */
-  let anagrafica = null;
-  M.inAnagrafica = function (codice) {
-    if (!codice) return false;
-    if (!anagrafica) {
-      const D = window.DATI_DEMO, esclusi = D.articoli_non_in_anagrafica || [];
-      anagrafica = new Set();
-      D.pratiche.forEach(p => p.documenti.forEach(d => d.righe.forEach(r => anagrafica.add(r.codice))));
-      D.in_arrivo.forEach(d => (d.righe || []).forEach(r => { if (r.codice && esclusi.indexOf(r.codice) < 0) anagrafica.add(r.codice); }));
-    }
-    return anagrafica.has(codice) || (M.S.articoli_noti || []).indexOf(codice) >= 0 ||
-      M.S.pratiche.some(p => p.documenti.some(d => d.righe.some(r => r.codice === codice)));
-  };
+  /* Nel giro agenzia (bollettini) gli articoli dei fornitori NON sono nell'anagrafica Decobrands:
+     nessun controllo anagrafica articoli. L'anagrafica serve solo per la commercializzazione diretta
+     (esportazione verso Integra con sostituzione codici e kit): fase successiva, spec §17. */
   /* Controlli fissi, indipendenti dal modello. */
   M.controlli = function (d) {
     const out = [];
@@ -276,7 +265,6 @@
       return out;
     }
     if (!M.abbinamentoPerCodice(d.fornitore_id, d.codice_cliente)) out.push({ campo: 'codice_cliente', testo: 'Codice cliente ' + d.codice_cliente + ' non presente fra i clienti del fornitore', grave: true });
-    d.righe.forEach((r, i) => { if (!M.inAnagrafica(r.codice)) out.push({ campo: 'righe.' + i + '.codice', testo: 'Articolo ' + (r.codice || '(vuoto)') + ' della riga ' + (i + 1) + ' non presente in anagrafica', grave: false }); });
     const stampato = M.totaleStampato(d), somma = M.importoLetto(d);
     if (Math.abs(stampato - somma) >= 0.01) out.push({ campo: 'totale', testo: 'Totale del documento ' + M.euro(stampato) + ' diverso dalla somma delle righe ' + M.euro(somma), grave: true });
     return out;
@@ -395,7 +383,6 @@
     if (!esempi.length) return null;
     const scelto = esempi.map(f => f()).sort((a, b) => (b.tipo === preferenza) - (a.tipo === preferenza))[0];
     const d = Object.assign({ id: Date.now() + Math.floor(Math.random() * 1000), ricevuto: M.oggi(), file: nome }, scelto);
-    if (d.tipo !== 'bollettino') M.S.articoli_noti = (M.S.articoli_noti || []).concat(d.righe.map(r => r.codice));
     M.S.in_arrivo.unshift(d);
     M.annota('Caricato ' + nome + ': letto ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero + ' di ' + M.fornitore(d.fornitore_id).breve);
     return d;
