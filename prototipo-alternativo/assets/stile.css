@@ -613,3 +613,11 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 
 .gruppo-nome .conta { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 999px; background: rgba(255,255,255,.16); color: #fff; }
 .gruppo-nome .conta.urgente { background: var(--attesa); color: #000; }
+
+/* barra: marchio, Carica documenti e piede restano fermi; scorre solo il menu */
+.barra { overflow: hidden; height: 100vh; }
+.barra-menu { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -12px; padding: 0 12px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent; }
+.barra-menu::-webkit-scrollbar { width: 6px; }
+.barra-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 3px; }
+.barra > .marchio, .barra > .carica-barra, .barra > .barra-piede { flex: none; }
+@media (max-width: 860px) { .barra { height: auto; overflow: visible; } .barra-menu { display: contents; } }
