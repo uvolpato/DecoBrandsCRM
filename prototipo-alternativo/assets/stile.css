@@ -665,3 +665,14 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .cifre.in-riga { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 24px; flex: none; }
 .cifre.in-riga div { border-bottom: 0; padding: 4px 0; }
 .strumenti-scheda .cerca { flex: 0 1 260px; }
+
+/* ---------- DataTable: pagine ---------- */
+.dt-piede { align-items: center; }
+.dt-pagine { display: inline-flex; align-items: center; gap: 2px; margin: 0 auto; }
+.dt-pagine button { min-width: 28px; height: 28px; padding: 0 7px; font-variant-numeric: tabular-nums; border: 1px solid transparent; border-radius: 6px; background: none; font: inherit; font-size: 13px; color: var(--testo-intest); cursor: pointer; }
+.dt-pagine button:hover:not(:disabled):not(.attiva) { background: var(--bordo-tenue); }
+.dt-pagine button.attiva { background: var(--primario); color: #fff; font-weight: 600; }
+.dt-pagine button:disabled { opacity: .35; cursor: default; }
+.dt-pagine button:focus-visible { outline: 2px solid var(--primario); outline-offset: 1px; }
+.dt-pagine span { padding: 0 4px; color: var(--testo-tenue); }
+.dt-pagine button:first-child, .dt-pagine button:last-child { font-size: 17px; line-height: 1; }

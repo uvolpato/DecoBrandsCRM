@@ -468,8 +468,12 @@
      opz: { colonne: [{ key, header, tipo: 'testo'|'euro'|'numero'|'pct'|'data', valore(r), cell(r) → html, align: 'left'|'right'|'center',
                         grow, sortable (default true), sortValue(r), classe(r), totale: 'somma' }],
             righe, onRowClick(r), rowClass(r), emptyText, emptyHint, ordinamentoIniziale: { key, dir },
-            compatta, naturale (altezza del contenuto), piede (html), etichettaTotale }
-     → { el, aggiorna(righe) }
+            compatta, naturale (altezza del contenuto), piede (html), etichettaTotale,
+            perPagina (righe per pagina; predefinito: Impostazioni → Conservazione → righe per pagina; false = senza pagine) }
+     → { el, aggiorna(righe), pagina(n) }
+     Paginazione: ordinamento e totali valgono su TUTTE le righe; la pagina mostra solo una fetta
+     dell'elenco già ordinato. Cambiando filtro (aggiorna) si torna alla prima pagina; cambiando
+     ordinamento pure. Pagina e ordinamento si ricordano tornando indietro (§7.12).
      ========================================================= */
   const TIPI = {
     testo: { fmt: v => v == null || v === '' ? '—' : esc(v), ord: v => String(v == null ? '' : v).toLowerCase(), al: '' },
@@ -485,6 +489,11 @@
     let ord = opz.ordinamentoIniziale || null;
     const ordR = CRM.registra('ord', () => ord);
     if (ordR !== undefined) ord = ordR;
+    const conf = ((M.S.impostazioni || {}).conservazione || {}).righe_pagina;
+    const perPagina = opz.perPagina === false ? 0 : Number(opz.perPagina || conf || 25);
+    let pag = 0;
+    const pagR = CRM.registra('pagina', () => pag);
+    if (pagR !== undefined) pag = pagR;
     const cols = opz.colonne.map(c => {
       const t = TIPI[c.tipo || 'testo'];
       const val = c.valore || (r => r[c.key]);
@@ -503,30 +512,44 @@
           (c.sortable ? ' data-k="' + c.key + '" aria-sort="' + (att ? (ord.dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' : '') + '>' +
           esc(c.header) + (c.sortable ? '<span class="freccia" aria-hidden="true">' + (att ? (ord.dir === 'asc' ? '▲' : '▼') : '▲▼') + '</span>' : '') + '</th>';
       }).join('') + '</tr></thead>';
+      const tutte = lista;                                   // ordinate: totali e conteggio su tutte
+      const pagine = perPagina ? Math.max(1, Math.ceil(tutte.length / perPagina)) : 1;
+      if (pag >= pagine) pag = pagine - 1;
+      if (perPagina && tutte.length > perPagina) lista = tutte.slice(pag * perPagina, (pag + 1) * perPagina);
       const tbody = '<tbody>' + (lista.length ? lista.map((r, i) =>
         '<tr data-i="' + i + '" class="' + [opz.onRowClick ? 'cliccabile' : '', opz.rowClass ? opz.rowClass(r) : ''].join(' ') + '">' +
         cols.map(c => '<td class="' + [c._al, c.grow ? 'cresce' : '', c.classe ? (typeof c.classe === 'function' ? c.classe(r) : c.classe) : ''].join(' ') + '">' + c._fmt(r) + '</td>').join('') + '</tr>').join('')
         : '<tr><td colspan="' + cols.length + '"><div class="vuoto"><b>' + esc(opz.emptyText || 'Nessun elemento') + '</b>' + esc(opz.emptyHint || '') + '</div></td></tr>') + '</tbody>';
       let tfoot = '';
-      if (lista.length && cols.some(c => c.totale)) {
+      if (tutte.length && cols.some(c => c.totale)) {
         const primo = Math.max(1, cols.findIndex(c => c.totale));
         tfoot = '<tfoot><tr><td colspan="' + primo + '">' + esc(opz.etichettaTotale || 'Totale') + '</td>' +
-          cols.slice(primo).map(c => '<td class="' + c._al + '">' + (c.totale ? TIPI[c.tipo || 'numero'].fmt(lista.reduce((s, r) => s + (Number(c._val(r)) || 0), 0)) : '') + '</td>').join('') + '</tr></tfoot>';
+          cols.slice(primo).map(c => '<td class="' + c._al + '">' + (c.totale ? TIPI[c.tipo || 'numero'].fmt(tutte.reduce((s, r) => s + (Number(c._val(r)) || 0), 0)) : '') + '</td>').join('') + '</tr></tfoot>';
       }
       box.innerHTML = '<div class="dt-scorri"><table>' + thead + tbody + tfoot + '</table></div>' +
-        '<div class="dt-piede"><span>' + lista.length + (lista.length === 1 ? ' elemento' : ' elementi') + '</span>' + (opz.piede ? '<span>' + opz.piede + '</span>' : '') + '</div>';
+        '<div class="dt-piede"><span>' + (pagine > 1 ? (pag * perPagina + 1) + '–' + (pag * perPagina + lista.length) + ' di ' : '') + tutte.length + (tutte.length === 1 ? ' elemento' : ' elementi') + '</span>' +
+        (pagine > 1 ? navPagine(pagine) : '') + (opz.piede ? '<span>' + opz.piede + '</span>' : '') + '</div>';
       $$('th[data-k]', box).forEach(th => th.addEventListener('click', () => {
         const k = th.dataset.k;
         ord = { key: k, dir: ord && ord.key === k && ord.dir === 'asc' ? 'desc' : 'asc' };
-        disegna();
+        pag = 0; disegna();
       }));
+      $$('.dt-pagine [data-p]', box).forEach(b => b.addEventListener('click', () => { pag = Number(b.dataset.p); disegna(); const sc = $('.dt-scorri', box); if (sc) sc.scrollTop = 0; }));
       if (opz.onRowClick) $$('tbody tr[data-i]', box).forEach(tr => tr.addEventListener('click', e => {
         if (e.target.closest('a, button')) return;
         opz.onRowClick(lista[Number(tr.dataset.i)]);
       }));
     }
+    // pulsanti delle pagine: prima, precedente, numeri vicini (con … se sono molte), successiva, ultima
+    function navPagine(n) {
+      const num = [];
+      for (let i = 0; i < n; i++) if (i === 0 || i === n - 1 || Math.abs(i - pag) <= 1) num.push(i); else if (num[num.length - 1] !== '…') num.push('…');
+      const b = (p, t, tit, dis, att) => '<button type="button" data-p="' + p + '"' + (dis ? ' disabled' : '') + (att ? ' aria-current="page" class="attiva"' : '') + ' title="' + tit + '">' + t + '</button>';
+      return '<nav class="dt-pagine" aria-label="Pagine">' + b(pag - 1, '‹', 'Pagina precedente', pag === 0) +
+        num.map(i => i === '…' ? '<span>…</span>' : b(i, i + 1, 'Pagina ' + (i + 1), false, i === pag)).join('') + b(pag + 1, '›', 'Pagina successiva', pag === n - 1) + '</nav>';
+    }
     disegna();
-    return { el: box, aggiorna: nuove => { righe = nuove; disegna(); } };
+    return { el: box, aggiorna: nuove => { righe = nuove; pag = 0; disegna(); }, pagina: n => { pag = n; disegna(); } };
   };
 
   /* =========================================================
