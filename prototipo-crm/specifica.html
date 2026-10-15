@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.2 — Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.3 — pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -92,7 +92,7 @@
           <li class="nav-item">
             <a class="nav-link" href="#sec-7">7. Schermate</a>
             <ul class="nav flex-column ps-3">
-              <li class="nav-item"><a class="nav-link" href="#sec-7-1">7.1 Dashboard (/dashboard)</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-1">7.1 Oggi (/dashboard)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-2">7.2 Elenco ordini fornitore (/ordini-fornitore)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-3">7.3 Dettaglio pratica (/ordini-fornitore/:id)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-4">7.4 Anagrafica fornitori (/fornitori, /fornitori/:id)</a></li>
@@ -156,7 +156,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.2 — <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.3 — pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -1950,8 +1950,8 @@ di Decobrands; tempi e memoria video con analisi della pagina attiva.</p>
 </tr>
 <tr>
 <td>2</td>
-<td><code>/dashboard</code></td>
-<td>Dashboard (home dopo login)</td>
+<td><code>/dashboard</code> (Oggi)</td>
+<td>Cose da fare, per gruppi (home dopo login)</td>
 </tr>
 <tr>
 <td>3</td>
@@ -2020,16 +2020,35 @@ di Decobrands; tempi e memoria video con analisi della pagina attiva.</p>
 </tr>
 </tbody>
 </table></div>
-<h3 id="sec-7-1">7.1 Dashboard (<code>/dashboard</code>)</h3>
+<h3 id="sec-7-1">7.1 Oggi (<code>/dashboard</code>)</h3>
+<p>La pagina è una <strong>lista di cose da fare organizzata per tipo di lavoro</strong>, non un
+cruscotto di numeri (prototipo: <code>prototipo-alternativo/</code>, pagina Oggi).</p>
 <ul>
-<li>Header con titolo e <strong>trimestre corrente</strong>; <strong>KPI sempre visibili</strong>: ordini in stato
-  <code>inviato</code> / <code>confermato</code> / <code>fatturato</code> e totale merce fatturata del trimestre.</li>
-<li><strong>Organizzazione a tab</strong> (pattern <code>tabs-crm</code>): <strong>Segnalazioni</strong> — conferme scadute
-  (alert §5.12), bollettini in stato <code>da_verificare</code> e <strong>pratiche con variazioni di
-  composizione fra fasi</strong> (o con note di credito, §5.8), con contatore sul tab;
-  <strong>Ordini fornitore</strong> — ultimi ordini (8) con accesso al dettaglio.</li>
-<li>Contenitori stabili (V9): liste segnalazioni con altezza costante, ultimi ordini in
-  tabella con intestazione fissa e scroll interno.</li>
+<li><strong>Riquadri in testa</strong> (KpiRow) che fanno da <strong>filtro</strong>: <em>Conferme in ritardo</em> (con la
+  più vecchia e il numero di fornitori da sollecitare), <em>Documenti in coda</em> (quanti
+  chiedono una decisione e quanti sono pronti), <em>Bollettini</em> (da verificare o chiudere,
+  da sollecitare). Clic = mostra solo quel gruppo; secondo clic = tutti.</li>
+<li><strong>"Da fare" in gruppi richiudibili</strong> (componente GruppiDaFare, §16.4); aperti o chiusi
+  restano come l'utente li lascia; la lista scorre nel suo riquadro, le intestazioni dei
+  gruppi restano visibili:</li>
+<li><strong>Conferme in ritardo</strong> (alert §5.12), ordinate per giorni di ritardo, con il ritardo
+    in evidenza; azione di gruppo <strong>Prepara i solleciti</strong>: <strong>un testo per fornitore</strong> con
+    l'elenco delle sue pratiche in ritardo (numero, data, cliente, codice cliente del
+    fornitore, importo, data attesa), schede per fornitore, <em>Copia il testo</em> passa al
+    fornitore successivo; ogni copia resta nel registro operazioni (§15);</li>
+<li><strong>Documenti da decidere</strong>: riassunto della coda (pronti da abbinare, dati letti da
+    controllare, da scegliere o verificare) e <strong>solo</strong> i documenti che chiedono una
+    decisione (abbinamento non sicuro, cliente non riconosciuto, doppioni, lettura non
+    affidabile); azione <em>Apri la coda</em> (§7.9);</li>
+<li><strong>Bollettini</strong>: da verificare, pronti da chiudere, mancanti da sollecitare.</li>
+<li><strong>Colonna destra rivolta al futuro</strong>:</li>
+<li><strong>Prossime scadenze</strong> (15 giorni): conferme attese, bollettini del mese precedente
+    attesi entro il 10, fine del trimestre; ogni voce porta alla pagina relativa;</li>
+<li><strong>trimestre in corso</strong>: atteso dai fornitori, già riconosciuto, da liquidare,
+    bloccato in attesa dei bollettini;</li>
+<li><strong>ultime operazioni</strong> (5, compatte).</li>
+<li>Le <strong>pratiche con variazioni</strong> fra fasi (§5.8) restano segnalate nell'elenco
+  Pratiche (filtro "Con variazioni").</li>
 </ul>
 <h3 id="sec-7-2">7.2 Elenco ordini fornitore (<code>/ordini-fornitore</code>)</h3>
 <ul>
@@ -3499,6 +3518,11 @@ stessi nomi e gli stessi parametri</strong> (attività F0-A4).</p>
 <td><strong>FinestraAffiancata</strong></td>
 <td>documento a sinistra, dati a destra, divisore trascinabile; usata da "Correggi i dati letti" (§6.5) e dalla consultazione dei documenti della pratica (§7.3)</td>
 <td>titolo, sottotitolo, larghezza iniziale, <code>sinistra(host)</code>, <code>destra(host)</code>, azioni del piede</td>
+</tr>
+<tr>
+<td><strong>GruppiDaFare</strong></td>
+<td>lista "Da fare" della pagina Oggi (§7.1)</td>
+<td>gruppi (<code>id</code>, titolo, variante, contatore, voci, riassunto, azioni di gruppo, testo se vuoto); <code>filtra(id)</code> collegato ai riquadri</td>
 </tr>
 <tr>
 <td><strong>Elenco</strong></td>

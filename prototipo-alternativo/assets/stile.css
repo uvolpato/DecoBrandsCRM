@@ -530,3 +530,34 @@ a.m-cella:hover { background: #f1f6ff; }
 /* avviso: funzione da verificare (evidenziazione nel documento) */
 .avviso-verifica { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--attesa-tenue, #fff3cd); color: var(--attesa-testo, #664d03); font-size: 12.5px; line-height: 1.45; }
 .avviso-verifica svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+
+/* Oggi: gruppi della lista Da fare */
+.gruppo-fare { border-bottom: 1px solid var(--bordo); }
+.gruppo-fare:last-child { border-bottom: 0; }
+.gruppo-fare > summary { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 18px; background: var(--sfondo); cursor: pointer; list-style: none; border-bottom: 1px solid var(--bordo-tenue); }
+.gruppo-fare > summary::-webkit-details-marker { display: none; }
+.gruppo-fare > summary::before { content: ''; width: 7px; height: 7px; margin-right: 2px; border-right: 2px solid var(--testo-tenue); border-bottom: 2px solid var(--testo-tenue); transform: rotate(-45deg); transition: transform .15s; flex: none; }
+.gruppo-fare[open] > summary::before { transform: rotate(45deg); }
+.gruppo-fare > summary:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; }
+.gf-titolo { flex: 1; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.gf-conta { min-width: 22px; padding: 1px 7px; border-radius: 10px; font-size: 12px; text-align: center; background: var(--bordo-tenue); color: var(--testo-intest); }
+.g-errore .gf-conta { background: var(--errore-tenue, #f8d7da); color: var(--errore-testo, #842029); }
+.g-attesa .gf-conta { background: var(--attesa-tenue); color: var(--attesa-testo); }
+.g-primario .gf-conta { background: var(--primario-tenue); color: var(--primario-testo); }
+.gf-azioni { display: flex; gap: 6px; }
+.gf-sommario { margin: 0; padding: 10px 18px; font-size: 13px; color: var(--testo-intest); border-bottom: 1px solid var(--bordo-tenue); }
+.gf-sommario b { color: var(--testo); }
+.da-fare .giorni { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; background: var(--errore-tenue, #f8d7da); color: var(--errore-testo, #842029); font-size: 12px; font-weight: 600; }
+/* Prossime scadenze */
+.scadenze { list-style: none; margin: 0; padding: 0; }
+.scadenze li { display: grid; grid-template-columns: 54px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--bordo-tenue); }
+.scadenze li:last-child { border-bottom: 0; }
+.scadenze .sc-data { font-weight: 700; font-size: 13px; color: var(--primario-testo); line-height: 1.2; }
+.scadenze .sc-data small { display: block; font-weight: 400; color: var(--testo-tenue); font-size: 11.5px; }
+.scadenze a { font-weight: 600; color: var(--testo); text-decoration: none; }
+.scadenze a:hover { text-decoration: underline; }
+.scadenze span { display: block; font-size: 12.5px; color: var(--testo-tenue); }
+/* Solleciti per fornitore */
+.solleciti-schede { margin-bottom: 10px; }
+.pannello.compatto .pannello-testa h2 { font-size: 14px; }
+.pannello.compatto .elenco li { font-size: 12.5px; padding: 6px 0; }

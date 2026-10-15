@@ -69,6 +69,13 @@
     { nome: 'Caricamento', gruppo: 'Flussi', testo: 'Area dove trascinare i file o sceglierli. È il punto d’ingresso di tutti i documenti; scegliFile apre la stessa scelta da un pulsante qualsiasi (barra laterale, Bollettini, Pratica).',
       firma: 'CRM.Caricamento(host, { titolo, testo, accetta, onFile(files) })\nCRM.scegliFile({ accetta, onFile(files) })',
       demo: h => CRM.Caricamento(h, { titolo: 'Trascina qui i documenti', testo: 'PDF o Excel', onFile: f => CRM.Avviso(f.length + (f.length === 1 ? ' file scelto: ' + f[0].name : ' file scelti')) }) },
+    { nome: 'GruppiDaFare', gruppo: 'Flussi', testo: 'Lista "Da fare" divisa in gruppi richiudibili (aperti o chiusi restano come li lasci), con contatore, riassunto e azioni sul gruppo intero; filtrabile dai riquadri KpiRow.',
+      firma: 'CRM.GruppiDaFare(host, [{ id, titolo, variante, conta, voci: [come ListaDaFare], sommario (html), azioni: [{ etichetta, icona, variante, onClick, href }], vuoto }], vuoto) → { el, filtra(id | null) }',
+      demo: h => CRM.GruppiDaFare(h, [
+        { id: 'a', titolo: 'Conferme in ritardo', variante: 'errore', conta: 1, azioni: [{ etichetta: 'Prepara i solleciti', icona: 'posta', variante: 'primario', onClick: () => CRM.Avviso('Solleciti') }],
+          voci: [{ tipo: 'errore', titolo: 'Sollecita la conferma di OF/2026/041', extra: '<span class="giorni">17 gg</span>', dettaglio: 'Gries · Vivaio Verde Azzurro', href: '#/componenti', azione: 'Apri' }] },
+        { id: 'b', titolo: 'Documenti da decidere', variante: 'primario', conta: 0, sommario: '<b>3</b> in coda, tutti pronti da abbinare.', voci: [], vuoto: 'Nessun documento richiede una decisione.' }
+      ], { titolo: 'Tutto in ordine', testo: '' }) },
     { nome: 'ListaDaFare', gruppo: 'Flussi', testo: 'Attività in ordine di urgenza, ognuna con il pulsante che porta dove si risolve.',
       firma: 'CRM.ListaDaFare(host, [{ tipo: errore|attesa|primario, titolo, dettaglio, href, azione }], vuoto: { titolo, testo })',
       demo: h => CRM.ListaDaFare(h, [

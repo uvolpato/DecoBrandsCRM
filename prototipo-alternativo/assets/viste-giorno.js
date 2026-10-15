@@ -12,14 +12,48 @@
     const fare = M.daFare();
     const corpo = CRM.Pagina({ voce: 'oggi', titolo: 'Oggi', pieno: true,
       sottotitolo: M.dataLunga(M.oggi()) + ' · ' + (fare.length ? fare.length + (fare.length === 1 ? ' cosa da fare' : ' cose da fare') : 'niente in sospeso') });
-    const col = CRM.blocco(corpo, 'colonne riempi');
+    // gruppi di lavoro: conferme in ritardo, documenti da decidere, bollettini
+    const conferme = fare.filter(x => x.gruppo === 'conferme').sort((a, b) => b.giorni - a.giorni);
+    const documenti = fare.filter(x => x.gruppo === 'documenti');
+    const daDecidere = documenti.filter(x => x.stato !== 'pronto');
+    const bollettini = fare.filter(x => x.gruppo === 'bollettini');
+    const conta = st => documenti.filter(x => x.stato === st).length;
+    const voce = x => ({ tipo: VARIANTE_FARE[x.tipo], titolo: x.titolo, dettaglio: x.dettaglio, href: x.link, azione: x.azione });
+    const fornConf = conferme.map(x => x.fornitore_id).filter((v, i, a) => a.indexOf(v) === i);
 
-    // la lista scorre dentro il suo riquadro: intestazione fissa, righe scorrevoli
-    const daFare = CRM.Pannello(col, { titolo: 'Da fare', nota: 'in ordine di urgenza', senzaMargine: true, riempi: true });
-    CRM.ListaDaFare(daFare.corpo, fare.map(x => ({ tipo: VARIANTE_FARE[x.tipo], titolo: x.titolo, dettaglio: x.dettaglio, href: x.link, azione: x.azione })),
-      { titolo: 'Tutto in ordine', testo: 'Nessun documento da abbinare, nessuna conferma in ritardo, nessun bollettino da verificare.' });
+    // 1. riquadri in testa: quanto lavoro c'è per tipo; un clic filtra la lista
+    let gruppi;
+    const kpi = CRM.KpiRow(corpo, [
+      { id: 'conferme', etichetta: 'Conferme in ritardo', valore: String(conferme.length), variante: conferme.length ? 'errore' : 'ok',
+        dettagli: conferme.length ? [{ testo: 'la più vecchia da ' + conferme[0].giorni + ' giorni' }, { testo: fornConf.length + (fornConf.length === 1 ? ' fornitore da sollecitare' : ' fornitori da sollecitare') }] : [{ testo: 'nessuna' }] },
+      { id: 'documenti', etichetta: 'Documenti in coda', valore: String(documenti.length), variante: 'primario',
+        dettagli: [{ testo: daDecidere.length + ' chiedono una decisione' }, { testo: conta('pronto') + ' pronti da abbinare' }] },
+      { id: 'bollettini', etichetta: 'Bollettini', valore: String(bollettini.length), variante: bollettini.length ? 'attesa' : 'ok',
+        dettagli: [{ testo: bollettini.filter(x => x.tipo === 'bollettino').length + ' da verificare o chiudere' }, { testo: bollettini.filter(x => x.tipo === 'mancante').length + ' da sollecitare' }] }
+    ], { onSeleziona: id => gruppi.filtra(id) });
+
+    const col = CRM.blocco(corpo, 'colonne riempi');
+    const daFare = CRM.Pannello(col, { titolo: 'Da fare', nota: 'clic sul gruppo per aprirlo o chiuderlo', senzaMargine: true, riempi: true });
+    // 2–3. gruppi richiudibili, ordinati per anzianità, con azioni sul gruppo intero
+    gruppi = CRM.GruppiDaFare(daFare.corpo, [
+      { id: 'conferme', titolo: 'Conferme in ritardo', variante: 'errore', conta: conferme.length,
+        azioni: conferme.length ? [{ etichetta: 'Prepara i solleciti', icona: 'posta', variante: 'primario', onClick: () => solleciti(conferme.map(x => M.pratica(x.pratica))) }] : [],
+        voci: conferme.map(x => Object.assign(voce(x), { extra: '<span class="giorni">' + x.giorni + ' gg</span>' })), vuoto: 'Nessuna conferma in ritardo.' },
+      { id: 'documenti', titolo: 'Documenti da decidere', variante: 'primario', conta: daDecidere.length,
+        azioni: [{ etichetta: 'Apri la coda', href: '#/documenti' }],
+        sommario: documenti.length ? '<b>' + documenti.length + '</b> in coda: <b>' + conta('pronto') + '</b> pronti da abbinare, <b>' + conta('controllare') + '</b> con dati letti da controllare, <b>' + conta('scegliere') + '</b> da scegliere o verificare. Qui sotto solo quelli che chiedono una decisione.' : '',
+        voci: daDecidere.map(x => Object.assign(voce(x), { dettaglio: x.dettaglio + (x.stato === 'controllare' ? ' · dati letti da controllare' : '') })), vuoto: 'Nessun documento richiede una decisione.' },
+      { id: 'bollettini', titolo: 'Bollettini', variante: 'attesa', conta: bollettini.length,
+        azioni: [{ etichetta: 'Apri bollettini', href: '#/bollettini' }],
+        voci: bollettini.map(voce), vuoto: 'Nessun bollettino da verificare.' }
+    ], { titolo: 'Tutto in ordine', testo: 'Nessun documento da abbinare, nessuna conferma in ritardo, nessun bollettino da verificare.' });
 
     const destra = CRM.blocco(col, 'pila', 'overflow:auto;min-height:0');
+    // 4. colonna rivolta al futuro: cosa arriva nei prossimi giorni
+    const sc = M.scadenze(15);
+    const scad = CRM.Pannello(destra, { titolo: 'Prossime scadenze', nota: 'prossimi 15 giorni' });
+    scad.corpo.innerHTML = sc.length ? '<ul class="scadenze">' + sc.map(x => '<li><span class="sc-data">' + M.data(x.data).slice(0, 5) + '<small>' + (M.giorni(M.oggi(), x.data) === 0 ? 'oggi' : 'fra ' + M.giorni(M.oggi(), x.data) + ' gg') + '</small></span>' +
+      '<div><a href="' + x.link + '">' + e(x.testo) + '</a><span>' + e(x.dettaglio) + '</span></div></li>').join('') + '</ul>' : '<p class="testo-tenue" style="margin:0">Nessuna scadenza nei prossimi 15 giorni.</p>';
     const a = 2026, t = M.trimestre(M.oggi());
     const st = M.statoTrimestre(a, t);
     const righe = M.righeLiquidazione(a, t);
@@ -38,7 +72,8 @@
       { etichetta: 'Bloccato in attesa dei bollettini', valore: somma(r => !r.liquidabile), variante: somma(r => !r.liquidabile) ? 'attesa' : '' }
     ]);
     const reg = CRM.Pannello(destra, { titolo: 'Ultime operazioni' });
-    CRM.Elenco(reg.corpo, M.S.registro.slice(0, 8).map(x => ({ testo: e(x.testo) })), 'Qui compaiono le operazioni fatte: abbinamenti, verifiche, liquidazioni.');
+    reg.el.classList.add('compatto');
+    CRM.Elenco(reg.corpo, M.S.registro.slice(0, 5).map(x => ({ testo: e(x.testo) })), 'Qui compaiono le operazioni fatte: abbinamenti, verifiche, liquidazioni.');
   });
 
   /* ---------- Documenti: Caricamento + ElencoSelezionabile + Dettagli + DataTable + Scelte ----------
@@ -648,6 +683,43 @@
       destra: '<span class="' + CRM.classeSegno(Math.min(0, M.importoDoc(d))) + '">' + M.euro(M.importoDoc(d)) + '</span>'
     })));
   });
+
+  /* Solleciti di conferma raggruppati per fornitore: un testo per fornitore con tutte le sue pratiche in ritardo. */
+  function solleciti(pratiche) {
+    const per = {};
+    pratiche.forEach(p => { (per[p.fornitore_id] = per[p.fornitore_id] || []).push(p); });
+    const ids = Object.keys(per).map(Number);
+    const testo = fid => {
+      const f = M.fornitore(fid), ps = per[fid];
+      return 'Gentili colleghi di ' + f.nome + ',\n\nnon abbiamo ancora ricevuto la conferma ' + (ps.length === 1 ? 'del seguente ordine' : 'dei seguenti ordini') + ':\n\n' +
+        ps.map(p => '- ' + p.numero + ' del ' + M.data(p.data) + ' · ' + M.nomeCliente(p.cliente_piva) + ' (vostro codice ' + ((M.abbinamento(p.cliente_piva, p.fornitore_id) || {}).codice || '—') + ') · ' +
+          M.euro(M.importoDoc(M.doc(p, 'ordine'))) + ' · attesa entro il ' + M.data(M.scadenzaConferma(p))).join('\n') +
+        '\n\nVi chiediamo di inviarcele appena possibile, indicando eventuali articoli non disponibili.\n\nGrazie,\nDecobrands SRL';
+    };
+    let cur = ids[0];
+    const copiati = {};
+    CRM.Modale({
+      titolo: 'Solleciti di conferma', testo: pratiche.length + ' pratiche in ritardo, ' + ids.length + (ids.length === 1 ? ' fornitore' : ' fornitori') + ': un testo per fornitore da copiare e inviare.',
+      corpo: c => {
+        const disegna = () => {
+          c.innerHTML = '<div class="segmenti solleciti-schede" role="tablist">' + ids.map(fid => '<button type="button" role="tab" data-f="' + fid + '" aria-selected="' + (fid === cur) + '">' +
+            e(M.fornitore(fid).breve) + '<span class="n">' + per[fid].length + '</span>' + (copiati[fid] ? ' ✓' : '') + '</button>').join('') + '</div>' +
+            '<p class="testo-tenue" style="margin:0 0 6px">A: ' + e(M.fornitore(cur).nome) + '</p><textarea class="testo-email" aria-label="Testo da inviare">' + e(testo(cur)) + '</textarea>';
+          CRM.$$('[data-f]', c).forEach(b => b.addEventListener('click', () => { cur = Number(b.dataset.f); disegna(); }));
+        };
+        disegna();
+      },
+      azioni: [{ etichetta: 'Chiudi', variante: 'sec' }, { etichetta: 'Copia il testo', onClick: (chiudi, corpo) => {
+        const t = CRM.$('textarea', corpo); t.select();
+        try { navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy')); } catch (x) { document.execCommand('copy'); }
+        M.annota('Sollecito conferme preparato per ' + M.fornitore(cur).breve + ' (' + per[cur].map(p => p.numero).join(', ') + ')'); M.salva();
+        copiati[cur] = true;
+        const prossimo = ids.find(fid => !copiati[fid]);
+        CRM.Avviso('Testo per ' + M.fornitore(cur).breve + ' copiato' + (prossimo ? ': ora ' + M.fornitore(prossimo).breve : ''));
+        if (prossimo) { cur = prossimo; CRM.$('[data-f="' + prossimo + '"]', corpo).click(); CRM.$$('[data-f]', corpo).forEach(b => { if (copiati[b.dataset.f] && b.textContent.indexOf('✓') < 0) b.insertAdjacentText('beforeend', ' ✓'); }); return false; }
+      } }]
+    });
+  }
 
   function sollecito(p) {
     const f = M.fornitore(p.fornitore_id);

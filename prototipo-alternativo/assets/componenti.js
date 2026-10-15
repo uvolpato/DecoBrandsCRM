@@ -154,7 +154,7 @@
     corpo: '<textarea class="testo-email" aria-label="Testo da inviare">' + esc(opz.testo) + '</textarea>',
     azioni: [{ etichetta: 'Chiudi', variante: 'sec' }, { etichetta: 'Copia il testo', onClick: (c, corpo) => {
       const t = $('textarea', corpo); t.select();
-      try { navigator.clipboard.writeText(t.value); } catch (x) { document.execCommand('copy'); }
+      try { navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy')); } catch (x) { document.execCommand('copy'); }
       if (opz.onCopia) opz.onCopia();
       CRM.Avviso('Testo copiato');
     } }]
@@ -583,11 +583,43 @@
      ========================================================= */
   CRM.ListaDaFare = function (host, voci, vuoto) {
     const ul = el('ul', 'da-fare');
-    ul.innerHTML = voci.length ? voci.map(x => '<li class="t-' + x.tipo + '"><span class="segno" aria-hidden="true"></span><div><b>' + esc(x.titolo) + '</b><span>' + esc(x.dettaglio) + '</span></div>' +
+    ul.innerHTML = voci.length ? voci.map(x => '<li class="t-' + x.tipo + '"><span class="segno" aria-hidden="true"></span><div><b>' + esc(x.titolo) + (x.extra || '') + '</b><span>' + esc(x.dettaglio) + '</span></div>' +
       '<a class="btn sec piccolo" href="' + x.href + '">' + esc(x.azione) + '</a></li>').join('')
       : '<li class="vuoto"><b>' + esc(vuoto.titolo) + '</b>' + esc(vuoto.testo) + '</li>';
     ospite(host).appendChild(ul);
     return ul;
+  };
+
+  /* =========================================================
+     GruppiDaFare: lista "Da fare" divisa in gruppi richiudibili, con azioni sul gruppo intero
+     gruppi: [{ id, titolo, variante, voci: [come ListaDaFare], sommario (html), azioni: [{ etichetta, onClick, href, variante }], vuoto }]
+     → { el, filtra(id | null) }   filtra: mostra un solo gruppo (null = tutti)
+     ========================================================= */
+  const gruppiAperti = {};
+  CRM.GruppiDaFare = function (host, gruppi, vuoto) {
+    const box = el('div', 'gruppi-fare');
+    const conVoci = gruppi.filter(g => g.voci.length || g.sommario);
+    if (!conVoci.length) box.innerHTML = '<ul class="da-fare"><li class="vuoto"><b>' + esc(vuoto.titolo) + '</b>' + esc(vuoto.testo) + '</li></ul>';
+    conVoci.forEach(g => {
+      const d = el('details', 'gruppo-fare g-' + (g.variante || 'neutro'));
+      d.dataset.id = g.id;
+      d.open = gruppiAperti[g.id] !== false;
+      d.innerHTML = '<summary><span class="gf-titolo">' + esc(g.titolo) + '<span class="gf-conta">' + g.conta + '</span></span><span class="gf-azioni"></span></summary>' +
+        (g.sommario ? '<p class="gf-sommario">' + g.sommario + '</p>' : '');
+      const az = $('.gf-azioni', d);
+      (g.azioni || []).forEach(a => {
+        const b = el(a.href ? 'a' : 'button', 'btn piccolo ' + (a.variante || 'sec'), (a.icona ? CRM.icona(a.icona) : '') + esc(a.etichetta));
+        if (a.href) b.href = a.href; else b.type = 'button';
+        b.addEventListener('click', ev => { ev.stopPropagation(); if (a.onClick) { ev.preventDefault(); a.onClick(); } });
+        az.appendChild(b);
+      });
+      if (g.voci.length) CRM.ListaDaFare(d, g.voci, vuoto);
+      else if (g.vuoto) d.insertAdjacentHTML('beforeend', '<p class="gf-sommario testo-tenue">' + esc(g.vuoto) + '</p>');
+      d.addEventListener('toggle', () => { gruppiAperti[g.id] = d.open; });
+      box.appendChild(d);
+    });
+    ospite(host).appendChild(box);
+    return { el: box, filtra: id => $$('.gruppo-fare', box).forEach(d => { d.hidden = !!id && d.dataset.id !== id; if (id && d.dataset.id === id) d.open = true; }) };
   };
 
   /* =========================================================

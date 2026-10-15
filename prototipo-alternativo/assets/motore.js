@@ -398,35 +398,60 @@
     return d;
   };
 
+  /* ---------- Prossime scadenze (pagina Oggi): cosa arriva nei prossimi giorni ---------- */
+  M.scadenze = function (giorni) {
+    const oggi = M.oggi(), fino = M.piuGiorni(oggi, giorni || 15), out = [];
+    M.S.pratiche.forEach(p => {
+      const s = M.statoPratica(p);
+      if (s.chiave === 'attesa' && s.scadenza <= fino) out.push({ data: s.scadenza, testo: 'Conferma attesa di ' + p.numero, dettaglio: M.fornitore(p.fornitore_id).breve + ' · ' + M.nomeCliente(p.cliente_piva), link: '#/pratiche/' + p.id });
+    });
+    // bollettino del mese scorso: atteso entro il 10 del mese
+    const a = Number(oggi.slice(0, 4)), m = Number(oggi.slice(5, 7)), am = m === 1 ? a - 1 : a, mm = m === 1 ? 12 : m - 1;
+    const entro = oggi.slice(0, 8) + '10';
+    M.S.fornitori.forEach(f => {
+      const c = M.casellaBollettino(f.id, am, mm);
+      if (c.tipo === 'mancante' && entro >= oggi) out.push({ data: entro, testo: 'Bollettino di ' + M.meseMin(mm) + ' di ' + f.breve, dettaglio: c.documenti + (c.documenti === 1 ? ' documento atteso' : ' documenti attesi'), link: '#/bollettini' });
+    });
+    const t = M.trimestre(oggi), lim = M.limiti(a, t);
+    if (lim.a <= M.piuGiorni(oggi, 31)) out.push({ data: lim.a, testo: 'Fine del ' + t + '° trimestre', dettaglio: 'poi si chiude la liquidazione ai subagenti', link: '#/liquidazioni/' + a + '/' + t });
+    return out.sort((x, y) => x.data.localeCompare(y.data));
+  };
+
   /* ---------- Da fare (pagina Oggi) ---------- */
   M.daFare = function () {
     const out = [];
     M.S.in_arrivo.forEach(d => {
       const pr = M.proposta(d);
       const f = M.fornitore(d.fornitore_id).breve;
-      if (d.tipo === 'bollettino' && pr.esito === 'doppio') return out.push({ peso: 3, tipo: 'documento', esito: 'doppio', titolo: 'Controlla il bollettino di ' + M.meseMin(d.mese) + ' di ' + f + ': è già registrato',
+      const liv = M.statoLettura(d).livello;
+      // pronto: abbinamento sicuro e lettura affidabile; altrimenti serve una decisione dell'operatore
+      const base = { gruppo: 'documenti', doc: d.id, fornitore_id: d.fornitore_id, lettura: liv,
+        stato: pr.esito === 'doppio' || pr.esito === 'nessuno' || pr.esito === 'ambiguo' || pr.esito === 'probabile' ? 'scegliere' : liv !== 'affidabile' ? 'controllare' : 'pronto' };
+      const push = x => out.push(Object.assign(x, base));
+      if (d.tipo === 'bollettino' && pr.esito === 'doppio') return push({ peso: 3, tipo: 'documento', esito: 'doppio', titolo: 'Controlla il bollettino di ' + M.meseMin(d.mese) + ' di ' + f + ': è già registrato',
         dettaglio: f + ' · rettifica o doppione da scartare', link: '#/documenti/' + d.id, azione: 'Apri' });
-      if (d.tipo === 'bollettino') return out.push({ peso: 2, tipo: 'documento', titolo: 'Registra il bollettino di ' + M.meseMin(d.mese) + ' di ' + f,
+      if (d.tipo === 'bollettino') return push({ peso: 2, tipo: 'documento', titolo: 'Registra il bollettino di ' + M.meseMin(d.mese) + ' di ' + f,
         dettaglio: f + ' · ' + d.righe.length + (d.righe.length === 1 ? ' riga letta' : ' righe lette'), link: '#/documenti/' + d.id, azione: 'Apri' });
-      if (d.tipo === 'ordine') return out.push({ peso: 2, tipo: 'documento', titolo: 'Apri la pratica dell’ordine ' + d.numero,
+      if (d.tipo === 'ordine') return push({ peso: 2, tipo: 'documento', titolo: 'Apri la pratica dell’ordine ' + d.numero,
         dettaglio: f + ' · ' + (pr.abbinamento ? M.nomeCliente(pr.abbinamento.cliente_piva) : 'codice cliente ' + d.codice_cliente + ' non riconosciuto'), link: '#/documenti/' + d.id, azione: 'Apri' });
-      out.push({ peso: pr.esito === 'certo' ? 2 : 3, tipo: 'documento', esito: pr.esito, titolo: 'Abbina ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero,
+      push({ peso: pr.esito === 'certo' ? 2 : 3, tipo: 'documento', esito: pr.esito, titolo: 'Abbina ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero,
         dettaglio: M.fornitore(d.fornitore_id).breve + ' · ' + (pr.esito === 'certo' || pr.esito === 'probabile' ? 'proposta: ' + pr.candidati[0].pratica.numero : pr.esito === 'nessuno' ? 'codice cliente ' + d.codice_cliente + ' non riconosciuto' : 'da scegliere fra ' + pr.candidati.length + ' pratiche'),
         link: '#/documenti/' + d.id, azione: 'Abbina' });
     });
     M.S.pratiche.forEach(p => {
       const s = M.statoPratica(p);
-      if (s.chiave === 'scaduta') out.push({ peso: 1, tipo: 'ritardo', titolo: 'Sollecita la conferma di ' + p.numero,
+      if (s.chiave === 'scaduta') out.push({ peso: 1, tipo: 'ritardo', gruppo: 'conferme', pratica: p.id, fornitore_id: p.fornitore_id, giorni: M.giorni(s.scadenza, M.oggi()),
+        titolo: 'Sollecita la conferma di ' + p.numero,
         dettaglio: M.fornitore(p.fornitore_id).breve + ' · ' + M.nomeCliente(p.cliente_piva) + ' · in ritardo ' + s.nota, link: '#/pratiche/' + p.id, azione: 'Apri' });
     });
     const anni = [2026];
     M.S.fornitori.forEach(f => anni.forEach(a => { for (let m = 1; m <= 12; m++) {
       const c = M.casellaBollettino(f.id, a, m);
-      if (c.tipo === 'da_verificare') out.push({ peso: 2, tipo: 'bollettino', titolo: 'Verifica il bollettino di ' + M.meseMin(m) + ' di ' + f.breve,
+      if (c.tipo === 'da_verificare') out.push({ peso: 2, tipo: 'bollettino', gruppo: 'bollettini', fornitore_id: f.id, titolo: 'Verifica il bollettino di ' + M.meseMin(m) + ' di ' + f.breve,
         dettaglio: c.aperte + (c.aperte === 1 ? ' riga non quadra' : ' righe non quadrano'), link: '#/bollettini/' + c.b.id, azione: 'Verifica' });
-      if (c.tipo === 'pronto') out.push({ peso: 3, tipo: 'bollettino', titolo: 'Chiudi il bollettino di ' + M.meseMin(m) + ' di ' + f.breve,
+      if (c.tipo === 'pronto') out.push({ peso: 3, tipo: 'bollettino', gruppo: 'bollettini', fornitore_id: f.id, titolo: 'Chiudi il bollettino di ' + M.meseMin(m) + ' di ' + f.breve,
         dettaglio: 'tutte le righe quadrano', link: '#/bollettini/' + c.b.id, azione: 'Chiudi' });
-      if (c.tipo === 'mancante') out.push({ peso: 2, tipo: 'mancante', titolo: 'Sollecita il bollettino di ' + M.meseMin(m) + ' di ' + f.breve,
+      if (c.tipo === 'mancante') out.push({ peso: 2, tipo: 'mancante', gruppo: 'bollettini', fornitore_id: f.id, titolo: 'Sollecita il bollettino di ' + M.meseMin(m) + ' di ' + f.breve,
         dettaglio: c.documenti + (c.documenti === 1 ? ' documento atteso' : ' documenti attesi'), link: '#/bollettini', azione: 'Vedi' });
     } }));
     return out.sort((a, b) => a.peso - b.peso);

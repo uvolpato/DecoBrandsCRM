@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 2.2 — **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 2.3 — pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -928,7 +928,7 @@ di Decobrands; tempi e memoria video con analisi della pagina attiva.
 | # | Route | Schermata |
 |---|-------|-----------|
 | 1 | `/login` | Login |
-| 2 | `/dashboard` | Dashboard (home dopo login) |
+| 2 | `/dashboard` (Oggi) | Cose da fare, per gruppi (home dopo login) |
 | 3 | `/ordini-fornitore` | Elenco pratiche ordini fornitore |
 | 4 | `/ordini-fornitore/:id` | Dettaglio pratica (tab per fase + strip riepilogo + righe + storico) |
 | 5 | `/fornitori` | Anagrafica fornitori |
@@ -943,16 +943,36 @@ di Decobrands; tempi e memoria video con analisi della pagina attiva.
 | 14 | `/utenti`, `/errori` | Utility (admin) |
 | 15 | `/eventi` | Log eventi applicativi: CRUD, cambi di stato, upload/export, autenticazione, errori (admin) |
 
-### 7.1 Dashboard (`/dashboard`)
+### 7.1 Oggi (`/dashboard`)
 
-- Header con titolo e **trimestre corrente**; **KPI sempre visibili**: ordini in stato
-  `inviato` / `confermato` / `fatturato` e totale merce fatturata del trimestre.
-- **Organizzazione a tab** (pattern `tabs-crm`): **Segnalazioni** — conferme scadute
-  (alert §5.12), bollettini in stato `da_verificare` e **pratiche con variazioni di
-  composizione fra fasi** (o con note di credito, §5.8), con contatore sul tab;
-  **Ordini fornitore** — ultimi ordini (8) con accesso al dettaglio.
-- Contenitori stabili (V9): liste segnalazioni con altezza costante, ultimi ordini in
-  tabella con intestazione fissa e scroll interno.
+La pagina è una **lista di cose da fare organizzata per tipo di lavoro**, non un
+cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
+
+- **Riquadri in testa** (KpiRow) che fanno da **filtro**: *Conferme in ritardo* (con la
+  più vecchia e il numero di fornitori da sollecitare), *Documenti in coda* (quanti
+  chiedono una decisione e quanti sono pronti), *Bollettini* (da verificare o chiudere,
+  da sollecitare). Clic = mostra solo quel gruppo; secondo clic = tutti.
+- **"Da fare" in gruppi richiudibili** (componente GruppiDaFare, §16.4); aperti o chiusi
+  restano come l'utente li lascia; la lista scorre nel suo riquadro, le intestazioni dei
+  gruppi restano visibili:
+  - **Conferme in ritardo** (alert §5.12), ordinate per giorni di ritardo, con il ritardo
+    in evidenza; azione di gruppo **Prepara i solleciti**: **un testo per fornitore** con
+    l'elenco delle sue pratiche in ritardo (numero, data, cliente, codice cliente del
+    fornitore, importo, data attesa), schede per fornitore, *Copia il testo* passa al
+    fornitore successivo; ogni copia resta nel registro operazioni (§15);
+  - **Documenti da decidere**: riassunto della coda (pronti da abbinare, dati letti da
+    controllare, da scegliere o verificare) e **solo** i documenti che chiedono una
+    decisione (abbinamento non sicuro, cliente non riconosciuto, doppioni, lettura non
+    affidabile); azione *Apri la coda* (§7.9);
+  - **Bollettini**: da verificare, pronti da chiudere, mancanti da sollecitare.
+- **Colonna destra rivolta al futuro**:
+  - **Prossime scadenze** (15 giorni): conferme attese, bollettini del mese precedente
+    attesi entro il 10, fine del trimestre; ogni voce porta alla pagina relativa;
+  - **trimestre in corso**: atteso dai fornitori, già riconosciuto, da liquidare,
+    bloccato in attesa dei bollettini;
+  - **ultime operazioni** (5, compatte).
+- Le **pratiche con variazioni** fra fasi (§5.8) restano segnalate nell'elenco
+  Pratiche (filtro "Con variazioni").
 
 ### 7.2 Elenco ordini fornitore (`/ordini-fornitore`)
 
@@ -1651,6 +1671,7 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 | **Intestazione** | testata pagina | titolo, icona, sottotitolo, briciole, azioni; pulsante **"Torna a …"** automatico (§7.12) |
 | **Stepper**, **Nota**, badge | passi di stato, note, stati | — |
 | **FinestraAffiancata** | documento a sinistra, dati a destra, divisore trascinabile; usata da "Correggi i dati letti" (§6.5) e dalla consultazione dei documenti della pratica (§7.3) | titolo, sottotitolo, larghezza iniziale, `sinistra(host)`, `destra(host)`, azioni del piede |
+| **GruppiDaFare** | lista "Da fare" della pagina Oggi (§7.1) | gruppi (`id`, titolo, variante, contatore, voci, riassunto, azioni di gruppo, testo se vuoto); `filtra(id)` collegato ai riquadri |
 | **Elenco** | liste semplici (documenti, registro) | voci (testo, destra, `onClick` facoltativo: voce cliccabile anche da tastiera) |
 | **CampoRicerca** + **RicercaEntita** | ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, articolo (articoli già usati dal fornitore: un articolo nuovo è ammesso col pallino rosso), pratica, fattura/nota di credito | autocompletamento con le prime 5 voci, lente / F4 che apre la maschera di ricerca (FilterBar + DataTable), pallino verde/rosso se il valore esiste in anagrafica; entità definite una volta (voci da `/api/lookup/*`, chiave, testo, colonne, filtri, contesto) |
 

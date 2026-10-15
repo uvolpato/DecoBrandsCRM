@@ -8,7 +8,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 
 | Cadenza | Pagina | A cosa serve |
 |---|---|---|
-| Ogni giorno | **Oggi** | Lista unica "Da fare" in ordine di urgenza, cifre del trimestre, ultime operazioni |
+| Ogni giorno | **Oggi** | Riquadri per tipo di lavoro (fanno da filtro); "Da fare" in gruppi richiudibili: **conferme in ritardo** (dalla più vecchia, *Prepara i solleciti* = un testo per fornitore), **documenti da decidere** (solo quelli che chiedono una decisione; gli altri contati), **bollettini**; a destra **prossime scadenze**, trimestre, ultime operazioni |
 | | **Documenti** | Unico ingresso di **tutti** i documenti (ordini, conferme, fatture, note di credito, bollettini): si caricano trascinandoli o con *Carica documenti* nella barra, da qualsiasi pagina. Lettura automatica, controllo dei dati letti (*Correggi i dati letti*), poi: l'ordine apre una pratica, conferme e fatture si abbinano alla pratica proposta (codice cliente + articoli in comune), il bollettino si registra e si verifica |
 | | **Pratiche** | Elenco filtrabile; la scheda mostra il **binario** ordine → conferma → fattura → nota di credito con le differenze fra le fasi. I documenti si consultano **affiancati**: a sinistra il documento, a destra il confronto riga per riga con un altro documento della pratica (clic su un documento, su *Consulta affiancati* o su una riga a confronto) |
 | Ogni mese | **Bollettini** | Matrice fornitore × mese: verificato, da decidere, pronto, non arrivato (con sollecito) |
@@ -42,7 +42,7 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 
 ## Prova consigliata (5 minuti)
 
-1. **Oggi**: 10 cose da fare, in ordine di urgenza.
+1. **Oggi**: 20 cose da fare divise per tipo; *Prepara i solleciti* prepara un testo per Gries, Gasper e Ing's.
 2. **Documenti** → fattura F-2026-0930 di Ing's → *Abbina*: la pratica diventa fatturata e la riga del bollettino di agosto quadra.
 3. **Bollettini** → Ing's agosto è "pronto da chiudere" → *Segna come verificato*.
 4. **Bollettini** → Gries luglio → *Accetta il loro importo* sulla riga con la promozione → *Segna come verificato*: si sbloccano 505,80 € ai subagenti.
