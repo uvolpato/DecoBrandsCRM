@@ -89,24 +89,23 @@
     const f = M.fornitore(sel.fornitore_id);
     const ab = pr.abbinamento;
     const boll = sel.tipo === 'bollettino';
-    const dx = CRM.Pannello(col, { titolo: M.TIPI[sel.tipo] + ' ' + sel.numero + ' · ' + f.breve, riempi: true,
-      azioni: [{ etichetta: 'Correggi i dati letti', onClick: () => correggi(sel) }, { etichetta: 'Scarta', variante: 'pericolo', onClick: () => scarta(sel) }] });
-    // in alto: a sinistra i dati letti, a destra la decisione; sotto le righe a tutta altezza
-    const alto = CRM.blocco(dx.corpo, 'colonne', 'grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:24px;flex:none;margin-bottom:16px');
-    const letto = CRM.blocco(alto, ''), decide = CRM.blocco(alto, '');
-    letto.insertAdjacentHTML('beforeend', '<h3>Letto dal documento</h3>');
-    CRM.Dettagli(letto, (boll ? [
+    const dx = CRM.Pannello(col, { titolo: M.TIPI[sel.tipo] + ' ' + sel.numero + ' · ' + f.breve, riempi: true, nota: CRM.icona('file') + ' ' + e(sel.file),
+      azioni: [{ etichetta: 'Correggi i dati letti', onClick: () => correggi(sel) }] });
+    dx.corpo.insertAdjacentHTML('beforeend', '<h3>Letto dal documento</h3>');
+    CRM.Dettagli(dx.corpo, (boll ? [
       { etichetta: 'Fornitore', valore: e(f.nome) },
       { etichetta: 'Mese', valore: M.mese(sel.mese, sel.anno) },
       { etichetta: 'Totale riconosciuto', valore: M.euro(pr.importo) }
     ] : [
       { etichetta: 'Fornitore', valore: e(f.nome) },
-      { etichetta: 'Data', valore: M.data(sel.data) },
-      { etichetta: 'Cliente', valore: e(sel.codice_cliente) + (ab ? '<span class="sec-riga">' + e(M.nomeCliente(ab.cliente_piva)) + '</span>' : ' ' + CRM.stato('errore', 'codice sconosciuto')) },
-      { etichetta: 'Importo', valore: M.euro(pr.importo) + ' <span class="testo-tenue">· ' + sel.righe.length + ' righe</span>' }
-    ]).concat([{ etichetta: 'File', valore: CRM.icona('file') + ' ' + e(sel.file) }]));
-    CRM.DataTable(CRM.blocco(dx.corpo, 'riempi'), boll ? {
-      compatta: true, righe: sel.righe, etichettaTotale: 'Totale',
+      { etichetta: 'Tipo', valore: M.TIPI[sel.tipo] },
+      { etichetta: 'Data del documento', valore: M.data(sel.data) },
+      { etichetta: 'Codice cliente', valore: e(sel.codice_cliente) + (ab ? '<span class="sec-riga">' + e(M.nomeCliente(ab.cliente_piva)) + '</span>' : ' ' + CRM.stato('errore', 'non trovato fra i clienti ' + f.breve)) },
+      { etichetta: 'Importo', valore: M.euro(pr.importo) }
+    ]), { inColonne: true });
+    CRM.blocco(dx.corpo, '', 'height:18px;flex:none');
+    CRM.DataTable(dx.corpo, boll ? {
+      compatta: true, naturale: true, righe: sel.righe, etichettaTotale: 'Totale',
       colonne: [
         { key: 'numero', header: 'Documento', grow: true },
         { key: 'data', header: 'Data', tipo: 'data' },
@@ -115,7 +114,7 @@
         { key: 'importo', header: 'Provvigione', tipo: 'euro', totale: 'somma' }
       ]
     } : {
-      compatta: true, righe: sel.righe, etichettaTotale: 'Totale',
+      compatta: true, naturale: true, righe: sel.righe, etichettaTotale: 'Totale',
       colonne: [
         { key: 'codice', header: 'Articolo' },
         { key: 'descrizione', header: 'Descrizione', grow: true },
@@ -126,22 +125,22 @@
     });
 
     if (boll) {
-      decide.insertAdjacentHTML('beforeend', '<h3>Cosa farne</h3>');
-      if (pr.esito === 'doppio') CRM.Nota(decide, 'Il bollettino di ' + M.meseMin(sel.mese) + ' di ' + e(f.breve) + ' è già registrato: <a href="#/bollettini/' + pr.esistente.id + '">aprilo</a>. Se questo è la versione rettificata, correggi il mese o scartalo.');
-      else CRM.Scelte(decide, [{
+      dx.corpo.insertAdjacentHTML('beforeend', '<h3>Cosa farne</h3>');
+      if (pr.esito === 'doppio') CRM.Nota(dx.corpo, 'Il bollettino di ' + M.meseMin(sel.mese) + ' di ' + e(f.breve) + ' è già registrato: <a href="#/bollettini/' + pr.esistente.id + '">aprilo</a>. Se questo è la versione rettificata, correggi il mese o scartalo.');
+      else CRM.Scelte(dx.corpo, [{
         titolo: 'Registra il bollettino di ' + M.mese(sel.mese, sel.anno), consigliata: true,
         punti: [sel.righe.length + (sel.righe.length === 1 ? ' riga letta' : ' righe lette') + ', totale ' + M.euro(pr.importo),
           'dopo la registrazione lo confronti riga per riga con le nostre pratiche'],
         azione: { etichetta: 'Registra e verifica', onClick: () => { const b = M.registraBollettino(sel.id); M.salva(); CRM.Avviso('Bollettino registrato: ora verificalo'); location.hash = '#/bollettini/' + b.id; } }
       }]);
     } else if (sel.tipo === 'ordine') {
-      decide.insertAdjacentHTML('beforeend', '<h3>Nuova pratica</h3>');
-      if (pr.esito === 'doppio') CRM.Nota(decide, 'Esiste già la pratica <a href="#/pratiche/' + pr.esistente.id + '">' + e(pr.esistente.numero) + '</a>: controlla il numero letto o scarta il documento.');
-      else if (pr.esito === 'nessuno') CRM.Nota(decide, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
+      dx.corpo.insertAdjacentHTML('beforeend', '<h3>Nuova pratica</h3>');
+      if (pr.esito === 'doppio') CRM.Nota(dx.corpo, 'Esiste già la pratica <a href="#/pratiche/' + pr.esistente.id + '">' + e(pr.esistente.numero) + '</a>: controlla il numero letto o scarta il documento.');
+      else if (pr.esito === 'nessuno') CRM.Nota(dx.corpo, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
         '. Correggi il codice letto oppure, se è un cliente nuovo, aggiungilo in <a href="#/abbinamenti">Clienti e abbinamenti</a>.');
       else {
         const sub = M.subagente(ab.subagente_id);
-        CRM.Scelte(decide, [{
+        CRM.Scelte(dx.corpo, [{
           titolo: sel.numero + ' · ' + M.nomeCliente(ab.cliente_piva), sottotitolo: CRM.stato('attesa', 'Attesa conferma'), consigliata: true,
           punti: ['codice cliente ' + e(ab.codice) + ' = ' + e(M.nomeCliente(ab.cliente_piva)), 'seguita da ' + e(sub.nome) + ', sconto ' + M.pct(ab.sconto),
             'conferma attesa entro ' + f.giorni_conferma + ' giorni, poi parte il sollecito'],
@@ -149,13 +148,13 @@
         }]);
       }
     } else {
-      decide.insertAdjacentHTML('beforeend', '<h3>' + (pr.esito === 'nessuno' ? 'A quale pratica appartiene?' : 'Pratica proposta') + '</h3>');
-      if (pr.esito === 'nessuno') CRM.Nota(decide, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
+      dx.corpo.insertAdjacentHTML('beforeend', '<h3>' + (pr.esito === 'nessuno' ? 'A quale pratica appartiene?' : 'Pratica proposta') + '</h3>');
+      if (pr.esito === 'nessuno') CRM.Nota(dx.corpo, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
         '. Scegli la pratica a mano oppure, se è un cliente nuovo, aggiungi il codice in <a href="#/abbinamenti">Clienti e abbinamenti</a>.').style.marginBottom = '12px';
       let candidati = pr.candidati;
       if (pr.esito === 'nessuno') candidati = M.S.pratiche.filter(p => p.fornitore_id === sel.fornitore_id && (sel.tipo === 'conferma' ? !M.doc(p, 'conferma') : !M.fiscali(p).some(d => d.tipo === 'fattura')))
         .map(p => ({ pratica: p, motivi: ['pratica ' + f.breve + ' ancora aperta'], delta: M.r2(pr.importo - M.importoDoc(M.doc(p, 'conferma') || M.doc(p, 'ordine'))) }));
-      CRM.Scelte(decide, candidati.map((c, i) => {
+      CRM.Scelte(dx.corpo, candidati.map((c, i) => {
         const p = c.pratica;
         const prima = M.statoPratica(p).etichetta;
         const dopo = sel.tipo === 'conferma' ? 'Confermata' : sel.tipo === 'fattura' ? 'Fatturata' : prima;
@@ -169,6 +168,9 @@
         };
       }), 'Nessuna pratica aperta di ' + f.breve + ' a cui abbinarlo.');
     }
+    CRM.blocco(dx.corpo, '', 'margin-top:20px;padding-top:14px;border-top:1px solid var(--bordo-tenue)').innerHTML =
+      '<button type="button" class="btn pericolo piccolo" id="scarta">Scarta il documento</button> <span class="testo-tenue piccolo">se è un doppione o non riguarda Decobrands</span>';
+    CRM.$('#scarta').addEventListener('click', () => scarta(sel));
   }
   async function scarta(sel) {
     if (!(await CRM.Conferma('Scartare ' + M.TIPI[sel.tipo].toLowerCase() + ' ' + sel.numero + '?', 'Il documento esce da questo elenco e non viene registrato: usalo per doppioni o documenti che non riguardano Decobrands.', 'Scarta', true))) return;

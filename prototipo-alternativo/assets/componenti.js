@@ -350,8 +350,10 @@
   };
 
   /* ---------- Dettagli: coppie etichetta / valore ---------- */
-  CRM.Dettagli = function (host, voci) {
-    const dl = el('dl', 'dettagli', voci.map(v => '<dt>' + esc(v.etichetta) + '</dt><dd>' + v.valore + '</dd>').join(''));
+  /* opz.inColonne: le coppie si dispongono affiancate (etichetta sopra, valore sotto) e vanno a capo da sole */
+  CRM.Dettagli = function (host, voci, opz) {
+    const col = opz && opz.inColonne;
+    const dl = el('dl', 'dettagli' + (col ? ' in-colonne' : ''), voci.map(v => (col ? '<div>' : '') + '<dt>' + esc(v.etichetta) + '</dt><dd>' + v.valore + '</dd>' + (col ? '</div>' : '')).join(''));
     ospite(host).appendChild(dl);
     return dl;
   };

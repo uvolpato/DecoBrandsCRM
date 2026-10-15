@@ -197,10 +197,12 @@ button.kpi[aria-pressed="true"] { background: var(--primario-tenue); outline: 2p
 .cifre dd { margin: 0; font-weight: 600; font-size: 16px; white-space: nowrap; }
 .cifre .c-errore { color: var(--errore); }
 .cifre .c-attesa { color: var(--attesa-testo); }
-.dettagli { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 0; }
+.dettagli { flex: none; display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 0; }
 .dettagli dt { color: var(--testo-tenue); }
 .dettagli dd { margin: 0; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
 .dettagli dt { white-space: nowrap; }
+.dettagli.in-colonne { grid-template-columns: repeat(auto-fit, minmax(110px, auto)); justify-content: space-between; gap: 12px 24px; }
+.dettagli.in-colonne dt { font-size: 12.5px; margin-bottom: 2px; }
 .elenco { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .elenco li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--bordo-tenue); }
 .elenco li:last-child { border-bottom: 0; }
