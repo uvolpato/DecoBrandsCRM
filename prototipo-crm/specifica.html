@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.0 — Stato: validata con il cliente; stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.1 — Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -96,7 +96,7 @@
               <li class="nav-item"><a class="nav-link" href="#sec-7-3">7.3 Dettaglio pratica (/ordini-fornitore/:id)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-4">7.4 Anagrafica fornitori (/fornitori, /fornitori/:id)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-5">7.5 Agenti e subagenti (/agenti)</a></li>
-              <li class="nav-item"><a class="nav-link" href="#sec-7-6">7.6 Interscambio (/interscambio)</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-6">7.6 Clienti e agenzie (/clienti, /clienti/:piva)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-7">7.7 Bollettini (/bollettini, /bollettini/:id)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-8">7.8 Liquidazione (/liquidazione)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-9">7.9 Documenti (/documenti)</a></li>
@@ -154,7 +154,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.0 — <strong>Stato:</strong> validata con il cliente; stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.1 — <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -274,7 +274,7 @@ ordine-fornitore-dettaglio.html  # dettaglio ordine: conferma/fattura/righe/docu
 fornitori.html          # anagrafica fornitori + scaglioni
 fornitore-dettaglio.html
 agenti.html             # anagrafica agenti e subagenti
-interscambio.html       # tabella subagente × cliente × fornitore
+clienti.html            # clienti (da Integra) con le loro agenzie (interscambio)
 bollettini.html         # controllo bollettini
 bollettino-dettaglio.html
 liquidazione.html       # rendiconto provvigioni subagenti + export CSV
@@ -357,7 +357,7 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).</p>
 </tr>
 <tr>
 <td><code>clienti</code></td>
-<td>anagrafica cliente (P.IVA univoca, ragione sociale, codice Integra)</td>
+<td>anagrafica cliente importata da Integra (P.IVA univoca, ragione sociale, indirizzo, codice Integra, flag vendita diretta): <strong>sola lettura</strong> nel CRM</td>
 </tr>
 <tr>
 <td><code>articoli</code></td>
@@ -398,6 +398,12 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).</p>
 </tbody>
 </table></div>
 <blockquote>
+<p><strong>Anagrafiche da Integra, sola lettura.</strong> Clienti e fornitori (ragione sociale, P.IVA,
+indirizzo, codice Integra) arrivano <strong>solo da Integra</strong>, come tutti i dati anagrafici: il
+CRM non li crea né li modifica, e un cliente nuovo si censisce in Integra. Il CRM gestisce
+soltanto i <strong>propri</strong> dati: condizioni e percentuali dei fornitori (§4.2.1–4.2.2), agenzie
+dei clienti (<code>interscambio</code>, §4.2.6) e subagenti. L'import da Integra è periodico e
+aggiorna i campi anagrafici senza toccare i dati del CRM.</p>
 <p><strong>Ordini cliente vs ordini fornitore: restano separati.</strong> Gli ordini dei clienti
 (<code>ordini_cliente_testata</code> / <code>ordini_cliente_articoli</code>) e le pratiche ordine a fornitore
 (<code>ordini_fornitore_testata</code> / <code>ordini_fornitore_righe</code>, §4.2.7) sono <strong>oggetti di
@@ -435,12 +441,17 @@ delle provvigioni.</p>
 <tr>
 <td><code>ragione_sociale</code></td>
 <td>VARCHAR(255) NOT NULL</td>
-<td></td>
+<td>da Integra, sola lettura</td>
 </tr>
 <tr>
 <td><code>piva</code></td>
 <td>VARCHAR(20)</td>
-<td>univoco se valorizzato</td>
+<td>univoco se valorizzato; da Integra, sola lettura</td>
+</tr>
+<tr>
+<td><code>codice_integra</code></td>
+<td>VARCHAR(20) UNIQUE</td>
+<td>codice del fornitore in Integra, chiave dell'import</td>
 </tr>
 <tr>
 <td><code>giorni_attesa_conferma</code></td>
@@ -1742,8 +1753,8 @@ verificata nella prova F0-A6. Il server è a carico del cliente.</p>
 </tr>
 <tr>
 <td>8</td>
-<td><code>/interscambio</code></td>
-<td>Tabella interscambio</td>
+<td><code>/clienti</code>, <code>/clienti/:piva</code></td>
+<td>Clienti (da Integra) con le loro agenzie</td>
 </tr>
 <tr>
 <td>9</td>
@@ -1772,8 +1783,8 @@ verificata nella prova F0-A6. Il server è a carico del cliente.</p>
 </tr>
 <tr>
 <td>14</td>
-<td><code>/clienti</code>, <code>/utenti</code>, <code>/errori</code></td>
-<td>Anagrafiche e utility (admin)</td>
+<td><code>/utenti</code>, <code>/errori</code></td>
+<td>Utility (admin)</td>
 </tr>
 <tr>
 <td>15</td>
@@ -1824,8 +1835,11 @@ verificata nella prova F0-A6. Il server è a carico del cliente.</p>
 <h3 id="sec-7-4">7.4 Anagrafica fornitori (<code>/fornitori</code>, <code>/fornitori/:id</code>)</h3>
 <ul>
 <li>Elenco con n° scaglioni e ordini aperti.</li>
-<li>CRUD fornitore: ragione sociale, P.IVA, giorni attesa conferma, <code>payment_type</code>
+<li>Anagrafica (ragione sociale, P.IVA, codice Integra) <strong>da Integra in sola lettura</strong>;
+  nel CRM si modificano solo le condizioni: giorni attesa conferma, <code>payment_type</code>
   (maturato/fatturato), note, attivo.</li>
+<li>Tabella in sola lettura <strong>"Clienti seguiti per <fornitore>"</strong> (vista inversa delle
+  agenzie, §7.6).</li>
 <li>Dettaglio con <strong>tabella scaglioni</strong> editabile (sconto min/max, % agente, % subagente);
   gestione eccezioni per subagente (backlog).</li>
 </ul>
@@ -1834,13 +1848,25 @@ verificata nella prova F0-A6. Il server è a carico del cliente.</p>
 <li>Elenco agenti (con n° subagenti) + elenco subagenti con riferimenti agente.</li>
 <li>CRUD di entrambi.</li>
 </ul>
-<h3 id="sec-7-6">7.6 Interscambio (<code>/interscambio</code>)</h3>
+<h3 id="sec-7-6">7.6 Clienti e agenzie (<code>/clienti</code>, <code>/clienti/:piva</code>)</h3>
+<p>Il focus è sul <strong>cliente</strong> (anagrafica Decobrands da Integra); le righe di <code>interscambio</code>
+sono le sue <strong>agenzie</strong>: i fornitori per cui Decobrands fa da agente verso quel cliente.</p>
 <ul>
-<li>Tabella: subagente (codice, cognome, nome) × agente × cliente (ragione sociale o
-  P.IVA) × fornitore, con <strong>codice cliente del fornitore</strong> e sconto.</li>
-<li>Nuova associazione: subagente + cliente (P.IVA) + fornitore + <strong>codice cliente del
-  fornitore</strong> (come compare su conferma/fattura, §4.4) + sconto; vincolo unico
-  (§5.10) e vincolo unico del codice per fornitore. Eliminazione riga.</li>
+<li><strong>Elenco</strong> (sinistra): ricerca per nome, P.IVA, codice Integra o codice cliente del
+  fornitore; segmenti <em>Tutti · Con agenzie · Senza agenzie · Vendita diretta</em>; colonne
+  cliente (con città e codice Integra), n° agenzie, pratiche aperte.</li>
+<li><strong>Scheda</strong> (destra): anagrafica in <strong>sola lettura</strong> con la nota "anagrafica da Integra";
+  pannello <strong>Agenzie</strong> (fornitore, codice cliente del fornitore, seguito da, sconto,
+  provvigione totale con la quota del subagente) con <em>Aggiungi agenzia</em>; clic su una riga
+  apre la modifica, con <em>Elimina</em>. Il cliente è fisso; fornitore e subagente sono campi di
+  ricerca (§16.4); gli sconti proposti seguono gli scaglioni del fornitore scelto. Vincoli:
+  un solo subagente per cliente × fornitore (§5.10), codice unico per fornitore.</li>
+<li>Pannello <strong>Attività</strong>: pratiche aperte, provvigioni ai subagenti del trimestre, ultime
+  pratiche del cliente.</li>
+<li><strong>Vista inversa</strong> nel dettaglio fornitore (§7.4): "Clienti seguiti per <fornitore>", in
+  sola lettura; clic sul cliente apre la sua scheda.</li>
+<li><strong>Vendita diretta</strong>: il flag arriva da Integra; la gestione dei clienti di sola vendita
+  diretta (senza agenzie) si completa con la sostituzione della Gestione Ordini (§17).</li>
 </ul>
 <h3 id="sec-7-7">7.7 Bollettini (<code>/bollettini</code>, <code>/bollettini/:id</code>)</h3>
 <ul>
@@ -2005,18 +2031,28 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).</p>
 </tr>
 <tr>
 <td>GET</td>
-<td><code>/interscambio</code></td>
-<td>tabella interscambio</td>
+<td><code>/clienti</code> · <code>/clienti/:piva</code></td>
+<td>clienti (sola lettura) con le agenzie</td>
 </tr>
 <tr>
 <td>POST</td>
 <td><code>/api/interscambio</code></td>
-<td>nuova associazione</td>
+<td>nuova agenzia del cliente</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/interscambio/:id</code></td>
+<td>modifica agenzia (codice, subagente, sconto)</td>
 </tr>
 <tr>
 <td>DELETE</td>
 <td><code>/api/interscambio/:id</code></td>
-<td>elimina associazione</td>
+<td>elimina agenzia</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/import-integra</code></td>
+<td>import periodico clienti e fornitori da Integra (job, admin)</td>
 </tr>
 <tr>
 <td>GET</td>
@@ -2521,6 +2557,14 @@ sempre salvato nella chiave <code>etichetta</code> del dettaglio (§15.4).</p>
 <td><code>interscambio</code></td>
 <td><code>successo</code></td>
 <td><code>{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}</code></td>
+</tr>
+<tr>
+<td>PUT <code>/api/interscambio/:id</code></td>
+<td><code>crud</code></td>
+<td><code>update</code></td>
+<td><code>interscambio</code></td>
+<td><code>successo</code></td>
+<td><code>{etichetta, prima, dopo}</code></td>
 </tr>
 <tr>
 <td>DELETE <code>/api/interscambio/:id</code></td>

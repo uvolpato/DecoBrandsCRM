@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 2.0 — **Stato:** validata con il cliente; stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 2.1 — **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -79,7 +79,7 @@ ordine-fornitore-dettaglio.html  # dettaglio ordine: conferma/fattura/righe/docu
 fornitori.html          # anagrafica fornitori + scaglioni
 fornitore-dettaglio.html
 agenti.html             # anagrafica agenti e subagenti
-interscambio.html       # tabella subagente × cliente × fornitore
+clienti.html            # clienti (da Integra) con le loro agenzie (interscambio)
 bollettini.html         # controllo bollettini
 bollettino-dettaglio.html
 liquidazione.html       # rendiconto provvigioni subagenti + export CSV
@@ -159,7 +159,7 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
 |---------|-------------|
 | `users` | autenticazione e ruoli (condivisa con la Gestione Ordini) |
 | `remember_tokens` | sessione persistente |
-| `clienti` | anagrafica cliente (P.IVA univoca, ragione sociale, codice Integra) |
+| `clienti` | anagrafica cliente importata da Integra (P.IVA univoca, ragione sociale, indirizzo, codice Integra, flag vendita diretta): **sola lettura** nel CRM |
 | `articoli` | catalogo (codice, descrizione, EAN, UM) |
 | `giacenze` | giacenza per codice (`qta_disponibile`) |
 | `codici_alias` | cambi codice articolo con conferma |
@@ -169,6 +169,13 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
 | `audit_log` | log di tutte le scritture |
 | `movimenti_giacenza` | movimenti stock |
 | `processing_errors` | **non usata dal CRM**: gli errori di lettura del CRM stanno in `documenti_in_arrivo` (§4.2.12) |
+
+> **Anagrafiche da Integra, sola lettura.** Clienti e fornitori (ragione sociale, P.IVA,
+> indirizzo, codice Integra) arrivano **solo da Integra**, come tutti i dati anagrafici: il
+> CRM non li crea né li modifica, e un cliente nuovo si censisce in Integra. Il CRM gestisce
+> soltanto i **propri** dati: condizioni e percentuali dei fornitori (§4.2.1–4.2.2), agenzie
+> dei clienti (`interscambio`, §4.2.6) e subagenti. L'import da Integra è periodico e
+> aggiorna i campi anagrafici senza toccare i dati del CRM.
 
 > **Ordini cliente vs ordini fornitore: restano separati.** Gli ordini dei clienti
 > (`ordini_cliente_testata` / `ordini_cliente_articoli`) e le pratiche ordine a fornitore
@@ -197,8 +204,9 @@ delle provvigioni.
 | Colonna | Tipo | Note |
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
-| `ragione_sociale` | VARCHAR(255) NOT NULL | |
-| `piva` | VARCHAR(20) | univoco se valorizzato |
+| `ragione_sociale` | VARCHAR(255) NOT NULL | da Integra, sola lettura |
+| `piva` | VARCHAR(20) | univoco se valorizzato; da Integra, sola lettura |
+| `codice_integra` | VARCHAR(20) UNIQUE | codice del fornitore in Integra, chiave dell'import |
 | `giorni_attesa_conferma` | INT DEFAULT 30 | usato per le scadenze |
 | `payment_type` | VARCHAR(20) DEFAULT `'invoiced'` | `matured` \| `invoiced` — maturazione provvigioni (**§5.5**) |
 | `discount` | NUMERIC(5,2) DEFAULT 0 | sconto di default del fornitore (ridondante, vedi §4.4) |
@@ -785,13 +793,13 @@ verificata nella prova F0-A6. Il server è a carico del cliente.
 | 5 | `/fornitori` | Anagrafica fornitori |
 | 6 | `/fornitori/:id` | Dettaglio fornitore con scaglioni |
 | 7 | `/agenti` | Agenti + subagenti |
-| 8 | `/interscambio` | Tabella interscambio |
+| 8 | `/clienti`, `/clienti/:piva` | Clienti (da Integra) con le loro agenzie |
 | 9 | `/bollettini` | Elenco bollettini con stato e differenze |
 | 10 | `/bollettini/:id` | Dettaglio bollettino con righe e divergenze |
 | 11 | `/liquidazione` | Rendiconto provvigioni subagenti |
 | 12 | `/cambia-password`, `/richiedi-reset` | Gestione credenziali |
 | 13 | `/ordini`, `/ordini/upload`, `/liste` | Gestione ordini cliente |
-| 14 | `/clienti`, `/utenti`, `/errori` | Anagrafiche e utility (admin) |
+| 14 | `/utenti`, `/errori` | Utility (admin) |
 | 15 | `/eventi` | Log eventi applicativi: CRUD, cambi di stato, upload/export, autenticazione, errori (admin) |
 
 ### 7.1 Dashboard (`/dashboard`)
@@ -836,8 +844,11 @@ verificata nella prova F0-A6. Il server è a carico del cliente.
 ### 7.4 Anagrafica fornitori (`/fornitori`, `/fornitori/:id`)
 
 - Elenco con n° scaglioni e ordini aperti.
-- CRUD fornitore: ragione sociale, P.IVA, giorni attesa conferma, `payment_type`
+- Anagrafica (ragione sociale, P.IVA, codice Integra) **da Integra in sola lettura**;
+  nel CRM si modificano solo le condizioni: giorni attesa conferma, `payment_type`
   (maturato/fatturato), note, attivo.
+- Tabella in sola lettura **"Clienti seguiti per <fornitore>"** (vista inversa delle
+  agenzie, §7.6).
 - Dettaglio con **tabella scaglioni** editabile (sconto min/max, % agente, % subagente);
   gestione eccezioni per subagente (backlog).
 
@@ -846,13 +857,26 @@ verificata nella prova F0-A6. Il server è a carico del cliente.
 - Elenco agenti (con n° subagenti) + elenco subagenti con riferimenti agente.
 - CRUD di entrambi.
 
-### 7.6 Interscambio (`/interscambio`)
+### 7.6 Clienti e agenzie (`/clienti`, `/clienti/:piva`)
 
-- Tabella: subagente (codice, cognome, nome) × agente × cliente (ragione sociale o
-  P.IVA) × fornitore, con **codice cliente del fornitore** e sconto.
-- Nuova associazione: subagente + cliente (P.IVA) + fornitore + **codice cliente del
-  fornitore** (come compare su conferma/fattura, §4.4) + sconto; vincolo unico
-  (§5.10) e vincolo unico del codice per fornitore. Eliminazione riga.
+Il focus è sul **cliente** (anagrafica Decobrands da Integra); le righe di `interscambio`
+sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel cliente.
+
+- **Elenco** (sinistra): ricerca per nome, P.IVA, codice Integra o codice cliente del
+  fornitore; segmenti *Tutti · Con agenzie · Senza agenzie · Vendita diretta*; colonne
+  cliente (con città e codice Integra), n° agenzie, pratiche aperte.
+- **Scheda** (destra): anagrafica in **sola lettura** con la nota "anagrafica da Integra";
+  pannello **Agenzie** (fornitore, codice cliente del fornitore, seguito da, sconto,
+  provvigione totale con la quota del subagente) con *Aggiungi agenzia*; clic su una riga
+  apre la modifica, con *Elimina*. Il cliente è fisso; fornitore e subagente sono campi di
+  ricerca (§16.4); gli sconti proposti seguono gli scaglioni del fornitore scelto. Vincoli:
+  un solo subagente per cliente × fornitore (§5.10), codice unico per fornitore.
+- Pannello **Attività**: pratiche aperte, provvigioni ai subagenti del trimestre, ultime
+  pratiche del cliente.
+- **Vista inversa** nel dettaglio fornitore (§7.4): "Clienti seguiti per <fornitore>", in
+  sola lettura; clic sul cliente apre la sua scheda.
+- **Vendita diretta**: il flag arriva da Integra; la gestione dei clienti di sola vendita
+  diretta (senza agenzie) si completa con la sostituzione della Gestione Ordini (§17).
 
 ### 7.7 Bollettini (`/bollettini`, `/bollettini/:id`)
 
@@ -977,9 +1001,11 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
 | GET | `/agenti` · `/api/agenti-lista` · `/api/subagenti` | anagrafica agenti/subagenti |
 | POST | `/api/agenti` · PUT `/api/agenti/:id` · DELETE `/api/agenti/:id` | CRUD agente |
 | POST | `/api/subagenti` · PUT `/api/subagenti/:id` · DELETE `/api/subagenti/:id` | CRUD subagente |
-| GET | `/interscambio` | tabella interscambio |
-| POST | `/api/interscambio` | nuova associazione |
-| DELETE | `/api/interscambio/:id` | elimina associazione |
+| GET | `/clienti` · `/clienti/:piva` | clienti (sola lettura) con le agenzie |
+| POST | `/api/interscambio` | nuova agenzia del cliente |
+| PUT | `/api/interscambio/:id` | modifica agenzia (codice, subagente, sconto) |
+| DELETE | `/api/interscambio/:id` | elimina agenzia |
+| POST | `/api/import-integra` | import periodico clienti e fornitori da Integra (job, admin) |
 | GET | `/ordini-fornitore` · `/ordini-fornitore/:id` | elenco / dettaglio pratiche |
 | POST | `/api/ordini-fornitore` | crea pratica |
 | PUT | `/api/ordini-fornitore/:id` | aggiorna pratica (stati, conferma, fattura) |
@@ -1188,6 +1214,7 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 | create/update/delete agente | `crud` | `create`/`update`/`delete` | `agente` | `successo` | create/delete: `{etichetta: cognome, nome}`; update: `{etichetta, prima, dopo}` |
 | create/update/delete subagente | `crud` | `create`/`update`/`delete` | `subagente` | `successo` | come agente (create include `agente_id`) |
 | POST `/api/interscambio` | `crud` | `create` | `interscambio` | `successo` | `{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}` |
+| PUT `/api/interscambio/:id` | `crud` | `update` | `interscambio` | `successo` | `{etichetta, prima, dopo}` |
 | DELETE `/api/interscambio/:id` | `crud` | `delete` | `interscambio` | `successo` | `{etichetta, interscambio_id, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}` |
 
 #### 15.2.4 Pratiche ordine a fornitore (§8.1)

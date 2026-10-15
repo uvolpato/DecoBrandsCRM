@@ -139,7 +139,7 @@
       dx.corpo.insertAdjacentHTML('beforeend', '<h3>Nuova pratica</h3>');
       if (pr.esito === 'doppio') CRM.Nota(dx.corpo, 'Esiste già la pratica <a href="#/pratiche/' + pr.esistente.id + '">' + e(pr.esistente.numero) + '</a>: controlla il numero letto o scarta il documento.');
       else if (pr.esito === 'nessuno') CRM.Nota(dx.corpo, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
-        '. Correggi il codice letto oppure, se è un cliente nuovo, aggiungilo in <a href="#/abbinamenti">Clienti e abbinamenti</a>.');
+        '. Correggi il codice letto oppure, se è un cliente nuovo, aggiungi l’agenzia nella scheda del cliente in <a href="#/clienti">Clienti</a>.');
       else {
         const sub = M.subagente(ab.subagente_id);
         CRM.Scelte(dx.corpo, [{
@@ -152,7 +152,7 @@
     } else {
       dx.corpo.insertAdjacentHTML('beforeend', '<h3>' + (pr.esito === 'nessuno' ? 'A quale pratica appartiene?' : 'Pratica proposta') + '</h3>');
       if (pr.esito === 'nessuno') CRM.Nota(dx.corpo, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
-        '. Scegli la pratica a mano oppure, se è un cliente nuovo, aggiungi il codice in <a href="#/abbinamenti">Clienti e abbinamenti</a>.').style.marginBottom = '12px';
+        '. Scegli la pratica a mano oppure, se è un cliente nuovo, aggiungi il codice nella scheda del cliente in <a href="#/clienti">Clienti</a>.').style.marginBottom = '12px';
       let candidati = pr.candidati;
       if (pr.esito === 'nessuno') candidati = M.S.pratiche.filter(p => p.fornitore_id === sel.fornitore_id && (sel.tipo === 'conferma' ? !M.doc(p, 'conferma') : !M.fiscali(p).some(d => d.tipo === 'fattura')))
         .map(p => ({ pratica: p, motivi: ['pratica ' + f.breve + ' ancora aperta'], delta: M.r2(pr.importo - M.importoDoc(M.doc(p, 'conferma') || M.doc(p, 'ordine'))) }));
@@ -524,7 +524,7 @@
     const perc = M.percentuali(p, (fatture[0] || ordine).data);
     const base = M.importoPratica(p);
     const prov = CRM.Pannello(destra, { titolo: 'Provvigione', nota: M.fiscali(p).length ? 'sul netto fatturato' : 'prevista' });
-    if (!perc) CRM.Nota(prov.corpo, 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni. <a href="#/abbinamenti">Aggiungi l’abbinamento</a>.');
+    if (!perc) CRM.Nota(prov.corpo, 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni. <a href="#/clienti/' + p.cliente_piva + '">Aggiungi l’agenzia nella scheda del cliente</a>.');
     else {
       CRM.Cifre(prov.corpo, [
         { etichetta: 'Imponibile', valore: base },

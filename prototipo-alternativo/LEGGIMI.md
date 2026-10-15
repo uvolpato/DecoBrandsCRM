@@ -14,7 +14,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | Ogni mese | **Bollettini** | Matrice fornitore × mese: verificato, da decidere, pronto, non arrivato (con sollecito) |
 | | Bollettino | Riconciliazione **a cerniera**: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura |
 | Ogni trimestre | **Liquidazioni** | Trimestri fissi, riquadri per subagente (fanno da filtro), documenti liquidabili o in attesa, prospetti CSV a 8 campi, chiusura |
-| Anagrafiche | Fornitori, Subagenti, Clienti e abbinamenti | Condizioni, percentuali **datate**, eccezioni, abbinamento cliente × fornitore con codice |
+| Anagrafiche | Fornitori, Subagenti, Clienti | Clienti e fornitori da Integra in **sola lettura**; nel CRM condizioni, percentuali **datate**, eccezioni, subagenti e **agenzie del cliente** (fornitore, codice, subagente, sconto) |
 
 ## Controllo dei dati letti
 
@@ -79,7 +79,7 @@ assets/componenti.js          libreria CRM.*: componenti standard, icone, rotte
 assets/entita.js              entità dei campi di ricerca (fornitore, cliente, subagente, codice cliente, articolo, pratica, fattura)
 assets/viste-giorno.js        Oggi, Documenti in arrivo, Pratiche, Pratica
 assets/viste-periodo.js       Bollettini, Bollettino, Liquidazioni
-assets/viste-anagrafiche.js   Fornitori, Subagenti, Clienti e abbinamenti
+assets/viste-anagrafiche.js   Fornitori, Subagenti, Clienti (con agenzie)
 assets/viste-componenti.js    catalogo dei componenti
 assets/stile.css              palette Decobrands e stile dei componenti
 assets/logo-decobrands.png    logo

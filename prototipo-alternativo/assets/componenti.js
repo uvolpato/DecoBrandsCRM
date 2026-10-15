@@ -706,7 +706,7 @@
     { gruppo: 'Anagrafiche', voci: [
       { id: 'fornitori', href: '#/fornitori', t: 'Fornitori', icona: 'fornitori' },
       { id: 'subagenti', href: '#/subagenti', t: 'Subagenti', icona: 'subagenti' },
-      { id: 'abbinamenti', href: '#/abbinamenti', t: 'Clienti e abbinamenti', icona: 'abbinamenti' }] },
+      { id: 'clienti', href: '#/clienti', t: 'Clienti', icona: 'abbinamenti' }] },
     { gruppo: 'Prototipo', voci: [{ id: 'componenti', href: '#/componenti', t: 'Componenti', icona: 'componenti' }] }
   ];
   CRM.Barra = function (attiva) {

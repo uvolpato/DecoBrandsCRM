@@ -14,23 +14,26 @@
 window.DATI_DEMO = {
   oggi: '2026-09-04',
 
+  /* Anagrafiche importate da Integra (sola lettura nel CRM): clienti e fornitori. */
   clienti: [
-    { piva: '04235980161', nome: 'Vivaio Verde Azzurro s.r.l.', citta: 'Bergamo' },
-    { piva: '03152770962', nome: 'Giardini & Forme s.r.l.', citta: 'Monza' },
-    { piva: '01826250167', nome: 'Verde Vita snc', citta: 'Brescia' },
-    { piva: '02457160341', nome: 'Il Giardino di Sofia srl', citta: 'Parma' },
-    { piva: '01573540439', nome: 'Floricoltura Centro Italia srl', citta: 'Macerata' },
-    { piva: '05328730963', nome: 'Orti Urbani soc. coop.', citta: 'Milano' },
-    { piva: '02289430245', nome: 'Casa & Natura sas', citta: 'Vicenza' },
-    { piva: '02633860254', nome: 'Fioreria Alba srl', citta: 'Treviso' }
+    { piva: '04235980161', nome: 'Vivaio Verde Azzurro s.r.l.', citta: 'Bergamo', indirizzo: 'Via Bergamina 12', codice_integra: 'C00412', vendita_diretta: false },
+    { piva: '03152770962', nome: 'Giardini & Forme s.r.l.', citta: 'Monza', indirizzo: 'Viale Lombardia 88', codice_integra: 'C00387', vendita_diretta: true },
+    { piva: '01826250167', nome: 'Verde Vita snc', citta: 'Brescia', indirizzo: 'Via Triumplina 140', codice_integra: 'C00521', vendita_diretta: false },
+    { piva: '02457160341', nome: 'Il Giardino di Sofia srl', citta: 'Parma', indirizzo: 'Strada Langhirano 31', codice_integra: 'C00233', vendita_diretta: false },
+    { piva: '01573540439', nome: 'Floricoltura Centro Italia srl', citta: 'Macerata', indirizzo: 'Contrada Valteia 5', codice_integra: 'C00610', vendita_diretta: true },
+    { piva: '05328730963', nome: 'Orti Urbani soc. coop.', citta: 'Milano', indirizzo: 'Via Padova 210', codice_integra: 'C00745', vendita_diretta: false },
+    { piva: '02289430245', nome: 'Casa & Natura sas', citta: 'Vicenza', indirizzo: 'Viale del Lavoro 9', codice_integra: 'C00198', vendita_diretta: false },
+    { piva: '02633860254', nome: 'Fioreria Alba srl', citta: 'Treviso', indirizzo: 'Via Feltrina 77', codice_integra: 'C00804', vendita_diretta: false },
+    { piva: '03312450135', nome: 'Garden Center Lario srl', citta: 'Como', indirizzo: 'Via Asiago 4', codice_integra: 'C00912', vendita_diretta: true },
+    { piva: '04120990983', nome: 'Serre del Garda snc', citta: 'Brescia', indirizzo: 'Via Gardesana 61', codice_integra: 'C00918', vendita_diretta: true }
   ],
 
   /* maturazione: 'maturato' = il fornitore paga quando incassa (la provvigione matura quando
      la riconosce nel bollettino); 'fatturato' = paga sull'emissione della fattura. */
   fornitori: [
-    { id: 1, nome: 'Gries GmbH & Co. KG', breve: 'Gries', piva: 'DE123456789', giorni_conferma: 21, maturazione: 'maturato', attivo: true },
-    { id: 2, nome: 'Gasper GmbH', breve: 'Gasper', piva: 'DE987654321', giorni_conferma: 30, maturazione: 'fatturato', attivo: true },
-    { id: 3, nome: 'Ing\'s Christmas Decor GmbH', breve: 'Ing\'s', piva: 'DE555111222', giorni_conferma: 14, maturazione: 'fatturato', attivo: true }
+    { id: 1, nome: 'Gries GmbH & Co. KG', breve: 'Gries', piva: 'DE123456789', codice_integra: 'F00031', paese: 'Germania', giorni_conferma: 21, maturazione: 'maturato', attivo: true },
+    { id: 2, nome: 'Gasper GmbH', breve: 'Gasper', piva: 'DE987654321', codice_integra: 'F00047', paese: 'Germania', giorni_conferma: 30, maturazione: 'fatturato', attivo: true },
+    { id: 3, nome: 'Ing\'s Christmas Decor GmbH', breve: 'Ing\'s', piva: 'DE555111222', codice_integra: 'F00052', paese: 'Germania', giorni_conferma: 14, maturazione: 'fatturato', attivo: true }
   ],
 
   /* Scaglioni: per sconto concesso al cliente, con data di validità (le percentuali possono

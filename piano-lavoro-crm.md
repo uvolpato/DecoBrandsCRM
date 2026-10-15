@@ -140,7 +140,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 |---|---|---|---|---|
 | **F1-A1** Fornitori + scaglioni (CRUD, dettaglio, flag/stati) | 2 | F0 | `fornitori.html`, `fornitore-dettaglio.html` (tab scaglioni in `.box-stabile`, thead scuro) | §4.2.1, §4.2.2, §7.4, §8.1, §15.2.2 |
 | **F1-A2** Agenti + subagenti | 2 | F0 | `agenti.html` (2 liste in `.table-box`, modali) | §4.2.4, §4.2.5, §7.5, §8.1, §15.2.3 |
-| **F1-A3** Interscambio (+ codice cliente fornitore) | 2 | F0 | `interscambio.html` (colonna "Cod. cliente fornitore", modale Nuova Associazione con hint, blocco duplicati per fornitore) | §4.2.6, §4.4, §7.6, §8.1, §15.2.3 |
+| **F1-A3** Clienti e agenzie (interscambio + codice cliente fornitore) | 2 | F0 | `clienti.html` (anagrafica da Integra in sola lettura, pannello Agenzie con modale e campi di ricerca, blocco duplicati per fornitore, vista inversa nel fornitore) | §4.2.6, §4.4, §7.6, §8.1, §15.2.3 |
 
 - **Output per ciascuna:** rotta pagina + API CRUD + eventi §15.2 + test delle regole univocità.
 - **DoD comune:** checklist §11.1 superata; CRUD completo; eventi esatti (es. fornitore non eliminabile ma `attivo=false` §15.2.2).
