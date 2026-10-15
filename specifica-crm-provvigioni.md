@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 1.9 — **Stato:** validata con il cliente; stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4)
+**Versione:** 2.0 — **Stato:** validata con il cliente; stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -31,13 +31,18 @@ stesso PostgreSQL, le stesse tabelle esistenti vengono **riusate senza modificar
 e il CRM aggiunge le proprie tabelle (§4). Ordini, clienti, articoli e utenti sono
 quindi gli stessi dati già visti dalla gestione ordini.
 
-**Tutti i documenti del flusso** — ordini cliente, ordini a fornitore, conferme,
-fatture e bollettini — vengono inseriti con **lo stesso sistema della Gestione Ordini**:
-l'app li **importa** da PDF e vari documenti tramite **OCR** e li fa passare dalla
-**validazione** dell'operatore, che conferma i dati letti prima del salvataggio. Il CRM
-legge dal database condiviso senza doppie inserzioni manuali; la tracciatura *ordine →
-conferma → fattura* lavora quindi sugli stessi documenti già importati ed elaborati da
-quel sistema (`ordini_upload_queue`, `processing_errors`, §4.1, §6).
+**Tutti i documenti del CRM** — ordini a fornitore, conferme, fatture, note di
+credito e bollettini — entrano da un **ingresso documenti interno** all'applicazione
+(§6.5): lettura della casella email o caricamento manuale → coda nel database →
+lettura automatica con **GLM-OCR installato su un server locale con GPU** →
+affidabilità per campo e controlli → **controllo dell'operatore** con il PDF a fianco →
+abbinamento alla pratica o al bollettino. **Nessun n8n e nessun servizio di lettura
+esterno**: tutto il flusso è codice del CRM, versionato con git.
+
+La **Gestione Ordini** attuale resta in esercizio, invariata, per gli ordini cliente e
+l'esportazione verso Integra. La sua **sostituzione** con un modulo del CRM, che userà lo
+stesso ingresso documenti, è prevista in una **fase successiva** (§17), fuori da questo
+preventivo.
 
 ---
 
@@ -46,7 +51,7 @@ quel sistema (`ordini_upload_queue`, `processing_errors`, §4.1, §6).
 | # | Vincolo | Valore |
 |---|---------|--------|
 | V1 | Unica applicazione | Tutte le funzioni in un'unica applicazione web |
-| V2 | Database condiviso | Stesso PostgreSQL (`decobrands`) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM. **Tutti i documenti entrano tramite lo stesso sistema della Gestione Ordini**: importazione (upload + OCR) e validazione dei dati letti; vengono poi letti dal CRM (§6) |
+| V2 | Database condiviso | Stesso PostgreSQL (`decobrands`) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM. I documenti del CRM entrano dall'**ingresso documenti interno** (§6.5), non dalla pipeline n8n della Gestione Ordini |
 | V3 | Autenticazione | Tabella `users` con ruoli; utente di default `admin` (ruolo `admin`); sessione su cookie HttpOnly/Secure/SameSite + protezione CSRF (§3.3) |
 | V4 | Stile grafico | Bootstrap 5.3, navbar scura, sfondo `#f5f6f8`, logo Decobrands |
 | V5 | Lingua | Tutte le interfacce in italiano |
@@ -54,6 +59,7 @@ quel sistema (`ordini_upload_queue`, `processing_errors`, §4.1, §6).
 | V7 | Stack | **Stesso stack del Portale B2B Luis**: Node 24, frontend Next.js 16 (App Router) + React 19 + TypeScript, backend NestJS 11, ORM Prisma 7 (adapter `pg`), PostgreSQL condiviso (V2). Due processi Node dietro Caddy; Docker solo in sviluppo (§3.4) |
 | V8 | Fidelità | Alta fedeltà — dati reali, interazioni reali |
 | V9 | Contenitori dati stabili | Ogni tabella è una **DataTable standard** (§16.4): occupa tutto lo spazio disponibile, intestazione fissa, righe scorrevoli, intestazioni ordinabili; il layout non cambia al variare del numero di righe |
+| V11 | Lettura documenti in locale | **GLM-OCR** servito da **vLLM** su un server aziendale con GPU, chiamato direttamente dal backend NestJS; nessun n8n, nessun servizio esterno; i documenti non escono dall'azienda (§6.5) |
 | V10 | Tracciamento eventi | Il sistema registra automaticamente gli eventi applicativi (CRUD, cambi di stato, upload/export, autenticazione) ed errori su `eventi_app` (§4.2.11), consultabili in sola lettura da `/eventi` (§7.11, §15); le tabelle della Gestione Ordini non vengono modificate (V2) |
 
 ---
@@ -159,10 +165,10 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
 | `codici_alias` | cambi codice articolo con conferma |
 | `kit_testata` / `kit_dettaglio` | kit di articoli |
 | `ordini_cliente_testata` / `ordini_cliente_articoli` | ordini dei clienti (`fornitore` è testo libero → si mappa ai fornitori CRM) |
-| `ordini_upload_queue` | coda di elaborazione degli upload documenti (import PDF/vari documenti tramite OCR della Gestione Ordini) |
+| `ordini_upload_queue` | **non usata dal CRM**: resta della Gestione Ordini fino alla sua sostituzione (§17) |
 | `audit_log` | log di tutte le scritture |
 | `movimenti_giacenza` | movimenti stock |
-| `processing_errors` | errori di elaborazione documenti |
+| `processing_errors` | **non usata dal CRM**: gli errori di lettura del CRM stanno in `documenti_in_arrivo` (§4.2.12) |
 
 > **Ordini cliente vs ordini fornitore: restano separati.** Gli ordini dei clienti
 > (`ordini_cliente_testata` / `ordini_cliente_articoli`) e le pratiche ordine a fornitore
@@ -430,7 +436,7 @@ nessuna UPDATE/DELETE in esercizio.
 | `entita_id` | BIGINT | id dell'entità coinvolta (dove applicabile) |
 | `azione` | VARCHAR(30) | `create` · `update` · `delete` · `upload` · `export` · `change_state` · `verify` · `login` · `logout` · `change_password` · `reset_requested` · `access_denied` · `error` |
 | `esito` | VARCHAR(10) | `successo` · `errore` · `negato` |
-| `dettaglio` | JSONB | sempre la chiave `etichetta`; diff `prima`/`dopo`, nuovo stato, riferimento documento / `processing_errors`, errore tecnico breve (§15.4) |
+| `dettaglio` | JSONB | sempre la chiave `etichetta`; diff `prima`/`dopo`, nuovo stato, riferimento documento / `documenti_in_arrivo`, errore tecnico breve (§15.4) |
 | `ip` | VARCHAR(45) | indirizzo client (solo eventi `auth`/`negato`) |
 | `created_at` | TIMESTAMPTZ | |
 
@@ -438,6 +444,47 @@ nessuna UPDATE/DELETE in esercizio.
 > **nella stessa transazione** dell'operazione che la genera (§15.3); un job di pulizia
 > elimina le righe più vecchie di 36 mesi (§15.7). Indici: `(tipo, ts)`,
 > `(entita, entita_id)`, `(utente_id, ts)`.
+
+### 4.2.12 `documenti_in_arrivo`
+
+Coda e stato di ogni documento entrato nel CRM (§6.5), dalla ricezione all'abbinamento.
+
+| Campo | Tipo | Note |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `origine` | VARCHAR(12) | `email` · `caricamento` |
+| `email_da` · `email_oggetto` | TEXT | solo per origine email |
+| `file_nome` | TEXT | nome originale |
+| `file_hash` | CHAR(64) UNIQUE | SHA-256 del file: evita di leggere due volte lo stesso documento |
+| `file` | BYTEA | PDF o Excel originale (oppure percorso su disco, da decidere in F0) |
+| `stato` | VARCHAR(16) | `in_coda` → `in_lettura` → `da_controllare` → `abbinato` · `scartato` · `errore` |
+| `tentativi` · `errore` | INT · TEXT | riletture automatiche (max 3) e ultimo errore |
+| `tipo` | VARCHAR(16) | `ordine` · `conferma` · `fattura` · `nota_credito` · `bollettino` (letto, correggibile) |
+| `fornitore_id` | FK → `fornitori` | riconosciuto dalla lettura, correggibile |
+| `dati_letti` | JSONB | testata + righe nello schema del tipo (§6.5) |
+| `affidabilita` | NUMERIC(4,3) | valore del campo meno affidabile del documento |
+| `livello` | VARCHAR(12) | `affidabile` · `da_controllare` · `bassa` (§6.5) |
+| `controlli` | JSONB | esito dei controlli fissi (§6.5) |
+| `modello` | TEXT | versione del modello e del prompt usati |
+| `ricevuto_il` · `letto_il` · `controllato_il` | TIMESTAMPTZ | |
+| `abbinato_pratica_id` · `abbinato_bollettino_id` | FK | valorizzati all'abbinamento |
+| `utente` | VARCHAR(100) | chi ha caricato / controllato |
+
+### 4.2.13 `documenti_campi`
+
+Un record per ogni campo letto (testata e righe): serve all'interfaccia di correzione e
+alla **taratura** delle soglie sui documenti reali.
+
+| Campo | Tipo | Note |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `documento_id` | FK → `documenti_in_arrivo` (CASCADE) | |
+| `campo` | TEXT | percorso nello schema, es. `numero`, `righe[3].prezzo` |
+| `valore_letto` · `valore_finale` | TEXT | valore proposto dalla lettura e valore confermato |
+| `affidabilita` | NUMERIC(4,3) | 0–1 (§6.5) |
+| `pagina` · `riquadro` | INT · JSONB | posizione nel PDF (`x, y, w, h` normalizzati) per l'evidenziazione |
+| `verificato` | BOOLEAN | confermato o corretto dall'operatore |
+| `corretto_da` · `corretto_il` | VARCHAR(100) · TIMESTAMPTZ | |
 
 ### 4.3 Diagramma relazionale
 
@@ -598,14 +645,12 @@ il bollettino può passare a `verificato` o `contestato`.
 
 ## 6. Flussi funzionali
 
-**Canale comune: importazione e validazione.** Tutti i documenti (ordini cliente,
-ordini a fornitore, conferme, fatture, bollettini) vengono inseriti con lo **stesso
-sistema della Gestione Ordini**: l'app li **importa** (upload del file → coda
-`ordini_upload_queue` → estrazione automatica OCR) e li fa passare dalla
-**validazione** dell'operatore, che conferma o corregge i dati letti prima del
-salvataggio — senza doppie digitazioni. I documenti non elaborabili finiscono in
-`processing_errors`; gli allegati restano sulla pratica (`att_filename_*`). Tutti i
-flussi sotto usano questo canale.
+**Canale comune: ingresso documenti (§6.5).** Tutti i documenti del CRM (ordini a
+fornitore, conferme, fatture, note di credito, bollettini) entrano dall'ingresso
+documenti interno: ricezione → coda → lettura GLM-OCR → controllo dell'operatore →
+abbinamento — senza doppie digitazioni. I documenti non leggibili restano in
+`documenti_in_arrivo` con stato `errore`; gli allegati restano sulla pratica
+(`att_filename_*`). Tutti i flussi sotto usano questo canale.
 
 ### 6.1 Flusso documentale: ordine → conferma → fattura
 
@@ -629,8 +674,8 @@ flussi sotto usano questo canale.
   giorni_attesa_conferma` del fornitore.
 - Passata la scadenza senza conferma, la pratica finisce nella lista **segnalazioni**
   della dashboard (alert in-app, §5.12).
-- La **lettura automatica** dei documenti propone i dati letti dal PDF (canale §6:
-  importazione + validazione); l'operatore li **conferma** prima del salvataggio.
+- La **lettura automatica** dei documenti propone i dati letti dal PDF (§6.5);
+  l'operatore li **conferma o corregge** prima dell'abbinamento.
 
 ### 6.2 Flusso controllo bollettini
 
@@ -665,6 +710,62 @@ flussi sotto usano questo canale.
   unico (§5.10).
 
 ---
+
+### 6.5 Ingresso documenti (senza n8n, GLM-OCR in locale)
+
+```
+casella email (IMAP) ─┐
+caricamento manuale ──┴─► coda `documenti_in_arrivo` ─► lettura GLM-OCR (vLLM, GPU locale)
+   ─► affidabilità per campo + controlli fissi ─► "Documenti": controllo operatore
+   ─► abbinamento a pratica / nuova pratica / registrazione bollettino
+```
+
+1. **Ricezione.** Un lavoro pianificato del backend (`@nestjs/schedule`, ogni 1–2 min)
+   legge la casella con `imapflow` e salva gli allegati PDF/Excel; il caricamento
+   manuale (trascinamento o "Carica documenti") scrive nella stessa tabella. Lo
+   `file_hash` scarta i doppioni.
+2. **Coda.** Il lettore prende un documento alla volta con `SELECT … FOR UPDATE SKIP
+   LOCKED` (nessuna coda esterna); fino a 3 tentativi, poi stato `errore` con notifica
+   in app.
+3. **Lettura.** PDF → immagini delle pagine; chiamata a **GLM-OCR** servito da **vLLM**
+   (interfaccia compatibile OpenAI) con:
+   - prompt di estrazione e **uscita vincolata allo schema JSON** del tipo di documento
+     (testata + righe; bollettino: righe documento/imponibile/%/importo);
+   - `logprobs` attivi, per calcolare l'affidabilità;
+   - pipeline di riconoscimento dei blocchi di pagina per ricavare la posizione dei
+     valori nel PDF.
+   I documenti su più pagine si leggono pagina per pagina e le righe si uniscono.
+   Gli Excel dei bollettini si leggono direttamente con `exceljs`, senza modello.
+4. **Affidabilità per campo** (0–1), calcolata dal backend dalle probabilità dei
+   pezzi di testo che compongono il valore: per numeri, codici e date la probabilità
+   **minima**; per i testi lunghi la **media**. L'affidabilità del documento è quella
+   del campo meno affidabile.
+5. **Controlli fissi**, indipendenti dal modello: totale letto ≠ somma righe;
+   quantità × prezzo ≠ totale riga; codice cliente non presente fra i clienti del
+   fornitore (`interscambio`); articolo assente nella pratica proposta; data fuori dal
+   periodo della pratica; bollettino già registrato per fornitore e mese.
+6. **Livello** del documento, mostrato in "Documenti" e sul pulsante "Correggi i dati
+   letti" (numero di campi da controllare):
+
+   | Livello | Regola iniziale (da tarare) | Interfaccia |
+   |---|---|---|
+   | `affidabile` | tutti i campi ≥ 0,90 e nessun controllo fallito | nessun avviso |
+   | `da_controllare` | un campo fra 0,70 e 0,90 o un controllo fallito | avviso giallo |
+   | `bassa` | un campo < 0,70 o fallito un controllo su campo chiave (codice cliente, totale) | avviso rosso; l'abbinamento chiede conferma |
+
+7. **Correzione.** "Correggi i dati letti" apre una finestra a tutto schermo: a
+   sinistra il PDF (divisore trascinabile), a destra testata e righe modificabili
+   (aggiungi/elimina riga); i campi incerti hanno bordo giallo/rosso con l'affidabilità
+   al passaggio del mouse; selezionando un campo si evidenzia nel PDF il blocco da cui è
+   stato letto; ogni campo corretto o confermato diventa `verificato`. Salvando si
+   ricalcolano controlli e abbinamento proposto.
+8. **Taratura.** Ogni correzione resta in `documenti_campi` (letto, finale,
+   affidabilità): dopo le prime centinaia di documenti si fissano le soglie per
+   fornitore; lo stesso archivio serve per un eventuale riaddestramento del modello.
+
+**Requisiti del server di lettura:** GPU NVIDIA con driver CUDA, vLLM e modello
+`zai-org/GLM-OCR` (0,9 miliardi di parametri); la memoria video necessaria va
+verificata nella prova F0-A6. Il server è a carico del cliente.
 
 ## 7. Schermate
 
@@ -765,10 +866,16 @@ flussi sotto usano questo canale.
   merce, totale provvigione subagente) con riga totale; dettaglio riga per riga.
 - **Export** con i campi §11 nell'header del dettaglio.
 
-### 7.9 Modulo ordini cliente
+### 7.9 Documenti (`/documenti`)
 
-Ordini cliente, liste, articoli, giacenze, errori, clienti, utenti: viste integrate
-nell'applicazione con lo stesso comportamento e lo stesso stile di tutte le altre.
+Unico punto d'ingresso dei documenti (§6.5): area di caricamento, elenco "Da
+controllare" con livello di affidabilità, dettaglio con dati letti, righe e proposta di
+abbinamento; pulsanti "Correggi i dati letti" (con numero di campi da controllare) e
+"Scarta il documento"; finestra di correzione con il PDF a fianco. Il pulsante "Carica
+documenti" è sempre presente nella barra laterale.
+
+Il **modulo ordini cliente** (sostituzione della Gestione Ordini) è rinviato alla fase
+successiva (§17).
 
 ### 7.10 Schema dei flussi e navigazione tra le schermate
 
@@ -776,7 +883,7 @@ Il prototipo si naviga a partire dal launcher `index.html`; ogni schermata ha la
 navbar comune che riporta al launcher (nessun menu laterale). Il dato che collega
 tutta l'applicazione è l'**ordine a fornitore**, osservato a tre livelli:
 anagrafiche, pratiche, controlli/pagamenti. Tutti i documenti entrano dal canale
-comune di importazione e validazione della Gestione Ordini (§6).
+comune di ingresso documenti del CRM (§6.5).
 
 ```
 index.html (launcher) ───── login.html (facciata, autenticazione in esercizio §3.3)
@@ -810,7 +917,7 @@ Considerazioni:
   autenticazione reale). In esercizio (V3) l'accesso usa la tabella `users` (§3.3)
   con sessioni server-side e `requireAuth`/`requireAdmin`.
 - **Dashboard come aggregatore**: è il punto d'ingresso del percorso consigliato;
-  gli ordini che arrivano nuovi dalla Gestione Ordini (§6) compaiono tra le
+  i documenti nuovi letti dall'ingresso documenti (§6.5) compaiono tra le
   segnalazioni e nei KPI, da qui si entra nelle liste.
 - **`interscambio` è la chiave di collegamento**: per ogni pratica risolve quale
   subagente segue il cliente presso il fornitore e con quale sconto; lo sconto
@@ -818,9 +925,9 @@ Considerazioni:
   liquidazione. Il vincolo unico di §5.10 garantisce un solo subagente per
   cliente × fornitore.
 - **Documenti**: ogni fase (ordine, conferma, fattura, bollettino) passa dal canale
-  comune importazione + validazione della Gestione Ordini (§6): upload → coda →
-  OCR → validazione operatore; i documenti non leggibili finiscono in
-  `processing_errors`.
+  comune di ingresso documenti (§6.5): ricezione → coda → lettura GLM-OCR → controllo
+  operatore → abbinamento; i documenti non leggibili restano in `documenti_in_arrivo`
+  con stato `errore`.
 - **Liquidazione**: considera solo le pratiche in stato `fatturato` nel periodo
   filtrato; le percentuali sono risolte dagli scaglioni correnti (o dalle eccezioni
   temporanee, §5.7), mentre per i periodi passati si usano i valori congelati (§5.11).
@@ -838,7 +945,7 @@ Considerazioni:
 - **Tabella** (contenitore stabile V9): data/ora, utente, tipo, entità, riferimento
   (es. pratica/bollettino), esito; intestazione fissa, scroll interno, paginazione.
 - **Dettaglio evento** in modale: JSON `dettaglio` formattato (diff `prima`/`dopo`,
-  nuovo stato, riferimento documento / `processing_errors`).
+  nuovo stato, riferimento documento / `documenti_in_arrivo`).
 - **Export CSV** del log filtrato (§8.1).
 - Dettagli di progettazione in §15.
 
@@ -881,16 +988,21 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
 | DELETE | `/api/bollettini/:id/righe/:rid` | elimina riga |
 | GET | `/liquidazione` | rendiconto provvigioni |
 | GET | `/api/liquidazione/export` | export CSV della liquidazione (§11) |
+| GET | `/documenti` · `/api/documenti` | ingresso documenti: elenco da controllare (§7.9) |
+| POST | `/api/documenti/carica` | caricamento manuale (uno o più file) → coda |
+| GET | `/api/documenti/:id` · `/api/documenti/:id/file` | dati letti con affidabilità e posizioni · file originale |
+| PUT | `/api/documenti/:id` | correzione dei dati letti (campi verificati) |
+| POST | `/api/documenti/:id/abbina` · `/apri-pratica` · `/registra-bollettino` | esito del controllo |
+| POST | `/api/documenti/:id/scarta` · `/rileggi` | scarto · nuova lettura |
 | GET | `/eventi` | log eventi applicativi (admin) |
 | GET | `/api/eventi` | elenco eventi filtrato (admin) |
 | GET | `/api/eventi/:id` | dettaglio evento (admin) |
 | GET | `/api/eventi/export` | export CSV del log filtrato (admin) |
 
-### 8.2 Modulo ordini cliente
+### 8.2 Modulo ordini cliente (fase successiva, §17)
 
-`/api/ordini*`, `/api/lookup/*`, `/api/clienti*`, `/api/utenti*`, `/api/errori*`: API del
-modulo ordini cliente, montate sul backend NestJS; leggono e scrivono le
-tabelle condivise di §4.1 (ordini cliente, clienti, articoli, giacenze, log).
+`/api/ordini*`, `/api/lookup/*`, `/api/clienti*`, `/api/utenti*`: API del futuro modulo
+ordini cliente, che sostituirà la Gestione Ordini; non incluse in questa fase.
 
 ### 8.3 Autenticazione
 
@@ -1019,8 +1131,8 @@ e bollettini, diagnosi degli errori.
   produce una riga in `eventi_app`. La scrittura avviene nel **service layer**,
   mai fidandosi di ciò che dichiara il client.
 - **Nessuna modifica alle tabelle esistenti** (V2): `eventi_app` è una tabella nuova
-  del CRM; gli errori di importazione documenti restano in `processing_errors` della
-  Gestione Ordini (§4.1) e vengono solo **referenziati** dagli eventi, non duplicati.
+  del CRM; gli errori di lettura documenti restano in `documenti_in_arrivo` (§4.2.12)
+  e vengono solo **referenziati** dagli eventi, non duplicati.
 - **Solo lettura per l'utente**: gli eventi non si modificano e non si eliminano
   dall'interfaccia (nemmeno dagli admin). L'eventuale correzione di errori passa
   dalle normali operazioni di business, che generano nuovi eventi.
@@ -1083,7 +1195,9 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 | DELETE `/api/ordini-fornitore/:id/righe/:rid` | `crud` | `delete` | `riga_pratica` | `successo` | `{etichetta, riga_pratica_id, pratica_id, codice, descrizione}` |
 | DELETE `/api/ordini-fornitore/:id` | `crud` | `delete` | `pratica` | `successo` | `{etichetta: numero_ordine, pratica_id, fornitore_id, cliente_piva, importo_merce, stato}` |
 | POST `/api/ordini-fornitore/:id/upload` (ordine/conferma/fattura) | `documento` | `upload` | `pratica` | `successo` | `{etichetta, pratica_id, fase, att_filename, dimensione}` |
-| upload con esito negativo (validazione/OCR non riuscita, §6) | `documento` | `upload` | `pratica` | `errore` | `{etichetta, pratica_id, fase, att_filename, processing_errors_id}` |
+| lettura con esito negativo (GLM-OCR non riuscita dopo 3 tentativi, §6.5) | `documento` | `upload` | `documento` | `errore` | `{etichetta, documento_id, file_nome, tentativi, errore}` |
+| correzione dati letti (§6.5) | `documento` | `update` | `documento` | `successo` | `{etichetta, documento_id, campi_corretti, livello_prima, livello_dopo}` |
+| abbinamento / nuova pratica / registrazione bollettino | `documento` | `change_state` | `documento` | `successo` | `{etichetta, documento_id, pratica_id \| bollettino_id}` |
 | POST `/api/ordini-fornitore/:id/documenti` (fattura/nota di credito, §4.2.7.1) | `documento` | `create` | `documento` | `successo` | `{etichetta: numero · tipo, pratica_id, documento_id, tipo, numero, data, importo, storno_totale, fattura_riferimento}` |
 | PUT `/api/ordini-fornitore/:id/documenti/:did` | `documento` | `update` | `documento` | `successo` | `{etichetta, documento_id, pratica_id, prima, dopo}` |
 | DELETE `/api/ordini-fornitore/:id/documenti/:did` | `documento` | `delete` | `documento` | `successo` | `{etichetta, documento_id, pratica_id, tipo, numero, importo}` |
@@ -1151,9 +1265,9 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
   catalogo §15.2 (mai l'intero record).
 - **contesto** → quando l'evento riguarda una riga o un sottorecord, il dettaglio
   include l'id del genitore (`pratica_id`, `bollettino_id`, `fornitore_id`).
-- **riferimenti esterni** → `processing_errors_id` è l'**id** della riga di
-  `processing_errors`, così la UI apre il dettaglio dell'errore della Gestione
-  Ordini.
+- **riferimenti ai documenti** → `documento_id` è l'**id** della riga di
+  `documenti_in_arrivo` (§4.2.12), così la UI apre il documento e il suo errore di
+  lettura.
 
 ### 15.5 Errori applicativi
 
@@ -1161,9 +1275,9 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
   intermedio: nessuna eccezione gestita silenziosamente (catalogo §15.2.7).
 - Al frontend viene restituito solo un **messaggio user-friendly**; il dettaglio
   tecnico (classe, messaggio) resta nel log e non viene mai esposto nel browser.
-- Gli **errori di importazione OCR/validazione** restano di competenza della
-  Gestione Ordini (`processing_errors`) e compaiono nel log come riferimento
-  (§15.4) — non vengono duplicati nel testo dell'evento.
+- Gli **errori di lettura documenti** stanno in `documenti_in_arrivo` (stato `errore`,
+  campo `errore`) e compaiono nel log come riferimento (§15.4) — non vengono
+  duplicati nel testo dell'evento.
 
 ### 15.6 Schermata `/eventi`
 
@@ -1206,7 +1320,7 @@ creazione + modifica scaglione (`crud/create`/`crud/update`), creazione pratica 
 `inviato` (`crud/create`), upload conferma con cambio stato a `confermato`
 (`documento/upload` + `stato/change_state`), verifica bollettino (`calcolo/verify`),
 export liquidazione (`export/export`) e **un evento di tipo `errore`**
-(`documento/upload` esito `errore` con `processing_errors_id`) per collaudare
+(`documento/upload` esito `errore` con `documento_id`) per collaudare
 filtri e dettaglio.
 
 ### 15.10 Riferimenti
@@ -1239,17 +1353,17 @@ HTML e confronto numerico sul seed §12, **prima del merge**:
 
 | Fase | Ambito | Attività | Agenti paralleli | Ore |
 |---|---|---|---|---|
-| F0 | Fondamenta: scaffold, DB/seed, auth, shell + componenti standard §16.4, motore §10 + `logEvent()`, prova lettura documenti fornitore | A1–A6 | 1 → fino a 4 | 28 |
+| F0 | Fondamenta: scaffold, DB/seed, auth, shell + componenti standard §16.4, motore §10 + `logEvent()`, prova GLM-OCR su documenti reali | A1–A6 | 1 → fino a 4 | 28 |
 | F1 | Anagrafiche (fornitori, agenti, interscambio) | A1–A3 | 3 | 6 |
 | F2 | Pratiche ordini (lista, dettaglio, documenti, upload) | A1–A3 | 3 | 6 |
 | F3 | Bollettini mensili | A1–A2 | 2 | 4 |
 | F4 | Liquidazione (filtri, dettaglio, export) | A1–A3 | 2–3 | 3 |
 | F5 | Dashboard + log eventi (`/eventi`) | A1–A2 | 2 | 2 |
-| F6 | Modulo ordini cliente (§7.9) | A1–A2 | 1–2 | 5 |
+| F6 | Ingresso documenti senza n8n: email + caricamento, coda, lettura GLM-OCR, affidabilità e controlli, `/documenti` con finestra di correzione (§6.5, §7.9) | A1–A5 | 2–3 | 17 |
 | F7 | Collaudo, replicazione, rilascio | A1–A2 | 1–2 | 5 |
-| | | **20** | | **59** (preventivo §4) |
-| — | Margine di rischio 25 % (riserva, usata solo se necessaria) | — | — | 15 |
-| | | | | **74** |
+| | | **23** | | **71** (preventivo §4) |
+| — | Margine di rischio 25 % (riserva, usata solo se necessaria) | — | — | 18 |
+| | | | | **89** |
 
 **F0 è bloccante** (scaffold A1 → DB/auth/shell/motore/prova documenti); da F0
 avanti **F1–F6 procedono in parallelo** (slice disgiunte, ownership per file), F7
@@ -1272,6 +1386,7 @@ A — solo Next.js — e C — Express + EJS — sono scartate):
 | Accesso | `express-session` + `connect-pg-simple`, argon2, CSRF, Helmet, throttler (§3.3) |
 | Esercizio | Caddy + due processi Node (8001/8002), Docker solo in sviluppo (§3.4) |
 | Lavori pianificati / Excel / test | `@nestjs/schedule` · `exceljs` · Jest + supertest |
+| Ingresso documenti | `imapflow` (casella email) · coda su PostgreSQL (`FOR UPDATE SKIP LOCKED`) · PDF → immagini (`pdftoppm`) · **GLM-OCR** su **vLLM** (server GPU locale, interfaccia compatibile OpenAI, uscita vincolata allo schema, `logprobs`) — **nessun n8n** |
 | Grafica | **Bootstrap 5.3.2 + `crm.css` del prototipo** (V4): coerenza con la Gestione Ordini, non con la grafica di Luis |
 
 **Riuso da Luis B2B — solo infrastruttura, nessuna interfaccia:**
@@ -1334,3 +1449,22 @@ Ogni attività è una slice con ownership disgiunta (nessun file toccato da due 
 una PR per attività con checklist §16.1 allegata; testi e stile presi dal prototipo,
 non inventati; prima del merge: checklist superata + test numerici seed §12 + eventi
 §15.2 completi. Casi limite §13 restano backlog, non toccati dal piano.
+
+---
+
+## 17. Fase successiva: sostituzione della Gestione Ordini
+
+Decisione: la Gestione Ordini attuale (Express + EJS + n8n + LlamaIndex) sarà
+**sostituita** da un modulo del CRM, **non in questa fase** e fuori da questo preventivo.
+Fino ad allora resta in esercizio, invariata, sullo stesso database.
+
+| Aspetto | Indicazione |
+|---|---|
+| Prerequisito | ingresso documenti (§6.5) in esercizio e tarato sui documenti reali |
+| Ambito | ordini cliente (testata + righe), controllo P.IVA e codici articolo (anagrafica, alias, kit), giacenze, esportazione CSV verso Integra, errori di lettura, anagrafiche clienti/articoli/utenti |
+| Ingresso | gli ordini cliente entrano dallo **stesso ingresso documenti** del CRM, con un nuovo tipo `ordine_cliente` e il suo schema; si spegne il flusso n8n + LlamaIndex |
+| Interfaccia | stile e componenti standard del CRM (§16.4); la finestra di correzione di §6.5 sostituisce la vista ordine attuale (PDF a sinistra, dati a destra) |
+| Dati | tabelle esistenti (`ordini_cliente_*`, `clienti`, `articoli`, …) riusate; migrazione solo se servono colonne nuove (affidabilità, riferimento a `documenti_in_arrivo`) |
+| Passaggio | i due sistemi in parallelo per un periodo di prova, poi spegnimento di n8n e della vecchia app |
+| Stima | da quotare a parte dopo la messa in esercizio del CRM |
+

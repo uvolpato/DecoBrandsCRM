@@ -27,7 +27,7 @@
 
   <div class="alert alert-light border small">
     <strong>Redatto da:</strong> Ugo Volpato — AI Consultant<br>
-    <strong>Data:</strong> 04/09/2026 — aggiornato il 14/10/2026 (stack allineato al Portale B2B Luis)<br>
+    <strong>Data:</strong> 04/09/2026 — aggiornato il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
     <strong>Cliente:</strong> Decobrands S.r.l. (da confermare)<br>
     <strong>Modalità di sviluppo:</strong> assistita da AI (analisi, generazione e codifica tramite modelli AI)
   </div>
@@ -39,9 +39,10 @@
 <li>controllare i <strong>bollettini</strong> mensili dei fornitori, confrontando riga per riga il <strong>riconosciuto</strong> con il <strong>calcolato</strong> (differenze evidenziate, verifica/contestazione);</li>
 <li><strong>liquidare i subagenti</strong> ogni trimestre con rendiconto calcolato al volo dagli scaglioni e <strong>export a 8 campi</strong>;</li>
 <li>condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, <code>requireAuth</code>/<code>requireAdmin</code>);</li>
-<li>integrare il <strong>modulo ordini cliente</strong> (ordini, upload, liste, clienti, utenti, errori) sulle rotte dell'applicazione.</li>
+<li>far entrare <strong>tutti i documenti</strong> (ordini a fornitore, conferme, fatture, note di credito, bollettini) da un <strong>ingresso documenti interno</strong>: casella email e caricamento, coda nel database, lettura con <strong>GLM-OCR su un server locale con GPU</strong>, affidabilità per campo, controllo dell'operatore con il PDF a fianco — <strong>senza n8n e senza servizi esterni</strong>.</li>
 </ul>
-<p>Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v1.9 (validata con il cliente; stack §3.4, §16.3) · piano: <code>piano-lavoro-crm.md</code>.</p>
+<p>La <strong>sostituzione della Gestione Ordini</strong> (ordini cliente, CSV Integra) è prevista in una fase successiva, <strong>esclusa</strong> da questo preventivo (spec §17).</p>
+<p>Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v2.0 (validata con il cliente; stack §3.4, §16.3; ingresso documenti §6.5) · piano: <code>piano-lavoro-crm.md</code>.</p>
 <h2 id="sez-2">2. Tariffe applicate (indicative, mercato Italia)</h2>
 <table class="table table-bordered bg-white">
 <thead>
@@ -178,10 +179,10 @@
 </tr>
 <tr>
 <td>7</td>
-<td>Integrazione <strong>modulo ordini cliente</strong> (API <code>/api/ordini*</code>, <code>/api/lookup/*</code>, <code>/api/clienti*</code>, <code>/api/utenti*</code>, <code>/api/errori*</code>) + viste ordini/upload/liste/clienti/utenti/errori coerenti</td>
-<td>6</td>
-<td>15</td>
-<td>€ 330,00</td>
+<td><strong>Ingresso documenti senza n8n</strong> (spec §6.5): lettura casella email + caricamento, coda su PostgreSQL, servizio di lettura <strong>GLM-OCR/vLLM</strong> con schema per tipo documento, <strong>affidabilità per campo</strong> dai <code>logprobs</code>, controlli fissi, schermata Documenti con <strong>finestra di correzione</strong> (PDF a sinistra, campi a destra), installazione sul server GPU e prima taratura</td>
+<td>18</td>
+<td>45</td>
+<td>€ 990,00</td>
 </tr>
 <tr>
 <td>8</td>
@@ -206,7 +207,7 @@
 </tr>
 <tr>
 <td>11</td>
-<td><strong>Prova di lettura automatica dei documenti fornitore</strong> (conferme, fatture, bollettini) su 2–3 fornitori reali tramite la pipeline OCR della Gestione Ordini: esito e stima dell'adattamento</td>
+<td><strong>Prova GLM-OCR su documenti reali</strong> (conferme, fatture, bollettini di 2–3 fornitori) sul server GPU: esito per campo, affidabilità, tempi; prime soglie e stima dell'adattamento</td>
 <td>4</td>
 <td>10</td>
 <td>€ 220,00</td>
@@ -214,23 +215,23 @@
 <tr>
 <td></td>
 <td><em>Subtotale attività</em></td>
-<td><em>59</em></td>
-<td><em>152</em></td>
-<td><em>€ 3.245,00</em></td>
+<td><em>71</em></td>
+<td><em>182</em></td>
+<td><em>€ 3.905,00</em></td>
 </tr>
 <tr>
 <td>12</td>
-<td><strong>Margine di rischio (25 %)</strong>: imprevisti su lettura documenti, accesso condiviso e dati reali. Riserva usata solo se necessaria e rendicontata a ore</td>
-<td>15</td>
-<td>38</td>
-<td>€ 825,00</td>
+<td><strong>Margine di rischio (25 %)</strong>: imprevisti su lettura documenti, server GPU, accesso condiviso e dati reali. Riserva usata solo se necessaria e rendicontata a ore</td>
+<td>18</td>
+<td>46</td>
+<td>€ 990,00</td>
 </tr>
 <tr>
 <td><strong>Subtotale da svolgere</strong></td>
 <td></td>
-<td><strong>74</strong></td>
-<td><strong>190</strong></td>
-<td><strong>€ 4.070,00</strong></td>
+<td><strong>89</strong></td>
+<td><strong>228</strong></td>
+<td><strong>€ 4.895,00</strong></td>
 </tr>
 </tbody>
 </table>
@@ -250,23 +251,25 @@
 <td>€ 1.280,00</td>
 </tr>
 <tr>
-<td>Attività da svolgere (incluso margine 15 h)</td>
-<td>74</td>
-<td>€ 4.070,00</td>
+<td>Attività da svolgere (incluso margine 18 h)</td>
+<td>89</td>
+<td>€ 4.895,00</td>
 </tr>
 <tr>
 <td><strong>Totale complessivo</strong></td>
-<td><strong>90</strong></td>
-<td><strong>€ 5.350,00</strong></td>
+<td><strong>105</strong></td>
+<td><strong>€ 6.175,00</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>Riferimento senza AI</strong> — lo sviluppo tradizionale richiederebbe <strong>190 ore</strong> (≈ 2,6× le ore assistite, margine incluso): 190 h × € 70,00 = <strong>€ 13.300,00</strong>, per un totale di <strong>€ 14.580,00</strong> (€ 1.280,00 già svolto + € 13.300,00 sviluppo).</p>
-<p>L'approccio assistito da AI consente un <strong>risparmio di € 9.230,00</strong> sul solo sviluppo (€ 13.300,00 → € 4.070,00, <strong>−69%</strong>).</p>
+<p><strong>Riferimento senza AI</strong> — lo sviluppo tradizionale richiederebbe <strong>228 ore</strong> (≈ 2,6× le ore assistite, margine incluso): 228 h × € 70,00 = <strong>€ 15.960,00</strong>, per un totale di <strong>€ 17.240,00</strong> (€ 1.280,00 già svolto + € 15.960,00 sviluppo).</p>
+<p>L'approccio assistito da AI consente un <strong>risparmio di € 11.065,00</strong> sul solo sviluppo (€ 15.960,00 → € 4.895,00, <strong>−69%</strong>).</p>
 <h2 id="sez-6">6. Note</h2>
 <ul>
 <li>Le ore della sezione "già svolte" sono una <strong>stima</strong> del tempo impiegato (analisi, specifica, prototipo e iterazioni); da confermare.</li>
-<li><strong>Stack allineato al Portale B2B Luis</strong> (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di <strong>5 ore</strong>, reinvestite nella <strong>prova di lettura dei documenti fornitore</strong> (attività 11), principale rischio tecnico del progetto. Totale attività invariato: 59 h.</li>
+<li><strong>Ingresso documenti senza n8n (attività 7)</strong>: sostituisce l'integrazione del modulo ordini cliente (6 h) prevista nella versione precedente; la lettura dei documenti non passa più dalla pipeline n8n + LlamaIndex della Gestione Ordini ma da GLM-OCR in locale: nessun costo per pagina, documenti che non escono dall'azienda, regole nel codice del CRM.</li>
+<li><strong>Server GPU</strong> per GLM-OCR: hardware, sistema operativo e driver a carico del cliente; l'attività 7 copre installazione del servizio di lettura e taratura iniziale.</li>
+<li><strong>Stack allineato al Portale B2B Luis</strong> (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di <strong>5 ore</strong>, reinvestite nella <strong>prova di lettura dei documenti fornitore</strong> (attività 11), principale rischio tecnico del progetto.</li>
 <li><strong>Margine di rischio 25 % (15 h, € 825,00)</strong>: copre gli imprevisti più probabili (formati dei documenti fornitore, compatibilità dell'accesso con la Gestione Ordini, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.</li>
 <li>Il motore di calcolo è <strong>solo lato server</strong> (spec §10): eliminata la voce "motore lato client" della versione precedente.</li>
 <li><strong>Accesso unico con la Gestione Ordini</strong>: confermato se le sessioni sono compatibili (verifica nell'attività 2); in caso contrario login separato sulla stessa tabella utenti, senza variazione di ore.</li>
@@ -276,6 +279,7 @@
 <li>Tariffe indicative e personalizzabili; <strong>IVA esclusa</strong>.</li>
 <li>Il progetto <strong>condivide il database</strong> con la Gestione Ordini: le tabelle esistenti vengono riusate <strong>senza modifiche</strong>; il CRM aggiunge solo le proprie tabelle (§4.2).</li>
 <li>Fatture su più ordini e ordini fatturati in più tranche sono <strong>inclusi</strong> (spec §5.9, documenti a ponte).</li>
+<li><strong>Esclusa la sostituzione della Gestione Ordini</strong> (ordini cliente, controlli articoli/alias/kit, giacenze, CSV Integra, spegnimento di n8n): fase successiva, da quotare a parte dopo la messa in esercizio del CRM (spec §17).</li>
 <li><strong>Esclusioni</strong> (backlog spec §13): interfaccia delle eccezioni per singolo subagente (B1), riga bollettino con solo totale cliente (B2), versioning degli scaglioni per periodo (B3), <strong>popolamento dei dati storici dagli Excel manuali</strong> (B6). Il consolidamento sconto (B4) è già definito nella specifica.</li>
 </ul>
 

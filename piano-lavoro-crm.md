@@ -1,7 +1,7 @@
 # Piano di lavoro — CRM Decobrands (fasi e attività parallele)
 
-**Versione:** 1.2 · **Data:** 14/10/2026 (stack Luis B2B; componenti standard)
-**Derivato da:** `specifica-crm-provvigioni.md` v1.9 (§16) · **Ore:** 59 h di attività + 15 h di margine = 74 h (preventivo §4)
+**Versione:** 1.3 · **Data:** 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
+**Derivato da:** `specifica-crm-provvigioni.md` v2.0 (§16) · **Ore:** 71 h di attività + 18 h di margine = 89 h (preventivo §4)
 **Scopo:** suddividere l'implementazione in fasi e attività indipendenti, assegnabili ad **agenti in parallelo**, con **replicazione maniacale** del prototipo navigabile.
 
 ---
@@ -44,7 +44,8 @@ Lo stack **ricalca il Portale B2B Luis** (spec V7, §3.3, §3.4, §16.3):
 - **Backend:** NestJS 11, DTO con `class-validator`, Prisma 7 (`@prisma/adapter-pg`);
 - **Accesso e sicurezza:** `express-session` + `connect-pg-simple`, argon2, CSRF, Helmet, throttler;
 - **Esercizio:** Caddy (HTTPS) → Next.js `localhost:8001` → inoltro `/api/*` → NestJS `localhost:8002` → PostgreSQL `decobrands`; Docker solo in sviluppo; Node 24;
-- **Varie:** `@nestjs/schedule` (conferme scadute), `exceljs` (bollettini/export), Jest + supertest.
+- **Varie:** `@nestjs/schedule` (conferme scadute, lettura casella), `exceljs` (bollettini/export), Jest + supertest;
+- **Ingresso documenti (spec §6.5):** `imapflow`, coda su PostgreSQL (`FOR UPDATE SKIP LOCKED`), `pdftoppm`, **GLM-OCR su vLLM** nel server GPU locale — **nessun n8n**.
 
 **Riuso da Luis B2B:** solo infrastruttura (accesso, sicurezza, Prisma, registro eventi, utilità comuni, inoltro `/api/*`, pubblicazione) — elenco moduli in spec §16.3. **Nessun componente o CSS di Luis: layout e grafica sono quelli del prototipo** (§1.1).
 
@@ -58,17 +59,17 @@ migrate**.
 
 | Fase | Ambito | Attività | Agenti paralleli | Ore | Dipende da |
 |---|---|---|---|---|---|
-| **F0** | Fondamenta: scaffold, DB, auth, shell + componenti, motore, prova documenti | 6 (A1–A6) | 1 → fino a 4 dopo A1 | **28** | — |
+| **F0** | Fondamenta: scaffold, DB, auth, shell + componenti, motore, prova GLM-OCR | 6 (A1–A6) | 1 → fino a 4 dopo A1 | **28** | — |
 | **F1** | Anagrafiche (fornitori, agenti, interscambio) | 3 | **3 in parallelo** | **6** | F0 |
 | **F2** | Pratiche ordini (lista, dettaglio, documenti, upload) | 3 | **3 in parallelo** | **6** | F0 |
 | **F3** | Bollettini mensili | 2 | **2 in parallelo** | **4** | F0 |
 | **F4** | Liquidazione (riepilogo, dettaglio, export) | 3 | **2–3 in parallelo** | **3** | F0 |
 | **F5** | Dashboard + log eventi (`/eventi`) | 2 | **2 in parallelo** | **2** | F0 |
-| **F6** | Modulo ordini cliente (§7.9) | 1 (2 sottofasi) | 1–2 | **5** | F0 |
+| **F6** | Ingresso documenti senza n8n (§6.5, §7.9) | 5 | **2–3 in parallelo** | **17** | F0 (A6 per la lettura) |
 | **F7** | Collaudo, replicazione, rilascio | 1 (2 sottofasi) | 1–2 | **5** | merged F1–F6 |
-| | | **20** | | **59** | |
-| — | Margine di rischio 25 % (riserva, preventivo §4 att. 12) | — | — | **15** | — |
-| | | | | **74** | |
+| | | **23** | | **71** | |
+| — | Margine di rischio 25 % (riserva, preventivo §4 att. 12) | — | — | **18** | — |
+| | | | | **89** | |
 
 ```
 F0-A1 (scaffold, modello Luis B2B)
@@ -84,7 +85,7 @@ F0-A1 (scaffold, modello Luis B2B)
               F7 collaudo + replicazione + rilascio
 ```
 
-Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 5 + 5 = **59 h** di attività + **15 h** di margine = **74 h** = preventivo §4. Il margine non è assegnato a una fase: si usa dove emergono imprevisti e si rendiconta a ore.
+Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività + **18 h** di margine = **89 h** = preventivo §4. Il margine non è assegnato a una fase: si usa dove emergono imprevisti e si rendiconta a ore.
 
 ---
 
@@ -99,7 +100,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 5 + 5 = **59 h** di attività + 
 
 #### F0-A2 · Schema dati + seed — 6 h
 - **Dipende da:** F0-A1 · **Blocca:** F1–F6 (lette/scritture), F0-A5
-- **Riferimenti:** spec §4.2.1–4.2.11 (tabelle nuove), §4.1 (tabelle legacy read-only), §12 (seed), §4.3 (relazioni), §4.4 (note schema, `ordine_cliente_id`, `codice_cliente_fornitore`)
+- **Riferimenti:** spec §4.2.1–4.2.13 (tabelle nuove, incl. `documenti_in_arrivo`/`documenti_campi`), §4.1 (tabelle legacy read-only), §12 (seed), §4.3 (relazioni), §4.4 (note schema, `ordine_cliente_id`, `codice_cliente_fornitore`)
 - **Sorgente prototipo:** `assets/js/data.js` (struttura dati demo = forma del seed)
 - **Output:** schema Prisma tabelle CRM + migrazioni; introspection letta sulle tabelle esistenti **senza migrazione** (V2); aggregatore seed con `seed/00-base`.
 - **DoD:** migrazioni riusate su DB `decobrands`; seed §12 caricato; vincoli chiave presenti (`UNIQUE(fornitore_id, mese, anno)` bollettini, `UNIQUE(fornitore_id, codice_cliente_fornitore)` interscambio, FK `ordine_cliente_id`).
@@ -125,11 +126,11 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 5 + 5 = **59 h** di attività + 
 - **Output:** motore server-side: scaglioni, eccezioni, maturato/fatturato, congelamento percentuali (§5.11), netto documenti (fatture − NC §5.3), differenze bollettino, confronto fasi; helper `logEvent()` conforme §15.3 (stessa transazione, formato §15.4).
 - **DoD:** test numerici (Jest) sui casi seed §12 (es. Gries 0/1/5/10/100 %, conferma ridotta 7/10, NC-2026-005) = stessi risultati del prototipo; nessun calcolo duplicato altrove (motore solo lato server).
 
-#### F0-A6 · Prova lettura automatica documenti fornitore — 4 h
-- **Dipende da:** F0-A1 · **Blocca:** nulla (in parallelo ad A2–A5); l'esito condiziona F2-A3 e F3
-- **Riferimenti:** spec V2, §6, §6.1, §6.2; preventivo §4 att. 11
-- **Output:** conferme, fatture e bollettini di 2–3 fornitori reali (Gries + un importatore) passati nella pipeline OCR della Gestione Ordini; tabella esito per campo letto (numero, data, importo, cliente, righe).
-- **DoD:** esito documentato; stima dell'adattamento per fornitore consegnata al cliente prima di F2-A3.
+#### F0-A6 · Prova GLM-OCR su documenti reali — 4 h
+- **Dipende da:** F0-A1 · **Blocca:** F6-A2 (lettura); in parallelo ad A2–A5
+- **Riferimenti:** spec V11, §6.5; preventivo §4 att. 11
+- **Output:** GLM-OCR servito da vLLM sul server GPU del cliente; conferme, fatture e bollettini di 2–3 fornitori reali (Gries + un importatore) letti con lo schema e i `logprobs`; tabella esito per campo (valore atteso, letto, affidabilità); memoria video e tempi per pagina misurati.
+- **DoD:** esito documentato; prime soglie di affidabilità proposte; stima dell'adattamento per fornitore consegnata al cliente prima di F6-A2.
 
 ---
 
@@ -183,14 +184,18 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 5 + 5 = **59 h** di attività + 
 
 - **Nota:** la scrittura degli eventi **non** è di F5: la fa l'attività che implementa ogni operazione (§15.2 tassativo). F5 costruisce solo lettura/filtri/export.
 
-## 10. Fase 6 — Modulo ordini cliente (5 h, 1–2 agenti)
+## 10. Fase 6 — Ingresso documenti senza n8n (17 h, 2–3 agenti)
 
 | Attività | Ore | Dipende da | Sorgente prototipo | Riferimenti spec |
 |---|---|---|---|---|
-| **F6-A1** API modulo (ordini, lookup, clienti, utenti, errori — letture sulle tabelle legacy) | 3 | F0 | — | §7.9, §8.2, §4.1 |
-| **F6-A2** Viste modulo (liste, upload, errori — composte con i componenti standard) | 2 | F6-A1 | stile generale (STILE-GUIDA §7, `.table-box`, thead scuro) | §7.9, §6 |
+| **F6-A1** Ricezione e coda: lettura casella (`imapflow`, lavoro pianificato), caricamento manuale, `file_hash` contro i doppioni, coda con `SKIP LOCKED`, tentativi ed errori | 3 | F0 | — | §4.2.12, §6.5 punti 1–2, §8.1 |
+| **F6-A2** Servizio di lettura: PDF → immagini, chiamata GLM-OCR/vLLM con schema per tipo documento, `logprobs` → affidabilità per campo, posizione nel PDF, unione righe multipagina, bollettini Excel con `exceljs` | 6 | F0-A6 | — | §6.5 punti 3–4, §4.2.13, V11 |
+| **F6-A3** Controlli fissi e livello del documento; proposta di abbinamento (codice cliente + articoli in comune) | 2 | F0-A5, F6-A2 | `prototipo-alternativo/assets/motore.js` (`proposta`, `daFare`) | §6.5 punti 5–6 |
+| **F6-A4** Schermata `/documenti` + finestra di correzione (PDF a sinistra, testata e righe a destra, campi incerti evidenziati, evidenziazione nel PDF), abbina / apri pratica / registra bollettino / scarta | 4 | F0-A4, F6-A3 | `prototipo-alternativo/` vista Documenti | §6.5 punto 7, §7.9, §15.2.4 |
+| **F6-A5** Installazione in esercizio (servizio vLLM, avvio automatico, controllo stato) e prima taratura delle soglie sui documenti reali | 2 | F6-A2 | — | §6.5 punto 8, §3.4 |
 
-- **DoD:** zero scrittura su tabelle legacy oltre a quelle consentite (V2); UI indistinguibile dal resto dell'app.
+- **DoD:** un PDF inviato alla casella o caricato compare in `/documenti` letto, con affidabilità per campo e livello; correzioni salvate in `documenti_campi`; nessun n8n e nessuna chiamata a servizi esterni; eventi `documento/*` §15.2.4 scritti.
+- Il **modulo ordini cliente** (sostituzione della Gestione Ordini) è nella fase successiva, spec §17, fuori da questo piano.
 
 ## 11. Fase 7 — Collaudo e rilascio (5 h)
 
@@ -217,5 +222,5 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 5 + 5 = **59 h** di attività + 
 
 ## 13. Riferimenti
 
-Specifica: `specifica-crm-provvigioni.md` v1.9 (§16) · Preventivo: `preventivo-crm-provvigioni.md` (74 h da svolgere, margine incluso) ·
+Specifica: `specifica-crm-provvigioni.md` v2.0 (§16, §6.5, §17) · Preventivo: `preventivo-crm-provvigioni.md` (89 h da svolgere, margine incluso) ·
 Prototipo sorgente: `prototipo-crm/` · Stile: `STILE-GUIDA-DECOBRANDS.md` · Seed: spec §12 · Eventi: spec §15
