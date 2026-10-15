@@ -101,6 +101,49 @@
   }));
 
   /* =========================================================
+     FinestraAffiancata: finestra a tutto schermo con due pannelli e divisore trascinabile
+     (es. documento originale a sinistra, dati da correggere a destra)
+     opz: { titolo, sottotitolo (html), sinistra(host), destra(host), piede(host) (html a sinistra del piede),
+            azioni: [{ etichetta, variante, onClick(chiudi) → false per restare }], larghezza: % iniziale del pannello sinistro }
+     → { chiudi, sinistra, destra, piede }
+     ========================================================= */
+  CRM.FinestraAffiancata = function (opz) {
+    const velo = el('div', 'velo velo-pieno');
+    velo.innerHTML = '<div class="affiancata" role="dialog" aria-modal="true" aria-labelledby="aff-t">' +
+      '<div class="modale-testa aff-testa"><div><h2 id="aff-t">' + esc(opz.titolo) + '</h2>' + (opz.sottotitolo ? '<p>' + opz.sottotitolo + '</p>' : '') + '</div>' +
+      '<button type="button" class="btn testo aff-chiudi" aria-label="Chiudi">✕</button></div>' +
+      '<div class="aff-corpo"><div class="aff-sx"></div><div class="aff-divisore" role="separator" aria-orientation="vertical" tabindex="0" title="Trascina per allargare"></div><div class="aff-dx"></div></div>' +
+      '<div class="modale-piede aff-piede"><div class="aff-piede-info"></div></div></div>';
+    const sx = $('.aff-sx', velo), dx = $('.aff-dx', velo), piede = $('.aff-piede', velo), info = $('.aff-piede-info', velo);
+    sx.style.flexBasis = (opz.larghezza || 46) + '%';
+    const chiudi = () => { velo.remove(); document.removeEventListener('keydown', tasto); };
+    const tasto = e => { if (e.key === 'Escape') chiudi(); };
+    document.addEventListener('keydown', tasto);
+    $('.aff-chiudi', velo).addEventListener('click', chiudi);
+    // divisore: trascinamento con il mouse o frecce da tastiera
+    const div = $('.aff-divisore', velo), corpo = $('.aff-corpo', velo);
+    const imposta = pct => { sx.style.flexBasis = Math.max(20, Math.min(75, pct)) + '%'; };
+    div.addEventListener('mousedown', e => {
+      e.preventDefault(); div.classList.add('trascina');
+      const muovi = ev => { const r = corpo.getBoundingClientRect(); imposta(100 * (ev.clientX - r.left) / r.width); };
+      const fine = () => { div.classList.remove('trascina'); document.removeEventListener('mousemove', muovi); document.removeEventListener('mouseup', fine); };
+      document.addEventListener('mousemove', muovi); document.addEventListener('mouseup', fine);
+    });
+    div.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); imposta(parseFloat(sx.style.flexBasis) + (e.key === 'ArrowLeft' ? -4 : 4)); } });
+    (opz.azioni || [{ etichetta: 'Chiudi', variante: 'sec' }]).forEach(a => {
+      const b = el('button', 'btn ' + (a.variante && a.variante !== 'primario' ? a.variante : ''), esc(a.etichetta));
+      b.type = 'button';
+      b.addEventListener('click', () => { if (!a.onClick || a.onClick(chiudi) !== false) chiudi(); });
+      piede.appendChild(b);
+    });
+    document.body.appendChild(velo);
+    if (opz.sinistra) opz.sinistra(sx);
+    if (opz.destra) opz.destra(dx);
+    if (opz.piede) opz.piede(info);
+    return { chiudi: chiudi, sinistra: sx, destra: dx, piede: info };
+  };
+
+  /* =========================================================
      TestoDaInviare: testo precompilato da copiare (solleciti, contestazioni)
      opz: { titolo, destinatario, testo, onCopia() }
      ========================================================= */
@@ -196,7 +239,7 @@
 
   /* =========================================================
      Pannello
-     opz: { titolo, nota (html a destra), azioni: [{ etichetta, icona, variante, onClick, href }], riempi, senzaMargine }
+     opz: { titolo, nota (html a destra), azioni: [{ etichetta, icona, variante, onClick, href, conta, contaVariante: 'attesa'|'errore', contaTitolo }], riempi, senzaMargine }
      → { el, corpo, nota(html) }
      ========================================================= */
   CRM.Pannello = function (host, opz) {
@@ -204,7 +247,8 @@
     p.innerHTML = (opz.titolo ? '<div class="pannello-testa"><h2>' + esc(opz.titolo) + '</h2><div class="pannello-destra"><span class="pannello-nota">' + (opz.nota || '') + '</span></div></div>' : '') +
       '<div class="pannello-corpo' + (opz.senzaMargine ? ' senza-margine' : '') + '"></div>';
     (opz.azioni || []).forEach(a => {
-      const b = el(a.href ? 'a' : 'button', 'btn piccolo ' + (a.variante || 'sec'), (a.icona ? CRM.icona(a.icona) : '') + esc(a.etichetta));
+      const b = el(a.href ? 'a' : 'button', 'btn piccolo ' + (a.variante || 'sec'), (a.icona ? CRM.icona(a.icona) : '') + esc(a.etichetta) +
+        (a.conta ? '<span class="btn-conta c-' + (a.contaVariante || 'attesa') + '" title="' + esc(a.contaTitolo || '') + '">' + esc(a.conta) + '</span>' : ''));
       if (a.href) b.href = a.href; else b.type = 'button';
       if (a.onClick) b.addEventListener('click', a.onClick);
       $('.pannello-destra', p).appendChild(b);

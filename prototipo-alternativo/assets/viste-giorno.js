@@ -82,15 +82,25 @@
     CRM.ElencoSelezionabile(sx.corpo, docs.map(d => {
       const pr = M.proposta(d);
       return { id: d.id, href: '#/documenti/' + d.id, titolo: M.TIPI[d.tipo] + ' ' + d.numero, valore: M.euro(pr.importo),
-        sotto: M.fornitore(d.fornitore_id).breve + ' · caricato il ' + M.data(d.ricevuto), stato: CRM.stato(ESITO[pr.esito][0], ESITO[pr.esito][1]) };
+        sotto: M.fornitore(d.fornitore_id).breve + ' · caricato il ' + M.data(d.ricevuto), stato: CRM.stato(ESITO[pr.esito][0], ESITO[pr.esito][1]) + statoLetturaHtml(d) };
     }), sel.id);
 
     const pr = M.proposta(sel);
     const f = M.fornitore(sel.fornitore_id);
     const ab = pr.abbinamento;
     const boll = sel.tipo === 'bollettino';
+    const stl = M.statoLettura(sel);
     const dx = CRM.Pannello(col, { titolo: M.TIPI[sel.tipo] + ' ' + sel.numero + ' · ' + f.breve, riempi: true, nota: CRM.icona('file') + ' ' + e(sel.file),
-      azioni: [{ etichetta: 'Correggi i dati letti', onClick: () => correggi(sel) }, { etichetta: 'Scarta il documento', variante: 'pericolo', onClick: () => scarta(sel) }] });
+      azioni: [{ etichetta: 'Correggi i dati letti', onClick: () => correggi(sel), conta: stl.n || null, contaVariante: stl.livello === 'bassa' ? 'errore' : 'attesa',
+        contaTitolo: stl.n + (stl.n === 1 ? ' punto da controllare' : ' punti da controllare') }, { etichetta: 'Scarta il documento', variante: 'pericolo', onClick: () => scarta(sel) }] });
+    if (stl.n) {
+      const a = CRM.blocco(dx.corpo, 'avviso-lettura ' + (stl.livello === 'bassa' ? 'bassa' : 'attesa'));
+      a.innerHTML = CRM.icona('avviso') + '<div><b>' + (stl.livello === 'bassa' ? 'Lettura con affidabilità bassa' : 'Lettura da controllare') + '</b> · ' +
+        stl.n + (stl.n === 1 ? ' punto da controllare: ' : ' punti da controllare: ') +
+        e(stl.controlli.map(c => c.testo).concat(stl.campi.map(c => nomeCampo(c, sel.tipo === 'bollettino').toLowerCase())).join('; ')) + '</div>' +
+        '<button type="button" class="btn piccolo ' + (stl.livello === 'bassa' ? '' : 'sec') + '">Correggi i dati letti</button>';
+      CRM.$('button', a).addEventListener('click', () => correggi(sel));
+    }
     dx.corpo.insertAdjacentHTML('beforeend', '<h3>Letto dal documento</h3>');
     CRM.Dettagli(dx.corpo, (boll ? [
       { etichetta: 'Fornitore', valore: e(f.nome) },
@@ -131,7 +141,7 @@
         titolo: 'Registra il bollettino di ' + M.mese(sel.mese, sel.anno), consigliata: true,
         punti: [sel.righe.length + (sel.righe.length === 1 ? ' riga letta' : ' righe lette') + ', totale ' + M.euro(pr.importo),
           'dopo la registrazione lo confronti riga per riga con le nostre pratiche'],
-        azione: { etichetta: 'Registra e verifica', onClick: () => { const b = M.registraBollettino(sel.id); M.salva(); CRM.Avviso('Bollettino registrato: ora verificalo'); location.hash = '#/bollettini/' + b.id; } }
+        azione: { etichetta: 'Registra e verifica', onClick: () => seAffidabile(sel, () => { const b = M.registraBollettino(sel.id); M.salva(); CRM.Avviso('Bollettino registrato: ora verificalo'); location.hash = '#/bollettini/' + b.id; }) }
       }]);
     } else if (sel.tipo === 'ordine') {
       dx.corpo.insertAdjacentHTML('beforeend', '<h3>Nuova pratica</h3>');
@@ -144,7 +154,7 @@
           titolo: sel.numero + ' · ' + M.nomeCliente(ab.cliente_piva), sottotitolo: CRM.stato('attesa', 'Attesa conferma'), consigliata: true,
           punti: ['codice cliente ' + e(ab.codice) + ' = ' + e(M.nomeCliente(ab.cliente_piva)), 'seguita da ' + e(sub.nome) + ', sconto ' + M.pct(ab.sconto),
             'conferma attesa entro ' + f.giorni_conferma + ' giorni, poi parte il sollecito'],
-          azione: { etichetta: 'Apri la pratica', onClick: () => { const p = M.apriPratica(sel.id); M.salva(); CRM.Avviso('Aperta la pratica ' + p.numero); location.hash = '#/pratiche/' + p.id; } }
+          azione: { etichetta: 'Apri la pratica', onClick: () => seAffidabile(sel, () => { const p = M.apriPratica(sel.id); M.salva(); CRM.Avviso('Aperta la pratica ' + p.numero); location.hash = '#/pratiche/' + p.id; }) }
         }]);
       }
     } else {
@@ -164,40 +174,177 @@
           sottotitolo: CRM.statoPratica(p) + (prima !== dopo ? ' › ' + CRM.stato(dopo === 'Fatturata' ? 'ok' : 'info', dopo) : ''),
           punti: c.motivi.map(e).concat([Math.abs(c.delta) < 0.01 ? 'importo uguale ' + rif : '<span class="' + CRM.classeSegno(c.delta) + '">' + CRM.euroSegno(c.delta) + '</span> rispetto ' + rif]),
           consigliata: i === 0 && pr.esito !== 'nessuno',
-          azione: { etichetta: 'Abbina a ' + p.numero, onClick: () => abbina(sel, p) }
+          azione: { etichetta: 'Abbina a ' + p.numero, onClick: () => seAffidabile(sel, () => abbina(sel, p)) }
         };
       }), 'Nessuna pratica aperta di ' + f.breve + ' a cui abbinarlo.');
     }
+  }
+  /* Stato della lettura per l'elenco e conferma prima di usare dati poco affidabili. */
+  function statoLetturaHtml(d) {
+    const st = M.statoLettura(d);
+    return st.n ? ' ' + CRM.stato(st.livello === 'bassa' ? 'errore' : 'attesa', st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare')) : '';
+  }
+  async function seAffidabile(d, fn) {
+    const st = M.statoLettura(d);
+    if (st.livello === 'bassa' && !(await CRM.Conferma('Lettura con affidabilità bassa',
+      'Ci sono ' + st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') + ' nei dati letti. Conviene correggerli prima: vuoi procedere comunque?', 'Procedi comunque'))) return;
+    fn();
   }
   async function scarta(sel) {
     if (!(await CRM.Conferma('Scartare ' + M.TIPI[sel.tipo].toLowerCase() + ' ' + sel.numero + '?', 'Il documento esce da questo elenco e non viene registrato: usalo per doppioni o documenti che non riguardano Decobrands.', 'Scarta', true))) return;
     M.scarta(sel.id); M.salva(); CRM.Avviso('Documento ' + sel.numero + ' scartato'); location.hash = '#/documenti';
   }
 
-  /* Controllo dei dati letti: l'operatore conferma o corregge prima di abbinare. */
+  /* ---------- Correggi i dati letti: FinestraAffiancata (spec §6.5 punto 7) ----------
+     A sinistra il documento com'è stampato, a destra testata e righe modificabili.
+     Campi incerti bordati (giallo 0,70–0,90 · rosso < 0,70); selezionando un campo
+     si evidenzia nel documento il punto da cui è stato letto. */
+  const COLONNE_RIGHE = {
+    articoli: [{ k: 'codice', t: 'Articolo' }, { k: 'descrizione', t: 'Descrizione', largo: true }, { k: 'qta', t: 'Quantità', n: true }, { k: 'prezzo', t: 'Prezzo', n: true }],
+    bollettino: [{ k: 'numero', t: 'Documento' }, { k: 'data', t: 'Data', data: true }, { k: 'imponibile', t: 'Imponibile', n: true }, { k: 'pct', t: '%', n: true }, { k: 'importo', t: 'Provvigione', n: true }]
+  };
+  const ETICHETTE = { tipo: 'Tipo', numero: 'Numero', data: 'Data', fornitore_id: 'Fornitore', codice_cliente: 'Codice cliente', totale: 'Totale del documento', mese: 'Mese', anno: 'Anno' };
+  const nomeCampo = (c, boll) => {
+    const m = /^righe\.(\d+)\.(\w+)$/.exec(c);
+    if (!m) return ETICHETTE[c] || c;
+    const col = COLONNE_RIGHE[boll ? 'bollettino' : 'articoli'].find(x => x.k === m[2]);
+    return (col ? col.t : m[2]) + ' riga ' + (Number(m[1]) + 1);
+  };
+  const classeAff = (a, ver) => ver ? 'campo-verificato' : a < M.SOGLIA_BASSA ? 'incerto-errore' : a < M.SOGLIA_OK ? 'incerto-attesa' : '';
+
   function correggi(d) {
     const boll = d.tipo === 'bollettino';
-    CRM.FormModal({
-      titolo: 'Correggi i dati letti', testo: 'Correggi solo ciò che la lettura automatica ha sbagliato: l’abbinamento proposto si ricalcola.', conferma: 'Salva', colonne: 2,
-      campi: (boll ? [
-        { nome: 'mese', etichetta: 'Mese', tipo: 'select', valore: d.mese, opzioni: M.MESI.map((m, i) => ({ value: i + 1, label: m[0].toUpperCase() + m.slice(1) })) },
-        { nome: 'anno', etichetta: 'Anno', tipo: 'numero', valore: d.anno }
-      ] : [
-        { nome: 'tipo', etichetta: 'Tipo', tipo: 'select', valore: d.tipo, opzioni: ['ordine', 'conferma', 'fattura', 'nota_credito'].map(t => ({ value: t, label: M.TIPI[t] })) },
-        { nome: 'numero', etichetta: 'Numero', valore: d.numero },
-        { nome: 'data', etichetta: 'Data del documento', tipo: 'data', valore: d.data },
-        { nome: 'codice_cliente', etichetta: 'Codice cliente', valore: d.codice_cliente }
-      ]).concat([{ nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'select', valore: d.fornitore_id, opzioni: M.S.fornitori.map(f => ({ value: f.id, label: f.nome })) }]),
-      onConferma: (v, form) => {
-        if (boll) { d.mese = Number(v.mese); d.anno = Number(v.anno) || d.anno; d.numero = M.MESI[d.mese - 1].toLowerCase() + ' ' + d.anno; }
-        else {
-          if (!v.numero) { form.aiuto('numero', 'Il numero è obbligatorio.', true); return false; }
-          Object.assign(d, { tipo: v.tipo, numero: v.numero, data: v.data || d.data, codice_cliente: v.codice_cliente });
-        }
-        d.fornitore_id = Number(v.fornitore_id);
-        M.annota('Corretti i dati letti di ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero); M.salva(); CRM.Avviso('Dati corretti'); CRM.naviga();
-      }
+    const cols = COLONNE_RIGHE[boll ? 'bollettino' : 'articoli'];
+    const l = d.lettura || {};
+    // bozza di lavoro: le righe portano con sé affidabilità e verifiche, così aggiunte ed eliminazioni non le confondono
+    const b = { tipo: d.tipo, numero: d.numero, data: d.data, fornitore_id: d.fornitore_id, codice_cliente: d.codice_cliente, mese: d.mese, anno: d.anno,
+      totale: M.totaleStampato(d).toFixed(2), aff: {}, ver: {}, toccati: {} };
+    Object.keys(l.campi || {}).filter(c => !/^righe\./.test(c)).forEach(c => { b.aff[c] = l.campi[c]; });
+    Object.keys(l.verificati || {}).filter(c => !/^righe\./.test(c)).forEach(c => { b.ver[c] = true; });
+    b.righe = d.righe.map((r, i) => {
+      const x = Object.assign({}, r, { _aff: {}, _ver: {} });
+      cols.forEach(c => { const k = 'righe.' + i + '.' + c.k; if (l.campi && l.campi[k] != null) x._aff[c.k] = l.campi[k]; if (M.verificato(d, k)) x._ver[c.k] = true; });
+      return x;
     });
+    const affT = c => b.aff[c] != null ? b.aff[c] : M.affidabilita(d, c);
+    // documento "virtuale" dalla bozza per ricalcolare controlli e livello
+    const comeDoc = () => {
+      const campi = {}, verificati = {};
+      Object.keys(b.aff).forEach(c => { campi[c] = b.aff[c]; });
+      Object.keys(b.ver).forEach(c => { verificati[c] = true; });
+      b.righe.forEach((r, i) => { Object.keys(r._aff).forEach(k => { campi['righe.' + i + '.' + k] = r._aff[k]; }); Object.keys(r._ver).forEach(k => { verificati['righe.' + i + '.' + k] = true; }); });
+      return { id: d.id, tipo: b.tipo, fornitore_id: Number(b.fornitore_id), codice_cliente: b.codice_cliente, mese: Number(b.mese), anno: Number(b.anno),
+        righe: b.righe.map(r => { const x = Object.assign({}, r); cols.filter(c => c.n).forEach(c => { x[c.k] = Number(x[c.k]) || 0; }); return x; }),
+        lettura: { campi: campi, verificati: verificati, totale: Number(b.totale) || 0 } };
+    };
+
+    let fin;
+    const anteprima = host => {
+      const f = M.fornitore(d.fornitore_id);
+      const o = (c, v) => M.originale(d, c, v);
+      const intest = boll
+        ? '<div class="doc-titolo">Provisionsabrechnung · Bollettino provvigioni</div><div class="doc-meta"><span>Periodo <b data-campo="mese">' + M.mese(d.mese, d.anno) + '</b></span><span>Agente: Decobrands SRL</span></div>'
+        : '<div class="doc-titolo">' + e(M.TIPI[d.tipo]).toUpperCase() + ' N. <b data-campo="numero">' + e(o('numero', d.numero)) + '</b></div>' +
+          '<div class="doc-meta"><span>Data <b data-campo="data">' + M.data(o('data', d.data)) + '</b></span><span>Cod. cliente <b data-campo="codice_cliente">' + e(o('codice_cliente', d.codice_cliente)) + '</b></span><span>Agente: Decobrands SRL</span></div>';
+      const th = cols.map(c => '<th' + (c.n ? ' class="dx"' : '') + '>' + e(c.t) + '</th>').join('') + (boll ? '' : '<th class="dx">Importo</th>');
+      const fmt = (c, v) => c.data ? M.data(v) : c.k === 'pct' ? M.num(v) + '%' : c.k === 'qta' ? M.num(v) : c.n ? M.dec(v) : e(v);
+      const righe = d.righe.map((r, i) => '<tr data-riga="' + i + '">' + cols.map(c => '<td' + (c.n ? ' class="dx"' : '') + ' data-campo="righe.' + i + '.' + c.k + '">' + fmt(c, o('righe.' + i + '.' + c.k, r[c.k])) + '</td>').join('') +
+        (boll ? '' : '<td class="dx">' + M.dec(o('righe.' + i + '.qta', r.qta) * o('righe.' + i + '.prezzo', r.prezzo)) + '</td>') + '</tr>').join('');
+      host.innerHTML = '<div class="doc-pagina" aria-label="Anteprima del documento originale"><div class="doc-intest"><div><b class="doc-marchio">' + e(f.nome) + '</b><span>' + e(f.piva ? 'P.IVA ' + f.piva : '') + '</span></div><span class="doc-file">' + CRM.icona('file') + ' ' + e(d.file) + '</span></div>' +
+        intest + '<table class="doc-tab"><thead><tr>' + th + '</tr></thead><tbody>' + righe + '</tbody>' +
+        '<tfoot><tr><td colspan="' + (cols.length + (boll ? 0 : 1) - 1) + '">Totale' + (boll ? ' provvigioni' : ' documento') + '</td><td class="dx" data-campo="totale"><b>' + M.dec(M.totaleStampato(d)) + '</b></td></tr></tfoot></table>' +
+        '<p class="doc-nota">Anteprima simulata del PDF. Nell\'app qui c\'è il file originale; l\'evidenziazione usa la posizione restituita dalla lettura.</p></div>';
+    };
+    const evidenzia = campo => {
+      const pag = CRM.$('.doc-pagina', fin.sinistra);
+      CRM.$$('.evidenziato', pag).forEach(x => x.classList.remove('evidenziato'));
+      const t = campo && CRM.$('[data-campo="' + campo + '"]', pag);
+      if (t) { t.classList.add('evidenziato'); const r = t.closest('tr'); if (r) r.classList.add('evidenziato'); t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    };
+
+    const campoTestata = (c, tipoInput, valore, opzioni, extra) => {
+      const a = affT(c), ver = !!b.ver[c];
+      const ctl = tipoInput === 'select'
+        ? '<select data-campo="' + c + '">' + opzioni.map(x => '<option value="' + e(x.value) + '"' + (String(x.value) === String(valore) ? ' selected' : '') + '>' + e(x.label) + '</option>').join('') + '</select>'
+        : '<input data-campo="' + c + '" type="' + (tipoInput || 'text') + '"' + (tipoInput === 'number' ? ' step="0.01"' : '') + ' value="' + e(valore == null ? '' : valore) + '"' + (extra === 'sola' ? ' readonly tabindex="-1"' : '') + '>';
+      const incerto = a < M.SOGLIA_OK && !ver;
+      return '<div class="campo-letto ' + classeAff(a, ver && a < M.SOGLIA_OK) + '" data-box="' + c + '"><label>' + e(ETICHETTE[c] || c) +
+        (incerto ? ' <span class="aff" title="Affidabilità della lettura">' + Math.round(a * 100) + '%</span>' : '') + '</label><div class="campo-riga">' + ctl +
+        (incerto ? '<button type="button" class="conferma-campo" data-conferma="' + c + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>' + (extra && extra !== 'sola' ? extra : '') + '</div>';
+    };
+    const destra = host => {
+      const st = M.statoLettura(comeDoc());
+      const opF = M.S.fornitori.map(f => ({ value: f.id, label: f.nome }));
+      const ab = !boll && M.abbinamentoPerCodice(Number(b.fornitore_id), b.codice_cliente);
+      const somma = M.importoLetto(comeDoc());
+      host.innerHTML = '<div class="aff-riepilogo" id="aff-riep"></div>' +
+        '<h3>Testata</h3><div class="griglia-letti">' + (boll
+          ? campoTestata('fornitore_id', 'select', b.fornitore_id, opF) +
+            campoTestata('mese', 'select', b.mese, M.MESI.map((m, i) => ({ value: i + 1, label: m[0].toUpperCase() + m.slice(1) }))) +
+            campoTestata('anno', 'number', b.anno)
+          : campoTestata('tipo', 'select', b.tipo, ['ordine', 'conferma', 'fattura', 'nota_credito'].map(t => ({ value: t, label: M.TIPI[t] }))) +
+            campoTestata('numero', 'text', b.numero) +
+            campoTestata('data', 'date', b.data) +
+            campoTestata('fornitore_id', 'select', b.fornitore_id, opF) +
+            campoTestata('codice_cliente', 'text', b.codice_cliente, null, '<span class="esito-campo">' + (ab ? '<span class="pallino ok"></span>' + e(M.nomeCliente(ab.cliente_piva)) : '<span class="pallino ko"></span>non trovato fra i clienti del fornitore') + '</span>') +
+            campoTestata('totale', 'number', b.totale, null, '<span class="esito-campo">' + (Math.abs((Number(b.totale) || 0) - somma) < 0.01
+              ? '<span class="pallino ok"></span>uguale alla somma delle righe' : '<span class="pallino ko"></span>somma delle righe ' + M.euro(somma)) + '</span>')) +
+        '</div><div class="righe-testa"><h3>Righe <span class="testo-tenue">' + b.righe.length + '</span></h3><button type="button" class="btn sec piccolo" id="aggiungi-riga">' + CRM.icona('piu') + 'Aggiungi riga</button></div>' +
+        '<div class="tab-righe-box"><table class="tab-righe"><thead><tr><th>#</th>' + cols.map(c => '<th' + (c.n ? ' class="dx"' : '') + '>' + e(c.t) + '</th>').join('') + (boll ? '' : '<th class="dx">Importo</th>') + '<th></th></tr></thead><tbody>' +
+        b.righe.map((r, i) => '<tr data-riga="' + i + '"' + (r._nuova ? ' class="nuova"' : '') + '><td class="testo-tenue">' + (i + 1) + '</td>' + cols.map(c => {
+          const a = r._aff[c.k] != null ? r._aff[c.k] : 0.97, ver = !!r._ver[c.k], incerto = a < M.SOGLIA_OK && !ver;
+          return '<td class="' + classeAff(a, ver && a < M.SOGLIA_OK) + (c.largo ? ' largo' : c.k === 'codice' || c.k === 'numero' ? ' col-codice' : '') + '"' + (incerto ? ' title="Affidabilità ' + Math.round(a * 100) + '%"' : '') + '><div class="campo-riga">' +
+            '<input data-campo="righe.' + i + '.' + c.k + '"' + (c.largo ? ' title="' + e(r[c.k] || '') + '"' : '') + ' type="' + (c.data ? 'date' : c.n ? 'number' : 'text') + '"' + (c.n ? ' step="any"' : '') + ' value="' + e(r[c.k] == null ? '' : (c.n && c.k !== 'qta' && r[c.k] !== '' ? Number(r[c.k]).toFixed(2) : r[c.k])) + '">' +
+            (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + i + '.' + c.k + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div></td>';
+        }).join('') + (boll ? '' : '<td class="dx calcolato">' + M.euro((Number(r.qta) || 0) * (Number(r.prezzo) || 0)) + '</td>') +
+        '<td><button type="button" class="btn testo piccolo" data-elimina="' + i + '" title="Elimina la riga" aria-label="Elimina la riga ' + (i + 1) + '">✕</button></td></tr>').join('') +
+        '</tbody></table></div>';
+      // riepilogo: livello, controlli falliti e campi incerti, con salto al campo
+      const riep = CRM.$('#aff-riep', host);
+      const LIV = { affidabile: ['ok', 'Lettura affidabile'], da_controllare: ['attesa', 'Da controllare'], bassa: ['errore', 'Affidabilità bassa'] }[st.livello];
+      riep.innerHTML = '<div class="riep-testa">' + CRM.stato(LIV[0], LIV[1]) + ' <span>' + (st.n ? st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') : 'tutti i campi sono controllati') + '</span></div>' +
+        (st.n ? '<ul>' + st.controlli.map(c => '<li class="' + (c.grave ? 'grave' : '') + '"><button type="button" class="btn testo piccolo" data-vai="' + c.campo + '">' + e(c.testo) + '</button></li>').join('') +
+          st.campi.map(c => '<li><button type="button" class="btn testo piccolo" data-vai="' + c + '">' + e(nomeCampo(c, boll)) + ': letto con affidabilità ' + Math.round(M.affidabilita(comeDoc(), c) * 100) + '%</button></li>').join('') + '</ul>' : '');
+      fin.piede.innerHTML = st.n ? '<b>' + st.n + '</b> ' + (st.n === 1 ? 'punto da controllare' : 'punti da controllare') : '<span style="color:var(--ok-testo)">Tutto controllato</span>';
+      collega(host);
+    };
+    const ridisegna = () => { const y = fin.destra.scrollTop; destra(fin.destra); fin.destra.scrollTop = y; };
+    const valoreDa = (campo, v) => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) { b.righe[m[1]][m[2]] = v; b.righe[m[1]]._ver[m[2]] = true; } else { b[campo] = v; b.ver[campo] = true; } b.toccati[campo] = true; };
+    const conferma = campo => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) b.righe[m[1]]._ver[m[2]] = true; else b.ver[campo] = true; };
+    function collega(host) {
+      CRM.$$('[data-campo]', host).forEach(x => {
+        x.addEventListener('focus', () => evidenzia(x.dataset.campo));
+        x.addEventListener('change', () => { valoreDa(x.dataset.campo, x.value); ridisegna(); const n = CRM.$('[data-campo="' + x.dataset.campo + '"]', fin.destra); if (n) n.focus(); });
+      });
+      CRM.$$('[data-conferma]', host).forEach(x => x.addEventListener('click', () => { conferma(x.dataset.conferma); ridisegna(); }));
+      CRM.$$('[data-vai]', host).forEach(x => x.addEventListener('click', () => { const n = CRM.$('[data-campo="' + x.dataset.vai + '"]', fin.destra); if (n) { n.focus(); n.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }));
+      CRM.$$('[data-elimina]', host).forEach(x => x.addEventListener('click', () => { b.righe.splice(Number(x.dataset.elimina), 1); b.toccati.righe = true; ridisegna(); }));
+      CRM.$('#aggiungi-riga', host).addEventListener('click', () => {
+        const r = { _aff: {}, _ver: {}, _nuova: true }; cols.forEach(c => { r[c.k] = c.n ? 0 : ''; }); b.righe.push(r); b.toccati.righe = true; ridisegna();
+        const n = CRM.$('[data-campo="righe.' + (b.righe.length - 1) + '.' + cols[0].k + '"]', fin.destra); if (n) n.focus();
+      });
+    }
+    const salva = () => {
+      const v = comeDoc();
+      if (!boll && !String(b.numero || '').trim()) { CRM.Avviso('Il numero del documento è obbligatorio'); return false; }
+      Object.assign(d, { tipo: v.tipo, fornitore_id: v.fornitore_id, righe: v.righe.map(r => { const x = Object.assign({}, r); delete x._aff; delete x._ver; delete x._nuova; return x; }) });
+      if (boll) { d.mese = v.mese; d.anno = v.anno || d.anno; d.numero = M.MESI[d.mese - 1] + ' ' + d.anno; }
+      else Object.assign(d, { numero: String(b.numero).trim(), data: b.data || d.data, codice_cliente: String(b.codice_cliente || '').trim() });
+      d.lettura = Object.assign({}, d.lettura || {}, { campi: v.lettura.campi, verificati: v.lettura.verificati, totale: v.lettura.totale });
+      const st = M.statoLettura(d), n = Object.keys(b.toccati).length;
+      M.annota('Controllati i dati letti di ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero + (n ? ' · ' + n + (n === 1 ? ' correzione' : ' correzioni') : ''));
+      M.salva();
+      CRM.Avviso(st.n ? 'Dati salvati: restano ' + st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') : 'Dati salvati: lettura controllata, l’abbinamento è ricalcolato');
+      CRM.naviga();
+    };
+    fin = CRM.FinestraAffiancata({
+      titolo: 'Correggi i dati letti · ' + M.TIPI[d.tipo] + ' ' + d.numero,
+      sottotitolo: 'A sinistra il documento, a destra i dati letti. Correggi o conferma i campi bordati: selezionandone uno lo vedi evidenziato nel documento.',
+      sinistra: anteprima, larghezza: 42, azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Salva e ricalcola l’abbinamento', onClick: salva }]
+    });
+    destra(fin.destra);
+    const primo = CRM.$('.incerto-errore [data-campo], .incerto-attesa [data-campo]', fin.destra);
+    if (primo) primo.focus();
   }
 
   function abbina(doc, p) {

@@ -125,6 +125,16 @@
         btn('TestoDaInviare', 'sec', () => CRM.TestoDaInviare({ titolo: 'Sollecito di conferma', destinatario: 'Gasper', testo: 'Gentili colleghi,\n\nnon abbiamo ancora ricevuto la conferma…' }));
         btn('Avviso', 'sec', () => CRM.Avviso('Operazione completata'));
       } },
+    { nome: 'FinestraAffiancata', gruppo: 'Finestre', testo: 'Finestra a tutto schermo con due pannelli e divisore trascinabile (anche con le frecce). Usata da "Correggi i dati letti": documento a sinistra, dati da correggere a destra.',
+      firma: 'CRM.FinestraAffiancata({ titolo, sottotitolo, sinistra(host), destra(host), piede(host), azioni: [{ etichetta, variante, onClick(chiudi) → false per restare }], larghezza })\n→ { chiudi, sinistra, destra, piede }',
+      demo: h => { const b = CRM.el('button', 'btn sec', 'Apri la finestra affiancata'); b.type = 'button'; h.appendChild(b);
+        b.addEventListener('click', () => CRM.FinestraAffiancata({ titolo: 'Finestra affiancata', sottotitolo: 'Trascina il divisore per cambiare le proporzioni.',
+          sinistra: x => { x.innerHTML = '<div class="doc-pagina"><div class="doc-titolo">Documento</div><p>Contenuto di sinistra.</p></div>'; },
+          destra: x => { CRM.Nota(x, 'Contenuto di destra: moduli, tabelle, riepiloghi.'); }, piede: x => { x.textContent = 'Informazioni nel piede'; },
+          azioni: [{ etichetta: 'Chiudi', variante: 'sec' }] })); } },
+    { nome: 'Pulsante con contatore', gruppo: 'Base', testo: 'Le azioni dei pannelli possono mostrare un contatore colorato (es. punti da controllare nella lettura).',
+      firma: "CRM.Pannello(host, { azioni: [{ etichetta, conta, contaVariante: 'attesa'|'errore', contaTitolo }] })",
+      demo: h => CRM.Pannello(h, { titolo: 'Documento letto', azioni: [{ etichetta: 'Correggi i dati letti', conta: 3, contaVariante: 'errore', onClick: prova }, { etichetta: 'Altro', conta: 1, onClick: prova }] }) },
     { nome: 'Pulsanti e icone', gruppo: 'Base', testo: 'Quattro varianti di pulsante (principale, secondario, pericolo, testo) in due misure; icone a tratto.',
       firma: '<button class="btn [sec|pericolo|testo] [piccolo]">\nCRM.icona(nome) → svg   ' + 'oggi arrivo pratiche bollettini liquidazioni fornitori subagenti abbinamenti componenti cerca spunta file scarica carica piu posta avviso',
       demo: h => { h.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn">' + CRM.icona('spunta') + 'Principale</button><button class="btn sec">Secondario</button><button class="btn pericolo">Pericolo</button><button class="btn testo">Testo</button><button class="btn piccolo">Piccolo</button><button class="btn" disabled>Disabilitato</button></div>' +

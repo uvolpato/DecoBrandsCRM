@@ -685,9 +685,13 @@ window.DATI_DEMO = {
         { codice: 'ORTO-SAC', descrizione: 'Sacco terriccio 70 L', qta: 40, prezzo: 15.00 } ] } ] }
   ],
 
-  /* Documenti caricati e letti in automatico, da controllare e abbinare a una pratica. */
+  /* Documenti caricati e letti in automatico, da controllare e abbinare a una pratica.
+     lettura: affidabilità (0–1) dei soli campi incerti (gli altri sono ≥ 0,95), valori
+     realmente stampati sul documento quando la lettura ha sbagliato (originale) e
+     totale stampato (totale) per il controllo con la somma delle righe. */
   in_arrivo: [
-    { id: 9001, tipo: 'conferma', fornitore_id: 1, numero: 'AB-77120', data: '2026-09-03', ricevuto: '2026-09-03', codice_cliente: 'K-10122', file: 'Gries_AB-77120.pdf', righe: [
+    { id: 9001, tipo: 'conferma', fornitore_id: 1, numero: 'AB-77120', data: '2026-09-03', ricevuto: '2026-09-03', codice_cliente: 'K-10122', file: 'Gries_AB-77120.pdf',
+      lettura: { campi: { data: 0.84, 'righe.2.qta': 0.61, 'righe.4.prezzo': 0.71 }, originale: { 'righe.2.qta': 18 }, totale: 8294.80 }, righe: [
       { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 96, prezzo: 6.40 },
       { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 10, prezzo: 15.00 },
       { codice: 'CACH-292', descrizione: 'Coprivaso smaltato Ø 29 cm', qta: 12, prezzo: 14.60 },
@@ -719,7 +723,8 @@ window.DATI_DEMO = {
       { codice: 'XMAS-RE602', descrizione: 'Renna luminosa da esterno 60 cm', qta: 2, prezzo: 50.00 },
       { codice: 'XMAS-NA107', descrizione: 'Nastro decorativo 10 m', qta: 30, prezzo: 4.99 },
       { codice: 'XMAS-GHO', descrizione: 'Ghirlanda natalizia 150 cm', qta: 80, prezzo: 25.375 } ] },
-    { id: 9003, tipo: 'fattura', fornitore_id: 2, numero: 'F-2026-0940', data: '2026-09-02', ricevuto: '2026-09-03', codice_cliente: 'GA-2271', file: 'Gasper_F-2026-0940.pdf', righe: [
+    { id: 9003, tipo: 'fattura', fornitore_id: 2, numero: 'F-2026-0940', data: '2026-09-02', ricevuto: '2026-09-03', codice_cliente: 'GA-2271', file: 'Gasper_F-2026-0940.pdf',
+      lettura: { campi: { 'righe.7.qta': 0.82 } }, righe: [
       { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 50, prezzo: 29.60 },
       { codice: 'GASPER-S275', descrizione: 'Sottovaso in resina Ø 27 cm', qta: 100, prezzo: 4.20 },
       { codice: 'ORTO-TER7', descrizione: 'Pacciamatura in corteccia 50 L', qta: 60, prezzo: 9.00 },
@@ -740,7 +745,8 @@ window.DATI_DEMO = {
       { codice: 'GASPER-H609', descrizione: 'Vaso alto in resina 60 cm', qta: 3, prezzo: 66.00 },
       { codice: 'GASPER-S472', descrizione: 'Sottovaso in resina Ø 47 cm', qta: 50, prezzo: 7.96 },
       { codice: 'GASPER-B3', descrizione: 'Cassa in legno decor 40x40', qta: 180, prezzo: 27.28 } ] },
-    { id: 9004, tipo: 'conferma', fornitore_id: 2, numero: 'C-2026/1101', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'GA-2999', file: 'Gasper_C-2026-1101.pdf', righe: [
+    { id: 9004, tipo: 'conferma', fornitore_id: 2, numero: 'C-2026/1101', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'GA-2277', file: 'Gasper_C-2026-1101.pdf',
+      lettura: { campi: { codice_cliente: 0.58 }, originale: { codice_cliente: 'GA-2271' } }, righe: [
       { codice: 'GASPER-E7', descrizione: 'Vaso alto in resina 80 cm', qta: 40, prezzo: 80.00 },
       { codice: 'GASPER-S241', descrizione: 'Sottovaso in resina Ø 24 cm', qta: 200, prezzo: 3.90 },
       { codice: 'GASPER-C804', descrizione: 'Contenitore in resina 80 L', qta: 15, prezzo: 34.00 },

@@ -16,6 +16,14 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | Ogni trimestre | **Liquidazioni** | Trimestri fissi, riquadri per subagente (fanno da filtro), documenti liquidabili o in attesa, prospetti CSV a 8 campi, chiusura |
 | Anagrafiche | Fornitori, Subagenti, Clienti e abbinamenti | Condizioni, percentuali **datate**, eccezioni, abbinamento cliente × fornitore con codice |
 
+## Controllo dei dati letti
+
+Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-OCR, qui è simulata) e passa da **controlli fissi** (codice cliente presente fra i clienti del fornitore, totale del documento uguale alla somma delle righe, bollettino non già registrato).
+
+- **Livello:** affidabile (tutto ≥ 90 %) · da controllare (un campo fra 70 e 90 % o un controllo fallito) · bassa (un campo sotto 70 % o un controllo grave). Compare nell'elenco, in un avviso nel dettaglio e come contatore su *Correggi i dati letti*; con livello basso l'abbinamento chiede conferma.
+- **Correggi i dati letti** apre una finestra a tutto schermo: a sinistra il documento com'è stampato, a destra testata e righe modificabili. I campi incerti sono bordati (giallo / rosso con la percentuale); selezionando un campo si evidenzia nel documento; ✓ conferma un valore giusto; si possono aggiungere ed eliminare righe. Il riepilogo in alto elenca i punti da controllare e porta al campo.
+- **Prova:** conferma AB-77120 di Gries → quantità della riga 3 letta 12 ma stampata 18, il totale non torna → correggi in 18, conferma data e prezzo della riga 5 → lettura affidabile.
+
 ## Regole di flusso applicate
 
 - **Lo stato della pratica non si scrive a mano**: si ricava dai documenti (ordine → in attesa/in ritardo; conferma → confermata; fattura → fatturata). La nota di credito è un documento, non uno stato.
@@ -56,7 +64,7 @@ Logo monocromatico, bianco sulla barra scura. Carattere **Public Sans** (OFL, in
 Ogni vista è **solo composizione** di componenti `CRM.*` parametrizzati (`assets/componenti.js`); il catalogo con esempi dal vivo e parametri è nella voce **Componenti** della barra.
 
 - Stessi nomi e parametri del primo prototipo: `Pagina`, `Pannello`, `DataTable`, `FilterBar`, `KpiRow`, `Form`, `FormModal`, `Modale`, `Conferma`, `Avviso`, `stato`.
-- Propri di questi flussi: `Caricamento`, `ListaDaFare`, `ElencoSelezionabile`, `Scelte`, `Binario`, `Matrice`, `Cerniera`, `Periodi`, `Cifre`, `Dettagli`, `Elenco`, `TestoDaInviare`.
+- Propri di questi flussi: `Caricamento`, `FinestraAffiancata`, `ListaDaFare`, `ElencoSelezionabile`, `Scelte`, `Binario`, `Matrice`, `Cerniera`, `Periodi`, `Cifre`, `Dettagli`, `Elenco`, `TestoDaInviare`.
 
 `DataTable` occupa sempre lo spazio disponibile, con intestazione fissa, righe scorrevoli, intestazioni ordinabili e totali fissi; con `naturale` prende l'altezza del contenuto (righe di un documento).
 

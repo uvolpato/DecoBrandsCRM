@@ -30,6 +30,7 @@
   M.euro0 = n => numero(n, 0, 0) + '\u00a0€';
   M.pct = n => numero(n, 2, 0) + '%';
   M.num = n => numero(n, 2, 0);
+  M.dec = n => numero(n, 2, 2);
   M.data = iso => { if (!iso) return '—'; const [a, m, g] = iso.split('-'); return g + '/' + m + '/' + a; };
   M.MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
   M.MESI_BREVI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
@@ -237,6 +238,42 @@
 
   /* ---------- Documenti in arrivo: proposta di abbinamento ---------- */
   M.importoLetto = d => d.tipo === 'bollettino' ? M.r2(d.righe.reduce((s, r) => s + r.importo, 0)) : M.importoDoc(d);
+
+  /* ---------- Affidabilità della lettura (spec §6.5) ----------
+     Nell'app arriva da GLM-OCR (logprobs); nel prototipo è simulata in doc.lettura.
+     Soglie iniziali: ≥ 0,90 affidabile · 0,70–0,90 da controllare · < 0,70 bassa. */
+  M.SOGLIA_OK = 0.9; M.SOGLIA_BASSA = 0.7;
+  const hash = t => { let h = 7; for (const c of String(t)) h = (h * 31 + c.charCodeAt(0)) % 997; return h; };
+  M.affidabilita = (d, campo) => {
+    const l = d.lettura || {};
+    if (l.campi && l.campi[campo] != null) return l.campi[campo];
+    return 0.95 + (hash(d.id + campo) % 5) / 100;   // 0,95–0,99 per i campi letti bene
+  };
+  M.verificato = (d, campo) => !!(d.lettura && d.lettura.verificati && d.lettura.verificati[campo]);
+  M.verifica = (d, campo) => { d.lettura = d.lettura || {}; d.lettura.verificati = d.lettura.verificati || {}; d.lettura.verificati[campo] = true; };
+  /* Valore realmente stampato sul documento (per l'anteprima): diverso dal letto solo se la lettura ha sbagliato. */
+  M.originale = (d, campo, letto) => { const o = d.lettura && d.lettura.originale; return o && o[campo] != null ? o[campo] : letto; };
+  M.totaleStampato = d => d.lettura && d.lettura.totale != null ? d.lettura.totale : M.importoLetto(d);
+  /* Controlli fissi, indipendenti dal modello. */
+  M.controlli = function (d) {
+    const out = [];
+    if (d.tipo === 'bollettino') {
+      if (M.bollettinoDi(d.fornitore_id, d.anno, d.mese)) out.push({ campo: 'mese', testo: 'Bollettino già registrato per questo fornitore e mese', grave: true });
+      return out;
+    }
+    if (!M.abbinamentoPerCodice(d.fornitore_id, d.codice_cliente)) out.push({ campo: 'codice_cliente', testo: 'Codice cliente ' + d.codice_cliente + ' non presente fra i clienti del fornitore', grave: true });
+    const stampato = M.totaleStampato(d), somma = M.importoLetto(d);
+    if (Math.abs(stampato - somma) >= 0.01) out.push({ campo: 'totale', testo: 'Totale del documento ' + M.euro(stampato) + ' diverso dalla somma delle righe ' + M.euro(somma), grave: true });
+    return out;
+  };
+  /* Campi incerti non ancora verificati + controlli falliti → livello del documento. */
+  M.statoLettura = function (d) {
+    const campi = Object.keys((d.lettura && d.lettura.campi) || {}).filter(c => !M.verificato(d, c) && M.affidabilita(d, c) < M.SOGLIA_OK);
+    const controlli = M.controlli(d);
+    const bassa = campi.some(c => M.affidabilita(d, c) < M.SOGLIA_BASSA) || controlli.some(c => c.grave);
+    const n = campi.length + controlli.length;
+    return { campi: campi, controlli: controlli, n: n, livello: bassa ? 'bassa' : n ? 'da_controllare' : 'affidabile' };
+  };
   M.proposta = function (doc) {
     if (doc.tipo === 'bollettino') {
       const gia = M.bollettinoDi(doc.fornitore_id, doc.anno, doc.mese);
@@ -318,7 +355,7 @@
     const esempi = [];
     const p3 = M.pratica(3);
     if (p3 && !M.fiscali(p3).length && !giaLetto('F-2026-0951')) esempi.push(() => ({ tipo: 'fattura', fornitore_id: 1, numero: 'F-2026-0951', data: M.oggi(), codice_cliente: 'K-10915', righe: clona(M.doc(p3, 'conferma').righe) }));
-    if (!M.S.pratiche.some(p => p.numero === 'OF/2026/052') && !giaLetto('OF/2026/052')) esempi.push(() => ({ tipo: 'ordine', fornitore_id: 3, numero: 'OF/2026/052', data: M.oggi(), codice_cliente: 'IN-3150',
+    if (!M.S.pratiche.some(p => p.numero === 'OF/2026/052') && !giaLetto('OF/2026/052')) esempi.push(() => ({ tipo: 'ordine', fornitore_id: 3, numero: 'OF/2026/052', data: M.oggi(), codice_cliente: 'IN-3150', lettura: { campi: { 'righe.5.qta': 0.74 } },
       righe: [
         { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 60, prezzo: 18.50 },
         { codice: 'XMAS-STL', descrizione: 'Stella luminosa da esterno', qta: 40, prezzo: 32.00 },
@@ -338,7 +375,7 @@
         { codice: 'XMAS-AL1501', descrizione: 'Albero artificiale 150 cm', qta: 12, prezzo: 82.50 },
         { codice: 'XMAS-AL1205', descrizione: 'Albero artificiale 120 cm', qta: 20, prezzo: 72.00 },
         { codice: 'XMAS-FL57', descrizione: 'Filo luminoso LED 5 m', qta: 80, prezzo: 14.08 } ] }));
-    if (!M.bollettinoDi(2, 2026, 6) && !M.S.in_arrivo.some(d => d.tipo === 'bollettino')) esempi.push(() => ({ tipo: 'bollettino', fornitore_id: 2, numero: 'giugno 2026', anno: 2026, mese: 6,
+    if (!M.bollettinoDi(2, 2026, 6) && !M.S.in_arrivo.some(d => d.tipo === 'bollettino')) esempi.push(() => ({ tipo: 'bollettino', fornitore_id: 2, numero: 'giugno 2026', anno: 2026, mese: 6, lettura: { campi: { 'righe.0.importo': 0.88 } },
       righe: M.fiscaliDelMese(2, 2026, 6).map(x => { const pc = M.percentuali(x.pratica, x.doc.data); const imp = M.importoDoc(x.doc); return { numero: x.doc.numero, data: x.doc.data, imponibile: imp, pct: pc.dal_fornitore, importo: M.r2(imp * pc.dal_fornitore / 100) }; }) }));
     if (!esempi.length) return null;
     const scelto = esempi.map(f => f()).sort((a, b) => (b.tipo === preferenza) - (a.tipo === preferenza))[0];

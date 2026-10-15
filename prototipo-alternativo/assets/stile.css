@@ -378,3 +378,92 @@ a.m-cella:hover { background: #f1f6ff; }
   .c-intest, .c-riga { min-width: 920px; }
   .testa { flex-direction: column; align-items: flex-start; }
 }
+
+/* ---------- Contatore sui pulsanti ---------- */
+.btn-conta { display: inline-block; margin-left: 6px; min-width: 18px; padding: 0 6px; border-radius: 9px; font-size: 11.5px; font-weight: 700; line-height: 18px; text-align: center; }
+.btn-conta.c-attesa { background: var(--attesa); color: #000; }
+.btn-conta.c-errore { background: var(--errore); color: #fff; }
+
+/* ---------- Avviso di lettura nel dettaglio documento ---------- */
+.avviso-lettura { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--r-piccolo); margin-bottom: 16px; flex: none; font-size: 13px; }
+.avviso-lettura > .icona { flex: none; width: 20px; height: 20px; }
+.avviso-lettura > div { flex: 1; min-width: 0; }
+.avviso-lettura.attesa { background: var(--attesa-tenue); color: var(--attesa-testo); }
+.avviso-lettura.bassa { background: var(--errore-tenue); color: var(--errore-testo); }
+
+/* ---------- FinestraAffiancata ---------- */
+.velo.velo-pieno { padding: 16px; place-items: stretch; }
+.affiancata { background: var(--superficie); border-radius: var(--r-medio); display: flex; flex-direction: column; min-height: 0; height: calc(100vh - 32px); box-shadow: 0 18px 50px rgba(0, 0, 0, .3); }
+.aff-testa { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--bordo-tenue); }
+.aff-chiudi { font-size: 18px; line-height: 1; padding: 4px 8px; }
+.aff-corpo { flex: 1 1 auto; min-height: 0; display: flex; }
+.aff-sx { flex: 0 0 46%; min-width: 0; background: #525659; overflow: auto; padding: 22px; }
+.aff-divisore { flex: none; width: 6px; cursor: col-resize; background: var(--bordo); }
+.aff-divisore:hover, .aff-divisore.trascina, .aff-divisore:focus-visible { background: var(--primario); outline: none; }
+.aff-dx { flex: 1 1 0; min-width: 0; overflow: auto; padding: 16px 20px; }
+.aff-dx h3 { font-size: 14px; margin: 18px 0 10px; }
+.aff-piede { align-items: center; }
+.aff-piede-info { margin-right: auto; color: var(--testo-tenue); }
+
+/* documento simulato (al posto del PDF) */
+.doc-pagina { background: #fff; max-width: 780px; margin: 0 auto; padding: 34px 38px 28px; box-shadow: 0 4px 18px rgba(0, 0, 0, .35); font-size: 12.5px; color: #222; }
+.doc-intest { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #222; padding-bottom: 10px; margin-bottom: 14px; }
+.doc-intest > div { display: flex; flex-direction: column; }
+.doc-marchio { font-size: 17px; letter-spacing: .02em; }
+.doc-file { color: #777; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px; }
+.doc-titolo { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.doc-meta { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 14px; }
+.doc-tab { width: 100%; border-collapse: collapse; }
+.doc-tab th { text-align: left; border-bottom: 1px solid #222; padding: 5px 6px; font-size: 11.5px; }
+.doc-tab td { padding: 4px 6px; border-bottom: 1px solid #e5e5e5; }
+.doc-tab tfoot td { border-top: 2px solid #222; border-bottom: 0; padding-top: 8px; }
+.doc-tab .dx { text-align: right; }
+.doc-nota { margin: 18px 0 0; color: #888; font-size: 11px; }
+.doc-pagina tr.evidenziato td { background: #fff8db; }
+.doc-pagina .evidenziato[data-campo] { background: rgba(255, 193, 7, .55) !important; outline: 2px solid var(--attesa); outline-offset: 1px; border-radius: 2px; }
+
+/* riepilogo e campi letti */
+.aff-riepilogo { background: var(--sfondo); border: 1px solid var(--bordo); border-radius: var(--r-piccolo); padding: 10px 12px; }
+.riep-testa { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.aff-riepilogo ul { margin: 6px 0 0; padding-left: 20px; font-size: 13px; }
+.aff-riepilogo li .btn.testo { padding: 2px 0; text-align: left; }
+.aff-riepilogo li.grave .btn.testo { color: var(--errore-testo); }
+.griglia-letti { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; }
+.campo-letto label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--testo-tenue); margin-bottom: 3px; }
+.campo-letto .aff { font-weight: 700; font-size: 11.5px; }
+.campo-riga { display: flex; align-items: center; gap: 4px; }
+.campo-letto input, .campo-letto select { width: 100%; min-width: 0; font: inherit; padding: 6px 8px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; }
+.campo-letto input:focus, .campo-letto select:focus, .tab-righe input:focus { outline: 2px solid var(--primario-chiaro); border-color: var(--primario); }
+.campo-letto input[readonly] { background: var(--sfondo); }
+.esito-campo { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 12px; color: var(--testo-tenue); }
+.pallino { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.pallino.ok { background: var(--ok); }
+.pallino.ko { background: var(--errore); }
+.incerto-attesa input, .incerto-attesa select { border-color: var(--attesa); background: #fffbea; }
+.incerto-attesa .aff { color: var(--attesa-testo); }
+.incerto-errore input, .incerto-errore select { border-color: var(--errore); background: #fff5f5; }
+.incerto-errore .aff { color: var(--errore-testo); }
+.campo-verificato input, .campo-verificato select { border-color: var(--ok); }
+.conferma-campo { flex: none; width: 26px; height: 26px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; color: var(--ok); font-weight: 700; cursor: pointer; padding: 0; }
+.conferma-campo:hover { background: var(--ok-tenue); border-color: var(--ok); }
+.righe-testa { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.righe-testa h3 { margin: 12px 0 8px; }
+.tab-righe-box { border: 1px solid var(--bordo); border-radius: var(--r-piccolo); overflow: auto; }
+.tab-righe { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.tab-righe th { position: sticky; top: 0; z-index: 1; background: var(--bordo-tenue); color: var(--testo-intest); font-weight: 600; font-size: 12px; text-align: left; padding: 7px 6px; white-space: nowrap; }
+.tab-righe th.dx, .tab-righe td.dx { text-align: right; }
+.tab-righe td { padding: 3px 4px; border-bottom: 1px solid var(--bordo-tenue); vertical-align: middle; }
+.tab-righe td.largo { min-width: 11rem; }
+.tab-righe td.col-codice { min-width: 7.5rem; }
+.tab-righe input { width: 100%; min-width: 3.5rem; font: inherit; padding: 4px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; }
+.tab-righe input[type="number"] { text-align: right; max-width: 6.5rem; margin-left: auto; display: block; }
+.tab-righe td.incerto-attesa input { border-color: var(--attesa); background: #fffbea; }
+.tab-righe td.incerto-errore input { border-color: var(--errore); background: #fff5f5; }
+.tab-righe td.campo-verificato input { border-color: var(--ok); }
+.tab-righe tr.nuova input { border-color: var(--ok); }
+.tab-righe td.calcolato { white-space: nowrap; color: var(--testo-tenue); padding-right: 8px; }
+@media (max-width: 860px) {
+  .aff-corpo { flex-direction: column; }
+  .aff-sx { flex-basis: 40% !important; }
+  .aff-divisore { display: none; }
+}
