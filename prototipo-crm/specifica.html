@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 3.0 — vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 3.1 — componente Schede (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -177,7 +177,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 3.0 — vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 3.1 — componente <strong>Schede</strong> (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -2225,11 +2225,11 @@ cruscotto di numeri (prototipo: <code>prototipo-alternativo/</code>, pagina Oggi
 <li><strong>Bollettini</strong>: da verificare, pronti da chiudere, <strong>non arrivati</strong> dopo il giorno
     atteso del fornitore, da sollecitare (§5.6).</li>
 <li><strong>Colonna destra rivolta al futuro</strong>:</li>
-<li><strong>Prossime scadenze</strong> (15 giorni): conferme attese, bollettini del mese precedente
-    attesi entro il giorno del fornitore (§5.6), fine del trimestre; ogni voce porta alla pagina relativa;</li>
-<li><strong>trimestre in corso</strong>: atteso dai fornitori, già riconosciuto, da liquidare,
-    bloccato in attesa dei bollettini;</li>
-<li><strong>ultime operazioni</strong> (5, compatte).</li>
+<li>due <strong>schede</strong> nello stesso riquadro (si ricorda l'ultima aperta): <strong>Prossime scadenze</strong> (15 giorni): conferme attese, bollettini del mese precedente
+    attesi entro il giorno del fornitore (§5.6), fine del trimestre; ogni voce porta alla pagina relativa;
+    e <strong>Ultime operazioni</strong> (6, compatte);</li>
+<li>sotto, sempre visibile, il <strong>trimestre in corso</strong>: atteso dai fornitori, già
+    riconosciuto, da liquidare, bloccato in attesa dei bollettini.</li>
 <li>Le <strong>pratiche con variazioni</strong> fra fasi (§5.8) restano segnalate nell'elenco
   Pratiche (filtro "Con variazioni").</li>
 </ul>
@@ -2283,8 +2283,9 @@ cruscotto di numeri (prototipo: <code>prototipo-alternativo/</code>, pagina Oggi
 <li>Anagrafica (ragione sociale, P.IVA, codice Integra) <strong>da Integra in sola lettura</strong>;
   nel CRM si modificano solo le condizioni: giorni attesa conferma, <strong>giorno entro cui
   arriva il bollettino</strong> (§5.6), <code>payment_type</code> (maturato/fatturato), note, attivo.</li>
-<li>Tabella in sola lettura <strong>"Clienti seguiti per <fornitore>"</strong> (vista inversa delle
-  agenzie, §7.6).</li>
+<li>Sotto i dati del fornitore due <strong>schede</strong>: <strong>Percentuali</strong> (in vigore da una data, con
+  <em>Nuove percentuali da una data</em> e le versioni) e <strong>Clienti seguiti</strong> in sola lettura
+  (vista inversa delle agenzie, §7.6); ogni scheda ha la sua tabella che riempie lo spazio.</li>
 <li>Dettaglio con <strong>tabella scaglioni</strong> editabile (sconto min/max, % agente, % subagente);
   gestione eccezioni per subagente (backlog).</li>
 </ul>
@@ -2455,8 +2456,8 @@ deve <strong>poter sempre tornare indietro e ritrovare la schermata esattamente 
   password (da cambiare al prossimo accesso), <strong>ultimo invio password con eventuale
   errore di recapito</strong>; azioni <em>Modifica</em>, <em>Invia nuova password</em>, <em>Disattiva/Riattiva</em>,
   <em>Elimina</em>.</li>
-<li><strong>Cosa può fare ogni ruolo</strong>: tabella attività × ruoli (la stessa di §8.3), con la
-  colonna del ruolo dell'utente evidenziata.</li>
+<li>La scheda ha due <strong>schede</strong>: <em>Dati dell'utente</em> e <strong>Cosa può fare ogni ruolo</strong> (tabella
+  attività × ruoli, la stessa di §8.3, con la colonna del ruolo dell'utente evidenziata).</li>
 <li><em>Nuovo utente</em>: nome, nome utente (non modificabile dopo), email, ruolo; parte l'email
   con la password temporanea da cambiare al primo accesso (<code>must_change_password</code>).</li>
 <li><strong>Vincoli</strong>: nome utente ed email unici; <strong>deve restare almeno un amministratore
@@ -2552,7 +2553,14 @@ tipo <code>ordine_cliente</code> (§17).</p>
 <li><strong>Righe</strong>: articolo con pallino (verde = in anagrafica Integra, rosso = no), descrizione,
   segni <em>alias → nuovo</em> e <em>kit di N componenti</em>, quantità con UM, prezzo, importo, totale,
   <strong>disponibile</strong> (giacenza − impegni).</li>
-<li><strong>Esporta per Integra</strong> (finestra larga):
+<li><strong>Esporta per Integra</strong> (finestra larga, a <strong>schede</strong> perché un ordine può avere decine
+  di alias e kit). Sopra le schede, sempre visibile, il <strong>riepilogo</strong>: righe nel file,
+  cambi di codice e kit applicati, problemi bloccanti e avvisi. Le schede hanno il
+  contatore (giallo se ci sono alias da confermare; <em>File e controlli</em> rosso se ci sono
+  problemi, verde se è pronto); <em>Genera i file</em> con problemi apre <em>File e controlli</em>.
+  Nelle schede alias e kit: ricerca per codice o descrizione, <em>Applica a tutti</em> / <em>A
+  nessuno</em>; negli alias anche i segmenti <em>Tutti · Da confermare · Divisi · Non applicati</em>.
+  Le quantità si modificano in tabella senza ridisegnarla (vecchio + nuovo = ordinato).
   1. <strong>Codici vecchio → nuovo</strong>: per ogni riga con alias il caso proposto — <em>A</em> disponibile
      il vecchio (nessun cambio), <em>B</em> disponibile in parte (divide la riga: il disponibile
      sul vecchio, il resto sul nuovo), <em>C</em> vecchio esaurito (tutto sul nuovo) — con
@@ -2561,7 +2569,8 @@ tipo <code>ordine_cliente</code> (§17).</p>
   2. <strong>Kit</strong>: articolo con disponibile ≤ 0 (o assente) e kit attivo → righe dei componenti
      × quantità ordinata, con il disponibile di ciascuno; <em>Applica</em> per riga. Le righe dei
      componenti escono senza prezzo (Integra lo reperisce).
-  3. <strong>File da generare</strong>: <em>Ordine cliente (OC)</em> e/o <em>Ordine fornitore (OF)</em>, con i nomi
+  3. <strong>File e controlli</strong>: anteprima delle righe finali del file (codice, descrizione,
+     origine alias/kit, quantità, prezzo o "da Integra"); file da generare <em>Ordine cliente (OC)</em> e/o <em>Ordine fornitore (OF)</em>, con i nomi
      <code>aaaammgg_codiceIntegra_progressivo_TIPO.xlsx</code> (progressivo del giorno per cliente).
   4. <strong>Controlli bloccanti</strong>: data, codice cliente Integra, almeno una riga, codice e
      quantità di ogni riga, almeno un file scelto. <strong>Avvisi</strong>: articolo non in anagrafica,
@@ -2593,7 +2602,9 @@ creano in Integra.</p>
   Integra</em> · <em>Rilasciato</em>).</li>
 </ul>
 <h3 id="sec-7-21">7.21 Alias e kit (<code>/alias-kit/alias</code>, <code>/alias-kit/kit/:codice</code>) — modifica solo amministratore</h3>
-<p>Due schede nella stessa pagina (segmenti <em>Codici vecchio → nuovo · Kit</em>).</p>
+<p>Due <strong>schede</strong> nella stessa pagina (<em>Codici vecchio → nuovo · Kit</em>), ognuna con il suo
+indirizzo. Negli alias: ricerca per codice, descrizione o EAN e segmenti <em>Tutti · Chiedono
+conferma · Codice non in Integra</em>.</p>
 <ul>
 <li><strong>Alias</strong>: codice vecchio e nuovo con pallino e disponibile, descrizione ed EAN,
   <em>Chiede conferma</em> (casella modificabile in tabella), <em>Modifica</em>, <em>Elimina</em> (con
@@ -4089,9 +4100,9 @@ stessi nomi e gli stessi parametri</strong> (attività F0-A4).</p>
 <td>voci (etichetta, icona, valore, variante)</td>
 </tr>
 <tr>
-<td><strong>Tabs</strong></td>
-<td>schede</td>
-<td>id, etichetta, icona, badge</td>
+<td><strong>Schede</strong></td>
+<td>contenuti alternativi nello stesso spazio, quando una scheda di dettaglio impilerebbe più tabelle (§7.1, §7.4, §7.13, §7.18, §7.21)</td>
+<td>schede (<code>id</code>, etichetta, contatore con variante neutro/giallo/rosso/verde, <code>disegna</code>), scheda attiva, <code>riempi</code>, <code>onCambia</code>; tastiera ← → Home Fine; <strong>ricorda la scheda</strong> per ogni passo della cronologia (§7.12). Le schede stanno <strong>in alto</strong>. Non sostituiscono i segmenti della FilterBar: i segmenti filtrano le stesse righe, le schede mostrano contenuti diversi</td>
 </tr>
 <tr>
 <td><strong>Pannello</strong></td>

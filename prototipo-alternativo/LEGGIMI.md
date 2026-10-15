@@ -14,7 +14,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | Ogni mese | **Bollettini** | Matrice fornitore × mese: verificato, da decidere, pronto, atteso (fino al giorno del fornitore), non arrivato (con sollecito) |
 | | Bollettino | Riconciliazione **a cerniera**: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura |
 | Ogni trimestre | **Liquidazioni** | Trimestri fissi, elenco dei subagenti con documenti nel trimestre (clic = filtro, regge qualsiasi numero), documenti liquidabili o in attesa, esportazione (completa per subagente, un solo subagente, solo riepilogo) in Excel, PDF identico all'Excel o CSV di soli dati, chiusura |
-| Vendita diretta | **Ordini cliente** | Come la Gestione Ordini: ordini dei clienti con controllo degli articoli (pallino), disponibile per riga, *Esporta per Integra* con alias (casi A/B/C, quantità modificabili), kit, file **Ordine cliente (OC)** e/o **Ordine fornitore (OF)** nel tracciato di Integra; le quantità esportate restano impegnate finché Integra non registra l'ordine; *Annulla esportazione* le rilascia |
+| Vendita diretta | **Ordini cliente** | Come la Gestione Ordini: ordini dei clienti con controllo degli articoli (pallino), disponibile per riga, *Esporta per Integra* a schede (alias con casi A/B/C, ricerca, filtri e quantità modificabili; kit; file e controlli con l'anteprima delle righe) e riepilogo sempre visibile, file **Ordine cliente (OC)** e/o **Ordine fornitore (OF)** nel tracciato di Integra; le quantità esportate restano impegnate finché Integra non registra l'ordine; *Annulla esportazione* le rilascia |
 | | **Articoli**, **Giacenze** | Da Integra in sola lettura (viste sul database, sincronizzazione ogni 15–60 secondi). Disponibile = giacenza di Integra − impegni; riquadri esauriti, negativi, con impegni aperti |
 | | **Alias e kit** | Codici vecchio → nuovo (con "chiede conferma") e kit (articolo → componenti × quantità, acceso/spento); modifiche solo all'amministratore |
 | Anagrafiche | Fornitori, Subagenti, Clienti | Clienti e fornitori da Integra in **sola lettura**; nel CRM condizioni, percentuali **datate**, eccezioni, subagenti e **agenzie del cliente** (fornitore, codice, subagente, sconto) |
@@ -59,7 +59,7 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 4. **Bollettini** → Gries luglio → *Accetta il loro importo* sulla riga con la promozione → *Segna come verificato*: si sbloccano 505,80 € ai subagenti.
 5. **Liquidazioni**: il 3° trimestre si aggiorna; prova *Esporta in Excel* con le tre scelte e i tre formati.
 6. **Bollettini** → Gasper agosto: la fattura F-2026-0933 manca → *Contesta* → *Prepara la contestazione*.
-7. **Ordini cliente** → OC-2026-118 → *Esporta per Integra*: VASA-3050 si divide 20 sul vecchio e 40 sul nuovo, KIT-BALC60 esaurito diventa balconetta + sottobalconetta; scegli OC e OF → *Genera i file*. In **Giacenze** → BALC-601 compare l'impegno; *Prototipo: simula la registrazione in Integra* lo chiude.
+7. **Ordini cliente** → OC-2026-121 (12 alias e 6 kit) → *Esporta per Integra*: scorri le schede. Poi OC-2026-118 → *Esporta per Integra*: VASA-3050 si divide 20 sul vecchio e 40 sul nuovo, KIT-BALC60 esaurito diventa balconetta + sottobalconetta; scegli OC e OF → *Genera i file*. In **Giacenze** → BALC-601 compare l'impegno; *Prototipo: simula la registrazione in Integra* lo chiude.
 8. **Carica documenti** (barra a sinistra) con un file qualsiasi: arriva la fattura F-2026-0951 → abbinala. Ricarica: arriva l'ordine OF/2026/052 → *Apri la pratica*. In **Bollettini** → *Carica un bollettino*: Gasper giugno → *Registra e verifica*.
 
 Le modifiche restano salvate nel browser; *Ripristina i dati di prova* (in basso a sinistra) riporta tutto all'inizio. Data simulata: 4 settembre 2026.
@@ -78,6 +78,8 @@ Palette Decobrands da `STILE-GUIDA-DECOBRANDS.md` §2, la stessa del primo proto
 Logo monocromatico, bianco sulla barra scura. Carattere **Public Sans** (OFL, incorporato in `assets/font/public-sans.css`), cifre tabellari; la guida prevede il carattere di sistema: si può tornare a quello cambiando una riga di `stile.css`. Importi in formato italiano (`1.234,56 €`).
 
 ## Componenti
+
+**Schede** (`CRM.Schede`) dove un dettaglio impilava più tabelle: fornitore (percentuali · clienti seguiti), utente (dati · permessi), Oggi (scadenze · ultime operazioni), Alias e kit, esportazione per Integra.
 
 Ogni vista è **solo composizione** di componenti `CRM.*` parametrizzati (`assets/componenti.js`); il catalogo con esempi dal vivo e parametri è nella voce **Componenti** della barra.
 

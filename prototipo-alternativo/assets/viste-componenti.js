@@ -37,6 +37,13 @@
     { nome: 'DataTable', gruppo: 'Dati', alto: true, testo: 'Tabella standard: occupa tutto lo spazio, intestazione fissa, righe scorrevoli, intestazioni ordinabili, totali fissi, conteggio nel piede. Con naturale prende l’altezza del contenuto.',
       firma: 'CRM.DataTable(host, { colonne: [{ key, header, tipo: testo|euro|numero|pct|data, valore(r), cell(r), align, grow, sortable, sortValue(r), totale: \'somma\' }],\n  righe, onRowClick(r), rowClass(r), emptyText, emptyHint, ordinamentoIniziale: { key, dir }, compatta, naturale, piede, etichettaTotale }) → { el, aggiorna(righe) }',
       demo: h => CRM.DataTable(h, { colonne: COLONNE, righe: RIGHE, onRowClick: r => CRM.Avviso('Riga ' + r.codice), ordinamentoIniziale: { key: 'data', dir: 'desc' }, piede: 'Clic su una riga o su un’intestazione.' }) },
+    { nome: 'Schede', gruppo: 'Struttura', testo: 'Contenuti alternativi nello stesso spazio, con un contatore per scheda (neutro, giallo, rosso, verde). Si usa quando una scheda di dettaglio impila più tabelle e la colonna scorrerebbe: percentuali e clienti del fornitore, dati e permessi dell’utente, scadenze e ultime operazioni in Oggi, esportazione per Integra con molti alias e kit. Le schede stanno in alto, sopra il contenuto; tornando indietro si riapre la stessa scheda. Non sostituisce i segmenti della FilterBar: i segmenti filtrano le stesse righe, le schede mostrano contenuti diversi.',
+      firma: "CRM.Schede(host, { schede: [{ id, etichetta, conta, contaVariante: 'neutro'|'attesa'|'errore'|'ok', disegna(corpo) }], attiva, riempi, onCambia(id), senzaMemoria })\n→ { el, corpo, attiva(), vai(id), conta(id, n, variante), ridisegna() }\nTastiera: ← → fra le schede, Home / Fine",
+      demo: h => { CRM.Schede(h, { senzaMemoria: true, schede: [
+        { id: 'a', etichetta: 'Percentuali', conta: 5, disegna: c => CRM.DataTable(c, { compatta: true, naturale: true, righe: RIGHE.slice(0, 3), colonne: COLONNE.slice(0, 4) }) },
+        { id: 'b', etichetta: 'Da controllare', conta: 2, contaVariante: 'attesa', disegna: c => CRM.Nota(c, 'Contenuto della seconda scheda.') },
+        { id: 'c', etichetta: 'Errori', conta: 1, contaVariante: 'errore', disegna: c => CRM.Nota(c, 'Contenuto della terza scheda.') }
+      ] }); } },
     { nome: 'FilterBar', gruppo: 'Dati', testo: 'Filtri sopra una tabella: segmenti con conteggio, ricerca, select. Chiama onChange con tutti i valori.',
       firma: 'CRM.FilterBar(host, { campi: [{ nome, tipo: segmenti|cerca|select, opzioni: [{ value, label, n }], valore, placeholder }], onChange(valori) }) → { el, valori() }',
       demo: h => {

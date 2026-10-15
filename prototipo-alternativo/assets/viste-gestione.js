@@ -80,7 +80,7 @@
   /* =========================================================
      Utenti e ruoli: elenco + scheda + cosa può fare ogni ruolo
      ========================================================= */
-  let filtroUtenti = { vista: 'attivi', q: '' };
+  let filtroUtenti = { vista: 'attivi', q: '' }, schedaUtente = 'utente';
   function vistaUtenti(idSel) {
     if (!CRM.permesso('gestione', 'utenti', 'Utenti e ruoli')) return;
     const corpo = CRM.Pagina({ voce: 'utenti', titolo: 'Utenti e ruoli', pieno: true,
@@ -108,39 +108,41 @@
       emptyText: 'Nessun utente', emptyHint: 'Cambia la ricerca o il filtro.'
     });
 
-    const dx = CRM.blocco(col, 'pila', 'overflow:auto;min-height:0');
     const io = M.utente(), protetto = !!u.sistema;
-    const p = CRM.Pannello(dx, { titolo: u.nome, nota: u.sistema ? 'utente dei servizi automatici' : '',
+    const p = CRM.Pannello(col, { titolo: u.nome, nota: u.sistema ? 'utente dei servizi automatici' : '', riempi: true,
       azioni: protetto ? [] : [{ etichetta: 'Modifica', onClick: () => modificaUtente(u) }, { etichetta: 'Invia nuova password', icona: 'chiave', onClick: () => inviaPassword(u) }] });
-    CRM.Dettagli(p.corpo, [
-      { etichetta: 'Nome utente', valore: e(u.utente) },
-      { etichetta: 'Email', valore: e(u.email) },
-      { etichetta: 'Ruolo', valore: e(M.RUOLI[u.ruolo].nome) },
-      { etichetta: 'Stato', valore: u.attivo ? CRM.stato('ok', 'Attivo') : CRM.stato('neutro', 'Disattivato') },
-      { etichetta: 'Ultimo accesso', valore: quando(u.ultimo_accesso) },
-      { etichetta: 'Password', valore: u.cambio_password ? CRM.stato('attesa', 'da cambiare al prossimo accesso') : 'impostata dall’utente' },
-      { etichetta: 'Ultimo invio password', valore: u.ultimo_invio ? quando(u.ultimo_invio.quando) + (u.ultimo_invio.errore ? '<span class="sec-riga negativo">' + e(u.ultimo_invio.errore) + '</span>' : '') : '—' }
-    ], { inColonne: true });
-    if (protetto) CRM.Nota(p.corpo, 'Utente usato dai servizi automatici (lettura della casella, sincronizzazione da Integra): non si modifica e non accede all’app.').style.marginTop = '10px';
-    else {
-      const az = CRM.blocco(p.corpo, 'azioni-riga');
-      const b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'btn sec piccolo'; b1.textContent = u.attivo ? 'Disattiva' : 'Riattiva';
-      b1.addEventListener('click', () => attiva(u, !u.attivo)); az.appendChild(b1);
-      const b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'btn pericolo piccolo'; b2.textContent = 'Elimina';
-      b2.addEventListener('click', () => elimina(u)); az.appendChild(b2);
-      if (u.id === io.id) { b1.disabled = b2.disabled = true; b1.title = b2.title = 'Non puoi disattivare o eliminare te stesso'; }
-    }
-    // cosa può fare ogni ruolo
-    const pr = CRM.Pannello(dx, { titolo: 'Cosa può fare ogni ruolo', senzaMargine: true });
-    pr.el.style.marginTop = '16px';
     const ruoli = Object.keys(M.RUOLI);
-    CRM.DataTable(pr.corpo, {
-      compatta: true, naturale: true, righe: M.PERMESSI,
-      colonne: [{ key: 'testo', header: 'Attività', grow: true, sortable: false }].concat(ruoli.map(r => ({
-        key: r, header: M.RUOLI[r].nome, align: 'center', sortable: false,
-        cell: x => x.ruoli.indexOf(r) >= 0 ? '<span class="si" aria-label="sì">' + CRM.icona('spunta') + '</span>' : '<span class="testo-tenue" aria-label="no">—</span>',
-        classe: x => r === u.ruolo ? 'col-evidenza' : '' })))
-    });
+    // dati dell'utente e tabella dei permessi in due schede: niente scorrimento nella colonna
+    CRM.Schede(p.corpo, { riempi: true, attiva: schedaUtente, onCambia: id => { schedaUtente = id; }, schede: [
+      { id: 'utente', etichetta: 'Dati dell’utente', disegna: c => {
+        CRM.Dettagli(c, [
+          { etichetta: 'Nome utente', valore: e(u.utente) },
+          { etichetta: 'Email', valore: e(u.email) },
+          { etichetta: 'Ruolo', valore: e(M.RUOLI[u.ruolo].nome) },
+          { etichetta: 'Stato', valore: u.attivo ? CRM.stato('ok', 'Attivo') : CRM.stato('neutro', 'Disattivato') },
+          { etichetta: 'Ultimo accesso', valore: quando(u.ultimo_accesso) },
+          { etichetta: 'Password', valore: u.cambio_password ? CRM.stato('attesa', 'da cambiare al prossimo accesso') : 'impostata dall’utente' },
+          { etichetta: 'Ultimo invio password', valore: u.ultimo_invio ? quando(u.ultimo_invio.quando) + (u.ultimo_invio.errore ? '<span class="sec-riga negativo">' + e(u.ultimo_invio.errore) + '</span>' : '') : '—' }
+        ], { inColonne: true });
+        if (protetto) { CRM.Nota(c, 'Utente usato dai servizi automatici (lettura della casella, sincronizzazione da Integra): non si modifica e non accede all’app.'); return; }
+        const az = CRM.blocco(c, 'azioni-riga');
+        const b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'btn sec piccolo'; b1.textContent = u.attivo ? 'Disattiva' : 'Riattiva';
+        b1.addEventListener('click', () => attiva(u, !u.attivo)); az.appendChild(b1);
+        const b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'btn pericolo piccolo'; b2.textContent = 'Elimina';
+        b2.addEventListener('click', () => elimina(u)); az.appendChild(b2);
+        if (u.id === io.id) { b1.disabled = b2.disabled = true; b1.title = b2.title = 'Non puoi disattivare o eliminare te stesso'; }
+      } },
+      { id: 'ruoli', etichetta: 'Cosa può fare ogni ruolo', conta: M.PERMESSI.length, disegna: c => {
+        CRM.DataTable(CRM.blocco(c, 'riempi'), {
+          compatta: true, righe: M.PERMESSI,
+          colonne: [{ key: 'testo', header: 'Attività', grow: true, sortable: false }].concat(ruoli.map(r => ({
+            key: r, header: M.RUOLI[r].nome, align: 'center', sortable: false,
+            cell: x => x.ruoli.indexOf(r) >= 0 ? '<span class="si" aria-label="sì">' + CRM.icona('spunta') + '</span>' : '<span class="testo-tenue" aria-label="no">—</span>',
+            classe: x => r === u.ruolo ? 'col-evidenza' : '' })))
+        });
+        CRM.Nota(c, 'Evidenziata la colonna del ruolo di ' + e(u.nome) + '.');
+      } }
+    ] });
   }
   CRM.rotta(/^\/utenti$/, () => vistaUtenti(null));
   CRM.rotta(/^\/utenti\/(\d+)$/, id => vistaUtenti(id));

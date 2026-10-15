@@ -633,3 +633,32 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .qta-cella { width: 80px; text-align: right; padding: 3px 6px; }
 .qta-cella:disabled { opacity: .45; }
 .modale.larga .modale-corpo { flex: 1 1 auto; min-height: 0; }
+
+/* ---------- Schede ---------- */
+.schede { display: flex; flex-direction: column; min-height: 0; }
+.schede.riempi { flex: 1 1 auto; min-height: 0; }
+.schede-barra { display: flex; gap: 2px; border-bottom: 1px solid var(--bordo); flex: none; overflow-x: auto; }
+.schede-barra [role=tab] { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px 8px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; font: inherit; font-size: 14px; color: var(--testo-tenue); cursor: pointer; white-space: nowrap; border-radius: 6px 6px 0 0; }
+.schede-barra [role=tab]:hover { color: var(--testo); background: var(--sfondo); }
+.schede-barra [role=tab][aria-selected="true"] { color: var(--primario); border-bottom-color: var(--primario); font-weight: 600; }
+.schede-barra [role=tab]:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; }
+.schede-conta { min-width: 20px; padding: 1px 7px; border-radius: 10px; font-size: 12px; font-weight: 600; text-align: center; background: var(--neutro-tenue); color: var(--testo-tenue); }
+.schede-conta.c-attesa { background: var(--attesa-tenue); color: var(--attesa-testo); }
+.schede-conta.c-errore { background: var(--errore-tenue); color: var(--errore-testo); }
+.schede-conta.c-ok { background: var(--ok-tenue, #d1e7dd); color: var(--ok-testo, #0f5132); }
+.schede-corpo { padding-top: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.schede.riempi > .schede-corpo { flex: 1 1 auto; overflow: auto; }
+.schede-corpo > .riempi:not(.colonne) { display: flex; flex-direction: column; min-height: 10rem; }
+
+/* Esportazione per Integra: finestra a schede */
+.modale-corpo.esp-corpo { display: flex; flex-direction: column; gap: 10px; overflow: hidden; flex: 1 1 auto; min-height: 0; }
+.esp-riepilogo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 12px; background: var(--sfondo); border-radius: 8px; font-size: 13.5px; flex: none; }
+.esp-riepilogo b { font-weight: 600; }
+.esp-strumenti, .strumenti-scheda { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
+.esp-strumenti .cerca-esp { flex: 1 1 220px; max-width: 320px; padding: 6px 10px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); font: inherit; }
+.esp-strumenti .spazio, .strumenti-scheda .spazio { flex: 1; }
+.modale.larga.alta { width: min(1100px, 100%); height: min(780px, calc(100vh - 40px)); }
+.strumenti-scheda h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.pannello-corpo > .schede.riempi { margin-top: 14px; }
+.pannello-corpo > .schede.riempi:first-child { margin-top: 0; }
+.schede-corpo > .colonne.riempi { min-height: 0; }

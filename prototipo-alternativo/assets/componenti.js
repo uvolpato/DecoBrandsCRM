@@ -412,6 +412,53 @@
     return { el: p, corpo: $('.pannello-corpo', p), nota: html => { $('.pannello-nota', p).innerHTML = html; } };
   };
 
+  /* =========================================================
+     Schede: contenuti alternativi nello stesso spazio, con contatore per scheda
+     opz: { schede: [{ id, etichetta, conta, contaVariante: 'attesa'|'errore'|'ok'|'neutro', disegna(corpo) }],
+            attiva (id), riempi (la scheda occupa lo spazio rimasto e scorre dentro), onCambia(id),
+            senzaMemoria (nelle finestre: non ricordare la scheda tornando indietro) }
+     → { el, corpo, attiva() → id, vai(id), conta(id, n, variante), ridisegna() }
+     Tastiera: ← → fra le schede, Home / Fine prima e ultima. La scheda si disegna solo quando si apre.
+     ========================================================= */
+  CRM.Schede = function (host, opz) {
+    const box = el('div', 'schede' + (opz.riempi ? ' riempi' : ''));
+    const uid = 'sk' + Math.random().toString(36).slice(2, 7);
+    box.innerHTML = '<div class="schede-barra" role="tablist"></div><div class="schede-corpo" role="tabpanel"></div>';
+    const barra = $('.schede-barra', box), corpo = $('.schede-corpo', box);
+    let attiva = opz.attiva && opz.schede.some(s => s.id === opz.attiva) ? opz.attiva : opz.schede[0].id;
+    // memoria della navigazione (§7.12): tornando indietro si riapre la stessa scheda
+    if (!opz.senzaMemoria) { const rip = CRM.registra('schede', () => attiva); if (rip !== undefined && opz.schede.some(x => x.id === rip)) attiva = rip; }
+    const contaHtml = s => s.conta == null || s.conta === '' ? '' : '<span class="schede-conta c-' + (s.contaVariante || 'neutro') + '">' + esc(s.conta) + '</span>';
+    opz.schede.forEach(s => {
+      const b = el('button', '', '<span>' + esc(s.etichetta) + '</span>' + contaHtml(s));
+      b.type = 'button'; b.id = uid + '-' + s.id; b.dataset.id = s.id;
+      b.setAttribute('role', 'tab'); b.setAttribute('aria-controls', uid + '-corpo');
+      b.addEventListener('click', () => vai(s.id));
+      barra.appendChild(b);
+    });
+    corpo.id = uid + '-corpo';
+    barra.addEventListener('keydown', ev => {
+      const ids = opz.schede.map(s => s.id), i = ids.indexOf(attiva);
+      const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: ids.length - 1 }[ev.key];
+      if (n == null) return;
+      ev.preventDefault(); vai(ids[(n + ids.length) % ids.length]); $('#' + uid + '-' + attiva, barra).focus();
+    });
+    function disegna() {
+      $$('[role=tab]', barra).forEach(b => { const si = b.dataset.id === attiva; b.setAttribute('aria-selected', String(si)); b.tabIndex = si ? 0 : -1; });
+      corpo.setAttribute('aria-labelledby', uid + '-' + attiva);
+      corpo.innerHTML = '';
+      opz.schede.find(s => s.id === attiva).disegna(corpo);
+    }
+    function vai(id) { if (id === attiva && corpo.childNodes.length) return; attiva = id; disegna(); if (opz.onCambia) opz.onCambia(id); }
+    ospite(host).appendChild(box);
+    disegna();
+    return {
+      el: box, corpo: corpo, attiva: () => attiva, vai: vai, ridisegna: disegna,
+      conta: (id, n, variante) => { const s = opz.schede.find(x => x.id === id); s.conta = n; if (variante) s.contaVariante = variante;
+        const b = $('#' + uid + '-' + id, barra), v = $('.schede-conta', b); if (v) v.remove(); b.insertAdjacentHTML('beforeend', contaHtml(s)); }
+    };
+  };
+
   /* ---------- Nota (testo informativo) ---------- */
   CRM.Nota = function (host, html) { const n = el('p', 'nota', html); ospite(host).appendChild(n); return n; };
 

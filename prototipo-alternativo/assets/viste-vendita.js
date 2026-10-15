@@ -81,76 +81,150 @@
   CRM.rotta(/^\/ordini-cliente$/, () => vistaOrdini(null));
   CRM.rotta(/^\/ordini-cliente\/(\d+)$/, id => vistaOrdini(id));
 
-  /* Esportazione: scheda codici vecchio → nuovo, scheda kit, tipo di file, controlli. */
+  /* Esportazione: finestra a schede (codici vecchio → nuovo, kit, file e controlli).
+     Riepilogo sempre visibile sopra le schede; le tabelle non si ridisegnano mentre si scrive. */
+  const CASI = { A: 'disponibile il vecchio: nessun cambio', B: 'disponibile in parte: divide la riga', C: 'vecchio esaurito: tutto sul nuovo' };
   function esporta(o) {
     const p = M.proposteEsportazione(o);
-    let tipi = { OC: true, OF: false };
+    const tipi = { OC: true, OF: false };
+    const filtro = { alias: { q: '', vista: 'tutti' }, kit: { q: '' } };
+    let schede;
+    const stato = () => {
+      const fin = M.righeFinali(o, p), err = M.controlliEsportazione(o, fin), scelti = Object.keys(tipi).filter(k => tipi[k]);
+      if (!scelti.length) err.push('Scegli almeno un file (OC o OF)');
+      return { fin: fin, err: err, av: M.avvisiEsportazione(fin), scelti: scelti };
+    };
+    const conta = (lista, pred) => lista.filter(pred).length;
+    function aggiornaRiepilogo(c) {
+      const st = stato(), r = CRM.$('.esp-riepilogo', c.closest('.modale'));
+      r.innerHTML = '<span><b>' + st.fin.length + '</b> righe nel file (ordine: ' + o.righe.length + ')</span>' +
+        '<span>Cambi di codice applicati <b>' + conta(p.alias, a => a.applica) + ' di ' + p.alias.length + '</b></span>' +
+        '<span>Kit applicati <b>' + conta(p.kit, k => k.applica) + ' di ' + p.kit.length + '</b></span>' +
+        (st.err.length ? CRM.stato('errore', st.err.length + (st.err.length === 1 ? ' problema bloccante' : ' problemi bloccanti')) : CRM.stato('ok', 'Pronto da generare')) +
+        (st.av.length ? CRM.stato('attesa', st.av.length + (st.av.length === 1 ? ' avviso' : ' avvisi')) : '');
+      if (schede) {
+        const daConf = conta(p.alias, a => a.conferma && a.applica);
+        schede.conta('alias', p.alias.length, daConf ? 'attesa' : 'neutro');
+        schede.conta('kit', p.kit.length, 'neutro');
+        schede.conta('file', st.err.length || st.av.length || '✓', st.err.length ? 'errore' : st.av.length ? 'attesa' : 'ok');
+      }
+      const b = CRM.$('.modale-piede .btn:last-child', c.closest('.modale')); if (b) b.disabled = !!st.err.length;
+    }
+    // barra sopra una tabella: ricerca, segmenti, "applica a tutte" / "a nessuna"
+    function strumenti(host, quale, voci, segmenti, ridisegna) {
+      const s = CRM.blocco(host, 'esp-strumenti');
+      s.innerHTML = '<input type="search" class="cerca-esp" placeholder="Cerca codice o descrizione" aria-label="Cerca" value="' + e(filtro[quale].q) + '">' +
+        (segmenti ? '<div class="segmenti" role="group">' + segmenti.map(x => '<button type="button" data-v="' + x[0] + '" aria-selected="' + (filtro[quale].vista === x[0]) + '">' + x[1] + '<span class="n">' + x[2] + '</span></button>').join('') + '</div>' : '') +
+        '<span class="spazio"></span><button type="button" class="btn testo piccolo" data-tutti="1">Applica a tutti</button><button type="button" class="btn testo piccolo" data-tutti="0">A nessuno</button>';
+      CRM.$('input', s).addEventListener('input', ev => { filtro[quale].q = ev.target.value; ridisegna(); });
+      s.addEventListener('click', ev => {
+        const v = ev.target.closest('[data-v]'), t = ev.target.closest('[data-tutti]');
+        if (v) { filtro[quale].vista = v.dataset.v; CRM.$$('[data-v]', s).forEach(x => x.setAttribute('aria-selected', String(x === v))); ridisegna(); }
+        if (t) { voci().forEach(x => { x.applica = t.dataset.tutti === '1'; }); ridisegna(); aggiornaRiepilogo(host); }
+      });
+    }
+    const cerca = (q, testi) => !q || testi.join(' ').toLowerCase().indexOf(q.toLowerCase()) >= 0;
+
+    function schedaAlias(c) {
+      if (!p.alias.length) { c.innerHTML = '<div class="vuoto"><b>Nessun cambio di codice</b>Nessuna riga dell’ordine ha un codice vecchio con alias.</div>'; return; }
+      const VISTE = { tutti: () => true, conferma: a => a.conferma, divisi: a => a.caso === 'B', spenti: a => !a.applica };
+      const visibili = () => p.alias.filter(VISTE[filtro.alias.vista]).filter(a => cerca(filtro.alias.q, [a.vecchio, a.nuovo, a.descrizione]));
+      const area = CRM.blocco(c, 'riempi');
+      let t;
+      const ridisegna = () => t.aggiorna(visibili());
+      strumenti(c, 'alias', visibili, [['tutti', 'Tutti', p.alias.length], ['conferma', 'Da confermare', conta(p.alias, VISTE.conferma)], ['divisi', 'Divisi', conta(p.alias, VISTE.divisi)], ['spenti', 'Non applicati', conta(p.alias, VISTE.spenti)]], () => ridisegna());
+      c.appendChild(area);   // la tabella sotto gli strumenti
+      t = CRM.DataTable(area, { compatta: true, righe: visibili(), ordinamentoIniziale: { key: 'n', dir: 'asc' },
+        emptyText: 'Nessun cambio con questi filtri',
+        colonne: [
+          { key: 'applica', header: 'Applica', sortable: false, cell: a => '<input type="checkbox" data-alias="' + a.n + '"' + (a.applica ? ' checked' : '') + ' aria-label="Applica il cambio di codice della riga ' + a.n + '">' },
+          { key: 'n', header: 'Riga', tipo: 'numero' },
+          { key: 'vecchio', header: 'Vecchio → nuovo', grow: true, cell: a => '<b>' + e(a.vecchio) + '</b> → <b>' + e(a.nuovo) + '</b>' + (a.conferma ? ' ' + CRM.stato('attesa', 'da confermare') : '') + '<span class="sec-riga">' + e(a.descrizione) + ' · ' + CASI[a.caso] + '</span>' },
+          { key: 'qta', header: 'Ordinato', tipo: 'numero' },
+          { key: 'disp_vecchio', header: 'Disp. vecchio', align: 'right', cell: a => a.disp_vecchio == null ? '—' : M.num(a.disp_vecchio) },
+          { key: 'disp_nuovo', header: 'Disp. nuovo', align: 'right', cell: a => a.disp_nuovo == null ? '—' : M.num(a.disp_nuovo) },
+          { key: 'qv', header: 'Sul vecchio', align: 'right', sortable: false, cell: a => '<input type="number" min="0" step="1" class="qta-cella" data-qv="' + a.n + '" value="' + a.qta_vecchio + '"' + (a.applica ? '' : ' disabled') + ' aria-label="Quantità sul codice vecchio">' },
+          { key: 'qn', header: 'Sul nuovo', align: 'right', sortable: false, cell: a => '<input type="number" min="0" step="1" class="qta-cella" data-qn="' + a.n + '" value="' + a.qta_nuovo + '"' + (a.applica ? '' : ' disabled') + ' aria-label="Quantità sul codice nuovo">' }
+        ] });
+      // le modifiche aggiornano solo i campi gemelli e il riepilogo: la tabella resta dov'è
+      t.el.addEventListener('input', ev => {
+        const x = ev.target, a = p.alias.find(y => String(y.n) === (x.dataset.qv || x.dataset.qn)); if (!a) return;
+        const v = Math.min(a.qta, Math.max(0, Number(x.value) || 0)), tr = x.closest('tr');
+        if (x.dataset.qv) { a.qta_vecchio = v; a.qta_nuovo = M.r2(a.qta - v); CRM.$('[data-qn]', tr).value = a.qta_nuovo; }
+        else { a.qta_nuovo = v; a.qta_vecchio = M.r2(a.qta - v); CRM.$('[data-qv]', tr).value = a.qta_vecchio; }
+        aggiornaRiepilogo(c);
+      });
+      t.el.addEventListener('change', ev => {
+        const x = ev.target; if (!x.dataset.alias) return;
+        const a = p.alias.find(y => String(y.n) === x.dataset.alias); a.applica = x.checked;
+        CRM.$$('.qta-cella', x.closest('tr')).forEach(i => { i.disabled = !a.applica; });
+        aggiornaRiepilogo(c);
+      });
+    }
+
+    function schedaKit(c) {
+      if (!p.kit.length) { c.innerHTML = '<div class="vuoto"><b>Nessun kit da applicare</b>Nessun articolo esaurito dell’ordine ha un kit attivo.</div>'; return; }
+      const visibili = () => p.kit.filter(k => cerca(filtro.kit.q, [k.codice, k.descrizione].concat(k.componenti.map(x => x.codice))));
+      const area = CRM.blocco(c, 'riempi');
+      let t;
+      strumenti(c, 'kit', visibili, null, () => t.aggiorna(visibili()));
+      c.appendChild(area);
+      t = CRM.DataTable(area, { compatta: true, righe: visibili(), ordinamentoIniziale: { key: 'n', dir: 'asc' }, emptyText: 'Nessun kit con questa ricerca',
+        colonne: [
+          { key: 'applica', header: 'Applica', sortable: false, cell: k => '<input type="checkbox" data-kit="' + k.n + '"' + (k.applica ? ' checked' : '') + ' aria-label="Sostituisci con i componenti la riga ' + k.n + '">' },
+          { key: 'n', header: 'Riga', tipo: 'numero' },
+          { key: 'codice', header: 'Kit', cell: k => '<b>' + e(k.codice) + '</b> × ' + M.num(k.qta) + '<span class="sec-riga">' + e(k.descrizione) + ' · disponibile ' + (k.disponibile == null ? 'assente' : M.num(k.disponibile)) + '</span>' },
+          { key: 'comp', header: 'Componenti × quantità = totale', grow: true, sortable: false, cell: k => k.componenti.map(x => e(x.codice) + ' × ' + M.num(x.qta_comp) + ' = <b>' + M.num(x.qta_tot) + '</b>' +
+            (x.disponibile != null && x.disponibile < x.qta_tot ? ' <span class="negativo">(disponibile ' + M.num(x.disponibile) + ')</span>' : '')).join('<br>') }
+        ] });
+      t.el.addEventListener('change', ev => { const k = p.kit.find(y => String(y.n) === ev.target.dataset.kit); if (k) { k.applica = ev.target.checked; aggiornaRiepilogo(c); } });
+    }
+
+    function schedaFile(c) {
+      const st = stato();
+      const f = CRM.blocco(c, 'scelte-tipi');
+      f.innerHTML = [['OC', 'Ordine cliente', 'OC0000 · cliente ' + ((M.cliente(o.cliente_piva) || {}).codice_integra || '?')], ['OF', 'Ordine fornitore', 'OF0000 · stesso ordine verso il fornitore']].map(x =>
+        '<label class="scelta-esporta"><input type="checkbox" data-tipo="' + x[0] + '"' + (tipi[x[0]] ? ' checked' : '') + '><span><b>' + x[1] + ' (' + x[0] + ')</b><span>' + x[2] + '</span></span></label>').join('');
+      f.addEventListener('change', ev => { tipi[ev.target.dataset.tipo] = ev.target.checked; schede.ridisegna(); aggiornaRiepilogo(c); });
+      if (st.scelti.length) CRM.Nota(c, 'File: ' + M.nomiFileIntegra(o, st.scelti).map(n => '<b>' + e(n) + '</b>').join(', ') + (st.scelti.length > 1 ? ' (uno per tipo)' : ''));
+      if (st.err.length) CRM.Nota(c, '<b>Non si può generare:</b><br>' + st.err.map(e).join('<br>')).classList.add('nota-errore');
+      if (st.av.length) CRM.Nota(c, '<b>Attenzione:</b><br>' + st.av.map(e).join('<br>')).classList.add('nota-attesa');
+      const area = CRM.blocco(c, 'riempi');
+      CRM.DataTable(area, { compatta: true, righe: st.fin.map((r, i) => Object.assign({ ord: i + 1 }, r)), emptyText: 'Nessuna riga',
+        colonne: [
+          { key: 'ord', header: '#', tipo: 'numero' },
+          { key: 'codice', header: 'Articolo nel file', grow: true, cell: r => '<span class="cod-anag">' + pallinoAnag(r.codice) + '<b>' + e(r.codice || '—') + '</b></span><span class="sec-riga">' + e(r.descrizione) + (r.nota ? ' · ' + e(r.nota) : '') + '</span>' },
+          { key: 'qta', header: 'Quantità', tipo: 'numero' },
+          { key: 'prezzo', header: 'Prezzo', align: 'right', cell: r => r.prezzo == null ? '<span class="testo-tenue">da Integra</span>' : M.euro(r.prezzo) }
+        ] });
+    }
+
     const m = CRM.Modale({
-      titolo: 'Esporta ' + o.numero + ' per Integra', testo: 'Controlla i cambi di codice e i kit, scegli i file e genera. Le quantità esportate vengono impegnate finché Integra non registra l’ordine.',
+      titolo: 'Esporta ' + o.numero + ' per Integra', testo: 'Controlla i cambi di codice e i kit, scegli i file e genera. Le quantità esportate restano impegnate finché Integra non registra l’ordine.',
       corpo: c => {
-        const ridisegna = () => {
-          const fin = M.righeFinali(o, p), err = M.controlliEsportazione(o, fin), av = M.avvisiEsportazione(fin);
-          c.innerHTML = '';
-          const sez = (titolo, nota) => { const h = document.createElement('h3'); h.className = 'esp-titolo'; h.innerHTML = e(titolo) + (nota ? ' <span class="testo-tenue">' + nota + '</span>' : ''); c.appendChild(h); };
-          sez('Codici vecchio → nuovo', p.alias.length ? p.alias.length + (p.alias.length === 1 ? ' riga' : ' righe') : 'nessun cambio di codice');
-          if (p.alias.length) {
-            const t = CRM.DataTable(c, { compatta: true, naturale: true, righe: p.alias, colonne: [
-              { key: 'applica', header: 'Applica', sortable: false, cell: a => '<input type="checkbox" data-alias="' + a.n + '"' + (a.applica ? ' checked' : '') + ' aria-label="Applica il cambio di codice">' },
-              { key: 'vecchio', header: 'Riga · codice', cell: a => a.n + ' · <b>' + e(a.vecchio) + '</b> → <b>' + e(a.nuovo) + '</b><span class="sec-riga">' + ({ A: 'disponibile il vecchio: nessun cambio', B: 'disponibile in parte: divide', C: 'vecchio esaurito: tutto sul nuovo' })[a.caso] + (a.conferma ? ' · chiede conferma' : '') + '</span>' },
-              { key: 'qta', header: 'Ordinato', tipo: 'numero' },
-              { key: 'dv', header: 'Disp. vecchio', align: 'right', cell: a => a.disp_vecchio == null ? '—' : M.num(a.disp_vecchio) },
-              { key: 'qv', header: 'Sul vecchio', align: 'right', sortable: false, cell: a => '<input type="number" min="0" step="1" class="qta-cella" data-qv="' + a.n + '" value="' + a.qta_vecchio + '"' + (a.applica ? '' : ' disabled') + '>' },
-              { key: 'qn', header: 'Sul nuovo', align: 'right', sortable: false, cell: a => '<input type="number" min="0" step="1" class="qta-cella" data-qn="' + a.n + '" value="' + a.qta_nuovo + '"' + (a.applica ? '' : ' disabled') + '>' }
-            ] });
-            t.el.addEventListener('change', ev => {
-              const x = ev.target, a = p.alias.find(y => String(y.n) === (x.dataset.alias || x.dataset.qv || x.dataset.qn));
-              if (x.dataset.alias) a.applica = x.checked;
-              if (x.dataset.qv) { a.qta_vecchio = Math.max(0, Number(x.value) || 0); a.qta_nuovo = Math.max(0, M.r2(a.qta - a.qta_vecchio)); }
-              if (x.dataset.qn) { a.qta_nuovo = Math.max(0, Number(x.value) || 0); a.qta_vecchio = Math.max(0, M.r2(a.qta - a.qta_nuovo)); }
-              ridisegna();
-            });
-          }
-          sez('Kit', p.kit.length ? 'articoli esauriti sostituiti dai componenti' : 'nessun kit da applicare');
-          if (p.kit.length) {
-            const t = CRM.DataTable(c, { compatta: true, naturale: true, righe: p.kit, colonne: [
-              { key: 'applica', header: 'Applica', sortable: false, cell: k => '<input type="checkbox" data-kit="' + k.n + '"' + (k.applica ? ' checked' : '') + ' aria-label="Sostituisci con i componenti">' },
-              { key: 'codice', header: 'Riga · kit', cell: k => k.n + ' · <b>' + e(k.codice) + '</b> × ' + M.num(k.qta) + '<span class="sec-riga">disponibile ' + (k.disponibile == null ? 'assente' : M.num(k.disponibile)) + '</span>' },
-              { key: 'comp', header: 'Componenti × quantità = totale', grow: true, sortable: false, cell: k => k.componenti.map(x => e(x.codice) + ' × ' + M.num(x.qta_comp) + ' = <b>' + M.num(x.qta_tot) + '</b>' + (x.disponibile != null && x.disponibile < x.qta_tot ? ' <span class="negativo">(disp. ' + M.num(x.disponibile) + ')</span>' : '')).join('<br>') }
-            ] });
-            t.el.addEventListener('change', ev => { const k = p.kit.find(y => String(y.n) === ev.target.dataset.kit); if (k) { k.applica = ev.target.checked; ridisegna(); } });
-          }
-          sez('File da generare');
-          const f = document.createElement('div'); f.className = 'scelte-tipi';
-          f.innerHTML = [['OC', 'Ordine cliente', 'OC0000 · cliente ' + ((M.cliente(o.cliente_piva) || {}).codice_integra || '?')], ['OF', 'Ordine fornitore', 'OF0000 · stesso ordine verso il fornitore']].map(x =>
-            '<label class="scelta-esporta"><input type="checkbox" data-tipo="' + x[0] + '"' + (tipi[x[0]] ? ' checked' : '') + '><span><b>' + x[1] + ' (' + x[0] + ')</b><span>' + x[2] + '</span></span></label>').join('');
-          c.appendChild(f);
-          f.addEventListener('change', ev => { tipi[ev.target.dataset.tipo] = ev.target.checked; ridisegna(); });
-          const scelti = Object.keys(tipi).filter(k => tipi[k]);
-          const r = document.createElement('p'); r.className = 'nota';
-          r.innerHTML = '<b>' + fin.length + (fin.length === 1 ? ' riga' : ' righe') + '</b> nel file' + (scelti.length ? ': ' + M.nomiFileIntegra(o, scelti).map(e).join(', ') : '') + '.';
-          c.appendChild(r);
-          if (!scelti.length) err.push('Scegli almeno un file (OC o OF)');
-          if (err.length) CRM.Nota(c, '<b>Non si può generare:</b> ' + err.map(e).join(' · ')).classList.add('nota-errore');
-          if (av.length) CRM.Nota(c, '<b>Attenzione:</b> ' + av.map(e).join(' · ')).classList.add('nota-attesa');
-          const b = CRM.$('.modale-piede .btn:last-child', c.closest('.modale')); if (b) b.disabled = !!err.length;
-        };
-        setTimeout(ridisegna);   // dopo la creazione del piede
-        ridisegna();
+        c.classList.add('esp-corpo');
+        CRM.blocco(c, 'esp-riepilogo');
+        schede = CRM.Schede(c, { riempi: true, senzaMemoria: true, attiva: p.alias.length ? 'alias' : p.kit.length ? 'kit' : 'file', schede: [
+          { id: 'alias', etichetta: 'Codici vecchio → nuovo', conta: p.alias.length, disegna: schedaAlias },
+          { id: 'kit', etichetta: 'Kit', conta: p.kit.length, disegna: schedaKit },
+          { id: 'file', etichetta: 'File e controlli', disegna: schedaFile }
+        ] });
+        setTimeout(() => aggiornaRiepilogo(c));   // dopo la creazione del piede
       },
       azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Genera i file', onClick: () => {
-        const fin = M.righeFinali(o, p), scelti = Object.keys(tipi).filter(k => tipi[k]);
-        if (M.controlliEsportazione(o, fin).length || !scelti.length) return false;
-        const nomi = M.nomiFileIntegra(o, scelti);
-        Promise.all(scelti.map(t => CRM.fileIntegra(o, fin, t))).then(blobs => {
+        const st = stato();
+        if (st.err.length) { schede.vai('file'); return false; }
+        const nomi = M.nomiFileIntegra(o, st.scelti);
+        Promise.all(st.scelti.map(t => CRM.fileIntegra(o, st.fin, t))).then(blobs => {
           blobs.forEach((b, i) => CRM.scarica(nomi[i], b, b.type));
           const prima = !o.esportato;
-          M.registraEsportazione(o, fin, nomi); M.salva();
+          M.registraEsportazione(o, st.fin, nomi); M.salva();
           CRM.Avviso((nomi.length === 1 ? 'Generato ' : 'Generati ') + nomi.join(', ') + (prima ? ' · quantità impegnate' : ''));
           CRM.naviga();
         });
       } }]
     });
-    m.corpo.closest('.modale').classList.add('larga');
+    m.corpo.closest('.modale').classList.add('larga', 'alta');
   }
   async function annulla(o) {
     const n = M.S.impegni.filter(i => i.ordine === o.numero && i.stato === 'impegnato').length;
@@ -243,20 +317,30 @@
   /* =========================================================
      Alias e kit (tabelle del CRM): due schede nella stessa pagina
      ========================================================= */
+  let filtroAlias = { q: '', vista: 'tutti' };
   function testataAliasKit(scheda) {
     const corpo = CRM.Pagina({ voce: 'alias-kit', titolo: 'Alias e kit', pieno: true,
       sottotitolo: 'Regole applicate all’esportazione degli ordini cliente: un codice vecchio passa al nuovo in base al disponibile; un articolo esaurito si sostituisce con i componenti del suo kit.',
       azioni: M.puo('magazzino') ? [scheda === 'alias' ? { etichetta: 'Nuovo alias', icona: 'piu', onClick: () => modificaAlias(null) } : { etichetta: 'Nuovo kit', icona: 'piu', onClick: () => nuovoKit() }] : [] });
-    CRM.FilterBar(corpo, { campi: [{ nome: 's', tipo: 'segmenti', valore: scheda, opzioni: [{ value: 'alias', label: 'Codici vecchio → nuovo', n: M.S.alias.length }, { value: 'kit', label: 'Kit', n: M.S.kit.length }] }],
-      onChange: v => { location.hash = '#/alias-kit/' + v.s; } });
-    return corpo;
+    // due schede con indirizzo proprio (#/alias-kit/alias, #/alias-kit/kit): cambiare scheda cambia pagina
+    const sk = CRM.Schede(corpo, { riempi: true, senzaMemoria: true, attiva: scheda, schede: [
+      { id: 'alias', etichetta: 'Codici vecchio → nuovo', conta: M.S.alias.length, disegna: () => { if (scheda !== 'alias') location.hash = '#/alias-kit/alias'; } },
+      { id: 'kit', etichetta: 'Kit', conta: M.S.kit.length, disegna: () => { if (scheda !== 'kit') location.hash = '#/alias-kit/kit'; } }
+    ] });
+    return sk.corpo;
   }
   CRM.rotta(/^\/alias-kit$/, () => { location.replace('#/alias-kit/alias'); });
   CRM.rotta(/^\/alias-kit\/alias$/, function () {
     const corpo = testataAliasKit('alias');
     const puo = M.puo('magazzino');
+    const VA = { tutti: () => true, conferma: a => a.conferma, mancanti: a => !M.articoloAnag(a.nuovo) || !M.articoloAnag(a.vecchio) };
+    const filtra = () => { const q = (filtroAlias.q || '').toLowerCase(); return M.S.alias.filter(VA[filtroAlias.vista]).filter(a => !q || [a.vecchio, a.nuovo, a.descrizione, a.ean].some(t => String(t || '').toLowerCase().indexOf(q) >= 0)); };
+    CRM.FilterBar(corpo, { campi: [
+      { nome: 'q', tipo: 'cerca', valore: filtroAlias.q, placeholder: 'Codice, descrizione o EAN' },
+      { nome: 'vista', tipo: 'segmenti', valore: filtroAlias.vista, opzioni: [{ value: 'tutti', label: 'Tutti', n: M.S.alias.length }, { value: 'conferma', label: 'Chiedono conferma', n: M.S.alias.filter(VA.conferma).length }, { value: 'mancanti', label: 'Codice non in Integra', n: M.S.alias.filter(VA.mancanti).length }] }
+    ], onChange: v => { filtroAlias = v; tab.aggiorna(filtra()); } });
     const tab = CRM.DataTable(CRM.blocco(corpo, 'riempi'), {
-      righe: M.S.alias, ordinamentoIniziale: { key: 'vecchio', dir: 'asc' },
+      righe: filtra(), ordinamentoIniziale: { key: 'vecchio', dir: 'asc' },
       colonne: [
         { key: 'vecchio', header: 'Codice vecchio', cell: a => '<span class="cod-anag">' + pallinoAnag(a.vecchio) + '<b>' + e(a.vecchio) + '</b></span><span class="sec-riga">disponibile ' + (M.disponibile(a.vecchio) == null ? '—' : M.num(M.disponibile(a.vecchio))) + '</span>' },
         { key: 'nuovo', header: 'Codice nuovo', cell: a => '<span class="cod-anag">' + pallinoAnag(a.nuovo) + '<b>' + e(a.nuovo) + '</b></span><span class="sec-riga">disponibile ' + (M.disponibile(a.nuovo) == null ? '—' : M.num(M.disponibile(a.nuovo))) + '</span>' },

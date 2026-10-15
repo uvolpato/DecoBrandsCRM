@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.0 — vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.1 — componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -1051,11 +1051,11 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
   - **Bollettini**: da verificare, pronti da chiudere, **non arrivati** dopo il giorno
     atteso del fornitore, da sollecitare (§5.6).
 - **Colonna destra rivolta al futuro**:
-  - **Prossime scadenze** (15 giorni): conferme attese, bollettini del mese precedente
+  - due **schede** nello stesso riquadro (si ricorda l'ultima aperta): **Prossime scadenze** (15 giorni): conferme attese, bollettini del mese precedente
     attesi entro il giorno del fornitore (§5.6), fine del trimestre; ogni voce porta alla pagina relativa;
-  - **trimestre in corso**: atteso dai fornitori, già riconosciuto, da liquidare,
-    bloccato in attesa dei bollettini;
-  - **ultime operazioni** (5, compatte).
+    e **Ultime operazioni** (6, compatte);
+  - sotto, sempre visibile, il **trimestre in corso**: atteso dai fornitori, già
+    riconosciuto, da liquidare, bloccato in attesa dei bollettini.
 - Le **pratiche con variazioni** fra fasi (§5.8) restano segnalate nell'elenco
   Pratiche (filtro "Con variazioni").
 
@@ -1109,8 +1109,9 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
 - Anagrafica (ragione sociale, P.IVA, codice Integra) **da Integra in sola lettura**;
   nel CRM si modificano solo le condizioni: giorni attesa conferma, **giorno entro cui
   arriva il bollettino** (§5.6), `payment_type` (maturato/fatturato), note, attivo.
-- Tabella in sola lettura **"Clienti seguiti per <fornitore>"** (vista inversa delle
-  agenzie, §7.6).
+- Sotto i dati del fornitore due **schede**: **Percentuali** (in vigore da una data, con
+  *Nuove percentuali da una data* e le versioni) e **Clienti seguiti** in sola lettura
+  (vista inversa delle agenzie, §7.6); ogni scheda ha la sua tabella che riempie lo spazio.
 - Dettaglio con **tabella scaglioni** editabile (sconto min/max, % agente, % subagente);
   gestione eccezioni per subagente (backlog).
 
@@ -1291,8 +1292,8 @@ deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'er
   password (da cambiare al prossimo accesso), **ultimo invio password con eventuale
   errore di recapito**; azioni *Modifica*, *Invia nuova password*, *Disattiva/Riattiva*,
   *Elimina*.
-- **Cosa può fare ogni ruolo**: tabella attività × ruoli (la stessa di §8.3), con la
-  colonna del ruolo dell'utente evidenziata.
+- La scheda ha due **schede**: *Dati dell'utente* e **Cosa può fare ogni ruolo** (tabella
+  attività × ruoli, la stessa di §8.3, con la colonna del ruolo dell'utente evidenziata).
 - *Nuovo utente*: nome, nome utente (non modificabile dopo), email, ruolo; parte l'email
   con la password temporanea da cambiare al primo accesso (`must_change_password`).
 - **Vincoli**: nome utente ed email unici; **deve restare almeno un amministratore
@@ -1367,7 +1368,14 @@ tipo `ordine_cliente` (§17).
 - **Righe**: articolo con pallino (verde = in anagrafica Integra, rosso = no), descrizione,
   segni *alias → nuovo* e *kit di N componenti*, quantità con UM, prezzo, importo, totale,
   **disponibile** (giacenza − impegni).
-- **Esporta per Integra** (finestra larga):
+- **Esporta per Integra** (finestra larga, a **schede** perché un ordine può avere decine
+  di alias e kit). Sopra le schede, sempre visibile, il **riepilogo**: righe nel file,
+  cambi di codice e kit applicati, problemi bloccanti e avvisi. Le schede hanno il
+  contatore (giallo se ci sono alias da confermare; *File e controlli* rosso se ci sono
+  problemi, verde se è pronto); *Genera i file* con problemi apre *File e controlli*.
+  Nelle schede alias e kit: ricerca per codice o descrizione, *Applica a tutti* / *A
+  nessuno*; negli alias anche i segmenti *Tutti · Da confermare · Divisi · Non applicati*.
+  Le quantità si modificano in tabella senza ridisegnarla (vecchio + nuovo = ordinato).
   1. **Codici vecchio → nuovo**: per ogni riga con alias il caso proposto — *A* disponibile
      il vecchio (nessun cambio), *B* disponibile in parte (divide la riga: il disponibile
      sul vecchio, il resto sul nuovo), *C* vecchio esaurito (tutto sul nuovo) — con
@@ -1376,7 +1384,8 @@ tipo `ordine_cliente` (§17).
   2. **Kit**: articolo con disponibile ≤ 0 (o assente) e kit attivo → righe dei componenti
      × quantità ordinata, con il disponibile di ciascuno; *Applica* per riga. Le righe dei
      componenti escono senza prezzo (Integra lo reperisce).
-  3. **File da generare**: *Ordine cliente (OC)* e/o *Ordine fornitore (OF)*, con i nomi
+  3. **File e controlli**: anteprima delle righe finali del file (codice, descrizione,
+     origine alias/kit, quantità, prezzo o "da Integra"); file da generare *Ordine cliente (OC)* e/o *Ordine fornitore (OF)*, con i nomi
      `aaaammgg_codiceIntegra_progressivo_TIPO.xlsx` (progressivo del giorno per cliente).
   4. **Controlli bloccanti**: data, codice cliente Integra, almeno una riga, codice e
      quantità di ogni riga, almeno un file scelto. **Avvisi**: articolo non in anagrafica,
@@ -1411,7 +1420,9 @@ creano in Integra.
 
 ### 7.21 Alias e kit (`/alias-kit/alias`, `/alias-kit/kit/:codice`) — modifica solo amministratore
 
-Due schede nella stessa pagina (segmenti *Codici vecchio → nuovo · Kit*).
+Due **schede** nella stessa pagina (*Codici vecchio → nuovo · Kit*), ognuna con il suo
+indirizzo. Negli alias: ricerca per codice, descrizione o EAN e segmenti *Tutti · Chiedono
+conferma · Codice non in Integra*.
 
 - **Alias**: codice vecchio e nuovo con pallino e disponibile, descrizione ed EAN,
   *Chiede conferma* (casella modificabile in tabella), *Modifica*, *Elimina* (con
@@ -1988,7 +1999,7 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 | **FilterBar** | filtri sopra le tabelle | campi `select` / `multi` (selezione multipla con "Tutti") / `cerca` / `numero`, `onChange`, Reset |
 | **KpiRow** | riquadri numerici | voci (etichetta, valore, variante colore) |
 | **Riepilogo** | schede compatte del dettaglio pratica | voci (etichetta, icona, valore, variante) |
-| **Tabs** | schede | id, etichetta, icona, badge |
+| **Schede** | contenuti alternativi nello stesso spazio, quando una scheda di dettaglio impilerebbe più tabelle (§7.1, §7.4, §7.13, §7.18, §7.21) | schede (`id`, etichetta, contatore con variante neutro/giallo/rosso/verde, `disegna`), scheda attiva, `riempi`, `onCambia`; tastiera ← → Home Fine; **ricorda la scheda** per ogni passo della cronologia (§7.12). Le schede stanno **in alto**. Non sostituiscono i segmenti della FilterBar: i segmenti filtrano le stesse righe, le schede mostrano contenuti diversi |
 | **Pannello** | card con testata | titolo, icona, azioni, piede |
 | **Form / FormModal** | moduli e finestre modali | campi (`nome`, `etichetta`, `tipo`, `opzioni`, `col`, `obbligatorio`, `aiuto`, `onChange`), pulsante / `onConferma` |
 | **Intestazione** | testata pagina | titolo, icona, sottotitolo, briciole, azioni; pulsante **"Torna a …"** automatico (§7.12) |

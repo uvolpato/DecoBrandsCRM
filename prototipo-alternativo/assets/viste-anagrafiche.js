@@ -9,6 +9,7 @@
   const e = CRM.esc;
 
   /* ---------- Fornitori: DataTable + Pannello (Dettagli, DataTable percentuali) + FormModal ---------- */
+  let schedaFornitore = 'percentuali';
   function vistaFornitori(idSel) {
     const corpo = CRM.Pagina({ voce: 'fornitori', titolo: 'Fornitori', pieno: true, sottotitolo: 'Condizioni di ogni fornitore e percentuali di provvigione per sconto, con la data da cui valgono.' });
     const f = M.fornitore(Number(idSel)) || M.S.fornitori[0];
@@ -37,35 +38,43 @@
       { etichetta: 'Bollettino mensile', valore: 'atteso entro il ' + (f.giorno_bollettino || 10) + ' del mese successivo, poi parte il sollecito' },
       { etichetta: 'Pagamento provvigioni', valore: 'sul ' + f.maturazione + (f.maturazione === 'maturato' ? ' (quando incassa dai clienti)' : ' (all’emissione della fattura)') }
     ]);
-    const perc = CRM.Pannello(dx.corpo, { titolo: 'Percentuali in vigore dal ' + M.data(vigente), senzaMargine: true,
-      azioni: [{ etichetta: 'Nuove percentuali da una data', icona: 'piu', onClick: () => nuovePercentuali(f, sc) }] });
-    perc.el.style.cssText = 'margin-top:20px;box-shadow:none';
-    CRM.DataTable(perc.corpo, {
-      compatta: true, naturale: true, righe: sc, ordinamentoIniziale: { key: 'sconto', dir: 'asc' },
-      colonne: [
-        { key: 'sconto', header: 'Sconto al cliente', tipo: 'pct' },
-        { key: 'pct_agente', header: 'A Decobrands', tipo: 'pct' },
-        { key: 'pct_sub', header: 'Al subagente', tipo: 'pct', cell: s => { const ecc = M.S.eccezioni.filter(x => x.scaglione_id === s.id); return M.pct(s.pct_sub) + (ecc.length ? '<span class="sec-riga">' + ecc.map(x => e(M.subagente(x.subagente_id).nome) + ' ' + M.pct(x.pct_sub)).join(', ') + '</span>' : ''); } },
-        { key: 'tot', header: 'Totale dal fornitore', tipo: 'pct', valore: s => s.pct_agente + s.pct_sub },
-        { key: 'clienti', header: 'Clienti', tipo: 'numero', valore: s => M.S.abbinamenti.filter(a => a.fornitore_id === f.id && a.sconto === s.sconto).length }
-      ]
-    });
-    // vista inversa delle agenzie: i clienti seguiti per questo fornitore (si modificano dal cliente)
-    const cli = CRM.Pannello(dx.corpo, { titolo: 'Clienti seguiti per ' + f.breve, nota: 'si modificano dal cliente', senzaMargine: true });
-    cli.el.style.cssText = 'margin-top:20px;box-shadow:none';
-    CRM.DataTable(cli.corpo, {
-      compatta: true, naturale: true, righe: M.S.abbinamenti.filter(a => a.fornitore_id === f.id), ordinamentoIniziale: { key: 'cliente', dir: 'asc' },
-      colonne: [
-        { key: 'cliente', header: 'Cliente', grow: true, valore: a => M.nomeCliente(a.cliente_piva) },
-        { key: 'codice', header: 'Codice', cell: a => a.codice ? e(a.codice) : CRM.stato('attesa', 'manca') },
-        { key: 'sub', header: 'Seguito da', valore: a => M.subagente(a.subagente_id).nome },
-        { key: 'sconto', header: 'Sconto', tipo: 'pct' }
-      ],
-      onRowClick: a => { location.hash = '#/clienti/' + a.cliente_piva; },
-      emptyText: 'Nessun cliente', emptyHint: 'Le agenzie si aggiungono dalla scheda del cliente.'
-    });
-    CRM.Nota(dx.corpo, versioni.length > 1 ? 'Versioni: ' + versioni.map(v => 'dal ' + M.data(v)).join(', ') + '. I documenti si calcolano con le percentuali in vigore alla loro data.'
-      : 'Se ' + e(f.breve) + ' rivede le condizioni, inserisci le nuove percentuali con la data da cui valgono: i documenti precedenti restano calcolati con quelle di allora.').style.marginTop = '12px';
+    // percentuali e clienti seguiti in due schede: la scheda resta compatta e non scorre
+    const clienti = M.S.abbinamenti.filter(a => a.fornitore_id === f.id);
+    CRM.Schede(dx.corpo, { riempi: true, attiva: schedaFornitore, onCambia: id => { schedaFornitore = id; }, schede: [
+      { id: 'percentuali', etichetta: 'Percentuali', conta: sc.length, disegna: c => {
+        const t = CRM.blocco(c, 'strumenti-scheda');
+        t.innerHTML = '<h3>In vigore dal ' + M.data(vigente) + '</h3><span class="spazio"></span>';
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.innerHTML = CRM.icona('piu') + 'Nuove percentuali da una data';
+        b.addEventListener('click', () => nuovePercentuali(f, sc)); t.appendChild(b);
+        CRM.DataTable(CRM.blocco(c, 'riempi'), {
+          compatta: true, righe: sc, ordinamentoIniziale: { key: 'sconto', dir: 'asc' },
+          colonne: [
+            { key: 'sconto', header: 'Sconto al cliente', tipo: 'pct' },
+            { key: 'pct_agente', header: 'A Decobrands', tipo: 'pct' },
+            { key: 'pct_sub', header: 'Al subagente', tipo: 'pct', cell: s => { const ecc = M.S.eccezioni.filter(x => x.scaglione_id === s.id); return M.pct(s.pct_sub) + (ecc.length ? '<span class="sec-riga">' + ecc.map(x => e(M.subagente(x.subagente_id).nome) + ' ' + M.pct(x.pct_sub)).join(', ') + '</span>' : ''); } },
+            { key: 'tot', header: 'Totale dal fornitore', tipo: 'pct', valore: s => s.pct_agente + s.pct_sub },
+            { key: 'clienti', header: 'Clienti', tipo: 'numero', valore: s => clienti.filter(a => a.sconto === s.sconto).length }
+          ]
+        });
+        CRM.Nota(c, versioni.length > 1 ? 'Versioni: ' + versioni.map(v => 'dal ' + M.data(v)).join(', ') + '. I documenti si calcolano con le percentuali in vigore alla loro data.'
+          : 'Se ' + e(f.breve) + ' rivede le condizioni, inserisci le nuove percentuali con la data da cui valgono: i documenti precedenti restano calcolati con quelle di allora.');
+      } },
+      // vista inversa delle agenzie: i clienti seguiti per questo fornitore (si modificano dal cliente)
+      { id: 'clienti', etichetta: 'Clienti seguiti', conta: clienti.length, disegna: c => {
+        CRM.DataTable(CRM.blocco(c, 'riempi'), {
+          compatta: true, righe: clienti, ordinamentoIniziale: { key: 'cliente', dir: 'asc' },
+          colonne: [
+            { key: 'cliente', header: 'Cliente', grow: true, valore: a => M.nomeCliente(a.cliente_piva) },
+            { key: 'codice', header: 'Codice', cell: a => a.codice ? e(a.codice) : CRM.stato('attesa', 'manca') },
+            { key: 'sub', header: 'Seguito da', valore: a => M.subagente(a.subagente_id).nome },
+            { key: 'sconto', header: 'Sconto', tipo: 'pct' }
+          ],
+          onRowClick: a => { location.hash = '#/clienti/' + a.cliente_piva; },
+          emptyText: 'Nessun cliente', emptyHint: 'Le agenzie si aggiungono dalla scheda del cliente.'
+        });
+        CRM.Nota(c, 'Codice, subagente e sconto si modificano dalla scheda del cliente.');
+      } }
+    ] });
   }
   function modificaCondizioni(f) {
     CRM.FormModal({

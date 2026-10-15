@@ -8,6 +8,7 @@
   const VARIANTE_FARE = { ritardo: 'errore', mancante: 'errore', documento: 'primario', bollettino: 'attesa' };
 
   /* ---------- Oggi: ListaDaFare + Cifre del trimestre + Elenco operazioni ---------- */
+  let schedaOggi = 'scadenze';
   CRM.rotta(/^\/$/, function () {
     const fare = M.daFare();
     const corpo = CRM.Pagina({ voce: 'oggi', titolo: 'Oggi', pieno: true,
@@ -51,9 +52,15 @@
     const destra = CRM.blocco(col, 'pila', 'overflow:auto;min-height:0');
     // 4. colonna rivolta al futuro: cosa arriva nei prossimi giorni
     const sc = M.scadenze(15);
-    const scad = CRM.Pannello(destra, { titolo: 'Prossime scadenze', nota: 'prossimi 15 giorni' });
-    scad.corpo.innerHTML = sc.length ? '<ul class="scadenze">' + sc.map(x => '<li><span class="sc-data">' + M.data(x.data).slice(0, 5) + '<small>' + (M.giorni(M.oggi(), x.data) === 0 ? 'oggi' : 'fra ' + M.giorni(M.oggi(), x.data) + ' gg') + '</small></span>' +
+    const htmlScadenze = sc.length ? '<ul class="scadenze">' + sc.map(x => '<li><span class="sc-data">' + M.data(x.data).slice(0, 5) + '<small>' + (M.giorni(M.oggi(), x.data) === 0 ? 'oggi' : 'fra ' + M.giorni(M.oggi(), x.data) + ' gg') + '</small></span>' +
       '<div><a href="' + x.link + '">' + e(x.testo) + '</a><span>' + e(x.dettaglio) + '</span></div></li>').join('') + '</ul>' : '<p class="testo-tenue" style="margin:0">Nessuna scadenza nei prossimi 15 giorni.</p>';
+    // scadenze e ultime operazioni in due schede dello stesso riquadro: il trimestre resta sempre visibile
+    const fut = CRM.Pannello(destra, {});
+    fut.el.classList.add('compatto');
+    CRM.Schede(fut.corpo, { attiva: schedaOggi, onCambia: id => { schedaOggi = id; }, schede: [
+      { id: 'scadenze', etichetta: 'Prossime scadenze', conta: sc.length, disegna: c => { c.insertAdjacentHTML('beforeend', htmlScadenze + '<p class="nota">Prossimi 15 giorni.</p>'); } },
+      { id: 'operazioni', etichetta: 'Ultime operazioni', disegna: c => { CRM.Elenco(c, M.S.registro.slice(0, 6).map(x => ({ testo: e(x.testo) })), 'Qui compaiono le operazioni fatte: abbinamenti, verifiche, liquidazioni.'); } }
+    ] });
     const a = 2026, t = M.trimestre(M.oggi());
     const st = M.statoTrimestre(a, t);
     const righe = M.righeLiquidazione(a, t);
@@ -71,9 +78,6 @@
       { etichetta: 'Da liquidare ai subagenti', valore: somma(r => r.liquidabile) },
       { etichetta: 'Bloccato in attesa dei bollettini', valore: somma(r => !r.liquidabile), variante: somma(r => !r.liquidabile) ? 'attesa' : '' }
     ]);
-    const reg = CRM.Pannello(destra, { titolo: 'Ultime operazioni' });
-    reg.el.classList.add('compatto');
-    CRM.Elenco(reg.corpo, M.S.registro.slice(0, 5).map(x => ({ testo: e(x.testo) })), 'Qui compaiono le operazioni fatte: abbinamenti, verifiche, liquidazioni.');
   });
 
   /* ---------- Documenti: Caricamento + ElencoSelezionabile + Dettagli + DataTable + Scelte ----------
