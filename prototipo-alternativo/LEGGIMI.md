@@ -22,7 +22,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | | **Stato del sistema** | Casella dei documenti, server di lettura, sincronizzazione da Integra, posta in uscita: stato, problemi da vedere (contatore nella barra), ultime esecuzioni |
 | | **Impostazioni** | Dati azienda, casella IMAP, server di lettura e soglie, posta in uscita, sincronizzazione da Integra (database, viste, ogni quanti secondi), conservazione; password mai rilette |
 | | **Documenti scartati** | Scarto con motivo; recupero (operatore) o eliminazione definitiva (amministratore) |
-| | **Guida** | Argomenti per pagina con ricerca; pulsante *Guida* in testata a ogni pagina |
+| | **Guida** | *Come funziona il CRM* (schema del ciclo) e *Comandi comuni*; per ogni pagina sintesi, passi, pulsanti, finestre e regole; ricerca in tutto il testo; pulsante *Guida* in testata a ogni pagina. Contenuti in `assets/guida.js` |
 
 **Prova i ruoli:** in fondo alla barra *Prova come* cambia utente. Con *Giulia Ferri · Lettura* la gestione sparisce, compare la fascia "Profilo in sola lettura", i pulsanti che modificano sono spenti e l'esportazione resta attiva; con *Matteo Caironi · Operatore* restano Stato del sistema, Scartati e Guida.
 

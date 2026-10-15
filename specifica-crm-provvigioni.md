@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.4 — paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.5 — guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -1355,10 +1355,28 @@ Ogni salvataggio scrive un evento con i campi cambiati (mai le password).
 
 ### 7.17 Guida (`/guida/:argomento`) — tutti
 
-- Argomenti a sinistra (ricerca nel testo), raggruppati *Lavoro · Vendita diretta ·
-  Anagrafiche · Gestione*; testo a destra con *Apri la pagina* e **chi può modificare** (dai ruoli).
+- **Argomenti** a sinistra, raggruppati *Inizia qui · Lavoro · Anagrafiche · Gestione* (più
+  *Vendita diretta* con l'ampliamento), con **ricerca in tutto il testo**: anche nomi di
+  pulsanti e finestre ("Prepara la contestazione" trova Bollettini).
+- **Inizia qui**: *Come funziona il CRM* (schema del ciclo documenti → pratiche →
+  bollettini → liquidazioni con la cadenza di ognuno, ogni riquadro apre la pagina) e
+  *Comandi comuni* (Torna a, Carica documenti, Guida, segmenti, riquadri-filtro, schede,
+  ordinamento, pagine, campi con ricerca e F4, Esc).
+- **Ogni argomento** ha la stessa struttura, sintetica ma completa:
+  1. **sintesi** (a cosa serve, in due righe);
+  2. **schema** dove aiuta (es. stati della pratica con i rami *Conferma in ritardo* e
+     *Nota di credito*);
+  3. **Come si lavora**: i passi in ordine, numerati;
+  4. **Pulsanti e comandi**: ogni pulsante della pagina con cosa fa;
+  5. **Finestre**: ogni finestra che la pagina apre, con *si apre da*, cosa contiene
+     (campi) e i suoi pulsanti;
+  6. **Da sapere**: regole e avvertenze;
+  7. **chi può modificare** (dai ruoli, §8.3).
 - **Aiuto contestuale**: ogni pagina con un argomento ha in testata il pulsante *Guida*
   che apre l'argomento giusto. Gli argomenti di gestione si vedono solo con il permesso.
+- I contenuti stanno in un solo file di dati (`CRM.GUIDA`, prototipo `assets/guida.js`):
+  nell'app sono un file di contenuti versionato con il codice, da aggiornare **nella
+  stessa attività** che cambia una pagina (regola di consegna §16.5).
 
 ### Vendita diretta (§7.18–§7.21) — **ampliamento futuro (§17), non in questa fase**
 

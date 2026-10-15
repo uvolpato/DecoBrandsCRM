@@ -10,72 +10,7 @@
   const quando = iso => iso ? M.data(iso.slice(0, 10)) + (iso.length > 10 ? ' ' + iso.slice(11, 16) : '') : '—';
   const STATO_SERVIZIO = { ok: ['ok', 'Funziona'], attesa: ['attesa', 'Da tenere d’occhio'], errore: ['errore', 'Problema'] };
 
-  /* =========================================================
-     Guida: contenuti per pagina (anche aiuto contestuale dal pulsante "Guida" in testata)
-     ========================================================= */
-  CRM.GUIDA = [
-    { id: 'oggi', titolo: 'Oggi', gruppo: 'Lavoro', vai: '#/', testo: [
-      'La pagina di partenza: cosa c’è da fare, diviso per tipo di lavoro.',
-      'I riquadri in alto contano conferme in ritardo, documenti in coda e bollettini; un clic mostra solo quel gruppo, un secondo clic tutti.',
-      '<b>Prepara i solleciti</b> crea un testo per ogni fornitore con tutte le sue pratiche in ritardo: copialo e invialo.',
-      'A destra le prossime scadenze (conferme attese, bollettini attesi, fine trimestre) e l’andamento del trimestre.'] },
-    { id: 'documenti', titolo: 'Documenti', gruppo: 'Lavoro', vai: '#/documenti', testo: [
-      'Tutti i documenti dei fornitori entrano da qui: dalla casella email in automatico o trascinando i file.',
-      'Per ogni documento vedi cosa è stato letto e la proposta: un ordine apre una pratica, conferme, fatture e note di credito si abbinano alla pratica, un bollettino si registra.',
-      'Se compaiono punti da controllare usa <b>Correggi i dati letti</b>: a sinistra il documento, a destra i dati; i campi incerti sono bordati.',
-      '<b>Scarta il documento</b> per doppioni o documenti che non riguardano Decobrands: va negli scartati e si può recuperare.'] },
-    { id: 'pratiche', titolo: 'Pratiche', gruppo: 'Lavoro', vai: '#/pratiche', testo: [
-      'Ogni ordine a fornitore è una pratica: lo stato avanza da solo quando arrivano conferma e fattura.',
-      'Nella scheda vedi il binario ordine → conferma → fattura → nota di credito e le righe che cambiano fra le fasi.',
-      'Clic su un documento o su una riga a confronto per vederlo affiancato al confronto.'] },
-    { id: 'bollettini', titolo: 'Bollettini', gruppo: 'Lavoro', vai: '#/bollettini', testo: [
-      'Matrice fornitore × mese: verificato, da decidere, pronto da chiudere, atteso, non arrivato.',
-      'Nel bollettino a sinistra c’è quanto riconosce il fornitore, a destra il nostro calcolo, al centro la differenza.',
-      'Ogni riga che non quadra si accetta o si contesta; il bollettino si chiude quando non restano righe da decidere.',
-      'Il bollettino è atteso entro il giorno fissato nelle condizioni del fornitore; dopo, compare il sollecito.'] },
-    { id: 'liquidazioni', titolo: 'Liquidazioni', gruppo: 'Lavoro', vai: '#/liquidazioni', testo: [
-      'Provvigioni ai subagenti per trimestre. A sinistra i subagenti con documenti nel trimestre (clic = filtro), a destra i documenti.',
-      '<b>Esporta</b>: tutto il trimestre diviso per subagente, un solo subagente o solo il riepilogo; in Excel, PDF o CSV.',
-      'Il trimestre si chiude a periodo finito e senza documenti in attesa dei bollettini.'] },
-    { id: 'fornitori', titolo: 'Fornitori', gruppo: 'Anagrafiche', vai: '#/fornitori', testo: [
-      'Anagrafica da Integra, in sola lettura. Nel CRM si gestiscono le condizioni: giorni di attesa della conferma, giorno del bollettino, pagamento sul maturato o sul fatturato.',
-      'Le percentuali hanno una data di validità: le nuove valgono dalla data indicata, i documenti precedenti restano calcolati con quelle di allora.'] },
-    { id: 'subagenti', titolo: 'Subagenti', gruppo: 'Anagrafiche', vai: '#/subagenti', testo: [
-      'I subagenti si gestiscono per intero nel CRM: nome, email, attivo.',
-      'Un subagente con clienti o provvigioni non si elimina: si rende non attivo.'] },
-    { id: 'clienti', titolo: 'Clienti', gruppo: 'Anagrafiche', vai: '#/clienti', testo: [
-      'Anagrafica da Integra, in sola lettura. Per ogni cliente le agenzie: i fornitori per cui Decobrands fa da agente, con codice cliente del fornitore, subagente e sconto.',
-      'Il codice cliente del fornitore serve ad abbinare in automatico i documenti.'] },
-    { id: 'ordini-cliente', titolo: 'Ordini cliente', gruppo: 'Vendita diretta', vai: '#/ordini-cliente', testo: [
-      'Gli ordini dei clienti in vendita diretta, da controllare ed esportare per Integra. Il pallino verde dice che l’articolo è nell’anagrafica di Integra.',
-      '<b>Esporta per Integra</b> mostra i cambi di codice (alias) e i kit da applicare: puoi spegnerli o spostare le quantità fra codice vecchio e nuovo. Poi scegli i file: <b>Ordine cliente (OC)</b>, <b>Ordine fornitore (OF)</b> o entrambi.',
-      'L’esportazione si blocca se mancano data, codice cliente di Integra, codici o quantità delle righe.',
-      'Le quantità esportate restano <b>impegnate</b> finché la sincronizzazione vede l’ordine registrato in Integra. <b>Annulla esportazione</b> rilascia gli impegni ancora aperti.'] },
-    { id: 'articoli', titolo: 'Articoli', gruppo: 'Vendita diretta', vai: '#/articoli', testo: [
-      'Anagrafica degli articoli letta da Integra (viste sul database, sincronizzazione ogni minuto): in sola lettura.',
-      'Per ogni articolo: UM, EAN, disponibile, eventuale alias o kit. Un clic apre le giacenze dell’articolo.'] },
-    { id: 'giacenze', titolo: 'Giacenze', gruppo: 'Vendita diretta', vai: '#/giacenze', testo: [
-      'La giacenza arriva da Integra ogni pochi secondi. Il CRM sottrae le quantità già esportate e non ancora registrate: il risultato è il <b>disponibile</b>.',
-      'I riquadri filtrano gli articoli esauriti, negativi o con impegni aperti; un articolo mostra gli ordini che lo hanno impegnato.'] },
-    { id: 'alias-kit', titolo: 'Alias e kit', gruppo: 'Vendita diretta', vai: '#/alias-kit', testo: [
-      '<b>Alias</b>: quando un articolo cambia codice. All’esportazione si usa il vecchio finché è disponibile, poi il nuovo (con divisione della riga se serve). "Chiede conferma" fa comparire il cambio per essere confermato.',
-      '<b>Kit</b>: un articolo esaurito si sostituisce con i suoi componenti, ognuno moltiplicato per la quantità ordinata. Un kit spento non si applica.',
-      'Modificare alias e kit è riservato agli amministratori.'] },
-    { id: 'utenti', titolo: 'Utenti e ruoli', gruppo: 'Gestione', vai: '#/utenti', testo: [
-      'Gli utenti sono gli stessi della Gestione Ordini: stesse credenziali.',
-      'Ruoli: <b>Amministratore</b> (tutto), <b>Operatore</b> (lavoro quotidiano e anagrafiche del CRM), <b>Sola lettura</b> (consulta ed esporta, non modifica).',
-      '<b>Invia nuova password</b> manda un’email con una password temporanea da cambiare al primo accesso.',
-      'Deve restare almeno un amministratore attivo; non puoi cambiare il tuo ruolo né disattivarti.'] },
-    { id: 'sistema', titolo: 'Stato del sistema', gruppo: 'Gestione', vai: '#/sistema', testo: [
-      'Lo stato dei servizi che girano da soli: casella dei documenti, server di lettura, sincronizzazione da Integra, posta in uscita.',
-      'I problemi nuovi hanno il contatore nella barra; aprili per leggere cosa è successo e cosa fare, poi segnali come visti.'] },
-    { id: 'impostazioni', titolo: 'Impostazioni', gruppo: 'Gestione', vai: '#/impostazioni', testo: [
-      'Dati dell’azienda per i prospetti, casella dei documenti, server di lettura e soglie di affidabilità, posta in uscita, sincronizzazione da Integra, conservazione dei dati.',
-      'Le password non si rileggono: si sostituiscono. Ogni modifica resta nel registro eventi.'] },
-    { id: 'scartati', titolo: 'Documenti scartati', gruppo: 'Gestione', vai: '#/scartati', testo: [
-      'I documenti scartati restano qui per il numero di giorni fissato nelle impostazioni, con motivo e autore.',
-      '<b>Recupera</b> lo rimette fra i documenti da controllare; l’eliminazione definitiva è riservata agli amministratori.'] }
-  ];
+  /* Contenuti della guida: assets/guida.js (CRM.GUIDA). */
 
   /* =========================================================
      Utenti e ruoli: elenco + scheda + cosa può fare ogni ruolo
@@ -371,31 +306,53 @@
      Guida: argomenti a sinistra (con ricerca), contenuto a destra
      ========================================================= */
   let cercaGuida = '';
+  const testoPiano = g => JSON.stringify([g.titolo, g.sintesi, g.flusso, g.pulsanti, g.finestre, g.sapere]).replace(/<[^>]+>/g, '').toLowerCase();
+  // schemi disegnati: il ciclo del lavoro (panoramica) e gli stati della pratica
+  const SCHEMI = {
+    ciclo: () => '<div class="guida-schema ciclo" role="img" aria-label="Ciclo del lavoro: documenti, pratiche, bollettini, liquidazioni">' +
+      [['Ogni giorno', 'Documenti', 'entrano, si leggono, si abbinano', 'arrivo', '#/documenti'], ['Ogni giorno', 'Pratiche', 'ordine → conferma → fattura', 'pratiche', '#/pratiche'],
+       ['Ogni mese', 'Bollettini', 'il fornitore riconosce, noi verifichiamo', 'bollettini', '#/bollettini'], ['Ogni trimestre', 'Liquidazioni', 'si paga ai subagenti', 'liquidazioni', '#/liquidazioni']]
+        .map((x, i) => (i ? '<span class="freccia" aria-hidden="true"></span>' : '') + '<a class="nodo" href="' + x[4] + '"><span class="cadenza">' + x[0] + '</span>' + CRM.icona(x[3]) + '<b>' + x[1] + '</b><span>' + x[2] + '</span></a>').join('') +
+      '</div><p class="guida-sotto-schema">' + CRM.icona('oggi') + '<span><b>Oggi</b> raccoglie da tutte e quattro le fasi quello che chiede un’azione.</span></p>',
+    stati: () => '<div class="guida-schema stati" role="img" aria-label="Stati della pratica">' +
+      '<div class="stato-nodo">' + CRM.stato('info', 'Attesa conferma') + '<span>arriva l’ordine</span><div class="ramo">' + CRM.stato('errore', 'Conferma in ritardo') + '<span>passati i giorni di attesa del fornitore</span></div></div>' +
+      '<span class="freccia" aria-hidden="true"></span><div class="stato-nodo">' + CRM.stato('primario', 'Confermata') + '<span>arriva la conferma</span></div>' +
+      '<span class="freccia" aria-hidden="true"></span><div class="stato-nodo">' + CRM.stato('ok', 'Fatturata') + '<span>arriva la fattura</span><div class="ramo">' + CRM.stato('neutro', 'Nota di credito') + '<span>riduce l’imponibile, non cambia lo stato</span></div></div></div>'
+  };
   function vistaGuida(idSel) {
-    const corpo = CRM.Pagina({ voce: 'guida', titolo: 'Guida', pieno: true, sottotitolo: 'Come si usa il CRM, pagina per pagina. Da ogni pagina il pulsante "Guida" in alto apre l’argomento giusto.' });
+    const corpo = CRM.Pagina({ voce: 'guida', titolo: 'Guida', pieno: true, sottotitolo: 'Come si usa il CRM, pagina per pagina: cosa fa, come si lavora, a cosa servono i pulsanti e le finestre. Da ogni pagina il pulsante "Guida" in alto apre l’argomento giusto.' });
     const visibili = CRM.GUIDA.filter(g => g.gruppo !== 'Vendita diretta' || CRM.AMPLIAMENTI.vendita).filter(g => g.gruppo !== 'Gestione' || M.puo(g.id === 'sistema' ? 'sistema' : g.id === 'scartati' ? 'scartati' : 'gestione'));
     const g = visibili.find(x => x.id === idSel) || visibili[0];
-    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(240px,0.6fr) minmax(0,2fr)');
+    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(240px,0.55fr) minmax(0,2fr)');
     const sx = CRM.Pannello(col, { titolo: 'Argomenti', riempi: true });
-    CRM.FilterBar(sx.corpo, { campi: [{ nome: 'q', tipo: 'cerca', valore: cercaGuida, placeholder: 'Cerca nella guida' }], onChange: v => { cercaGuida = v.q; disegna(); } });
+    CRM.FilterBar(sx.corpo, { campi: [{ nome: 'q', tipo: 'cerca', valore: cercaGuida, placeholder: 'Cerca un pulsante, una finestra…' }], onChange: v => { cercaGuida = v.q; disegna(); } });
     const elenco = CRM.blocco(sx.corpo, '');
     function disegna() {
       const q = cercaGuida.trim().toLowerCase();
-      const trovati = visibili.filter(x => !q || (x.titolo + ' ' + x.testo.join(' ')).toLowerCase().replace(/<[^>]+>/g, '').indexOf(q) >= 0);
+      const trovati = visibili.filter(x => !q || testoPiano(x).indexOf(q) >= 0);
       elenco.innerHTML = '';
       if (!trovati.length) { CRM.Nota(elenco, 'Nessun argomento contiene «' + e(cercaGuida) + '».'); return; }
       CRM.ElencoSelezionabile(elenco, trovati.map(x => ({ id: x.id, href: '#/guida/' + x.id, titolo: x.titolo, sotto: x.gruppo })), g.id);
     }
     disegna();
     const ruoli = (() => {
-      const mappa = { utenti: 'gestione', impostazioni: 'gestione', sistema: 'sistema', scartati: 'scartati' };
+      const mappa = { utenti: 'gestione', impostazioni: 'gestione', sistema: 'sistema', scartati: 'scartati', 'alias-kit': 'magazzino' };
       const perm = M.PERMESSI.find(p => p.id === (mappa[g.id] || (g.gruppo === 'Anagrafiche' ? 'anagrafiche' : 'modifica')));
       return perm.ruoli.map(r => M.RUOLI[r].nome).join(', ');
     })();
-    const p = CRM.Pannello(col, { titolo: g.titolo, nota: g.gruppo, riempi: true, azioni: [{ etichetta: 'Apri la pagina', href: g.vai, consentito: true }] });
-    p.corpo.insertAdjacentHTML('beforeend', '<div class="guida-testo">' + g.testo.map(t => '<p>' + t + '</p>').join('') + '</div>');
-    CRM.Nota(p.corpo, '<b>Chi può modificare:</b> ' + e(ruoli) + '. Con il ruolo sola lettura la pagina si consulta (e le liquidazioni si esportano) ma non si modifica.').style.marginTop = '14px';
+    const p = CRM.Pannello(col, { titolo: g.titolo, nota: e(g.gruppo), riempi: true, azioni: g.gruppo === 'Inizia qui' ? [] : [{ etichetta: 'Apri la pagina', href: g.vai, consentito: true }] });
+    const sez = (titolo, html) => '<section class="guida-sez"><h3>' + titolo + '</h3>' + html + '</section>';
+    const coppie = (lista, classe) => '<dl class="' + classe + '">' + lista.map(x => '<div><dt>' + x[0] + '</dt><dd>' + x[1] + '</dd></div>').join('') + '</dl>';
+    let html = '<p class="guida-sintesi">' + g.sintesi + '</p>';
+    if (g.schema) html += SCHEMI[g.schema]();
+    if (g.flusso) html += sez('Come si lavora', '<ol class="guida-flusso">' + g.flusso.map((x, i) => '<li><span class="n">' + (i + 1) + '</span><b>' + x[0] + '</b><span>' + x[1] + '</span></li>').join('') + '</ol>');
+    if (g.pulsanti) html += sez('Pulsanti e comandi', coppie(g.pulsanti.map(x => ['<span class="tasto">' + x[0] + '</span>', x[1]]), 'guida-pulsanti'));
+    if (g.finestre) html += sez('Finestre', '<div class="guida-finestre">' + g.finestre.map(f => '<article class="guida-finestra"><header><b>' + f.nome + '</b><span>si apre da <span class="tasto piccolo">' + f.da + '</span></span></header>' +
+      '<p>' + f.cosa + '</p>' + (f.campi ? '<h4>Cosa contiene</h4>' + coppie(f.campi, 'guida-campi') : '') + (f.azioni ? '<h4>Pulsanti</h4>' + coppie(f.azioni.map(x => ['<span class="tasto piccolo">' + x[0] + '</span>', x[1]]), 'guida-campi') : '') + '</article>').join('') + '</div>');
+    if (g.sapere) html += sez('Da sapere', '<ul class="guida-sapere">' + g.sapere.map(x => '<li>' + x + '</li>').join('') + '</ul>');
+    if (g.gruppo !== 'Inizia qui') html += '<p class="guida-ruoli">' + CRM.icona('lucchetto') + '<span><b>Chi può modificare:</b> ' + e(ruoli) + '. Con il profilo sola lettura la pagina si consulta (e le liquidazioni si esportano) ma non si modifica.</span></p>';
+    p.corpo.insertAdjacentHTML('beforeend', '<div class="guida">' + html + '</div>');
   }
   CRM.rotta(/^\/guida$/, () => vistaGuida(null));
-  CRM.rotta(/^\/guida\/(\w+)$/, id => vistaGuida(id));
+  CRM.rotta(/^\/guida\/([\w-]+)$/, id => vistaGuida(id));
 })();

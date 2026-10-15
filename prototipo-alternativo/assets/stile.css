@@ -600,7 +600,7 @@ body.sola-lettura .principale::before { content: 'Profilo in sola lettura: puoi 
 .si { color: var(--ok-testo, #0f5132); display: inline-flex; }
 .si svg { width: 16px; height: 16px; }
 .dt td.col-evidenza { background: var(--primario-tenue); }
-.guida-testo p { margin: 0 0 10px; line-height: 1.55; max-width: 72ch; }
+
 .dt tbody tr.decisa td { color: var(--testo-tenue); }
 
 /* gruppo Gestione richiudibile nella barra */
@@ -676,3 +676,58 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .dt-pagine button:focus-visible { outline: 2px solid var(--primario); outline-offset: 1px; }
 .dt-pagine span { padding: 0 4px; color: var(--testo-tenue); }
 .dt-pagine button:first-child, .dt-pagine button:last-child { font-size: 17px; line-height: 1; }
+
+/* ---------- Guida ---------- */
+.guida { max-width: 980px; display: flex; flex-direction: column; gap: 22px; padding-bottom: 8px; }
+.guida-sintesi { margin: 0; font-size: 15.5px; line-height: 1.6; color: var(--testo); max-width: 72ch; }
+.guida-sez h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--testo-intest); padding-bottom: 6px; border-bottom: 1px solid var(--bordo-tenue); }
+.guida h4 { margin: 12px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--testo-tenue); }
+.tasto { display: inline-block; padding: 2px 9px; border: 1px solid var(--bordo); border-bottom-width: 2px; border-radius: 6px; background: var(--superficie); font-size: 13px; font-weight: 500; color: var(--testo); white-space: nowrap; }
+.tasto.piccolo { font-size: 12px; padding: 1px 7px; }
+
+/* passi in ordine: cartelle collegate da una linea */
+.guida-flusso { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; counter-reset: passo; }
+.guida-flusso li { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--sfondo); border-radius: 10px; font-size: 13px; line-height: 1.45; color: var(--testo-tenue); }
+.guida-flusso li b { color: var(--testo); font-size: 14px; }
+.guida-flusso .n { width: 24px; height: 24px; border-radius: 50%; background: var(--primario); color: #fff; font-weight: 600; font-size: 12.5px; display: grid; place-items: center; margin-bottom: 4px; }
+.guida-flusso li + li::before { content: ''; position: absolute; left: -10px; top: 23px; width: 10px; height: 2px; background: var(--primario); opacity: .45; }
+
+/* pulsanti: nome a sinistra, effetto a destra */
+.guida-pulsanti { margin: 0; display: grid; grid-template-columns: minmax(170px, max-content) 1fr; }
+.guida-pulsanti > div { display: contents; }
+.guida-pulsanti dt, .guida-pulsanti dd { padding: 8px 0; border-bottom: 1px solid var(--bordo-tenue); margin: 0; font-size: 13.5px; line-height: 1.5; }
+.guida-pulsanti dt { padding-right: 18px; }
+.guida-pulsanti dt .tasto { white-space: normal; }
+
+/* finestre: una scheda per finestra */
+.guida-finestre { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.guida-finestra { border: 1px solid var(--bordo); border-radius: 10px; padding: 14px 16px; background: var(--superficie); }
+.guida-finestra header { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.guida-finestra header b { font-size: 14.5px; }
+.guida-finestra header > span { font-size: 12.5px; color: var(--testo-tenue); }
+.guida-finestra p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--testo-tenue); }
+.guida-campi { margin: 0; }
+.guida-campi > div { display: grid; grid-template-columns: minmax(110px, 40%) 1fr; gap: 10px; padding: 5px 0; border-top: 1px solid var(--bordo-tenue); font-size: 13px; line-height: 1.45; }
+.guida-campi dt { font-weight: 500; }
+.guida-campi dd { margin: 0; color: var(--testo-tenue); }
+
+.guida-sapere { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; }
+.guida-sapere li + li { margin-top: 4px; }
+.guida-ruoli { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 14px; background: var(--sfondo); border-radius: 8px; font-size: 13px; color: var(--testo-tenue); }
+.guida-ruoli .icona { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+
+/* schemi */
+.guida-schema { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
+.guida-schema .freccia { flex: 0 0 28px; align-self: center; height: 2px; background: var(--primario); position: relative; opacity: .5; }
+.guida-schema .freccia::after { content: ''; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left-color: var(--primario); border-right: 0; }
+.guida-schema.ciclo .nodo { flex: 1 1 150px; display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 1px solid var(--bordo); border-radius: 12px; background: var(--superficie); color: var(--testo-tenue); font-size: 12.5px; text-decoration: none; transition: border-color .15s; }
+.guida-schema.ciclo .nodo:hover { border-color: var(--primario); }
+.guida-schema.ciclo .nodo .icona { width: 22px; height: 22px; color: var(--primario); margin: 4px 0; }
+.guida-schema.ciclo .nodo b { color: var(--testo); font-size: 15px; }
+.guida-schema.ciclo .cadenza { font-size: 11.5px; font-weight: 600; color: var(--primario); }
+.guida-sotto-schema { display: flex; gap: 8px; align-items: center; margin: -10px 0 0; font-size: 13px; color: var(--testo-tenue); }
+.guida-sotto-schema .icona { width: 16px; height: 16px; color: var(--primario); }
+.guida-schema.stati .stato-nodo { flex: 1 1 160px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--bordo); border-radius: 12px; font-size: 12.5px; color: var(--testo-tenue); }
+.guida-schema.stati .ramo { margin-top: 8px; padding: 8px 0 0 12px; border-left: 2px dashed var(--bordo); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+@media (max-width: 860px) { .guida-schema .freccia { display: none; } .guida-schema { gap: 8px; } .guida-pulsanti { grid-template-columns: 1fr; } .guida-pulsanti dt { border-bottom: 0; padding-bottom: 0; } }
+.guida-campi .tasto { white-space: normal; }
