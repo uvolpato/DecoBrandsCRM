@@ -202,6 +202,7 @@
   let filtroClienti = { vista: 'tutti', q: '' };
   const agenzie = piva => M.S.abbinamenti.filter(a => a.cliente_piva === piva);
   const praticheAperte = piva => M.S.pratiche.filter(p => p.cliente_piva === piva && M.statoPratica(p).chiave !== 'fatturata');
+  let schedaCliente = 'agenzie', filtroAgenzie = '', filtroPratiche = { vista: 'aperte', f: '', q: '' };
   function vistaClienti(pivaSel) {
     const corpo = CRM.Pagina({ voce: 'clienti', titolo: 'Clienti', pieno: true,
       sottotitolo: 'Anagrafica da Integra. Per ogni cliente: le agenzie (fornitori per cui Decobrands fa da agente), chi lo segue e con quale sconto.' });
@@ -238,34 +239,57 @@
       { etichetta: 'Vendita diretta', valore: c.vendita_diretta ? CRM.stato('info', 'Sì') : '<span class="testo-tenue">No</span>' }
     ], { inColonne: true });
 
-    const ag = CRM.Pannello(dx.corpo, { titolo: 'Agenzie', nota: 'fornitori per cui Decobrands fa da agente', senzaMargine: true,
-      azioni: [{ etichetta: 'Aggiungi agenzia', icona: 'piu', onClick: () => modificaAgenzia(c, null) }] });
-    ag.el.style.cssText = 'margin-top:18px;box-shadow:none;flex:none';
-    CRM.DataTable(ag.corpo, {
-      compatta: true, naturale: true, righe: agenzie(c.piva), ordinamentoIniziale: { key: 'fornitore', dir: 'asc' },
-      colonne: [
-        { key: 'fornitore', header: 'Fornitore', valore: a => M.fornitore(a.fornitore_id).breve },
-        { key: 'codice', header: 'Codice cliente', cell: a => a.codice ? '<b>' + e(a.codice) + '</b>' : CRM.stato('attesa', 'manca') },
-        { key: 'sub', header: 'Seguito da', valore: a => M.subagente(a.subagente_id).nome },
-        { key: 'sconto', header: 'Sconto', tipo: 'pct' },
-        { key: 'perc', header: 'Provvigione', align: 'right', sortValue: a => { const sc = M.scaglione(a.fornitore_id, a.sconto, M.oggi()); return sc ? sc.pct_agente + sc.pct_sub : 0; },
-          cell: a => { const sc = M.scaglione(a.fornitore_id, a.sconto, M.oggi()); return sc ? M.pct(sc.pct_agente + sc.pct_sub) + '<span class="sec-riga">' + M.pct(sc.pct_sub) + ' sub.</span>' : '—'; } }
-      ],
-      onRowClick: a => modificaAgenzia(c, a),
-      emptyText: 'Nessuna agenzia', emptyHint: c.vendita_diretta ? 'Cliente di sola vendita diretta. Aggiungi un’agenzia se Decobrands lo segue anche per un fornitore.' : 'Aggiungi il fornitore per cui Decobrands segue questo cliente.'
-    });
-    CRM.Nota(dx.corpo, 'Un solo subagente per cliente e fornitore; il codice è unico per fornitore. Clic su una riga per modificarla.').style.marginTop = '8px';
-
-    const att = CRM.Pannello(dx.corpo, { titolo: 'Attività', senzaMargine: false });
-    att.el.style.cssText = 'margin-top:18px;box-shadow:none;flex:none';
+    // agenzie e pratiche in due schede: possono essere molte; le agenzie sono il lavoro principale
+    const ags = agenzie(c.piva), pr = M.S.pratiche.filter(p => p.cliente_piva === c.piva);
     const tr = M.trimestre(M.oggi()), prov = M.righeLiquidazione(2026, tr).filter(r => r.cliente === c.piva);
-    CRM.Cifre(att.corpo, [
-      { etichetta: 'Pratiche aperte', valore: String(praticheAperte(c.piva).length) },
-      { etichetta: 'Provvigioni ai subagenti, ' + tr + '° trimestre', valore: prov.reduce((x, r) => x + r.provvigione, 0) }
-    ]);
-    CRM.Elenco(att.corpo, M.S.pratiche.filter(p => p.cliente_piva === c.piva).sort((x, y) => y.data.localeCompare(x.data)).slice(0, 5).map(p => ({
-      testo: '<a href="#/pratiche/' + p.id + '">' + e(p.numero) + '</a> <span class="testo-tenue">' + e(M.fornitore(p.fornitore_id).breve) + ' · ' + M.data(p.data) + '</span>',
-      destra: CRM.statoPratica(p) })), 'Nessuna pratica per questo cliente.');
+    CRM.Schede(dx.corpo, { riempi: true, attiva: schedaCliente, onCambia: id => { schedaCliente = id; }, schede: [
+      { id: 'agenzie', etichetta: 'Agenzie', conta: ags.length, contaVariante: ags.some(a => !a.codice) ? 'attesa' : 'neutro', disegna: h => {
+        const t = CRM.blocco(h, 'strumenti-scheda');
+        t.innerHTML = '<label class="cerca">' + CRM.icona('cerca') + '<input type="search" placeholder="Fornitore, codice o subagente" aria-label="Cerca fra le agenzie" value="' + e(filtroAgenzie) + '"></label><span class="spazio"></span>';
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.innerHTML = CRM.icona('piu') + 'Aggiungi agenzia';
+        b.addEventListener('click', () => modificaAgenzia(c, null)); t.appendChild(b);
+        const filtra = () => { const q = filtroAgenzie.trim().toLowerCase(); return ags.filter(a => !q || [M.fornitore(a.fornitore_id).nome, a.codice, M.subagente(a.subagente_id).nome].some(x => String(x || '').toLowerCase().indexOf(q) >= 0)); };
+        const tab = CRM.DataTable(CRM.blocco(h, 'riempi'), {
+          compatta: true, righe: filtra(), ordinamentoIniziale: { key: 'fornitore', dir: 'asc' },
+          colonne: [
+            { key: 'fornitore', header: 'Fornitore', valore: a => M.fornitore(a.fornitore_id).breve },
+            { key: 'codice', header: 'Codice cliente', cell: a => a.codice ? '<b>' + e(a.codice) + '</b>' : CRM.stato('attesa', 'manca') },
+            { key: 'sub', header: 'Seguito da', valore: a => M.subagente(a.subagente_id).nome },
+            { key: 'perc', header: 'Provvigione', align: 'right', sortValue: a => { const sc = M.scaglione(a.fornitore_id, a.sconto, M.oggi()); return sc ? sc.pct_agente + sc.pct_sub : 0; },
+              cell: a => { const sc = M.scaglione(a.fornitore_id, a.sconto, M.oggi()); return (sc ? M.pct(sc.pct_agente + sc.pct_sub) + '<span class="sec-riga">' + M.pct(sc.pct_sub) + ' sub. · sconto ' + M.pct(a.sconto) + '</span>' : '—'); } },
+            { key: 'aperte', header: 'Aperte', tipo: 'numero', valore: a => pr.filter(p => p.fornitore_id === a.fornitore_id && M.statoPratica(p).chiave !== 'fatturata').length }
+          ],
+          onRowClick: a => modificaAgenzia(c, a),
+          emptyText: ags.length ? 'Nessuna agenzia con questa ricerca' : 'Nessuna agenzia',
+          emptyHint: ags.length ? '' : c.vendita_diretta ? 'Cliente di sola vendita diretta. Aggiungi un’agenzia se Decobrands lo segue anche per un fornitore.' : 'Aggiungi il fornitore per cui Decobrands segue questo cliente.'
+        });
+        CRM.$('input', t).addEventListener('input', ev => { filtroAgenzie = ev.target.value; tab.aggiorna(filtra()); });
+        CRM.Nota(h, 'Un solo subagente per cliente e fornitore; il codice è unico per fornitore. Clic su una riga per modificarla.');
+      } },
+      { id: 'pratiche', etichetta: 'Pratiche', conta: pr.length, disegna: h => {
+        const ST = { aperte: p => M.statoPratica(p).chiave !== 'fatturata', ritardo: p => M.statoPratica(p).chiave === 'scaduta', fatturate: p => M.statoPratica(p).chiave === 'fatturata', tutte: () => true };
+        const forn = pr.map(p => p.fornitore_id).filter((x, i, arr) => arr.indexOf(x) === i);
+        const filtra = () => { const q = (filtroPratiche.q || '').trim().toLowerCase(); return pr.filter(ST[filtroPratiche.vista]).filter(p => !filtroPratiche.f || String(p.fornitore_id) === filtroPratiche.f).filter(p => !q || p.numero.toLowerCase().indexOf(q) >= 0); };
+        CRM.FilterBar(h, { campi: [
+          { nome: 'vista', tipo: 'segmenti', valore: filtroPratiche.vista, opzioni: [{ value: 'aperte', label: 'Aperte', n: pr.filter(ST.aperte).length }, { value: 'ritardo', label: 'In ritardo', n: pr.filter(ST.ritardo).length }, { value: 'fatturate', label: 'Fatturate', n: pr.filter(ST.fatturate).length }, { value: 'tutte', label: 'Tutte', n: pr.length }] },
+          { nome: 'f', tipo: 'select', valore: filtroPratiche.f, opzioni: [{ value: '', label: 'Tutti i fornitori' }].concat(forn.map(f => ({ value: String(f), label: M.fornitore(f).breve }))) },
+          { nome: 'q', tipo: 'cerca', valore: filtroPratiche.q, placeholder: 'Numero' }
+        ], onChange: v => { filtroPratiche = v; tab.aggiorna(filtra()); } });
+        const tab = CRM.DataTable(CRM.blocco(h, 'riempi'), {
+          compatta: true, righe: filtra(), ordinamentoIniziale: { key: 'data', dir: 'desc' },
+          colonne: [
+            { key: 'numero', header: 'Pratica', cell: p => '<b>' + e(p.numero) + '</b>' },
+            { key: 'fornitore', header: 'Fornitore', valore: p => M.fornitore(p.fornitore_id).breve },
+            { key: 'data', header: 'Data', tipo: 'data' },
+            { key: 'importo', header: 'Importo', tipo: 'euro', valore: p => M.importoPratica(p) },
+            { key: 'stato', header: 'Stato', sortValue: p => ['scaduta', 'attesa', 'confermata', 'fatturata'].indexOf(M.statoPratica(p).chiave), cell: p => CRM.statoPratica(p) }
+          ],
+          onRowClick: p => { location.hash = '#/pratiche/' + p.id; },
+          emptyText: 'Nessuna pratica con questi filtri', emptyHint: pr.length ? 'Prova "Tutte".' : 'Le pratiche nascono dagli ordini caricati in Documenti.',
+          piede: 'Provvigioni ai subagenti nel ' + tr + '° trimestre: <b>' + M.euro(prov.reduce((x, r) => x + r.provvigione, 0)) + '</b>'
+        });
+      } }
+    ] });
   }
   CRM.rotta(/^\/clienti$/, () => vistaClienti(null));
   CRM.rotta(/^\/clienti\/(\w+)$/, piva => vistaClienti(piva));

@@ -79,7 +79,7 @@ Logo monocromatico, bianco sulla barra scura. Carattere **Public Sans** (OFL, in
 
 ## Componenti
 
-**Schede** (`CRM.Schede`) dove un dettaglio impilava più tabelle: fornitore (percentuali · clienti seguiti), utente (dati · permessi), Oggi (scadenze · ultime operazioni), Alias e kit, esportazione per Integra.
+**Schede** (`CRM.Schede`) dove un dettaglio impilava più tabelle: fornitore (percentuali · clienti seguiti), cliente (agenzie · pratiche con filtro; prova *Garden Store Brianza*: 10 agenzie e 34 pratiche), utente (dati · permessi), Oggi (scadenze · ultime operazioni), Alias e kit, esportazione per Integra.
 
 Ogni vista è **solo composizione** di componenti `CRM.*` parametrizzati (`assets/componenti.js`); il catalogo con esempi dal vivo e parametri è nella voce **Componenti** della barra.
 

@@ -25,7 +25,8 @@ window.DATI_DEMO = {
     { piva: '02289430245', nome: 'Casa & Natura sas', citta: 'Vicenza', indirizzo: 'Viale del Lavoro 9', codice_integra: 'C00198', vendita_diretta: false },
     { piva: '02633860254', nome: 'Fioreria Alba srl', citta: 'Treviso', indirizzo: 'Via Feltrina 77', codice_integra: 'C00804', vendita_diretta: false },
     { piva: '03312450135', nome: 'Garden Center Lario srl', citta: 'Como', indirizzo: 'Via Asiago 4', codice_integra: 'C00912', vendita_diretta: true },
-    { piva: '04120990983', nome: 'Serre del Garda snc', citta: 'Brescia', indirizzo: 'Via Gardesana 61', codice_integra: 'C00918', vendita_diretta: true }
+    { piva: '04120990983', nome: 'Serre del Garda snc', citta: 'Brescia', indirizzo: 'Via Gardesana 61', codice_integra: 'C00918', vendita_diretta: true },
+    { piva: '03987650157', nome: 'Garden Store Brianza srl', citta: 'Seregno', indirizzo: 'Via Milano 140', codice_integra: 'C00960', vendita_diretta: false }
   ],
 
   /* maturazione: 'maturato' = il fornitore paga quando incassa (la provvigione matura quando
@@ -33,7 +34,14 @@ window.DATI_DEMO = {
   fornitori: [
     { id: 1, nome: 'Gries GmbH & Co. KG', breve: 'Gries', piva: 'DE123456789', codice_integra: 'F00031', paese: 'Germania', giorni_conferma: 21, giorno_bollettino: 10, maturazione: 'maturato', attivo: true },
     { id: 2, nome: 'Gasper GmbH', breve: 'Gasper', piva: 'DE987654321', codice_integra: 'F00047', paese: 'Germania', giorni_conferma: 30, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true },
-    { id: 3, nome: 'Ing\'s Christmas Decor GmbH', breve: 'Ing\'s', piva: 'DE555111222', codice_integra: 'F00052', paese: 'Germania', giorni_conferma: 14, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true }
+    { id: 3, nome: 'Ing\'s Christmas Decor GmbH', breve: 'Ing\'s', piva: 'DE555111222', codice_integra: 'F00052', paese: 'Germania', giorni_conferma: 14, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true },
+    { id: 4, nome: 'Vasi Toscani Rossetti srl', breve: 'Rossetti', piva: 'IT01234560481', codice_integra: 'F00061', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true },
+    { id: 5, nome: 'Nordgarten AG', breve: 'Nordgarten', piva: 'DE811223344', codice_integra: 'F00064', paese: 'Germania', giorni_conferma: 28, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true },
+    { id: 6, nome: 'Lumière Déco SAS', breve: 'Lumière', piva: 'FR45678901234', codice_integra: 'F00067', paese: 'Francia', giorni_conferma: 21, giorno_bollettino: 10, maturazione: 'maturato', attivo: true },
+    { id: 7, nome: 'Orto Facile srl', breve: 'Orto Facile', piva: 'IT09876540151', codice_integra: 'F00070', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true },
+    { id: 8, nome: 'Ceramiche Valdera spa', breve: 'Valdera', piva: 'IT05432100506', codice_integra: 'F00073', paese: 'Italia', giorni_conferma: 30, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true },
+    { id: 9, nome: 'GreenLine BV', breve: 'GreenLine', piva: 'NL812345678B01', codice_integra: 'F00076', paese: 'Paesi Bassi', giorni_conferma: 28, giorno_bollettino: 10, maturazione: 'fatturato', attivo: true },
+    { id: 10, nome: 'Ferro & Fiori srl', breve: 'Ferro & Fiori', piva: 'IT03344550165', codice_integra: 'F00079', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, maturazione: 'maturato', attivo: true }
   ],
 
   /* Scaglioni: per sconto concesso al cliente, con data di validità (le percentuali possono
@@ -50,7 +58,28 @@ window.DATI_DEMO = {
     { id: 14, fornitore_id: 2, valido_dal: '2025-01-01', sconto: 10,  pct_agente: 6,  pct_sub: 3 },
     { id: 15, fornitore_id: 2, valido_dal: '2025-01-01', sconto: 100, pct_agente: 0,  pct_sub: 0 },
     { id: 21, fornitore_id: 3, valido_dal: '2025-01-01', sconto: 0,   pct_agente: 20, pct_sub: 12 },
-    { id: 22, fornitore_id: 3, valido_dal: '2025-01-01', sconto: 100, pct_agente: 0,  pct_sub: 0 }
+    { id: 22, fornitore_id: 3, valido_dal: '2025-01-01', sconto: 100, pct_agente: 0,  pct_sub: 0 },
+    { id: 23, fornitore_id: 4, valido_dal: '2025-01-01', sconto: 0, pct_agente: 15, pct_sub: 8 },
+    { id: 24, fornitore_id: 4, valido_dal: '2025-01-01', sconto: 5, pct_agente: 11, pct_sub: 5 },
+    { id: 25, fornitore_id: 4, valido_dal: '2025-01-01', sconto: 10, pct_agente: 7, pct_sub: 3 },
+    { id: 26, fornitore_id: 5, valido_dal: '2025-01-01', sconto: 0, pct_agente: 15, pct_sub: 8 },
+    { id: 27, fornitore_id: 5, valido_dal: '2025-01-01', sconto: 5, pct_agente: 11, pct_sub: 5 },
+    { id: 28, fornitore_id: 5, valido_dal: '2025-01-01', sconto: 10, pct_agente: 7, pct_sub: 3 },
+    { id: 29, fornitore_id: 6, valido_dal: '2025-01-01', sconto: 0, pct_agente: 15, pct_sub: 8 },
+    { id: 30, fornitore_id: 6, valido_dal: '2025-01-01', sconto: 5, pct_agente: 11, pct_sub: 5 },
+    { id: 31, fornitore_id: 6, valido_dal: '2025-01-01', sconto: 10, pct_agente: 7, pct_sub: 3 },
+    { id: 32, fornitore_id: 7, valido_dal: '2025-01-01', sconto: 0, pct_agente: 15, pct_sub: 8 },
+    { id: 33, fornitore_id: 7, valido_dal: '2025-01-01', sconto: 5, pct_agente: 11, pct_sub: 5 },
+    { id: 34, fornitore_id: 7, valido_dal: '2025-01-01', sconto: 10, pct_agente: 7, pct_sub: 3 },
+    { id: 35, fornitore_id: 8, valido_dal: '2025-01-01', sconto: 0, pct_agente: 15, pct_sub: 8 },
+    { id: 36, fornitore_id: 8, valido_dal: '2025-01-01', sconto: 5, pct_agente: 11, pct_sub: 5 },
+    { id: 37, fornitore_id: 8, valido_dal: '2025-01-01', sconto: 10, pct_agente: 7, pct_sub: 3 },
+    { id: 38, fornitore_id: 9, valido_dal: '2025-01-01', sconto: 0, pct_agente: 15, pct_sub: 8 },
+    { id: 39, fornitore_id: 9, valido_dal: '2025-01-01', sconto: 5, pct_agente: 11, pct_sub: 5 },
+    { id: 40, fornitore_id: 9, valido_dal: '2025-01-01', sconto: 10, pct_agente: 7, pct_sub: 3 },
+    { id: 41, fornitore_id: 10, valido_dal: '2025-01-01', sconto: 0, pct_agente: 15, pct_sub: 8 },
+    { id: 42, fornitore_id: 10, valido_dal: '2025-01-01', sconto: 5, pct_agente: 11, pct_sub: 5 },
+    { id: 43, fornitore_id: 10, valido_dal: '2025-01-01', sconto: 10, pct_agente: 7, pct_sub: 3 }
   ],
 
   /* Eccezione per singolo subagente: Bastasin prende il 3% sullo scaglione Gries a sconto 1%. */
@@ -76,7 +105,17 @@ window.DATI_DEMO = {
     { id: 5, cliente_piva: '01573540439', fornitore_id: 1, subagente_id: 3, sconto: 10, codice: 'K-11036' },
     { id: 6, cliente_piva: '05328730963', fornitore_id: 2, subagente_id: 3, sconto: 5,  codice: 'GA-2304' },
     { id: 7, cliente_piva: '02289430245', fornitore_id: 3, subagente_id: 4, sconto: 0,  codice: 'IN-3150' },
-    { id: 8, cliente_piva: '02633860254', fornitore_id: 2, subagente_id: 4, sconto: 3,  codice: 'GA-2389' }
+    { id: 8, cliente_piva: '02633860254', fornitore_id: 2, subagente_id: 4, sconto: 3,  codice: 'GA-2389' },
+    { id: 9, cliente_piva: '03987650157', fornitore_id: 1, subagente_id: 3, sconto: 0, codice: 'K-11290' },
+    { id: 10, cliente_piva: '03987650157', fornitore_id: 2, subagente_id: 2, sconto: 0, codice: 'GA-2402' },
+    { id: 11, cliente_piva: '03987650157', fornitore_id: 3, subagente_id: 4, sconto: 0, codice: 'IN-3301' },
+    { id: 12, cliente_piva: '03987650157', fornitore_id: 4, subagente_id: 1, sconto: 0, codice: 'RT-4128' },
+    { id: 13, cliente_piva: '03987650157', fornitore_id: 5, subagente_id: 1, sconto: 5, codice: 'NG-4135' },
+    { id: 14, cliente_piva: '03987650157', fornitore_id: 6, subagente_id: 1, sconto: 0, codice: 'LD-4142' },
+    { id: 15, cliente_piva: '03987650157', fornitore_id: 7, subagente_id: 1, sconto: 0, codice: 'OFA-4149' },
+    { id: 16, cliente_piva: '03987650157', fornitore_id: 8, subagente_id: 4, sconto: 5, codice: 'CV-4156' },
+    { id: 17, cliente_piva: '03987650157', fornitore_id: 9, subagente_id: 1, sconto: 0, codice: '' },
+    { id: 18, cliente_piva: '03987650157', fornitore_id: 10, subagente_id: 1, sconto: 5, codice: 'FF-4170' }
   ],
 
   /* Pratiche: fascicoli di documenti. Importi dei documenti = somma delle righe. */
@@ -729,7 +768,132 @@ window.DATI_DEMO = {
         { codice: 'GASPER-K304', descrizione: 'Cassa in legno decor 30x30', qta: 20, prezzo: 23.00 },
         { codice: 'ORTO-GRA8', descrizione: 'Pacciamatura in corteccia 50 L', qta: 40, prezzo: 11.00 },
         { codice: 'GASPER-H604', descrizione: 'Vaso alto in resina 60 cm', qta: 6, prezzo: 66.00 },
-        { codice: 'GASPER-F1206', descrizione: 'Fioriera rettangolare in resina 120 cm', qta: 4, prezzo: 48.00 } ] } ] }
+        { codice: 'GASPER-F1206', descrizione: 'Fioriera rettangolare in resina 120 cm', qta: 4, prezzo: 48.00 } ] } ] },
+    { id: 17, numero: 'OF/2025/300', fornitore_id: 1, cliente_piva: '03987650157', data: '2025-01-05', documenti: [
+      { id: 1701, tipo: 'ordine', numero: 'OF/2025/300', data: '2025-01-05', file: 'ordine_OF-2025-300.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 4, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 36, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] },
+      { id: 1702, tipo: 'conferma', numero: 'CF-1301', data: '2025-01-11', file: 'conferma_CF-1301.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 4, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 36, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] },
+      { id: 1703, tipo: 'fattura', numero: 'FT-2025-1301', data: '2025-01-25', file: 'fattura_FT-2025-1301.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 4, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 36, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] } ] },
+    { id: 18, numero: 'OF/2025/301', fornitore_id: 2, cliente_piva: '03987650157', data: '2025-06-08', documenti: [
+      { id: 1704, tipo: 'ordine', numero: 'OF/2025/301', data: '2025-06-08', file: 'ordine_OF-2025-301.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 4, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 6, prezzo: 13.00 } ] },
+      { id: 1705, tipo: 'conferma', numero: 'CF-2302', data: '2025-06-14', file: 'conferma_CF-2302.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 4, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 6, prezzo: 13.00 } ] },
+      { id: 1706, tipo: 'fattura', numero: 'FT-2025-2302', data: '2025-06-28', file: 'fattura_FT-2025-2302.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 4, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 6, prezzo: 13.00 } ] } ] },
+    { id: 19, numero: 'OF/2025/302', fornitore_id: 3, cliente_piva: '03987650157', data: '2025-11-11', documenti: [
+      { id: 1707, tipo: 'ordine', numero: 'OF/2025/302', data: '2025-11-11', file: 'ordine_OF-2025-302.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 24, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 24, prezzo: 11.90 } ] },
+      { id: 1708, tipo: 'conferma', numero: 'CF-3303', data: '2025-11-17', file: 'conferma_CF-3303.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 24, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 24, prezzo: 11.90 } ] },
+      { id: 1709, tipo: 'fattura', numero: 'FT-2025-3303', data: '2025-12-01', file: 'fattura_FT-2025-3303.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 24, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 24, prezzo: 11.90 } ] } ] },
+    { id: 20, numero: 'OF/2025/303', fornitore_id: 4, cliente_piva: '03987650157', data: '2025-05-14', documenti: [
+      { id: 1710, tipo: 'ordine', numero: 'OF/2025/303', data: '2025-05-14', file: 'ordine_OF-2025-303.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 20, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 4, prezzo: 42.00 } ] },
+      { id: 1711, tipo: 'conferma', numero: 'CF-4304', data: '2025-05-20', file: 'conferma_CF-4304.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 20, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 4, prezzo: 42.00 } ] },
+      { id: 1712, tipo: 'fattura', numero: 'FT-2025-4304', data: '2025-06-03', file: 'fattura_FT-2025-4304.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 20, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 4, prezzo: 42.00 } ] } ] },
+    { id: 21, numero: 'OF/2025/304', fornitore_id: 5, cliente_piva: '03987650157', data: '2025-10-17', documenti: [
+      { id: 1713, tipo: 'ordine', numero: 'OF/2025/304', data: '2025-10-17', file: 'ordine_OF-2025-304.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 20, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 20, prezzo: 74.00 } ] },
+      { id: 1714, tipo: 'conferma', numero: 'CF-5305', data: '2025-10-23', file: 'conferma_CF-5305.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 20, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 20, prezzo: 74.00 } ] },
+      { id: 1715, tipo: 'fattura', numero: 'FT-2025-5305', data: '2025-11-06', file: 'fattura_FT-2025-5305.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 20, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 20, prezzo: 74.00 } ] } ] },
+    { id: 22, numero: 'OF/2025/305', fornitore_id: 6, cliente_piva: '03987650157', data: '2025-04-20', documenti: [
+      { id: 1716, tipo: 'ordine', numero: 'OF/2025/305', data: '2025-04-20', file: 'ordine_OF-2025-305.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 12, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 4, prezzo: 9.90 } ] },
+      { id: 1717, tipo: 'conferma', numero: 'CF-6306', data: '2025-04-26', file: 'conferma_CF-6306.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 12, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 4, prezzo: 9.90 } ] },
+      { id: 1718, tipo: 'fattura', numero: 'FT-2025-6306', data: '2025-05-10', file: 'fattura_FT-2025-6306.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 12, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 4, prezzo: 9.90 } ] } ] },
+    { id: 23, numero: 'OF/2025/306', fornitore_id: 7, cliente_piva: '03987650157', data: '2025-09-23', documenti: [
+      { id: 1719, tipo: 'ordine', numero: 'OF/2025/306', data: '2025-09-23', file: 'ordine_OF-2025-306.pdf', righe: [ { codice: 'OFA-SEM', descrizione: 'Semenzaio 24 fori', qta: 6, prezzo: 6.20 }, { codice: 'OFA-TUN', descrizione: 'Tunnel per orto 3 m', qta: 4, prezzo: 34.00 } ] },
+      { id: 1720, tipo: 'conferma', numero: 'CF-7307', data: '2025-09-29', file: 'conferma_CF-7307.pdf', righe: [ { codice: 'OFA-SEM', descrizione: 'Semenzaio 24 fori', qta: 6, prezzo: 6.20 }, { codice: 'OFA-TUN', descrizione: 'Tunnel per orto 3 m', qta: 4, prezzo: 34.00 } ] },
+      { id: 1721, tipo: 'fattura', numero: 'FT-2025-7307', data: '2025-10-13', file: 'fattura_FT-2025-7307.pdf', righe: [ { codice: 'OFA-SEM', descrizione: 'Semenzaio 24 fori', qta: 6, prezzo: 6.20 }, { codice: 'OFA-TUN', descrizione: 'Tunnel per orto 3 m', qta: 4, prezzo: 34.00 } ] } ] },
+    { id: 24, numero: 'OF/2025/307', fornitore_id: 8, cliente_piva: '03987650157', data: '2025-03-06', documenti: [
+      { id: 1722, tipo: 'ordine', numero: 'OF/2025/307', data: '2025-03-06', file: 'ordine_OF-2025-307.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 20, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 36, prezzo: 18.00 } ] },
+      { id: 1723, tipo: 'conferma', numero: 'CF-8308', data: '2025-03-12', file: 'conferma_CF-8308.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 20, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 36, prezzo: 18.00 } ] },
+      { id: 1724, tipo: 'fattura', numero: 'FT-2025-8308', data: '2025-03-26', file: 'fattura_FT-2025-8308.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 20, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 36, prezzo: 18.00 } ] } ] },
+    { id: 25, numero: 'OF/2025/308', fornitore_id: 9, cliente_piva: '03987650157', data: '2025-08-09', documenti: [
+      { id: 1725, tipo: 'ordine', numero: 'OF/2025/308', data: '2025-08-09', file: 'ordine_OF-2025-308.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 6, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 10, prezzo: 27.00 } ] },
+      { id: 1726, tipo: 'conferma', numero: 'CF-9309', data: '2025-08-15', file: 'conferma_CF-9309.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 6, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 10, prezzo: 27.00 } ] },
+      { id: 1727, tipo: 'fattura', numero: 'FT-2025-9309', data: '2025-08-29', file: 'fattura_FT-2025-9309.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 6, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 10, prezzo: 27.00 } ] } ] },
+    { id: 26, numero: 'OF/2025/309', fornitore_id: 10, cliente_piva: '03987650157', data: '2025-02-12', documenti: [
+      { id: 1728, tipo: 'ordine', numero: 'OF/2025/309', data: '2025-02-12', file: 'ordine_OF-2025-309.pdf', righe: [ { codice: 'FF-ARCO', descrizione: 'Arco per rampicanti', qta: 12, prezzo: 68.00 }, { codice: 'FF-GRIG', descrizione: 'Grigliato in ferro 90 cm', qta: 6, prezzo: 45.00 } ] },
+      { id: 1729, tipo: 'conferma', numero: 'CF-10310', data: '2025-02-18', file: 'conferma_CF-10310.pdf', righe: [ { codice: 'FF-ARCO', descrizione: 'Arco per rampicanti', qta: 12, prezzo: 68.00 }, { codice: 'FF-GRIG', descrizione: 'Grigliato in ferro 90 cm', qta: 6, prezzo: 45.00 } ] },
+      { id: 1730, tipo: 'fattura', numero: 'FT-2025-10310', data: '2025-03-04', file: 'fattura_FT-2025-10310.pdf', righe: [ { codice: 'FF-ARCO', descrizione: 'Arco per rampicanti', qta: 12, prezzo: 68.00 }, { codice: 'FF-GRIG', descrizione: 'Grigliato in ferro 90 cm', qta: 6, prezzo: 45.00 } ] } ] },
+    { id: 27, numero: 'OF/2025/310', fornitore_id: 1, cliente_piva: '03987650157', data: '2025-07-15', documenti: [
+      { id: 1731, tipo: 'ordine', numero: 'OF/2025/310', data: '2025-07-15', file: 'ordine_OF-2025-310.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 20, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 4, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] },
+      { id: 1732, tipo: 'conferma', numero: 'CF-1311', data: '2025-07-21', file: 'conferma_CF-1311.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 20, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 4, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] },
+      { id: 1733, tipo: 'fattura', numero: 'FT-2025-1311', data: '2025-08-04', file: 'fattura_FT-2025-1311.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 20, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 4, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] } ] },
+    { id: 28, numero: 'OF/2025/311', fornitore_id: 2, cliente_piva: '03987650157', data: '2025-01-18', documenti: [
+      { id: 1734, tipo: 'ordine', numero: 'OF/2025/311', data: '2025-01-18', file: 'ordine_OF-2025-311.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 10, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 20, prezzo: 13.00 } ] },
+      { id: 1735, tipo: 'conferma', numero: 'CF-2312', data: '2025-01-24', file: 'conferma_CF-2312.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 10, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 20, prezzo: 13.00 } ] },
+      { id: 1736, tipo: 'fattura', numero: 'FT-2025-2312', data: '2025-02-07', file: 'fattura_FT-2025-2312.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 10, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 20, prezzo: 13.00 } ] } ] },
+    { id: 29, numero: 'OF/2025/312', fornitore_id: 3, cliente_piva: '03987650157', data: '2025-06-21', documenti: [
+      { id: 1737, tipo: 'ordine', numero: 'OF/2025/312', data: '2025-06-21', file: 'ordine_OF-2025-312.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 36, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 24, prezzo: 11.90 } ] },
+      { id: 1738, tipo: 'conferma', numero: 'CF-3313', data: '2025-06-27', file: 'conferma_CF-3313.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 36, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 24, prezzo: 11.90 } ] },
+      { id: 1739, tipo: 'fattura', numero: 'FT-2025-3313', data: '2025-07-11', file: 'fattura_FT-2025-3313.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 36, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 24, prezzo: 11.90 } ] } ] },
+    { id: 30, numero: 'OF/2025/313', fornitore_id: 4, cliente_piva: '03987650157', data: '2025-11-24', documenti: [
+      { id: 1740, tipo: 'ordine', numero: 'OF/2025/313', data: '2025-11-24', file: 'ordine_OF-2025-313.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 6, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 4, prezzo: 42.00 } ] },
+      { id: 1741, tipo: 'conferma', numero: 'CF-4314', data: '2025-11-30', file: 'conferma_CF-4314.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 6, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 4, prezzo: 42.00 } ] },
+      { id: 1742, tipo: 'fattura', numero: 'FT-2025-4314', data: '2025-12-14', file: 'fattura_FT-2025-4314.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 6, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 4, prezzo: 42.00 } ] } ] },
+    { id: 31, numero: 'OF/2025/314', fornitore_id: 5, cliente_piva: '03987650157', data: '2025-05-07', documenti: [
+      { id: 1743, tipo: 'ordine', numero: 'OF/2025/314', data: '2025-05-07', file: 'ordine_OF-2025-314.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 20, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 20, prezzo: 74.00 } ] },
+      { id: 1744, tipo: 'conferma', numero: 'CF-5315', data: '2025-05-13', file: 'conferma_CF-5315.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 20, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 20, prezzo: 74.00 } ] },
+      { id: 1745, tipo: 'fattura', numero: 'FT-2025-5315', data: '2025-05-27', file: 'fattura_FT-2025-5315.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 20, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 20, prezzo: 74.00 } ] } ] },
+    { id: 32, numero: 'OF/2025/315', fornitore_id: 6, cliente_piva: '03987650157', data: '2025-10-10', documenti: [
+      { id: 1746, tipo: 'ordine', numero: 'OF/2025/315', data: '2025-10-10', file: 'ordine_OF-2025-315.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 24, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 6, prezzo: 9.90 } ] },
+      { id: 1747, tipo: 'conferma', numero: 'CF-6316', data: '2025-10-16', file: 'conferma_CF-6316.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 24, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 6, prezzo: 9.90 } ] },
+      { id: 1748, tipo: 'fattura', numero: 'FT-2025-6316', data: '2025-10-30', file: 'fattura_FT-2025-6316.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 24, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 6, prezzo: 9.90 } ] } ] },
+    { id: 33, numero: 'OF/2025/316', fornitore_id: 7, cliente_piva: '03987650157', data: '2025-04-13', documenti: [
+      { id: 1749, tipo: 'ordine', numero: 'OF/2025/316', data: '2025-04-13', file: 'ordine_OF-2025-316.pdf', righe: [ { codice: 'OFA-SEM', descrizione: 'Semenzaio 24 fori', qta: 10, prezzo: 6.20 }, { codice: 'OFA-TUN', descrizione: 'Tunnel per orto 3 m', qta: 4, prezzo: 34.00 } ] },
+      { id: 1750, tipo: 'conferma', numero: 'CF-7317', data: '2025-04-19', file: 'conferma_CF-7317.pdf', righe: [ { codice: 'OFA-SEM', descrizione: 'Semenzaio 24 fori', qta: 10, prezzo: 6.20 }, { codice: 'OFA-TUN', descrizione: 'Tunnel per orto 3 m', qta: 4, prezzo: 34.00 } ] },
+      { id: 1751, tipo: 'fattura', numero: 'FT-2025-7317', data: '2025-05-03', file: 'fattura_FT-2025-7317.pdf', righe: [ { codice: 'OFA-SEM', descrizione: 'Semenzaio 24 fori', qta: 10, prezzo: 6.20 }, { codice: 'OFA-TUN', descrizione: 'Tunnel per orto 3 m', qta: 4, prezzo: 34.00 } ] } ] },
+    { id: 34, numero: 'OF/2025/317', fornitore_id: 8, cliente_piva: '03987650157', data: '2025-09-16', documenti: [
+      { id: 1752, tipo: 'ordine', numero: 'OF/2025/317', data: '2025-09-16', file: 'ordine_OF-2025-317.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 20, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 24, prezzo: 18.00 } ] },
+      { id: 1753, tipo: 'conferma', numero: 'CF-8318', data: '2025-09-22', file: 'conferma_CF-8318.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 20, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 24, prezzo: 18.00 } ] },
+      { id: 1754, tipo: 'fattura', numero: 'FT-2025-8318', data: '2025-10-06', file: 'fattura_FT-2025-8318.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 20, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 24, prezzo: 18.00 } ] } ] },
+    { id: 35, numero: 'OF/2025/318', fornitore_id: 9, cliente_piva: '03987650157', data: '2025-03-19', documenti: [
+      { id: 1755, tipo: 'ordine', numero: 'OF/2025/318', data: '2025-03-19', file: 'ordine_OF-2025-318.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 4, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 20, prezzo: 27.00 } ] },
+      { id: 1756, tipo: 'conferma', numero: 'CF-9319', data: '2025-03-25', file: 'conferma_CF-9319.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 4, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 20, prezzo: 27.00 } ] },
+      { id: 1757, tipo: 'fattura', numero: 'FT-2025-9319', data: '2025-04-08', file: 'fattura_FT-2025-9319.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 4, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 20, prezzo: 27.00 } ] } ] },
+    { id: 36, numero: 'OF/2025/319', fornitore_id: 10, cliente_piva: '03987650157', data: '2025-08-22', documenti: [
+      { id: 1758, tipo: 'ordine', numero: 'OF/2025/319', data: '2025-08-22', file: 'ordine_OF-2025-319.pdf', righe: [ { codice: 'FF-ARCO', descrizione: 'Arco per rampicanti', qta: 4, prezzo: 68.00 }, { codice: 'FF-GRIG', descrizione: 'Grigliato in ferro 90 cm', qta: 20, prezzo: 45.00 } ] },
+      { id: 1759, tipo: 'conferma', numero: 'CF-10320', data: '2025-08-28', file: 'conferma_CF-10320.pdf', righe: [ { codice: 'FF-ARCO', descrizione: 'Arco per rampicanti', qta: 4, prezzo: 68.00 }, { codice: 'FF-GRIG', descrizione: 'Grigliato in ferro 90 cm', qta: 20, prezzo: 45.00 } ] },
+      { id: 1760, tipo: 'fattura', numero: 'FT-2025-10320', data: '2025-09-11', file: 'fattura_FT-2025-10320.pdf', righe: [ { codice: 'FF-ARCO', descrizione: 'Arco per rampicanti', qta: 4, prezzo: 68.00 }, { codice: 'FF-GRIG', descrizione: 'Grigliato in ferro 90 cm', qta: 20, prezzo: 45.00 } ] } ] },
+    { id: 37, numero: 'OF/2025/320', fornitore_id: 1, cliente_piva: '03987650157', data: '2025-02-05', documenti: [
+      { id: 1761, tipo: 'ordine', numero: 'OF/2025/320', data: '2025-02-05', file: 'ordine_OF-2025-320.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 6, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 12, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 24, prezzo: 13.80 } ] },
+      { id: 1762, tipo: 'conferma', numero: 'CF-1321', data: '2025-02-11', file: 'conferma_CF-1321.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 6, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 12, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 24, prezzo: 13.80 } ] },
+      { id: 1763, tipo: 'fattura', numero: 'FT-2025-1321', data: '2025-02-25', file: 'fattura_FT-2025-1321.pdf', righe: [ { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 6, prezzo: 6.40 }, { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 12, prezzo: 15.00 }, { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 24, prezzo: 13.80 } ] } ] },
+    { id: 38, numero: 'OF/2025/321', fornitore_id: 2, cliente_piva: '03987650157', data: '2025-07-08', documenti: [
+      { id: 1764, tipo: 'ordine', numero: 'OF/2025/321', data: '2025-07-08', file: 'ordine_OF-2025-321.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 20, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 12, prezzo: 13.00 } ] },
+      { id: 1765, tipo: 'conferma', numero: 'CF-2322', data: '2025-07-14', file: 'conferma_CF-2322.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 20, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 12, prezzo: 13.00 } ] },
+      { id: 1766, tipo: 'fattura', numero: 'FT-2025-2322', data: '2025-07-28', file: 'fattura_FT-2025-2322.pdf', righe: [ { codice: 'GASPER-A1', descrizione: 'Contenitore in resina 60 L', qta: 20, prezzo: 29.60 }, { codice: 'GASPER-C203', descrizione: 'Contenitore in resina 20 L', qta: 12, prezzo: 13.00 } ] } ] },
+    { id: 39, numero: 'OF/2025/322', fornitore_id: 3, cliente_piva: '03987650157', data: '2025-01-11', documenti: [
+      { id: 1767, tipo: 'ordine', numero: 'OF/2025/322', data: '2025-01-11', file: 'ordine_OF-2025-322.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 36, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 10, prezzo: 11.90 } ] },
+      { id: 1768, tipo: 'conferma', numero: 'CF-3323', data: '2025-01-17', file: 'conferma_CF-3323.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 36, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 10, prezzo: 11.90 } ] },
+      { id: 1769, tipo: 'fattura', numero: 'FT-2025-3323', data: '2025-01-31', file: 'fattura_FT-2025-3323.pdf', righe: [ { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 36, prezzo: 18.50 }, { codice: 'XMAS-CA34', descrizione: 'Candele LED, conf. 6', qta: 10, prezzo: 11.90 } ] } ] },
+    { id: 40, numero: 'OF/2025/323', fornitore_id: 4, cliente_piva: '03987650157', data: '2025-06-14', documenti: [
+      { id: 1770, tipo: 'ordine', numero: 'OF/2025/323', data: '2025-06-14', file: 'ordine_OF-2025-323.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 12, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 20, prezzo: 42.00 } ] },
+      { id: 1771, tipo: 'conferma', numero: 'CF-4324', data: '2025-06-20', file: 'conferma_CF-4324.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 12, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 20, prezzo: 42.00 } ] },
+      { id: 1772, tipo: 'fattura', numero: 'FT-2025-4324', data: '2025-07-04', file: 'fattura_FT-2025-4324.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 12, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 20, prezzo: 42.00 } ] } ] },
+    { id: 41, numero: 'OF/2025/324', fornitore_id: 5, cliente_piva: '03987650157', data: '2025-11-17', documenti: [
+      { id: 1773, tipo: 'ordine', numero: 'OF/2025/324', data: '2025-11-17', file: 'ordine_OF-2025-324.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 12, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 10, prezzo: 74.00 } ] },
+      { id: 1774, tipo: 'conferma', numero: 'CF-5325', data: '2025-11-23', file: 'conferma_CF-5325.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 12, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 10, prezzo: 74.00 } ] },
+      { id: 1775, tipo: 'fattura', numero: 'FT-2025-5325', data: '2025-12-07', file: 'fattura_FT-2025-5325.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 12, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 10, prezzo: 74.00 } ] } ] },
+    { id: 42, numero: 'OF/2025/325', fornitore_id: 6, cliente_piva: '03987650157', data: '2025-05-20', documenti: [
+      { id: 1776, tipo: 'ordine', numero: 'OF/2025/325', data: '2025-05-20', file: 'ordine_OF-2025-325.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 10, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 6, prezzo: 9.90 } ] },
+      { id: 1777, tipo: 'conferma', numero: 'CF-6326', data: '2025-05-26', file: 'conferma_CF-6326.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 10, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 6, prezzo: 9.90 } ] },
+      { id: 1778, tipo: 'fattura', numero: 'FT-2025-6326', data: '2025-06-09', file: 'fattura_FT-2025-6326.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 10, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 6, prezzo: 9.90 } ] } ] },
+    { id: 43, numero: 'OF/2026/326', fornitore_id: 4, cliente_piva: '03987650157', data: '2026-08-10', documenti: [
+      { id: 1779, tipo: 'ordine', numero: 'OF/2026/326', data: '2026-08-10', file: 'ordine_OF-2026-326.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 36, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 6, prezzo: 42.00 } ] },
+      { id: 1780, tipo: 'conferma', numero: 'CF-4327', data: '2026-08-16', file: 'conferma_CF-4327.pdf', righe: [ { codice: 'RT-ORC70', descrizione: 'Orcio toscano h 70 cm', qta: 36, prezzo: 89.00 }, { codice: 'RT-LIM40', descrizione: 'Conca per limoni Ø 40 cm', qta: 6, prezzo: 42.00 } ] } ] },
+    { id: 44, numero: 'OF/2026/327', fornitore_id: 5, cliente_piva: '03987650157', data: '2026-08-13', documenti: [
+      { id: 1781, tipo: 'ordine', numero: 'OF/2026/327', data: '2026-08-13', file: 'ordine_OF-2026-327.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 24, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 36, prezzo: 74.00 } ] },
+      { id: 1782, tipo: 'conferma', numero: 'CF-5328', data: '2026-08-19', file: 'conferma_CF-5328.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 24, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 36, prezzo: 74.00 } ] } ] },
+    { id: 45, numero: 'OF/2026/328', fornitore_id: 6, cliente_piva: '03987650157', data: '2026-08-16', documenti: [
+      { id: 1783, tipo: 'ordine', numero: 'OF/2026/328', data: '2026-08-16', file: 'ordine_OF-2026-328.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 6, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 4, prezzo: 9.90 } ] },
+      { id: 1784, tipo: 'conferma', numero: 'CF-6329', data: '2026-08-22', file: 'conferma_CF-6329.pdf', righe: [ { codice: 'LD-LANT', descrizione: 'Lanterna in vetro h 40 cm', qta: 6, prezzo: 24.50 }, { codice: 'LD-BOUG', descrizione: 'Portacandela in ferro', qta: 4, prezzo: 9.90 } ] } ] },
+    { id: 46, numero: 'OF/2026/329', fornitore_id: 8, cliente_piva: '03987650157', data: '2026-08-19', documenti: [
+      { id: 1785, tipo: 'ordine', numero: 'OF/2026/329', data: '2026-08-19', file: 'ordine_OF-2026-329.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 20, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 10, prezzo: 18.00 } ] },
+      { id: 1786, tipo: 'conferma', numero: 'CF-8330', data: '2026-08-25', file: 'conferma_CF-8330.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 20, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 10, prezzo: 18.00 } ] } ] },
+    { id: 47, numero: 'OF/2026/330', fornitore_id: 9, cliente_piva: '03987650157', data: '2026-08-22', documenti: [
+      { id: 1787, tipo: 'ordine', numero: 'OF/2026/330', data: '2026-08-22', file: 'ordine_OF-2026-330.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 20, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 12, prezzo: 27.00 } ] },
+      { id: 1788, tipo: 'conferma', numero: 'CF-9331', data: '2026-08-28', file: 'conferma_CF-9331.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 20, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 12, prezzo: 27.00 } ] } ] },
+    { id: 48, numero: 'OF/2026/331', fornitore_id: 5, cliente_piva: '03987650157', data: '2026-09-01', documenti: [
+      { id: 1789, tipo: 'ordine', numero: 'OF/2026/331', data: '2026-09-01', file: 'ordine_OF-2026-331.pdf', righe: [ { codice: 'NG-HOCH', descrizione: 'Aiuola rialzata 120 cm', qta: 10, prezzo: 129.00 }, { codice: 'NG-KOMP', descrizione: 'Compostiera 400 L', qta: 24, prezzo: 74.00 } ] } ] },
+    { id: 49, numero: 'OF/2026/332', fornitore_id: 8, cliente_piva: '03987650157', data: '2026-09-02', documenti: [
+      { id: 1790, tipo: 'ordine', numero: 'OF/2026/332', data: '2026-09-02', file: 'ordine_OF-2026-332.pdf', righe: [ { codice: 'CV-CIOT', descrizione: 'Ciotola smaltata Ø 35 cm', qta: 12, prezzo: 21.00 }, { codice: 'CV-VASO', descrizione: 'Vaso smaltato Ø 28 cm', qta: 10, prezzo: 18.00 } ] } ] },
+    { id: 50, numero: 'OF/2026/333', fornitore_id: 9, cliente_piva: '03987650157', data: '2026-09-03', documenti: [
+      { id: 1791, tipo: 'ordine', numero: 'OF/2026/333', data: '2026-09-03', file: 'ordine_OF-2026-333.pdf', righe: [ { codice: 'GL-IRR', descrizione: 'Kit irrigazione 20 m', qta: 20, prezzo: 39.00 }, { codice: 'GL-TUBO', descrizione: 'Tubo da giardino 25 m', qta: 4, prezzo: 27.00 } ] } ] }
   ],
 
   /* Documenti caricati e letti in automatico, da controllare e abbinare a una pratica.

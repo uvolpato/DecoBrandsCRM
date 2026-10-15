@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.2 — la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.3 — scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -1131,13 +1131,19 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
   fornitore; segmenti *Tutti · Con agenzie · Senza agenzie · Vendita diretta*; colonne
   cliente (con città e codice Integra), n° agenzie, pratiche aperte.
 - **Scheda** (destra): anagrafica in **sola lettura** con la nota "anagrafica da Integra";
-  pannello **Agenzie** (fornitore, codice cliente del fornitore, seguito da, sconto,
-  provvigione totale con la quota del subagente) con *Aggiungi agenzia*; clic su una riga
-  apre la modifica, con *Elimina*. Il cliente è fisso; fornitore e subagente sono campi di
-  ricerca (§16.4); gli sconti proposti seguono gli scaglioni del fornitore scelto. Vincoli:
-  un solo subagente per cliente × fornitore (§5.10), codice unico per fornitore.
-- Pannello **Attività**: pratiche aperte, provvigioni ai subagenti del trimestre, ultime
-  pratiche del cliente.
+  sotto, due **schede** (un cliente può avere molte agenzie e molte pratiche; si ricorda
+  l'ultima aperta):
+  - **Agenzie** (scheda principale; contatore giallo se manca un codice cliente): ricerca
+    per fornitore, codice o subagente, *Aggiungi agenzia*; colonne fornitore, codice
+    cliente del fornitore, seguito da, provvigione totale con quota del subagente e
+    sconto, pratiche aperte con quel fornitore. Clic su una riga apre la modifica, con
+    *Elimina*. Il cliente è fisso; fornitore e subagente sono campi di ricerca (§16.4); gli
+    sconti proposti seguono gli scaglioni del fornitore scelto. Vincoli: un solo
+    subagente per cliente × fornitore (§5.10), codice unico per fornitore.
+  - **Pratiche** (meno usata, con filtro): segmenti *Aperte · In ritardo · Fatturate ·
+    Tutte* (iniziale *Aperte*), fornitore, ricerca per numero; colonne pratica,
+    fornitore, data, importo, stato; clic apre la pratica; nel piede le provvigioni ai
+    subagenti del trimestre.
 - **Vista inversa** nel dettaglio fornitore (§7.4): "Clienti seguiti per <fornitore>", in
   sola lettura; clic sul cliente apre la sua scheda.
 - **Vendita diretta**: il flag arriva da Integra; la gestione dei clienti di sola vendita
