@@ -93,14 +93,6 @@
     const dx = CRM.Pannello(col, { titolo: M.TIPI[sel.tipo] + ' ' + sel.numero + ' · ' + f.breve, riempi: true, nota: CRM.icona('file') + ' ' + e(sel.file),
       azioni: [{ etichetta: 'Correggi i dati letti', onClick: () => correggi(sel), conta: stl.n || null, contaVariante: stl.livello === 'bassa' ? 'errore' : 'attesa',
         contaTitolo: stl.n + (stl.n === 1 ? ' punto da controllare' : ' punti da controllare') }, { etichetta: 'Scarta il documento', variante: 'pericolo', onClick: () => scarta(sel) }] });
-    if (stl.n) {
-      const a = CRM.blocco(dx.corpo, 'avviso-lettura ' + (stl.livello === 'bassa' ? 'bassa' : 'attesa'));
-      a.innerHTML = CRM.icona('avviso') + '<div><b>' + (stl.livello === 'bassa' ? 'Lettura con affidabilità bassa' : 'Lettura da controllare') + '</b> · ' +
-        stl.n + (stl.n === 1 ? ' punto da controllare: ' : ' punti da controllare: ') +
-        e(stl.controlli.map(c => c.testo).concat(stl.campi.map(c => nomeCampo(c, sel.tipo === 'bollettino').toLowerCase())).join('; ')) + '</div>' +
-        '<button type="button" class="btn piccolo ' + (stl.livello === 'bassa' ? '' : 'sec') + '">Correggi i dati letti</button>';
-      CRM.$('button', a).addEventListener('click', () => correggi(sel));
-    }
     dx.corpo.insertAdjacentHTML('beforeend', '<h3>Letto dal documento</h3>');
     CRM.Dettagli(dx.corpo, (boll ? [
       { etichetta: 'Fornitore', valore: e(f.nome) },
