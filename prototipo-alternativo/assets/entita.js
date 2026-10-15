@@ -35,7 +35,7 @@
 
   CRM.Entita('subagente', {
     titolo: 'Subagente',
-    voci: () => M.S.subagenti, chiave: s => s.id, testo: s => s.nome, dettaglio: s => s.email || '',
+    voci: () => M.S.subagenti.filter(s => s.attivo !== false), chiave: s => s.id, testo: s => s.nome, dettaglio: s => s.email || '',
     colonne: [
       { key: 'nome', header: 'Subagente', grow: true },
       { key: 'email', header: 'Email' },

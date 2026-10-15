@@ -82,14 +82,15 @@
   /* ---------- Subagenti: DataTable + Pannello (DataTable clienti, Elenco eccezioni) ---------- */
   const pctSub = (a, s) => { const sc = M.scaglione(a.fornitore_id, a.sconto, M.oggi()); const ex = sc && M.S.eccezioni.find(x => x.scaglione_id === sc.id && x.subagente_id === s.id); return ex ? ex.pct_sub : sc ? sc.pct_sub : 0; };
   function vistaSubagenti(idSel) {
-    const corpo = CRM.Pagina({ voce: 'subagenti', titolo: 'Subagenti', pieno: true, sottotitolo: 'Chi segue quali clienti e quanto ha maturato nel trimestre in corso. L’agente è uno solo: Decobrands SRL.' });
+    const corpo = CRM.Pagina({ voce: 'subagenti', titolo: 'Subagenti', pieno: true, sottotitolo: 'Chi segue quali clienti e quanto ha maturato nel trimestre in corso. L’agente è uno solo: Decobrands SRL.',
+      azioni: [{ etichetta: 'Nuovo subagente', icona: 'piu', onClick: () => modificaSubagente(null) }] });
     const t = M.trimestre(M.oggi());
     const righe = M.righeLiquidazione(2026, t);
     const s = M.subagente(Number(idSel)) || M.S.subagenti[0];
     const col = CRM.blocco(corpo, 'colonne pari riempi');
     CRM.DataTable(CRM.blocco(col, 'riempi'), {
       colonne: [
-        { key: 'nome', header: 'Subagente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === s.id ? ' ' + CRM.stato('primario', 'aperto') : '') + '<span class="sec-riga">' + e(x.email) + '</span>' },
+        { key: 'nome', header: 'Subagente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.attivo === false ? ' ' + CRM.stato('neutro', 'non attivo') : '') + (x.id === s.id ? ' ' + CRM.stato('primario', 'aperto') : '') + '<span class="sec-riga">' + e(x.email || '') + (x.telefono ? ' · ' + e(x.telefono) : '') + '</span>' },
         { key: 'clienti', header: 'Clienti seguiti', tipo: 'numero', valore: x => M.S.abbinamenti.filter(a => a.subagente_id === x.id).length },
         { key: 'liq', header: t + '° trim. liquidabile', tipo: 'euro', totale: 'somma', valore: x => righe.filter(r => r.subagente_id === x.id && r.liquidabile).reduce((a, r) => a + r.provvigione, 0) },
         { key: 'att', header: 'In attesa', tipo: 'euro', totale: 'somma', valore: x => righe.filter(r => r.subagente_id === x.id && !r.liquidabile).reduce((a, r) => a + r.provvigione, 0) }
@@ -97,7 +98,15 @@
       righe: M.S.subagenti, rowClass: x => x.id === s.id ? 'selezionata' : '',
       onRowClick: x => { location.hash = '#/subagenti/' + x.id; }
     });
-    const dx = CRM.Pannello(col, { titolo: s.nome, riempi: true, azioni: [{ etichetta: 'Vedi la liquidazione', variante: 'testo', href: '#/liquidazioni/2026/' + t }] });
+    const dx = CRM.Pannello(col, { titolo: s.nome, riempi: true, azioni: [{ etichetta: 'Vedi la liquidazione', variante: 'testo', href: '#/liquidazioni/2026/' + t },
+      { etichetta: 'Modifica', onClick: () => modificaSubagente(s) }, { etichetta: 'Elimina', variante: 'pericolo', onClick: () => eliminaSubagente(s) }] });
+    CRM.Dettagli(dx.corpo, [
+      { etichetta: 'Email', valore: s.email ? e(s.email) : '<span class="testo-tenue">—</span>' },
+      { etichetta: 'Telefono', valore: s.telefono ? e(s.telefono) : '<span class="testo-tenue">—</span>' },
+      { etichetta: 'Codice fiscale / P.IVA', valore: s.cf ? e(s.cf) : '<span class="testo-tenue">—</span>' },
+      { etichetta: 'Stato', valore: s.attivo === false ? CRM.stato('neutro', 'Non attivo: non si può assegnare a nuovi clienti') : CRM.stato('ok', 'Attivo') }
+    ], { inColonne: true });
+    CRM.blocco(dx.corpo, '', 'height:8px;flex:none');
     dx.corpo.insertAdjacentHTML('beforeend', '<h3>Clienti seguiti</h3>');
     CRM.DataTable(dx.corpo, {
       compatta: true, naturale: true, righe: M.S.abbinamenti.filter(a => a.subagente_id === s.id),
@@ -114,6 +123,43 @@
       const sc = M.S.scaglioni.find(y => y.id === x.scaglione_id);
       return { testo: e(M.fornitore(sc.fornitore_id).breve) + ', sconto ' + M.pct(sc.sconto), destra: M.pct(x.pct_sub) + ' <span class="testo-tenue">invece di ' + M.pct(sc.pct_sub) + '</span>' };
     }), 'Nessuna: valgono le percentuali standard dei fornitori.');
+  }
+  function modificaSubagente(sa) {
+    const nuovo = !sa;
+    CRM.FormModal({
+      titolo: nuovo ? 'Nuovo subagente' : 'Modifica ' + sa.nome, conferma: nuovo ? 'Crea subagente' : 'Salva', colonne: 2,
+      campi: [
+        { nome: 'nome', etichetta: 'Nome e cognome', valore: sa ? sa.nome : '', largo: true },
+        { nome: 'email', etichetta: 'Email', valore: sa ? sa.email : '', aiuto: 'Riceve il prospetto della liquidazione.' },
+        { nome: 'telefono', etichetta: 'Telefono', valore: sa ? sa.telefono : '' },
+        { nome: 'cf', etichetta: 'Codice fiscale / P.IVA', valore: sa ? sa.cf : '' },
+        { nome: 'attivo', etichetta: 'Stato', tipo: 'select', valore: sa && sa.attivo === false ? 'no' : 'si', opzioni: [{ value: 'si', label: 'Attivo' }, { value: 'no', label: 'Non attivo' }] }
+      ],
+      onConferma: (v, form) => {
+        if (!v.nome) { form.errore('Il nome è obbligatorio.'); return false; }
+        if (v.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { form.errore('L’email non è valida.'); return false; }
+        const dup = M.S.subagenti.find(x => x !== sa && x.nome.toLowerCase() === v.nome.toLowerCase());
+        if (dup) { form.errore('Esiste già un subagente con questo nome.'); return false; }
+        const rec = sa || { id: Math.max.apply(null, M.S.subagenti.map(x => x.id)) + 1 };
+        Object.assign(rec, { nome: v.nome, email: v.email, telefono: v.telefono, cf: v.cf, attivo: v.attivo !== 'no' });
+        if (nuovo) M.S.subagenti.push(rec);
+        M.annota((nuovo ? 'Nuovo subagente ' : 'Subagente aggiornato ') + rec.nome); M.salva();
+        CRM.Avviso(nuovo ? 'Subagente creato' : 'Subagente salvato'); location.hash = '#/subagenti/' + rec.id; CRM.naviga();
+      }
+    });
+  }
+  async function eliminaSubagente(sa) {
+    const clienti = M.S.abbinamenti.filter(a => a.subagente_id === sa.id).length;
+    const liquidato = M.S.liquidazioni_chiuse.length && [1, 2, 3, 4].some(t => M.righeLiquidazione(2026, t).some(r => r.subagente_id === sa.id));
+    if (clienti || liquidato) {
+      CRM.Modale({ titolo: 'Non si può eliminare ' + sa.nome,
+        testo: (clienti ? 'Segue ' + clienti + (clienti === 1 ? ' cliente' : ' clienti') + ': riassegnali prima in Clienti e abbinamenti. ' : '') +
+          (liquidato ? 'Ha provvigioni nei trimestri: lo storico delle liquidazioni deve restare. ' : '') + 'Puoi renderlo non attivo: resta nello storico ma non si assegna a nuovi clienti.',
+        azioni: [{ etichetta: 'Chiudi', variante: 'sec' }].concat(sa.attivo === false ? [] : [{ etichetta: 'Rendi non attivo', onClick: () => { sa.attivo = false; M.annota('Subagente ' + sa.nome + ' reso non attivo'); M.salva(); CRM.Avviso('Subagente reso non attivo'); CRM.naviga(); } }]) });
+      return;
+    }
+    if (!(await CRM.Conferma('Eliminare ' + sa.nome + '?', 'Non segue clienti e non ha provvigioni: l’eliminazione è definitiva.', 'Elimina', true))) return;
+    M.S.subagenti.splice(M.S.subagenti.indexOf(sa), 1); M.annota('Subagente ' + sa.nome + ' eliminato'); M.salva(); CRM.Avviso('Subagente eliminato'); location.hash = '#/subagenti';
   }
   CRM.rotta(/^\/subagenti$/, () => vistaSubagenti(null));
   CRM.rotta(/^\/subagenti\/(\d+)$/, id => vistaSubagenti(id));
