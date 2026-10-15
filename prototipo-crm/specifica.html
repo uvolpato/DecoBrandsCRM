@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.8 — pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.9 — idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -151,6 +151,17 @@
             </ul>
           </li>
           <li class="nav-item"><a class="nav-link" href="#sec-17">17. Fase successiva: sostituzione della Gestione Ordini</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="#sec-18">18. Fase successiva: supporto alle decisioni e all&#x27;analisi con modelli</a>
+            <ul class="nav flex-column ps-3">
+              <li class="nav-item"><a class="nav-link" href="#sec-18-1">18.1 Principi</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-18-2">18.2 Idee (ordinate per valore rispetto allo sforzo)</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-18-3">18.3 Strumenti</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-18-4">18.4 Prova consigliata (prima di qualsiasi interfaccia)</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-18-5">18.5 Dati</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-18-6">18.6 Fonti</a></li>
+            </ul>
+          </li>
         </ul>
       </nav>
     </div>
@@ -161,7 +172,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.8 — pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.9 — idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -3876,6 +3887,207 @@ Fino ad allora resta in esercizio, invariata, sullo stesso database.</p>
 </tr>
 </tbody>
 </table></div>
+
+</section>
+<section id="sec-18">
+<h2>18. Fase successiva: supporto alle decisioni e all'analisi con modelli</h2>
+<p><strong>Non in questa fase</strong> e fuori dal preventivo: raccolta di idee e strumenti da valutare
+dopo la messa in esercizio, con una prova misurata prima di ogni adozione.</p>
+<h3 id="sec-18-1">18.1 Principi</h3>
+<ol>
+<li><strong>I numeri li calcola il programma</strong>, mai il modello: il modello riceve importi,
+   percentuali, date e storico già calcolati e si limita a classificare, spiegare,
+   proporre o scrivere.</li>
+<li><strong>Il modello propone, l'operatore decide</strong>: nessuna azione automatica; ogni proposta
+   ha un pulsante di conferma e si può ignorare.</li>
+<li><strong>Ogni proposta mostra le prove</strong> (i dati su cui si basa, con i collegamenti) e, quando
+   c'è, la <strong>probabilità</strong>; sotto una soglia la proposta non si mostra.</li>
+<li><strong>Si registra tutto</strong>: proposta, probabilità, scelta dell'operatore (tabella
+   <code>suggerimenti</code>, §18.5). Così si misura quanto il modello ci prende e se vale la pena.</li>
+<li><strong>I dati non escono</strong>: modelli in locale sul server con scheda video di GLM-OCR (§6.5);
+   in alternativa un servizio esterno solo con contratto sul trattamento dei dati.</li>
+<li><strong>Rispetto dei ruoli</strong> (§8.3): le proposte che portano a una modifica compaiono solo a
+   chi può modificare; le analisi in sola lettura a tutti.</li>
+</ol>
+<h3 id="sec-18-2">18.2 Idee (ordinate per valore rispetto allo sforzo)</h3>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>#</th>
+<th>Idea</th>
+<th>Cosa fa</th>
+<th>Dove compare</th>
+<th>Strumento</th>
+<th>Valore · sforzo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Spiegare le differenze dei bollettini</strong></td>
+<td>per ogni riga che non quadra propone la causa più probabile (sconto diverso da quello in anagrafica, percentuale vecchia, nota di credito non riconosciuta, fattura del mese sbagliato, errore del fornitore, informazioni insufficienti) con le prove; suggerisce <em>accetta</em> o <em>contesta</em> e scrive la contestazione in tedesco o inglese</td>
+<td>cerniera del bollettino (§7.7)</td>
+<td>decisione tipizzata per la causa; modello che scrive per il testo</td>
+<td>alto · basso</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Anomalie prima che diventino differenze</strong></td>
+<td>il programma confronta ogni documento con lo storico (prezzo di un articolo fuori dal solito, sconto fuori scaglione, conferme ridotte ricorrenti da un fornitore, ritardi di conferma in peggioramento); il modello decide se è un'anomalia e la riassume in una frase</td>
+<td>Oggi (§7.1), gruppo dedicato</td>
+<td>statistiche + decisione tipizzata (sì/no + punteggio)</td>
+<td>alto · medio</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Domande in italiano sui dati</strong></td>
+<td>es. "quanto ha maturato Nista da Gasper quest'anno rispetto al 2025?": il modello scrive l'interrogazione in <strong>sola lettura</strong> su viste dedicate, il programma la esegue e mostra la tabella con l'interrogazione visibile e i collegamenti</td>
+<td>pagina "Chiedi ai dati", per tutti i ruoli</td>
+<td>modello che scrive (SQL) su viste in sola lettura</td>
+<td>alto · medio</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Riepilogo del trimestre per la direzione</strong></td>
+<td>commento generato dai numeri: fornitori in crescita o in calo, provvigioni bloccate e perché, tempi medi di conferma per fornitore, clienti fermi da mesi</td>
+<td>accanto all'esportazione della liquidazione (§11)</td>
+<td>modello che scrive</td>
+<td>medio · basso</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Leggere le email dei fornitori</strong></td>
+<td>classifica le risposte (conferma in arrivo, ritardo, articolo esaurito, altro) e le allega come nota alla pratica; sospende il sollecito se il fornitore ha già risposto</td>
+<td>ingresso documenti (§6.5), pratica (§7.3)</td>
+<td>decisione tipizzata (scelta)</td>
+<td>medio · medio</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Previsioni semplici</strong></td>
+<td>data probabile di conferma per fornitore, provvigioni attese nel trimestre, quanto si sblocca con il prossimo bollettino sul maturato</td>
+<td>Oggi, Liquidazioni</td>
+<td>statistiche sullo storico (nessun modello linguistico)</td>
+<td>medio · basso</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Lettura che migliora nel tempo</strong></td>
+<td>dalle correzioni in <code>documenti_campi</code> propone regole per fornitore (es. "su Ing's la data è in formato tedesco"), da approvare prima dell'uso</td>
+<td>Impostazioni › Server di lettura (§7.15)</td>
+<td>modello che scrive + approvazione</td>
+<td>medio · basso</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Decisioni tipizzate adatte al CRM</strong> (domande chiuse con probabilità):</p>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Decisione</th>
+<th>Tipo</th>
+<th>Dove entra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Che documento è questo allegato? (ordine · conferma · fattura · nota di credito · bollettino · non riguarda Decobrands)</td>
+<td>scelta</td>
+<td>prima della lettura (§6.5): smista la coda, propone lo scarto di listini e bolle</td>
+</tr>
+<tr>
+<td>Perché questa riga del bollettino non quadra? (cause dell'idea 1 + informazioni insufficienti)</td>
+<td>scelta + probabilità</td>
+<td>cerniera del bollettino</td>
+</tr>
+<tr>
+<td>A quale pratica va questo documento? (fra le candidate)</td>
+<td>scelta</td>
+<td>Documenti, abbinamenti "da scegliere"</td>
+</tr>
+<tr>
+<td>Cosa dice la risposta del fornitore?</td>
+<td>scelta</td>
+<td>email in arrivo</td>
+</tr>
+<tr>
+<td>Questa conferma è anomala rispetto allo storico?</td>
+<td>sì/no + punteggio</td>
+<td>Oggi</td>
+</tr>
+<tr>
+<td>Quanto è urgente questa voce?</td>
+<td>punteggio</td>
+<td>ordine dei gruppi di Oggi</td>
+</tr>
+<tr>
+<td>Il totale letto è plausibile?</td>
+<td>sì/no</td>
+<td>secondo parere accanto all'affidabilità di GLM-OCR</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="sec-18-3">18.3 Strumenti</h3>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Strumento</th>
+<th>A cosa serve</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Rizzo Flow</strong> (Rizzo AI Academy, licenza Apache 2.0) — versione aperta e locale di <strong>Jev</strong> (TypeSafe)</td>
+<td><strong>decisioni tipizzate</strong> senza generare testo: sì/no, scelta fra opzioni (fino a 26), punteggio, numero, ciascuna con probabilità; risposta di astensione "informazioni insufficienti"; <strong>taratura sui propri dati etichettati</strong> (<code>rizzo calibrate</code>)</td>
+<td>servizio HTTP locale (<code>/v1/decisions</code>, compatibile Jev su <code>/v1/systemone</code>); modelli da 4 e 1,7 miliardi di parametri, motore llama.cpp, schede NVIDIA/AMD/Intel/Apple o processore. <strong>Progetto giovane</strong>: provato dai manutentori solo su Windows con scheda NVIDIA, <strong>non protetto per l'esposizione in rete</strong>, nessun limite alle richieste → solo dietro il server del CRM, mai raggiungibile da fuori. Stessa interfaccia del servizio commerciale Jev: si può passare dall'uno all'altro</td>
+</tr>
+<tr>
+<td><strong>Modello che scrive, in locale</strong> (modello aperto da 7–14 miliardi di parametri, da scegliere nella prova) servito da <strong>vLLM</strong></td>
+<td>spiegazioni, contestazioni e solleciti in tedesco/inglese, riepiloghi, interrogazioni in sola lettura (idea 3)</td>
+<td>stesso server e stesso vLLM di GLM-OCR (§6.5); la memoria video necessaria si misura nella prova</td>
+</tr>
+<tr>
+<td><strong>Statistiche sullo storico</strong> (nel motore del CRM)</td>
+<td>anomalie (idea 2), previsioni (idea 6)</td>
+<td>nessun modello: medie, deviazioni, tempi per fornitore</td>
+</tr>
+<tr>
+<td><strong>Viste in sola lettura</strong> sul database</td>
+<td>base per le domande sui dati (idea 3)</td>
+<td>utente del database con soli permessi di lettura; tempo massimo per interrogazione</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="sec-18-4">18.4 Prova consigliata (prima di qualsiasi interfaccia)</h3>
+<ol>
+<li><strong>Due decisioni</strong>: <em>tipo di allegato</em> e <em>causa delle differenze nei bollettini</em>.</li>
+<li>Il servizio gira <strong>in ombra</strong> per un mese: per ogni caso registra proposta e
+   probabilità, senza mostrarle; l'operatore lavora come sempre e la sua scelta diventa
+   l'etichetta.</li>
+<li><strong>Taratura</strong> di Rizzo Flow sulle etichette raccolte.</li>
+<li><strong>Misure</strong>: % di proposte corrette sopra soglia, % di astensioni, errori gravi (es.
+   "accetta" proposto dove l'operatore ha contestato), tempo per decisione.</li>
+<li><strong>Decisione</strong>: si mostra in interfaccia solo la decisione con <strong>≥ 90 % di proposte
+   corrette sopra soglia</strong>; le altre restano in ombra o si abbandonano.</li>
+<li>Poi, nello stesso modo, le idee 1 (testo della contestazione) e 2.</li>
+</ol>
+<p><strong>Stima indicativa</strong> (da quotare a parte): installazione dei servizi e registro dei
+suggerimenti 6 h; prova in ombra delle due decisioni 8 h; taratura e relazione 4 h.</p>
+<h3 id="sec-18-5">18.5 Dati</h3>
+<p>Tabella <code>suggerimenti</code>: <code>id</code>, <code>tipo</code> (es. <code>tipo_allegato</code>, <code>causa_differenza</code>),
+<code>riferimento</code> (documento, riga di bollettino, pratica), <code>stato_in_ingresso</code> JSONB (i dati
+passati al modello), <code>proposta</code>, <code>probabilita</code>, <code>modello</code> (nome e versione),
+<code>mostrata</code> (bool), <code>scelta_operatore</code>, <code>scelto_da</code>, <code>scelto_il</code>. Conservazione come il
+registro eventi (§7.15). È la base per tarare e misurare.</p>
+<h3 id="sec-18-6">18.6 Fonti</h3>
+<ul>
+<li><a href="https://github.com/Rizzo-AI-Academy/rizzo-flow">Rizzo Flow — repository (Rizzo AI Academy)</a>,
+  consultato il 16/10/2026: scopo ("decisioni tipizzate da un modello senza generare
+  testo"), primitive e servizio HTTP, modelli e motore, licenza, avvertenze su sicurezza e
+  piattaforme provate.</li>
+<li>vLLM e GLM-OCR: vedi §6.6.4.</li>
+</ul>
 </section>
       </div>
     </div>
