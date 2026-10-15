@@ -90,7 +90,7 @@
     const ab = pr.abbinamento;
     const boll = sel.tipo === 'bollettino';
     const dx = CRM.Pannello(col, { titolo: M.TIPI[sel.tipo] + ' ' + sel.numero + ' · ' + f.breve, riempi: true, nota: CRM.icona('file') + ' ' + e(sel.file),
-      azioni: [{ etichetta: 'Scarta il documento', variante: 'pericolo', onClick: () => scarta(sel) }, { etichetta: 'Correggi i dati letti', onClick: () => correggi(sel) }] });
+      azioni: [{ etichetta: 'Correggi i dati letti', onClick: () => correggi(sel) }, { etichetta: 'Scarta il documento', variante: 'pericolo', onClick: () => scarta(sel) }] });
     dx.corpo.insertAdjacentHTML('beforeend', '<h3>Letto dal documento</h3>');
     CRM.Dettagli(dx.corpo, (boll ? [
       { etichetta: 'Fornitore', valore: e(f.nome) },
