@@ -594,10 +594,20 @@
      ElencoSelezionabile: elenco a sinistra di una vista a due pannelli
      voci: [{ id, href, titolo, valore, sotto, stato (html) }], selezionata
      ========================================================= */
+  let elencoY = null;
   CRM.ElencoSelezionabile = function (host, voci, selezionata) {
     const ul = el('ul', 'selezionabile', voci.map(v => '<li><a href="' + v.href + '"' + (v.id === selezionata ? ' class="attivo" aria-current="true"' : '') + '>' +
       '<span class="r1"><span>' + esc(v.titolo) + '</span><span>' + esc(v.valore || '') + '</span></span><span class="r2">' + esc(v.sotto || '') + '</span>' + (v.stato ? '<span class="r3">' + v.stato + '</span>' : '') + '</a></li>').join(''));
     ospite(host).appendChild(ul);
+    // scegliendo una voce la schermata si ridisegna: l'elenco resta dove era e la voce scelta resta visibile
+    // area che scorre: l'elenco stesso o il primo contenitore scorrevole
+    let area = ul;
+    while (area && area.parentElement && !(/(auto|scroll)/.test(getComputedStyle(area).overflowY) && area.scrollHeight > area.clientHeight)) area = area.parentElement;
+    if (!area || area === document.body || area === document.documentElement) area = ul;
+    if (elencoY != null) { area.scrollTop = elencoY; elencoY = null; }
+    const att = $('a.attivo', ul);
+    if (att) { const r = att.getBoundingClientRect(), ra = area.getBoundingClientRect(); if (r.top < ra.top || r.bottom > ra.bottom) att.scrollIntoView({ block: 'nearest' }); }
+    ul.addEventListener('click', ev => { if (ev.target.closest('a')) elencoY = area.scrollTop; });
     return ul;
   };
 
