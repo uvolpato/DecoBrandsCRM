@@ -908,7 +908,7 @@ window.DATI_DEMO = {
     servizi: [
       { id: 'casella', nome: 'Casella dei documenti', icona: 'posta', stato: 'ok', dove: 'documenti@decobrands.it · cartella Fornitori', ultimo: '2026-09-04T09:58', ritmo: 'ogni 2 minuti', nota: '6 allegati letti oggi' },
       { id: 'lettura', nome: 'Server di lettura (GLM-OCR)', icona: 'arrivo', stato: 'attesa', dove: 'gpu-decobrands:8080', ultimo: '2026-09-04T09:57', ritmo: 'a ogni documento', nota: 'lento: 9,8 s per pagina (di solito 4 s)' },
-      { id: 'integra', nome: 'Sincronizzazione da Integra', icona: 'abbinamenti', stato: 'errore', dove: 'viste sul database di Integra · clienti, fornitori, articoli, giacenze, registrazioni', ultimo: '2026-09-04T09:59:40', ritmo: 'ogni 60 secondi (giacenze ogni 15)', nota: '2 clienti non sincronizzati' },
+      { id: 'integra', nome: 'Sincronizzazione da Integra', icona: 'abbinamenti', stato: 'errore', dove: 'viste sul database di Integra · clienti e fornitori', ultimo: '2026-09-04T09:59:40', ritmo: 'ogni 60 secondi', nota: '2 clienti non sincronizzati' },
       { id: 'posta', nome: 'Posta in uscita', icona: 'posta', stato: 'ok', dove: 'smtp.office365.com · noreply@decobrands.it', ultimo: '2026-09-03T16:20', ritmo: 'a ogni invio', nota: 'ultimo invio riuscito' }
     ],
     problemi: [
@@ -923,10 +923,10 @@ window.DATI_DEMO = {
       { quando: '2026-09-04T09:58', servizio: 'casella', esito: 'ok', testo: '1 email, 1 allegato (Gries_AB-77120.pdf)' },
       { quando: '2026-09-04T09:57', servizio: 'lettura', esito: 'attenzione', testo: 'Gries_AB-77120.pdf · 2 pagine · 19,6 s' },
       { quando: '2026-09-04T09:41', servizio: 'lettura', esito: 'attenzione', testo: 'Ings_F-2026-0961_scansione.pdf · 3 pagine · 29,4 s' },
-      { quando: '2026-09-04T09:59:40', servizio: 'integra', esito: 'errore', testo: 'giacenze: 2 variazioni · clienti: 2 non sincronizzati (vedi problemi)' },
+      { quando: '2026-09-04T09:59:40', servizio: 'integra', esito: 'errore', testo: 'clienti: 1 aggiornato, 2 non sincronizzati (vedi problemi)' },
       { quando: '2026-09-03T16:20', servizio: 'posta', esito: 'ok', testo: 'Sollecito conferme a Gries GmbH & Co. KG' },
       { quando: '2026-09-03T11:01', servizio: 'casella', esito: 'attenzione', testo: '1 email · 1 allegato ignorato (Lieferschein.zip)' },
-      { quando: '2026-09-04T09:58:40', servizio: 'integra', esito: 'ok', testo: 'giacenze: nessuna variazione · registrazioni: nessuna nuova' }
+      { quando: '2026-09-04T09:58:40', servizio: 'integra', esito: 'ok', testo: 'clienti e fornitori: nessuna variazione' }
     ]
   },
 

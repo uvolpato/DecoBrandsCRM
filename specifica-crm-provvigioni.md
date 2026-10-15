@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.1 — componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.2 — la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -511,7 +511,7 @@ Una riga per sezione (`chiave` = `azienda` · `casella` · `lettura` · `posta` 
 
 Registro dei servizi automatici (§7.14): `servizi_esecuzioni` (`servizio` = `casella` · `lettura` · `integra` · `posta`, `inizio`, `fine`, `esito` `ok`·`attenzione`·`errore`, `testo`); `servizi_problemi` (`servizio`, `quando`, `livello` `errore`·`attenzione`, `testo`, `dettaglio` con cosa fare, `visto_il`, `visto_da`). Conservazione come il registro eventi.
 
-### 4.2.16 `impegni_giacenza`
+### 4.2.16 `impegni_giacenza` — **ampliamento futuro (§17), non in questa fase**
 
 Quantità esportate verso Integra (§7.18) e **non ancora registrate** da Integra. Servono a
 non vendere due volte la stessa merce nell'intervallo fra l'esportazione e la
@@ -537,7 +537,7 @@ registrazione dell'ordine in Integra.
 - Passa a `rilasciato` con **Annulla esportazione**.
 - Indici: `(codice_articolo, stato)`, `(ordine_cliente_id)`.
 
-### 4.2.17 `ordini_cliente_esportazioni`
+### 4.2.17 `ordini_cliente_esportazioni` — **ampliamento futuro (§17), non in questa fase**
 
 Una riga per esportazione verso Integra (le tabelle della Gestione Ordini non si modificano):
 `id`, `ordine_cliente_id`, `quando`, `utente_id`, `tipi` (`OC`, `OF` o entrambi), `file`
@@ -590,9 +590,9 @@ users 1 ── n eventi_app  (audit append-only, §15)
 |---|---|---|---|
 | Clienti | `v_clienti` (P.IVA, ragione sociale, indirizzo, codice cliente) | 60 s | un cliente senza P.IVA valida è segnalato in Stato del sistema |
 | Fornitori | `v_fornitori` (P.IVA, ragione sociale, paese, codice fornitore) | 60 s | |
-| Articoli | `v_articoli` (codice, descrizione, EAN, UM, attivo) | 60 s | |
-| Giacenze | `v_giacenze` (codice, quantità) | 15 s | la più frequente: serve al disponibile |
-| Ordini registrati | `v_ordini_registrati` (numero, codice cliente, data) | 60 s | chiude gli impegni (§4.2.16) |
+| Articoli (ampliamento §17) | `v_articoli` (codice, descrizione, EAN, UM, attivo) | 60 s | |
+| Giacenze (ampliamento §17) | `v_giacenze` (codice, quantità) | 15 s | la più frequente: serve al disponibile |
+| Ordini registrati (ampliamento §17) | `v_ordini_registrati` (numero, codice cliente, data) | 60 s | chiude gli impegni (§4.2.16) |
 
 - **Accesso**: utente del database **in sola lettura** (`crm_lettura`), solo sulle viste;
   le viste le crea chi gestisce Integra. Parametri in Impostazioni → Sincronizzazione da
@@ -1327,7 +1327,7 @@ dove serve, *Prova la connessione*.
 | Casella dei documenti | server IMAP, porta, utente, password, cartella da leggere, cartella dove spostare le email lette, ogni quanti minuti (1–60) |
 | Server di lettura | indirizzo, modello, tempo massimo per documento, **soglie di affidabilità** (affidabile da, bassa sotto; §6.5) |
 | Posta in uscita | server SMTP, porta, utente, password, mittente |
-| Sincronizzazione da Integra | server del database, nome del database, utente in sola lettura, password, schema delle viste, ogni quanti secondi (anagrafiche, 10–3600), ogni quanti secondi le giacenze (5–600) (§4.5) |
+| Sincronizzazione da Integra | server del database, nome del database, utente in sola lettura, password, schema delle viste, ogni quanti secondi (anagrafiche, 10–3600), ogni quanti secondi le giacenze (5–600, solo con l'ampliamento §17) (§4.5) |
 | Conservazione dei dati | registro eventi (mesi), documenti scartati (giorni), righe per pagina |
 
 Le **password non si rileggono**: il campo mostra "impostata", si scrive solo per
@@ -1351,6 +1351,13 @@ Ogni salvataggio scrive un evento con i campi cambiati (mai le password).
   Anagrafiche · Gestione*; testo a destra con *Apri la pagina* e **chi può modificare** (dai ruoli).
 - **Aiuto contestuale**: ogni pagina con un argomento ha in testata il pulsante *Guida*
   che apre l'argomento giusto. Gli argomenti di gestione si vedono solo con il permesso.
+
+### Vendita diretta (§7.18–§7.21) — **ampliamento futuro (§17), non in questa fase**
+
+> Le pagine sotto sono progettate e funzionano nel prototipo, ma **spente**: il gruppo
+> "Vendita diretta" non compare nella barra e gli indirizzi mostrano "Ampliamento previsto
+> più avanti". Si accendono nel prototipo con `?vendita=1` nell'indirizzo. Nell'app non si
+> sviluppano in questa fase.
 
 ### 7.18 Ordini cliente (`/ordini-cliente`, `/ordini-cliente/:id`) — vendita diretta
 
@@ -1486,7 +1493,7 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
 | GET | `/api/eventi/:id` | dettaglio evento (admin) |
 | GET | `/api/eventi/export` | export CSV del log filtrato (admin) |
 
-### 8.2 Vendita diretta (§7.18–§7.21)
+### 8.2 Vendita diretta (§7.18–§7.21) — **ampliamento futuro (§17), non in questa fase**
 
 | Metodo | Rotta | Descrizione |
 |--------|-------|-------------|
@@ -1519,7 +1526,7 @@ rotte; ogni rotta dichiara il **permesso** richiesto, verificato lato server
 | Chiudere la liquidazione del trimestre (`chiudi`) | ✓ | ✓ | — |
 | Vedere e recuperare i documenti scartati (`scartati`) | ✓ | ✓ | — |
 | Stato del sistema, segnare i problemi come visti (`sistema`) | ✓ | ✓ | — |
-| Alias e kit: creare, modificare, eliminare (`magazzino`) | ✓ | — | — |
+| Alias e kit: creare, modificare, eliminare (`magazzino`, ampliamento §17) | ✓ | — | — |
 | Utenti e ruoli, impostazioni, eliminazione definitiva degli scartati (`gestione`) | ✓ | — | — |
 
 **Sola lettura** nell'interfaccia: fascia "Profilo in sola lettura: puoi consultare ed
@@ -1792,7 +1799,7 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 > Il **rendiconto** §7.8 è calcolato al volo (GET = nessun evento); diventa un evento
 > **solo quando viene esportato**.
 
-#### 15.2.6.1 Vendita diretta (§8.2)
+#### 15.2.6.1 Vendita diretta (§8.2) — **ampliamento futuro (§17), non in questa fase**
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
@@ -2031,22 +2038,62 @@ non inventati; prima del merge: checklist superata + test numerici seed §12 + e
 
 ---
 
-## 17. Fase successiva: sostituzione della Gestione Ordini
+## 17. Ampliamento futuro: vendita diretta e sostituzione della Gestione Ordini
 
-Decisione: la Gestione Ordini attuale (Express + EJS + n8n + LlamaIndex) sarà
-**sostituita** da un modulo del CRM, **non in questa fase** e fuori da questo preventivo.
-Fino ad allora resta in esercizio, invariata, sullo stesso database.
+Decisione: la **vendita diretta** (articoli che Decobrands compra e rivende in proprio) e la
+sostituzione della Gestione Ordini attuale (Express + EJS + n8n + LlamaIndex) sono un
+**ampliamento successivo**, **non in questa fase** e fuori da questo preventivo. Fino ad
+allora la Gestione Ordini resta in esercizio, invariata, sullo stesso database.
+
+### 17.1 Cosa è già progettato
 
 | Aspetto | Indicazione |
 |---|---|
+| Pagine | Ordini cliente con esportazione per Integra (§7.18), Articoli (§7.19), Giacenze (§7.20), Alias e kit (§7.21): **nel prototipo, spente** (`CRM.AMPLIAMENTI.vendita`, si accendono con `?vendita=1`) |
+| Dati | `impegni_giacenza` (§4.2.16), `ordini_cliente_esportazioni` (§4.2.17); tabelle esistenti `ordini_cliente_*`, `articoli`, `giacenze`, `codici_alias`, `kit_*` riusate; viste di Integra per articoli, giacenze, ordini registrati (§4.5) |
+| Esportazione verso Integra | file Ordine cliente (OC) e Ordine fornitore (OF) con il tracciato della Gestione Ordini, alias e kit applicati, impegni sul disponibile fino alla registrazione in Integra (§7.18) |
+| Interfacce e permessi | §8.2, permesso `magazzino` (§8.3), eventi §15.2.6.1 |
 | Prerequisito | ingresso documenti (§6.5) in esercizio e tarato sui documenti reali |
-| Ambito | ingresso degli ordini cliente dall'ingresso documenti, errori di lettura, spegnimento di n8n. **Già progettato nel prototipo** (§7.18–§7.21, da approvare nel piano): ordini cliente con esportazione OC/OF per Integra, articoli, giacenze con impegni, alias e kit |
-| Ingresso | gli ordini cliente entrano dallo **stesso ingresso documenti** del CRM, con un nuovo tipo `ordine_cliente` e il suo schema; si spegne il flusso n8n + LlamaIndex |
-| Interfaccia | stile e componenti standard del CRM (§16.4); la finestra di correzione di §6.5 sostituisce la vista ordine attuale (PDF a sinistra, dati a destra) |
-| Dati | tabelle esistenti (`ordini_cliente_*`, `clienti`, `articoli`, …) riusate; migrazione solo se servono colonne nuove (affidabilità, riferimento a `documenti_in_arrivo`) |
-| Esportazione verso Integra | definita in §7.18: file Ordine cliente (OC) e Ordine fornitore (OF) con il tracciato della Gestione Ordini, alias e kit applicati, impegni sul disponibile fino alla registrazione in Integra |
+| Ingresso | gli ordini cliente entrano dallo **stesso ingresso documenti** del CRM (§17.2); si spegne il flusso n8n + LlamaIndex |
 | Passaggio | i due sistemi in parallelo per un periodo di prova, poi spegnimento di n8n e della vecchia app |
-| Stima | da quotare a parte dopo la messa in esercizio del CRM |
+| Stima | piano §10.1 (14 h indicative), da quotare a parte quando si avvia l'ampliamento |
+
+### 17.2 Ingresso unico: documento dell'agenzia o ordine della vendita diretta? — DA DECIDERE
+
+Ordini, conferme e fatture dell'agenzia e ordini dei clienti della vendita diretta sono
+tutti **documenti**: entrano dalla stessa pagina Documenti (§6.5, §7.9). Dopo la lettura il
+documento va **classificato** per mandarlo nel flusso giusto: pratica (agenzia) oppure
+Ordini cliente (vendita diretta).
+
+**Cosa li distingue:** chi fattura al cliente. In agenzia fattura il fornitore e Decobrands
+riceve la provvigione; in vendita diretta Decobrands compra dal fornitore e fattura lei.
+
+| Segnale | Agenzia | Vendita diretta | Peso |
+|---|---|---|---|
+| Casella o mittente | casella dei documenti, indirizzo di un fornitore | casella degli ordini, indirizzo di un cliente | forte, se le caselle sono separate |
+| Codici degli articoli | già usati da quel fornitore nelle pratiche | presenti fra gli articoli di Integra, o in alias e kit | forte |
+| Intestazione del documento | fornitore venditore, codice cliente del fornitore (es. K-11036) | Decobrands venditrice, codice cliente di Integra | forte |
+| Cliente | ha l'agenzia per quel fornitore (`interscambio`) | ha la vendita diretta attiva (`clienti`) | medio: un cliente può averle entrambe |
+| Prezzi | listino del fornitore | listino Decobrands | debole |
+
+**Proposta**
+1. La lettura propone il tipo con un'affidabilità, come per i campi (§6.5): *Ordine
+   (agenzia)* oppure *Ordine cliente (vendita diretta)*; per conferme, fatture, note di
+   credito e bollettini il tipo è sempre agenzia.
+2. Se i segnali concordano il documento va da solo nel flusso giusto; se sono in conflitto
+   l'elenco mostra **Da classificare** e l'operatore sceglie con un clic.
+3. **Ordine misto** (righe di articoli di Integra e righe di articoli del fornitore): si
+   propone di **dividerlo in due**, una parte alla pratica e una agli Ordini cliente.
+4. Ogni scelta manuale resta registrata (`documenti_in_arrivo.classificato_da`, evento §15)
+   e serve a tarare le regole (es. "questo cliente manda sempre vendita diretta").
+5. **La via più semplice e sicura**: due caselle separate (es. ordini@ e documenti@), che da
+   sole risolvono la maggior parte dei casi; i segnali sul contenuto restano per i documenti
+   caricati a mano e per i casi dubbi.
+
+**Domande per Decobrands** (da chiudere prima di avviare l'ampliamento):
+- i clienti mandano gli ordini dell'agenzia e quelli della vendita diretta allo stesso indirizzo?
+- un unico ordine del cliente può contenere articoli in agenzia e articoli in vendita diretta?
+- i documenti della vendita diretta hanno sempre il codice cliente di Integra?
 
 ---
 

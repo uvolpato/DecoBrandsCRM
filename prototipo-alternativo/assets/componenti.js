@@ -375,7 +375,7 @@
     const p = $('#principale');
     p.innerHTML = '';
     // aiuto contestuale: ogni pagina con una voce di guida ha il collegamento "Guida" in testata
-    if (opz.voce && CRM.GUIDA && CRM.GUIDA.some(g => g.id === opz.voce) && opz.voce !== 'guida')
+    if (opz.voce && CRM.GUIDA && CRM.GUIDA.some(g => g.id === opz.voce && (g.gruppo !== 'Vendita diretta' || CRM.AMPLIAMENTI.vendita)) && opz.voce !== 'guida')
       opz = Object.assign({}, opz, { azioni: (opz.azioni || []).concat([{ etichetta: 'Guida', icona: 'guida', variante: 'testo', href: '#/guida/' + opz.voce, consentito: true }]) });
     CRM.Intestazione(p, opz);
     const corpo = el('section', 'corpo' + (opz.pieno ? ' pieno' : ''));
@@ -824,6 +824,9 @@
   /* =========================================================
      Barra laterale: navigazione per cadenza di lavoro
      ========================================================= */
+  /* Ampliamenti progettati ma non in questa fase: spenti, il codice resta pronto (spec §17).
+     Per provarli: CRM.AMPLIAMENTI.vendita = true nella console, poi ricarica la pagina con il menu. */
+  CRM.AMPLIAMENTI = { vendita: /[?&]vendita=1\b/.test(location.search) };
   const VOCI = [
     { gruppo: 'Ogni giorno', voci: [
       { id: 'oggi', href: '#/', t: 'Oggi', icona: 'oggi' },
@@ -831,7 +834,7 @@
       { id: 'pratiche', href: '#/pratiche', t: 'Pratiche', icona: 'pratiche' }] },
     { gruppo: 'Ogni mese', voci: [{ id: 'bollettini', href: '#/bollettini', t: 'Bollettini', icona: 'bollettini' }] },
     { gruppo: 'Ogni trimestre', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni' }] },
-    { gruppo: 'Vendita diretta', voci: [
+    { gruppo: 'Vendita diretta', ampliamento: 'vendita', voci: [
       { id: 'ordini-cliente', href: '#/ordini-cliente', t: 'Ordini cliente', icona: 'carrello' },
       { id: 'articoli', href: '#/articoli', t: 'Articoli', icona: 'scatola' },
       { id: 'giacenze', href: '#/giacenze', t: 'Giacenze', icona: 'magazzino' },
@@ -865,7 +868,7 @@
     const b = $('#barra');
     b.innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Pratiche e provvigioni</span></div>' +
       '<button type="button" class="carica-barra" id="carica-barra">' + CRM.icona('carica') + 'Carica documenti</button>' +
-      '<div class="barra-menu">' + VOCI.map(g => Object.assign({}, g, { voci: g.voci.filter(v => !v.permesso || M.puo(v.permesso)) })).filter(g => g.voci.length).map(g => {
+      '<div class="barra-menu">' + VOCI.filter(g => !g.ampliamento || CRM.AMPLIAMENTI[g.ampliamento]).map(g => Object.assign({}, g, { voci: g.voci.filter(v => !v.permesso || M.puo(v.permesso)) })).filter(g => g.voci.length).map(g => {
         // il gruppo Gestione si apre da solo quando si è in una delle sue pagine (il contatore dei problemi resta visibile sul titolo)
         const aperto = !g.richiudibile || gestioneAperta || window.innerWidth <= 860 || g.voci.some(v => v.id === attiva);
         const titolo = g.richiudibile ? '<summary class="gruppo-nome">' + g.gruppo + (conta.sistema && conta.sistema.n && M.puo('sistema') ? ' <span class="conta' + (conta.sistema.urgente ? ' urgente' : '') + '">' + conta.sistema.n + '</span>' : '') + '</summary>' : '<div class="gruppo-nome">' + g.gruppo + '</div>';

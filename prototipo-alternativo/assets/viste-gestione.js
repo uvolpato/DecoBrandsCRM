@@ -276,9 +276,9 @@
     { id: 'integra', titolo: 'Sincronizzazione da Integra', sotto: 'viste sul database di Integra', campi: s => [
       { nome: 'server', etichetta: 'Server del database', valore: s.server }, { nome: 'database', etichetta: 'Database', valore: s.database },
       { nome: 'utente', etichetta: 'Utente (sola lettura)', valore: s.utente }, { nome: 'password', etichetta: 'Password', tipo: 'password', impostata: s.password },
-      { nome: 'schema', etichetta: 'Schema delle viste', valore: s.schema, aiuto: 'Clienti, fornitori, articoli, giacenze, registrazioni degli ordini.' },
+      { nome: 'schema', etichetta: 'Schema delle viste', valore: s.schema, aiuto: CRM.AMPLIAMENTI.vendita ? 'Clienti, fornitori, articoli, giacenze, registrazioni degli ordini.' : 'Clienti e fornitori.' },
       { nome: 'secondi', etichetta: 'Anagrafiche ogni (secondi)', tipo: 'numero', valore: s.secondi, aiuto: 'Da 10 a 3600.' },
-      { nome: 'secondi_giacenze', etichetta: 'Giacenze e registrazioni ogni (secondi)', tipo: 'numero', valore: s.secondi_giacenze, aiuto: 'Da 5 a 600.' }] },
+      ...(CRM.AMPLIAMENTI.vendita ? [{ nome: 'secondi_giacenze', etichetta: 'Giacenze e registrazioni ogni (secondi)', tipo: 'numero', valore: s.secondi_giacenze, aiuto: 'Da 5 a 600.' }] : [])] },
     { id: 'conservazione', titolo: 'Conservazione dei dati', sotto: 'per quanto restano registro e scartati', campi: s => [
       { nome: 'eventi_mesi', etichetta: 'Registro eventi (mesi)', tipo: 'numero', valore: s.eventi_mesi, aiuto: 'Poi le righe più vecchie vengono eliminate in automatico.' },
       { nome: 'scartati_giorni', etichetta: 'Documenti scartati (giorni)', tipo: 'numero', valore: s.scartati_giorni },
@@ -314,7 +314,7 @@
       for (const c of numeri) if (v[c.nome] === '' || isNaN(Number(v[c.nome]))) { form.errore(c.etichetta + ': inserisci un numero.'); return; }
       if (sez.id === 'lettura' && !(Number(v.soglia_bassa) > 0 && Number(v.soglia_bassa) < Number(v.soglia_ok) && Number(v.soglia_ok) <= 1)) { form.errore('Le soglie devono essere fra 0 e 1, con "bassa" minore di "affidabile".'); return; }
       if (sez.id === 'casella' && !(Number(v.minuti) >= 1 && Number(v.minuti) <= 60)) { form.errore('Controlla ogni: da 1 a 60 minuti.'); return; }
-      if (sez.id === 'integra' && !(Number(v.secondi) >= 10 && Number(v.secondi) <= 3600 && Number(v.secondi_giacenze) >= 5 && Number(v.secondi_giacenze) <= 600)) { form.errore('Anagrafiche: da 10 a 3600 secondi; giacenze: da 5 a 600.'); return; }
+      if (sez.id === 'integra' && !(Number(v.secondi) >= 10 && Number(v.secondi) <= 3600 && (!CRM.AMPLIAMENTI.vendita || Number(v.secondi_giacenze) >= 5 && Number(v.secondi_giacenze) <= 600))) { form.errore('Anagrafiche: da 10 a 3600 secondi; giacenze: da 5 a 600.'); return; }
       sez.campi(dati).forEach(c => {
         if (c.tipo === 'password') { if (v[c.nome]) dati[c.nome] = true; return; }
         dati[c.nome] = c.tipo === 'numero' ? Number(v[c.nome]) : v[c.nome];
@@ -373,7 +373,7 @@
   let cercaGuida = '';
   function vistaGuida(idSel) {
     const corpo = CRM.Pagina({ voce: 'guida', titolo: 'Guida', pieno: true, sottotitolo: 'Come si usa il CRM, pagina per pagina. Da ogni pagina il pulsante "Guida" in alto apre l’argomento giusto.' });
-    const visibili = CRM.GUIDA.filter(g => g.gruppo !== 'Gestione' || M.puo(g.id === 'sistema' ? 'sistema' : g.id === 'scartati' ? 'scartati' : 'gestione'));
+    const visibili = CRM.GUIDA.filter(g => g.gruppo !== 'Vendita diretta' || CRM.AMPLIAMENTI.vendita).filter(g => g.gruppo !== 'Gestione' || M.puo(g.id === 'sistema' ? 'sistema' : g.id === 'scartati' ? 'scartati' : 'gestione'));
     const g = visibili.find(x => x.id === idSel) || visibili[0];
     const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(240px,0.6fr) minmax(0,2fr)');
     const sx = CRM.Pannello(col, { titolo: 'Argomenti', riempi: true });

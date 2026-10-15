@@ -210,20 +210,22 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 | **F6-A5** Installazione in esercizio (servizio vLLM, avvio automatico, controllo stato) e prima taratura delle soglie sui documenti reali | 2 | F6-A2 | — | §6.5 punto 8, §3.4 |
 
 - **DoD:** un PDF inviato alla casella o caricato compare in `/documenti` letto, con affidabilità per campo e livello; correzioni salvate in `documenti_campi`; nessun n8n e nessuna chiamata a servizi esterni; eventi `documento/*` §15.2.4 scritti.
-- L'**ingresso degli ordini cliente** (sostituzione completa della Gestione Ordini) è nella fase successiva, spec §17; le pagine di vendita diretta sono qui sotto (§10.1), da approvare.
+- L'**ingresso degli ordini cliente** (sostituzione completa della Gestione Ordini) è nella fase successiva, spec §17; la vendita diretta è un ampliamento futuro (§10.1).
 
-### 10.1 Vendita diretta dalla Gestione Ordini (14 h, da approvare)
+### 10.1 Vendita diretta dalla Gestione Ordini — ampliamento futuro, fuori da questo piano (14 h indicative)
+
+> Decisione: la vendita diretta è un ampliamento successivo (spec §17). Le attività restano qui come stima indicativa; nel prototipo le pagine sono spente.
 
 | Attività | Ore | Dipende da | Sorgente prototipo | Riferimenti spec |
 |---|---|---|---|---|
-| **F8-A1** Sincronizzazione da Integra: viste sul database (clienti, fornitori, articoli, giacenze, ordini registrati), processo ogni 15–60 s, incrementale, registri di esecuzione e problemi; sostituisce l'import da file | 4 · **da approvare** | F0-A2 | `prototipo-alternativo/assets/dati.js` (`sistema`, `impostazioni.integra`) | §4.1, §4.5, §7.14, §7.15 |
-| **F8-A2** Articoli e Giacenze (sola lettura), impegni e disponibile | 2 · **da approvare** | F8-A1 | `assets/viste-vendita.js`, `assets/motore-vendita.js` | §7.19, §7.20, §4.2.16 |
-| **F8-A3** Alias e kit (CRUD, controlli, permesso `magazzino`) | 2 · **da approvare** | F0-A4 | idem | §7.21, §8.3 |
-| **F8-A4** Ordini cliente: elenco, scheda, controlli, proposte alias/kit (casi A/B/C) | 3 · **da approvare** | F8-A2, F8-A3 | idem | §7.18 |
-| **F8-A5** Esportazione OC/OF: tracciato Integra a 28 colonne, nomi file, impegni, esporta di nuovo, annulla, eventi | 3 · **da approvare** | F8-A4 | `assets/esporta-integra.js` | §7.18, §4.2.17, §15.2.6.1 |
+| **F8-A1** Sincronizzazione da Integra: viste sul database (clienti, fornitori, articoli, giacenze, ordini registrati), processo ogni 15–60 s, incrementale, registri di esecuzione e problemi; sostituisce l'import da file | 4 · ampliamento | F0-A2 | `prototipo-alternativo/assets/dati.js` (`sistema`, `impostazioni.integra`) | §4.1, §4.5, §7.14, §7.15 |
+| **F8-A2** Articoli e Giacenze (sola lettura), impegni e disponibile | 2 · ampliamento | F8-A1 | `assets/viste-vendita.js`, `assets/motore-vendita.js` | §7.19, §7.20, §4.2.16 |
+| **F8-A3** Alias e kit (CRUD, controlli, permesso `magazzino`) | 2 · ampliamento | F0-A4 | idem | §7.21, §8.3 |
+| **F8-A4** Ordini cliente: elenco, scheda, controlli, proposte alias/kit (casi A/B/C) | 3 · ampliamento | F8-A2, F8-A3 | idem | §7.18 |
+| **F8-A5** Esportazione OC/OF: tracciato Integra a 28 colonne, nomi file, impegni, esporta di nuovo, annulla, eventi | 3 · ampliamento | F8-A4 | `assets/esporta-integra.js` | §7.18, §4.2.17, §15.2.6.1 |
 
 - **DoD:** un ordine cliente con alias e kit si esporta in OC e OF con lo stesso contenuto dei file della Gestione Ordini; il disponibile scende subito e torna quando la sincronizzazione vede l'ordine registrato o l'esportazione viene annullata.
-- **Vendita diretta (F8): 14 h fuori preventivo, da approvare.**
+- **Vendita diretta (F8): ampliamento futuro, 14 h indicative, da quotare quando si avvia.** La sincronizzazione delle sole anagrafiche clienti e fornitori (parte di F8-A1) resta necessaria anche in questa fase al posto dell'import da file.
 
 ## 11. Fase 7 — Collaudo e rilascio (5 h)
 

@@ -6,6 +6,12 @@
    ============================================================ */
 (function () {
   'use strict';
+  /* Ampliamento futuro (spec §17): con CRM.AMPLIAMENTI.vendita spento le pagine dicono che non sono in questa fase. */
+  const rotta = (re, fn) => CRM.rotta(re, function () {
+    if (CRM.AMPLIAMENTI.vendita) return fn.apply(this, arguments);
+    const corpo = CRM.Pagina({ voce: 'vendita', titolo: 'Vendita diretta' });
+    CRM.Pannello(corpo, {}).corpo.innerHTML = '<div class="vuoto"><b>Ampliamento previsto più avanti</b>Ordini cliente, articoli, giacenze, alias e kit fanno parte di un ampliamento successivo (specifica §17). In questa fase non sono attivi.</div>';
+  });
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const quando = iso => iso ? M.data(iso.slice(0, 10)) + (iso.length > 10 ? ' ' + iso.slice(11, 19) : '') : '—';
   const sync = () => 'Da Integra, sincronizzato alle ' + (M.S.sincronizzato || '').slice(11, 19) + ' del ' + M.data((M.S.sincronizzato || '').slice(0, 10)) + ' · sola lettura';
@@ -78,8 +84,8 @@
     const sim = CRM.$('#simula-reg', dx.corpo);
     if (sim) sim.addEventListener('click', () => { M.simulaRegistrazioneIntegra(o); M.salva(); CRM.Avviso('Integra ha registrato ' + o.numero + ': impegni chiusi, giacenze aggiornate'); CRM.naviga(); });
   }
-  CRM.rotta(/^\/ordini-cliente$/, () => vistaOrdini(null));
-  CRM.rotta(/^\/ordini-cliente\/(\d+)$/, id => vistaOrdini(id));
+  rotta(/^\/ordini-cliente$/, () => vistaOrdini(null));
+  rotta(/^\/ordini-cliente\/(\d+)$/, id => vistaOrdini(id));
 
   /* Esportazione: finestra a schede (codici vecchio → nuovo, kit, file e controlli).
      Riepilogo sempre visibile sopra le schede; le tabelle non si ridisegnano mentre si scrive. */
@@ -236,7 +242,7 @@
      Articoli (da Integra, sola lettura)
      ========================================================= */
   let filtroArt = { q: '', um: '', vista: 'tutti' };
-  CRM.rotta(/^\/articoli$/, function () {
+  rotta(/^\/articoli$/, function () {
     const art = M.S.articoli;
     const corpo = CRM.Pagina({ voce: 'articoli', titolo: 'Articoli', pieno: true, sottotitolo: sync() + '. Servono a controllare le righe degli ordini cliente e a definire alias e kit.' });
     const ums = art.map(a => a.um).filter((u, i, x) => u && x.indexOf(u) === i).sort();
@@ -311,8 +317,8 @@
       emptyText: 'Nessun movimento dal CRM', emptyHint: 'La giacenza arriva solo da Integra.'
     });
   }
-  CRM.rotta(/^\/giacenze$/, () => vistaGiacenze(null));
-  CRM.rotta(/^\/giacenze\/(.+)$/, c => vistaGiacenze(c));
+  rotta(/^\/giacenze$/, () => vistaGiacenze(null));
+  rotta(/^\/giacenze\/(.+)$/, c => vistaGiacenze(c));
 
   /* =========================================================
      Alias e kit (tabelle del CRM): due schede nella stessa pagina
@@ -329,8 +335,8 @@
     ] });
     return sk.corpo;
   }
-  CRM.rotta(/^\/alias-kit$/, () => { location.replace('#/alias-kit/alias'); });
-  CRM.rotta(/^\/alias-kit\/alias$/, function () {
+  rotta(/^\/alias-kit$/, () => { location.replace('#/alias-kit/alias'); });
+  rotta(/^\/alias-kit\/alias$/, function () {
     const corpo = testataAliasKit('alias');
     const puo = M.puo('magazzino');
     const VA = { tutti: () => true, conferma: a => a.conferma, mancanti: a => !M.articoloAnag(a.nuovo) || !M.articoloAnag(a.vecchio) };
@@ -383,8 +389,8 @@
     });
   }
 
-  CRM.rotta(/^\/alias-kit\/kit$/, () => vistaKit(null));
-  CRM.rotta(/^\/alias-kit\/kit\/(.+)$/, c => vistaKit(decodeURIComponent(c)));
+  rotta(/^\/alias-kit\/kit$/, () => vistaKit(null));
+  rotta(/^\/alias-kit\/kit\/(.+)$/, c => vistaKit(decodeURIComponent(c)));
   function vistaKit(codSel) {
     const corpo = testataAliasKit('kit');
     const puo = M.puo('magazzino');
