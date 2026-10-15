@@ -689,9 +689,12 @@ window.DATI_DEMO = {
      lettura: affidabilità (0–1) dei soli campi incerti (gli altri sono ≥ 0,95), valori
      realmente stampati sul documento quando la lettura ha sbagliato (originale) e
      totale stampato (totale) per il controllo con la somma delle righe. */
+  /* Codici letti male che non esistono in anagrafica articoli (es. lettera O letta come zero). */
+  articoli_non_in_anagrafica: ['CI0T-387'],
+
   in_arrivo: [
     { id: 9001, tipo: 'conferma', fornitore_id: 1, numero: 'AB-77120', data: '2026-09-03', ricevuto: '2026-09-03', codice_cliente: 'K-10122', file: 'Gries_AB-77120.pdf',
-      lettura: { campi: { data: 0.84, 'righe.2.qta': 0.61, 'righe.4.prezzo': 0.71 }, originale: { 'righe.2.qta': 18 }, totale: 8294.80 }, righe: [
+      lettura: { campi: { data: 0.84, 'righe.2.qta': 0.61, 'righe.4.prezzo': 0.71, 'righe.7.codice': 0.86 }, originale: { 'righe.2.qta': 18, 'righe.7.codice': 'CIOT-387' }, totale: 8294.80 }, righe: [
       { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 96, prezzo: 6.40 },
       { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 10, prezzo: 15.00 },
       { codice: 'CACH-292', descrizione: 'Coprivaso smaltato Ø 29 cm', qta: 12, prezzo: 14.60 },
@@ -699,7 +702,7 @@ window.DATI_DEMO = {
       { codice: 'CIOT-459', descrizione: 'Ciotola in terracotta Ø 45 cm', qta: 12, prezzo: 17.50 },
       { codice: 'SOGG-0225', descrizione: 'Sottovaso in terracotta Ø 22 cm', qta: 48, prezzo: 3.64 },
       { codice: 'VASA-4456', descrizione: 'Vaso in terracotta Ø 44 cm', qta: 15, prezzo: 17.40 },
-      { codice: 'CIOT-387', descrizione: 'Ciotola in terracotta Ø 38 cm', qta: 15, prezzo: 15.40 },
+      { codice: 'CI0T-387', descrizione: 'Ciotola in terracotta Ø 38 cm', qta: 15, prezzo: 15.40 },
       { codice: 'SOGG-0491', descrizione: 'Sottovaso in terracotta Ø 49 cm', qta: 25, prezzo: 6.88 },
       { codice: 'VASA-3828', descrizione: 'Vaso in terracotta Ø 38 cm', qta: 15, prezzo: 15.30 },
       { codice: 'BALC-503', descrizione: 'Balconetta in terracotta 50 cm', qta: 15, prezzo: 12.00 },

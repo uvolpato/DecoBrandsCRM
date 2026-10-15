@@ -18,11 +18,12 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 
 ## Controllo dei dati letti
 
-Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-OCR, qui è simulata) e passa da **controlli fissi** (codice cliente presente fra i clienti del fornitore, totale del documento uguale alla somma delle righe, bollettino non già registrato).
+Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-OCR, qui è simulata) e passa da **controlli fissi** (codice cliente presente fra i clienti del fornitore, articoli presenti in anagrafica, totale del documento uguale alla somma delle righe, bollettino non già registrato).
 
 - **Livello:** affidabile (tutto ≥ 90 %) · da controllare (un campo fra 70 e 90 % o un controllo fallito) · bassa (un campo sotto 70 % o un controllo grave). Compare nell'elenco e come contatore su *Correggi i dati letti*; con livello basso l'abbinamento chiede conferma.
 - **Correggi i dati letti** apre una finestra a tutto schermo: a sinistra il documento com'è stampato, a destra testata e righe modificabili. I campi incerti sono bordati (giallo / rosso con la percentuale); selezionando un campo si evidenzia nel documento; ✓ conferma un valore giusto; si possono aggiungere ed eliminare righe. Il riepilogo in alto elenca i punti da controllare e porta al campo.
-- **Prova:** conferma AB-77120 di Gries → quantità della riga 3 letta 12 ma stampata 18, il totale non torna → correggi in 18, conferma data e prezzo della riga 5 → lettura affidabile.
+- Le righe sono una **DataTable** standard (ordinabile, totale fisso) con celle modificabili; accanto al codice articolo un **pallino verde** se il codice è in anagrafica articoli, **rosso** se non c'è (anche questo è un punto da controllare).
+- **Prova:** conferma AB-77120 di Gries → quantità della riga 3 letta 12 ma stampata 18 (il totale non torna) e codice della riga 8 letto CI0T-387 con lo zero (pallino rosso) → correggi in 18 e CIOT-387, conferma data e prezzo della riga 5 → lettura affidabile.
 
 ## Regole di flusso applicate
 

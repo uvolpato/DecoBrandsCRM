@@ -460,3 +460,9 @@ a.m-cella:hover { background: #f1f6ff; }
   .aff-sx { flex-basis: 40% !important; }
   .aff-divisore { display: none; }
 }
+.aff-dx { display: flex; flex-direction: column; }
+.aff-dx > * { flex: none; }
+.aff-dx > .aff-righe { flex: 1 1 auto; min-height: 18rem; }
+.aff-righe .campo-riga .pallino { margin-right: 4px; }
+.aff-righe .dt td { padding: 3px 6px; }
+.aff-righe .dt th { padding: 7px 6px; }

@@ -202,6 +202,10 @@
     const col = COLONNE_RIGHE[boll ? 'bollettino' : 'articoli'].find(x => x.k === m[2]);
     return (col ? col.t : m[2]) + ' riga ' + (Number(m[1]) + 1);
   };
+  const pallinoArticolo = codice => {
+    const ok = M.inAnagrafica(codice);
+    return '<span class="pallino ' + (ok ? 'ok' : 'ko') + '" title="' + (ok ? 'Articolo presente in anagrafica' : 'Codice non presente in anagrafica articoli') + '" aria-label="' + (ok ? 'in anagrafica' : 'non in anagrafica') + '"></span>';
+  };
   const classeAff = (a, ver) => ver ? 'campo-verificato' : a < M.SOGLIA_BASSA ? 'incerto-errore' : a < M.SOGLIA_OK ? 'incerto-attesa' : '';
 
   function correggi(d) {
@@ -281,16 +285,31 @@
             campoTestata('codice_cliente', 'text', b.codice_cliente, null, '<span class="esito-campo">' + (ab ? '<span class="pallino ok"></span>' + e(M.nomeCliente(ab.cliente_piva)) : '<span class="pallino ko"></span>non trovato fra i clienti del fornitore') + '</span>') +
             campoTestata('totale', 'number', b.totale, null, '<span class="esito-campo">' + (Math.abs((Number(b.totale) || 0) - somma) < 0.01
               ? '<span class="pallino ok"></span>uguale alla somma delle righe' : '<span class="pallino ko"></span>somma delle righe ' + M.euro(somma)) + '</span>')) +
-        '</div><div class="righe-testa"><h3>Righe <span class="testo-tenue">' + b.righe.length + '</span></h3><button type="button" class="btn sec piccolo" id="aggiungi-riga">' + CRM.icona('piu') + 'Aggiungi riga</button></div>' +
-        '<div class="tab-righe-box"><table class="tab-righe"><thead><tr><th>#</th>' + cols.map(c => '<th' + (c.n ? ' class="dx"' : '') + '>' + e(c.t) + '</th>').join('') + (boll ? '' : '<th class="dx">Importo</th>') + '<th></th></tr></thead><tbody>' +
-        b.righe.map((r, i) => '<tr data-riga="' + i + '"' + (r._nuova ? ' class="nuova"' : '') + '><td class="testo-tenue">' + (i + 1) + '</td>' + cols.map(c => {
-          const a = r._aff[c.k] != null ? r._aff[c.k] : 0.97, ver = !!r._ver[c.k], incerto = a < M.SOGLIA_OK && !ver;
-          return '<td class="' + classeAff(a, ver && a < M.SOGLIA_OK) + (c.largo ? ' largo' : c.k === 'codice' || c.k === 'numero' ? ' col-codice' : '') + '"' + (incerto ? ' title="Affidabilità ' + Math.round(a * 100) + '%"' : '') + '><div class="campo-riga">' +
-            '<input data-campo="righe.' + i + '.' + c.k + '"' + (c.largo ? ' title="' + e(r[c.k] || '') + '"' : '') + ' type="' + (c.data ? 'date' : c.n ? 'number' : 'text') + '"' + (c.n ? ' step="any"' : '') + ' value="' + e(r[c.k] == null ? '' : (c.n && c.k !== 'qta' && r[c.k] !== '' ? Number(r[c.k]).toFixed(2) : r[c.k])) + '">' +
-            (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + i + '.' + c.k + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div></td>';
-        }).join('') + (boll ? '' : '<td class="dx calcolato">' + M.euro((Number(r.qta) || 0) * (Number(r.prezzo) || 0)) + '</td>') +
-        '<td><button type="button" class="btn testo piccolo" data-elimina="' + i + '" title="Elimina la riga" aria-label="Elimina la riga ' + (i + 1) + '">✕</button></td></tr>').join('') +
-        '</tbody></table></div>';
+        '</div><div class="righe-testa"><h3>Righe <span class="testo-tenue">' + b.righe.length + '</span></h3><button type="button" class="btn sec piccolo" data-aggiungi="1">' + CRM.icona('piu') + 'Aggiungi riga</button></div>';
+      // righe: DataTable standard con celle modificabili; ogni riga ricorda la sua posizione (_i) anche se si ordina
+      b.righe.forEach((r, i) => { r._i = i; });
+      const affR = (r, k) => r._aff[k] != null ? r._aff[k] : 0.97;
+      const cella = c => r => {
+        const a = affR(r, c.k), incerto = a < M.SOGLIA_OK && !r._ver[c.k], v = r[c.k];
+        const val = v == null ? '' : (c.n && c.k !== 'qta' && v !== '' ? Number(v).toFixed(2) : v);
+        return '<div class="campo-riga">' + (c.k === 'codice' ? pallinoArticolo(v) : '') +
+          '<input data-campo="righe.' + r._i + '.' + c.k + '"' + (c.largo ? ' title="' + e(v || '') + '"' : '') + ' type="' + (c.data ? 'date' : c.n ? 'number' : 'text') + '"' + (c.n ? ' step="any"' : '') + ' value="' + e(val) + '"' +
+          (incerto ? ' title="Affidabilità della lettura ' + Math.round(a * 100) + '%"' : '') + '>' +
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.' + c.k + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
+      };
+      CRM.DataTable(CRM.blocco(host, 'riempi aff-righe tab-righe'), {
+        compatta: true, righe: b.righe, etichettaTotale: 'Totale righe', rowClass: r => r._nuova ? 'nuova' : '',
+        emptyText: 'Nessuna riga', emptyHint: 'Aggiungi le righe del documento.',
+        colonne: [{ key: '_i', header: '#', tipo: 'numero', valore: r => r._i + 1, classe: 'testo-tenue' }]
+          .concat(cols.map(c => ({
+            key: c.k, header: c.t, tipo: c.n ? 'numero' : 'testo', grow: !!c.largo, cell: cella(c),
+            sortValue: r => c.n ? Number(r[c.k]) || 0 : String(r[c.k] || '').toLowerCase(),
+            classe: r => [classeAff(affR(r, c.k), !!r._ver[c.k] && affR(r, c.k) < M.SOGLIA_OK), c.largo ? 'largo' : c.k === 'codice' || c.k === 'numero' ? 'col-codice' : ''].join(' '),
+            totale: boll && c.k === 'importo' ? 'somma' : undefined, valore: c.n ? (r => Number(r[c.k]) || 0) : undefined
+          })))
+          .concat(boll ? [] : [{ key: 'importo', header: 'Importo', tipo: 'euro', valore: r => M.r2((Number(r.qta) || 0) * (Number(r.prezzo) || 0)), totale: 'somma', classe: 'calcolato' }])
+          .concat([{ key: 'elimina', header: '', sortable: false, cell: r => '<button type="button" class="btn testo piccolo" data-elimina="' + r._i + '" title="Elimina la riga" aria-label="Elimina la riga ' + (r._i + 1) + '">✕</button>' }])
+      });
       // riepilogo: livello, controlli falliti e campi incerti, con salto al campo
       const riep = CRM.$('#aff-riep', host);
       const LIV = { affidabile: ['ok', 'Lettura affidabile'], da_controllare: ['attesa', 'Da controllare'], bassa: ['errore', 'Affidabilità bassa'] }[st.livello];
@@ -298,28 +317,33 @@
         (st.n ? '<ul>' + st.controlli.map(c => '<li class="' + (c.grave ? 'grave' : '') + '"><button type="button" class="btn testo piccolo" data-vai="' + c.campo + '">' + e(c.testo) + '</button></li>').join('') +
           st.campi.map(c => '<li><button type="button" class="btn testo piccolo" data-vai="' + c + '">' + e(nomeCampo(c, boll)) + ': letto con affidabilità ' + Math.round(M.affidabilita(comeDoc(), c) * 100) + '%</button></li>').join('') + '</ul>' : '');
       fin.piede.innerHTML = st.n ? '<b>' + st.n + '</b> ' + (st.n === 1 ? 'punto da controllare' : 'punti da controllare') : '<span style="color:var(--ok-testo)">Tutto controllato</span>';
-      collega(host);
     };
     const ridisegna = () => { const y = fin.destra.scrollTop; destra(fin.destra); fin.destra.scrollTop = y; };
     const valoreDa = (campo, v) => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) { b.righe[m[1]][m[2]] = v; b.righe[m[1]]._ver[m[2]] = true; } else { b[campo] = v; b.ver[campo] = true; } b.toccati[campo] = true; };
     const conferma = campo => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) b.righe[m[1]]._ver[m[2]] = true; else b.ver[campo] = true; };
+    // eventi delegati sul pannello destro: restano validi anche quando la DataTable si ridisegna (ordinamento)
     function collega(host) {
-      CRM.$$('[data-campo]', host).forEach(x => {
-        x.addEventListener('focus', () => evidenzia(x.dataset.campo));
-        x.addEventListener('change', () => { valoreDa(x.dataset.campo, x.value); ridisegna(); const n = CRM.$('[data-campo="' + x.dataset.campo + '"]', fin.destra); if (n) n.focus(); });
+      const vai = c => { const n = CRM.$('[data-campo="' + c + '"]', host); if (n) { n.focus(); n.scrollIntoView({ block: 'center', behavior: 'smooth' }); } };
+      host.addEventListener('focusin', ev => { const x = ev.target.closest('[data-campo]'); if (x) evidenzia(x.dataset.campo); });
+      host.addEventListener('change', ev => {
+        const x = ev.target.closest('[data-campo]'); if (!x) return;
+        valoreDa(x.dataset.campo, x.value); ridisegna(); const n = CRM.$('[data-campo="' + x.dataset.campo + '"]', host); if (n) n.focus();
       });
-      CRM.$$('[data-conferma]', host).forEach(x => x.addEventListener('click', () => { conferma(x.dataset.conferma); ridisegna(); }));
-      CRM.$$('[data-vai]', host).forEach(x => x.addEventListener('click', () => { const n = CRM.$('[data-campo="' + x.dataset.vai + '"]', fin.destra); if (n) { n.focus(); n.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }));
-      CRM.$$('[data-elimina]', host).forEach(x => x.addEventListener('click', () => { b.righe.splice(Number(x.dataset.elimina), 1); b.toccati.righe = true; ridisegna(); }));
-      CRM.$('#aggiungi-riga', host).addEventListener('click', () => {
-        const r = { _aff: {}, _ver: {}, _nuova: true }; cols.forEach(c => { r[c.k] = c.n ? 0 : ''; }); b.righe.push(r); b.toccati.righe = true; ridisegna();
-        const n = CRM.$('[data-campo="righe.' + (b.righe.length - 1) + '.' + cols[0].k + '"]', fin.destra); if (n) n.focus();
+      host.addEventListener('click', ev => {
+        const t = ev.target.closest('[data-conferma], [data-vai], [data-elimina], [data-aggiungi]'); if (!t) return;
+        if (t.dataset.conferma) { conferma(t.dataset.conferma); ridisegna(); }
+        else if (t.dataset.vai) vai(t.dataset.vai);
+        else if (t.dataset.elimina != null) { b.righe.splice(Number(t.dataset.elimina), 1); b.toccati.righe = true; ridisegna(); }
+        else {
+          const r = { _aff: {}, _ver: {}, _nuova: true }; cols.forEach(c => { r[c.k] = c.n ? 0 : ''; }); b.righe.push(r); b.toccati.righe = true; ridisegna();
+          vai('righe.' + (b.righe.length - 1) + '.' + cols[0].k);
+        }
       });
     }
     const salva = () => {
       const v = comeDoc();
       if (!boll && !String(b.numero || '').trim()) { CRM.Avviso('Il numero del documento è obbligatorio'); return false; }
-      Object.assign(d, { tipo: v.tipo, fornitore_id: v.fornitore_id, righe: v.righe.map(r => { const x = Object.assign({}, r); delete x._aff; delete x._ver; delete x._nuova; return x; }) });
+      Object.assign(d, { tipo: v.tipo, fornitore_id: v.fornitore_id, righe: v.righe.map(r => { const x = Object.assign({}, r); delete x._aff; delete x._ver; delete x._nuova; delete x._i; return x; }) });
       if (boll) { d.mese = v.mese; d.anno = v.anno || d.anno; d.numero = M.MESI[d.mese - 1] + ' ' + d.anno; }
       else Object.assign(d, { numero: String(b.numero).trim(), data: b.data || d.data, codice_cliente: String(b.codice_cliente || '').trim() });
       d.lettura = Object.assign({}, d.lettura || {}, { campi: v.lettura.campi, verificati: v.lettura.verificati, totale: v.lettura.totale });
@@ -334,6 +358,7 @@
       sottotitolo: 'A sinistra il documento, a destra i dati letti. Correggi o conferma i campi bordati: selezionandone uno lo vedi evidenziato nel documento.',
       sinistra: anteprima, larghezza: 42, azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Salva e ricalcola l’abbinamento', onClick: salva }]
     });
+    collega(fin.destra);
     destra(fin.destra);
     const primo = CRM.$('.incerto-errore [data-campo], .incerto-attesa [data-campo]', fin.destra);
     if (primo) primo.focus();
