@@ -171,7 +171,7 @@
       voce: 'liquidazioni', titolo: 'Liquidazioni', pieno: true,
       sottotitolo: 'Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre.',
       azioni: [
-        { etichetta: 'Esporta in Excel', icona: 'scarica', variante: 'sec', disabilitato: !righe.length, titolo: righe.length ? '' : 'Nessun documento nel trimestre', onClick: () => esporta(a, t, righe) },
+        { etichetta: 'Esporta in Excel', icona: 'scarica', variante: 'sec', consentito: true, disabilitato: !righe.length, titolo: righe.length ? '' : 'Nessun documento nel trimestre', onClick: () => esporta(a, t, righe) },
         { etichetta: st.chiave === 'chiusa' ? 'Liquidazione chiusa' : 'Chiudi il trimestre', icona: 'spunta', disabilitato: !puoChiudere, titolo: perche, onClick: async () => {
           if (!(await CRM.Conferma('Chiudere la liquidazione del ' + t + '° trimestre?', 'Gli importi vengono fissati: ' + M.euro(totLiq) + ' a ' + new Set(liquidabili.map(r => r.subagente_id)).size + ' subagenti.', 'Chiudi il trimestre'))) return;
           M.chiudiTrimestre(a, t); M.salva(); CRM.Avviso('Liquidazione del ' + t + '° trimestre chiusa'); CRM.naviga();
@@ -260,11 +260,11 @@
         sel.addEventListener('focus', () => { scelta = 'uno'; CRM.$('input[value=uno]', c).checked = true; agg(); });
         agg();
       },
-      azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Scarica', icona: 'scarica', onClick: (chiudi, corpo) => {
+      azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Scarica', icona: 'scarica', consentito: true, onClick: (chiudi, corpo) => {
         const sub = CRM.$('#esporta-sub', corpo).value;
         CRM.esportaLiquidazione(a, t, scelta, sub, formatoEsporta).then(nome => {
           if (!nome) return;
-          M.annota('Esportata la liquidazione del ' + t + '° trimestre ' + a + (scelta === 'uno' ? ' di ' + M.subagente(Number(sub)).nome : scelta === 'riepilogo' ? ' (riepilogo)' : ' (completa)') + ' in ' + formatoEsporta.toUpperCase()); M.salva();
+          if (M.puo('modifica')) M.annota('Esportata la liquidazione del ' + t + '° trimestre ' + a + (scelta === 'uno' ? ' di ' + M.subagente(Number(sub)).nome : scelta === 'riepilogo' ? ' (riepilogo)' : ' (completa)') + ' in ' + formatoEsporta.toUpperCase()); if (M.puo('modifica')) M.salva();
           CRM.Avviso('Scaricato ' + nome);
         });
       } }]

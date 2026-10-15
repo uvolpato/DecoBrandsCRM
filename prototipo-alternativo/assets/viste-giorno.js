@@ -99,7 +99,7 @@
       sottotitolo: 'Qui entrano tutti i documenti dei fornitori: ordini, conferme, fatture, note di credito e bollettini. Caricali, controlla i dati letti e abbinali: la pratica avanza da sola.'
     });
     const col = CRM.blocco(corpo, 'colonne posta riempi');
-    const sx = CRM.Pannello(col, { titolo: 'Da controllare', nota: String(docs.length), riempi: true });
+    const sx = CRM.Pannello(col, { titolo: 'Da controllare', nota: String(docs.length) + (M.puo('scartati') && M.S.scartati.length ? ' · <a href="#/scartati">' + M.S.scartati.length + ' scartati</a>' : ''), riempi: true });
     CRM.Caricamento(sx.corpo, { titolo: 'Trascina qui i documenti', testo: 'PDF di ordini, conferme, fatture e note di credito; bollettini in PDF o Excel', accetta: ACCETTA, onFile: f => carica(f) });
     if (!docs.length) {
       CRM.Nota(sx.corpo, 'Nessun documento da controllare.').style.marginTop = '12px';
@@ -227,9 +227,17 @@
       'Ci sono ' + st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') + ' nei dati letti. Conviene correggerli prima: vuoi procedere comunque?', 'Procedi comunque'))) return;
     fn();
   }
-  async function scarta(sel) {
-    if (!(await CRM.Conferma('Scartare ' + M.TIPI[sel.tipo].toLowerCase() + ' ' + sel.numero + '?', 'Il documento esce da questo elenco e non viene registrato: usalo per doppioni o documenti che non riguardano Decobrands.', 'Scarta', true))) return;
-    M.scarta(sel.id); M.salva(); CRM.Avviso('Documento ' + sel.numero + ' scartato'); location.hash = '#/documenti';
+  function scarta(sel) {
+    const giorni = M.S.impostazioni.conservazione.scartati_giorni;
+    CRM.FormModal({
+      titolo: 'Scartare ' + M.TIPI[sel.tipo].toLowerCase() + ' ' + sel.numero + '?', conferma: 'Scarta', pericolo: true,
+      testo: 'Il documento esce dall’elenco e non viene registrato. Resta fra i <a href="#/scartati">documenti scartati</a> per ' + giorni + ' giorni e si può recuperare.',
+      campi: [
+        { nome: 'motivo', etichetta: 'Motivo', tipo: 'select', valore: 'Doppione', opzioni: ['Doppione', 'Non riguarda Decobrands', 'Documento illeggibile', 'Altro'].map(x => ({ value: x, label: x })) },
+        { nome: 'nota', etichetta: 'Nota (facoltativa)', placeholder: 'es. arrivato due volte' }
+      ],
+      onConferma: v => { M.scarta(sel.id, v.motivo, v.nota); M.salva(); CRM.Avviso('Documento ' + sel.numero + ' scartato: lo trovi fra gli scartati'); location.hash = '#/documenti'; }
+    });
   }
 
   /* ---------- Correggi i dati letti: FinestraAffiancata (spec §6.5 punto 7) ----------

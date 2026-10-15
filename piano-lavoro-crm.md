@@ -189,6 +189,14 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 | **F5-A1** Dashboard: KPI, tab Segnalazioni (conferme scadute, bollettini da verificare, variazioni, NC) / Ordini, contatori, "Vedi tutti" | 1 | F0 (+ dati da F1–F4 per popolare) | `dashboard.html` (KPI invariati, `box-stabile`, `.table-box`) | §7.1, §5.12, §6.1 |
 | **F5-A2** Schermata `/eventi` (filtri, dettaglio JSON in modale, export CSV, rotazione 36 mesi) | 1 | F0-A5 | — (nessuna schermata prototipo: nuova, stile identico alle liste) | §7.11, §8.1, §15.6, §15.7 |
 
+| **F5-A3** Ruoli e permessi: tabella `crm_ruoli_utente`, `requirePermesso()` su ogni rotta, interfaccia in sola lettura, barra per ruolo | 2 · **da approvare** | F0-A3 | `prototipo-alternativo/assets/motore.js` (`M.PERMESSI`), `componenti.js` (barra) | §8.3 |
+| **F5-A4** Utenti e ruoli `/utenti` (elenco, scheda, nuova password via email, vincoli) | 2 · **da approvare** | F5-A3 | `prototipo-alternativo/assets/viste-gestione.js` | §7.13 |
+| **F5-A5** Stato del sistema `/sistema` + registri `servizi_esecuzioni` / `servizi_problemi` scritti dai servizi | 3 · **da approvare** | F6-A1 | idem | §7.14, §4.2.15 |
+| **F5-A6** Impostazioni `/impostazioni` (6 sezioni, password cifrate mai rilette, prova connessione) | 3 · **da approvare** | F0 | idem | §7.15, §4.2.14 |
+| **F5-A7** Documenti scartati `/scartati` (motivo, recupero, eliminazione automatica) | 1 · **da approvare** | F6-A4 | idem | §7.16 |
+| **F5-A8** Guida in linea `/guida` + pulsante *Guida* nelle testate | 2 · **da approvare** | F0-A4 | idem (`CRM.GUIDA`) | §7.17 |
+
+- **Pagine di gestione (F5-A3…A8): 13 h fuori preventivo, da approvare.**
 - **Nota:** la scrittura degli eventi **non** è di F5: la fa l'attività che implementa ogni operazione (§15.2 tassativo). F5 costruisce solo lettura/filtri/export.
 
 ## 10. Fase 6 — Ingresso documenti senza n8n (17 h, 2–3 agenti)

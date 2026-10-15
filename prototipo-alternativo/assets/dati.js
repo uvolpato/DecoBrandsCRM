@@ -889,5 +889,63 @@ window.DATI_DEMO = {
   liquidazioni_chiuse: [
     { anno: 2026, trimestre: 1, chiusa_il: '2026-04-10' },
     { anno: 2026, trimestre: 2, chiusa_il: '2026-07-10' }
+  ],
+
+  /* ---------- Gestione ----------
+     Utenti: tabella condivisa con la Gestione Ordini (stesse credenziali). Ruoli del CRM:
+     amministratore (tutto), operatore (lavoro quotidiano e anagrafiche CRM), lettura (consulta ed esporta). */
+  utente_corrente: 1,
+  utenti: [
+    { id: 1, utente: 'ugo.volpato', nome: 'Ugo Volpato', email: 'ugo.volpato@decobrands.it', ruolo: 'amministratore', attivo: true, ultimo_accesso: '2026-09-04T08:12', cambio_password: false, ultimo_invio: { quando: '2026-03-02T10:15', errore: null } },
+    { id: 2, utente: 'matteo.caironi', nome: 'Matteo Caironi', email: 'matteo.caironi@decobrands.it', ruolo: 'operatore', attivo: true, ultimo_accesso: '2026-09-04T08:47', cambio_password: false, ultimo_invio: { quando: '2026-03-02T10:16', errore: null } },
+    { id: 3, utente: 'giulia.ferri', nome: 'Giulia Ferri', email: 'amministrazione@decobrands.it', ruolo: 'lettura', attivo: true, ultimo_accesso: '2026-09-01T17:30', cambio_password: false, ultimo_invio: { quando: '2026-06-10T09:00', errore: null } },
+    { id: 4, utente: 'luca.bianchi', nome: 'Luca Bianchi', email: 'luca.bianchi@decobrands.it', ruolo: 'operatore', attivo: false, ultimo_accesso: '2026-05-28T12:05', cambio_password: true, ultimo_invio: { quando: '2026-05-29T08:30', errore: 'Casella inesistente (550 5.1.1)' } },
+    { id: 5, utente: 'servizi', nome: 'Servizi automatici', email: 'noreply@decobrands.it', ruolo: 'amministratore', attivo: true, sistema: true, ultimo_accesso: null, cambio_password: false, ultimo_invio: null }
+  ],
+
+  /* Stato dei servizi che girano da soli (spec §7.13). */
+  sistema: {
+    servizi: [
+      { id: 'casella', nome: 'Casella dei documenti', icona: 'posta', stato: 'ok', dove: 'documenti@decobrands.it · cartella Fornitori', ultimo: '2026-09-04T09:58', ritmo: 'ogni 2 minuti', nota: '6 allegati letti oggi' },
+      { id: 'lettura', nome: 'Server di lettura (GLM-OCR)', icona: 'arrivo', stato: 'attesa', dove: 'gpu-decobrands:8080', ultimo: '2026-09-04T09:57', ritmo: 'a ogni documento', nota: 'lento: 9,8 s per pagina (di solito 4 s)' },
+      { id: 'integra', nome: 'Import anagrafiche da Integra', icona: 'abbinamenti', stato: 'errore', dove: 'cartella condivisa Integra · clienti e fornitori', ultimo: '2026-09-04T06:00', ritmo: 'ogni giorno alle 06:00', nota: '2 clienti non importati' },
+      { id: 'posta', nome: 'Posta in uscita', icona: 'posta', stato: 'ok', dove: 'smtp.office365.com · noreply@decobrands.it', ultimo: '2026-09-03T16:20', ritmo: 'a ogni invio', nota: 'ultimo invio riuscito' }
+    ],
+    problemi: [
+      { id: 1, quando: '2026-09-04T06:00', servizio: 'integra', livello: 'errore', testo: 'Cliente non importato: P.IVA mancante', dettaglio: 'Codice Integra C00931 «Serra Bella di Rossi M.» senza partita IVA: correggere in Integra, al prossimo import entra da solo.', visto: false },
+      { id: 2, quando: '2026-09-04T06:00', servizio: 'integra', livello: 'errore', testo: 'Cliente non importato: P.IVA già usata', dettaglio: 'Codice Integra C00944 ha la stessa P.IVA di C00412 (Vivaio Verde Azzurro): unire o correggere in Integra.', visto: false },
+      { id: 3, quando: '2026-09-04T09:41', servizio: 'lettura', livello: 'attenzione', testo: 'Lettura lenta', dettaglio: 'Ings_F-2026-0961_scansione.pdf: 3 pagine in 29 s. Se si ripete, controllare il carico della scheda video.', visto: false },
+      { id: 4, quando: '2026-09-03T11:02', servizio: 'casella', livello: 'attenzione', testo: 'Allegato non leggibile', dettaglio: 'Email di ordini@gasper.de del 03/09 alle 11:01: allegato «Lieferschein.zip» non è PDF né Excel; ignorato.', visto: false },
+      { id: 5, quando: '2026-08-29T08:15', servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: 'Password a luca.bianchi@decobrands.it: casella inesistente (550 5.1.1).', visto: true },
+      { id: 6, quando: '2026-08-21T02:10', servizio: 'lettura', livello: 'errore', testo: 'Server di lettura non raggiungibile per 14 minuti', dettaglio: 'Riavvio automatico del servizio alle 02:24; 2 documenti riletti.', visto: true }
+    ],
+    esecuzioni: [
+      { quando: '2026-09-04T09:58', servizio: 'casella', esito: 'ok', testo: '1 email, 1 allegato (Gries_AB-77120.pdf)' },
+      { quando: '2026-09-04T09:57', servizio: 'lettura', esito: 'attenzione', testo: 'Gries_AB-77120.pdf · 2 pagine · 19,6 s' },
+      { quando: '2026-09-04T09:41', servizio: 'lettura', esito: 'attenzione', testo: 'Ings_F-2026-0961_scansione.pdf · 3 pagine · 29,4 s' },
+      { quando: '2026-09-04T06:00', servizio: 'integra', esito: 'errore', testo: '412 clienti, 18 fornitori · 3 aggiornati · 2 non importati' },
+      { quando: '2026-09-03T16:20', servizio: 'posta', esito: 'ok', testo: 'Sollecito conferme a Gries GmbH & Co. KG' },
+      { quando: '2026-09-03T11:01', servizio: 'casella', esito: 'attenzione', testo: '1 email · 1 allegato ignorato (Lieferschein.zip)' },
+      { quando: '2026-09-03T06:00', servizio: 'integra', esito: 'ok', testo: '412 clienti, 18 fornitori · nessuna variazione' }
+    ]
+  },
+
+  /* Impostazioni (spec §7.14): le password non si rileggono, si sostituiscono. */
+  impostazioni: {
+    azienda: { ragione_sociale: 'Decobrands SRL', piva: 'IT03589740163', indirizzo: 'Via dell’Industria 12, 24040 Bergamo', email: 'amministrazione@decobrands.it' },
+    casella: { server: 'outlook.office365.com', porta: 993, utente: 'documenti@decobrands.it', password: true, cartella: 'Fornitori', cartella_lette: 'Fornitori/Letti', minuti: 2 },
+    lettura: { indirizzo: 'http://gpu-decobrands:8080/v1', modello: 'zai-org/GLM-OCR', soglia_ok: 0.90, soglia_bassa: 0.70, attesa_s: 120 },
+    posta: { server: 'smtp.office365.com', porta: 587, utente: 'noreply@decobrands.it', password: true, mittente: 'Decobrands CRM <noreply@decobrands.it>' },
+    integra: { percorso: '\\\\srv-integra\\export\\anagrafiche', ora: '06:00', clienti: true, fornitori: true },
+    conservazione: { eventi_mesi: 36, scartati_giorni: 90, righe_pagina: 25 }
+  },
+
+  /* Documenti scartati: recuperabili per il tempo fissato nelle impostazioni. */
+  scartati: [
+    { id: 8801, quando: '2026-09-02T10:20', da: 'Matteo Caironi', motivo: 'Doppione', nota: 'stessa conferma arrivata due volte',
+      doc: { id: 8801, tipo: 'conferma', fornitore_id: 3, numero: 'CON/2026/778', data: '2026-08-21', ricevuto: '2026-09-02', codice_cliente: 'IN-3150', file: 'Ings_CON-2026-778 (1).pdf', righe: [
+        { codice: 'XMAS-LED', descrizione: 'Addobbo luminoso a LED, 100 pz', qta: 24, prezzo: 18.50 } ] } },
+    { id: 8802, quando: '2026-08-28T15:44', da: 'Matteo Caironi', motivo: 'Non riguarda Decobrands', nota: 'listino prezzi 2027',
+      doc: { id: 8802, tipo: 'ordine', fornitore_id: 2, numero: 'Preisliste 2027', data: '2026-08-28', ricevuto: '2026-08-28', codice_cliente: '', file: 'Gasper_Preisliste_2027.pdf', righe: [] } }
   ]
 };

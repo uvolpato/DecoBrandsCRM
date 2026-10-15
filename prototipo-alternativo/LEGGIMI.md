@@ -15,6 +15,13 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | | Bollettino | Riconciliazione **a cerniera**: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura |
 | Ogni trimestre | **Liquidazioni** | Trimestri fissi, elenco dei subagenti con documenti nel trimestre (clic = filtro, regge qualsiasi numero), documenti liquidabili o in attesa, esportazione (completa per subagente, un solo subagente, solo riepilogo) in Excel, PDF identico all'Excel o CSV di soli dati, chiusura |
 | Anagrafiche | Fornitori, Subagenti, Clienti | Clienti e fornitori da Integra in **sola lettura**; nel CRM condizioni, percentuali **datate**, eccezioni, subagenti e **agenzie del cliente** (fornitore, codice, subagente, sconto) |
+| Gestione (gruppo richiudibile) | **Utenti e ruoli** | Utenti condivisi con la Gestione Ordini; ruoli *Amministratore*, *Operatore*, *Sola lettura*; nuova password via email; tabella di cosa può fare ogni ruolo |
+| | **Stato del sistema** | Casella dei documenti, server di lettura, import da Integra, posta in uscita: stato, problemi da vedere (contatore nella barra), ultime esecuzioni |
+| | **Impostazioni** | Dati azienda, casella IMAP, server di lettura e soglie, posta in uscita, import Integra, conservazione; password mai rilette |
+| | **Documenti scartati** | Scarto con motivo; recupero (operatore) o eliminazione definitiva (amministratore) |
+| | **Guida** | Argomenti per pagina con ricerca; pulsante *Guida* in testata a ogni pagina |
+
+**Prova i ruoli:** in fondo alla barra *Prova come* cambia utente. Con *Giulia Ferri · Lettura* la gestione sparisce, compare la fascia "Profilo in sola lettura", i pulsanti che modificano sono spenti e l'esportazione resta attiva; con *Matteo Caironi · Operatore* restano Stato del sistema, Scartati e Guida.
 
 ## Controllo dei dati letti
 

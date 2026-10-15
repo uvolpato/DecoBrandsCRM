@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 2.7 — esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 2.8 — pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -157,7 +157,7 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
 
 | Tabella | Uso nel CRM |
 |---------|-------------|
-| `users` | autenticazione e ruoli (condivisa con la Gestione Ordini) |
+| `users` | autenticazione e ruoli (condivisa con la Gestione Ordini). Il CRM legge il ruolo da una tabella propria `crm_ruoli_utente` (`user_id`, `ruolo` = `amministratore` \| `operatore` \| `lettura`): i ruoli della Gestione Ordini (`admin`/`operator`) non cambiano (§8.3) |
 | `remember_tokens` | sessione persistente |
 | `clienti` | anagrafica cliente importata da Integra (P.IVA univoca, ragione sociale, indirizzo, codice Integra, flag vendita diretta): **sola lettura** nel CRM |
 | `articoli` | catalogo (codice, descrizione, EAN, UM) |
@@ -479,6 +479,7 @@ Coda e stato di ogni documento entrato nel CRM (§6.5), dalla ricezione all'abbi
 | `ricevuto_il` · `letto_il` · `controllato_il` | TIMESTAMPTZ | |
 | `abbinato_pratica_id` · `abbinato_bollettino_id` | FK | valorizzati all'abbinamento |
 | `utente` | VARCHAR(100) | chi ha caricato / controllato |
+| `scartato_il` · `scartato_da` · `motivo_scarto` · `nota_scarto` | TIMESTAMPTZ · VARCHAR · VARCHAR(40) · TEXT | motivo: `Doppione` · `Non riguarda Decobrands` · `Documento illeggibile` · `Altro`; il documento scartato resta recuperabile per `conservazione.scartati_giorni` (§7.16), poi un lavoro pianificato lo elimina |
 
 ### 4.2.13 `documenti_campi`
 
@@ -496,6 +497,14 @@ alla **taratura** delle soglie sui documenti reali.
 | `precisione` | VARCHAR(12) | `esatta` \| `approssimata` \| `assente` — come è stata trovata la posizione (§6.6) |
 | `verificato` | BOOLEAN | confermato o corretto dall'operatore |
 | `corretto_da` · `corretto_il` | VARCHAR(100) · TIMESTAMPTZ | |
+
+### 4.2.14 `impostazioni`
+
+Una riga per sezione (`chiave` = `azienda` · `casella` · `lettura` · `posta` · `integra` · `conservazione`), `valore` JSONB, `aggiornato_il`, `aggiornato_da`. Le password (casella IMAP, posta in uscita) sono **cifrate** (chiave nel file d'ambiente del server) e **non vengono mai restituite** dalle API: si sostituiscono soltanto. Ogni modifica scrive un evento (§15).
+
+### 4.2.15 `servizi_esecuzioni` e `servizi_problemi`
+
+Registro dei servizi automatici (§7.14): `servizi_esecuzioni` (`servizio` = `casella` · `lettura` · `integra` · `posta`, `inizio`, `fine`, `esito` `ok`·`attenzione`·`errore`, `testo`); `servizi_problemi` (`servizio`, `quando`, `livello` `errore`·`attenzione`, `testo`, `dettaglio` con cosa fare, `visto_il`, `visto_da`). Conservazione come il registro eventi.
 
 ### 4.3 Diagramma relazionale
 
@@ -949,9 +958,9 @@ di Decobrands; tempi e memoria video con analisi della pagina attiva.
 | 9 | `/bollettini` | Elenco bollettini con stato e differenze |
 | 10 | `/bollettini/:id` | Dettaglio bollettino con righe e divergenze |
 | 11 | `/liquidazione` | Rendiconto provvigioni subagenti |
-| 12 | `/cambia-password`, `/richiedi-reset` | Gestione credenziali |
+| 12 | `/login`, `/cambia-password`, `/richiedi-reset`, `/reset-password` | Credenziali (condivise con la Gestione Ordini) |
 | 13 | `/ordini`, `/ordini/upload`, `/liste` | Gestione ordini cliente |
-| 14 | `/utenti`, `/errori` | Utility (admin) |
+| 14 | `/utenti`, `/sistema`, `/impostazioni/:sezione`, `/scartati`, `/guida/:argomento` | Gestione (§7.13–§7.17) |
 | 15 | `/eventi` | Log eventi applicativi: CRUD, cambi di stato, upload/export, autenticazione, errori (admin) |
 
 ### 7.1 Oggi (`/dashboard`)
@@ -1208,6 +1217,76 @@ deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'er
   nessuna schermata scrive codice proprio per questo. Nel prototipo: `CRM.naviga`,
   `CRM.registra`, `CRM.indietro` in `componenti.js`.
 
+### 7.13 Utenti e ruoli (`/utenti`, `/utenti/:id`) — solo amministratore
+
+- Gli **utenti sono quelli della Gestione Ordini** (tabella `users` condivisa, stesse
+  credenziali); il **ruolo nel CRM** è proprio (`crm_ruoli_utente`, §4.1).
+- **Elenco** (sinistra): ricerca per nome, utente o email; segmenti *Attivi · Disattivati ·
+  Tutti*; colonne utente (con nome utente ed email), ruolo, ultimo accesso.
+- **Scheda** (destra): nome utente, email, ruolo, stato, ultimo accesso, stato della
+  password (da cambiare al prossimo accesso), **ultimo invio password con eventuale
+  errore di recapito**; azioni *Modifica*, *Invia nuova password*, *Disattiva/Riattiva*,
+  *Elimina*.
+- **Cosa può fare ogni ruolo**: tabella attività × ruoli (la stessa di §8.3), con la
+  colonna del ruolo dell'utente evidenziata.
+- *Nuovo utente*: nome, nome utente (non modificabile dopo), email, ruolo; parte l'email
+  con la password temporanea da cambiare al primo accesso (`must_change_password`).
+- **Vincoli**: nome utente ed email unici; **deve restare almeno un amministratore
+  attivo**; nessuno può cambiare il proprio ruolo, disattivarsi o eliminarsi; l'**utente
+  dei servizi automatici** non si modifica e non accede all'app; eliminare un utente che
+  ha già usato l'app chiede conferma e suggerisce di disattivarlo (il nome resta nel
+  registro eventi). Un invio non recapitato crea un problema in §7.14.
+
+### 7.14 Stato del sistema (`/sistema`) — amministratore e operatore
+
+- **Riquadri per servizio** (KpiRow, fanno da filtro): *Casella dei documenti*, *Server di
+  lettura (GLM-OCR)*, *Import anagrafiche da Integra*, *Posta in uscita*; per ognuno stato
+  (*Funziona* · *Da tenere d'occhio* · *Problema*), nota (es. "lento: 9,8 s per pagina"),
+  ultima esecuzione e ritmo, problemi da vedere.
+- **Problemi** (sinistra): quando, livello (*Errore* · *Attenzione*), servizio, testo e
+  **cosa fare**; segmenti *Da vedere · Tutti*; *Segna come visto* per riga e *Segna tutti
+  come visti*. Il numero dei problemi da vedere compare **nella barra** (voce Stato del
+  sistema e titolo del gruppo Gestione), in giallo se c'è un errore.
+- **Ultime esecuzioni** (destra): quando, servizio, esito, cosa ha fatto.
+- *Controlla adesso*: esegue subito il controllo della casella e la verifica dei servizi.
+- Sostituisce la pagina "Errori" della Gestione Ordini per il CRM.
+
+### 7.15 Impostazioni (`/impostazioni/:sezione`) — solo amministratore
+
+Sezioni a sinistra (ElencoSelezionabile), modulo della sezione a destra con *Salva* e,
+dove serve, *Prova la connessione*.
+
+| Sezione | Campi |
+|---|---|
+| Dati dell'azienda | ragione sociale, P.IVA, indirizzo, email (intestazione dei prospetti esportati, §11) |
+| Casella dei documenti | server IMAP, porta, utente, password, cartella da leggere, cartella dove spostare le email lette, ogni quanti minuti (1–60) |
+| Server di lettura | indirizzo, modello, tempo massimo per documento, **soglie di affidabilità** (affidabile da, bassa sotto; §6.5) |
+| Posta in uscita | server SMTP, porta, utente, password, mittente |
+| Import da Integra | cartella dei file esportati da Integra, ora giornaliera, cosa importare (clienti e/o fornitori) |
+| Conservazione dei dati | registro eventi (mesi), documenti scartati (giorni), righe per pagina |
+
+Le **password non si rileggono**: il campo mostra "impostata", si scrive solo per
+sostituirla. Controlli: numeri validi, soglie 0 < bassa < affidabile ≤ 1, ora `hh:mm`.
+Ogni salvataggio scrive un evento con i campi cambiati (mai le password).
+
+### 7.16 Documenti scartati (`/scartati`) — amministratore e operatore
+
+- Lo **scarto chiede il motivo** (*Doppione* · *Non riguarda Decobrands* · *Documento
+  illeggibile* · *Altro*) e una nota facoltativa.
+- Elenco: scartato il / da chi, documento (tipo, numero, fornitore, file), motivo e nota,
+  data di eliminazione automatica (`scartati_giorni`, §7.15); segmenti per motivo e
+  ricerca.
+- **Recupera** rimette il documento fra quelli da controllare (§7.9) e lo apre;
+  **Elimina** definitivamente solo l'amministratore, con conferma.
+- Da "Documenti" il collegamento "N scartati" accanto al contatore.
+
+### 7.17 Guida (`/guida/:argomento`) — tutti
+
+- Argomenti a sinistra (ricerca nel testo), raggruppati *Lavoro · Anagrafiche ·
+  Gestione*; testo a destra con *Apri la pagina* e **chi può modificare** (dai ruoli).
+- **Aiuto contestuale**: ogni pagina con un argomento ha in testata il pulsante *Guida*
+  che apre l'argomento giusto. Gli argomenti di gestione si vedono solo con il permesso.
+
 ## 8. API endpoint
 
 ### 8.1 Rotte nuove (CRM)
@@ -1265,8 +1344,29 @@ ordini cliente, che sostituirà la Gestione Ordini; non incluse in questa fase.
 
 ### 8.3 Autenticazione
 
-`/login` (POST), `/logout` (POST), `/cambia-password`, `/richiedi-reset`. Guard
-`requireAuth` su tutte le rotte app, `requireAdmin` su clienti/utenti/eventi.
+`/login` (POST), `/logout` (POST), `/cambia-password`, `/richiedi-reset`,
+`/reset-password` (stessi della Gestione Ordini). Guard `requireAuth` su tutte le
+rotte; ogni rotta dichiara il **permesso** richiesto, verificato lato server
+(`requirePermesso('modifica')` ecc.), non solo nascondendo i pulsanti.
+
+**Ruoli del CRM** (`crm_ruoli_utente`, §4.1):
+
+| Attività (permesso) | Amministratore | Operatore | Sola lettura |
+|---|:-:|:-:|:-:|
+| Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche (`consulta`) | ✓ | ✓ | ✓ |
+| Esportare le liquidazioni in Excel, PDF, CSV (`esporta`) | ✓ | ✓ | ✓ |
+| Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti (`modifica`) | ✓ | ✓ | — |
+| Condizioni dei fornitori, agenzie dei clienti, subagenti (`anagrafiche`) | ✓ | ✓ | — |
+| Chiudere la liquidazione del trimestre (`chiudi`) | ✓ | ✓ | — |
+| Vedere e recuperare i documenti scartati (`scartati`) | ✓ | ✓ | — |
+| Stato del sistema, segnare i problemi come visti (`sistema`) | ✓ | ✓ | — |
+| Utenti e ruoli, impostazioni, eliminazione definitiva degli scartati (`gestione`) | ✓ | — | — |
+
+**Sola lettura** nell'interfaccia: fascia "Profilo in sola lettura: puoi consultare ed
+esportare, non modificare"; caricamento nascosto; pulsanti che modificano spenti
+(restano attivi solo quelli consentiti: esporta, guida, navigazione); le pagine non
+permesse mostrano "Pagina riservata" e non compaiono nella barra. Il gruppo **Gestione**
+della barra è richiudibile, aperto solo nelle sue pagine, con il contatore dei problemi.
 
 ---
 

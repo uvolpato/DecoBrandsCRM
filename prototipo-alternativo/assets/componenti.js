@@ -35,6 +35,12 @@
     abbinamenti: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
     componenti: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     cerca: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    sistema: '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
+    impostazioni: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    cestino: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    guida: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.5V14M12 17.5v.5"/>',
+    chiave: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+    lucchetto: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     indietro: '<path d="M15 18l-6-6 6-6"/>',
     chiudi: '<path d="M6 6l12 12M18 6L6 18"/>',
     spunta: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
@@ -87,7 +93,7 @@
     velo.addEventListener('click', e => { if (e.target === velo) chiudi(); });
     const piede = $('.modale-piede', velo);
     (opz.azioni || [{ etichetta: 'Chiudi', variante: 'sec' }]).forEach(a => {
-      const b = el('button', 'btn ' + (a.variante && a.variante !== 'primario' ? a.variante : ''), esc(a.etichetta));
+      const b = el('button', 'btn ' + (a.variante && a.variante !== 'primario' ? a.variante : '') + (a.consentito ? ' consentito' : ''), esc(a.etichetta));
       b.type = 'button';
       b.addEventListener('click', () => { if (!a.onClick || a.onClick(chiudi, corpo) !== false) chiudi(); });
       piede.appendChild(b);
@@ -350,7 +356,7 @@
     if (ind) $('.torna', h).addEventListener('click', ind.vai);
     const az = $('.testa-azioni', h);
     (opz.azioni || []).forEach(a => {
-      const b = el(a.href ? 'a' : 'button', 'btn ' + (a.variante && a.variante !== 'primario' ? a.variante : ''), (a.icona ? CRM.icona(a.icona) : '') + esc(a.etichetta));
+      const b = el(a.href ? 'a' : 'button', 'btn ' + (a.variante && a.variante !== 'primario' ? a.variante : '') + (a.consentito ? ' consentito' : ''), (a.icona ? CRM.icona(a.icona) : '') + esc(a.etichetta));
       if (a.href) b.href = a.href; else b.type = 'button';
       if (a.disabilitato) b.disabled = true;
       if (a.titolo) b.title = a.titolo;
@@ -364,11 +370,22 @@
     CRM.Barra(opz.voce);
     const p = $('#principale');
     p.innerHTML = '';
+    // aiuto contestuale: ogni pagina con una voce di guida ha il collegamento "Guida" in testata
+    if (opz.voce && CRM.GUIDA && CRM.GUIDA.some(g => g.id === opz.voce) && opz.voce !== 'guida')
+      opz = Object.assign({}, opz, { azioni: (opz.azioni || []).concat([{ etichetta: 'Guida', icona: 'guida', variante: 'testo', href: '#/guida/' + opz.voce, consentito: true }]) });
     CRM.Intestazione(p, opz);
     const corpo = el('section', 'corpo' + (opz.pieno ? ' pieno' : ''));
     p.appendChild(corpo);
     document.title = (opz.titolo || 'Decobrands') + ' · Decobrands';
     return corpo;
+  };
+
+  /* Pagina non permessa al ruolo dell'utente: spiega perché, senza mostrare i dati. */
+  CRM.permesso = function (azione, voce, titolo) {
+    if (M.puo(azione)) return true;
+    const corpo = CRM.Pagina({ voce: voce, titolo: titolo });
+    CRM.Pannello(corpo, {}).corpo.innerHTML = '<div class="vuoto"><b>Pagina riservata</b>Con il ruolo ' + esc(M.RUOLI[M.utente().ruolo].nome.toLowerCase()) + ' non puoi aprire questa pagina. Chiedi a un amministratore.</div>';
+    return false;
   };
 
   /* =========================================================
@@ -381,7 +398,7 @@
     p.innerHTML = (opz.titolo ? '<div class="pannello-testa"><h2>' + esc(opz.titolo) + '</h2><div class="pannello-destra"><span class="pannello-nota">' + (opz.nota || '') + '</span></div></div>' : '') +
       '<div class="pannello-corpo' + (opz.senzaMargine ? ' senza-margine' : '') + '"></div>';
     (opz.azioni || []).forEach(a => {
-      const b = el(a.href ? 'a' : 'button', 'btn piccolo ' + (a.variante || 'sec'), (a.icona ? CRM.icona(a.icona) : '') + esc(a.etichetta) +
+      const b = el(a.href ? 'a' : 'button', 'btn piccolo ' + (a.variante || 'sec') + (a.consentito ? ' consentito' : ''), (a.icona ? CRM.icona(a.icona) : '') + esc(a.etichetta) +
         (a.conta ? '<span class="btn-conta c-' + (a.contaVariante || 'attesa') + '" title="' + esc(a.contaTitolo || '') + '">' + esc(a.conta) + '</span>' : ''));
       if (a.href) b.href = a.href; else b.type = 'button';
       if (a.onClick) b.addEventListener('click', a.onClick);
@@ -767,8 +784,14 @@
       { id: 'fornitori', href: '#/fornitori', t: 'Fornitori', icona: 'fornitori' },
       { id: 'subagenti', href: '#/subagenti', t: 'Subagenti', icona: 'subagenti' },
       { id: 'clienti', href: '#/clienti', t: 'Clienti', icona: 'abbinamenti' }] },
-    { gruppo: 'Prototipo', voci: [{ id: 'componenti', href: '#/componenti', t: 'Componenti', icona: 'componenti' }] }
+    { gruppo: 'Gestione', voci: [
+      { id: 'utenti', href: '#/utenti', t: 'Utenti e ruoli', icona: 'subagenti', permesso: 'gestione' },
+      { id: 'sistema', href: '#/sistema', t: 'Stato del sistema', icona: 'sistema', permesso: 'sistema' },
+      { id: 'impostazioni', href: '#/impostazioni', t: 'Impostazioni', icona: 'impostazioni', permesso: 'gestione' },
+      { id: 'scartati', href: '#/scartati', t: 'Documenti scartati', icona: 'cestino', permesso: 'scartati' },
+      { id: 'guida', href: '#/guida', t: 'Guida', icona: 'guida' }], richiudibile: true }
   ];
+  let gestioneAperta = false;
   CRM.Barra = function (attiva) {
     const fare = M.daFare();
     const conta = {
@@ -776,18 +799,29 @@
       documenti: { n: M.S.in_arrivo.length, urgente: M.S.in_arrivo.length > 0 },
       // la voce si chiama "Documenti": qui si caricano e si abbinano
       pratiche: { n: M.S.pratiche.filter(p => M.statoPratica(p).chiave === 'scaduta').length, urgente: true },
-      bollettini: { n: fare.filter(x => x.tipo === 'bollettino' || x.tipo === 'mancante').length }
+      bollettini: { n: fare.filter(x => x.tipo === 'bollettino' || x.tipo === 'mancante').length },
+      sistema: { n: M.S.sistema.problemi.filter(x => !x.visto).length, urgente: M.S.sistema.problemi.some(x => !x.visto && x.livello === 'errore') }
     };
+    const io = M.utente();
+    document.body.classList.toggle('sola-lettura', !M.puo('modifica'));
     const b = $('#barra');
     b.innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Pratiche e provvigioni</span></div>' +
       '<button type="button" class="carica-barra" id="carica-barra">' + CRM.icona('carica') + 'Carica documenti</button>' +
-      VOCI.map(g => '<nav class="gruppo" aria-label="' + g.gruppo + '"><div class="gruppo-nome">' + g.gruppo + '</div>' + g.voci.map(v => {
+      VOCI.map(g => Object.assign({}, g, { voci: g.voci.filter(v => !v.permesso || M.puo(v.permesso)) })).filter(g => g.voci.length).map(g => {
+        // il gruppo Gestione si apre da solo quando si è in una delle sue pagine (il contatore dei problemi resta visibile sul titolo)
+        const aperto = !g.richiudibile || gestioneAperta || window.innerWidth <= 860 || g.voci.some(v => v.id === attiva);
+        const titolo = g.richiudibile ? '<summary class="gruppo-nome">' + g.gruppo + (conta.sistema && conta.sistema.n && M.puo('sistema') ? ' <span class="conta' + (conta.sistema.urgente ? ' urgente' : '') + '">' + conta.sistema.n + '</span>' : '') + '</summary>' : '<div class="gruppo-nome">' + g.gruppo + '</div>';
+        return (g.richiudibile ? '<details class="gruppo richiudibile"' + (aperto ? ' open' : '') + ' aria-label="' + g.gruppo + '">' : '<nav class="gruppo" aria-label="' + g.gruppo + '">') + titolo + g.voci.map(v => {
         const k = conta[v.id];
         return '<a class="voce' + (v.id === attiva ? ' attiva' : '') + '" href="' + v.href + '"' + (v.id === attiva ? ' aria-current="page"' : '') + '>' + CRM.icona(v.icona) + '<span>' + v.t + '</span>' +
           (k && k.n ? '<span class="conta' + (k.urgente ? ' urgente' : '') + '">' + k.n + '</span>' : '') + '</a>';
-      }).join('') + '</nav>').join('') +
-      '<div class="barra-piede">Data simulata: ' + M.dataLunga(M.oggi()) + '<br><button type="button" id="ripristina">Ripristina i dati di prova</button></div>';
+      }).join('') + (g.richiudibile ? '</details>' : '</nav>'); }).join('') +
+      '<div class="barra-piede"><div class="io"><span class="io-sigla" aria-hidden="true">' + esc(io.nome.split(' ').map(x => x[0]).join('').slice(0, 2)) + '</span><span><b>' + esc(io.nome) + '</b>' + esc(M.RUOLI[io.ruolo].nome) + '</span></div>' +
+      '<label class="io-cambia">Prova come <select id="accedi-come" aria-label="Prova il prototipo come">' + M.S.utenti.filter(u => u.attivo && !u.sistema).map(u => '<option value="' + u.id + '"' + (u.id === io.id ? ' selected' : '') + '>' + esc(u.nome + ' · ' + M.RUOLI[u.ruolo].breve) + '</option>').join('') + '</select></label>' +
+      'Data simulata: ' + M.dataLunga(M.oggi()) + '<br><button type="button" id="ripristina">Ripristina i dati di prova</button> · <a href="#/componenti"' + (attiva === 'componenti' ? ' aria-current="page"' : '') + '>Componenti</a></div>';
+    const det = $('details.richiudibile', b); if (det) det.addEventListener('toggle', () => { gestioneAperta = det.open; });
     $('#carica-barra').addEventListener('click', () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.alCaricamento && CRM.alCaricamento(f) }));
+    $('#accedi-come').addEventListener('change', ev => { M.S.utente_corrente = Number(ev.target.value); M.salvaSempre(); CRM.Avviso('Ora sei ' + M.utente().nome + ' · ' + M.RUOLI[M.utente().ruolo].nome); CRM.naviga(); });
     $('#ripristina').addEventListener('click', async () => {
       if (!(await CRM.Conferma('Ripristinare i dati di prova?', 'Le modifiche fatte in questa demo andranno perse.', 'Ripristina', true))) return;
       M.ripristina(); CRM.Avviso('Dati di prova ripristinati'); CRM.naviga();

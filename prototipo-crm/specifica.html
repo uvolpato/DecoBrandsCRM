@@ -31,7 +31,7 @@
     <a href="index.html" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Launcher</a>
   </div>
   <div class="alert alert-light border nota-prototipo mb-4 py-2">
-    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.7 — esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
+    <i class="bi bi-info-circle me-1"></i>Rendering statico di <code>specifica-crm-provvigioni.md</code> — Versione: 2.8 — pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); Stato: validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento da verificare con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17) (generato da <code>strumenti/genera-pagine-doc.py</code>).
   </div>
 
   <div class="row g-4">
@@ -104,6 +104,11 @@
               <li class="nav-item"><a class="nav-link" href="#sec-7-10">7.10 Schema dei flussi e navigazione tra le schermate</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-11">7.11 Log eventi applicativi (/eventi)</a></li>
               <li class="nav-item"><a class="nav-link" href="#sec-7-12">7.12 Navigazione: ritorno alla schermata precedente, nello stesso punto</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-13">7.13 Utenti e ruoli (/utenti, /utenti/:id) — solo amministratore</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-14">7.14 Stato del sistema (/sistema) — amministratore e operatore</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-15">7.15 Impostazioni (/impostazioni/:sezione) — solo amministratore</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-16">7.16 Documenti scartati (/scartati) — amministratore e operatore</a></li>
+              <li class="nav-item"><a class="nav-link" href="#sec-7-17">7.17 Guida (/guida/:argomento) — tutti</a></li>
             </ul>
           </li>
           <li class="nav-item">
@@ -156,7 +161,7 @@
 
         <section id="sec-intro">
           <h2 class="border-0 pt-0" style="margin-top:0">Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)</h2>
-          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.7 — esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
+          <p class="small text-muted mb-1"><strong>Versione:</strong> 2.8 — pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); <strong>Stato:</strong> validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento <strong>da verificare</strong> con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)</p>
           <p class="small text-muted mb-1"><strong>Fonte:</strong> <code>ANALISI_CRM_PROVVIGIONI.md</code> (analisi) + risposte di Matteo Caironi (Sales Assistant)</p>
         </section>
 
@@ -351,7 +356,7 @@ già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).</p>
 <tbody>
 <tr>
 <td><code>users</code></td>
-<td>autenticazione e ruoli (condivisa con la Gestione Ordini)</td>
+<td>autenticazione e ruoli (condivisa con la Gestione Ordini). Il CRM legge il ruolo da una tabella propria <code>crm_ruoli_utente</code> (<code>user_id</code>, <code>ruolo</code> = <code>amministratore</code> | <code>operatore</code> | <code>lettura</code>): i ruoli della Gestione Ordini (<code>admin</code>/<code>operator</code>) non cambiano (§8.3)</td>
 </tr>
 <tr>
 <td><code>remember_tokens</code></td>
@@ -1381,6 +1386,11 @@ elimina le righe più vecchie di 36 mesi (§15.7). Indici: <code>(tipo, ts)</cod
 <td>VARCHAR(100)</td>
 <td>chi ha caricato / controllato</td>
 </tr>
+<tr>
+<td><code>scartato_il</code> · <code>scartato_da</code> · <code>motivo_scarto</code> · <code>nota_scarto</code></td>
+<td>TIMESTAMPTZ · VARCHAR · VARCHAR(40) · TEXT</td>
+<td>motivo: <code>Doppione</code> · <code>Non riguarda Decobrands</code> · <code>Documento illeggibile</code> · <code>Altro</code>; il documento scartato resta recuperabile per <code>conservazione.scartati_giorni</code> (§7.16), poi un lavoro pianificato lo elimina</td>
+</tr>
 </tbody>
 </table></div>
 <h3 id="sec-4-2-13">4.2.13 <code>documenti_campi</code></h3>
@@ -1442,6 +1452,10 @@ alla <strong>taratura</strong> delle soglie sui documenti reali.</p>
 </tr>
 </tbody>
 </table></div>
+<h3 id="sec-4-2-14">4.2.14 <code>impostazioni</code></h3>
+<p>Una riga per sezione (<code>chiave</code> = <code>azienda</code> · <code>casella</code> · <code>lettura</code> · <code>posta</code> · <code>integra</code> · <code>conservazione</code>), <code>valore</code> JSONB, <code>aggiornato_il</code>, <code>aggiornato_da</code>. Le password (casella IMAP, posta in uscita) sono <strong>cifrate</strong> (chiave nel file d'ambiente del server) e <strong>non vengono mai restituite</strong> dalle API: si sostituiscono soltanto. Ogni modifica scrive un evento (§15).</p>
+<h3 id="sec-4-2-15">4.2.15 <code>servizi_esecuzioni</code> e <code>servizi_problemi</code></h3>
+<p>Registro dei servizi automatici (§7.14): <code>servizi_esecuzioni</code> (<code>servizio</code> = <code>casella</code> · <code>lettura</code> · <code>integra</code> · <code>posta</code>, <code>inizio</code>, <code>fine</code>, <code>esito</code> <code>ok</code>·<code>attenzione</code>·<code>errore</code>, <code>testo</code>); <code>servizi_problemi</code> (<code>servizio</code>, <code>quando</code>, <code>livello</code> <code>errore</code>·<code>attenzione</code>, <code>testo</code>, <code>dettaglio</code> con cosa fare, <code>visto_il</code>, <code>visto_da</code>). Conservazione come il registro eventi.</p>
 <h3 id="sec-4-3">4.3 Diagramma relazionale</h3>
 <pre class="spec-code"><code>fornitori 1 ── n provvigioni_scaglioni 1 ── n provvigioni_eccezioni (→ subagenti)
 fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
@@ -2015,8 +2029,8 @@ di Decobrands; tempi e memoria video con analisi della pagina attiva.</p>
 </tr>
 <tr>
 <td>12</td>
-<td><code>/cambia-password</code>, <code>/richiedi-reset</code></td>
-<td>Gestione credenziali</td>
+<td><code>/login</code>, <code>/cambia-password</code>, <code>/richiedi-reset</code>, <code>/reset-password</code></td>
+<td>Credenziali (condivise con la Gestione Ordini)</td>
 </tr>
 <tr>
 <td>13</td>
@@ -2025,8 +2039,8 @@ di Decobrands; tempi e memoria video con analisi della pagina attiva.</p>
 </tr>
 <tr>
 <td>14</td>
-<td><code>/utenti</code>, <code>/errori</code></td>
-<td>Utility (admin)</td>
+<td><code>/utenti</code>, <code>/sistema</code>, <code>/impostazioni/:sezione</code>, <code>/scartati</code>, <code>/guida/:argomento</code></td>
+<td>Gestione (§7.13–§7.17)</td>
 </tr>
 <tr>
 <td>15</td>
@@ -2278,6 +2292,98 @@ deve <strong>poter sempre tornare indietro e ritrovare la schermata esattamente 
   nessuna schermata scrive codice proprio per questo. Nel prototipo: <code>CRM.naviga</code>,
   <code>CRM.registra</code>, <code>CRM.indietro</code> in <code>componenti.js</code>.</li>
 </ul>
+<h3 id="sec-7-13">7.13 Utenti e ruoli (<code>/utenti</code>, <code>/utenti/:id</code>) — solo amministratore</h3>
+<ul>
+<li>Gli <strong>utenti sono quelli della Gestione Ordini</strong> (tabella <code>users</code> condivisa, stesse
+  credenziali); il <strong>ruolo nel CRM</strong> è proprio (<code>crm_ruoli_utente</code>, §4.1).</li>
+<li><strong>Elenco</strong> (sinistra): ricerca per nome, utente o email; segmenti <em>Attivi · Disattivati ·
+  Tutti</em>; colonne utente (con nome utente ed email), ruolo, ultimo accesso.</li>
+<li><strong>Scheda</strong> (destra): nome utente, email, ruolo, stato, ultimo accesso, stato della
+  password (da cambiare al prossimo accesso), <strong>ultimo invio password con eventuale
+  errore di recapito</strong>; azioni <em>Modifica</em>, <em>Invia nuova password</em>, <em>Disattiva/Riattiva</em>,
+  <em>Elimina</em>.</li>
+<li><strong>Cosa può fare ogni ruolo</strong>: tabella attività × ruoli (la stessa di §8.3), con la
+  colonna del ruolo dell'utente evidenziata.</li>
+<li><em>Nuovo utente</em>: nome, nome utente (non modificabile dopo), email, ruolo; parte l'email
+  con la password temporanea da cambiare al primo accesso (<code>must_change_password</code>).</li>
+<li><strong>Vincoli</strong>: nome utente ed email unici; <strong>deve restare almeno un amministratore
+  attivo</strong>; nessuno può cambiare il proprio ruolo, disattivarsi o eliminarsi; l'<strong>utente
+  dei servizi automatici</strong> non si modifica e non accede all'app; eliminare un utente che
+  ha già usato l'app chiede conferma e suggerisce di disattivarlo (il nome resta nel
+  registro eventi). Un invio non recapitato crea un problema in §7.14.</li>
+</ul>
+<h3 id="sec-7-14">7.14 Stato del sistema (<code>/sistema</code>) — amministratore e operatore</h3>
+<ul>
+<li><strong>Riquadri per servizio</strong> (KpiRow, fanno da filtro): <em>Casella dei documenti</em>, <em>Server di
+  lettura (GLM-OCR)</em>, <em>Import anagrafiche da Integra</em>, <em>Posta in uscita</em>; per ognuno stato
+  (<em>Funziona</em> · <em>Da tenere d'occhio</em> · <em>Problema</em>), nota (es. "lento: 9,8 s per pagina"),
+  ultima esecuzione e ritmo, problemi da vedere.</li>
+<li><strong>Problemi</strong> (sinistra): quando, livello (<em>Errore</em> · <em>Attenzione</em>), servizio, testo e
+  <strong>cosa fare</strong>; segmenti <em>Da vedere · Tutti</em>; <em>Segna come visto</em> per riga e <em>Segna tutti
+  come visti</em>. Il numero dei problemi da vedere compare <strong>nella barra</strong> (voce Stato del
+  sistema e titolo del gruppo Gestione), in giallo se c'è un errore.</li>
+<li><strong>Ultime esecuzioni</strong> (destra): quando, servizio, esito, cosa ha fatto.</li>
+<li><em>Controlla adesso</em>: esegue subito il controllo della casella e la verifica dei servizi.</li>
+<li>Sostituisce la pagina "Errori" della Gestione Ordini per il CRM.</li>
+</ul>
+<h3 id="sec-7-15">7.15 Impostazioni (<code>/impostazioni/:sezione</code>) — solo amministratore</h3>
+<p>Sezioni a sinistra (ElencoSelezionabile), modulo della sezione a destra con <em>Salva</em> e,
+dove serve, <em>Prova la connessione</em>.</p>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Sezione</th>
+<th>Campi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dati dell'azienda</td>
+<td>ragione sociale, P.IVA, indirizzo, email (intestazione dei prospetti esportati, §11)</td>
+</tr>
+<tr>
+<td>Casella dei documenti</td>
+<td>server IMAP, porta, utente, password, cartella da leggere, cartella dove spostare le email lette, ogni quanti minuti (1–60)</td>
+</tr>
+<tr>
+<td>Server di lettura</td>
+<td>indirizzo, modello, tempo massimo per documento, <strong>soglie di affidabilità</strong> (affidabile da, bassa sotto; §6.5)</td>
+</tr>
+<tr>
+<td>Posta in uscita</td>
+<td>server SMTP, porta, utente, password, mittente</td>
+</tr>
+<tr>
+<td>Import da Integra</td>
+<td>cartella dei file esportati da Integra, ora giornaliera, cosa importare (clienti e/o fornitori)</td>
+</tr>
+<tr>
+<td>Conservazione dei dati</td>
+<td>registro eventi (mesi), documenti scartati (giorni), righe per pagina</td>
+</tr>
+</tbody>
+</table></div>
+<p>Le <strong>password non si rileggono</strong>: il campo mostra "impostata", si scrive solo per
+sostituirla. Controlli: numeri validi, soglie 0 &lt; bassa &lt; affidabile ≤ 1, ora <code>hh:mm</code>.
+Ogni salvataggio scrive un evento con i campi cambiati (mai le password).</p>
+<h3 id="sec-7-16">7.16 Documenti scartati (<code>/scartati</code>) — amministratore e operatore</h3>
+<ul>
+<li>Lo <strong>scarto chiede il motivo</strong> (<em>Doppione</em> · <em>Non riguarda Decobrands</em> · <em>Documento
+  illeggibile</em> · <em>Altro</em>) e una nota facoltativa.</li>
+<li>Elenco: scartato il / da chi, documento (tipo, numero, fornitore, file), motivo e nota,
+  data di eliminazione automatica (<code>scartati_giorni</code>, §7.15); segmenti per motivo e
+  ricerca.</li>
+<li><strong>Recupera</strong> rimette il documento fra quelli da controllare (§7.9) e lo apre;
+  <strong>Elimina</strong> definitivamente solo l'amministratore, con conferma.</li>
+<li>Da "Documenti" il collegamento "N scartati" accanto al contatore.</li>
+</ul>
+<h3 id="sec-7-17">7.17 Guida (<code>/guida/:argomento</code>) — tutti</h3>
+<ul>
+<li>Argomenti a sinistra (ricerca nel testo), raggruppati <em>Lavoro · Anagrafiche ·
+  Gestione</em>; testo a destra con <em>Apri la pagina</em> e <strong>chi può modificare</strong> (dai ruoli).</li>
+<li><strong>Aiuto contestuale</strong>: ogni pagina con un argomento ha in testata il pulsante <em>Guida</em>
+  che apre l'argomento giusto. Gli argomenti di gestione si vedono solo con il permesso.</li>
+</ul>
 </section>
 <section id="sec-8">
 <h2>8. API endpoint</h2>
@@ -2499,8 +2605,76 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).</p>
 <p><code>/api/ordini*</code>, <code>/api/lookup/*</code>, <code>/api/clienti*</code>, <code>/api/utenti*</code>: API del futuro modulo
 ordini cliente, che sostituirà la Gestione Ordini; non incluse in questa fase.</p>
 <h3 id="sec-8-3">8.3 Autenticazione</h3>
-<p><code>/login</code> (POST), <code>/logout</code> (POST), <code>/cambia-password</code>, <code>/richiedi-reset</code>. Guard
-<code>requireAuth</code> su tutte le rotte app, <code>requireAdmin</code> su clienti/utenti/eventi.</p>
+<p><code>/login</code> (POST), <code>/logout</code> (POST), <code>/cambia-password</code>, <code>/richiedi-reset</code>,
+<code>/reset-password</code> (stessi della Gestione Ordini). Guard <code>requireAuth</code> su tutte le
+rotte; ogni rotta dichiara il <strong>permesso</strong> richiesto, verificato lato server
+(<code>requirePermesso('modifica')</code> ecc.), non solo nascondendo i pulsanti.</p>
+<p><strong>Ruoli del CRM</strong> (<code>crm_ruoli_utente</code>, §4.1):</p>
+<div class="table-wrap"><table class="table table-sm table-bordered align-middle mb-2">
+<thead class="table-light">
+<tr>
+<th>Attività (permesso)</th>
+<th style="text-align: center;">Amministratore</th>
+<th style="text-align: center;">Operatore</th>
+<th style="text-align: center;">Sola lettura</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche (<code>consulta</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr>
+<td>Esportare le liquidazioni in Excel, PDF, CSV (<code>esporta</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr>
+<td>Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti (<code>modifica</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td>Condizioni dei fornitori, agenzie dei clienti, subagenti (<code>anagrafiche</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td>Chiudere la liquidazione del trimestre (<code>chiudi</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td>Vedere e recuperare i documenti scartati (<code>scartati</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td>Stato del sistema, segnare i problemi come visti (<code>sistema</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td>Utenti e ruoli, impostazioni, eliminazione definitiva degli scartati (<code>gestione</code>)</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Sola lettura</strong> nell'interfaccia: fascia "Profilo in sola lettura: puoi consultare ed
+esportare, non modificare"; caricamento nascosto; pulsanti che modificano spenti
+(restano attivi solo quelli consentiti: esporta, guida, navigazione); le pagine non
+permesse mostrano "Pagina riservata" e non compaiono nella barra. Il gruppo <strong>Gestione</strong>
+della barra è richiudibile, aperto solo nelle sue pagine, con il contatore dei problemi.</p>
 
 </section>
 <section id="sec-9">
