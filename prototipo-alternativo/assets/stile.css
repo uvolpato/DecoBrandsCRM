@@ -572,3 +572,7 @@ a.m-cella:hover { background: #f1f6ff; }
 .scelta-esporta > span { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .scelta-esporta > span > span { font-size: 13px; color: var(--testo-tenue); }
 .scelta-esporta select { margin-top: 6px; max-width: 260px; }
+
+.formato-esporta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--bordo-tenue); }
+.formato-esporta > span:first-child { font-weight: 600; }
+.formato-esporta #formato-nota { font-size: 12.5px; flex-basis: 100%; }

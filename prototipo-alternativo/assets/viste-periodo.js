@@ -231,6 +231,7 @@
     });
   });
   /* Esporta in Excel: tutto il trimestre (riepilogo + un foglio per subagente), un solo subagente, o solo il riepilogo. */
+  let formatoEsporta = 'xlsx';
   function esporta(a, t, righe) {
     const subs = M.S.subagenti.filter(s => righe.some(r => r.subagente_id === s.id)).sort((x, y) => x.nome.localeCompare(y.nome));
     let scelta = subSel ? 'uno' : 'tutto';
@@ -240,23 +241,30 @@
       { v: 'riepilogo', t: 'Solo il riepilogo', d: 'Una riga per subagente: documenti, imponibile, provvigione da liquidare' + (M.statoTrimestre(a, t).chiave !== 'chiusa' ? ' e in attesa dei bollettini.' : '.') }
     ];
     CRM.Modale({
-      titolo: 'Esporta la liquidazione del ' + t + '° trimestre ' + a, testo: 'File Excel con i campi concordati: fornitore, numero e data documento, codice cliente, ragione sociale, importo, % e importo provvigionale.',
+      titolo: 'Esporta la liquidazione del ' + t + '° trimestre ' + a, testo: 'Campi concordati: fornitore, numero e data documento, codice cliente, ragione sociale, importo, % e importo provvigionale.',
       corpo: c => {
         c.innerHTML = '<div class="scelte-esporta" role="radiogroup" aria-label="Cosa esportare">' + SCELTE.map(x =>
           '<label class="scelta-esporta"><input type="radio" name="esporta" value="' + x.v + '"' + (x.v === scelta ? ' checked' : '') + '><span><b>' + e(x.t) + '</b><span>' + e(x.d) + '</span>' +
           (x.v === 'uno' ? '<select class="filtro-select" id="esporta-sub" aria-label="Subagente">' + subs.map(s => '<option value="' + s.id + '"' + (String(s.id) === subSel ? ' selected' : '') + '>' + e(s.nome) + '</option>').join('') + '</select>' : '') +
-          '</span></label>').join('') + '</div>';
+          '</span></label>').join('') + '</div>' +
+          '<div class="formato-esporta"><span>Formato</span><div class="segmenti" role="radiogroup" aria-label="Formato del file">' +
+          [['xlsx', 'Excel'], ['pdf', 'PDF'], ['csv', 'CSV']].map(f => '<button type="button" role="radio" data-formato="' + f[0] + '" aria-checked="' + (f[0] === formatoEsporta) + '" aria-selected="' + (f[0] === formatoEsporta) + '">' + f[1] + '</button>').join('') +
+          '</div><span class="testo-tenue" id="formato-nota"></span></div>';
+        const NOTE_FORMATO = { xlsx: 'Fogli impaginati, totali con formule, pronti da stampare.', pdf: 'Stesso contenuto e stessa impaginazione dell’Excel, da inviare o archiviare.', csv: 'Solo dati, senza totali né formattazione: separatore punto e virgola, per altri programmi.' };
+        const nf = () => { CRM.$('#formato-nota', c).textContent = NOTE_FORMATO[formatoEsporta]; CRM.$$('[data-formato]', c).forEach(b => { b.setAttribute('aria-selected', String(b.dataset.formato === formatoEsporta)); b.setAttribute('aria-checked', String(b.dataset.formato === formatoEsporta)); }); };
+        CRM.$$('[data-formato]', c).forEach(b => b.addEventListener('click', () => { formatoEsporta = b.dataset.formato; nf(); }));
+        nf();
         const sel = CRM.$('#esporta-sub', c);
         const agg = () => { sel.disabled = scelta !== 'uno'; };
         CRM.$$('input[name=esporta]', c).forEach(i => i.addEventListener('change', () => { scelta = i.value; agg(); }));
         sel.addEventListener('focus', () => { scelta = 'uno'; CRM.$('input[value=uno]', c).checked = true; agg(); });
         agg();
       },
-      azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Scarica l’Excel', onClick: (chiudi, corpo) => {
+      azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Scarica', icona: 'scarica', onClick: (chiudi, corpo) => {
         const sub = CRM.$('#esporta-sub', corpo).value;
-        CRM.esportaLiquidazione(a, t, scelta, sub).then(nome => {
+        CRM.esportaLiquidazione(a, t, scelta, sub, formatoEsporta).then(nome => {
           if (!nome) return;
-          M.annota('Esportata la liquidazione del ' + t + '° trimestre ' + a + (scelta === 'uno' ? ' di ' + M.subagente(Number(sub)).nome : scelta === 'riepilogo' ? ' (riepilogo)' : ' (completa)')); M.salva();
+          M.annota('Esportata la liquidazione del ' + t + '° trimestre ' + a + (scelta === 'uno' ? ' di ' + M.subagente(Number(sub)).nome : scelta === 'riepilogo' ? ' (riepilogo)' : ' (completa)') + ' in ' + formatoEsporta.toUpperCase()); M.salva();
           CRM.Avviso('Scaricato ' + nome);
         });
       } }]
