@@ -199,7 +199,8 @@ button.kpi[aria-pressed="true"] { background: var(--primario-tenue); outline: 2p
 .cifre .c-attesa { color: var(--attesa-testo); }
 .dettagli { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 0; }
 .dettagli dt { color: var(--testo-tenue); }
-.dettagli dd { margin: 0; font-weight: 500; }
+.dettagli dd { margin: 0; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.dettagli dt { white-space: nowrap; }
 .elenco { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .elenco li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--bordo-tenue); }
 .elenco li:last-child { border-bottom: 0; }
@@ -242,6 +243,12 @@ button.kpi[aria-pressed="true"] { background: var(--primario-tenue); outline: 2p
 .selezionabile .r3 { display: block; margin-top: 6px; }
 .scelta { border: 1px solid var(--bordo); border-radius: var(--r-medio); padding: 14px 16px; display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; align-items: center; }
 .scelta + .scelta { margin-top: 10px; }
+.scelte { container-type: inline-size; }
+.scelta > div { min-width: 0; }
+@container (max-width: 540px) {
+  .scelta { grid-template-columns: minmax(0, 1fr); }
+  .scelta > .btn { justify-self: start; margin-top: 4px; }
+}
 .scelta.consigliata { border-color: var(--primario); box-shadow: inset 4px 0 0 var(--primario); }
 .scelta h3 { font-size: 15px; margin: 0 0 4px; }
 .scelta-sotto { display: flex; align-items: center; gap: 6px; font-size: 13px; }

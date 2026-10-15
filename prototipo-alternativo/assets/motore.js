@@ -19,12 +19,17 @@
   M.annota = function (testo) { M.S.registro.unshift({ quando: new Date().toISOString(), testo: testo }); M.S.registro = M.S.registro.slice(0, 30); };
 
   /* ---------- Formati ---------- */
-  const euroFmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
-  const euro0Fmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
-  M.euro = n => euroFmt.format(Number(n) || 0);
-  M.euro0 = n => euro0Fmt.format(Number(n) || 0);
-  M.pct = n => (Number(n) || 0).toLocaleString('it-IT', { maximumFractionDigits: 2 }) + '%';
-  M.num = n => (Number(n) || 0).toLocaleString('it-IT', { maximumFractionDigits: 2 });
+  /* Formattazione manuale: Intl con 'it-IT' non mette il separatore delle migliaia sotto 10.000 (8207,20). */
+  const gruppi = t => t.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const numero = (n, dec, minDec) => {
+    const x = Number(n) || 0; let [i, d] = Math.abs(x).toFixed(dec).split('.');
+    if (d && minDec < dec) { d = d.replace(/0+$/, ''); while (d.length < minDec) d += '0'; }
+    return (x < 0 && Number(Math.abs(x).toFixed(dec)) !== 0 ? '-' : '') + gruppi(i) + (d ? ',' + d : '');
+  };
+  M.euro = n => numero(n, 2, 2) + '\u00a0€';
+  M.euro0 = n => numero(n, 0, 0) + '\u00a0€';
+  M.pct = n => numero(n, 2, 0) + '%';
+  M.num = n => numero(n, 2, 0);
   M.data = iso => { if (!iso) return '—'; const [a, m, g] = iso.split('-'); return g + '/' + m + '/' + a; };
   M.MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
   M.MESI_BREVI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
