@@ -594,6 +594,8 @@ users 1 ── n eventi_app  (audit append-only, §15)
 | Giacenze (ampliamento §17) | `v_giacenze` (codice, quantità) | 15 s | la più frequente: serve al disponibile |
 | Ordini registrati (ampliamento §17) | `v_ordini_registrati` (numero, codice cliente, data) | 60 s | chiude gli impegni (§4.2.16) |
 
+- **In questa fase** si sincronizzano solo **clienti e fornitori** (piano F1-A4); articoli,
+  giacenze e ordini registrati arrivano con l'ampliamento (§17).
 - **Accesso**: utente del database **in sola lettura** (`crm_lettura`), solo sulle viste;
   le viste le crea chi gestisce Integra. Parametri in Impostazioni → Sincronizzazione da
   Integra (§7.15).
@@ -2056,7 +2058,7 @@ allora la Gestione Ordini resta in esercizio, invariata, sullo stesso database.
 | Prerequisito | ingresso documenti (§6.5) in esercizio e tarato sui documenti reali |
 | Ingresso | gli ordini cliente entrano dallo **stesso ingresso documenti** del CRM (§17.2); si spegne il flusso n8n + LlamaIndex |
 | Passaggio | i due sistemi in parallelo per un periodo di prova, poi spegnimento di n8n e della vecchia app |
-| Stima | piano §10.1 (14 h indicative), da quotare a parte quando si avvia l'ampliamento |
+| Stima | piano §10.1 (12 h indicative), da quotare a parte quando si avvia l'ampliamento. La sincronizzazione di **clienti e fornitori** non fa parte dell'ampliamento: è in questa fase (piano F1-A4) |
 
 ### 17.2 Ingresso unico: documento dell'agenzia o ordine della vendita diretta? — DA DECIDERE
 

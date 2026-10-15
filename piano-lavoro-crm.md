@@ -148,7 +148,9 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 | **F1-A1** Fornitori + scaglioni (CRUD, dettaglio, flag/stati) | 2 | F0 | `fornitori.html`, `fornitore-dettaglio.html` (tab scaglioni in `.box-stabile`, thead scuro) | §4.2.1, §4.2.2, §7.4, §8.1, §15.2.2 |
 | **F1-A2** Agenti + subagenti | 2 | F0 | `agenti.html` (2 liste in `.table-box`, modali) | §4.2.4, §4.2.5, §7.5, §8.1, §15.2.3 |
 | **F1-A3** Clienti e agenzie (interscambio + codice cliente fornitore) | 2 | F0 | `clienti.html` (anagrafica da Integra in sola lettura, pannello Agenzie con modale e campi di ricerca, blocco duplicati per fornitore, vista inversa nel fornitore) | §4.2.6, §4.4, §7.6, §8.1, §15.2.3 |
+| **F1-A4** Sincronizzazione da Integra delle **anagrafiche clienti e fornitori**: viste sul database (`v_clienti`, `v_fornitori`), utente in sola lettura, processo ogni 60 s, incrementale, aggiorna solo i campi di Integra senza toccare i dati del CRM, registri di esecuzione e problemi (cliente senza P.IVA o P.IVA doppia), sezione delle impostazioni e *Prova la connessione*; sostituisce l'import da file | 3 · **da approvare** | F0-A2 | `prototipo-alternativo/assets/dati.js` (`sistema`, `impostazioni.integra`), `viste-gestione.js` (Impostazioni → Sincronizzazione da Integra) | §4.1, §4.5, §7.14, §7.15 |
 
+- **F1-A4: 3 h fuori preventivo, da approvare** (la sincronizzazione dalle viste sostituisce l'import da file, non previsto nel preventivo originale). Le viste le crea chi gestisce Integra.
 - **Output per ciascuna:** rotta pagina + API CRUD + eventi §15.2 + test delle regole univocità.
 - **DoD comune:** checklist §11.1 superata; CRUD completo; eventi esatti (es. fornitore non eliminabile ma `attivo=false` §15.2.2).
 
@@ -212,20 +214,20 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **DoD:** un PDF inviato alla casella o caricato compare in `/documenti` letto, con affidabilità per campo e livello; correzioni salvate in `documenti_campi`; nessun n8n e nessuna chiamata a servizi esterni; eventi `documento/*` §15.2.4 scritti.
 - L'**ingresso degli ordini cliente** (sostituzione completa della Gestione Ordini) è nella fase successiva, spec §17; la vendita diretta è un ampliamento futuro (§10.1).
 
-### 10.1 Vendita diretta dalla Gestione Ordini — ampliamento futuro, fuori da questo piano (14 h indicative)
+### 10.1 Vendita diretta dalla Gestione Ordini — ampliamento futuro, fuori da questo piano (12 h indicative)
 
 > Decisione: la vendita diretta è un ampliamento successivo (spec §17). Le attività restano qui come stima indicativa; nel prototipo le pagine sono spente.
 
 | Attività | Ore | Dipende da | Sorgente prototipo | Riferimenti spec |
 |---|---|---|---|---|
-| **F8-A1** Sincronizzazione da Integra: viste sul database (clienti, fornitori, articoli, giacenze, ordini registrati), processo ogni 15–60 s, incrementale, registri di esecuzione e problemi; sostituisce l'import da file | 4 · ampliamento | F0-A2 | `prototipo-alternativo/assets/dati.js` (`sistema`, `impostazioni.integra`) | §4.1, §4.5, §7.14, §7.15 |
+| **F8-A1** Sincronizzazione da Integra di **articoli, giacenze e ordini registrati** (`v_articoli`, `v_giacenze` ogni 15 s, `v_ordini_registrati` che chiude gli impegni), sullo stesso processo di F1-A4 | 2 · ampliamento | F1-A4 | `prototipo-alternativo/assets/dati.js` | §4.5, §4.2.16 |
 | **F8-A2** Articoli e Giacenze (sola lettura), impegni e disponibile | 2 · ampliamento | F8-A1 | `assets/viste-vendita.js`, `assets/motore-vendita.js` | §7.19, §7.20, §4.2.16 |
 | **F8-A3** Alias e kit (CRUD, controlli, permesso `magazzino`) | 2 · ampliamento | F0-A4 | idem | §7.21, §8.3 |
 | **F8-A4** Ordini cliente: elenco, scheda, controlli, proposte alias/kit (casi A/B/C) | 3 · ampliamento | F8-A2, F8-A3 | idem | §7.18 |
 | **F8-A5** Esportazione OC/OF: tracciato Integra a 28 colonne, nomi file, impegni, esporta di nuovo, annulla, eventi | 3 · ampliamento | F8-A4 | `assets/esporta-integra.js` | §7.18, §4.2.17, §15.2.6.1 |
 
 - **DoD:** un ordine cliente con alias e kit si esporta in OC e OF con lo stesso contenuto dei file della Gestione Ordini; il disponibile scende subito e torna quando la sincronizzazione vede l'ordine registrato o l'esportazione viene annullata.
-- **Vendita diretta (F8): ampliamento futuro, 14 h indicative, da quotare quando si avvia.** La sincronizzazione delle sole anagrafiche clienti e fornitori (parte di F8-A1) resta necessaria anche in questa fase al posto dell'import da file.
+- **Vendita diretta (F8): ampliamento futuro, 12 h indicative, da quotare quando si avvia.** La sincronizzazione delle anagrafiche clienti e fornitori è in questa fase (F1-A4).
 
 ## 11. Fase 7 — Collaudo e rilascio (5 h)
 
