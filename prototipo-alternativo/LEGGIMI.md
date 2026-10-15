@@ -22,7 +22,7 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 
 - **Livello:** affidabile (tutto ≥ 90 %) · da controllare (un campo fra 70 e 90 % o un controllo fallito) · bassa (un campo sotto 70 % o un controllo grave). Compare nell'elenco e come contatore su *Correggi i dati letti*; con livello basso l'abbinamento chiede conferma.
 - **Correggi i dati letti** apre una finestra a tutto schermo: a sinistra il documento com'è stampato, a destra testata e righe modificabili. I campi incerti sono bordati (giallo / rosso con la percentuale); selezionando un campo si evidenzia nel documento; ✓ conferma un valore giusto; si possono aggiungere ed eliminare righe. Il riepilogo in alto elenca i punti da controllare e porta al campo.
-- Le righe sono una **DataTable** standard (ordinabile, totale fisso) con celle modificabili; nessun controllo sull'anagrafica articoli: nel giro agenzia gli articoli dei fornitori non sono nell'anagrafica Decobrands.
+- Le righe sono una **DataTable** standard (ordinabile, totale fisso) con celle modificabili. Il codice articolo è un campo di ricerca sugli articoli già usati dal fornitore nei documenti registrati (nel giro agenzia gli articoli non sono nell'anagrafica Decobrands): pallino verde se noto, rosso se nuovo; un articolo nuovo si inserisce lo stesso e non conta fra i punti da controllare. *Aggiungi riga* apre una finestra modale: scegliendo un articolo noto propone descrizione e ultimo prezzo.
 - **Prova:** conferma AB-77120 di Gries → quantità della riga 3 letta 12 ma stampata 18 (il totale non torna) e codice della riga 8 letto CI0T-387 con lo zero (affidabilità 86 %) → correggi in 18 e CIOT-387, conferma data e prezzo della riga 5 → lettura affidabile.
 
 ## Regole di flusso applicate
@@ -76,7 +76,7 @@ index.html                    pagina unica
 assets/dati.js                dati di prova organizzati per flusso
 assets/motore.js              regole: stato pratica, scaglioni datati, riconciliazione, liquidazione, abbinamento
 assets/componenti.js          libreria CRM.*: componenti standard, icone, rotte
-assets/entita.js              entità dei campi di ricerca (fornitore, cliente, subagente, codice cliente, pratica, fattura)
+assets/entita.js              entità dei campi di ricerca (fornitore, cliente, subagente, codice cliente, articolo, pratica, fattura)
 assets/viste-giorno.js        Oggi, Documenti in arrivo, Pratiche, Pratica
 assets/viste-periodo.js       Bollettini, Bollettino, Liquidazioni
 assets/viste-anagrafiche.js   Fornitori, Subagenti, Clienti e abbinamenti

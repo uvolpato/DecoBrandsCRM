@@ -299,6 +299,8 @@
       const cella = c => r => {
         const a = affR(r, c.k), incerto = a < M.SOGLIA_OK && !r._ver[c.k], v = r[c.k];
         const val = v == null ? '' : (c.n && c.k !== 'qta' && v !== '' ? Number(v).toFixed(2) : v);
+        if (!boll && c.k === 'codice') return '<div class="campo-riga">' + CRM.campoRicercaHtml({ entita: 'articolo', campo: 'righe.' + r._i + '.codice', valore: v, contesto: { fornitore_id: b.fornitore_id } }) +
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.codice" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
         if (boll && c.k === 'numero') return '<div class="campo-riga">' + CRM.campoRicercaHtml({ entita: 'documentoFiscale', campo: 'righe.' + r._i + '.numero', valore: v, contesto: { fornitore_id: b.fornitore_id } }) +
           (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.numero" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
         return '<div class="campo-riga">' +
@@ -332,11 +334,13 @@
     const conferma = campo => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) b.righe[m[1]]._ver[m[2]] = true; else b.ver[campo] = true; };
     // eventi delegati sul pannello destro: restano validi anche quando la DataTable si ridisegna (ordinamento)
     const trovaCampo = c => CRM.$('[data-evidenzia="' + c + '"]', fin.destra) || CRM.$('[data-campo="' + c + '"]', fin.destra);
+    const vai = c => { const n = trovaCampo(c); if (n) { n.focus(); n.scrollIntoView({ block: 'center', behavior: 'smooth' }); } };
     function collega(host) {
-      const vai = c => { const n = trovaCampo(c); if (n) { n.focus(); n.scrollIntoView({ block: 'center', behavior: 'smooth' }); } };
       CRM.attivaRicerche(host, () => ({ fornitore_id: b.fornitore_id, mese: b.mese, anno: b.anno }));
       host.addEventListener('focusin', ev => { const x = ev.target.closest('[data-campo], [data-evidenzia]'); if (x) evidenzia(x.dataset.campo || x.dataset.evidenzia); });
       host.addEventListener('ricerca-scelta', ev => {
+        const ma = /^righe\.(\d+)\.codice$/.exec(ev.detail.campo || '');
+        if (ma && !boll) { const r = b.righe[ma[1]]; if (!r.descrizione) r.descrizione = ev.detail.voce.descrizione; return; }
         const m = /^righe\.(\d+)\.numero$/.exec(ev.detail.campo || ''); if (!m || !boll) return;
         const r = b.righe[m[1]], x = ev.detail.voce;
         r.data = x.doc.data; r.imponibile = M.importoDoc(x.doc); r._ver.data = true; r._ver.imponibile = true;
@@ -350,9 +354,43 @@
         if (t.dataset.conferma) { conferma(t.dataset.conferma); ridisegna(); }
         else if (t.dataset.vai) vai(t.dataset.vai);
         else if (t.dataset.elimina != null) { b.righe.splice(Number(t.dataset.elimina), 1); b.toccati.righe = true; ridisegna(); }
-        else {
-          const r = { _aff: {}, _ver: {}, _nuova: true }; cols.forEach(c => { r[c.k] = c.n ? 0 : ''; }); b.righe.push(r); b.toccati.righe = true; ridisegna();
-          vai('righe.' + (b.righe.length - 1) + '.' + cols[0].k);
+        else nuovaRiga();
+      });
+    }
+    /* Nuova riga in una finestra modale: articolo con ricerca (anche non in anagrafica, pallino rosso),
+       la scelta di un articolo noto propone descrizione e ultimo prezzo. */
+    function nuovaRiga() {
+      const campi = boll ? [
+        { nome: 'numero', etichetta: 'Documento', tipo: 'ricerca', entita: 'documentoFiscale', largo: true, placeholder: 'Numero fattura o nota di credito' },
+        { nome: 'data', etichetta: 'Data', tipo: 'data' },
+        { nome: 'imponibile', etichetta: 'Imponibile', tipo: 'numero', passo: '0.01' },
+        { nome: 'pct', etichetta: 'Provvigione %', tipo: 'numero', passo: '0.01' },
+        { nome: 'importo', etichetta: 'Provvigione', tipo: 'numero', passo: '0.01' }
+      ] : [
+        { nome: 'codice', etichetta: 'Articolo', tipo: 'ricerca', entita: 'articolo', placeholder: 'Codice o descrizione', aiuto: 'Pallino verde: articolo già usato da questo fornitore. Rosso: articolo nuovo, si può inserire lo stesso.' },
+        { nome: 'descrizione', etichetta: 'Descrizione' },
+        { nome: 'qta', etichetta: 'Quantità', tipo: 'numero', passo: '1' },
+        { nome: 'prezzo', etichetta: 'Prezzo', tipo: 'numero', passo: '0.01' }
+      ];
+      CRM.FormModal({
+        titolo: 'Aggiungi riga', testo: boll ? 'Riga del bollettino come riportata dal fornitore.' : 'Riga del documento come stampata sul PDF.', conferma: 'Aggiungi riga', colonne: 2, campi: campi,
+        contesto: () => ({ fornitore_id: b.fornitore_id, mese: b.mese, anno: b.anno }),
+        dopo: form => form.el.addEventListener('ricerca-scelta', ev => {
+          const x = ev.detail.voce;
+          if (boll) { form.campo('data').value = x.doc.data; form.campo('imponibile').value = M.importoDoc(x.doc).toFixed(2); }
+          else { if (!form.campo('descrizione').value) form.campo('descrizione').value = x.descrizione; if (!form.campo('prezzo').value) form.campo('prezzo').value = Number(x.prezzo).toFixed(2); form.campo('qta').focus(); }
+        }),
+        onConferma: (v, form) => {
+          if (boll) {
+            if (!v.numero) { form.errore('Indica il documento.'); return false; }
+            b.righe.push({ numero: v.numero, data: v.data, imponibile: Number(v.imponibile) || 0, pct: Number(v.pct) || 0, importo: Number(v.importo) || 0, _aff: {}, _ver: {}, _nuova: true });
+          } else {
+            if (!v.codice) { form.errore('Indica l’articolo.'); return false; }
+            if (!(Number(v.qta) > 0)) { form.errore('La quantità deve essere maggiore di zero.'); return false; }
+            b.righe.push({ codice: v.codice, descrizione: v.descrizione, qta: Number(v.qta), prezzo: Number(v.prezzo) || 0, _aff: {}, _ver: {}, _nuova: true });
+          }
+          b.toccati.righe = true; ridisegna();
+          setTimeout(() => vai('righe.' + (b.righe.length - 1) + '.' + cols[0].k), 0);
         }
       });
     }

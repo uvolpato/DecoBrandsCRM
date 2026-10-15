@@ -2,7 +2,9 @@
    Entità per i campi di ricerca (CRM.CampoRicerca / CRM.RicercaEntita).
    Ognuna è definita una sola volta: voci (già ristrette dal contesto, es. il fornitore
    del documento), chiave, testo mostrato, colonne e filtri della maschera. Nell'app le voci arrivano da /api/lookup/* con ricerca lato server.
-   Nessuna entità "articolo": nel giro agenzia gli articoli non sono in anagrafica.
+   Articolo: nel giro agenzia gli articoli non sono nell'anagrafica Decobrands; l'anagrafica di
+   riferimento sono gli articoli già usati dal fornitore nei documenti registrati. Un articolo
+   nuovo si può inserire (pallino rosso) e non blocca nulla.
    ============================================================ */
 (function () {
   'use strict';
@@ -53,6 +55,32 @@
       { key: 'fornitore', header: 'Fornitore', valore: a => M.fornitore(a.fornitore_id).breve },
       { key: 'sub', header: 'Seguito da', valore: a => M.subagente(a.subagente_id).nome },
       { key: 'sconto', header: 'Sconto', tipo: 'pct' }
+    ]
+  });
+
+  /* Articoli del fornitore, ricavati dai documenti delle pratiche (nell'app: tabella alimentata dai documenti registrati).
+     Contesto: fornitore_id. */
+  CRM.Entita('articolo', {
+    titolo: 'Articolo',
+    voci: ctx => {
+      const mappa = new Map();
+      M.S.pratiche.filter(p => !ctx.fornitore_id || p.fornitore_id === Number(ctx.fornitore_id)).forEach(p => p.documenti.forEach(d => d.righe.forEach(r => {
+        if (!r.codice || r.qta < 0) return;
+        const a = mappa.get(r.codice) || { codice: r.codice, descrizione: r.descrizione, prezzo: r.prezzo, data: '', fornitore_id: p.fornitore_id, pratiche: new Set() };
+        if (d.data >= a.data) { a.data = d.data; a.prezzo = r.prezzo; a.descrizione = r.descrizione; }
+        a.pratiche.add(p.id); mappa.set(r.codice, a);
+      })));
+      return Array.from(mappa.values()).sort((x, y) => x.codice.localeCompare(y.codice));
+    },
+    chiave: a => a.codice, testo: a => a.codice,
+    dettaglio: a => a.descrizione + ' · ultimo prezzo ' + M.euro(a.prezzo), cerca: a => a.descrizione,
+    colonne: [
+      { key: 'codice', header: 'Articolo' },
+      { key: 'descrizione', header: 'Descrizione', grow: true },
+      { key: 'fornitore', header: 'Fornitore', valore: a => M.fornitore(a.fornitore_id).breve },
+      { key: 'prezzo', header: 'Ultimo prezzo', tipo: 'euro' },
+      { key: 'data', header: 'Ultimo documento', tipo: 'data' },
+      { key: 'pratiche', header: 'Pratiche', tipo: 'numero', valore: a => a.pratiche.size }
     ]
   });
 

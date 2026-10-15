@@ -193,6 +193,7 @@
   /* =========================================================
      FormModal
      opz: { titolo, testo, campi, colonne, conferma ('Salva'), pericolo, azioniExtra: [{ etichetta, variante, onClick(chiudi) }],
+            contesto() (per i campi di ricerca), dopo(form) (eventi sui campi),
             onConferma(valori, form) → false per lasciarla aperta }
      ========================================================= */
   /* =========================================================
@@ -247,7 +248,7 @@
       const p = parti(box), q = p.testo.value.trim().toLowerCase();
       const punteggio = r => {
         const k = String(p.ent.chiave(r)).toLowerCase(), t = String(p.ent.testo(r)).toLowerCase(), c = String(p.ent.cerca ? p.ent.cerca(r) : '').toLowerCase();
-        if (!q) return 3; if (t.startsWith(q) || k.startsWith(q)) return 0; if (t.indexOf(q) >= 0) return 1; if (c.indexOf(q) >= 0 || k.indexOf(q) >= 0) return 2; return -1;
+        if (!q) return 3; if (t.startsWith(q) || k.startsWith(q)) return 0; if (c.startsWith(q) || t.indexOf(q) >= 0) return 1; if (c.indexOf(q) >= 0 || k.indexOf(q) >= 0) return 2; return -1;
       };
       const trovate = p.ent.voci(ctx()).map(r => ({ r: r, s: punteggio(r) })).filter(x => x.s >= 0).sort((a, b) => a.s - b.s);
       const prime = trovate.slice(0, 5);
@@ -325,7 +326,7 @@
     let form;
     return CRM.Modale({
       titolo: opz.titolo, testo: opz.testo,
-      corpo: c => { form = CRM.Form(c, { campi: opz.campi, colonne: opz.colonne, contesto: () => form ? form.valori() : {} }); },
+      corpo: c => { form = CRM.Form(c, { campi: opz.campi, colonne: opz.colonne, contesto: () => Object.assign({}, form ? form.valori() : {}, opz.contesto ? opz.contesto() : {}) }); if (opz.dopo) opz.dopo(form); },
       azioni: (opz.azioniExtra || []).concat([{ etichetta: 'Annulla', variante: 'sec' },
         { etichetta: opz.conferma || 'Salva', variante: opz.pericolo ? 'pericolo' : 'primario', onClick: () => opz.onConferma(form.valori(), form) }])
     });

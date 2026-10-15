@@ -447,7 +447,7 @@ a.m-cella:hover { background: #f1f6ff; }
 .tab-righe th.dx, .tab-righe td.dx { text-align: right; }
 .tab-righe td { padding: 3px 4px; border-bottom: 1px solid var(--bordo-tenue); vertical-align: middle; }
 .tab-righe td.largo { min-width: 11rem; }
-.tab-righe td.col-codice { min-width: 7.5rem; }
+.tab-righe td.col-codice { min-width: 11rem; }
 .tab-righe input { width: 100%; min-width: 3.5rem; font: inherit; padding: 4px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; }
 .tab-righe input[type="number"] { text-align: right; max-width: 6.5rem; margin-left: auto; display: block; }
 .tab-righe td.incerto-attesa input { border-color: var(--attesa); background: #fffbea; }

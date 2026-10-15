@@ -1643,10 +1643,13 @@ caricamento manuale ──┴─► coda `documenti_in_arrivo` ─► lettura GL
    quantità × prezzo ≠ totale riga; codice cliente non presente fra i clienti del
    fornitore (<code>interscambio</code>); articolo assente nella pratica proposta; data fuori dal
    periodo della pratica; bollettino già registrato per fornitore e mese.
-   <strong>Nessun controllo sull'anagrafica articoli</strong>: nel giro dei bollettini Decobrands
+   <strong>Nessun blocco sull'anagrafica articoli</strong>: nel giro dei bollettini Decobrands
    fa da agente e gli articoli dei fornitori non sono (né saranno) nella sua
-   anagrafica; il codice articolo resta testo libero, verificato solo dall'affidabilità
-   della lettura e dal confronto con le fasi della pratica.</li>
+   anagrafica. Il codice articolo è un campo di ricerca sugli <strong>articoli già usati dal
+   fornitore</strong> nei documenti registrati: pallino verde se noto, rosso se nuovo; un
+   articolo nuovo si inserisce lo stesso e non conta fra i punti da controllare.
+   Le righe nuove si aggiungono da una finestra modale (articolo, descrizione,
+   quantità, prezzo; un articolo noto propone descrizione e ultimo prezzo).</li>
 <li><strong>Livello</strong> del documento, mostrato in "Documenti" e sul pulsante "Correggi i dati
    letti" (numero di campi da controllare):</li>
 </ol>
@@ -3180,7 +3183,7 @@ stessi nomi e gli stessi parametri</strong> (attività F0-A4).</p>
 </tr>
 <tr>
 <td><strong>CampoRicerca</strong> + <strong>RicercaEntita</strong></td>
-<td>ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, pratica, fattura/nota di credito (non gli articoli: nel giro agenzia non sono in anagrafica)</td>
+<td>ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, articolo (articoli già usati dal fornitore: un articolo nuovo è ammesso col pallino rosso), pratica, fattura/nota di credito</td>
 <td>autocompletamento con le prime 5 voci, lente / F4 che apre la maschera di ricerca (FilterBar + DataTable), pallino verde/rosso se il valore esiste in anagrafica; entità definite una volta (voci da <code>/api/lookup/*</code>, chiave, testo, colonne, filtri, contesto)</td>
 </tr>
 </tbody>

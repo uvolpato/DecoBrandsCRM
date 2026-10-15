@@ -744,10 +744,13 @@ caricamento manuale ──┴─► coda `documenti_in_arrivo` ─► lettura GL
    quantità × prezzo ≠ totale riga; codice cliente non presente fra i clienti del
    fornitore (`interscambio`); articolo assente nella pratica proposta; data fuori dal
    periodo della pratica; bollettino già registrato per fornitore e mese.
-   **Nessun controllo sull'anagrafica articoli**: nel giro dei bollettini Decobrands
+   **Nessun blocco sull'anagrafica articoli**: nel giro dei bollettini Decobrands
    fa da agente e gli articoli dei fornitori non sono (né saranno) nella sua
-   anagrafica; il codice articolo resta testo libero, verificato solo dall'affidabilità
-   della lettura e dal confronto con le fasi della pratica.
+   anagrafica. Il codice articolo è un campo di ricerca sugli **articoli già usati dal
+   fornitore** nei documenti registrati: pallino verde se noto, rosso se nuovo; un
+   articolo nuovo si inserisce lo stesso e non conta fra i punti da controllare.
+   Le righe nuove si aggiungono da una finestra modale (articolo, descrizione,
+   quantità, prezzo; un articolo noto propone descrizione e ultimo prezzo).
 6. **Livello** del documento, mostrato in "Documenti" e sul pulsante "Correggi i dati
    letti" (numero di campi da controllare):
 
@@ -1435,7 +1438,7 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 | **Form / FormModal** | moduli e finestre modali | campi (`nome`, `etichetta`, `tipo`, `opzioni`, `col`, `obbligatorio`, `aiuto`, `onChange`), pulsante / `onConferma` |
 | **Intestazione** | testata pagina | titolo, icona, sottotitolo, briciole, azioni |
 | **Stepper**, **Nota**, badge | passi di stato, note, stati | — |
-| **CampoRicerca** + **RicercaEntita** | ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, pratica, fattura/nota di credito (non gli articoli: nel giro agenzia non sono in anagrafica) | autocompletamento con le prime 5 voci, lente / F4 che apre la maschera di ricerca (FilterBar + DataTable), pallino verde/rosso se il valore esiste in anagrafica; entità definite una volta (voci da `/api/lookup/*`, chiave, testo, colonne, filtri, contesto) |
+| **CampoRicerca** + **RicercaEntita** | ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, articolo (articoli già usati dal fornitore: un articolo nuovo è ammesso col pallino rosso), pratica, fattura/nota di credito | autocompletamento con le prime 5 voci, lente / F4 che apre la maschera di ricerca (FilterBar + DataTable), pallino verde/rosso se il valore esiste in anagrafica; entità definite una volta (voci da `/api/lookup/*`, chiave, testo, colonne, filtri, contesto) |
 
 **Comportamento fisso della DataTable** (uguale in ogni schermata):
 - occupa **sempre tutto lo spazio** a disposizione del suo contenitore;
