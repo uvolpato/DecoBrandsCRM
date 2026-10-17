@@ -196,7 +196,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 | **F5-A3** Ruoli e permessi: tabella `crm_ruoli_utente`, `requirePermesso()` su ogni rotta, interfaccia in sola lettura, barra per ruolo | 2 · **da approvare** | F0-A3 | `prototipo-alternativo/assets/motore.js` (`M.PERMESSI`), `componenti.js` (barra) | §8.3 |
 | **F5-A4** Utenti e ruoli `/utenti` (elenco, scheda, nuova password via email, vincoli) | 2 · **da approvare** | F5-A3 | `prototipo-alternativo/assets/viste-gestione.js` | §7.13 |
-| **F5-A5** Stato del sistema `/sistema` + registri `servizi_esecuzioni` / `servizi_problemi` scritti dai servizi | 3 · **da approvare** | F6-A1 | idem | §7.14, §4.2.15 |
+| **F5-A5** Stato del sistema `/sistema` + registri `servizi_esecuzioni` / `servizi_problemi` scritti dai servizi: controlli di salute ogni 5 minuti, calcolo dello stato, catalogo dei problemi con apertura, ripetizione e chiusura automatica, *Controlla adesso*, pulizia notturna | 3 · **da approvare** | F6-A1 | idem | §7.14–§7.14.5, §4.2.15 |
 | **F5-A6** Impostazioni `/impostazioni` (6 sezioni, password cifrate mai rilette, prova connessione) | 3 · **da approvare** | F0 | idem | §7.15, §4.2.14 |
 | **F5-A7** Documenti scartati `/scartati` (motivo, recupero, eliminazione automatica) | 1 · **da approvare** | F6-A4 | idem | §7.16 |
 | **F5-A8** Guida in linea `/guida` + pulsante *Guida* nelle testate | 2 · **da approvare** | F0-A4 | idem (`CRM.GUIDA`) | §7.17 |

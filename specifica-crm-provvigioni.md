@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.6 — incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.7 — Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -516,7 +516,45 @@ Una riga per sezione (`chiave` = `azienda` · `casella` · `lettura` · `posta` 
 
 ### 4.2.15 `servizi_esecuzioni` e `servizi_problemi`
 
-Registro dei servizi automatici (§7.14): `servizi_esecuzioni` (`servizio` = `casella` · `lettura` · `integra` · `posta`, `inizio`, `fine`, `esito` `ok`·`attenzione`·`errore`, `testo`); `servizi_problemi` (`servizio`, `quando`, `livello` `errore`·`attenzione`, `testo`, `dettaglio` con cosa fare, `visto_il`, `visto_da`). Conservazione come il registro eventi.
+Registro dei servizi automatici, letto dalla pagina Stato del sistema (§7.14). Li scrivono
+**solo i servizi** (mai l'interfaccia, salvo *Segna come visto*), con un'unica funzione
+`registraEsecuzione()` / `apriProblema()` nel livello dei servizi.
+
+`servizi_esecuzioni` — una riga per ogni giro di lavoro o controllo di un servizio.
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `servizio` | VARCHAR(15) | `casella` · `lettura` · `integra` · `posta` |
+| `tipo` | VARCHAR(10) | `lavoro` (giro reale: email lette, documento letto, sincronizzazione, invio) · `controllo` (prova di salute periodica, §7.14.1) |
+| `inizio` · `fine` | TIMESTAMPTZ | `fine` NULL finché il giro è in corso |
+| `esito` | VARCHAR(10) | `ok` · `attenzione` · `errore` |
+| `testo` | VARCHAR(300) | cosa ha fatto, leggibile (es. "1 email, 1 allegato (Gries_AB-77120.pdf)") |
+| `misure` | JSONB | numeri del giro: `{email, allegati, ignorati}` · `{pagine, secondi, secondi_pagina, documento_id}` · `{vista, lette, aggiornate, scartate}` · `{destinatario, codice_smtp}` |
+| `avviato_da` | BIGINT FK → `users` | NULL se pianificato; l'utente se da *Controlla adesso* |
+
+`servizi_problemi` — una riga per problema **aperto o chiuso**; lo stesso problema che si
+ripete aggiorna la riga esistente invece di crearne una nuova.
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `servizio` | VARCHAR(15) | come sopra |
+| `codice` | VARCHAR(40) | dal catalogo §7.14.3 (es. `casella.connessione`) |
+| `chiave` | VARCHAR(120) | cosa riguarda, per riconoscere i doppioni (es. `C00931`, nome dell'allegato, email del destinatario); vuota se il problema è del servizio intero |
+| `livello` | VARCHAR(10) | `errore` · `attenzione` |
+| `testo` | VARCHAR(200) | titolo (es. "Cliente non sincronizzato: P.IVA mancante") |
+| `dettaglio` | TEXT | cosa è successo e **cosa fare** |
+| `primo` · `ultimo` | TIMESTAMPTZ | prima e ultima volta che si è presentato |
+| `volte` | INT DEFAULT 1 | quante volte |
+| `chiuso_il` | TIMESTAMPTZ | NULL = aperto; valorizzato quando la causa sparisce (chiusura automatica, §7.14.4) |
+| `visto_il` · `visto_da` | TIMESTAMPTZ · BIGINT FK → `users` | *Segna come visto* |
+
+Indici: `servizi_esecuzioni (servizio, inizio DESC)`; `servizi_problemi (servizio, codice,
+chiave) WHERE chiuso_il IS NULL` univoco (un solo problema aperto per causa),
+`servizi_problemi (visto_il) WHERE visto_il IS NULL`. Conservazione: esecuzioni 90 giorni
+(sono molte: la sincronizzazione ne scrive una al minuto), problemi come il registro
+eventi (`eventi_mesi`, §7.15); pulizia con un lavoro notturno.
 
 ### 4.2.16 `impegni_giacenza` — **ampliamento futuro (§17), non in questa fase**
 
@@ -1405,15 +1443,96 @@ deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'er
 
 - **Riquadri per servizio** (KpiRow, fanno da filtro): *Casella dei documenti*, *Server di
   lettura (GLM-OCR)*, *Sincronizzazione da Integra*, *Posta in uscita*; per ognuno stato
-  (*Funziona* · *Da tenere d'occhio* · *Problema*), nota (es. "lento: 9,8 s per pagina"),
-  ultima esecuzione e ritmo, problemi da vedere.
+  (*Funziona* · *Da tenere d'occhio* · *Problema*, calcolato come in §7.14.2), nota
+  (es. "lento: 9,8 s per pagina"), indirizzo, ultima esecuzione e ritmo, problemi da vedere.
 - **Problemi** (sinistra): quando, livello (*Errore* · *Attenzione*), servizio, testo e
-  **cosa fare**; segmenti *Da vedere · Tutti*; *Segna come visto* per riga e *Segna tutti
-  come visti*. Il numero dei problemi da vedere compare **nella barra** (voce Stato del
-  sistema e titolo del gruppo Gestione), in giallo se c'è un errore.
-- **Ultime esecuzioni** (destra): quando, servizio, esito, cosa ha fatto.
-- *Controlla adesso*: esegue subito il controllo della casella e la verifica dei servizi.
+  **cosa fare**, "si è ripetuto N volte"; segmenti *Da vedere · Tutti*; *Segna come visto*
+  per riga e *Segna tutti come visti*. Il numero dei problemi da vedere compare **nella
+  barra** (voce Stato del sistema e titolo del gruppo Gestione), in giallo se c'è un
+  errore. I problemi chiusi da soli hanno il segno *Risolto il …*.
+- **Ultime esecuzioni** (destra): quando, servizio, esito, cosa ha fatto (ultime 50; con un
+  servizio scelto nei riquadri, solo le sue). I `controllo` senza novità si raggruppano
+  ("12 controlli riusciti dalle 09:00").
+- *Controlla adesso*: esegue subito il giro della casella e il controllo di tutti i servizi
+  (§7.14.1), poi ridisegna la pagina.
+- La pagina si **aggiorna da sola** ogni 30 secondi mentre è aperta.
 - Sostituisce la pagina "Errori" della Gestione Ordini per il CRM.
+
+#### 7.14.1 Da dove vengono i dati: cosa scrive ogni servizio
+
+Tutti i servizi girano nel server del CRM come **lavori pianificati** (stessa coda dei
+lavori di §6.5) e scrivono in `servizi_esecuzioni` / `servizi_problemi` (§4.2.15). Oltre
+al lavoro vero, ogni servizio ha un **controllo di salute** ogni 5 minuti, così si sa se
+funziona anche quando non c'è nulla da fare.
+
+| Servizio | Lavoro (`tipo = lavoro`) | Controllo di salute (`tipo = controllo`) | Misure registrate |
+|---|---|---|---|
+| **Casella dei documenti** (`casella`) | ogni N minuti (Impostazioni → Casella): legge le email nuove della cartella, salva gli allegati PDF/Excel in `documenti_in_arrivo`, sposta le email lette (§6.5 punti 1–2) | accesso IMAP e presenza delle due cartelle | email, allegati presi, allegati ignorati |
+| **Server di lettura** (`lettura`) | a ogni documento: invio a GLM-OCR, risposta, campi letti (§6.5 punti 3–4) | chiamata di prova al servizio (`/health` o modello caricato) e tempo di risposta | pagine, secondi, secondi per pagina, documento |
+| **Sincronizzazione da Integra** (`integra`) | ogni 60 s per le anagrafiche (§4.5); una riga per giro con il riepilogo di tutte le viste | connessione al database e lettura di una riga per vista | per vista: righe lette, aggiornate, scartate |
+| **Posta in uscita** (`posta`) | a ogni invio (password, solleciti se inviati dal CRM) | accesso SMTP senza inviare | destinatario, codice di risposta del server |
+
+#### 7.14.2 Come si calcola lo stato del riquadro
+
+Si valuta in quest'ordine; vince la prima regola vera. I valori sono parametri di
+configurazione del server con questi valori iniziali.
+
+| Stato | Quando |
+|---|---|
+| **Problema** (rosso) | c'è un problema aperto di livello `errore` per il servizio · oppure **servizio fermo**: nessuna esecuzione (lavoro o controllo) da più di 3 cicli (casella: 3 × minuti impostati; Integra: 3 minuti; lettura e posta: 15 minuti, cioè 3 controlli) · oppure gli ultimi 3 giri sono finiti in `errore` |
+| **Da tenere d'occhio** (giallo) | c'è un problema aperto di livello `attenzione` · oppure il server di lettura negli ultimi 10 documenti ha una media oltre **8 s per pagina** · oppure una sincronizzazione è durata più del suo intervallo |
+| **Funziona** (verde) | altrimenti |
+
+La **nota** del riquadro è la frase più utile del momento, nell'ordine: causa del rosso o
+del giallo ("2 clienti non sincronizzati", "lento: 9,8 s per pagina (di solito 4 s)",
+"fermo da 22 minuti"), altrimenti un riepilogo del giorno ("6 allegati letti oggi",
+"ultimo invio riuscito"). Il "di solito" è la media degli ultimi 7 giorni.
+
+#### 7.14.3 Catalogo dei problemi
+
+| Servizio | `codice` | Livello | Quando si apre | Cosa fare (testo del dettaglio) | Si chiude da solo |
+|---|---|---|---|---|---|
+| casella | `casella.connessione` | errore | accesso IMAP fallito 3 volte di fila | controllare server, utente e password in Impostazioni → Casella; *Prova la connessione* | al primo accesso riuscito |
+| casella | `casella.cartella` | errore | la cartella da leggere o quella delle lette non esiste | crearla nella casella o correggere il nome | quando la cartella c'è |
+| casella | `casella.allegato` | attenzione | allegato non PDF né Excel (es. .zip), o file danneggiato | aprire l'email e caricare il documento a mano da Documenti | no (si segna come visto) |
+| casella | `casella.vuota` | attenzione | email senza allegati dalla cartella dei fornitori | verificare se il documento era nel corpo dell'email | no |
+| lettura | `lettura.non_raggiungibile` | errore | il server non risponde a 2 controlli di fila | verificare il servizio sulla macchina con la scheda video; i documenti restano in coda e si leggono alla ripresa | al primo controllo riuscito (con "N documenti riletti") |
+| lettura | `lettura.lenta` | attenzione | media oltre 8 s per pagina sugli ultimi 10 documenti | controllare il carico della scheda video | quando la media rientra |
+| lettura | `lettura.fallita` | errore | un documento non si legge dopo 3 tentativi | aprirlo in Documenti e inserire i dati a mano, o scartarlo | quando il documento è corretto o scartato |
+| integra | `integra.connessione` | errore | database non raggiungibile per 3 giri di fila | verificare server, utente e password in Impostazioni → Sincronizzazione; avvisare chi gestisce Integra | al primo giro riuscito |
+| integra | `integra.vista` | errore | una vista manca o ha colonne diverse | chiedere a chi gestisce Integra di ripristinare la vista (§4.5) | quando la vista si legge |
+| integra | `integra.piva_mancante` | errore | un cliente o fornitore senza P.IVA valida (chiave = codice Integra) | correggere in Integra; entra da solo al giro successivo | quando la riga entra |
+| integra | `integra.piva_doppia` | errore | due codici Integra con la stessa P.IVA | unire o correggere in Integra | quando il doppione sparisce |
+| integra | `integra.lenta` | attenzione | un giro dura più del suo intervallo | segnalare a chi gestisce Integra (carico del database) | al primo giro nei tempi |
+| posta | `posta.connessione` | errore | accesso SMTP fallito | controllare server, utente e password in Impostazioni → Posta | al primo invio o controllo riuscito |
+| posta | `posta.respinta` | errore | il server rifiuta il destinatario (chiave = indirizzo) | correggere l'email dell'utente o del destinatario | no |
+
+Testi e dettagli sono **frasi fisse con segnaposto** (nome del file, codice Integra,
+secondi…) definite in un solo file del server; nessun messaggio tecnico grezzo nel testo
+(il messaggio tecnico va in `servizi_esecuzioni.misure`).
+
+#### 7.14.4 Vita di un problema
+
+1. **Si apre**: se non c'è già un problema aperto con lo stesso `servizio + codice +
+   chiave`, se ne crea uno (`primo = ultimo = adesso`, `volte = 1`).
+2. **Si ripete**: se c'è, si aggiornano `ultimo` e `volte` e si **azzera `visto_il`** solo
+   se il livello è `errore` (un errore che torna va rivisto).
+3. **Si chiude da solo** quando la causa sparisce (colonna "si chiude da solo" di §7.14.3):
+   `chiuso_il = adesso`; resta in *Tutti* con *Risolto il …* e non conta più nella barra.
+4. **Visto**: *Segna come visto* toglie il problema dal contatore della barra ma non lo
+   chiude; un problema visto e ancora aperto continua a colorare il riquadro.
+5. Ogni apertura e chiusura di un problema di livello `errore` scrive anche un evento
+   (§15.2.7).
+
+#### 7.14.5 Interfacce del server
+
+| Metodo | Rotta | Descrizione |
+|---|---|---|
+| GET | `/api/sistema` | riquadri (stato e nota calcolati §7.14.2), problemi (`?vista=da_vedere|tutti&servizio=`), ultime esecuzioni (`?servizio=&limite=50`) |
+| GET | `/api/sistema/contatore` | numero dei problemi da vedere e se c'è un errore (per la barra; letto a ogni cambio pagina) |
+| POST | `/api/sistema/problemi/:id/visto` | *Segna come visto* (permesso `sistema`) |
+| POST | `/api/sistema/problemi/visti` | *Segna tutti come visti* (permesso `sistema`) |
+| POST | `/api/sistema/controlla` | *Controlla adesso*: mette in coda il giro della casella e i quattro controlli, risponde quando sono finiti (al massimo 30 s) |
 
 ### 7.15 Impostazioni (`/impostazioni/:sezione`) — solo amministratore
 
@@ -1606,6 +1725,7 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
 | POST | `/api/documenti/:id/abbina` · `/apri-pratica` · `/registra-bollettino` | esito del controllo |
 | POST | `/api/documenti/:id/scarta` · `/rileggi` | scarto · nuova lettura |
 | GET | `/eventi` | log eventi applicativi (admin) |
+| GET · POST | `/api/sistema*` | Stato del sistema, vedi §7.14.5 |
 | GET | `/api/eventi` | elenco eventi filtrato (admin) |
 | GET | `/api/eventi/:id` | dettaglio evento (admin) |
 | GET | `/api/eventi/export` | export CSV del log filtrato (admin) |
@@ -1940,6 +2060,8 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 |--------|--------|----------|----------|---------|-------------|
 | Eccezione non gestita / errore 5xx (handler globale) | `errore` | `error` | `sistema` | `errore` | `{rotta, metodo, http_status, errore: {classe, messaggio}}` |
 | Errore di validazione 4xx (operazione rifiutata) | tipo dell'operazione tentata (es. `crud`) | azione dell'operazione | entità dell'operazione | `errore` | `{etichetta, errore: {campo, messaggio}}` |
+| Problema di livello `errore` di un servizio aperto o chiuso da solo (§7.14.4) | `errore` | `error` | `sistema` | `errore` (apertura) · `successo` (chiusura) | `{etichetta: testo, servizio, codice, chiave, volte}` |
+| *Segna come visto* / *Segna tutti come visti* | `stato` | `change_state` | `sistema` | `successo` | `{etichetta, problemi: [id]}` |
 
 ### 15.3 Regole di scrittura (transazionali)
 
