@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.5 — guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.6 — incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -216,6 +216,7 @@ delle provvigioni.
 | `giorni_attesa_conferma` | INT DEFAULT 30 | usato per le scadenze |
 | `giorno_bollettino` | SMALLINT DEFAULT 10, CHECK 1–28 | giorno del **mese successivo** entro cui il fornitore manda il bollettino; prima è "atteso", dopo "non arrivato" con sollecito (§5.6) |
 | `payment_type` | VARCHAR(20) DEFAULT `'invoiced'` | `matured` \| `invoiced` — maturazione provvigioni (**§5.5**) |
+| `giorni_incasso` | SMALLINT DEFAULT 60 | giorni dalla data fattura entro cui ci si aspetta il pagamento del cliente; dopo, la fattura non riconosciuta (maturato) diventa **incasso da verificare** (§5.14) |
 | `discount` | NUMERIC(5,2) DEFAULT 0 | sconto di default del fornitore (ridondante, vedi §4.4) |
 | `note` | TEXT | |
 | `attivo` | BOOLEAN DEFAULT true | |
@@ -351,6 +352,10 @@ singoli `fattura_*` della testata.
 | `importo` | NUMERIC(12,2) | **positivo** per fattura, **negativo** per nota di credito |
 | `storno_totale` | BOOLEAN DEFAULT false | per una nota di credito: `true` = storna tutta la fattura, `false` = storno parziale |
 | `fattura_riferimento` | VARCHAR(50) | nullable — numero della fattura stornata (per le note di credito) |
+| `stato_incasso` | VARCHAR(15) DEFAULT `'da_incassare'` | solo fatture: `da_incassare` · `pagata` · `insoluta` (§5.14) |
+| `insoluta_dal` · `pagata_il` | DATE | dal bollettino (storno, riaccredito, riconoscimento sul maturato) o dalla segnalazione del fornitore |
+| `fonte_incasso` | VARCHAR(20) | `bollettino` · `fornitore` (segnalazione via email o telefono) · `manuale` |
+| `sollecitata_il` · `solleciti` | DATE · SMALLINT | ultimo sollecito di pagamento al cliente e quanti ne sono stati fatti |
 | `att_filename` | TEXT | allegato PDF del documento |
 | `note` | TEXT | |
 | `created_at` | TIMESTAMPTZ | |
@@ -429,6 +434,8 @@ ha calcolato.
 | `pct_calcolata` | NUMERIC(5,2) | % attesa dal sistema |
 | `importo_calcolato` | NUMERIC(12,2) | importo atteso dal sistema |
 | `differenza` | NUMERIC(12,2) | riconosciuto − calcolato |
+| `tipo_riga` | VARCHAR(15) DEFAULT `'provvigione'` | `provvigione` · `storno` (riga negativa: il cliente non ha pagato; solo fatturato) · `riaccredito` (riga positiva su fattura già stornata, dopo il pagamento) (§5.14) |
+| `fattura_mese` | DATE | mese della fattura quando è diverso da quello del bollettino (storni, riaccrediti, riconoscimenti al pagamento sul maturato) |
 | `created_at` | TIMESTAMPTZ | |
 
 > `pct_calcolata` / `importo_calcolato` vengono **congelati alla verifica**: è il modo
@@ -654,6 +661,16 @@ Alcuni fornitori pagano sul **maturato** (quando incassano dai clienti), altri s
 (`payment_type`) e si applica coerentemente sia a ciò che incassa Decobrands sia a ciò
 che paga ai subagenti: maturato→maturato, fatturato→fatturato.
 
+Come si comportano quando **il cliente non paga** (risposta di Decobrands, 16/10/2026):
+
+| | Fatturato | Maturato |
+|---|---|---|
+| Quando arriva la provvigione | nel bollettino del mese della fattura | nel bollettino del **mese in cui il cliente paga** |
+| Se il cliente non paga | nel bollettino di 1 o 2 mesi dopo la provvigione viene **stornata** (riga negativa) | semplicemente **non viene riconosciuta** |
+| Quando il cliente paga | la provvigione viene **riaccreditata** nel bollettino del mese del pagamento | viene riconosciuta in quel mese |
+
+Le regole di dettaglio (stati della fattura, solleciti, effetto sui subagenti) sono in §5.14.
+
 ### 5.6 Cadenze
 
 - **Subagenti**: liquidazione trimestrale su trimestri fissi **Gen-Mar, Apr-Giu,
@@ -737,6 +754,63 @@ particolari), l'operatore può **confermare l'importo del fornitore o correggerl
 manualmente** senza che il flusso si blocchi. La differenza resta comunque registrata e
 il bollettino può passare a `verificato` o `contestato`.
 
+### 5.14 Incassi dei clienti: insoluti, storni, riaccrediti e solleciti di pagamento
+
+**Chi incassa.** Decobrands **non incassa** dai clienti: incassa il fornitore. Se il
+cliente non paga, il fornitore **sollecita Decobrands**, che a sua volta **sollecita il
+cliente**. Il CRM quindi deve sapere, per ogni fattura, se è stata pagata, e aiutare a
+sollecitare.
+
+**Stato d'incasso della fattura** (`ordini_fornitore_documenti.stato_incasso`, §4.2.7.1):
+`da_incassare` → `pagata` oppure `insoluta` → (dopo il pagamento) `pagata`. Si ricava dai
+bollettini; si imposta anche a mano quando il fornitore segnala un insoluto per email o
+telefono (*Segna come non pagata*, con data e nota).
+
+**Fornitori sul fatturato**
+1. La fattura entra nel bollettino del suo mese e la provvigione è riconosciuta.
+2. Se il cliente non paga, 1–2 mesi dopo il bollettino contiene una **riga di storno**
+   (importo negativo, riferita alla fattura). Nella verifica la riga è riconosciuta come
+   `storno`: **non è una differenza da contestare**; la fattura passa a `insoluta` e
+   compare fra i **pagamenti da sollecitare** al cliente.
+3. Quando il cliente paga, un bollettino successivo contiene il **riaccredito** (riga
+   positiva sulla fattura stornata): la fattura passa a `pagata`.
+4. **Subagenti**: per coerenza fatturato→fatturato, lo storno **riduce** la provvigione
+   del subagente nel trimestre del bollettino con lo storno (anche se la provvigione era
+   già stata liquidata in un trimestre precedente) e il riaccredito la **restituisce** nel
+   trimestre del riaccredito. Nel prospetto di liquidazione (§11) le due righe compaiono
+   con il riferimento alla fattura. *Da confermare con Decobrands.*
+
+**Fornitori sul maturato**
+1. Una fattura **assente** dal bollettino del suo mese non è una riga "mancante" da
+   decidere: è **in attesa di incasso** (nessuna azione, nessun sollecito al fornitore).
+2. Quando il cliente paga, la provvigione compare nel bollettino del **mese del
+   pagamento**: la riga si abbina alla fattura di qualunque mese precedente, non solo del
+   mese del bollettino; la fattura passa a `pagata`.
+3. Se dopo `giorni_incasso` dalla data fattura (condizione del fornitore, iniziale 60) la
+   provvigione non è ancora riconosciuta, la fattura diventa **incasso da verificare**: si
+   chiede al fornitore se è stata pagata o si sollecita il cliente.
+4. **Subagenti**: come oggi, la provvigione entra nella liquidazione quando il bollettino
+   che la riconosce è verificato (maturato→maturato).
+
+**Sollecito di pagamento al cliente**
+- In **Oggi** un nuovo gruppo **Pagamenti da sollecitare** (fatture insolute e incassi da
+  verificare), dal più vecchio; *Prepara i solleciti* crea **un testo per cliente** con le
+  fatture non pagate (numero, data, fornitore, importo, giorni di ritardo), come per i
+  solleciti di conferma (§7.1). Copiando il testo si registra il sollecito
+  (`sollecitata_il`, `solleciti`) e l'evento (§15).
+- Nella **pratica** la fattura mostra lo stato d'incasso; nel **cliente** (§7.6) la scheda
+  Pratiche ha il filtro *Non pagate*.
+
+**Domande per Decobrands** (prima di realizzare):
+- il sollecito al cliente lo manda Decobrands o il subagente che lo segue (in copia)?
+- i solleciti del fornitore arrivano per email in un formato ricorrente? Se sì possono
+  entrare da Documenti come nuovo tipo `sollecito_insoluti`;
+- lo storno ai subagenti avviene davvero nel trimestre dello storno, anche se la
+  provvigione era già stata liquidata?
+- `giorni_incasso`: basta un valore per fornitore o dipende dal cliente (termini di
+  pagamento diversi)?
+- l'email del cliente per il sollecito arriva da Integra (vista `v_clienti`)?
+
 ---
 
 ## 6. Flussi funzionali
@@ -786,6 +860,10 @@ abbinamento — senza doppie digitazioni. I documenti non leggibili restano in
    corregge manualmente** (§5.13) senza bloccare.
 6. Il bollettino passa a **`verificato`** (ok) o **`contestato`** (si comunica al
    fornitore e si attende la rettifica).
+7. **Incassi** (§5.14): le righe di **storno** e di **riaccredito** (fatturato) e le
+   provvigioni riconosciute **al pagamento** su fatture di mesi precedenti (maturato) si
+   abbinano alla fattura di origine e aggiornano il suo stato d'incasso; le fatture sul
+   maturato assenti dal bollettino restano **in attesa di incasso** e non vanno decise.
 
 ### 6.3 Flusso liquidazione subagenti
 
@@ -1052,6 +1130,10 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
     affidabile); azione *Apri la coda* (§7.9);
   - **Bollettini**: da verificare, pronti da chiudere, **non arrivati** dopo il giorno
     atteso del fornitore, da sollecitare (§5.6).
+  - **Pagamenti da sollecitare** (§5.14): fatture insolute (storno nel bollettino o
+    segnalazione del fornitore) e incassi da verificare (maturato oltre `giorni_incasso`),
+    dal più vecchio; *Prepara i solleciti* = un testo per cliente. *Non ancora nel
+    prototipo.*
 - **Colonna destra rivolta al futuro**:
   - due **schede** nello stesso riquadro (si ricorda l'ultima aperta): **Prossime scadenze** (15 giorni): conferme attese, bollettini del mese precedente
     attesi entro il giorno del fornitore (§5.6), fine del trimestre; ogni voce porta alla pagina relativa;
@@ -1158,6 +1240,11 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
 - Dettaglio: righe con fattura, cliente, merce, riconosciuto/calcolato e `differenza`
   evidenziata; azioni: aggiungi/elimina riga, **conferma importo fornitore o modifica
   manuale** (§5.13), passa a `verificato`/`contestato`.
+- **Righe d'incasso** (§5.14), con un segno proprio e senza decisione richiesta: *Storno:
+  il cliente non ha pagato* (fattura → insoluta, con *Prepara il sollecito al cliente*),
+  *Riaccredito dopo il pagamento*, *Riconosciuta al pagamento* (maturato, fattura di un mese
+  precedente); le fatture sul maturato assenti stanno in fondo come *In attesa di incasso*
+  (con i giorni dalla fattura, in giallo oltre `giorni_incasso`).
 
 ### 7.8 Liquidazione (`/liquidazione`)
 
@@ -1176,6 +1263,10 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
     documenti nel trimestre**; gli altri sono contati nella testata ("4 con documenti ·
     8 senza"). Niente riquadri per subagente: con più di 4 non entrano in larghezza.
 - **Export** con i campi §11 nell'header del dettaglio.
+- **Storni e riaccrediti** (fatturato, §5.14): compaiono fra i documenti del trimestre del
+  bollettino che li contiene, con segno *Storno: cliente non pagante* (provvigione
+  negativa) o *Riaccredito*, e il riferimento alla fattura e al trimestre d'origine; si
+  sommano alla liquidazione del subagente come le note di credito.
 
 ### 7.9 Documenti (`/documenti`)
 
@@ -1691,6 +1782,7 @@ Anagrafiche di riferimento per il collaudo:
 | B5 | ~~Upload documenti~~ | chiuso: incluso nell'implementazione (multer, §3.4) |
 | B6 | Dati storici / popolamento iniziale | capire se importare le prassi dagli Excel manuali |
 | B7 | Casi cliente su più subagenti su fornitori diversi | risolti internamente da Marco |
+| B8 | Incassi dei clienti (§5.14) | regole chiarite il 16/10/2026; **non ancora nel prototipo**; restano le domande di §5.14 |
 
 ---
 
@@ -1814,6 +1906,14 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 
 > Quando la verifica conferma anche il passaggio a `verificato`, si generano **due
 > eventi**: `calcolo/verify` + `stato/change_state`.
+
+**Incassi (§5.14)**
+
+| Operazione | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
+|------------|--------|----------|----------|---------|-------------|
+| Verifica di un bollettino con storno, riaccredito o riconoscimento al pagamento | `stato` | `change_state` | `documento` | `successo` | `{etichetta: fattura, prima: {stato_incasso}, dopo: {stato_incasso}, bollettino_id, tipo_riga}` |
+| *Segna come non pagata* / *Segna come pagata* (segnalazione del fornitore) | `stato` | `change_state` | `documento` | `successo` | `{etichetta, prima, dopo, fonte_incasso, nota}` |
+| Sollecito di pagamento copiato o inviato al cliente | `documento` | `export` | `documento` | `successo` | `{etichetta: cliente, fatture: [numero], importo_totale, solleciti}` |
 
 #### 15.2.6 Liquidazione ed export (§8.1, §11)
 

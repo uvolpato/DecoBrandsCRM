@@ -48,6 +48,7 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 - **Bollettino**: ogni riga che non quadra va accettata (con motivo) o contestata (motivo obbligatorio); "manca nel bollettino" si può rimandare al mese dopo. Si chiude come verificato o contestato; per la contestazione viene preparato il testo da inviare.
 - **Dal fornitore ci aspettiamo** % agente + % subagente dello scaglione; **al subagente liquidiamo** la sua %, con eventuale eccezione personale. Se il fornitore riconosce un importo diverso, al subagente resta quello calcolato sull'imponibile.
 - **Maturato / fatturato**: per chi paga sul fatturato (Gasper, Ing's) la provvigione entra nel trimestre del documento; per chi paga sul maturato (Gries) entra quando il bollettino che la riconosce è verificato.
+- **Clienti che non pagano** (da Decobrands, 16/10/2026; *non ancora nel prototipo*, spec §5.14): incassa il fornitore, che sollecita Decobrands, che sollecita il cliente. Sul fatturato la provvigione viene stornata 1–2 mesi dopo e riaccreditata al pagamento; sul maturato arriva solo nel mese in cui il cliente paga.
 - **Percentuali nel tempo**: le nuove percentuali hanno una data di validità; i documenti si calcolano con quelle in vigore alla loro data.
 - **Trimestre**: si chiude solo a trimestre finito e senza documenti in attesa.
 

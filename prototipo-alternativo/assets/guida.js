@@ -162,7 +162,7 @@
           azioni: [['Scarica', 'Genera il file; l’esportazione resta nel registro.']] },
         { nome: 'Chiudere la liquidazione', da: 'Chiudi il trimestre', cosa: 'Conferma della chiusura.', azioni: [['Chiudi il trimestre', 'Gli importi non cambiano più.']] }
       ],
-      sapere: ['Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura.', 'Chi paga sul <b>maturato</b> (es. Gries): entra quando il bollettino che la riconosce è verificato.'] },
+      sapere: ['Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga.', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
 
     /* ---------------- Anagrafiche ---------------- */
     { id: 'fornitori', titolo: 'Fornitori', gruppo: 'Anagrafiche', vai: '#/fornitori',
