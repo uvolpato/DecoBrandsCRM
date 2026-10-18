@@ -1,6 +1,8 @@
-# Decobrands — prototipo alternativo
+# Decobrands — prototipo ufficiale ("alternativo")
 
-Prototipo indipendente dal primo (`prototipo-crm/`): stessa materia, ma costruito sui **flussi di lavoro** invece che sulle tabelle, con la palette Decobrands e gli stessi componenti standard del primo. Si apre con `index.html` (doppio clic, nessun server, nessuna libreria esterna).
+**È il prototipo ufficiale del CRM** (decisione D-24 della specifica, 18/10/2026): sorgente di verità per struttura, stile, componenti, testi e numeri dell'applicazione. Il primo prototipo (`prototipo-crm/`) resta come archivio.
+
+Nato indipendente dal primo: stessa materia, ma costruito sui **flussi di lavoro** invece che sulle tabelle, con la palette Decobrands e gli stessi componenti standard del primo. Si apre con `index.html` (doppio clic, nessun server, nessuna libreria esterna).
 
 ## Idea
 

@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -53,7 +53,7 @@ preventivo.
 | V1 | Unica applicazione | Tutte le funzioni in un'unica applicazione web |
 | V2 | Database condiviso | Stesso PostgreSQL (`decobrands`) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM. I documenti del CRM entrano dall'**ingresso documenti interno** (§6.5), non dalla pipeline n8n della Gestione Ordini |
 | V3 | Autenticazione | Tabella `users` con ruoli; utente di default `admin` (ruolo `admin`); sessione su cookie HttpOnly/Secure/SameSite + protezione CSRF (§3.3) |
-| V4 | Stile grafico | Bootstrap 5.3, navbar scura, sfondo `#f5f6f8`, logo Decobrands |
+| V4 | Stile grafico | Quello del prototipo ufficiale `prototipo-alternativo/` (D-24): `stile.css` con la palette Decobrands (primario `#0d6efd`, scuro `#212529`, sfondo `#f5f6f8`, stessi colori della Gestione Ordini), carattere Public Sans, barra laterale scura con logo; niente Bootstrap |
 | V5 | Lingua | Tutte le interfacce in italiano |
 | V6 | Responsive | Desktop + tablet + mobile |
 | V7 | Stack | **Stesso stack del Portale B2B Luis**: Node 24, frontend Next.js 16 (App Router) + React 19 + TypeScript, backend NestJS 11, ORM Prisma 7 (adapter `pg`), PostgreSQL condiviso (V2). Due processi Node dietro Caddy; Docker solo in sviluppo (§3.4) |
@@ -71,23 +71,28 @@ preventivo.
 L'applicazione è organizzata in viste che corrispondono alle schermate della sezione §7:
 
 ```
-index.html              # launcher schermate (dashboard, ordini, bollettini, liquidazione, anagrafiche)
-login.html              # accesso (facciata)
-dashboard.html          # schermata riepilogo
-ordini-fornitore.html   # pratiche ordine a fornitore
-ordine-fornitore-dettaglio.html  # dettaglio ordine: conferma/fattura/righe/documenti
-fornitori.html          # anagrafica fornitori + scaglioni
-fornitore-dettaglio.html
-agenti.html             # anagrafica agenti e subagenti
-clienti.html            # clienti (da Integra) con le loro agenzie (interscambio)
-bollettini.html         # controllo bollettini
-bollettino-dettaglio.html
-liquidazione.html       # rendiconto provvigioni subagenti + esportazione Excel (§11)
+prototipo-alternativo/            # prototipo ufficiale (D-24): pagina unica, rotte #/percorso
+  index.html                      # barra laterale a gruppi + area della pagina
+  assets/stile.css                # stile (palette Decobrands, Public Sans), nessun Bootstrap
+  assets/componenti.js            # libreria dei componenti standard CRM.* (§16.4) + rotte + memoria
+  assets/motore.js                # regole e calcoli (§5, §10)
+  assets/dati.js                  # dati dimostrativi = seed (§12)
+  assets/entita.js                # entità dei campi di ricerca
+  assets/viste-giorno.js          # Oggi, Documenti, Pratiche, Pratica
+  assets/viste-periodo.js         # Bollettini, Bollettino, Liquidazioni (con Report subagenti)
+  assets/viste-analisi.js         # Analisi (BI)
+  assets/viste-anagrafiche.js     # Fornitori, Subagenti, Clienti con agenzie
+  assets/viste-gestione.js        # Utenti e ruoli, Stato del sistema, Impostazioni, Scartati, Guida
+  assets/viste-vendita.js …       # vendita diretta (spenta, §17)
+  assets/esporta-*.js             # esportazioni Excel / PDF / CSV
+  assets/guida.js                 # testi della Guida in linea
+  assets/viste-componenti.js      # catalogo dei componenti (#/componenti)
 ```
 
 Componenti condivise:
 
-- foglio di stile comune (Bootstrap 5.3, sfondo `#f5f6f8`, navbar scura, logo);
+- foglio di stile comune (`stile.css` del prototipo ufficiale, V4);
+- libreria dei componenti standard (§16.4);
 - dati dimostrativi (interamente lato client);
 - motore di calcolo provvigioni/bollettini (§10).
 
@@ -95,12 +100,11 @@ Componenti condivise:
 
 L'architettura di esercizio (frontend Next.js + backend NestJS/Prisma, PostgreSQL,
 autenticazione, upload documenti, lavori pianificati) è descritta in §3.3, §3.4 e §8; riprende le
-stesse funzioni del collaudo e mantiene il foglio di stile comune (§V4: Bootstrap 5.3,
-navbar scura, logo), con il layout invariato.
+stesse funzioni del prototipo e ne mantiene stile, componenti e layout (V4, §16.1).
 
 L'implementazione di collaudo resta **consultabile senza server**: si apre `index.html`
-direttamente nel browser; nessun `npm install`, nessuna porta; Bootstrap e icone arrivano
-da CDN. I calcoli provvigioni e le differenze bollettini sono eseguiti **lato client** dal
+direttamente nel browser (`prototipo-alternativo/index.html`); nessun `npm install`, nessuna
+porta, nessuna risorsa esterna: carattere, icone e librerie sono nella cartella. I calcoli provvigioni e le differenze bollettini sono eseguiti **lato client** dal
 motore della sezione §10 su dati dimostrativi.
 
 ### 3.3 Autenticazione e autorizzazione
@@ -1465,62 +1469,68 @@ successiva (§17).
 
 ### 7.10 Schema dei flussi e navigazione tra le schermate
 
-Il prototipo si naviga a partire dal launcher `index.html`; ogni schermata ha la
-navbar comune che riporta al launcher (nessun menu laterale). Il dato che collega
-tutta l'applicazione è l'**ordine a fornitore**, osservato a tre livelli:
-anagrafiche, pratiche, controlli/pagamenti. Tutti i documenti entrano dal canale
-comune di ingresso documenti del CRM (§6.5).
+Il prototipo ufficiale (`prototipo-alternativo/`, D-24) è una **pagina unica** con le
+rotte `#/percorso`. A sinistra c'è la **barra laterale**, con le voci raggruppate per
+frequenza di lavoro; il gruppo *Gestione* si può chiudere. Il dato che collega tutta
+l'applicazione è l'**ordine a fornitore** (la pratica). Tutti i documenti entrano dal
+canale comune di ingresso documenti del CRM (§6.5).
 
 ```
-index.html (launcher) ───── login.html (facciata, autenticazione in esercizio §3.3)
-        │
-        ├── dashboard.html ─────────────────┐   aggregatore: KPI per stato, segnalazioni
-        │                                   │   conferme scadute, bollettini da verificare,
-        │                                   │   ultime pratiche, riepilogo provvigioni
-        │                                   │
-        ├── Anagrafiche                     │
-        │   fornitori → fornitore-dettaglio │   scaglioni provvigioni (§5.1)
-        │   agenti                          │   agente + subagenti
-        │   interscambio                    │   subagente × cliente × fornitore, sconto
-        │        │_ sconto → scaglione (§5.1)
-        │
-        ├── Pratiche
-        │   ordini-fornitore → ordine-fornitore-dettaglio
-        │        stati inviato → confermato → fatturato, documenti per fase (§6.1)
-        │
-        └── Controlli e pagamenti
-            bollettini → bollettino-dettaglio    riconosciuto vs calcolato (§10)
-            liquidazione                         rendiconto trimestrale + export (§11)
+Barra laterale                         Rotte
+├── Carica documenti (sempre visibile) → apre la scelta dei file, poi Documenti
+├── Ogni giorno
+│   ├── Oggi                           #/                       cose da fare per gruppi, scadenze
+│   ├── Documenti                      #/documenti/:id          controlla, correggi, abbina, scarta
+│   └── Pratiche                       #/pratiche/:id           riepilogo · righe a confronto
+├── Ogni mese
+│   └── Bollettini                     #/bollettini/:id         matrice 6 mesi → riconciliazione
+├── Ogni trimestre
+│   ├── Liquidazioni                   #/liquidazioni/:anno/:t  documenti · report subagenti
+│   └── Analisi                        #/analisi                BI con filtri ed esportazione
+├── Vendita diretta (spenta, §17)
+├── Anagrafiche
+│   ├── Fornitori                      #/fornitori/:id          percentuali · clienti seguiti
+│   ├── Subagenti                      #/subagenti/:id
+│   └── Clienti                        #/clienti/:piva          agenzie · pratiche
+└── Gestione (richiudibile)
+    ├── Utenti e ruoli                 #/utenti/:id
+    ├── Stato del sistema              #/sistema
+    ├── Impostazioni                   #/impostazioni/:sezione
+    ├── Documenti scartati             #/scartati
+    └── Guida                          #/guida/:argomento
 ```
 
 Considerazioni:
 
-- **Navigazione**: nel prototipo l'ingresso è il launcher `index.html`; ogni schermata
-  è un file HTML separato (`prototipo-crm/`) con i dati dimostrativi condivisi in
-  `assets/js/data.js` e il motore di calcolo in `assets/js/app.js`; la navbar comune
-  (logo + versione) riporta al launcher.
-- **Login**: `login.html` è una schermata di facciata nel prototipo (nessuna
-  autenticazione reale). In esercizio (V3) l'accesso usa la tabella `users` (§3.3)
-  con sessioni server-side e `requireAuth`/`requireAdmin`.
-- **Dashboard come aggregatore**: è il punto d'ingresso del percorso consigliato;
-  i documenti nuovi letti dall'ingresso documenti (§6.5) compaiono tra le
-  segnalazioni e nei KPI, da qui si entra nelle liste.
-- **`interscambio` è la chiave di collegamento**: per ogni pratica risolve quale
-  subagente segue il cliente presso il fornitore e con quale sconto; lo sconto
-  determina lo scaglione (§5.1) usato sia per il confronto bollettini sia per la
-  liquidazione. Il vincolo unico di §5.10 garantisce un solo subagente per
-  cliente × fornitore.
+- **Navigazione**:
+  - ogni pagina ha una testata con *‹ Torna a …*, il titolo, le azioni e *Guida*;
+  - si torna sempre alla schermata precedente nello stesso punto (§7.12);
+  - le pagine di dettaglio non hanno il percorso "Pratiche › …" (D-12);
+  - i contatori della barra laterale (Oggi, Documenti, Pratiche, Bollettini) seguono i
+    dati (§16.4.2).
+- **Utente**: in fondo alla barra laterale ci sono l'utente e il ruolo. Nel prototipo *Prova
+  come* cambia utente, *Ripristina i dati di prova* riporta i dati all'inizio e la data di
+  lavoro è simulata (04/09/2026). In esercizio (V3) l'accesso usa la tabella `users`
+  (§3.3).
+- **Oggi come punto d'ingresso**: raccoglie per gruppi di lavoro ciò che c'è da fare
+  (documenti da controllare, conferme in ritardo, bollettini, pagamenti da sollecitare);
+  da qui si entra nelle pagine.
+- **L'agenzia (abbinamento cliente × fornitore) è la chiave di collegamento**: per ogni
+  pratica risolve quale subagente segue il cliente presso il fornitore e con quale
+  sconto. Lo sconto determina lo scaglione (§5.1), usato sia per il confronto dei
+  bollettini sia per la liquidazione. Il vincolo unico di §5.10 garantisce un solo
+  subagente per cliente × fornitore.
 - **Documenti**: ogni fase (ordine, conferma, fattura, bollettino) passa dal canale
   comune di ingresso documenti (§6.5): ricezione → coda → lettura GLM-OCR → controllo
-  operatore → abbinamento; i documenti non leggibili restano in `documenti_in_arrivo`
+  operatore → abbinamento. I documenti non leggibili restano in `documenti_in_arrivo`
   con stato `errore`.
-- **Liquidazione**: considera solo le pratiche in stato `fatturato` nel periodo
-  filtrato; le percentuali sono risolte dagli scaglioni correnti (o dalle eccezioni
-  temporanee, §5.7), mentre per i periodi passati si usano i valori congelati (§5.11).
-- **Tab e contenitori stabili**: le viste complesse organizzano le informazioni a tab
-  per flusso (Pratica → Conferma → Fattura → Righe; Riepilogo/Dettaglio liquidazione;
-  Segnalazioni/Ordini in dashboard); le tabelle filtrate usano contenitori stabili
-  (V9) così il layout non salta al variare del numero di righe.
+- **Liquidazione**: le regole di competenza (fatturato, maturato, storni e riaccrediti)
+  sono in §5.14 e §7.8. Le percentuali sono quelle in vigore alla data del documento
+  (§5.7); per i periodi chiusi valgono i valori congelati (§5.11).
+- **Schede e pagine alte quanto lo schermo**: i dettagli con più contenuti usano le
+  schede (§16.4), con prima l'informazione aggregata e l'azione proposta, poi le righe
+  (D-12, D-15). Le tabelle riempiono lo spazio rimasto e scorrono dentro, così il
+  layout non salta al variare del numero di righe.
 
 ### 7.11 Log eventi applicativi (`/eventi`)
 
@@ -2448,17 +2458,50 @@ Il dettaglio delle attività (ore, dipendenze, DoD, file sorgente per ciascuna) 
 
 ### 16.1 Replicazione maniacale del prototipo
 
-Il prototipo navigabile (`prototipo-crm/*.html` + `assets/css/crm.css` +
-`assets/js/app.js`) è la **sorgente di verità**. Ogni schermata implementata deve
-superare tutti e sei i criteri, verificati con confronto side-by-side con la sorgente
-HTML e confronto numerico sul seed §12, **prima del merge**:
+Il prototipo ufficiale è **`prototipo-alternativo/`** (D-24). È la **sorgente di verità**
+dell'interfaccia:
+- `index.html`;
+- `assets/stile.css` (stile);
+- `assets/componenti.js` (componenti);
+- `assets/viste-*.js` (pagine);
+- `assets/motore.js` (regole);
+- `assets/dati.js` (dati = seed §12).
 
-1. **Struttura/navigazione** — stesse aree e ordine: navbar fissa (§4.2), contenuto, footer fisso centrato; stesse rotte (§7).
-2. **Layout** — stesse card/tabelle nello stesso ordine; `.table-box`/`.box-stabile` con altezze e thead sticky; `thead class="table-dark"`.
-3. **Componenti/stile** — schermata composta **solo** dai componenti standard §16.4 con gli stessi parametri del prototipo; Bootstrap 5.3.2 + bootstrap-icons identichi; `crm.css` **copiato, non riscritto**.
-4. **Testi** — etichette, empty state, avvisi e note: italiano identico parola per parola al file di prototipo.
-5. **Interazioni** — filtri (incl. multifiltro checkbox §7.8), tab, modali, stepper, conferme, toast, export: stesso comportamento e stessi messaggi.
-6. **Dati** — seed §12 identico → stessi numeri in KPI e tabelle (prova oggettiva).
+Il primo prototipo (`prototipo-crm/`, Bootstrap) resta solo come archivio e per le pagine
+generate della documentazione. Non è un riferimento per l'app.
+
+Ogni schermata implementata deve superare tutti e sei i criteri **prima del merge**. Si
+verificano in tre modi:
+- confronto affiancato con il prototipo aperto nel browser;
+- confronto numerico sul seed §12;
+- `strumenti/prove/flusso.py`, la prova di riferimento del comportamento.
+
+1. **Struttura e navigazione**:
+   - barra laterale a gruppi con i contatori;
+   - testata della pagina con *‹ Torna a …*, titolo, azioni e *Guida*;
+   - stesse rotte (§7.10);
+   - ritorno nello stesso punto (§7.12).
+2. **Layout**:
+   - pagina alta quanto lo schermo;
+   - l'elemento che riempie (di norma la tabella) prende lo spazio rimasto e scorre
+     dentro;
+   - stessi pannelli, schede e colonne nello stesso ordine;
+   - sotto i 992 px flusso naturale.
+3. **Componenti e stile**:
+   - schermata composta **solo** dai componenti standard §16.4, con gli stessi parametri;
+   - `stile.css` (variabili di colore, misure, classi) **copiato, non riscritto**;
+   - carattere Public Sans incorporato;
+   - niente Bootstrap.
+4. **Testi**: etichette, segnaposto, messaggi vuoti, avvisi, note e testi della Guida in
+   italiano **identico** parola per parola al prototipo.
+5. **Interazioni**: devono avere lo stesso comportamento e gli stessi messaggi:
+   - filtri standard (§16.4.1) e conteggi dal vivo (§16.4.2);
+   - schede, finestre, campi di ricerca (singoli e multipli);
+   - selettore dei mesi, grafici cliccabili;
+   - conferme, avvisi;
+   - esportazioni (Excel, PDF, CSV).
+6. **Dati**: con il seed §12 uguale a `dati.js` si ottengono gli **stessi numeri** in
+   riquadri, tabelle, totali, grafici ed esportazioni. È la prova oggettiva.
 
 ### 16.2 Fasi e attività parallele
 
@@ -2498,7 +2541,7 @@ A — solo Next.js — e C — Express + EJS — sono scartate):
 | Esercizio | Caddy + due processi Node (8001/8002), Docker solo in sviluppo (§3.4) |
 | Lavori pianificati / Excel / test | `@nestjs/schedule` · `exceljs` · Jest + supertest |
 | Ingresso documenti | `imapflow` (casella email) · coda su PostgreSQL (`FOR UPDATE SKIP LOCKED`) · PDF → immagini (`pdftoppm`) · **GLM-OCR** su **vLLM** (server GPU locale, interfaccia compatibile OpenAI, uscita vincolata allo schema, `logprobs`) — **nessun n8n** |
-| Grafica | **Bootstrap 5.3.2 + `crm.css` del prototipo** (V4): coerenza con la Gestione Ordini, non con la grafica di Luis |
+| Grafica | **`stile.css` del prototipo ufficiale** (V4, D-24): CSS proprio con le variabili del prototipo (moduli CSS o un unico foglio globale), Public Sans incorporato, icone SVG del prototipo; niente Bootstrap e niente grafica di Luis |
 
 **Riuso da Luis B2B — solo infrastruttura, nessuna interfaccia:**
 
@@ -2517,8 +2560,9 @@ A — solo Next.js — e C — Express + EJS — sono scartate):
 
 **Non si prende da Luis:** componenti React, `globals.css` e qualsiasi CSS, layout,
 next-intl, socket.io, moduli di dominio (catalogo, carrello, checkout, AI, lead, mail).
-**Layout, grafica e testi restano quelli del prototipo** (`prototipo-crm/*.html` +
-`crm.css`, §16.1): le schermate Next.js riproducono l'HTML del prototipo con Bootstrap 5.3.2.
+**Layout, grafica e testi restano quelli del prototipo ufficiale** (`prototipo-alternativo/`,
+§16.1): le schermate Next.js riproducono le pagine del prototipo con gli stessi componenti
+e lo stesso `stile.css`.
 
 Lo schema Prisma copre solo le tabelle CRM (§4.2); le
 tabelle esistenti si leggono in sola lettura (V2), mai migrate.
@@ -2527,8 +2571,8 @@ tabelle esistenti si leggono in sola lettura (V2), mai migrate.
 
 Ogni schermata è una **composizione di componenti standard** configurati con parametri,
 mai codice di interfaccia scritto a mano pagina per pagina. Nel prototipo la libreria è
-`prototipo-crm/assets/js/componenti.js` (stili in `crm.css`), con catalogo dal vivo in
-`componenti.html`; nell'app gli stessi componenti diventano componenti React **con gli
+`prototipo-alternativo/assets/componenti.js` (stili in `stile.css`), con catalogo dal vivo
+nella voce *Componenti* (`#/componenti`, `assets/viste-componenti.js`); nell'app gli stessi componenti diventano componenti React **con gli
 stessi nomi e gli stessi parametri** (attività F0-A4).
 
 | Componente | Uso | Parametri principali |
@@ -2839,3 +2883,4 @@ rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in
 | D-21 | 18/10/2026 | Selezione multipla senza etichette nel campo: il campo mostra il nome della sola voce o *Filtro multiplo (n)*; le voci scelte stanno in alto nel menu, dove si tolgono; filtri sulla stessa riga del periodo; icone *Riepilogo dei filtri* e *Togli tutti i filtri*. Sostituisce le etichette nel campo di D-20 | con più voci le etichette allungavano i campi su più righe e spingevano giù la pagina; una riga sola lascia spazio ai numeri; il riepilogo mostra comunque tutto in un clic; applicare alla chiusura del menu evita di ridisegnare la pagina a ogni voce | Ugo | §7.22, §16.4 |
 | D-22 | 18/10/2026 | Il modo di filtrare dell'Analisi diventa lo **standard** di tutte le barre dei filtri: entità con ricerca a selezione multipla (mai tendine), etichetta come segnaposto, riepilogo e azzeramento a icona; applicato a Pratiche (fornitore, cliente, subagente), Bollettini, Cliente → Pratiche | un solo modo di filtrare in tutta l'applicazione si impara una volta; le tendine non reggono centinaia di clienti; il riepilogo fa vedere in un clic perché un elenco è corto | Ugo | §16.4, §16.4.1, §7.2, §7.6, §7.7 |
 | D-23 | 18/10/2026 | Numeri e conteggi: ricalcolati **dal vivo** a ogni cambio di filtro (il numero di un segmento conta con tutti gli altri filtri applicati); ai cambiamenti dei dati fatti da altri o dai servizi i contatori si aggiornano da soli, le tabelle no: avviso *Ci sono aggiornamenti · Aggiorna* | un numero che non corrisponde a ciò che si vede fa perdere fiducia e fa cercare lavoro inesistente; righe che si spostano mentre si clicca fanno sbagliare riga | Ugo | §16.4.2 |
+| D-24 | 18/10/2026 | Il **prototipo ufficiale** è `prototipo-alternativo/`: è la sorgente di verità per struttura, stile (`stile.css`, Public Sans, niente Bootstrap), componenti, testi e numeri; `prototipo-crm/` resta come archivio | tutte le decisioni d'interfaccia degli ultimi lavori (D-09 → D-23) sono state prese e provate lì; tenere due riferimenti porterebbe chi sviluppa a copiare quello sbagliato | Ugo | V4, §3.1, §7.10, §16.1, §16.3, §16.4 |

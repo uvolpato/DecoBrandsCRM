@@ -48,9 +48,9 @@ cliente).
 | `preventivo-crm-provvigioni.md` | Preventivo |
 | `ANALISI_CRM_PROVVIGIONI.md` | Analisi iniziale |
 | `idee-supporto-decisioni.md` | Idee sul supporto alle decisioni con modelli linguistici (fase successiva, spec §18) |
-| `STILE-GUIDA-DECOBRANDS.md` | Stile del primo prototipo e della Gestione Ordini (Bootstrap) |
-| `prototipo-alternativo/` | **Prototipo di riferimento attuale** (JavaScript puro, nessun build). Tutte le decisioni recenti (D-09 → D-23) sono qui |
-| `prototipo-crm/` | Primo prototipo (HTML + Bootstrap) e pagine generate della documentazione (`specifica.html`, `preventivo.html`) |
+| `STILE-GUIDA-DECOBRANDS.md` | Stile del primo prototipo e della Gestione Ordini (Bootstrap): **archivio**, per il CRM vale `prototipo-alternativo/assets/stile.css` |
+| `prototipo-alternativo/` | **Prototipo ufficiale** (D-24; JavaScript puro, nessun build): sorgente di verità dell'interfaccia |
+| `prototipo-crm/` | Primo prototipo (HTML + Bootstrap), **solo archivio**; contiene le pagine generate della documentazione (`specifica.html`, `preventivo.html`) |
 | `app/` | Applicazione vera (Next.js + NestJS). È l'**unica cartella che va in produzione** (sparse checkout, vedi `app/README.md`) |
 | `strumenti/genera-pagine-doc.py` | Rigenera `prototipo-crm/specifica.html` e `preventivo.html` dai `.md` |
 | `strumenti/prove/flusso.py` | Prova completa del prototipo (Playwright): ~180 controlli |
@@ -58,10 +58,11 @@ cliente).
 Prototipo pubblicato: https://uvolpato.github.io/DecoBrandsCRM/prototipo-alternativo/index.html
 Repository: https://github.com/uvolpato/DecoBrandsCRM
 
-> **Punto aperto da allineare**: la spec §16.1 e §16.3 indicano ancora `prototipo-crm/`
-> (Bootstrap + `crm.css`) come sorgente di verità della grafica. Il lavoro di progetto
-> degli ultimi giorni è tutto su `prototipo-alternativo/`. Prima di iniziare l'app, chiedi
-> a Ugo quale vale e aggiorna §16.1 e §16.3.
+> **Prototipo ufficiale: `prototipo-alternativo/`** (D-24, spec §16.1). È la sorgente di
+> verità per struttura, stile (`stile.css`, Public Sans, niente Bootstrap), componenti,
+> testi e numeri. `prototipo-crm/` e `STILE-GUIDA-DECOBRANDS.md` restano come archivio: non
+> sono un riferimento per l'app. La radice del sito (`index.html`) apre il prototipo
+> ufficiale.
 
 ## 3. Il prototipo `prototipo-alternativo/`
 
@@ -161,6 +162,7 @@ Regole del codice del prototipo:
 - Liquidazioni: due colonne, con le schede *Documenti* e *Report subagenti*; la BI
   completa è nella pagina **Analisi** (D-18), con importi per data del documento (D-19).
 - Filtri standard e conteggi dal vivo (D-20 → D-23).
+- Prototipo ufficiale `prototipo-alternativo/` (D-24).
 - Vendita diretta spenta, ampliamento futuro (D-08).
 - Evidenziazione dei valori nel PDF/Excel: **da verificare** con una prova di fattibilità
   prima di prometterla (D-06). Il cliente prende per certo ciò che vede nel prototipo:
@@ -174,6 +176,7 @@ Lo stack ricalca il **Portale B2B Luis** (spec §16.3):
 |---|---|
 | Frontend | Next.js 16 + React 19 + TypeScript |
 | Backend | NestJS 11 + Prisma 7, PostgreSQL condiviso `decobrands` |
+| Stile | `stile.css` del prototipo ufficiale, Public Sans, niente Bootstrap |
 | Grafici | Chart.js |
 | Excel | `exceljs` |
 | Processi | Node 24, Caddy, due processi (porte 8001 e 8002) |

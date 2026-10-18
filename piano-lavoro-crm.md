@@ -1,6 +1,6 @@
 # Piano di lavoro — CRM Decobrands (fasi e attività parallele)
 
-**Versione:** 1.3 · **Data:** 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
+**Versione:** 1.4 · **Data:** 18/10/2026 (prototipo ufficiale `prototipo-alternativo/`, D-24: checklist §1.1 e file sorgente delle attività riscritti) · versione 1.3 del 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
 **Derivato da:** `specifica-crm-provvigioni.md` v2.0 (§16) · **Ore:** 71 h di attività + 18 h di margine = 89 h (preventivo §4)
 **Scopo:** suddividere l'implementazione in fasi e attività indipendenti, assegnabili ad **agenti in parallelo**, con **replicazione maniacale** del prototipo navigabile.
 
@@ -10,18 +10,24 @@
 
 ### 1.1 Replicazione maniacale del prototipo (definizione operativa)
 
-Il prototipo (`prototipo-crm/*.html` + `assets/css/crm.css` + `assets/js/app.js`) è la
-**sorgente di verità visiva e comportamentale**. Ogni schermata implementata deve
-superare questa checklist prima del merge (6 criteri, tutti obbligatori):
+Il prototipo ufficiale **`prototipo-alternativo/`** (spec §16.1, D-24) è la
+**sorgente di verità visiva e comportamentale**:
+- `index.html`, `assets/stile.css` e `assets/componenti.js`;
+- le viste `assets/viste-*.js`;
+- `assets/motore.js` e `assets/dati.js`.
 
-1. **Struttura e navigazione** — stesse aree nella stesso ordine: navbar fissa (logo + "CRM" → launcher, versione, link Launcher, voci di sezione §4.2), contenuto, footer fisso centrato; stesse rotte e breadcrumb (§7).
-2. **Layout** — stesse card/sezioni/tabelle nello stesso ordine e con le stesse proporzioni; tabelle avvolte in `.table-box`/`.box-stabile` (altezze, scroll, thead sticky) con `thead class="table-dark"` (§2-V9); nessun elemento sovrapposto o tagliato.
-3. **Componenti e stile** — schermata composta **solo** dai componenti standard (spec §16.4: DataTable, FilterBar, KpiRow, Tabs, Pannello, Form/FormModal…) con gli stessi parametri del prototipo; Bootstrap 5.3.2 + bootstrap-icons identichi e `crm.css` **copiato, non riscritto** (token, `.kpi-card`, `.tabs-crm`, `.badge-stato`, `.riep-card`, `.doc-chip`, `.db-footer`, bottoni e stati).
-4. **Testi** — etichette, titoli, empty state, avvisi, note (es. nota regole §5 in Liquidazione): **italiano identico parola per parola** rispetto al file HTML del prototipo.
-5. **Interazioni** — filtri (incl. multifiltro checkbox), tab, modali, stepper 4 passi, conferme, toast, export CSV, stati hover/focus/disabled: stesso comportamento e stessi messaggi.
-6. **Dati** — seed §12 identico (`pratica`: stesso set di ordini/bollettini/anagrafiche) → **stessi numeri** in KPI, tabelle e totali; la verifica numerica è la prova oggettiva di replicazione.
+Il primo prototipo `prototipo-crm/` (Bootstrap) è solo archivio. Ogni schermata
+implementata deve superare questa checklist prima del merge (6 criteri, tutti
+obbligatori):
 
-**Verifica:** confronto side-by-side tra schermata implementata e sorgente HTML del
+1. **Struttura e navigazione** — barra laterale a gruppi con contatori, testata della pagina (*‹ Torna a …*, titolo, azioni, *Guida*), stesse rotte (spec §7.10), ritorno nello stesso punto (§7.12).
+2. **Layout** — pagina alta quanto lo schermo, l'elemento che riempie (di norma la DataTable) prende lo spazio rimasto e scorre dentro; stessi pannelli, schede e colonne nello stesso ordine; nessun elemento sovrapposto o tagliato; sotto i 992 px flusso naturale.
+3. **Componenti e stile** — schermata composta **solo** dai componenti standard (spec §16.4: Pagina, Pannello, Schede, DataTable, FilterBar, RiepilogoFiltri, KpiRow, CampoRicerca, PeriodoMesi, Grafico, Modale…) con gli stessi parametri del prototipo; `stile.css` **copiato, non riscritto**; Public Sans incorporato; niente Bootstrap.
+4. **Testi** — etichette, titoli, segnaposto, messaggi vuoti, avvisi, note e Guida: **italiano identico parola per parola** al prototipo.
+5. **Interazioni** — filtri standard e conteggi dal vivo (spec §16.4.1–§16.4.2), schede, finestre, campi di ricerca, conferme, avvisi, esportazioni: stesso comportamento e stessi messaggi.
+6. **Dati** — seed §12 identico a `assets/dati.js` → **stessi numeri** in riquadri, tabelle, totali, grafici ed esportazioni; la verifica numerica è la prova oggettiva di replicazione.
+
+**Verifica:** `strumenti/prove/flusso.py` sul prototipo come riferimento del comportamento; confronto affiancato tra schermata implementata e prototipo nel browser e
 prototipo (struttura + testi) + confronto numerico sul seed. Le divergenze si
 chiudono **prima del merge**, non in collaudo finale.
 
@@ -40,7 +46,7 @@ chiudono **prima del merge**, non in collaudo finale.
 
 Lo stack **ricalca il Portale B2B Luis** (spec V7, §3.3, §3.4, §16.3):
 
-- **Frontend:** Next.js 16 (App Router) + React 19 + TypeScript, Bootstrap 5.3.2 + `crm.css` del prototipo;
+- **Frontend:** Next.js 16 (App Router) + React 19 + TypeScript, `stile.css` del prototipo ufficiale (niente Bootstrap), Chart.js, ExcelJS, jsPDF;
 - **Backend:** NestJS 11, DTO con `class-validator`, Prisma 7 (`@prisma/adapter-pg`);
 - **Accesso e sicurezza:** `express-session` + `connect-pg-simple`, argon2, CSRF, Helmet, throttler;
 - **Esercizio:** Caddy (HTTPS) → Next.js `localhost:8001` → inoltro `/api/*` → NestJS `localhost:8002` → PostgreSQL `decobrands`; Docker solo in sviluppo; Node 24;
@@ -94,35 +100,35 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 #### F0-A1 · Scaffold applicativo — 3 h
 - **Dipende da:** — · **Blocca:** tutte le attività
 - **Riferimenti:** spec §3.4, §16.3, V7 (stack Luis B2B), V5 (italiano), V6 (responsive)
-- **Sorgente prototipo:** `assets/css/crm.css` (intero file, copiato), `login.html` (CDN: Bootstrap 5.3.2 CSS/JS bundle + bootstrap-icons 1.11.3)
-- **Output:** `frontend/` (Next.js) + `backend/` (NestJS + Prisma) sul modello di Luis B2B, import di `crm.css`, inoltro `/api/*`, `.env.example`, `avvia.bat`, Caddyfile.
-- **DoD:** frontend su 8001 e backend su 8002 avviati; nessun CSS riscritto a mano; CDN/moduli identici al prototipo.
+- **Sorgente prototipo:** `prototipo-alternativo/assets/stile.css` (intero file, copiato), `prototipo-alternativo/assets/font/` (Public Sans), `prototipo-alternativo/assets/lib/` (versioni di ExcelJS, jsPDF, Chart.js)
+- **Output:** `frontend/` (Next.js) + `backend/` (NestJS + Prisma) sul modello di Luis B2B, import di `stile.css`, inoltro `/api/*`, `.env.example`, `avvia.bat`, Caddyfile.
+- **DoD:** frontend su 8001 e backend su 8002 avviati; nessun CSS riscritto a mano; librerie alle stesse versioni del prototipo.
 
 #### F0-A2 · Schema dati + seed — 6 h
 - **Dipende da:** F0-A1 · **Blocca:** F1–F6 (lette/scritture), F0-A5
 - **Riferimenti:** spec §4.2.1–4.2.13 (tabelle nuove, incl. `documenti_in_arrivo`/`documenti_campi`), §4.1 (tabelle legacy read-only), §12 (seed), §4.3 (relazioni), §4.4 (note schema, `ordine_cliente_id`, `codice_cliente_fornitore`)
-- **Sorgente prototipo:** `assets/js/data.js` (struttura dati demo = forma del seed)
+- **Sorgente prototipo:** `prototipo-alternativo/assets/dati.js` (struttura dei dati di prova = forma del seed)
 - **Output:** schema Prisma tabelle CRM + migrazioni; introspection letta sulle tabelle esistenti **senza migrazione** (V2); aggregatore seed con `seed/00-base`.
 - **DoD:** migrazioni riusate su DB `decobrands`; seed §12 caricato; vincoli chiave presenti (`UNIQUE(fornitore_id, mese, anno)` bollettini, `UNIQUE(fornitore_id, codice_cliente_fornitore)` interscambio, FK `ordine_cliente_id`).
 
 #### F0-A3 · Autenticazione condivisa — 3 h
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate login-guardate
 - **Riferimenti:** spec §3.3, §8.3, preventivo §4 att. 2 (sessioni server-side su PostgreSQL, argon2, remember cookie, `requireAuth`/`requireAdmin` — stessa tabella `users`)
-- **Sorgente prototipo:** `login.html` (UI: card, "← Torna al launcher", versione `.7rem opacity .6` §24)
-- **Output:** moduli di accesso ripresi da Luis B2B (sessioni, CSRF, Helmet, throttler) sulla tabella `users` condivisa; login/logout/reset/cambio password, guard admin, UI login identica; **verifica compatibilità sessioni con la Gestione Ordini** (se incompatibili: login separato, stesse credenziali — spec §3.3).
-- **DoD:** accesso con utenti della Gestione Ordini; UI login = prototipo (checklist §11.1); eventi `auth/*` §15.2.1 scritti da `logEvent()` (F0-A5).
+- **Sorgente prototipo:** il prototipo ufficiale **non ha la pagina di accesso**: si disegna con `stile.css` e i componenti (riquadro centrato con logo, utente, password, *Accedi*, errore sotto il campo) e si fa approvare prima di svilupparla; in fondo alla barra laterale utente, ruolo ed *Esci* come nel prototipo (`componenti.js`, `CRM.Barra`)
+- **Output:** moduli di accesso ripresi da Luis B2B (sessioni, CSRF, Helmet, throttler) sulla tabella `users` condivisa; login/logout/reset/cambio password, guard admin, pagina di accesso approvata; **verifica compatibilità sessioni con la Gestione Ordini** (se incompatibili: login separato, stesse credenziali — spec §3.3).
+- **DoD:** accesso con utenti della Gestione Ordini; pagina di accesso approvata (checklist §1.1); eventi `auth/*` §15.2.1 scritti da `logEvent()` (F0-A5).
 
 #### F0-A4 · Shell layout comune + componenti standard — 5 h
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate
-- **Riferimenti:** spec §4.2 (navbar), §7.10, **§16.4 (componenti standard)**; STILE-GUIDA §4.2
-- **Sorgente prototipo:** `assets/js/app.js` → `navbar()`, `footer()`; **`assets/js/componenti.js`** (intero: Intestazione, DataTable, FilterBar, KpiRow, Riepilogo, Tabs, Pannello, Form, FormModal, Stepper, Nota, badge) e catalogo `componenti.html`; `crm.css` (layout a tutta altezza `.crm-pagina`/`.crm-riempi`, `.dt-*`)
-- **Output:** layout route (navbar fissa + footer fisso + toast) e **libreria componenti React** con gli stessi nomi e parametri di `componenti.js`; pagina catalogo `/componenti` (solo admin) equivalente a `componenti.html`.
+- **Riferimenti:** spec §7.10 (barra laterale e rotte), §7.12 (ritorno nello stesso punto), **§16.4, §16.4.1, §16.4.2 (componenti standard, filtri, conteggi)**
+- **Sorgente prototipo:** `prototipo-alternativo/assets/componenti.js` (intero: Pagina, Barra, Pannello, Schede, DataTable, FilterBar, RiepilogoFiltri, KpiRow, CampoRicerca/RicercaEntita, PeriodoMesi, Grafico, Modale, FormModal, Conferma, Avviso, Elenco, Binario, Matrice, Cerniera, Periodi, …, rotte e memoria `registra`), `prototipo-alternativo/assets/entita.js`, catalogo `prototipo-alternativo/assets/viste-componenti.js`; `stile.css`
+- **Output:** layout comune (barra laterale a gruppi con contatori + testata della pagina + avvisi) e **libreria componenti React** con gli stessi nomi e parametri di `componenti.js`; pagina catalogo `/componenti` (solo admin) equivalente a `#/componenti`.
 - **DoD:** ogni rotta eredita la shell senza duplicarla; ogni componente supera il confronto con il catalogo del prototipo (DataTable: riempie lo spazio, intestazione fissa, righe scorrevoli, ordinamento ▲▼, totali fissi, piede); nessuna tabella o modale scritta a mano fuori dalla libreria.
 
 #### F0-A5 · Motore di calcolo §10 + contratto eventi — 7 h
 - **Dipende da:** F0-A1, F0-A2 · **Blocca:** F2, F3, F4 (calcoli)
 - **Riferimenti:** spec §10 (formulario), §5.1–5.13 (regole), §11 (export), §15.3 (`logEvent()` service, da modulo `audit` di Luis B2B), preventivo §4 att. 4 + 9
-- **Sorgente prototipo:** `assets/js/app.js` → `commissionePerOrdine`, `rigaBollettinoCalcolata`, `confrontoFasi`, `documentiOrdine`, `importoNettoOrdine`, `fasiOrdine`, `haVariazioni`, `inTrimestre`, helper `fmt*`/`meseLabel`
+- **Sorgente prototipo:** `prototipo-alternativo/assets/motore.js` → `percentuali`, `statoPratica`, `riconcilia`, `righeLiquidazione`, `statoIncasso`, `trimestreLiquidazione`, `analisiTrimestre`, `fattiAnalisi`, `importoDoc`, `haVariazioni`, formattazione `euro`/`pct`/`data`
 - **Output:** motore server-side: scaglioni, eccezioni, maturato/fatturato, congelamento percentuali (§5.11), netto documenti (fatture − NC §5.3), differenze bollettino, confronto fasi; helper `logEvent()` conforme §15.3 (stessa transazione, formato §15.4).
 - **DoD:** test numerici (Jest) sui casi seed §12 (es. Gries 0/1/5/10/100 %, conferma ridotta 7/10, NC-2026-005) = stessi risultati del prototipo; nessun calcolo duplicato altrove (motore solo lato server).
 
@@ -145,9 +151,9 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
-| **F1-A1** Fornitori + scaglioni (CRUD, dettaglio, flag/stati) | 2 | F0 | `fornitori.html`, `fornitore-dettaglio.html` (tab scaglioni in `.box-stabile`, thead scuro) | §4.2.1, §4.2.2, §7.4, §8.1, §15.2.2 |
-| **F1-A2** Agenti + subagenti | 2 | F0 | `agenti.html` (2 liste in `.table-box`, modali) | §4.2.4, §4.2.5, §7.5, §8.1, §15.2.3 |
-| **F1-A3** Clienti e agenzie (interscambio + codice cliente fornitore) | 2 | F0 | `clienti.html` (anagrafica da Integra in sola lettura, pannello Agenzie con modale e campi di ricerca, blocco duplicati per fornitore, vista inversa nel fornitore) | §4.2.6, §4.4, §7.6, §8.1, §15.2.3 |
+| **F1-A1** Fornitori + scaglioni (CRUD, dettaglio, flag/stati) | 2 | F0 | `prototipo-alternativo/assets/viste-anagrafiche.js` (Fornitori: elenco, dettaglio a schede *Percentuali · Clienti seguiti*) | §4.2.1, §4.2.2, §7.4, §8.1, §15.2.2 |
+| **F1-A2** Agenti + subagenti | 2 | F0 | `prototipo-alternativo/assets/viste-anagrafiche.js` (Subagenti: elenco e scheda) | §4.2.4, §4.2.5, §7.5, §8.1, §15.2.3 |
+| **F1-A3** Clienti e agenzie (interscambio + codice cliente fornitore) | 2 | F0 | `prototipo-alternativo/assets/viste-anagrafiche.js` (Clienti: anagrafica da Integra in sola lettura, schede *Agenzie · Pratiche*, finestra dell'agenzia con campi di ricerca, blocco duplicati per fornitore) | §4.2.6, §4.4, §7.6, §8.1, §15.2.3 |
 | **F1-A4** Sincronizzazione da Integra delle **anagrafiche clienti e fornitori**: viste sul database (`v_clienti`, `v_fornitori`), utente in sola lettura, processo ogni 60 s, incrementale, aggiorna solo i campi di Integra senza toccare i dati del CRM, registri di esecuzione e problemi (cliente senza P.IVA o P.IVA doppia), sezione delle impostazioni e *Prova la connessione*; sostituisce l'import da file | 3 · **da approvare** | F0-A2 | `prototipo-alternativo/assets/dati.js` (`sistema`, `impostazioni.integra`), `viste-gestione.js` (Impostazioni → Sincronizzazione da Integra) | §4.1, §4.5, §7.14, §7.15 |
 
 - **F1-A4: 3 h fuori preventivo, da approvare** (la sincronizzazione dalle viste sostituisce l'import da file, non previsto nel preventivo originale). Le viste le crea chi gestisce Integra.
@@ -158,8 +164,8 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
-| **F2-A1** Elenco ordini fornitore (filtri, icone variazioni/NC, `.table-box`) | 2 | F0 | `ordini-fornitore.html` | §7.2, §8.1, §15.2.4 |
-| **F2-A2** Dettaglio pratica: stepper 4 passi, strip riepilogo, tab Pratica/Conferma/Fattura/Righe/Confronto | 2 | F0, F2-A1 | `ordine-fornitore-dettaglio.html` (intero: tab `tabs-crm`, check fase, subagente da interscambio, documenti per fase) | §7.3, §6.1, §5.8, §5.9, §5.10, §15.2.4 |
+| **F2-A1** Elenco pratiche (segmenti di stato con conteggi, filtri standard, segno delle variazioni) | 2 | F0 | `prototipo-alternativo/assets/viste-giorno.js` (Pratiche: segmenti con conteggi, filtri standard, DataTable) | §7.2, §8.1, §15.2.4 |
+| **F2-A2** Dettaglio pratica: binario delle fasi, schede *Riepilogo · Righe a confronto* con avviso delle variazioni, documenti affiancati | 2 | F0, F2-A1 | `prototipo-alternativo/assets/viste-giorno.js` (Pratica: binario delle fasi, schede *Riepilogo · Righe a confronto*, documenti affiancati) | §7.3, §6.1, §5.8, §5.9, §5.10, §15.2.4 |
 | **F2-A3** Documenti fiscali (fatture/NC, netto) + canale comune upload/validazione §6 | 2 | F0 | card "Documenti fiscali", modale NC (§6 canale: upload → coda → validazione → salvataggio) | §4.2.7.1, §5.3, §6, §8.1 (`/api/pratiche/:id/documenti`), §15.2.4 |
 
 - **Nota:** il confronto fasi non si salva: calcolato al volo da `F0-A5` sugli snapshot per fase (§4.2.8 `fase = ordine|conferma|fattura`).
@@ -169,8 +175,8 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
-| **F3-A1** Elenco bollettini + nuovo bollettino (mese/anno, dup-check) | 2 | F0 | `bollettini.html` (colonna Mese, select 12 mesi, `meseLabel`, filtri in card, `.table-box`) | §4.2.9, §5.6, §7.7, §15.2.5 |
-| **F3-A2** Dettaglio bollettino (righe, riconosciuto vs calcolato, stati, differenze) | 2 | F0, F3-A1 | `bollettino-dettaglio.html` (colonne, badge stato, nota §10, `.box-stabile`) | §4.2.10, §6.2, §7.7, §15.2.5 |
+| **F3-A1** Matrice dei bollettini (fornitore × 6 mesi, selettore a mesi, filtri standard) + caricamento (mese/anno, controllo doppioni) | 2 | F0 | `prototipo-alternativo/assets/viste-periodo.js` (Bollettini: matrice fornitore × 6 mesi, PeriodoMesi, filtri standard) | §4.2.9, §5.6, §7.7, §15.2.5 |
+| **F3-A2** Dettaglio bollettino (righe, riconosciuto vs calcolato, stati, differenze) | 2 | F0, F3-A1 | `prototipo-alternativo/assets/viste-periodo.js` (Bollettino: cerniera fornitore | nostro calcolo, decisioni, incassi) | §4.2.10, §6.2, §7.7, §15.2.5 |
 
 | **F3-A3** Incassi dei clienti: stato d'incasso della fattura, righe di storno e riaccredito (fatturato), riconoscimento al pagamento su fatture di mesi precedenti e *in attesa di incasso* (maturato), `giorni_incasso` nelle condizioni del fornitore, gruppo *Pagamenti da sollecitare* in Oggi con un testo per cliente, storni e riaccrediti nella liquidazione | 4 · **da approvare** | F3-A2, F4 | `prototipo-alternativo/assets/motore.js` (`statoIncasso`, `pagamentiDaSollecitare`, `trimestreLiquidazione`), `viste-periodo.js`, `viste-giorno.js` (`sollecitiPagamento`) | §5.5, §5.14, §6.2, §7.1, §7.7, §7.8, §15.2.5 |
 
@@ -181,8 +187,8 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
-| **F4-A1** Filtri (incl. **multifiltro fornitori**), KPI periodo, tab Riepilogo per subagente | 1 | F0 | `liquidazione.html` (dropdown checkbox "Tutti/Fornitori (n)/Nessun", `.table-box`, `tfoot` totale) | §7.8, §6.3, §15.2.6 |
-| **F4-A2** Tab Dettaglio rendiconto (13 colonne, contatore, `.table-box`) | 1 | F0, F4-A1 | `liquidazione.html` tab dettaglio | §7.8, §15.2.6 |
+| **F4-A1** Trimestri (riquadri dei periodi), elenco dei subagenti con totali che fa da filtro, chiusura del trimestre | 1 | F0 | `prototipo-alternativo/assets/viste-periodo.js` (Liquidazioni: trimestri, subagenti a sinistra, schede a destra) | §7.8, §6.3, §15.2.6 |
+| **F4-A2** Scheda *Documenti* (liquidabili e in attesa, storni e riaccrediti, contatore nella scheda) | 1 | F0, F4-A1 | `prototipo-alternativo/assets/viste-periodo.js` (scheda *Documenti*) | §7.8, §15.2.6 |
 | **F4-A3** Esportazione (§11): completa per subagente, un subagente, solo riepilogo; Excel curato con formule, PDF convertito dallo stesso Excel (LibreOffice), CSV di soli dati + trimestri | 4 (era 1: +3 h da approvare) | F4-A2 | `prototipo-alternativo/assets/esporta-liquidazione.js` | §11, §8.1 (`/api/liquidazione/export`), §15.2.6 |
 | **F4-A4** Report subagenti nel pannello della liquidazione (scheda accanto a *Documenti*): grafico e tabella per subagente con confronto sul trimestre prima; con un subagente scelto 3 numeri, trimestri dell'anno, primi clienti (Chart.js + react-chartjs-2), API `/api/liquidazione/report` | 2 · **da approvare** | F4-A1 | `prototipo-alternativo/assets/viste-periodo.js` (`reportSubagenti`), `motore.js` (`analisiTrimestre`), `componenti.js` (`Grafico`) | §7.8, §16.4, D-18 |
 | **F4-A5** Pagina **Analisi** (BI): vista `v_analisi_documenti` e API con aggregazioni sul server; periodo 3/6/12 mesi con PeriodoMesi, filtri fornitori/subagenti/clienti con campi di ricerca a selezione multipla (CampoRicerca `multipla`, D-20), filtro incrociato da grafici e righe, 4 numeri con periodo precedente, 4 grafici, tabella raggruppabile; esportazione Excel con grafici, PDF, CSV | 11 · **da approvare** | F4-A4, F4-A3 | `prototipo-alternativo/assets/viste-analisi.js`, `motore.js` (`fattiAnalisi`), `esporta-liquidazione.js` (`esportaModello`, blocco immagine) | §7.22, §11, §16.4, D-18, D-19 |
@@ -196,7 +202,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
-| **F5-A1** Dashboard: KPI, tab Segnalazioni (conferme scadute, bollettini da verificare, variazioni, NC) / Ordini, contatori, "Vedi tutti" | 1 | F0 (+ dati da F1–F4 per popolare) | `dashboard.html` (KPI invariati, `box-stabile`, `.table-box`) | §7.1, §5.12, §6.1 |
+| **F5-A1** Oggi: gruppi di lavoro (documenti, conferme in ritardo, bollettini, pagamenti da sollecitare), scadenze, ultime operazioni, contatori della barra | 1 | F0 (+ dati da F1–F4 per popolare) | `prototipo-alternativo/assets/viste-giorno.js` (Oggi: gruppi di lavoro, scadenze, ultime operazioni) | §7.1, §5.12, §6.1 |
 | **F5-A2** Schermata `/eventi` (filtri, dettaglio JSON in modale, export CSV, rotazione 36 mesi) | 1 | F0-A5 | — (nessuna schermata prototipo: nuova, stile identico alle liste) | §7.11, §8.1, §15.6, §15.7 |
 
 | **F5-A3** Ruoli e permessi: tabella `crm_ruoli_utente`, `requirePermesso()` su ogni rotta, interfaccia in sola lettura, barra per ruolo | 2 · **da approvare** | F0-A3 | `prototipo-alternativo/assets/motore.js` (`M.PERMESSI`), `componenti.js` (barra) | §8.3 |
@@ -255,7 +261,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 - **Perché prima del cosa**: prima di implementare o cambiare un comportamento leggere il motivo nel registro delle decisioni (spec §19); se il codice si discosta dalla specifica, motivo nella PR e nuova riga al §19; commento breve nel codice che rimanda alla decisione nei punti non ovvi.
 1. **Prima** leggere la sezione di specifica citata nell'attività + i file prototipo indicati. **Il prototipo vince** su ogni interpretazione stilistica.
-2. CSS: si usa `crm.css` così com'è; nuove regole solo se il prototipo le ha (altrimenti si replica il pattern più vicino e si segnala).
+2. CSS: si usa `stile.css` del prototipo ufficiale così com'è; nuove regole solo se il prototipo le ha (altrimenti si replica il pattern più vicino e si segnala).
 3. Testi: copiare le stringhe dal prototipo; niente sinonimi "migliori".
 4. Eventi: §15.2 per operazione, scrittura nel service layer (§15.3), mai dal client.
 5. Tabelle legacy: **solo lettura** (V2) salvo le scritture già previste dalla Gestione Ordini.
@@ -265,4 +271,4 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 ## 13. Riferimenti
 
 Specifica: `specifica-crm-provvigioni.md` v2.0 (§16, §6.5, §17) · Preventivo: `preventivo-crm-provvigioni.md` (89 h da svolgere, margine incluso) ·
-Prototipo sorgente: `prototipo-crm/` · Stile: `STILE-GUIDA-DECOBRANDS.md` · Seed: spec §12 · Eventi: spec §15
+Prototipo sorgente: `prototipo-alternativo/` (D-24; `prototipo-crm/` solo archivio) · Stile: `prototipo-alternativo/assets/stile.css` · Seed: spec §12 · Eventi: spec §15

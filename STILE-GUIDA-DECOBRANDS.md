@@ -1,5 +1,7 @@
 # STILE-GUIDA DECOBRANDS — Standard grafico e comportamentale
 
+> **Archivio per il CRM** (18/10/2026, D-24 della specifica): per il CRM il riferimento grafico è il prototipo ufficiale `prototipo-alternativo/` (`assets/stile.css`, Public Sans, niente Bootstrap). Questa guida resta valida per la Gestione Ordini e come storia del primo prototipo.
+
 > **Scopo:** documento unico di riferimento trasversale per tutti i progetti Decobrands che utilizzano lo stesso linguaggio visivo: **prototipo CRM** (`prototipo-crm/`) e **webapp Gestione Ordini** (`webapp/`). Raccoglie, senza tralasciare nulla, colori, tipografia, tabelle, badge, card, modali, toast, form, import, formattazione, icone, comportamento JavaScript, stati di caricamento e differenze tra i due progetti.
 >
 > **Fonti:** `prototipo-crm/assets/css/crm.css`, `prototipo-crm/assets/js/app.js`, `prototipo-crm/assets/js/data.js`, `prototipo-crm/*.html`, `webapp/views/_head.ejs`, `webapp/views/_foot.ejs`, `webapp/views/*.ejs` (tutte le view), `webapp/static/*.js` (tutti i moduli), `specifica-app-gestione-ordini.md` (v1.4.17), `specifica-crm-provvigioni.md` (v1.2).
