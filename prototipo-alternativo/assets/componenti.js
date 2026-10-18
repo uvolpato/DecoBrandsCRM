@@ -459,6 +459,76 @@
     };
   };
 
+  /* =========================================================
+     PeriodoMesi: scelta di un periodo di N mesi (es. 6) con mese e anno, come il selettore di
+     date del Portale Luis (pulsante "da → a" che apre un riquadro con scorciatoie a sinistra),
+     ma a mesi: si sceglie il mese d'inizio e il periodo si completa da solo a N mesi restando
+     dentro i mesi con dati (primo…ultimo). D-16 §19.
+     opz: { da: 'aaaa-mm', mesi: 6, primo: 'aaaa-mm', ultimo: 'aaaa-mm', onChange(da, a) }
+     → { el, valori() → { da, a } }
+     ========================================================= */
+  const MESI_BREVI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const mk = (a, m) => a + '-' + String(m).padStart(2, '0');
+  const mpiu = (k, n) => { const t = Number(k.slice(0, 4)) * 12 + Number(k.slice(5, 7)) - 1 + n; return mk(Math.floor(t / 12), t % 12 + 1); };
+  const metichetta = k => MESI_BREVI[Number(k.slice(5, 7)) - 1] + ' ' + k.slice(0, 4);
+  CRM.completaPeriodo = function (da, n, primo, ultimo) {
+    let a = mpiu(da, n - 1);
+    if (a > ultimo) { a = ultimo; da = mpiu(a, -(n - 1)); }
+    if (da < primo) { da = primo; a = mpiu(da, n - 1); if (a > ultimo) a = ultimo; }
+    return { da: da, a: a };
+  };
+  CRM.PeriodoMesi = function (host, opz) {
+    const n = opz.mesi || 6;
+    let cur = CRM.completaPeriodo(opz.da, n, opz.primo, opz.ultimo);
+    const rip = CRM.registra('periodo', () => cur.da);
+    if (rip && rip !== cur.da) { cur = CRM.completaPeriodo(rip, n, opz.primo, opz.ultimo); CRM.dopoDisegno(() => opz.onChange(cur.da, cur.a)); }
+    const box = el('div', 'periodo-mesi');
+    box.innerHTML = '<button type="button" class="periodo-btn" aria-haspopup="dialog" aria-expanded="false">' + CRM.icona('oggi') + '<span></span></button>' +
+      '<div class="periodo-pop" role="dialog" aria-label="Scegli il periodo" hidden></div>';
+    const btn = $('.periodo-btn', box), pop = $('.periodo-pop', box);
+    const testo = () => { $('span', btn).textContent = metichetta(cur.da) + ' → ' + metichetta(cur.a); };
+    testo();
+    let anno = Number(cur.da.slice(0, 4));
+    const scegli = da => { cur = CRM.completaPeriodo(da, n, opz.primo, opz.ultimo); testo(); chiudi(); opz.onChange(cur.da, cur.a); };
+    // scorciatoie: ultimi N mesi, semestri interi con dati
+    const scorciatoie = () => {
+      const out = [{ t: 'Ultimi ' + n + ' mesi', da: mpiu(opz.ultimo, -(n - 1)) }];
+      for (let y = Number(opz.ultimo.slice(0, 4)); y >= Number(opz.primo.slice(0, 4)); y--) {
+        if (mk(y, 12) <= opz.ultimo && mk(y, 7) >= opz.primo) out.push({ t: '2° semestre ' + y, da: mk(y, 7) });
+        if (mk(y, 6) <= opz.ultimo && mk(y, 1) >= opz.primo) out.push({ t: '1° semestre ' + y, da: mk(y, 1) });
+      }
+      return out.slice(0, 6);
+    };
+    function disegnaPop() {
+      const anteprima = k => { const p = CRM.completaPeriodo(k, n, opz.primo, opz.ultimo); return p; };
+      pop.innerHTML = '<div class="pm-scorciatoie">' + scorciatoie().map(x => '<button type="button" data-da="' + x.da + '"' + (x.da === cur.da ? ' class="attiva"' : '') + '>' + esc(x.t) + '</button>').join('') + '</div>' +
+        '<div class="pm-griglia"><div class="pm-anno"><button type="button" data-anno="-1" aria-label="Anno precedente"' + (anno <= Number(opz.primo.slice(0, 4)) ? ' disabled' : '') + '>‹</button><b>' + anno + '</b>' +
+        '<button type="button" data-anno="1" aria-label="Anno successivo"' + (anno >= Number(opz.ultimo.slice(0, 4)) ? ' disabled' : '') + '>›</button></div><div class="pm-mesi">' +
+        MESI_BREVI.map((m, i) => { const k = mk(anno, i + 1), fuori = k < opz.primo || k > opz.ultimo, dentro = k >= cur.da && k <= cur.a;
+          return '<button type="button" data-mese="' + k + '"' + (fuori ? ' disabled title="Nessun dato"' : '') + ' class="' + (dentro ? 'dentro' : '') + (k === cur.da || k === cur.a ? ' estremo' : '') + '">' + m + '</button>'; }).join('') +
+        '</div><p class="pm-nota">Scegli il mese d’inizio: il periodo si completa da solo a ' + n + ' mesi.</p></div>';
+      // anteprima al passaggio del mouse: mostra i mesi che verrebbero scelti
+      $$('[data-mese]', pop).forEach(b => b.addEventListener('mouseenter', () => {
+        const p = anteprima(b.dataset.mese); $('.pm-mesi', pop).classList.add('in-anteprima');
+        $$('[data-mese]', pop).forEach(x => x.classList.toggle('anteprima', x.dataset.mese >= p.da && x.dataset.mese <= p.a));
+      }));
+      $('.pm-mesi', pop).addEventListener('mouseleave', () => { $('.pm-mesi', pop).classList.remove('in-anteprima'); $$('[data-mese]', pop).forEach(x => x.classList.remove('anteprima')); });
+    }
+    pop.addEventListener('click', ev => {
+      const t = ev.target.closest('button'); if (!t || t.disabled) return;
+      if (t.dataset.anno) { anno += Number(t.dataset.anno); disegnaPop(); return; }
+      if (t.dataset.mese) scegli(t.dataset.mese);
+      if (t.dataset.da) scegli(t.dataset.da);
+    });
+    const fuori = ev => { if (!box.contains(ev.target)) chiudi(); };
+    const tasto = ev => { if (ev.key === 'Escape') { chiudi(); btn.focus(); } };
+    function apri() { anno = Number(cur.da.slice(0, 4)); disegnaPop(); pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); setTimeout(() => document.addEventListener('click', fuori)); document.addEventListener('keydown', tasto); }
+    function chiudi() { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', fuori); document.removeEventListener('keydown', tasto); }
+    btn.addEventListener('click', () => { if (pop.hidden) apri(); else chiudi(); });
+    ospite(host).appendChild(box);
+    return { el: box, valori: () => Object.assign({}, cur) };
+  };
+
   /* ---------- Nota (testo informativo) ---------- */
   CRM.Nota = function (host, html) { const n = el('p', 'nota', html); ospite(host).appendChild(n); return n; };
 

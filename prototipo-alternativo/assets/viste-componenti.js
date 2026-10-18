@@ -44,6 +44,9 @@
         { id: 'b', etichetta: 'Da controllare', conta: 2, contaVariante: 'attesa', disegna: c => CRM.Nota(c, 'Contenuto della seconda scheda.') },
         { id: 'c', etichetta: 'Errori', conta: 1, contaVariante: 'errore', disegna: c => CRM.Nota(c, 'Contenuto della terza scheda.') }
       ] }); } },
+    { nome: 'PeriodoMesi', gruppo: 'Dati', testo: 'Periodo di N mesi scelto con anno e griglia dei mesi, con scorciatoie a sinistra: si sceglie il mese d’inizio e il periodo si completa da solo dentro i mesi con dati. Usato nei Bollettini (sempre 6 mesi).',
+      firma: "CRM.PeriodoMesi(host, { da: 'aaaa-mm', mesi: 6, primo: 'aaaa-mm', ultimo: 'aaaa-mm', onChange(da, a) }) → { el, valori() }\nCRM.completaPeriodo(da, n, primo, ultimo) → { da, a }",
+      demo: h => { const r = CRM.el('p', 'nota', ''); CRM.PeriodoMesi(h, { da: '2026-04', mesi: 6, primo: '2026-01', ultimo: '2026-09', onChange: (da, a) => { r.textContent = 'Scelto: ' + da + ' → ' + a; } }); h.appendChild(r); } },
     { nome: 'FilterBar', gruppo: 'Dati', testo: 'Filtri sopra una tabella: segmenti con conteggio, ricerca, select. Chiama onChange con tutti i valori.',
       firma: 'CRM.FilterBar(host, { campi: [{ nome, tipo: segmenti|cerca|select, opzioni: [{ value, label, n }], valore, placeholder }], onChange(valori) }) → { el, valori() }',
       demo: h => {

@@ -8,45 +8,29 @@
   const ANNO = 2026;
 
   /* ---------- Bollettini: Matrice fornitore × mese ----------
-     Periodo scelto con "Da" e "A" (al massimo 6 mesi, D-14 §19: oltre la matrice non entra
-     in larghezza e le celle diventano illeggibili) e filtro sul fornitore. */
+     Sempre 6 mesi (D-14, D-16 §19): si sceglie il mese d'inizio con il selettore a mesi e il
+     periodo si completa da solo dentro i mesi con dati; filtro sul fornitore. */
   const MAX_MESI = 6;
   const chiave = (a, m) => a + '-' + String(m).padStart(2, '0');
   const daChiave = k => ({ a: Number(k.slice(0, 4)), m: Number(k.slice(5, 7)) });
   const piuMesi = (k, n) => { const x = daChiave(k), t = x.a * 12 + (x.m - 1) + n; return chiave(Math.floor(t / 12), t % 12 + 1); };
-  const distanza = (da, a) => { const x = daChiave(da), y = daChiave(a); return (y.a * 12 + y.m) - (x.a * 12 + x.m); };
   const meseOggi = () => M.oggi().slice(0, 7);
   const PRIMO = '2026-01';   // primo mese con dati nel CRM (nell'app: il mese del primo bollettino registrato)
   let filtroBoll = null;   // { da, a, f, vista } — iniziale: gli ultimi 5 mesi fino al mese in corso
   function vistaBollettini() {
-    if (!filtroBoll) filtroBoll = { da: piuMesi(meseOggi(), -4), a: meseOggi(), f: '', vista: 'tutti' };
+    if (!filtroBoll) filtroBoll = Object.assign(CRM.completaPeriodo(piuMesi(meseOggi(), -(MAX_MESI - 1)), MAX_MESI, PRIMO, meseOggi()), { f: '', vista: 'tutti' });
     const corpo = CRM.Pagina({ voce: 'bollettini', titolo: 'Bollettini',
       sottotitolo: 'Ogni mese ogni fornitore ci comunica le provvigioni che ci riconosce. Qui vedi quali sono arrivati e quali vanno ancora verificati.',
       azioni: [{ etichetta: 'Carica un bollettino', icona: 'carica', onClick: () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.caricaDocumenti(f, 'bollettino') }) }] });
-    const mesi = [];
-    for (let k = PRIMO; k <= meseOggi(); k = piuMesi(k, 1)) mesi.push(k);
-    const etichetta = k => { const x = daChiave(k); return M.mese(x.m, x.a); };
     const colonne = [];
     for (let k = filtroBoll.da; k <= filtroBoll.a; k = piuMesi(k, 1)) colonne.push(daChiave(k));
     const DA_FARE = ['da_verificare', 'pronto', 'mancante', 'contestato'];
     const daFare = f => colonne.some(c => DA_FARE.indexOf(M.casellaBollettino(f.id, c.a, c.m).tipo) >= 0);
     const fornitori = M.S.fornitori.filter(f => !filtroBoll.f || String(f.id) === filtroBoll.f).filter(f => filtroBoll.vista !== 'dafare' || daFare(f));
 
-    // barra: periodo (Da · A · ‹ ›), fornitore, solo chi ha qualcosa da fare
+    // barra: periodo di 6 mesi (selettore a mesi + mese prima/dopo), fornitore, solo chi ha qualcosa da fare
     const riga = CRM.blocco(corpo, 'barra-periodo');
-    CRM.FilterBar(riga, { campi: [
-      { nome: 'da', tipo: 'select', etichetta: 'Da', valore: filtroBoll.da, opzioni: mesi.map(k => ({ value: k, label: etichetta(k) })) },
-      { nome: 'a', tipo: 'select', etichetta: 'A', valore: filtroBoll.a, opzioni: mesi.map(k => ({ value: k, label: etichetta(k) })) },
-      { nome: 'f', tipo: 'select', etichetta: 'Fornitore', valore: filtroBoll.f, opzioni: [{ value: '', label: 'Tutti i fornitori' }].concat(M.S.fornitori.map(f => ({ value: String(f.id), label: f.breve }))) },
-      { nome: 'vista', tipo: 'segmenti', valore: filtroBoll.vista, opzioni: [{ value: 'tutti', label: 'Tutti', n: M.S.fornitori.length }, { value: 'dafare', label: 'Con qualcosa da fare', n: M.S.fornitori.filter(daFare).length }] }
-    ], onChange: v => {
-      let { da, a } = v, avviso = '';
-      if (da !== filtroBoll.da && (a < da || distanza(da, a) >= MAX_MESI)) { a = piuMesi(da, MAX_MESI - 1); if (a > meseOggi()) a = meseOggi(); avviso = 'Al massimo 6 mesi: “A” spostato a ' + etichetta(a); }
-      else if (a !== filtroBoll.a && (a < da || distanza(da, a) >= MAX_MESI)) { da = piuMesi(a, -(MAX_MESI - 1)); if (da < PRIMO) da = PRIMO; avviso = 'Al massimo 6 mesi: “Da” spostato a ' + etichetta(da); }
-      filtroBoll = { da: da, a: a, f: v.f, vista: v.vista };
-      vistaBollettini();
-      if (avviso) CRM.Avviso(avviso);
-    } });
+    CRM.PeriodoMesi(riga, { da: filtroBoll.da, mesi: MAX_MESI, primo: PRIMO, ultimo: meseOggi(), onChange: (da, a) => { filtroBoll = Object.assign({}, filtroBoll, { da: da, a: a }); vistaBollettini(); } });
     const nav = CRM.blocco(riga, 'sposta-periodo');
     const btn = (testo, tit, n) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.textContent = testo; b.title = tit;
@@ -55,8 +39,12 @@
       b.addEventListener('click', () => { filtroBoll = Object.assign({}, filtroBoll, { da: da, a: a }); vistaBollettini(); });
       nav.appendChild(b);
     };
-    btn('‹ Mese prima', 'Sposta il periodo di un mese indietro', -1);
-    btn('Mese dopo ›', 'Sposta il periodo di un mese avanti', 1);
+    btn('‹', 'Sposta il periodo di un mese indietro', -1);
+    btn('›', 'Sposta il periodo di un mese avanti', 1);
+    CRM.FilterBar(riga, { campi: [
+      { nome: 'f', tipo: 'select', etichetta: 'Fornitore', valore: filtroBoll.f, opzioni: [{ value: '', label: 'Tutti i fornitori' }].concat(M.S.fornitori.map(f => ({ value: String(f.id), label: f.breve }))) },
+      { nome: 'vista', tipo: 'segmenti', valore: filtroBoll.vista, opzioni: [{ value: 'tutti', label: 'Tutti', n: M.S.fornitori.length }, { value: 'dafare', label: 'Con qualcosa da fare', n: M.S.fornitori.filter(daFare).length }] }
+    ], onChange: v => { filtroBoll = Object.assign({}, filtroBoll, { f: v.f, vista: v.vista }); vistaBollettini(); } });
 
     const imp = b => M.euro(b.righe.reduce((s, r) => s + r.importo, 0));
     if (!fornitori.length) { CRM.Pannello(corpo, {}).corpo.innerHTML = '<div class="vuoto"><b>Nessun fornitore con qualcosa da fare in questo periodo</b>Scegli “Tutti” o cambia i mesi.</div>'; return; }

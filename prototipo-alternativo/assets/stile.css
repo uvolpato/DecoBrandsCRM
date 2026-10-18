@@ -754,3 +754,31 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .barra-periodo .filtri { margin: 0; }
 .filtro-etichetta { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--testo-tenue); }
 .sposta-periodo { display: inline-flex; gap: 6px; margin-left: auto; }
+
+/* ---------- PeriodoMesi ---------- */
+.periodo-mesi { position: relative; }
+.periodo-btn { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--bordo); border-radius: var(--r-medio); background: var(--superficie); font: inherit; font-size: 14px; color: var(--testo); cursor: pointer; font-variant-numeric: tabular-nums; }
+.periodo-btn:hover { border-color: var(--primario); }
+.periodo-btn .icona { width: 16px; height: 16px; color: var(--testo-tenue); }
+.periodo-pop { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; display: flex; gap: 0; background: var(--superficie); border: 1px solid var(--bordo); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.16); }
+.periodo-pop[hidden] { display: none; }
+.pm-scorciatoie { display: flex; flex-direction: column; padding: 10px; gap: 2px; border-right: 1px solid var(--bordo-tenue); min-width: 160px; }
+.pm-scorciatoie button { text-align: left; padding: 7px 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13.5px; cursor: pointer; color: var(--testo); }
+.pm-scorciatoie button:hover { background: var(--sfondo); }
+.pm-scorciatoie button.attiva { background: var(--primario-tenue); color: var(--primario); font-weight: 600; }
+.pm-griglia { padding: 12px 14px; width: 270px; }
+.pm-anno { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.pm-anno b { font-size: 15px; }
+.pm-anno button { width: 30px; height: 30px; border: 1px solid var(--bordo); border-radius: 6px; background: none; cursor: pointer; font-size: 16px; }
+.pm-anno button:disabled { opacity: .35; cursor: default; }
+.pm-mesi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.pm-mesi button { padding: 9px 0; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 14px; cursor: pointer; color: var(--testo); }
+.pm-mesi button:hover:not(:disabled) { outline: 1px solid var(--primario); }
+.pm-mesi button.dentro, .pm-mesi button.anteprima { background: var(--primario-tenue); }
+.pm-mesi button.estremo { background: var(--primario); color: #fff; font-weight: 600; }
+.pm-mesi button:disabled { color: var(--testo-tenue); opacity: .45; cursor: default; }
+.pm-nota { margin: 10px 0 0; font-size: 12px; color: var(--testo-tenue); }
+.sposta-periodo { margin-left: 0; }
+.barra-periodo .filtri { margin-left: auto; }
+.pm-mesi.in-anteprima button.dentro:not(.anteprima), .pm-mesi.in-anteprima button.estremo:not(.anteprima) { background: none; color: var(--testo); font-weight: 400; }
+.pm-mesi.in-anteprima button.anteprima { background: var(--primario-tenue); color: var(--primario); }

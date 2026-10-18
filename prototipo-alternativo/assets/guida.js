@@ -142,8 +142,8 @@
       ],
       pulsanti: [
         ['Carica un bollettino', 'In testata: carica il file del bollettino.'],
-        ['Da · A', 'Scelgono i mesi da vedere, al massimo 6: se ne scegli di più, l’altro estremo si sposta da solo e un avviso lo dice.'],
-        ['‹ Mese prima · Mese dopo ›', 'Spostano tutto il periodo di un mese.'],
+        ['apr 2026 → set 2026', 'Il periodo: sempre 6 mesi. Clic: a sinistra le scorciatoie (Ultimi 6 mesi, semestri), a destra l’anno e i mesi; scegli il mese d’inizio e il periodo si completa da solo (passando col mouse vedi quali mesi prende).'],
+        ['‹ · ›', 'Spostano tutto il periodo di un mese.'],
         ['Fornitore', 'Mostra un solo fornitore.'],
         ['Tutti · Con qualcosa da fare', 'Solo i fornitori con un bollettino da decidere, pronto, contestato o non arrivato nel periodo.'],
         ['Cella della matrice', 'Fornitore × mese: verificato, da decidere, pronto, atteso, non arrivato. Clic apre il bollettino.'],
