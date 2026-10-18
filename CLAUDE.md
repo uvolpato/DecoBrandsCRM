@@ -46,6 +46,8 @@ cliente).
 | `specifica-crm-provvigioni.md` §19 | **Registro delle decisioni D-01…**: cosa si è deciso e **perché** |
 | `piano-lavoro-crm.md` | Fasi e attività (ore, dipendenze, file del prototipo da replicare); le ore fuori preventivo sono segnate **da approvare** |
 | `PRD-crm-provvigioni.md` | PRD unico: problema, utenti, misure, storie con criteri, fuori ambito, rischi, domande e incoerenze fra i documenti (sintesi; vince la spec) |
+| `specifica-automazione-llm.md` | Specifica tecnica della fase LLM e agenti in locale (A1–A8, `suggerimenti`, ombra → attivazione, V12) |
+| `PRD-supporto-decisioni-llm.md` | PRD della fase successiva: modelli linguistici e agenti in locale (proposte con probabilità, in ombra prima, V12) |
 | `preventivo-crm-provvigioni.md` | Preventivo |
 | `ANALISI_CRM_PROVVIGIONI.md` | Analisi iniziale |
 | `idee-supporto-decisioni.md` | Idee sul supporto alle decisioni con modelli linguistici (fase successiva, spec §18) |

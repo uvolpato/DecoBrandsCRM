@@ -2901,6 +2901,8 @@ riceve la provvigione; in vendita diretta Decobrands compra dal fornitore e fatt
 
 ## 18. Fase successiva: supporto alle decisioni e all'analisi con modelli
 
+> Dettaglio: PRD `PRD-supporto-decisioni-llm.md` e specifica tecnica `specifica-automazione-llm.md` (architettura, dati, funzioni A1–A8, ombra e attivazione, API, sicurezza, prove, piano indicativo 46 h).
+
 **Non in questa fase** e fuori dal preventivo: raccolta di idee e strumenti da valutare
 dopo la messa in esercizio, con una prova misurata prima di ogni adozione.
 
