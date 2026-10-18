@@ -268,7 +268,7 @@
       const titolo = () => subSel ? M.subagente(Number(subSel)).nome : 'Tutti i subagenti';
       const pan = CRM.Pannello(col, { titolo: titolo(), riempi: true, senzaMargine: true,
         nota: 'Totale da liquidare <b>' + M.euro(totLiq) + '</b>' + (inAttesa.length ? ' · ' + inAttesa.length + ' documenti in attesa · <a href="#/bollettini">vai ai bollettini</a>' : ''),
-        azioni: [{ etichetta: 'Analisi completa', icona: 'analisi', onClick: () => CRM.apriAnalisi({ s: subSel || '', n: 3, da: M.limiti(a, t).da.slice(0, 7) }) }] });
+        azioni: [{ etichetta: 'Analisi completa', icona: 'analisi', onClick: () => CRM.apriAnalisi({ s: subSel ? [subSel] : [], n: 3, da: M.limiti(a, t).da.slice(0, 7) }) }] });
       let tab = null;
       const sk = CRM.Schede(pan.corpo, { riempi: true, schede: [
         { id: 'documenti', etichetta: 'Documenti', conta: filtra().length, contaVariante: inAttesa.length ? 'attesa' : 'neutro', disegna: h => documenti(h) },
@@ -345,7 +345,7 @@
       CRM.Nota(box, 'Numeri del trimestre di liquidazione. Altri periodi, confronti ed esportazione: <a href="#/analisi" data-analisi>Analisi completa di ' + e(M.subagente(Number(sub)).nome) + '</a>.');
     }
     const ln = CRM.$('[data-analisi]', box);
-    if (ln) ln.addEventListener('click', ev => { ev.preventDefault(); CRM.apriAnalisi({ s: sub || '', n: 3, da: M.limiti(a, t).da.slice(0, 7) }); });
+    if (ln) ln.addEventListener('click', ev => { ev.preventDefault(); CRM.apriAnalisi({ s: sub ? [String(sub)] : [], n: 3, da: M.limiti(a, t).da.slice(0, 7) }); });
   }
   /* Esporta in Excel: tutto il trimestre (riepilogo + un foglio per subagente), un solo subagente, o solo il riepilogo. */
   let formatoEsporta = 'xlsx';

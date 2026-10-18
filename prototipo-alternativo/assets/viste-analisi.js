@@ -21,7 +21,7 @@
   const corto = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
 
   /* Stato della pagina (resta per la sessione): periodo, durata, filtri, raggruppamento della tabella */
-  const BI = { da: null, n: 12, f: '', s: '', c: '', per: 'subagente' };
+  const BI = { da: null, n: 12, f: [], s: [], c: [], per: 'subagente' };   // f, s, c: elenchi di chiavi (selezione multipla, D-20)
   const DIM = {
     f: { campo: 'fornitore_id', nome: 'fornitore', etichetta: 'Fornitore', plurale: 'fornitori' },
     s: { campo: 'subagente_id', nome: 'subagente', etichetta: 'Subagente', plurale: 'subagenti' },
@@ -30,7 +30,8 @@
   /* Apertura da altre pagine (es. Liquidazioni → Report subagenti): filtri e periodo già impostati */
   CRM.apriAnalisi = function (o) {
     o = o || {};
-    Object.assign(BI, { f: '', s: '', c: '' }, o);
+    Object.assign(BI, { f: [], s: [], c: [] }, o);
+    ['f', 's', 'c'].forEach(d => { if (!Array.isArray(BI[d])) BI[d] = BI[d] ? [String(BI[d])] : []; });
     if (o.n && !o.da) BI.da = null;   // periodo che finisce con l'ultimo mese con dati
     if (location.hash === '#/analisi') vista(); else location.hash = '#/analisi';
   };
@@ -45,8 +46,10 @@
     return Array.from(m.values()).map(g => Object.assign({ chiave: g.chiave, nome: g.nome }, somma(g.rr)));
   };
   // filtri attivi, tranne quello della dimensione indicata (filtro incrociato dei grafici)
-  const filtra = (rr, salvo) => rr.filter(x => Object.keys(DIM).every(d => d === salvo || !BI[d] || String(x[DIM[d].campo]) === BI[d]));
-  const nomeFiltro = (d, fatti) => { const x = fatti.find(r => String(r[DIM[d].campo]) === BI[d]); return x ? x[DIM[d].nome] : BI[d]; };
+  const filtra = (rr, salvo) => rr.filter(x => Object.keys(DIM).every(d => d === salvo || !BI[d].length || BI[d].indexOf(String(x[DIM[d].campo])) >= 0));
+  // nomi delle voci scelte in un filtro (per i testi dell'esportazione)
+  const nomeFiltro = (d, fatti) => BI[d].map(k => { const x = fatti.find(r => String(r[DIM[d].campo]) === k); return x ? x[DIM[d].nome] : k; }).join(', ');
+  const ENT = { f: 'fornitore', s: 'subagente', c: 'cliente' };
 
   CRM.rotta(/^\/analisi$/, vista);
   function vista() {
@@ -65,7 +68,7 @@
     const sel = filtra(base), tot = somma(sel), totPrec = somma(filtra(basePrec));
     const conPrec = basePrec.length > 0;
     const etPrec = lung === 12 ? 'sullo stesso periodo dell’anno prima' : 'sui ' + lung + ' mesi prima';
-    const filtriAttivi = Object.keys(DIM).filter(d => BI[d]);
+    const filtriAttivi = Object.keys(DIM).filter(d => BI[d].length);
 
     const grafici = {};
     const corpo = CRM.Pagina({
@@ -84,28 +87,23 @@
       b.addEventListener('click', () => { BI.da = piu(per.da, x[2]); vista(); });
       nav.appendChild(b);
     });
-    const opzioni = d => {
-      const g = raggruppa(filtra(base, d), DIM[d].campo, DIM[d].nome).sort((x, y) => x.nome.localeCompare(y.nome));
-      if (BI[d] && !g.some(x => x.chiave === BI[d])) g.unshift({ chiave: BI[d], nome: nomeFiltro(d, fatti) });
-      return [{ value: '', label: 'Tutti i ' + DIM[d].plurale }].concat(g.map(x => ({ value: x.chiave, label: x.nome })));
-    };
     CRM.FilterBar(riga, { campi: [
-      { nome: 'n', tipo: 'segmenti', valore: String(BI.n), opzioni: [{ value: '3', label: '3 mesi' }, { value: '6', label: '6 mesi' }, { value: '12', label: '12 mesi' }] },
-      { nome: 'f', tipo: 'select', etichetta: 'Fornitore', valore: BI.f, opzioni: opzioni('f') },
-      { nome: 's', tipo: 'select', etichetta: 'Subagente', valore: BI.s, opzioni: opzioni('s') },
-      { nome: 'c', tipo: 'select', etichetta: 'Cliente', valore: BI.c, opzioni: opzioni('c') }
+      { nome: 'n', tipo: 'segmenti', valore: String(BI.n), opzioni: [{ value: '3', label: '3 mesi' }, { value: '6', label: '6 mesi' }, { value: '12', label: '12 mesi' }] }
     ], onChange: v => {
       // cambiando durata il periodo finisce nello stesso mese di prima
-      if (Number(v.n) !== BI.n) { BI.da = piu(per.a, -(Number(v.n) - 1)); BI.n = Number(v.n); }
-      Object.assign(BI, { f: v.f, s: v.s, c: v.c }); vista();
+      if (Number(v.n) !== BI.n) { BI.da = piu(per.a, -(Number(v.n) - 1)); BI.n = Number(v.n); vista(); }
     } });
+    // fornitori, subagenti, clienti: campi di ricerca a selezione multipla (stesso componente della
+    // ricerca articoli); il menu propone solo le voci con documenti nel periodo e compatibili con gli altri filtri
+    const rigaFiltri = CRM.blocco(corpo, 'filtri-bi');
+    const presenti = d => raggruppa(filtra(base, d), DIM[d].campo, DIM[d].nome).map(x => x.chiave);
+    CRM.FilterBar(rigaFiltri, { campi: ['f', 's', 'c'].map(d => ({ nome: d, tipo: 'ricerca', entita: ENT[d], multipla: true, etichetta: DIM[d].etichetta, valore: BI[d],
+      placeholder: 'Tutti i ' + DIM[d].plurale, contesto: { limita: presenti(d), tutti: true } })),
+      onChange: v => { Object.assign(BI, { f: v.f, s: v.s, c: v.c }); vista(); } });
     if (filtriAttivi.length) {
-      const ch = CRM.blocco(corpo, 'filtri-attivi');
-      ch.innerHTML = '<span class="testo-tenue">Filtri:</span>' + filtriAttivi.map(d => '<button type="button" class="chip-filtro" data-d="' + d + '" title="Togli il filtro">' +
-        e(DIM[d].etichetta) + ': <b>' + e(nomeFiltro(d, fatti)) + '</b>' + CRM.icona('chiudi') + '</button>').join('') +
-        (filtriAttivi.length > 1 ? '<button type="button" class="link-azzera">Togli tutti i filtri</button>' : '');
-      CRM.$$('[data-d]', ch).forEach(b => b.addEventListener('click', () => { BI[b.dataset.d] = ''; vista(); }));
-      const az = CRM.$('.link-azzera', ch); if (az) az.addEventListener('click', () => { BI.f = BI.s = BI.c = ''; vista(); });
+      const az = CRM.el('button', 'link-azzera', 'Togli tutti i filtri'); az.type = 'button';
+      az.addEventListener('click', () => { BI.f = []; BI.s = []; BI.c = []; vista(); });
+      rigaFiltri.appendChild(az);
     }
 
     /* ---------- Numeri ---------- */
@@ -137,28 +135,29 @@
       ] }) };
     // grafico per dimensione: ignora il proprio filtro, evidenzia la voce scelta; clic = filtro (di nuovo = toglie)
     const perDim = (d, ord) => raggruppa(filtra(base, d), DIM[d].campo, DIM[d].nome).sort(ord || ((x, y) => y.fatturato - x.fatturato));
-    const scegli = (d, chiave) => { BI[d] = BI[d] === chiave ? '' : chiave; vista(); };
+    const scegli = (d, chiave) => { const i = BI[d].indexOf(chiave); if (i >= 0) BI[d].splice(i, 1); else BI[d].push(chiave); vista(); };
+    const indici = (d, voci) => voci.map((x, i) => BI[d].indexOf(x.chiave) >= 0 ? i : -1).filter(i => i >= 0);
     // 2. fatturato per fornitore (i primi 7, gli altri insieme)
     const fo = perDim('f'), foV = fo.slice(0, fo.length <= 8 ? 8 : 7), foA = fo.slice(foV.length);
-    const p2 = CRM.Pannello(griglia, { titolo: 'Fatturato per fornitore', nota: BI.f ? 'clic di nuovo per togliere il filtro' : 'clic per filtrare' });
+    const p2 = CRM.Pannello(griglia, { titolo: 'Fatturato per fornitore', nota: BI.f.length ? 'clic su una voce scelta per toglierla' : 'clic per filtrare' });
     const etFo = foV.map(x => x.nome).concat(foA.length ? ['Altri ' + foA.length] : []);
-    const ixF = foV.findIndex(x => x.chiave === BI.f);
+    const ixF = indici('f', foV).concat(foA.some(x => BI.f.indexOf(x.chiave) >= 0) ? [etFo.length - 1] : []);
     grafici.fornitori = { titolo: 'Fatturato per fornitore', g: CRM.Grafico(p2.corpo, { tipo: 'doughnut', titolo: 'Distribuzione del fatturato per fornitore', altezza: 260, etichette: etFo,
-      evidenzia: BI.f ? (ixF >= 0 ? ixF : etFo.length - 1) : null,
+      evidenzia: BI.f.length ? ixF : null,
       serie: [{ nome: 'Fatturato', valori: foV.map(x => x.fatturato).concat(foA.length ? [M.r2(foA.reduce((s, x) => s + x.fatturato, 0))] : []), colore: ['#0d6efd', '#6ea8fe', '#198754', '#75b798', '#ffc107', '#ffda6a', '#6f42c1', '#adb5bd'] }],
       onClick: i => { if (foV[i]) scegli('f', foV[i].chiave); } }) };
     // 3. subagenti: provvigioni generate dai loro clienti, divise fra subagente e Decobrands
     const su = perDim('s', (x, y) => y.prese - x.prese);
     const p3 = CRM.Pannello(griglia, { titolo: 'Subagenti', nota: 'provvigioni generate dai loro clienti' });
     grafici.subagenti = { titolo: 'Provvigioni generate per subagente', g: CRM.Grafico(p3.corpo, { tipo: 'bar', orizzontale: true, impilato: true, titolo: 'Provvigioni generate per subagente', altezza: Math.max(170, 34 * su.length + 70),
-      etichette: su.map(x => x.nome), evidenzia: BI.s ? su.findIndex(x => x.chiave === BI.s) : null,
+      etichette: su.map(x => x.nome), evidenzia: BI.s.length ? indici('s', su) : null,
       serie: [{ nome: 'Al subagente', valori: su.map(x => x.pagate), colore: C().neutro }, { nome: 'Margine Decobrands', valori: su.map(x => x.margine), colore: C().ok }],
       onClick: i => scegli('s', su[i].chiave) }) };
     // 4. i 10 clienti con più fatturato
     const cl = perDim('c').slice(0, 10);
     const p4 = CRM.Pannello(griglia, { titolo: 'Primi 10 clienti', nota: 'per fatturato' });
     grafici.clienti = { titolo: 'Primi 10 clienti per fatturato', g: CRM.Grafico(p4.corpo, { tipo: 'bar', orizzontale: true, titolo: 'Primi 10 clienti per fatturato', altezza: Math.max(170, 30 * cl.length + 50),
-      etichette: cl.map(x => corto(x.nome, 26)), evidenzia: BI.c ? cl.findIndex(x => x.chiave === BI.c) : null,
+      etichette: cl.map(x => corto(x.nome, 26)), evidenzia: BI.c.length ? indici('c', cl) : null,
       serie: [{ nome: 'Fatturato', valori: cl.map(x => x.fatturato), colore: C().primario }],
       onClick: i => scegli('c', cl[i].chiave) }) };
 
@@ -191,9 +190,9 @@
         : raggruppa(sel, DIM[d].campo, DIM[d].nome);
       righe.forEach(x => { x.quota = tot.fatturato ? M.r2(100 * x.fatturato / tot.fatturato) : 0; });
       CRM.DataTable(host, { naturale: true, righe: righe, ordinamentoIniziale: BI.per === 'mese' ? { key: 'chiave', dir: 'asc' } : { key: 'fatturato', dir: 'desc' }, etichettaTotale: 'Totale',
-        rowClass: x => d && BI[d] === x.chiave ? 'selezionata' : '',
+        rowClass: x => d && BI[d].indexOf(x.chiave) >= 0 ? 'selezionata' : '',
         onRowClick: d ? (x => scegli(d, x.chiave)) : null,
-        piede: d ? 'Clic su una riga per filtrare la pagina, di nuovo per togliere il filtro.' : '',
+        piede: d ? 'Clic su una riga per aggiungerla al filtro, di nuovo per toglierla.' : '',
         colonne: [
           { key: BI.per === 'mese' ? 'chiave' : 'nome', header: RAGGR[BI.per][1], grow: true, cell: x => '<b>' + e(x.nome) + '</b><span class="sec-riga">' + x.documenti + (x.documenti === 1 ? ' fattura' : ' fatture') + (BI.per !== 'cliente' ? ' · ' + x.clienti + (x.clienti === 1 ? ' cliente' : ' clienti') : '') + '</span>' },
           { key: 'fatturato', header: 'Fatturato', tipo: 'euro', totale: 'somma' },

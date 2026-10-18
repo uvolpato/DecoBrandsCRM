@@ -180,7 +180,7 @@
   function campoHtml(c) {
     const id = 'c-' + c.nome;
     let ctl;
-    if (c.tipo === 'ricerca') ctl = CRM.campoRicercaHtml({ nome: c.nome, entita: c.entita, valore: c.valore, id: id, placeholder: c.placeholder });
+    if (c.tipo === 'ricerca') ctl = CRM.campoRicercaHtml({ nome: c.nome, entita: c.entita, valore: c.valore, multipla: c.multipla, valori: c.valori, id: id, placeholder: c.placeholder });
     else if (c.tipo === 'select') ctl = '<select id="' + id + '" name="' + c.nome + '">' + c.opzioni.map(o => '<option value="' + esc(o.value) + '"' + (String(o.value) === String(c.valore) ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>';
     else if (c.tipo === 'area') ctl = '<textarea id="' + id + '" name="' + c.nome + '" rows="' + (c.righe || 3) + '">' + esc(c.valore || '') + '</textarea>';
     else ctl = '<input id="' + id + '" name="' + c.nome + '" type="' + ({ numero: 'number', data: 'date' }[c.tipo] || 'text') + '"' + (c.passo ? ' step="' + c.passo + '"' : '') +
@@ -196,7 +196,7 @@
     CRM.attivaRicerche(f, opz.contesto);
     return {
       el: f,
-      valori: () => { const v = {}; $$('[name]', f).forEach(x => { v[x.name] = x.value.trim(); }); return v; },
+      valori: () => { const v = {}; $$('[name]', f).forEach(x => { v[x.name] = x.closest('.ricerca.multipla') ? leggiScelte(x) : x.value.trim(); }); return v; },   // ricerca multipla: elenco di chiavi
       campo: n => f.elements[n],
       aiuto: (n, html, errore) => { const a = $('[data-aiuto="' + n + '"]', f); a.innerHTML = html || ''; a.hidden = !html; a.classList.toggle('errore', !!errore); },
       errore: t => { const p = $('.modulo-errore', f); p.textContent = t || ''; p.hidden = !t; }
@@ -219,16 +219,50 @@
      CRM.attivaRicerche(contenitore, contesto()) attiva i campi presenti (eventi delegati):
        alla scelta aggiorna il valore nascosto, emette 'change' e l'evento 'ricerca-scelta' { campo, voce }
      CRM.RicercaEntita({ entita, contesto, testo, onScelta(voce) }) → maschera di ricerca completa
+     Selezione SINGOLA (predefinita) o MULTIPLA (multipla: true, D-20 §19):
+       - campoRicercaHtml({ ..., multipla: true, valori: [chiavi] }): le voci scelte sono etichette
+         dentro il campo (× per toglierne una, Backspace a campo vuoto toglie l'ultima); il menu
+         segna con ✓ le voci già scelte e Invio/clic le aggiunge o le toglie; niente valori liberi
+         (niente pallino); il valore nascosto è un elenco JSON di chiavi
+       - RicercaEntita({ ..., multipla: true, scelte: [chiavi], onScelta(voci[]) }): colonna di
+         caselle, "Scegli tutte le righe filtrate", "Togli tutte", pulsante Applica (n)
+       - contesto.limita: [chiavi] restringe le voci (es. solo quelle con dati nel periodo);
+         contesto.tutti: anche le voci non attive (es. subagenti cessati, nelle analisi)
+     CRM.CampoRicerca(host, { entita, multipla, valore | valori, contesto, placeholder, onChange(valore | valori) })
+       → { el, valore() }: il campo già attivo, da usare fuori dai moduli (filtri, barre)
      ========================================================= */
   const ENTITA = CRM.ENTITA = {};
   CRM.Entita = (nome, def) => { ENTITA[nome] = def; };
+  // voci dell'entità nel contesto, ristrette a contesto.limita se c'è
+  const vociDi = (ent, ctx) => {
+    const v = ent.voci(ctx || {});
+    if (!ctx || !ctx.limita) return v;
+    const k = new Set(ctx.limita.map(String));
+    return v.filter(r => k.has(String(ent.chiave(r))));
+  };
+  const leggiScelte = h => { try { return (JSON.parse(h.value || '[]') || []).map(String); } catch (e) { return []; } };
+  // etichette delle voci scelte (cercate senza limita: una voce scelta resta visibile anche se esce dal periodo)
+  const scelteHtml = (ent, ctx, chiavi) => {
+    const tutte = ent.voci(Object.assign({}, ctx, { limita: null }));
+    return chiavi.map(k => { const r = tutte.find(x => String(ent.chiave(x)) === k); const t = r ? ent.testo(r) : k;
+      return '<span class="scelta" data-k="' + esc(k) + '">' + esc(t) + '<button type="button" class="scelta-togli" aria-label="Togli ' + esc(t) + '" title="Togli">' + CRM.icona('chiudi') + '</button></span>'; }).join('');
+  };
   const trovaVoce = (ent, ctx, valore) => {
     if (valore == null || valore === '') return null;
-    const v = String(valore).toLowerCase(), voci = ent.voci(ctx);
+    const v = String(valore).toLowerCase(), voci = vociDi(ent, ctx);
     return voci.find(r => String(ent.chiave(r)).toLowerCase() === v) || voci.find(r => String(ent.testo(r)).toLowerCase() === v) || null;
   };
   CRM.campoRicercaHtml = function (o) {
     const ent = ENTITA[o.entita];
+    if (o.multipla) {
+      const chiavi = (o.valori || []).map(String);
+      return '<div class="ricerca multipla" data-entita="' + o.entita + '" data-multipla="1">' +
+        '<div class="ricerca-scelte">' + scelteHtml(ent, o.contesto || {}, chiavi) +
+        '<input class="ricerca-testo"' + (o.id ? ' id="' + o.id + '"' : '') + ' type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-label="' + esc(o.etichetta || 'Cerca ' + ent.titolo.toLowerCase()) + '" placeholder="' + esc(chiavi.length ? '' : (o.placeholder || 'Scrivi per cercare')) + '" data-vuoto="' + esc(o.placeholder || 'Scrivi per cercare') + '"></div>' +
+        '<input type="hidden"' + (o.nome ? ' name="' + o.nome + '"' : '') + (o.campo ? ' data-campo="' + o.campo + '"' : '') + ' value="' + esc(JSON.stringify(chiavi)) + '">' +
+        '<button type="button" class="ricerca-lente" title="Apri la ricerca di ' + esc(ent.titolo.toLowerCase()) + ' (F4): scelta di più voci" aria-label="Apri la ricerca">' + CRM.icona('cerca') + '</button>' +
+        '<ul class="ricerca-menu" role="listbox" aria-multiselectable="true" hidden></ul></div>';
+    }
     const voce = trovaVoce(ent, o.contesto || {}, o.valore);  // contesto: restringe le voci (es. fornitore)
     const testo = voce ? ent.testo(voce) : (o.valore == null ? '' : o.valore);
     return '<div class="ricerca" data-entita="' + o.entita + '">' +
@@ -241,10 +275,26 @@
   CRM.attivaRicerche = function (cont, contesto) {
     if (!cont || cont._ricerche) return; cont._ricerche = true;
     const ctx = () => (contesto ? contesto() : {}) || {};
-    const parti = box => ({ ent: ENTITA[box.dataset.entita], testo: $('.ricerca-testo', box), nascosto: $('input[type=hidden]', box), menu: $('.ricerca-menu', box), pallino: $('.pallino', box) });
+    const parti = box => ({ ent: ENTITA[box.dataset.entita], testo: $('.ricerca-testo', box), nascosto: $('input[type=hidden]', box), menu: $('.ricerca-menu', box), pallino: $('.pallino', box), multi: box.dataset.multipla === '1' });
+    // selezione multipla: aggiunge o toglie una voce, ridisegna le etichette, emette 'change'
+    const scriviScelte = (box, chiavi) => {
+      const p = parti(box);
+      p.nascosto.value = JSON.stringify(chiavi);
+      $$('.scelta', box).forEach(x => x.remove());
+      p.testo.insertAdjacentHTML('beforebegin', scelteHtml(p.ent, ctx(), chiavi));
+      p.testo.placeholder = chiavi.length ? '' : p.testo.dataset.vuoto;
+      p.nascosto.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const alterna = (box, voce) => {
+      const p = parti(box), k = String(p.ent.chiave(voce)), ch = leggiScelte(p.nascosto);
+      const i = ch.indexOf(k); if (i >= 0) ch.splice(i, 1); else ch.push(k);
+      p.testo.value = ''; chiudiMenu(box); scriviScelte(box, ch);
+      box.dispatchEvent(new CustomEvent('ricerca-scelta', { bubbles: true, detail: { campo: p.nascosto.dataset.campo || p.nascosto.name, voce: voce, scelte: ch } }));
+    };
     const chiudiMenu = box => { const p = parti(box); p.menu.hidden = true; p.testo.setAttribute('aria-expanded', 'false'); };
     const imposta = (box, voce, testoLibero) => {
       const p = parti(box), vecchio = p.nascosto.value;
+      if (p.multi) { if (voce) alterna(box, voce); else { p.testo.value = ''; chiudiMenu(box); } return; }
       if (voce) { p.testo.value = p.ent.testo(voce); p.nascosto.value = p.ent.chiave(voce); }
       else p.nascosto.value = testoLibero || '';
       p.pallino.className = 'pallino ' + (voce ? 'ok' : testoLibero ? 'ko' : 'vuoto');
@@ -254,7 +304,13 @@
       if (String(vecchio) !== String(p.nascosto.value)) p.nascosto.dispatchEvent(new Event('change', { bubbles: true }));
     };
     const apriMaschera = box => {
-      const p = parti(box), noto = trovaVoce(p.ent, ctx(), p.nascosto.value);
+      const p = parti(box);
+      if (p.multi) {
+        CRM.RicercaEntita({ entita: box.dataset.entita, contesto: ctx(), testo: p.testo.value, multipla: true, scelte: leggiScelte(p.nascosto),
+          onScelta: voci => { p.testo.value = ''; scriviScelte(box, voci.map(v => String(p.ent.chiave(v)))); p.testo.focus(); } });
+        return;
+      }
+      const noto = trovaVoce(p.ent, ctx(), p.nascosto.value);
       CRM.RicercaEntita({ entita: box.dataset.entita, contesto: ctx(), testo: noto ? '' : p.testo.value, onScelta: v => { imposta(box, v); p.testo.focus(); } });
     };
     const mostra = box => {
@@ -263,10 +319,12 @@
         const k = String(p.ent.chiave(r)).toLowerCase(), t = String(p.ent.testo(r)).toLowerCase(), c = String(p.ent.cerca ? p.ent.cerca(r) : '').toLowerCase();
         if (!q) return 3; if (t.startsWith(q) || k.startsWith(q)) return 0; if (c.startsWith(q) || t.indexOf(q) >= 0) return 1; if (c.indexOf(q) >= 0 || k.indexOf(q) >= 0) return 2; return -1;
       };
-      const trovate = p.ent.voci(ctx()).map(r => ({ r: r, s: punteggio(r) })).filter(x => x.s >= 0).sort((a, b) => a.s - b.s);
+      const trovate = vociDi(p.ent, ctx()).map(r => ({ r: r, s: punteggio(r) })).filter(x => x.s >= 0).sort((a, b) => a.s - b.s);
       const prime = trovate.slice(0, 5);
+      const scelte = p.multi ? leggiScelte(p.nascosto) : [];
+      const spunta = r => p.multi ? '<i class="spunta-voce" aria-hidden="true">' + (scelte.indexOf(String(p.ent.chiave(r))) >= 0 ? '✓' : '') + '</i>' : '';
       p.menu._voci = prime.map(x => x.r); p.menu._attiva = prime.length ? 0 : -1;
-      p.menu.innerHTML = (prime.length ? prime.map((x, i) => '<li role="option" data-i="' + i + '"' + (i === 0 ? ' class="attiva" aria-selected="true"' : '') + '><b>' + esc(p.ent.testo(x.r)) + '</b><span>' + esc(p.ent.dettaglio ? p.ent.dettaglio(x.r) : '') + '</span></li>').join('')
+      p.menu.innerHTML = (prime.length ? prime.map((x, i) => '<li role="option" data-i="' + i + '"' + (i === 0 ? ' class="attiva"' : '') + (p.multi ? ' aria-checked="' + (scelte.indexOf(String(p.ent.chiave(x.r))) >= 0) + '"' : (i === 0 ? ' aria-selected="true"' : '')) + '>' + spunta(x.r) + '<b>' + esc(p.ent.testo(x.r)) + '</b><span>' + esc(p.ent.dettaglio ? p.ent.dettaglio(x.r) : '') + '</span></li>').join('')
         : '<li class="nessuna">Nessun risultato</li>') +
         '<li class="altre" data-maschera="1">' + CRM.icona('cerca') + (trovate.length > 5 ? 'Altri ' + (trovate.length - 5) + ' risultati: ' : '') + 'apri la ricerca di ' + esc(p.ent.titolo.toLowerCase()) + '</li>';
       const r = p.testo.getBoundingClientRect();   // posizione fissa: il menu non viene tagliato da tabelle e finestre che scorrono
@@ -288,19 +346,26 @@
       else if (ev.key === 'Enter') { if (!p.menu.hidden && p.menu._attiva >= 0) { ev.preventDefault(); imposta(box, p.menu._voci[p.menu._attiva]); } }
       else if (ev.key === 'Escape') { if (!p.menu.hidden) { ev.stopPropagation(); chiudiMenu(box); } }
       else if (ev.key === 'F4') { ev.preventDefault(); chiudiMenu(box); apriMaschera(box); }
+      else if (ev.key === 'Backspace' && p.multi && !p.testo.value) { const ch = leggiScelte(p.nascosto); if (ch.length) { ch.pop(); scriviScelte(box, ch); } }
     });
     cont.addEventListener('mousedown', ev => {
       const li = ev.target.closest('.ricerca-menu li'); if (!li) return;
       ev.preventDefault(); const box = li.closest('.ricerca'), p = parti(box);
       if (li.dataset.maschera) { chiudiMenu(box); apriMaschera(box); } else if (li.dataset.i != null) imposta(box, p.menu._voci[Number(li.dataset.i)]);
     });
-    cont.addEventListener('click', ev => { const b = ev.target.closest('.ricerca-lente'); if (b) apriMaschera(b.closest('.ricerca')); });
+    cont.addEventListener('click', ev => {
+      const b = ev.target.closest('.ricerca-lente'); if (b) { apriMaschera(b.closest('.ricerca')); return; }
+      const x = ev.target.closest('.scelta-togli');
+      if (x) { const box = x.closest('.ricerca'), k = x.closest('.scelta').dataset.k; scriviScelte(box, leggiScelte(parti(box).nascosto).filter(c => c !== k)); parti(box).testo.focus(); return; }
+      const zona = ev.target.closest('.ricerca.multipla .ricerca-scelte'); if (zona && ev.target === zona) parti(zona.closest('.ricerca')).testo.focus();
+    });
     cont.addEventListener('focusout', ev => {
       if (!eTesto(ev.target)) return;
       const box = ev.target.closest('.ricerca'), p = parti(box);
       setTimeout(() => {
         if (!box.isConnected) return;
         chiudiMenu(box);
+        if (p.multi) { p.testo.value = ''; return; }   // in selezione multipla niente valori liberi
         const t = p.testo.value.trim(), noto = trovaVoce(p.ent, ctx(), p.nascosto.value);
         if (noto && p.ent.testo(noto) === t) return;          // nessun cambiamento
         imposta(box, trovaVoce(p.ent, ctx(), t), t);           // testo scritto a mano: cerca corrispondenza esatta, altrimenti valore libero
@@ -308,9 +373,10 @@
     });
   };
   CRM.RicercaEntita = function (o) {
+    if (o.multipla) return ricercaMultipla(o);
     const ent = ENTITA[o.entita], ctx = o.contesto || {};
     let tab, valori = {}, scelta = null;
-    const filtra = () => ent.voci(ctx).filter(r => {
+    const filtra = () => vociDi(ent, ctx).filter(r => {
       const q = (valori.q || '').trim().toLowerCase();
       const testo = [ent.chiave(r), ent.testo(r), ent.dettaglio ? ent.dettaglio(r) : '', ent.cerca ? ent.cerca(r) : ''].join(' ').toLowerCase();
       return (!q || testo.indexOf(q) >= 0) && (!ent.filtra || ent.filtra(r, valori));
@@ -333,6 +399,65 @@
     });
     m.corpo.closest('.modale').classList.add('larga');
     return m;
+  };
+
+  /* Maschera di ricerca a selezione multipla: casella per riga, scelta di tutte le righe filtrate */
+  function ricercaMultipla(o) {
+    const ent = ENTITA[o.entita], ctx = o.contesto || {};
+    const sel = new Set((o.scelte || []).map(String));
+    let tab, valori = {};
+    const k = r => String(ent.chiave(r));
+    const filtra = () => vociDi(ent, ctx).filter(r => {
+      const q = (valori.q || '').trim().toLowerCase();
+      const testo = [ent.chiave(r), ent.testo(r), ent.dettaglio ? ent.dettaglio(r) : '', ent.cerca ? ent.cerca(r) : ''].join(' ').toLowerCase();
+      return (!q || testo.indexOf(q) >= 0) && (!ent.filtra || ent.filtra(r, valori));
+    });
+    let conta, applica;
+    const aggiornaConta = () => { conta.textContent = sel.size ? sel.size + (sel.size === 1 ? ' scelta' : ' scelte') : 'Nessuna scelta: vale come “tutti”'; if (applica) applica.innerHTML = 'Applica' + (sel.size ? ' (' + sel.size + ')' : ''); };
+    const m = CRM.Modale({
+      titolo: 'Cerca ' + ent.titolo.toLowerCase(), testo: 'Spunta una o più righe (clic sulla riga), poi premi Applica.',
+      corpo: c => {
+        c.classList.add('ricerca-corpo');
+        const campi = [{ nome: 'q', tipo: 'cerca', valore: o.testo || '', placeholder: 'Cerca ' + ent.titolo.toLowerCase() }].concat(ent.filtri ? ent.filtri(ctx) : []);
+        const fb = CRM.FilterBar(c, { campi: campi, onChange: v => { valori = v; tab.aggiorna(filtra()); } });
+        valori = fb.valori();
+        const barra = CRM.blocco(c, 'ricerca-scelta-barra');
+        barra.innerHTML = '<span class="testo-tenue" data-conta></span><span><button type="button" class="link-azzera" data-tutte>Scegli tutte le righe filtrate</button> <button type="button" class="link-azzera" data-nessuna>Togli tutte</button></span>';
+        conta = $('[data-conta]', barra);
+        const colonne = [{ key: '_sel', header: '', sortable: false, cell: r => '<input type="checkbox" data-k="' + esc(k(r)) + '"' + (sel.has(k(r)) ? ' checked' : '') + ' aria-label="Scegli ' + esc(ent.testo(r)) + '">' }].concat(ent.colonne);
+        tab = CRM.DataTable(CRM.blocco(c, 'riempi'), { compatta: true, colonne: colonne, righe: filtra(), rowClass: r => sel.has(k(r)) ? 'selezionata' : '',
+          onRowClick: r => { if (sel.has(k(r))) sel.delete(k(r)); else sel.add(k(r)); }, emptyText: 'Nessun risultato', emptyHint: 'Cambia la ricerca o i filtri.' });
+        // dopo il clic sulla riga: casella e riga allineate alla scelta, senza ridisegnare la tabella
+        c.addEventListener('click', ev => {
+          const tr = ev.target.closest('tbody tr[data-i]'); if (!tr) return;
+          const cb = $('input[type=checkbox]', tr); if (!cb) return;
+          cb.checked = sel.has(cb.dataset.k); tr.classList.toggle('selezionata', cb.checked); aggiornaConta();
+        });
+        $('[data-tutte]', barra).addEventListener('click', () => { filtra().forEach(r => sel.add(k(r))); tab.aggiorna(filtra()); aggiornaConta(); });
+        $('[data-nessuna]', barra).addEventListener('click', () => { sel.clear(); tab.aggiorna(filtra()); aggiornaConta(); });
+        aggiornaConta();
+        setTimeout(() => { const i = $('.cerca input', c); if (i) { i.focus(); i.select(); } }, 0);
+      },
+      azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Applica', onClick: () => {
+        const tutte = ent.voci(Object.assign({}, ctx, { limita: null }));
+        o.onScelta(Array.from(sel).map(x => tutte.find(r => k(r) === x)).filter(Boolean));
+      } }]
+    });
+    m.corpo.closest('.modale').classList.add('larga');
+    applica = $$('.modale-piede .btn', m.corpo.closest('.modale')).pop();
+    aggiornaConta();
+    return m;
+  }
+  /* Campo di ricerca già attivo, da usare fuori dai moduli (filtri delle pagine) */
+  CRM.CampoRicerca = function (host, o) {
+    const w = el('div', 'campo-ricerca');
+    w.innerHTML = CRM.campoRicercaHtml(o);
+    ospite(host).appendChild(w);
+    CRM.attivaRicerche(w, () => o.contesto || {});
+    const h = $('input[type=hidden]', w);
+    const valore = () => o.multipla ? leggiScelte(h) : h.value;
+    h.addEventListener('change', () => { if (o.onChange) o.onChange(valore()); });
+    return { el: w, valore: valore };
   };
 
   CRM.FormModal = function (opz) {
@@ -536,7 +661,7 @@
      animazioni vistose. D-17 §19.
      opz: { tipo: 'bar'|'line'|'doughnut', etichette: [..], serie: [{ nome, valori, colore, tipo, asse }],
             orizzontale, impilato, altezza (px), euro (true: valori in euro), titolo (aria),
-            onClick(indice) (clic su una barra o fetta: usato come filtro), evidenzia (indice da mettere in risalto: gli altri si schiariscono) }
+            onClick(indice) (clic su una barra o fetta: usato come filtro), evidenzia (indice o elenco di indici da mettere in risalto: gli altri si schiariscono) }
      → { el, grafico, immagine() → PNG base64 su fondo bianco, per le esportazioni }
      ========================================================= */
   CRM.COLORI_GRAFICI = { primario: '#0d6efd', primarioTenue: '#9ec5fe', neutro: '#adb5bd', ok: '#198754', attesa: '#ffc107', errore: '#dc3545', testo: '#495057', griglia: '#e9ecef' };
@@ -556,8 +681,9 @@
     const schiarisci = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c + '4d' : c;
     const colore = s => {
       const c = s.colore || C.primario;
-      if (opz.evidenzia == null || s.tipo === 'line') return c;
-      return s.valori.map((v, i) => { const x = Array.isArray(c) ? c[i % c.length] : c; return i === opz.evidenzia ? x : schiarisci(x); });
+      const ev = opz.evidenzia == null ? [] : [].concat(opz.evidenzia);
+      if (!ev.length || s.tipo === 'line') return c;
+      return s.valori.map((v, i) => { const x = Array.isArray(c) ? c[i % c.length] : c; return ev.indexOf(i) >= 0 ? x : schiarisci(x); });
     };
     const g = new Chart($('canvas', box), {
       type: opz.tipo || 'bar',
@@ -687,7 +813,8 @@
 
   /* =========================================================
      FilterBar
-     opz: { campi: [{ nome, tipo: 'segmenti'|'cerca'|'select', opzioni: [{ value, label, n }], valore, placeholder, etichetta (solo select) }], onChange(valori) }
+     opz: { campi: [{ nome, tipo: 'segmenti'|'cerca'|'select'|'ricerca', opzioni: [{ value, label, n }], valore, placeholder, etichetta (select e ricerca) }], onChange(valori) }
+     tipo 'ricerca': campo di ricerca su un'entità (entita, multipla, contesto); valore = chiave o, se multipla, elenco di chiavi
      → { el, valori() }
      ========================================================= */
   CRM.FilterBar = function (host, opz) {
@@ -696,6 +823,15 @@
     const rip = CRM.registra('filtri', () => Object.assign({}, val));
     let cambiati = false;
     opz.campi.forEach(c => {
+      if (c.tipo === 'ricerca') {
+        val[c.nome] = c.multipla ? (c.valore || []).map(String) : (c.valore == null ? '' : String(c.valore));
+        if (rip && rip[c.nome] != null && JSON.stringify(rip[c.nome]) !== JSON.stringify(val[c.nome])) { val[c.nome] = rip[c.nome]; cambiati = true; }
+        const l = el('div', 'filtro-etichetta filtro-ricerca', c.etichetta ? '<span>' + esc(c.etichetta) + '</span>' : '');
+        CRM.CampoRicerca(l, { entita: c.entita, multipla: c.multipla, valori: c.multipla ? val[c.nome] : null, valore: c.multipla ? null : val[c.nome],
+          contesto: c.contesto, placeholder: c.placeholder, etichetta: c.etichetta, onChange: v => { val[c.nome] = v; opz.onChange(Object.assign({}, val)); } });
+        bar.appendChild(l);
+        return;
+      }
       val[c.nome] = c.valore != null ? String(c.valore) : (c.tipo === 'segmenti' ? String(c.opzioni[0].value) : '');
       if (rip && rip[c.nome] != null && rip[c.nome] !== val[c.nome] && (c.tipo === 'cerca' || c.opzioni.some(o => String(o.value) === rip[c.nome]))) { val[c.nome] = rip[c.nome]; cambiati = true; }
       if (c.tipo === 'segmenti') {

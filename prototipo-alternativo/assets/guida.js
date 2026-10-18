@@ -195,7 +195,7 @@
       sintesi: 'Quanto fatturano i clienti, quanto riconoscono i fornitori, quanto va ai subagenti e quanto resta a Decobrands: per periodo, fornitore, subagente e cliente, con il confronto sul periodo prima.',
       flusso: [
         ['Scegli il periodo', '3, 6 o 12 mesi; il mese d’inizio dal selettore a mesi, ‹ › per spostarlo di un mese.'],
-        ['Filtra', 'Tendine fornitore, subagente, cliente; oppure un clic su una fetta, una barra o una riga.'],
+        ['Filtra', 'Campi Fornitore, Subagente, Cliente: puoi scegliere più voci in ognuno; oppure un clic su una fetta, una barra o una riga.'],
         ['Leggi', '4 numeri con la variazione sul periodo precedente, l’andamento mese per mese, i pesi di fornitori, subagenti e clienti.'],
         ['Approfondisci', 'Tabella Dettaglio per subagente, fornitore, cliente, mese o documento per documento.'],
         ['Esporta', 'Excel con i grafici, PDF o CSV, con gli stessi filtri.']
@@ -203,18 +203,22 @@
       pulsanti: [
         ['Periodo · ‹ ›', 'Sceglie il mese d’inizio o sposta il periodo di un mese.'],
         ['3 mesi · 6 mesi · 12 mesi', 'Durata del periodo; finisce nello stesso mese di prima.'],
-        ['Fornitore · Subagente · Cliente', 'Filtrano tutta la pagina; mostrano solo le voci presenti.'],
-        ['Etichetta del filtro ×', 'Toglie quel filtro; “Togli tutti i filtri” li toglie tutti.'],
-        ['Clic su un grafico', 'Fornitore, subagente o cliente diventano filtro; di nuovo per toglierlo. Il grafico continua a mostrare tutte le voci, con la scelta in risalto.'],
-        ['Per subagente · Per fornitore · Per cliente · Per mese · Documenti', 'Raggruppamento della tabella; clic su una riga = filtro.'],
+        ['Fornitore · Subagente · Cliente', 'Scrivi e scegli con Invio o clic: la voce diventa un’etichetta nel campo e puoi aggiungerne altre. ✓ nel menu = già scelta (scegli di nuovo per toglierla). Campo vuoto = tutti. Propongono solo le voci con documenti nel periodo.'],
+        ['× sull’etichetta · Backspace', 'Toglie quella voce; Backspace a campo vuoto toglie l’ultima. “Togli tutti i filtri” li toglie tutti.'],
+        ['Lente (F4)', 'Apre la ricerca completa con le caselle: spunta più righe, “Scegli tutte le righe filtrate”, poi Applica.'],
+        ['Clic su un grafico', 'Aggiunge fornitore, subagente o cliente al filtro; di nuovo per toglierlo. Il grafico continua a mostrare tutte le voci, con le scelte in risalto.'],
+        ['Per subagente · Per fornitore · Per cliente · Per mese · Documenti', 'Raggruppamento della tabella; clic su una riga = aggiunge la voce al filtro.'],
         ['Esporta', 'Apre la finestra di esportazione.']
       ],
       finestre: [
+        { nome: 'Cerca fornitore · subagente · cliente', da: 'Lente del campo (F4)', cosa: 'Ricerca completa a selezione multipla.',
+          campi: [['Cerca e filtri', 'Restringono le righe.'], ['Caselle', 'Clic sulla riga per spuntarla o toglierla; “Scegli tutte le righe filtrate” · “Togli tutte”.']],
+          azioni: [['Applica (n)', 'Le righe spuntate diventano le voci del filtro; nessuna = tutti.']] },
         { nome: 'Esporta l’analisi', da: 'Esporta', cosa: 'Periodo e filtri attivi sono quelli della pagina.',
           campi: [['Formato', 'Excel: riepilogo con i grafici, un foglio per subagente, fornitore, cliente e mese, l’elenco dei documenti · PDF con lo stesso contenuto · CSV con i soli documenti.']],
           azioni: [['Scarica', 'Genera il file.']] }
       ],
-      sapere: ['Gli importi sono per <b>data del documento</b> (competenza): fatture e note di credito abbinate alle pratiche, anche se non ancora riconosciute nei bollettini. Non cambiano quando arriva un bollettino.', 'Gli storni per mancato pagamento non cambiano questi numeri: spostano solo il momento in cui la provvigione è pagata (vedi Liquidazioni).', 'Dai fornitori = imponibile × % che il fornitore riconosce a Decobrands; ai subagenti = imponibile × % del subagente; margine = differenza.'] },
+      sapere: ['Gli importi sono per <b>data del documento</b> (competenza): fatture e note di credito abbinate alle pratiche, anche se non ancora riconosciute nei bollettini. Non cambiano quando arriva un bollettino.', 'Gli storni per mancato pagamento non cambiano questi numeri: spostano solo il momento in cui la provvigione è pagata (vedi Liquidazioni).', 'Dai fornitori = imponibile × % che il fornitore riconosce a Decobrands; ai subagenti = imponibile × % del subagente; margine = differenza.', 'Più voci nello stesso campo valgono in “o” (Gries o Gasper); campi diversi in “e” (fornitore e cliente).'] },
 
     { id: 'incassi', titolo: 'Incassi dei clienti', gruppo: 'Lavoro', vai: '#/', schema: 'incassi',
       sintesi: 'Decobrands non incassa: incassa il fornitore. Se il cliente non paga, il fornitore sollecita Decobrands e Decobrands sollecita il cliente. Il CRM segue per ogni fattura se è stata pagata e aiuta a sollecitare.',

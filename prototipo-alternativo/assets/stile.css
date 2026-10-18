@@ -790,11 +790,6 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 @media (max-width: 992px) { .griglia-bi { grid-template-columns: 1fr; } }
 
 /* ---------- Analisi (§7.22): filtri attivi, grafici cliccabili ---------- */
-.filtri-attivi { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 14px; font-size: 13px; }
-.chip-filtro { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--primario); background: var(--primario-tenue); color: var(--primario-testo, #084298);
-  border-radius: 999px; padding: 3px 8px 3px 11px; font: inherit; cursor: pointer; }
-.chip-filtro .icona { width: 14px; height: 14px; }
-.chip-filtro:hover, .chip-filtro:focus-visible { background: #cfe2ff; }
 .link-azzera { border: 0; background: none; color: var(--primario); font: inherit; cursor: pointer; text-decoration: underline; padding: 2px 4px; }
 .pannello-bi { margin-top: 16px; }
 .pannello-bi .filtri { margin-bottom: 10px; }
@@ -807,3 +802,28 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
   .barra-periodo .filtro-etichetta .filtro-select { flex: 1; min-width: 0; }
   .pannello-bi .filtri .segmenti { overflow-x: auto; max-width: 100%; }
 }
+
+/* ---------- Campo di ricerca a selezione multipla (D-20): etichette dentro il campo ---------- */
+.ricerca.multipla { align-items: stretch; }
+.ricerca-scelte { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 34px; padding: 3px 6px;
+  border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; cursor: text; }
+.ricerca-scelte:focus-within { border-color: var(--primario); box-shadow: 0 0 0 3px rgba(13, 110, 253, .15); }
+.ricerca-scelte .ricerca-testo { flex: 1 1 80px; min-width: 80px; border: 0; outline: none; padding: 3px 2px; box-shadow: none; background: transparent; font: inherit; }
+.scelta { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 2px 3px 2px 8px; border-radius: 999px;
+  background: var(--primario-tenue); color: var(--primario-testo); font-size: 12.5px; line-height: 1.4; }
+.scelta-togli { display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; padding: 0; }
+.scelta-togli:hover, .scelta-togli:focus-visible { background: #cfe2ff; outline: none; }
+.scelta-togli .icona { width: 12px; height: 12px; }
+.ricerca.multipla .ricerca-lente { height: auto; align-self: stretch; }
+.ricerca-menu li .spunta-voce { font-style: normal; color: var(--primario); width: 14px; display: inline-block; margin-right: 4px; }
+.ricerca.multipla .ricerca-menu li[data-i] { display: grid; grid-template-columns: 18px 1fr; column-gap: 2px; }
+.ricerca.multipla .ricerca-menu li[data-i] span { grid-column: 2; }
+.ricerca-scelta-barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+/* filtri dell'Analisi: tre campi affiancati */
+.filtri-bi { display: flex; align-items: flex-start; gap: 12px; margin: -4px 0 16px; }
+.filtri-bi .filtri { flex: 1 1 0; min-width: 0; margin: 0; align-items: start; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.filtro-ricerca { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
+.filtro-ricerca .campo-ricerca { width: 100%; }
+.filtro-ricerca > span { font-size: 12.5px; color: var(--testo-tenue); }
+.filtri-bi .link-azzera { margin-top: 26px; white-space: nowrap; }
+@media (max-width: 900px) { .filtri-bi { flex-wrap: wrap; } .filtri-bi .filtri { flex-basis: 100%; grid-template-columns: 1fr; } .filtri-bi .link-azzera { margin-top: 0; } }
