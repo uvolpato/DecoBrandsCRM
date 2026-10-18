@@ -45,6 +45,7 @@ cliente).
 | `specifica-crm-provvigioni.md` | **Specifica** per chi sviluppa l'app (versione in testa). Fonte di verità di regole, schermate, componenti, API |
 | `specifica-crm-provvigioni.md` §19 | **Registro delle decisioni D-01…**: cosa si è deciso e **perché** |
 | `piano-lavoro-crm.md` | Fasi e attività (ore, dipendenze, file del prototipo da replicare); le ore fuori preventivo sono segnate **da approvare** |
+| `PRD-crm-provvigioni.md` | PRD unico: problema, utenti, misure, storie con criteri, fuori ambito, rischi, domande e incoerenze fra i documenti (sintesi; vince la spec) |
 | `preventivo-crm-provvigioni.md` | Preventivo |
 | `ANALISI_CRM_PROVVIGIONI.md` | Analisi iniziale |
 | `idee-supporto-decisioni.md` | Idee sul supporto alle decisioni con modelli linguistici (fase successiva, spec §18) |
@@ -109,6 +110,7 @@ Regole del codice del prototipo:
 
 ## 4. Regole di lavoro (obbligatorie)
 
+0. ⚠ **Tutto sul backend, MAI dai dati del frontend** (spec V12, D-28): ogni calcolo (provvigioni, bollettini, liquidazione, Analisi, totali, esportazioni) e ogni operazione sensibile (stati, verifiche, chiusure, abbinamenti, correzioni, permessi, eventi) si esegue sul server partendo dal database; il frontend mostra e invia solo le scelte (id, valori digitati, motivo); il server ricarica, ricontrolla e ricalcola, e non salva mai un valore calcolato arrivato dal browser. Il prototipo calcola nel browser solo perché è una dimostrazione.
 1. **Lingua**: si scrive in italiano, semplice e conciso, senza parole inglesi inutili:
    - interfaccia: "Esporta", "Riepilogo", "Filtro multiplo", non "export" o "dashboard";
    - risposte a Ugo: brevi, tecniche, senza ripetere quello che si vede;
@@ -163,6 +165,7 @@ Regole del codice del prototipo:
   completa è nella pagina **Analisi** (D-18), con importi per data del documento (D-19).
 - Filtri standard e conteggi dal vivo (D-20 → D-23).
 - Prototipo ufficiale `prototipo-alternativo/` (D-24).
+- ⚠ **Tutto sul backend, mai dai dati del frontend** (V12, D-28).
 - Vendita diretta spenta, ampliamento futuro (D-08).
 - Evidenziazione dei valori nel PDF/Excel: **da verificare** con una prova di fattibilità
   prima di prometterla (D-06). Il cliente prende per certo ciò che vede nel prototipo:
@@ -181,6 +184,7 @@ Lo stack ricalca il **Portale B2B Luis** (spec §16.3):
 | Excel | `exceljs` |
 | Processi | Node 24, Caddy, due processi (porte 8001 e 8002) |
 
+- ⚠ **Calcoli e operazioni sensibili solo nel backend NestJS, dal database; mai fidarsi dei dati del frontend** (V12, D-28).
 - Da Luis si riusa **solo l'infrastruttura** (accesso, sessioni, CSRF, Prisma, registro
   eventi). Non si riusano le sue interfacce né il suo CSS.
 - Le tabelle esistenti (Gestione Ordini, Integra) si leggono in sola lettura e non si

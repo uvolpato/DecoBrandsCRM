@@ -27,7 +27,7 @@
 
   <div class="alert alert-light border small">
     <strong>Redatto da:</strong> Ugo Volpato — AI Consultant<br>
-    <strong>Data:</strong> 04/09/2026 — aggiornato il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
+    <strong>Data:</strong> 04/09/2026 — aggiornato il 18/10/2026 (grafica del prototipo ufficiale, margine 18 h, percentuali datate ed eccezioni da approvare) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
     <strong>Cliente:</strong> Decobrands S.r.l. (da confermare)<br>
     <strong>Modalità di sviluppo:</strong> assistita da AI (analisi, generazione e codifica tramite modelli AI)
   </div>
@@ -101,7 +101,7 @@
 </tr>
 <tr>
 <td>4</td>
-<td>Stile applicato alla app esistente (Bootstrap 5.3, navbar scura, sfondo <code>#f5f6f8</code>, logo) + footer/versione</td>
+<td>Stile applicato alla app esistente (Bootstrap 5.3, navbar scura, sfondo <code>#f5f6f8</code>, logo) + footer/versione — primo prototipo, ora archivio</td>
 <td>1</td>
 <td>€ 80,00</td>
 <td>€ 80,00</td>
@@ -172,7 +172,7 @@
 </tr>
 <tr>
 <td>6</td>
-<td>Frontend Next.js viste CRM (Bootstrap 5.3 + <code>crm.css</code> del prototipo): login, dashboard (KPI + tab segnalazioni/ordini), anagrafiche, dettaglio pratica con tab per fase e upload, bollettini con divergenze, liquidazione (tab riepilogo/dettaglio), contenitori dati stabili (§2-V9)</td>
+<td>Frontend Next.js viste CRM come il prototipo ufficiale <code>prototipo-alternativo/</code> (<code>stile.css</code>, Public Sans, niente Bootstrap, spec D-24): accesso, Oggi a gruppi, anagrafiche, pratica con <em>Riepilogo · Righe a confronto</em> e documenti affiancati, bollettini a 6 mesi con riconciliazione, liquidazione con <em>Documenti</em>, tabelle standard (spec §16.4)</td>
 <td>12</td>
 <td>30</td>
 <td>€ 660,00</td>
@@ -266,21 +266,28 @@
 <p>L'approccio assistito da AI consente un <strong>risparmio di € 11.065,00</strong> sul solo sviluppo (€ 15.960,00 → € 4.895,00, <strong>−69%</strong>).</p>
 <h2 id="sez-6">6. Note</h2>
 <ul>
-<li>Le ore della sezione "già svolte" sono una <strong>stima</strong> del tempo impiegato (analisi, specifica, prototipo e iterazioni); da confermare.</li>
+<li>
+<p>⚠ <strong>Ogni calcolo e operazione sensibile si esegue sul server, dai dati del database, mai da dati presi dal frontend</strong> (spec V12, D-28): è compreso nelle ore delle attività 4 e 5.</p>
+</li>
+<li>
+<p>Le ore della sezione "già svolte" sono una <strong>stima</strong> del tempo impiegato (analisi, specifica, prototipo e iterazioni); da confermare.</p>
+</li>
 <li><strong>Ingresso documenti senza n8n (attività 7)</strong>: sostituisce l'integrazione del modulo ordini cliente (6 h) prevista nella versione precedente; la lettura dei documenti non passa più dalla pipeline n8n + LlamaIndex della Gestione Ordini ma da GLM-OCR in locale: nessun costo per pagina, documenti che non escono dall'azienda, regole nel codice del CRM.</li>
 <li><strong>Server GPU</strong> per GLM-OCR: hardware, sistema operativo e driver a carico del cliente; l'attività 7 copre installazione del servizio di lettura e taratura iniziale.</li>
 <li><strong>Stack allineato al Portale B2B Luis</strong> (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di <strong>5 ore</strong>, reinvestite nella <strong>prova di lettura dei documenti fornitore</strong> (attività 11), principale rischio tecnico del progetto.</li>
-<li><strong>Margine di rischio 25 % (15 h, € 825,00)</strong>: copre gli imprevisti più probabili (formati dei documenti fornitore, compatibilità dell'accesso con la Gestione Ordini, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.</li>
+<li><strong>Margine di rischio 25 % (18 h, € 990,00)</strong>: copre gli imprevisti più probabili (formati dei documenti fornitore, compatibilità dell'accesso con la Gestione Ordini, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.</li>
 <li>Il motore di calcolo è <strong>solo lato server</strong> (spec §10): eliminata la voce "motore lato client" della versione precedente.</li>
 <li><strong>Accesso unico con la Gestione Ordini</strong>: confermato se le sessioni sono compatibili (verifica nell'attività 2); in caso contrario login separato sulla stessa tabella utenti, senza variazione di ore.</li>
-<li><strong>Grafica</strong>: Bootstrap 5.3 + <code>crm.css</code> del prototipo, coerente con la Gestione Ordini.</li>
+<li><strong>Grafica</strong>: <code>stile.css</code> del prototipo ufficiale <code>prototipo-alternativo/</code>, carattere Public Sans, <strong>niente Bootstrap</strong> (spec D-24); stessa palette della Gestione Ordini.</li>
 <li>L'esito dell'attività 11 può richiedere una <strong>stima aggiuntiva</strong> per adattare la lettura ai formati dei singoli fornitori; sarà quotata a parte prima di procedere.</li>
 <li>Il costo ridotto dello sviluppo riflette la <strong>velocizzazione dell'AI</strong>, non una riduzione di qualità o delle garanzie.</li>
 <li>Tariffe indicative e personalizzabili; <strong>IVA esclusa</strong>.</li>
 <li>Il progetto <strong>condivide il database</strong> con la Gestione Ordini: le tabelle esistenti vengono riusate <strong>senza modifiche</strong>; il CRM aggiunge solo le proprie tabelle (§4.2).</li>
 <li>Fatture su più ordini e ordini fatturati in più tranche sono <strong>inclusi</strong> (spec §5.9, documenti a ponte).</li>
 <li><strong>Esclusa la sostituzione della Gestione Ordini</strong> (ordini cliente, controlli articoli/alias/kit, giacenze, CSV Integra, spegnimento di n8n): fase successiva, da quotare a parte dopo la messa in esercizio del CRM (spec §17).</li>
-<li><strong>Esclusioni</strong> (backlog spec §13): interfaccia delle eccezioni per singolo subagente (B1), riga bollettino con solo totale cliente (B2), versioning degli scaglioni per periodo (B3), <strong>popolamento dei dati storici dagli Excel manuali</strong> (B6). Il consolidamento sconto (B4) è già definito nella specifica.</li>
+<li><strong>Esclusioni</strong> (backlog spec §13): riga bollettino con solo totale cliente (B2), <strong>popolamento dei dati storici dagli Excel manuali</strong> (B6). Il consolidamento sconto (B4) è già definito nella specifica.</li>
+<li><strong>Percentuali con data di validità (B3) ed eccezioni personali inserite nel CRM (B1)</strong>: ora comprese (spec D-25, D-26), <strong>3 h fuori preventivo da approvare</strong> (piano F1-A5).</li>
+<li><strong>Regole del subagente per cliente e per documento</strong> (% dell'agenzia, una fattura al mese, correzione con motivo; spec D-27): <strong>4 h fuori preventivo da approvare</strong> (piano F1-A6).</li>
 </ul>
 
 </div>

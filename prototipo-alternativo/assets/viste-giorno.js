@@ -733,7 +733,10 @@
           { etichetta: 'Imponibile', valore: base },
           { etichetta: 'Sconto al cliente', valore: M.pct(perc.sconto), nota: 'percentuali in vigore dal ' + M.data(perc.scaglione.valido_dal) },
           { etichetta: 'Da ' + f.breve + ' a Decobrands: ' + M.pct(perc.agente) + ' + ' + M.pct(perc.sub_standard), valore: base * perc.dal_fornitore / 100 },
-          { etichetta: 'A ' + sub.nome + ': ' + M.pct(perc.sub) + (perc.eccezione ? ' (eccezione personale)' : ''), valore: base * perc.sub / 100 }
+          // quota del subagente con le regole di D-27 (agenzia, una fattura al mese, correzioni); senza fatture: prevista
+          (() => { const qq = M.fiscali(p).map(d => M.quotaSub(p, d)), note = qq.map(q => q.nota).filter((x, i, a) => x && a.indexOf(x) === i);
+            return qq.length ? { etichetta: 'A ' + sub.nome + (note.length ? ' (' + note.join('; ') + ')' : ': ' + M.pct(qq[0].pct)), valore: qq.reduce((x, q) => x + q.provvigione, 0) }
+              : { etichetta: 'A ' + sub.nome + ': ' + M.pct(perc.sub) + (perc.eccezione ? ' (eccezione personale)' : ''), valore: base * perc.sub / 100 }; })()
         ]);
         CRM.Nota(prov.corpo, e(f.breve) + (f.maturazione === 'maturato' ? ' paga sul maturato: la provvigione del subagente si sblocca quando ' + e(f.breve) + ' la riconosce in un bollettino verificato.' : ' paga sul fatturato: la provvigione del subagente entra nel trimestre della fattura.')).style.marginTop = '10px';
         if (f.maturazione === 'maturato' && M.fiscali(p).length) CRM.Elenco(prov.corpo, M.fiscali(p).map(d => {

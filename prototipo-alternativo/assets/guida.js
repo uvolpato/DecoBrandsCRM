@@ -186,13 +186,17 @@
         ['vai ai bollettini', 'Se ci sono documenti in attesa: porta ai bollettini da verificare.'],
         ['Esporta in Excel', 'Apre la finestra di esportazione.'],
         ['Chiudi il trimestre', 'Fissa gli importi; chiede conferma.'],
-        ['Voce Storno · Riaccredito', 'Fra i documenti: provvigione negativa o positiva su una fattura di un trimestre precedente; nell’esportazione compare come “Storno F-…”.']
+        ['Voce Storno · Riaccredito', 'Fra i documenti: provvigione negativa o positiva su una fattura di un trimestre precedente; nell’esportazione compare come “Storno F-…”.'],
+        ['Correggi · Cambia la correzione', 'Sotto la provvigione di un documento: cambia solo quanto va al subagente su quel documento, con un motivo.']
       ],
       finestre: [
         { nome: 'Esporta la liquidazione', da: 'Esporta in Excel', cosa: 'Scegli cosa e in che formato.',
           campi: [['Cosa', 'Tutto il trimestre diviso per subagente (dettaglio e riepilogo) · Un solo subagente · Solo il riepilogo.'], ['Formato', 'Excel (.xlsx) · PDF identico all’Excel · CSV di soli dati.']],
           azioni: [['Scarica', 'Genera il file; l’esportazione resta nel registro.']] },
-        { nome: 'Chiudere la liquidazione', da: 'Chiudi il trimestre', cosa: 'Conferma della chiusura.', azioni: [['Chiudi il trimestre', 'Gli importi non cambiano più.']] }
+        { nome: 'Chiudere la liquidazione', da: 'Chiudi il trimestre', cosa: 'Conferma della chiusura.', azioni: [['Chiudi il trimestre', 'Gli importi non cambiano più.']] },
+        { nome: 'Provvigione del subagente su un documento', da: 'Correggi · Cambia la correzione', cosa: 'Cliente, fornitore, imponibile e provvigione di adesso.',
+          campi: [['Provvigione al subagente', 'Altra percentuale · Importo fisso · Nessuna provvigione.'], ['Percentuale o importo', '% da 0 a 100 o euro; vuoto per Nessuna.'], ['Motivo', 'Obbligatorio: compare nel prospetto e nel registro.']],
+          azioni: [['Salva la correzione', 'Vince su ogni altra regola per quel documento.'], ['Togli la correzione', 'Con conferma: torna la regola normale.']] }
       ],
       sapere: ['Il Report subagenti usa i numeri del trimestre di liquidazione (compresi i documenti in attesa e gli storni), non quelli incassati. Margine = provvigioni dai fornitori − provvigioni ai subagenti. Per altri periodi, filtri ed esportazione c’è la pagina <b>Analisi</b>.', 'Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga: al subagente lo storno arriva nella liquidazione successiva come <b>voce negativa</b> (il riaccredito come voce positiva).', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
 
@@ -264,8 +268,13 @@
       ] },
     { id: 'subagenti', titolo: 'Subagenti', gruppo: 'Anagrafiche', vai: '#/subagenti',
       sintesi: 'Chi segue i clienti per conto di Decobrands. Non sono in Integra: si gestiscono per intero nel CRM.',
-      pulsanti: [['Nuovo subagente', 'Nome, email, codice fiscale o P.IVA, telefono.'], ['Modifica', 'Cambia i dati.'], ['Rendi non attivo', 'Un subagente con clienti o provvigioni non si elimina: si disattiva.'], ['Vedi la liquidazione', 'Apre la liquidazione filtrata sul subagente.']],
-      finestre: [{ nome: 'Subagente', da: 'Nuovo subagente · Modifica', cosa: 'Dati anagrafici.', azioni: [['Salva', 'Registra.'], ['Elimina', 'Solo se non ha clienti né provvigioni.']] }] },
+      pulsanti: [['Nuovo subagente', 'Nome, email, codice fiscale o P.IVA, telefono.'], ['Modifica', 'Cambia i dati.'], ['Rendi non attivo', 'Un subagente con clienti o provvigioni non si elimina: si disattiva.'], ['Vedi la liquidazione', 'Apre la liquidazione filtrata sul subagente.'],
+        ['Aggiungi eccezione', 'Una percentuale personale che vale al posto di quella dello scaglione.'], ['Clic su un’eccezione', 'La modifica o la elimina.']],
+      finestre: [{ nome: 'Subagente', da: 'Nuovo subagente · Modifica', cosa: 'Dati anagrafici.', azioni: [['Salva', 'Registra.'], ['Elimina', 'Solo se non ha clienti né provvigioni.']] },
+        { nome: 'Eccezione', da: 'Aggiungi eccezione · clic su un’eccezione', cosa: 'Il subagente è fisso.',
+          campi: [['Fornitore', 'Campo con ricerca.'], ['Sconto al cliente', 'Gli sconti proposti seguono le percentuali del fornitore.'], ['Al subagente %', 'Da 0 a 100; 0 = nessuna provvigione su quello scaglione.']],
+          azioni: [['Aggiungi eccezione · Salva', 'Registra: vale per i documenti calcolati con le percentuali in vigore oggi.'], ['Elimina', 'Con conferma: torna a valere la percentuale standard.']] }],
+      sapere: ['Le eccezioni sono rare: di norma tutti i subagenti hanno la percentuale dello scaglione.', 'Un’eccezione per subagente e scaglione; con <b>Nuove percentuali da una data</b> del fornitore passa alla nuova versione con la stessa percentuale.'] },
     { id: 'clienti', titolo: 'Clienti', gruppo: 'Anagrafiche', vai: '#/clienti',
       sintesi: 'Anagrafica da Integra in sola lettura. Per ogni cliente le <b>agenzie</b>: i fornitori per cui Decobrands fa da agente, con codice cliente del fornitore, subagente e sconto.',
       pulsanti: [
@@ -277,7 +286,10 @@
       finestre: [{ nome: 'Agenzia', da: 'Aggiungi agenzia · clic su una riga', cosa: 'Il cliente è fisso.',
         campi: [['Fornitore', 'Campo con ricerca.'], ['Codice cliente del fornitore', 'Come il fornitore chiama il cliente: serve ad abbinare i documenti in automatico.'], ['Seguito da', 'Subagente, campo con ricerca.'], ['Sconto al cliente', 'Gli sconti proposti seguono le percentuali del fornitore.']],
         azioni: [['Aggiungi agenzia · Salva', 'Registra.'], ['Elimina', 'Con conferma: le pratiche con quel fornitore non generano più provvigioni.']] }],
-      sapere: ['Un solo subagente per cliente e fornitore; il codice cliente è unico per fornitore.'] },
+      sapere: ['Un solo subagente per cliente e fornitore; il codice cliente è unico per fornitore.',
+        '<b>Al subagente per questo cliente %</b>: vale solo per questo cliente e fornitore; vuoto = la percentuale dello scaglione o l’eccezione del subagente.',
+        '<b>Una fattura al mese</b> (la prima o la più alta): le altre fatture del mese non danno provvigione al subagente. Il fornitore non cambia: si controlla nel bollettino.',
+        'Per un caso singolo si corregge il documento in Liquidazioni (<b>Correggi</b>), con il motivo. Lo sconto fittizio non serve più: lo sconto resta quello vero.'] },
 
     /* ---------------- Vendita diretta (ampliamento) ---------------- */
     { id: 'ordini-cliente', titolo: 'Ordini cliente', gruppo: 'Vendita diretta', vai: '#/ordini-cliente',

@@ -146,6 +146,41 @@
     };
   };
 
+  /* Quota del subagente su un documento fiscale (D-27 §19). Vince la prima regola presente:
+     1. correzione sul documento (altra %, nessuna, importo fisso; con motivo);
+     2. "una fattura al mese" sull'agenzia: le altre fatture del mese vanno a zero (le note di
+        credito seguono la fattura a cui si riferiscono);
+     3. % dell'agenzia (cliente × fornitore);
+     4. eccezione personale sullo scaglione (§5.2);
+     5. % standard dello scaglione.
+     Riguarda solo quanto si paga al subagente: quanto riconosce il fornitore si controlla nel bollettino. */
+  M.REGOLE_MENSILI = { prima: 'la prima del mese', piu_alta: 'la più alta del mese' };
+  M.fatturaDelMese = function (ab, mese) {
+    const ff = [];
+    M.S.pratiche.filter(p => p.cliente_piva === ab.cliente_piva && p.fornitore_id === ab.fornitore_id)
+      .forEach(p => p.documenti.forEach(d => { if (d.tipo === 'fattura' && d.data.slice(0, 7) === mese) ff.push(d); }));
+    ff.sort(ab.mensile === 'piu_alta' ? (x, y) => M.importoDoc(y) - M.importoDoc(x) || x.data.localeCompare(y.data) : (x, y) => x.data.localeCompare(y.data) || x.numero.localeCompare(y.numero));
+    return ff[0] || null;
+  };
+  M.correzioneSub = numero => (M.S.correzioni_sub || []).find(c => c.numero === numero);
+  M.quotaSub = function (p, d) {
+    const perc = M.percentuali(p, d.data); if (!perc) return null;
+    const ab = M.abbinamento(p.cliente_piva, p.fornitore_id), imp = M.importoDoc(d);
+    const q = (pct, regola, nota) => ({ pct: pct, provvigione: M.r2(imp * pct / 100), regola: regola, nota: nota || '' });
+    const cor = M.correzioneSub(d.numero);
+    if (cor) {
+      if (cor.tipo === 'importo') return { pct: imp ? M.r2(cor.valore / imp * 100) : 0, provvigione: M.r2(cor.valore), regola: 'correzione', nota: 'importo fisso: ' + cor.motivo };
+      return q(cor.tipo === 'nessuna' ? 0 : cor.valore, 'correzione', (cor.tipo === 'nessuna' ? 'nessuna provvigione: ' : 'corretta: ') + cor.motivo);
+    }
+    if (ab && ab.mensile) {
+      const rif = d.tipo === 'nota_credito' && d.riferimento ? (M.praticaPerDocumento(d.riferimento) || p).documenti.find(x => x.numero === d.riferimento) || d : d;
+      const scelta = M.fatturaDelMese(ab, rif.data.slice(0, 7));
+      if (scelta && scelta.numero !== rif.numero) return q(0, 'mensile', 'una fattura al mese: vale ' + scelta.numero);
+    }
+    if (ab && ab.pct_sub != null && ab.pct_sub !== '') return q(Number(ab.pct_sub), 'agenzia', 'percentuale dell’agenzia');
+    return q(perc.sub, perc.eccezione ? 'eccezione' : 'standard', perc.eccezione ? 'eccezione personale' : '');
+  };
+
   /* ---------- Bollettini ---------- */
   M.fineMese = (a, m) => new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
   M.inMese = (iso, a, m) => iso.slice(0, 7) === a + '-' + String(m).padStart(2, '0');
@@ -319,7 +354,7 @@
     M.S.pratiche.forEach(p => M.fiscali(p).forEach(d => {
       const perc = M.percentuali(p, d.data); if (!perc) return;
       const imp = M.importoDoc(d), f = M.fornitore(p.fornitore_id), s = M.subagente(perc.subagente_id);
-      const prese = M.r2(imp * perc.dal_fornitore / 100), pagate = M.r2(imp * perc.sub / 100);
+      const prese = M.r2(imp * perc.dal_fornitore / 100), pagate = M.quotaSub(p, d).provvigione;
       out.push({ numero: d.numero, data: d.data, mese: d.data.slice(0, 7), tipo: d.tipo, pratica_id: p.id,
         fornitore_id: f.id, fornitore: f.breve, cliente: p.cliente_piva, nome_cliente: M.nomeCliente(p.cliente_piva),
         subagente_id: s.id, subagente: s.nome, importo: imp, prese: prese, pagate: pagate, margine: M.r2(prese - pagate) });
@@ -342,6 +377,8 @@
     const lim = M.limiti(a, t);
     const out = [];
     const nelTrimestre = iso => iso >= lim.da && iso <= lim.a;
+    // quota del subagente con le sue regole (D-27); per storni e riaccrediti col segno della voce
+    const quota = (p, d, segno) => { const q = M.quotaSub(p, d); return { pct: q.pct, provvigione: M.r2(segno * q.provvigione), regola: q.regola, nota: q.nota, eccezione: q.regola === 'eccezione' }; };
     M.S.pratiche.forEach(p => M.fiscali(p).forEach(d => {
       const f = M.fornitore(p.fornitore_id);
       const perc = M.percentuali(p, d.data);
@@ -362,10 +399,10 @@
         }
       } else if (!nelTrimestre(d.data)) return;
       const ab = M.abbinamento(p.cliente_piva, p.fornitore_id);
-      out.push({
+      out.push(Object.assign({
         pratica: p, doc: d, fornitore: f, subagente_id: perc.subagente_id, cliente: p.cliente_piva, codice_cliente: ab ? ab.codice : '',
-        importo: imp, pct: perc.sub, eccezione: perc.eccezione, provvigione: M.r2(imp * perc.sub / 100), liquidabile: liquidabile, motivo: motivo, incasso: incasso
-      });
+        importo: imp, liquidabile: liquidabile, motivo: motivo, incasso: incasso
+      }, quota(p, d, 1)));
     }));
     // storni e riaccrediti (fatturato, §5.14): per Decobrands arrivano nel bollettino del mese successivo;
     // al subagente vanno nella liquidazione trimestrale successiva (la prima ancora aperta dopo la
@@ -377,12 +414,12 @@
       const p = M.praticaPerDocumento(r.numero); if (!p) return;
       const d = p.documenti.find(x => x.numero === r.numero), perc = M.percentuali(p, d.data); if (!perc) return;
       const segno = r.tipo === 'storno' ? -1 : 1, imp = M.r2(segno * M.importoDoc(d)), ab = M.abbinamento(p.cliente_piva, p.fornitore_id), f = M.fornitore(p.fornitore_id);
-      out.push({
+      out.push(Object.assign({
         pratica: p, doc: Object.assign({}, d, { data: quando, origine: d.data }), fornitore: f, subagente_id: perc.subagente_id, cliente: p.cliente_piva, codice_cliente: ab ? ab.codice : '',
-        importo: imp, pct: perc.sub, eccezione: perc.eccezione, provvigione: M.r2(imp * perc.sub / 100), liquidabile: true, voce: r.tipo,
+        importo: imp, liquidabile: true, voce: r.tipo,
         motivo: (r.tipo === 'storno' ? 'Storno: il cliente non ha pagato la fattura del ' : 'Riaccredito: il cliente ha pagato la fattura del ') + M.data(d.data) +
           ' (' + M.trimestre(d.data) + '° trimestre ' + d.data.slice(0, 4) + '; bollettino di ' + M.meseMin(b.mese) + ')'
-      });
+      }, quota(p, d, segno)));
     }));
     return out.sort((x, y) => x.doc.data.localeCompare(y.doc.data));
   };

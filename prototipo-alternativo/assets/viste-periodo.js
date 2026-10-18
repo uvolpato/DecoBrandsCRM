@@ -282,7 +282,8 @@
         colonne: [
           { key: 'numero', header: 'Documento', valore: r => r.doc.numero, cell: r => '<a href="#/pratiche/' + r.pratica.id + '">' + e(r.doc.numero) + '</a>' + (r.voce ? ' ' + CRM.stato(r.voce === 'storno' ? 'errore' : 'info', r.voce === 'storno' ? 'Storno' : 'Riaccredito') : '') + '<span class="sec-riga">' + e(r.fornitore.breve) + ' · ' + (r.doc.origine ? 'fattura del ' + M.data(r.doc.origine) : M.data(r.doc.data)) + '</span>' },
           { key: 'cliente', header: 'Cliente · subagente', grow: true, valore: r => M.nomeCliente(r.cliente), cell: r => e(M.nomeCliente(r.cliente)) + '<span class="sec-riga">' + e(M.subagente(r.subagente_id).nome) + ' · codice ' + e(r.codice_cliente) + '</span>' },
-          { key: 'provvigione', header: 'Provvigione', tipo: 'euro', totale: 'somma', cell: r => '<b class="' + CRM.classeSegno(Math.min(0, r.provvigione)) + '">' + M.euro(r.provvigione) + '</b><span class="sec-riga">' + M.pct(r.pct) + (r.eccezione ? ' (eccezione)' : '') + ' di ' + M.euro(r.importo) + '</span>' },
+          { key: 'provvigione', header: 'Provvigione', tipo: 'euro', totale: 'somma', cell: r => '<b class="' + CRM.classeSegno(Math.min(0, r.provvigione)) + '">' + M.euro(r.provvigione) + '</b><span class="sec-riga">' + M.pct(r.pct) + ' di ' + M.euro(r.importo) + (r.nota ? ' · ' + e(r.nota) : '') + '</span>' +
+            (!r.voce && st.chiave !== 'chiusa' && M.puo('modifica') ? '<button type="button" class="btn testo piccolo" data-correggi="' + e(r.doc.numero) + '">' + (r.regola === 'correzione' ? 'Cambia la correzione' : 'Correggi') + '</button>' : '') },
           { key: 'stato', header: 'Stato', grow: true, sortValue: r => r.liquidabile ? 1 : 0,
             cell: r => r.voce ? CRM.stato(r.voce === 'storno' ? 'errore' : 'ok', r.voce === 'storno' ? 'Da stornare' : 'Da riaccreditare') + '<span class="sec-riga">' + e(r.motivo) + '</span>'
               : r.liquidabile ? CRM.stato('ok', st.chiave === 'chiusa' ? 'Liquidata' : 'Liquidabile')
@@ -293,9 +294,45 @@
         piede: 'Fatturato (es. Gasper, Ing’s): entrano le fatture del trimestre; se il cliente non paga, lo storno è una voce negativa nella liquidazione successiva. Maturato (es. Gries): la fattura entra nel trimestre del bollettino che la riconosce, cioè quando il cliente paga.',
         emptyText: 'Nessun documento', emptyHint: 'Nessuna fattura o nota di credito con data in questo trimestre.'
       });
+      // correzione della quota del subagente sul singolo documento (D-27 §19)
+      h.addEventListener('click', ev => { const b = ev.target.closest('[data-correggi]'); if (!b) return; ev.stopPropagation(); correggiQuota(righe.find(r => !r.voce && r.doc.numero === b.dataset.correggi)); });
       }
     }
   });
+
+  /* Correzione della quota del subagente su un documento (D-27 §19): vince su ogni altra regola,
+     motivo obbligatorio, resta nel registro e si vede nel prospetto. Il fornitore non cambia. */
+  function correggiQuota(r) {
+    if (!r) return;
+    if (!M.S.correzioni_sub) M.S.correzioni_sub = [];
+    const c0 = M.correzioneSub(r.doc.numero), sub = M.subagente(r.subagente_id).nome;
+    CRM.FormModal({
+      titolo: 'Provvigione di ' + sub + ' · ' + r.doc.numero,
+      testo: M.nomeCliente(r.cliente) + ' · ' + r.fornitore.breve + ' · imponibile ' + M.euro(r.importo) + '. Ora: ' + M.euro(r.provvigione) + ' (' + M.pct(r.pct) + (r.nota ? ', ' + r.nota : '') + '). Cambia solo quanto va al subagente.',
+      conferma: 'Salva la correzione', colonne: 2,
+      campi: [
+        { nome: 'tipo', etichetta: 'Provvigione al subagente', tipo: 'select', valore: c0 ? c0.tipo : 'pct', opzioni: [{ value: 'pct', label: 'Altra percentuale' }, { value: 'importo', label: 'Importo fisso' }, { value: 'nessuna', label: 'Nessuna provvigione' }] },
+        { nome: 'valore', etichetta: 'Percentuale o importo', tipo: 'numero', passo: '0.01', valore: c0 && c0.tipo !== 'nessuna' ? c0.valore : '', aiuto: '% per "Altra percentuale", € per "Importo fisso"; vuoto per "Nessuna".' },
+        { nome: 'motivo', etichetta: 'Motivo', tipo: 'area', valore: c0 ? c0.motivo : '', largo: true, aiuto: 'Obbligatorio: compare nel prospetto del subagente e nel registro.' }
+      ],
+      azioniExtra: c0 ? [{ etichetta: 'Togli la correzione', variante: 'pericolo', onClick: () => {
+        CRM.Conferma('Togliere la correzione?', 'Torna a valere la regola dell’agenzia o la percentuale dello scaglione.', 'Togli', true).then(ok => {
+          if (!ok) return; M.S.correzioni_sub.splice(M.S.correzioni_sub.indexOf(c0), 1); M.annota('Correzione tolta su ' + r.doc.numero + ' (' + sub + ')'); M.salva(); CRM.Avviso('Correzione tolta'); CRM.naviga();
+        });
+      } }] : [],
+      onConferma: (v, form) => {
+        const motivo = (v.motivo || '').trim();
+        if (!motivo) { form.errore('Scrivi il motivo della correzione.'); return false; }
+        const val = Number(v.valore);
+        if (v.tipo === 'pct' && (v.valore === '' || isNaN(val) || val < 0 || val > 100)) { form.errore('Indica una percentuale fra 0 e 100.'); return false; }
+        if (v.tipo === 'importo' && (v.valore === '' || isNaN(val))) { form.errore('Indica l’importo in euro.'); return false; }
+        const rec = c0 || { numero: r.doc.numero };
+        Object.assign(rec, { tipo: v.tipo, valore: v.tipo === 'nessuna' ? 0 : val, motivo: motivo, da: M.utente().nome, il: M.oggi() });
+        if (!c0) M.S.correzioni_sub.push(rec);
+        M.annota('Provvigione di ' + sub + ' corretta su ' + r.doc.numero + ': ' + motivo); M.salva(); CRM.Avviso('Correzione salvata'); CRM.naviga();
+      }
+    });
+  }
 
   /* Report subagenti (scheda nel pannello di destra delle Liquidazioni, D-18 §19).
      Stessi numeri del trimestre di liquidazione (M.analisiTrimestre), confronto con il trimestre prima.

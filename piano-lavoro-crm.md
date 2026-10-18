@@ -1,6 +1,6 @@
 # Piano di lavoro — CRM Decobrands (fasi e attività parallele)
 
-**Versione:** 1.4 · **Data:** 18/10/2026 (prototipo ufficiale `prototipo-alternativo/`, D-24: checklist §1.1 e file sorgente delle attività riscritti) · versione 1.3 del 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
+**Versione:** 1.7 · **Data:** 18/10/2026 (regola V12: tutto sul backend) · versione 1.6 (F1-A6 regole del subagente, da approvare) · versione 1.5 (F1-A5 percentuali datate ed eccezioni, da approvare; riferimento alla checklist §1.1) · versione 1.4 (prototipo ufficiale `prototipo-alternativo/`, D-24: checklist §1.1 e file sorgente delle attività riscritti) · versione 1.3 del 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
 **Derivato da:** `specifica-crm-provvigioni.md` v2.0 (§16) · **Ore:** 71 h di attività + 18 h di margine = 89 h (preventivo §4)
 **Scopo:** suddividere l'implementazione in fasi e attività indipendenti, assegnabili ad **agenti in parallelo**, con **replicazione maniacale** del prototipo navigabile.
 
@@ -34,9 +34,10 @@ chiudono **prima del merge**, non in collaudo finale.
 ### 1.2 Regole di parallelizzazione
 
 - **Attività = slice verticale con ownership disgiunta**: nessun file/modulo toccato da due agenti contemporaneamente. Se un'attività serve un oggetto condiviso, lo dichiara e lo crea nella **Fase 0** (o nel suo primo commit), non lo ridefinisce.
+- ⚠ **Backend unica fonte dei calcoli** (spec V12, D-28): motore, regole, permessi ed eventi solo sul server; le API ricevono scelte, non risultati.
 - **Contratti congelati in Fase 0**: schema tabelle §4.2, API §8 (firmi), motore di calcolo §10, helper `logEvent()` §15.3, seed §12. Le attività a valle consumano i contratti, non li modificano.
 - **Ogni attività** riporta: ore, dipendenze, riferimenti di specifica, **file sorgente del prototipo da replicare**, output e DoD (Definition of Done).
-- **Una PR per attività**, con checklist §11.1 allegata; il merge avviene solo a checklist superata.
+- **Una PR per attività**, con checklist §1.1 allegata; il merge avviene solo a checklist superata.
 - **Eventi applicativi (§15.2)**: a carico dell'attività che implementa il CRUD/operazione — il catalogo è tassativo (né più né meno eventi).
 - **Seed per fasi**: la Fase 0 crea l'aggregatore `seed/00-base`; ogni attività aggiunge il proprio file (`seed/1x-*.ts` ecc.) senza toccare quello degli altri.
 
@@ -155,10 +156,14 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 | **F1-A2** Agenti + subagenti | 2 | F0 | `prototipo-alternativo/assets/viste-anagrafiche.js` (Subagenti: elenco e scheda) | §4.2.4, §4.2.5, §7.5, §8.1, §15.2.3 |
 | **F1-A3** Clienti e agenzie (interscambio + codice cliente fornitore) | 2 | F0 | `prototipo-alternativo/assets/viste-anagrafiche.js` (Clienti: anagrafica da Integra in sola lettura, schede *Agenzie · Pratiche*, finestra dell'agenzia con campi di ricerca, blocco duplicati per fornitore) | §4.2.6, §4.4, §7.6, §8.1, §15.2.3 |
 | **F1-A4** Sincronizzazione da Integra delle **anagrafiche clienti e fornitori**: viste sul database (`v_clienti`, `v_fornitori`), utente in sola lettura, processo ogni 60 s, incrementale, aggiorna solo i campi di Integra senza toccare i dati del CRM, registri di esecuzione e problemi (cliente senza P.IVA o P.IVA doppia), sezione delle impostazioni e *Prova la connessione*; sostituisce l'import da file | 3 · **da approvare** | F0-A2 | `prototipo-alternativo/assets/dati.js` (`sistema`, `impostazioni.integra`), `viste-gestione.js` (Impostazioni → Sincronizzazione da Integra) | §4.1, §4.5, §7.14, §7.15 |
+| **F1-A5** Percentuali con data di validità (`valido_dal`, nuova versione da una data, calcolo per documento alla sua data) ed **eccezioni personali** dei subagenti (inserisci, modifica, elimina dalla scheda del subagente; copia sulla nuova versione), API `/api/fornitori/:id/percentuali` e `/api/eccezioni`, eventi §15.2.2 | 3 · **da approvare** | F1-A1, F1-A2, F0-A5 | `prototipo-alternativo/assets/viste-anagrafiche.js` (`nuovePercentuali`, `modificaEccezione`), `motore.js` (`scaglione`, `percentuali`) | §4.2.2, §4.2.3, §5.2, §5.11, §7.4, §7.5, §10, D-25, D-26 |
+| **F1-A6** Regole del subagente (D-27): % dell'agenzia e *una fattura al mese* nella finestra dell'agenzia; tabella `provvigioni_correzioni` e finestra *Correggi* in Liquidazioni con motivo obbligatorio; motore con l'ordine correzione → mensile → agenzia → eccezione → scaglione, usato da liquidazione, Analisi, pratica ed esportazione; API ed eventi | 4 · **da approvare** | F1-A3, F1-A5, F4-A2 | `motore.js` (`quotaSub`, `fatturaDelMese`), `viste-anagrafiche.js` (`modificaAgenzia`), `viste-periodo.js` (`correggiQuota`), `esporta-liquidazione.js` | §4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §10, D-27 |
 
+- **F1-A6: 4 h fuori preventivo, da approvare** (agenzia 1 h, regola mensile 1,5 h, correzione sul documento 1,5 h).
+- **F1-A5: 3 h fuori preventivo, da approvare** (percentuali datate 2 h, eccezioni 1 h; chiudono B3 e B1, spec D-25, D-26).
 - **F1-A4: 3 h fuori preventivo, da approvare** (la sincronizzazione dalle viste sostituisce l'import da file, non previsto nel preventivo originale). Le viste le crea chi gestisce Integra.
 - **Output per ciascuna:** rotta pagina + API CRUD + eventi §15.2 + test delle regole univocità.
-- **DoD comune:** checklist §11.1 superata; CRUD completo; eventi esatti (es. fornitore non eliminabile ma `attivo=false` §15.2.2).
+- **DoD comune:** checklist §1.1 superata; CRUD completo; eventi esatti (es. fornitore non eliminabile ma `attivo=false` §15.2.2).
 
 ## 6. Fase 2 — Pratiche ordini (6 h, 3 agenti in parallelo)
 
@@ -246,7 +251,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 ## 11. Fase 7 — Collaudo e rilascio (5 h)
 
 #### F7-A1 · Verifica replicazione + E2E — 3 h
-- **Dipende da:** merge F1–F6 · **Output:** report checklist §11.1 per **tutte** le schermate (una riga per criterio), test E2E su flussi critici (stati pratica, NC → netto, multifiltro, export, eventi)
+- **Dipende da:** merge F1–F6 · **Output:** report checklist §1.1 per **tutte** le schermate (una riga per criterio), test E2E su flussi critici (stati pratica, NC → netto, multifiltro, export, eventi)
 - **DoD:** 6/6 criteri su ogni schermata; numeri seed §12 identici al prototipo; zero divergenze aperte.
 
 #### F7-A2 · Responsive + collaudo dati + rilascio — 2 h
@@ -258,6 +263,8 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 ## 12. Regole di consegna per agente (riepilogo)
 
+- ⚠ **Tutto sul backend, MAI dai dati del frontend** (spec V12, D-28): ogni calcolo (provvigioni, bollettini, liquidazione, Analisi, totali, esportazioni) e ogni operazione sensibile (stati, verifiche, chiusure, abbinamenti, correzioni, permessi, eventi) si esegue sul server partendo dal database; il frontend mostra e invia solo le scelte (id, valori digitati, motivo); il server ricarica, ricontrolla e ricalcola, e non salva mai un valore calcolato arrivato dal browser. Il prototipo calcola nel browser solo perché è una dimostrazione. Vale per **ogni attività**: una PR che la viola non si unisce.
+
 
 - **Perché prima del cosa**: prima di implementare o cambiare un comportamento leggere il motivo nel registro delle decisioni (spec §19); se il codice si discosta dalla specifica, motivo nella PR e nuova riga al §19; commento breve nel codice che rimanda alla decisione nei punti non ovvi.
 1. **Prima** leggere la sezione di specifica citata nell'attività + i file prototipo indicati. **Il prototipo vince** su ogni interpretazione stilistica.
@@ -265,7 +272,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 3. Testi: copiare le stringhe dal prototipo; niente sinonimi "migliori".
 4. Eventi: §15.2 per operazione, scrittura nel service layer (§15.3), mai dal client.
 5. Tabelle legacy: **solo lettura** (V2) salvo le scritture già previste dalla Gestione Ordini.
-6. Prima del merge: checklist §11.1 compilata + `git diff --check` + test numerici seed.
+6. Prima del merge: checklist §1.1 compilata + `git diff --check` + test numerici seed.
 7. Conflitti: se due attività necessitano dello stesso file condiviso, la prevale in Fase 0 o l'attività lo dichiara all'orchestratore — mai edit contemporanei.
 
 ## 13. Riferimenti

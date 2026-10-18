@@ -33,6 +33,9 @@
       { tipo: 'tabella', colonne: COL_DETTAGLIO, righe: g.att.map(rigaDettaglio), variante: 'attesa',
         totale: { etichetta: 'Totale in attesa · ' + docs(g.att.length), valori: { 5: somma(g.att, 'importo'), 7: somma(g.att, 'provvigione') } } },
       { tipo: 'nota', testo: g.att.map(x => x.doc.numero + ': ' + x.motivo).join(' · '), stretta: true });
+    // regole particolari del subagente (D-27): agenzia, una fattura al mese, correzioni con motivo
+    const regole = g.liq.concat(g.att).filter(x => x.nota && x.regola !== 'standard');
+    if (regole.length) blocchi.push({ tipo: 'nota', testo: 'Provvigioni particolari: ' + regole.map(x => x.doc.numero + ': ' + x.nota).join(' · '), stretta: true });
     blocchi.push({ tipo: 'nota', testo: NOTA_DETTAGLIO });
     return { nome: g.foglio, titolo: 'Prospetto provvigioni · ' + g.s.nome, colonne: COL_DETTAGLIO, blocchi: blocchi, ctx: ctx, subagente: g.s.nome };
   }

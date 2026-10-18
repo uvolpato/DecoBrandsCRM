@@ -1060,6 +1060,8 @@ window.DATI_DEMO = {
   ],
 
   /* Liquidazioni ai subagenti già chiuse. */
+  /* Correzioni della quota del subagente su un singolo documento (D-27): { numero, tipo: pct|nessuna|importo, valore, motivo, da, il } */
+  correzioni_sub: [],
   liquidazioni_chiuse: [
     { anno: 2026, trimestre: 1, chiusa_il: '2026-04-10' },
     { anno: 2026, trimestre: 2, chiusa_il: '2026-07-10' }

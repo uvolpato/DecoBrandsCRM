@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 5.2 — **regola V12: ogni calcolo e operazione sensibile solo sul backend, mai da dati del frontend** (§2, §16.5, D-28); versione 5.1 — regole del subagente per cliente e per documento: % dell'agenzia, una fattura al mese, correzione sul documento con motivo (§4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §8.1, §10, §15.2.3, D-27); versione 5.0 — fotografia delle righe registrata nel cambio di stato della pratica, senza l'azione `snapshot_righe` (§15.2.4); percentuali dei fornitori con data di validità e calcolo per documento alla sua data; eccezioni personali dei subagenti inserite nel CRM; rotte delle pagine come il prototipo ufficiale; tolti i filtri vecchi della liquidazione; formula §10 sul netto dei documenti (§4.2.2, §4.2.3, §5.2, §5.11, §7, §7.5, §7.8, §8.1, §10, §13, §15.2.2, D-25, D-26); versione 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -61,6 +61,27 @@ preventivo.
 | V9 | Contenitori dati stabili | Ogni tabella è una **DataTable standard** (§16.4): occupa tutto lo spazio disponibile, intestazione fissa, righe scorrevoli, intestazioni ordinabili; il layout non cambia al variare del numero di righe |
 | V11 | Lettura documenti in locale | **GLM-OCR** servito da **vLLM** su un server aziendale con GPU, chiamato direttamente dal backend NestJS; nessun n8n, nessun servizio esterno; i documenti non escono dall'azienda (§6.5) |
 | V10 | Tracciamento eventi | Il sistema registra automaticamente gli eventi applicativi (CRUD, cambi di stato, upload/export, autenticazione) ed errori su `eventi_app` (§4.2.11), consultabili in sola lettura da `/eventi` (§7.11, §15); le tabelle della Gestione Ordini non vengono modificate (V2) |
+| **V12** | **Calcoli e operazioni sensibili solo sul backend** | **Ogni calcolo e ogni operazione sensibile si esegue sul server partendo dai dati del database, MAI da dati presi dal frontend**: il client mostra e invia solo le scelte dell'utente (vedi la regola qui sotto, D-28) |
+
+> ⚠ **REGOLA FONDAMENTALE — tutto sul backend, MAI dai dati del frontend (V12, D-28).**
+> Ogni calcolo e ogni operazione sensibile si esegue **sul server (NestJS)**, partendo **solo
+> dai dati del database**. Il frontend **mostra** i risultati e **invia soltanto le scelte**
+> dell'utente (id, valori digitati, motivo); il server **non usa mai** importi, percentuali,
+> totali, stati, permessi o utente arrivati dal browser.
+> - **Calcoli**: provvigioni, scaglioni ed eccezioni, regole del subagente, netto dei
+>   documenti, differenze dei bollettini, liquidazione, storni, Analisi, totali delle
+>   tabelle, esportazioni (Excel/PDF/CSV generati dal server).
+> - **Operazioni sensibili**: cambi di stato, verifiche e chiusure (bollettino, trimestre),
+>   abbinamenti, correzioni, permessi (`requirePermesso`), utente e data dell'evento,
+>   registro eventi.
+> - Ogni richiesta che modifica qualcosa **ricarica dal database** ciò che serve, **ricontrolla**
+>   regole, vincoli e permessi e **ricalcola**; un valore calcolato mandato dal client si
+>   ignora (o la richiesta si rifiuta), mai si salva.
+> - Il prototipo calcola nel browser **solo perché è una dimostrazione senza server**: non è
+>   un modello da copiare.
+>
+> **Perché**: dal browser chiunque può cambiare qualsiasi valore; le provvigioni sono soldi e
+> il registro deve essere vero.
 
 ---
 
@@ -239,8 +260,16 @@ si incassa / si paga**.
 | `sconto_max` | NUMERIC(5,2) DEFAULT 100 | |
 | `pct_agente` | NUMERIC(5,2) DEFAULT 0 | % che incassa Decobrands dal fornitore |
 | `pct_subagente` | NUMERIC(5,2) DEFAULT 0 | % che Decobrands paga al subagente |
+| `valido_dal` | DATE NOT NULL | data da cui valgono le percentuali (versione); un documento usa la versione con `valido_dal` ≤ data del documento più recente (§5.11, D-25) |
 | `ordinamento` | INT DEFAULT 0 | |
 | `created_at` | TIMESTAMPTZ | |
+| Vincolo | `UNIQUE(fornitore_id, sconto_min, valido_dal)` | uno scaglione per sconto in ogni versione |
+
+*Nuove percentuali da una data* (scheda del fornitore, §7.4) crea una nuova versione di
+tutti gli scaglioni del fornitore con la data indicata; le versioni precedenti restano e
+calcolano i documenti di prima. **Perché** (D-25): le condizioni cambiano dal periodo in cui
+vengono riviste e i documenti precedenti vanno riletti con le percentuali di allora, anche
+quelli non ancora in un bollettino verificato e nell'Analisi dei periodi passati.
 
 Esempio reale (fornitore Gries):
 
@@ -265,7 +294,10 @@ il valore vince sulla percentuale standard dello scaglione.
 | `pct_override` | NUMERIC(5,2) NOT NULL | |
 | `created_at` | TIMESTAMPTZ | |
 
-> Nota: modello dati presente; la gestione UI delle eccezioni è in backlog (§13).
+> Le eccezioni si **inseriscono, modificano ed eliminano nel CRM**, dalla scheda del
+> subagente (§7.5, D-26). Valgono sulla versione delle percentuali in vigore quando si
+> salvano; con *Nuove percentuali da una data* passano alla nuova versione con la stessa
+> percentuale. Vincolo `UNIQUE(scaglione_id, subagente_id)`.
 
 ### 4.2.4 `agenti`
 
@@ -305,6 +337,8 @@ presso un fornitore e con quale sconto.
 | `fornitore_id` | BIGINT FK → `fornitori` | ON DELETE CASCADE |
 | `codice_cliente_fornitore` | VARCHAR(50) | nullable — **codice con cui il fornitore identifica il cliente** (quello stampato su conferma e fattura): è la chiave per abbinare il documento ricevuto alla pratica (§4.4) |
 | `discount` | NUMERIC(5,2) DEFAULT 0 | **sconto accordato al cliente su quel fornitore** — determina lo scaglione (**§4.4**) |
+| `pct_subagente` | NUMERIC(5,2) NULL | % al subagente **per questo cliente** su questo fornitore; NULL = quella dello scaglione o dell'eccezione (§5.2, D-27) |
+| `regola_mensile` | VARCHAR(10) NULL | NULL = provvigione al subagente su ogni fattura; `prima` · `piu_alta` = **una fattura al mese** (la prima o la più alta del mese), le altre a zero (§5.2, D-27) |
 | `attivo` | BOOLEAN DEFAULT true | |
 | `created_at` | TIMESTAMPTZ | |
 | Vincolo | `UNIQUE(subagente_id, cliente_piva, fornitore_id)` | un solo subagente per cliente×fornitore (**§5.10**) |
@@ -376,6 +410,22 @@ singoli `fattura_*` della testata.
 > con lo stesso `numero`/`tipo` ricostruisce il totale della fattura; la provvigione
 > si calcola sulla quota di pratica, non sul totale. Stessa cosa per una nota di credito
 > che storna fatture di più pratiche.
+
+#### 4.2.7.2 `provvigioni_correzioni`
+
+Correzione della **quota del subagente** su un singolo documento fiscale (§5.2, D-27). Vince
+su ogni altra regola; non cambia quanto riconosce il fornitore.
+
+| Colonna | Tipo | Note |
+|---------|------|------|
+| `id` | BIGSERIAL PK | |
+| `documento_id` | BIGINT FK → `ordini_fornitore_documenti` UNIQUE | una correzione per documento |
+| `tipo` | VARCHAR(10) | `pct` (altra percentuale) · `nessuna` · `importo` (importo fisso in euro) |
+| `valore` | NUMERIC(12,2) | % (0–100) o euro; 0 per `nessuna` |
+| `motivo` | TEXT NOT NULL | obbligatorio; compare nel prospetto del subagente (§11) |
+| `creato_da` · `creato_il` | BIGINT FK → `users` · TIMESTAMPTZ | |
+
+Si modifica solo finché il trimestre di liquidazione del documento è aperto.
 
 ### 4.2.8 `ordini_fornitore_righe`
 
@@ -458,7 +508,7 @@ nessuna UPDATE/DELETE in esercizio.
 | `utente_id` | BIGINT FK → `users` | NULL per eventi di sistema / login non riuscito |
 | `sessione_id` | VARCHAR(100) | sessione server-side (per eventi `auth`) |
 | `tipo` | VARCHAR(30) | `auth` · `crud` · `stato` · `documento` · `calcolo` · `export` · `errore` |
-| `entita` | VARCHAR(50) | `fornitore`, `scaglione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `documento`, `bollettino`, `riga_bollettino`, `liquidazione`, `ordine_cliente`, `alias`, `kit`, `utente`, `sistema` |
+| `entita` | VARCHAR(50) | `fornitore`, `scaglione`, `eccezione`, `correzione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `documento`, `bollettino`, `riga_bollettino`, `liquidazione`, `ordine_cliente`, `alias`, `kit`, `utente`, `sistema` |
 | `entita_id` | BIGINT | id dell'entità coinvolta (dove applicabile) |
 | `azione` | VARCHAR(30) | `create` · `update` · `delete` · `upload` · `export` · `change_state` · `verify` · `login` · `logout` · `change_password` · `reset_requested` · `access_denied` · `error` |
 | `esito` | VARCHAR(10) | `successo` · `errore` · `negato` |
@@ -601,7 +651,7 @@ fornitori 1 ── n provvigioni_scaglioni 1 ── n provvigioni_eccezioni (→
 fornitori 1 ── n interscambio ── n 1 subagenti n ── 1 agenti
 fornitori 1 ── n ordini_fornitore_testata 1 ── n ordini_fornitore_righe
 fornitori 1 ── n bollettini_testata 1 ── n bollettini_righe
-ordini_fornitore_testata 1 ── n ordini_fornitore_documenti (fatture e note di credito, §4.2.7.1)
+ordini_fornitore_testata 1 ── n ordini_fornitore_documenti (fatture e note di credito, §4.2.7.1) 1 ── 0..1 provvigioni_correzioni (§4.2.7.2)
 interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)
 interscambio (fornitore_id, codice_cliente_fornitore) → ordini_fornitore_testata (cliente_piva, fornitore_id)
 ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1)
@@ -625,8 +675,8 @@ users 1 ── n eventi_app  (audit append-only, §15)
   (confermato dall'operatore, §6.1).
 - `conferma_scadenza` viene valorizzata automaticamente alla creazione della pratica
   con `data_ordine + giorni_attesa_conferma` (§6.1).
-- Le percentuali storiche vengono congelate su `bollettini_righe` (§5.11); il versioning
-  degli scaglioni per periodo è in backlog (§13).
+- Le percentuali hanno una data di validità (`provvigioni_scaglioni.valido_dal`, D-25); in
+  più i valori calcolati si congelano su `bollettini_righe` alla verifica (§5.11).
 - Le **righe per fase** (`ordini_fornitore_righe.fase`) non si sovrascrivono: conservano
   la fotografia di ordine, conferma e fattura, così il confronto fra fasi resta
   ispezionabile a posteriori (§5.8, §7.3).
@@ -669,10 +719,30 @@ La provvigione si determina dallo **sconto accordato al cliente sul fornitore**
 
 Le eccezioni sono **rarissime**: tutti i subagenti hanno la stessa provvigione. Se
 esiste una `provvigioni_eccezioni` per lo scaglione/subagente, `pct_override` vince sulla
-percentuale standard. Gli sconti speciali usati solo per differire la provvigione (es.
-`1%` = eccezione `3%` del subagente Bastasin) si gestiscono a mano fuori dal calcolo
-automatico; per quei clienti le provvigioni non vengono riconosciute per ogni ordine ma
-**solo una fattura al mese**.
+percentuale standard. Si inseriscono nel CRM dalla scheda del subagente (§7.5) e il motore
+le applica da solo (es. `1%` = eccezione `3%` del subagente Bastasin).
+**Perché** (D-26): tutto il calcolo delle provvigioni deve stare nel CRM; un'eccezione
+gestita fuori non comparirebbe né nella liquidazione né nell'Analisi.
+
+**Regole del subagente per cliente e per documento** (D-27). La quota del subagente su un
+documento si decide così, vince la prima regola presente:
+
+1. **correzione sul documento** (`provvigioni_correzioni`, §4.2.7.2): altra %, nessuna o
+   importo fisso, con motivo obbligatorio; da Liquidazioni (§7.8);
+2. **una fattura al mese** sull'agenzia (`interscambio.regola_mensile`): conta la prima o la
+   più alta fattura del mese per quel cliente e fornitore; le altre danno 0 al subagente (le
+   note di credito seguono la fattura a cui si riferiscono);
+3. **% dell'agenzia** (`interscambio.pct_subagente`): vale solo per quel cliente;
+4. **eccezione personale** sullo scaglione (§4.2.3);
+5. **% standard** dello scaglione.
+
+Le regole riguardano solo quanto si paga al subagente: quanto riconosce il fornitore segue
+lo scaglione e si controlla nel bollettino (§6.2). Lo "sconto fittizio" (es. 1 % per dare a
+Bastasin il 3 %) non serve più: lo sconto dell'agenzia resta quello vero.
+
+**Perché** (D-27): gli accordi con i subagenti sono vari e non tutti prevedibili; con
+agenzia, regola mensile e correzione sul documento ogni caso si gestisce nel CRM senza
+cambiare il codice, e ogni scostamento resta motivato e tracciato.
 
 ### 5.3 Zero, trattino e note di credito
 
@@ -779,9 +849,14 @@ residui vengono risolti internamente da Marco.
 ### 5.11 Le percentuali nel tempo
 
 Le condizioni nuove valgono **dal periodo in cui vengono riviste**; quelle precedenti
-vanno rilette con le percentuali di allora. Implementazione: `bollettini_righe` congelano
-`pct_calcolata`/`importo_calcolato` alla verifica; la rilettura di un mese passato
-usa i valori congelati. Versioning degli scaglioni per periodo = estensione (§13).
+vanno rilette con le percentuali di allora. Implementazione:
+- ogni versione delle percentuali ha la sua data (`provvigioni_scaglioni.valido_dal`): ogni
+  documento si calcola con la versione in vigore alla **sua data** (D-25);
+- in più `bollettini_righe` congelano `pct_calcolata`/`importo_calcolato` alla verifica: un
+  mese verificato non cambia più, nemmeno se si corregge una versione.
+
+**Perché** (D-25): il solo congelamento copriva i mesi già verificati, non i documenti ancora
+in attesa del bollettino né l'Analisi dei periodi passati.
 
 ### 5.12 Alert solo in-app
 
@@ -1138,23 +1213,24 @@ di Decobrands; tempi e memoria video con analisi della pagina attiva.
 
 ## 7. Schermate
 
-| # | Route | Schermata |
+Le rotte sono quelle del prototipo ufficiale (§7.10, D-24): nell'app lo stesso percorso
+senza `#`.
+
+| # | Rotta | Schermata |
 |---|-------|-----------|
-| 1 | `/login` | Login |
-| 2 | `/dashboard` (Oggi) | Cose da fare, per gruppi (home dopo login) |
-| 3 | `/ordini-fornitore` | Elenco pratiche ordini fornitore |
-| 4 | `/ordini-fornitore/:id` | Dettaglio pratica (tab per fase + strip riepilogo + righe + storico) |
-| 5 | `/fornitori` | Anagrafica fornitori |
-| 6 | `/fornitori/:id` | Dettaglio fornitore con scaglioni |
-| 7 | `/agenti` | Agenti + subagenti |
-| 8 | `/clienti`, `/clienti/:piva` | Clienti (da Integra) con le loro agenzie |
-| 9 | `/bollettini` | Elenco bollettini con stato e differenze |
-| 10 | `/bollettini/:id` | Dettaglio bollettino con righe e divergenze |
-| 11 | `/liquidazione` | Rendiconto provvigioni subagenti |
-| 12 | `/login`, `/cambia-password`, `/richiedi-reset`, `/reset-password` | Credenziali (condivise con la Gestione Ordini) |
-| 13 | `/ordini`, `/ordini/upload`, `/liste` | Gestione ordini cliente |
-| 14 | `/utenti`, `/sistema`, `/impostazioni/:sezione`, `/scartati`, `/guida/:argomento` | Gestione (§7.13–§7.17) |
-| 15 | `/eventi` | Log eventi applicativi: CRUD, cambi di stato, upload/export, autenticazione, errori (admin) |
+| 1 | `/login`, `/cambia-password`, `/richiedi-reset`, `/reset-password` | Credenziali (condivise con la Gestione Ordini) |
+| 2 | `/` | Oggi: cose da fare per gruppi (home dopo l'accesso, §7.1) |
+| 3 | `/documenti`, `/documenti/:id` | Ingresso documenti (§7.9) |
+| 4 | `/pratiche`, `/pratiche/:id` | Elenco e dettaglio delle pratiche (§7.2, §7.3) |
+| 5 | `/bollettini`, `/bollettini/:id` | Matrice di 6 mesi e riconciliazione (§7.7) |
+| 6 | `/liquidazioni/:anno/:t` | Liquidazione del trimestre (§7.8) |
+| 7 | `/analisi` | Analisi (§7.22) |
+| 8 | `/fornitori`, `/fornitori/:id` | Fornitori con percentuali e clienti seguiti (§7.4) |
+| 9 | `/subagenti`, `/subagenti/:id` | Subagenti con eccezioni personali (§7.5) |
+| 10 | `/clienti`, `/clienti/:piva` | Clienti (da Integra) con le loro agenzie (§7.6) |
+| 11 | `/utenti/:id`, `/sistema`, `/impostazioni/:sezione`, `/scartati`, `/guida/:argomento` | Gestione (§7.13–§7.17) |
+| 12 | `/eventi` | Registro eventi (amministratore, §7.11) |
+| — | `/ordini-cliente`, `/articoli`, `/giacenze`, `/alias-kit` | Vendita diretta: spenta, ampliamento futuro (§17) |
 
 ### 7.1 Oggi (`/dashboard`)
 
@@ -1290,13 +1366,22 @@ Contenuti di dettaglio (dal primo prototipo, restano validi come elenco dei dati
 - Sotto i dati del fornitore due **schede**: **Percentuali** (in vigore da una data, con
   *Nuove percentuali da una data* e le versioni) e **Clienti seguiti** in sola lettura
   (vista inversa delle agenzie, §7.6); ogni scheda ha la sua tabella che riempie lo spazio.
-- Dettaglio con **tabella scaglioni** editabile (sconto min/max, % agente, % subagente);
-  gestione eccezioni per subagente (backlog).
+- Dettaglio con **tabella scaglioni** (sconto, % a Decobrands, % al subagente con le
+  eccezioni personali sotto, totale dal fornitore, clienti); le percentuali non si
+  modificano: si crea una nuova versione con *Nuove percentuali da una data* (§5.11, D-25).
 
-### 7.5 Agenti e subagenti (`/agenti`)
+### 7.5 Subagenti (`/subagenti`, `/subagenti/:id`)
 
-- Elenco agenti (con n° subagenti) + elenco subagenti con riferimenti agente.
-- CRUD di entrambi.
+- L'agente è uno solo, Decobrands SRL (§5.4): non ha una pagina.
+- **Elenco** (sinistra): subagente con email, clienti seguiti, liquidabile e in attesa nel
+  trimestre in corso; *Nuovo subagente*.
+- **Scheda** (destra): dati, *Modifica*, *Elimina* (solo senza clienti né provvigioni,
+  altrimenti *Rendi non attivo*), *Vedi la liquidazione*; clienti seguiti con la sua %.
+- **Eccezioni personali** (D-26): elenco (fornitore, sconto, data delle percentuali, sua %
+  invece della standard) e *Aggiungi eccezione*. La finestra chiede fornitore (campo di
+  ricerca), sconto (dagli scaglioni del fornitore) e % al subagente (0–100); clic su
+  un'eccezione la modifica o la elimina. Controlli: fornitore esistente, percentuale fra 0
+  e 100, un'eccezione per subagente e scaglione. Permesso `anagrafiche` (§8.3).
 
 ### 7.6 Clienti e agenzie (`/clienti`, `/clienti/:piva`)
 
@@ -1314,8 +1399,12 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
     cliente del fornitore, seguito da, provvigione totale con quota del subagente e
     sconto, pratiche aperte con quel fornitore. Clic su una riga apre la modifica, con
     *Elimina*. Il cliente è fisso; fornitore e subagente sono campi di ricerca (§16.4); gli
-    sconti proposti seguono gli scaglioni del fornitore scelto. Vincoli: un solo
-    subagente per cliente × fornitore (§5.10), codice unico per fornitore.
+    sconti proposti seguono gli scaglioni del fornitore scelto. In più (D-27): *Al
+    subagente per questo cliente %* (vuoto = quella dello scaglione) e *Provvigione al
+    subagente* (*Su ogni fattura* · *Una fattura al mese: la prima* · *Una fattura al mese:
+    la più alta*); la colonna provvigione mostra "(del cliente)" e "una fattura al mese".
+    Vincoli: un solo subagente per cliente × fornitore (§5.10), codice unico per fornitore,
+    percentuale fra 0 e 100.
   - **Pratiche** (meno usata, con filtro): segmenti *Aperte · In ritardo · Fatturate ·
     Non pagate · Tutte* (iniziale *Aperte*; *Non pagate* = pratiche con una fattura non
     pagata o da verificare, §5.14; numeri dei segmenti calcolati con gli altri filtri,
@@ -1416,11 +1505,9 @@ pagina sua e non deve togliere spazio al controllo (D-18).
 
 Dettaglio (colonna sinistra e scheda *Documenti*):
 
-- **Filtri in card**: fornitore (**multifiltro a checkbox**: selezione multipla,
-  "Tutti i fornitori" di default, etichetta con contatore; nessun fornitore
-  selezionato = nessuna riga), subagente, trimestre, anno.
-- **KPI del periodo**: documenti liquidabili, totale merce, provvigione agente,
-  provvigione subagenti (solo pratiche `fatturato` del periodo, §5.5; V9).
+- **Filtri**: il trimestre (riquadri in alto) e il subagente (elenco a sinistra); niente
+  altre barre di filtri né riquadri numerici: i numeri stanno nel *Report subagenti* (D-18,
+  D-22).
 - **Riepilogo e dettaglio affiancati** (prototipo `prototipo-alternativo/`, pagina
   Liquidazioni): a sinistra l'**elenco dei subagenti** (DataTable: nome, n° documenti,
   da liquidare / liquidato, in attesa dei bollettini; riga totale; ordinabile), a destra
@@ -1435,6 +1522,14 @@ Dettaglio (colonna sinistra e scheda *Documenti*):
   liquidazione ancora aperta dopo la chiusura del bollettino che li contiene, con segno *Storno: cliente non pagante* (provvigione
   negativa) o *Riaccredito*, e il riferimento alla fattura e al trimestre d'origine; si
   sommano alla liquidazione del subagente come le note di credito.
+- **Correzione sul documento** (D-27): sotto la provvigione di ogni documento (non sulle
+  voci di storno o riaccredito) *Correggi*, oppure *Cambia la correzione*. La finestra
+  mostra cliente, fornitore, imponibile e provvigione attuale e chiede *Altra
+  percentuale* · *Importo fisso* · *Nessuna provvigione*, il valore e il **motivo
+  obbligatorio**; *Togli la correzione* torna alla regola normale. Solo a trimestre aperto
+  e con il permesso `modifica`. Sotto la provvigione compare la regola applicata
+  (percentuale dell'agenzia, una fattura al mese, eccezione personale, correzione con il
+  motivo); nel prospetto esportato una nota *Provvigioni particolari* le elenca.
 
 ### 7.9 Documenti (`/documenti`)
 
@@ -1976,27 +2071,30 @@ conferma · Codice non in Integra*.
 
 ### 8.1 Rotte nuove (CRM)
 
-Le pagine (`GET /dashboard`, `/fornitori`, …) sono servite da Next.js; le rotte `/api/*`
-da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
+Le pagine (`/`, `/pratiche`, `/fornitori`, …, §7) sono servite da Next.js; le rotte `/api/*`
+da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4). Le pagine seguono le
+rotte del prototipo (§7.10); le API tengono i nomi delle tabelle (es. `ordini-fornitore` =
+pratiche).
 
 | Metodo | Endpoint | Funzione |
 |--------|----------|----------|
-| GET | `/dashboard` | pagina dashboard |
+| GET | `/` | pagina Oggi |
 | GET | `/fornitori` · `/fornitori/:id` | elenco / dettaglio fornitori |
 | POST | `/api/fornitori` | crea fornitore |
 | PUT | `/api/fornitori/:id` | aggiorna fornitore |
-| POST | `/api/fornitori/:id/scaglioni` | aggiunge scaglione |
-| DELETE | `/api/scaglioni/:id` | elimina scaglione |
+| POST | `/api/fornitori/:id/percentuali` | nuova versione delle percentuali da una data: `{valido_dal, scaglioni: [{sconto, pct_agente, pct_subagente}]}`; copia le eccezioni sulla nuova versione (§5.11, D-25) |
+| POST | `/api/eccezioni` | nuova eccezione personale `{subagente_id, fornitore_id, sconto, pct_override}` sullo scaglione in vigore (§5.2, D-26) |
+| PUT · DELETE | `/api/eccezioni/:id` | modifica · elimina eccezione |
 | GET | `/api/fornitori-lista` | dropdown fornitori attivi |
-| GET | `/agenti` · `/api/agenti-lista` · `/api/subagenti` | anagrafica agenti/subagenti |
-| POST | `/api/agenti` · PUT `/api/agenti/:id` · DELETE `/api/agenti/:id` | CRUD agente |
+| GET | `/subagenti` · `/subagenti/:id` · `/api/subagenti` | subagenti con clienti seguiti ed eccezioni |
 | POST | `/api/subagenti` · PUT `/api/subagenti/:id` · DELETE `/api/subagenti/:id` | CRUD subagente |
 | GET | `/clienti` · `/clienti/:piva` | clienti (sola lettura) con le agenzie |
 | POST | `/api/interscambio` | nuova agenzia del cliente |
 | PUT | `/api/interscambio/:id` | modifica agenzia (codice, subagente, sconto) |
 | DELETE | `/api/interscambio/:id` | elimina agenzia |
+| PUT · DELETE | `/api/documenti-fiscali/:id/correzione` | correzione della quota del subagente `{tipo, valore, motivo}` · la toglie (§4.2.7.2, D-27; permesso `modifica`, trimestre aperto) |
 | GET | `/api/integra/stato` | ultima sincronizzazione per vista (§4.5) |
-| GET | `/ordini-fornitore` · `/ordini-fornitore/:id` | elenco / dettaglio pratiche |
+| GET | `/pratiche` · `/pratiche/:id` | elenco / dettaglio pratiche |
 | POST | `/api/ordini-fornitore` | crea pratica |
 | PUT | `/api/ordini-fornitore/:id` | aggiorna pratica (stati, conferma, fattura) |
 | DELETE | `/api/ordini-fornitore/:id` | elimina pratica |
@@ -2009,7 +2107,7 @@ da NestJS, raggiunte tramite l'inoltro di Next (stessa origine, §3.4).
 | PUT | `/api/bollettini/:id` | aggiorna stato/note |
 | POST | `/api/bollettini/:id/righe` | aggiunge riga (calcolo atteso + differenza) |
 | DELETE | `/api/bollettini/:id/righe/:rid` | elimina riga |
-| GET | `/liquidazione` | rendiconto provvigioni |
+| GET | `/liquidazioni/:anno/:t` | liquidazione del trimestre |
 | GET | `/api/liquidazione/export?anno&trimestre&scelta=tutto\|uno\|riepilogo&subagente&formato=xlsx\|pdf\|csv` | file Excel della liquidazione (§11) |
 | GET | `/documenti` · `/api/documenti` | ingresso documenti: elenco da controllare (§7.9) |
 | POST | `/api/documenti/carica` | caricamento manuale (uno o più file) → coda |
@@ -2052,7 +2150,7 @@ rotte; ogni rotta dichiara il **permesso** richiesto, verificato lato server
 | Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche (`consulta`) | ✓ | ✓ | ✓ |
 | Esportare le liquidazioni in Excel, PDF, CSV (`esporta`) | ✓ | ✓ | ✓ |
 | Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti (`modifica`) | ✓ | ✓ | — |
-| Condizioni dei fornitori, agenzie dei clienti, subagenti (`anagrafiche`) | ✓ | ✓ | — |
+| Condizioni e percentuali dei fornitori, agenzie dei clienti, subagenti ed eccezioni personali (`anagrafiche`) | ✓ | ✓ | — |
 | Chiudere la liquidazione del trimestre (`chiudi`) | ✓ | ✓ | — |
 | Vedere e recuperare i documenti scartati (`scartati`) | ✓ | ✓ | — |
 | Stato del sistema, segnare i problemi come visti (`sistema`) | ✓ | ✓ | — |
@@ -2082,26 +2180,37 @@ il confronto del bollettino (§6.2).
 
 ## 10. Calcolo delle provvigioni — formulario
 
-Base = `importo_merce` della pratica fatturata (o confermata, a seconda dello stato
-§5.8).
+La provvigione si calcola **per documento fiscale** (fattura o nota di credito) della
+pratica, mai sull'ordine o sulla conferma (§5.8): la base è l'imponibile del documento e la
+somma dei documenti è il netto della pratica (§4.2.7.1, §5.3).
 
 ```
-Scaglione applicato:
-  sconto_cliente_fornitore (interscambio.discount)  ∈  [sconto_min, sconto_max]
-  → pct_agente, pct_subagente  (o pct_override da provvigioni_eccezioni se presente)
+Per ogni documento d della pratica (fattura > 0, nota di credito < 0):
+  versione  = scaglioni del fornitore con valido_dal ≤ d.data, la più recente (§5.11)
+  scaglione = sconto del cliente sul fornitore (interscambio.discount) ∈ [sconto_min, sconto_max]
+  pct_agente, pct_subagente dello scaglione
+    (pct_override da provvigioni_eccezioni del subagente su quello scaglione, se presente, §5.2)
 
-provv_agente     = importo_merce × pct_agente / 100
-provv_subagente  = importo_merce × pct_subagente / 100
-provv_totale     = provv_agente + provv_subagente
+  provv_agente(d)    = d.importo × pct_agente / 100
+  provv_subagente(d) = regole del subagente (§5.2, D-27), nell'ordine:
+                       correzione sul documento → una fattura al mese → % dell'agenzia
+                       → eccezione → d.importo × pct_subagente / 100
+  atteso dal fornitore(d) = provv_agente(d) + provv_subagente(d)
 
-Nota di credito: importo_merce < 0 → provvigioni negative (§5.3)
+Pratica: provvigione = Σ sui documenti; nota di credito totale → la fattura stornata va a 0
 pct_agente = 0 e pct_subagente = 0 → nessuna provvigione
+Pratica senza fatture → nessuna provvigione maturata (il Riepilogo può mostrare l'attesa
+sull'importo dell'ordine, solo come stima)
 ```
 
 Il motore gira **solo lato server** (servizio NestJS): l'interfaccia mostra i valori
-calcolati, non li ricalcola. Il rendiconto usa i dati fatturati del periodo filtrato; le percentuali sono risolte
-al volo dagli scaglioni correnti (o dalle eccezioni). Per i periodi passati i valori
-restano quelli congelati nel bollettino (§5.11).
+calcolati, non li ricalcola. Per i mesi con bollettino verificato valgono i valori congelati
+(§5.11).
+
+**Perché**: la provvigione la riconosce il fornitore sul fatturato; calcolarla sull'ordine
+sbaglierebbe conferme ridotte, fatture in più tranche e note di credito. Il calcolo per
+documento con la percentuale alla sua data tiene insieme percentuali datate (D-25),
+liquidazione e Analisi (D-19).
 
 ---
 
@@ -2188,9 +2297,9 @@ Anagrafiche di riferimento per il collaudo:
 
 | # | Argomento | Nota |
 |---|-----------|------|
-| B1 | Gestione UI delle `provvigioni_eccezioni` | modello dati pronto, UI da sviluppare |
+| B1 | ~~Gestione UI delle `provvigioni_eccezioni`~~ | chiuso: le eccezioni si inseriscono dalla scheda del subagente (§7.5, D-26); resta da chiarire la regola "una fattura al mese" dei clienti con sconto fittizio (§5.2) |
 | B2 | Riga bollettino con solo totale cliente | supportare riga aggregata (cliente + totale) nel confronto |
-| B3 | Versioning scaglioni per periodo | rilettura storica automatica (§5.11) |
+| B3 | ~~Versioning scaglioni per periodo~~ | chiuso: percentuali con data di validità (§4.2.2, §5.11, D-25) |
 | B4 | Consolidamento sconto | `interscambio.discount` resta il campo canonico (§5.7); `fornitori.discount` è un semplice default |
 | B5 | ~~Upload documenti~~ | chiuso: incluso nell'implementazione (multer, §3.4) |
 | B6 | Dati storici / popolamento iniziale | capire se importare le prassi dagli Excel manuali |
@@ -2263,14 +2372,16 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 | POST `/richiedi-reset` | `auth` | `reset_requested` | `utente` | `successo` | `{etichetta}` |
 | Richiesta a rotta `requireAdmin` senza il ruolo (§3.3) | `auth` | `access_denied` | `utente` | `negato` | `{etichetta, rotta, metodo}` (`ip` valorizzato) |
 
-#### 15.2.2 Anagrafiche — fornitori e scaglioni (§8.1)
+#### 15.2.2 Anagrafiche — fornitori, percentuali ed eccezioni (§8.1)
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
 | POST `/api/fornitori` | `crud` | `create` | `fornitore` | `successo` | `{etichetta: ragione_sociale, p_iva, giorni_attesa_conferma, giorno_bollettino, payment_type, attivo}` |
 | PUT `/api/fornitori/:id` | `crud` | `update` | `fornitore` | `successo` | `{etichetta, prima: {…campi cambiati}, dopo: {…}}` |
-| POST `/api/fornitori/:id/scaglioni` | `crud` | `create` | `scaglione` | `successo` | `{etichetta: sconto min–max, fornitore_id, sconto_min, sconto_max, pct_agente, pct_subagente}` |
-| DELETE `/api/scaglioni/:id` | `crud` | `delete` | `scaglione` | `successo` | `{etichetta, scaglione_id, fornitore_id, sconto_min, sconto_max, pct_agente, pct_subagente}` |
+| POST `/api/fornitori/:id/percentuali` | `crud` | `create` | `scaglione` | `successo` | `{etichetta: fornitore · dal valido_dal, fornitore_id, valido_dal, scaglioni: [{sconto_min, sconto_max, pct_agente, pct_subagente}], eccezioni_copiate}` (un evento per versione, non per scaglione) |
+| POST `/api/eccezioni` | `crud` | `create` | `eccezione` | `successo` | `{etichetta: subagente · fornitore sconto, subagente_id, scaglione_id, pct_override}` |
+| PUT `/api/eccezioni/:id` | `crud` | `update` | `eccezione` | `successo` | `{etichetta, prima, dopo}` |
+| DELETE `/api/eccezioni/:id` | `crud` | `delete` | `eccezione` | `successo` | `{etichetta, eccezione_id, subagente_id, scaglione_id, pct_override}` |
 
 > Il fornitore **non si elimina** via API: si disattiva con `attivo=false`
 > (evento `crud/update`).
@@ -2282,7 +2393,9 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 | create/update/delete agente | `crud` | `create`/`update`/`delete` | `agente` | `successo` | create/delete: `{etichetta: cognome, nome}`; update: `{etichetta, prima, dopo}` |
 | create/update/delete subagente | `crud` | `create`/`update`/`delete` | `subagente` | `successo` | come agente (create include `agente_id`) |
 | POST `/api/interscambio` | `crud` | `create` | `interscambio` | `successo` | `{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}` |
-| PUT `/api/interscambio/:id` | `crud` | `update` | `interscambio` | `successo` | `{etichetta, prima, dopo}` |
+| PUT `/api/interscambio/:id` | `crud` | `update` | `interscambio` | `successo` | `{etichetta, prima, dopo}` (comprende `pct_subagente` e `regola_mensile`) |
+| PUT `/api/documenti-fiscali/:id/correzione` | `crud` | `create` · `update` | `correzione` | `successo` | `{etichetta: numero · subagente, documento_id, prima, dopo: {tipo, valore, motivo}}` |
+| DELETE `/api/documenti-fiscali/:id/correzione` | `crud` | `delete` | `correzione` | `successo` | `{etichetta, documento_id, tipo, valore, motivo}` |
 | DELETE `/api/interscambio/:id` | `crud` | `delete` | `interscambio` | `successo` | `{etichetta, interscambio_id, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, discount}` |
 
 #### 15.2.4 Pratiche ordine a fornitore (§8.1)
@@ -2291,7 +2404,7 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 |------------------|--------|----------|----------|---------|-------------|
 | POST `/api/ordini-fornitore` | `crud` | `create` | `pratica` | `successo` | `{etichetta: numero_ordine, fornitore_id, cliente_piva, ordine_cliente_id, agente_id, importo_merce, stato}` |
 | PUT `/api/ordini-fornitore/:id` **senza** cambio stato | `crud` | `update` | `pratica` | `successo` | `{etichetta, prima, dopo}` (lo `stato` è **escluso** dal diff) |
-| PUT `/api/ordini-fornitore/:id` **con** cambio stato | `stato` | `change_state` | `pratica` | `successo` | `{etichetta, prima: {stato}, dopo: {stato}, motivo: note}` |
+| PUT `/api/ordini-fornitore/:id` **con** cambio stato | `stato` | `change_state` | `pratica` | `successo` | `{etichetta, prima: {stato}, dopo: {stato}, motivo: note}`; se il cambio salva le righe della nuova fase, anche `{da_fase, a_fase, n_righe, importo, scostamento_vs_fase_precedente}` |
 | PUT con **entrambi** (cambio stato + altri campi) | `crud`+`stato` | `update`+`change_state` | `pratica` | `successo` | **due eventi separati**, come da righe precedenti |
 | POST `/api/ordini-fornitore/:id/righe` | `crud` | `create` | `riga_pratica` | `successo` | `{etichetta: codice · descrizione, pratica_id, riga_numero, codice, descrizione, quantita, prezzo, importo}` |
 | DELETE `/api/ordini-fornitore/:id/righe/:rid` | `crud` | `delete` | `riga_pratica` | `successo` | `{etichetta, riga_pratica_id, pratica_id, codice, descrizione}` |
@@ -2303,7 +2416,7 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 | POST `/api/ordini-fornitore/:id/documenti` (fattura/nota di credito, §4.2.7.1) | `documento` | `create` | `documento` | `successo` | `{etichetta: numero · tipo, pratica_id, documento_id, tipo, numero, data, importo, storno_totale, fattura_riferimento}` |
 | PUT `/api/ordini-fornitore/:id/documenti/:did` | `documento` | `update` | `documento` | `successo` | `{etichetta, documento_id, pratica_id, prima, dopo}` |
 | DELETE `/api/ordini-fornitore/:id/documenti/:did` | `documento` | `delete` | `documento` | `successo` | `{etichetta, documento_id, pratica_id, tipo, numero, importo}` |
-| PUT che fa avanzare di fase le righe (ordine→conferma→fattura, §5.8) | `stato` | `snapshot_righe` | `pratica` | `successo` | `{etichetta, pratica_id, da_fase, a_fase, n_righe, importo, scostamento_vs_fase_precedente}` |
+| PUT che fa avanzare di fase le righe (ordine→conferma→fattura, §5.8) | `stato` | `change_state` | `pratica` | `successo` | **nessun evento in più**: la fotografia delle righe è parte del cambio di stato; il dettaglio dell'evento `stato/change_state` della riga sopra aggiunge `{da_fase, a_fase, n_righe, importo, scostamento_vs_fase_precedente}`. **Perché**: l'elenco delle azioni (§4.2.11) è chiuso e il catalogo vuole una riga per operazione |
 
 #### 15.2.5 Bollettini e righe bollettino (§8.1)
 
@@ -2688,6 +2801,28 @@ altezza propria, l'elemento "riempi" (di norma la DataTable) prende il resto. So
 
 ### 16.5 Regole di consegna
 
+> ⚠ **REGOLA FONDAMENTALE — tutto sul backend, MAI dai dati del frontend (V12, D-28).**
+> Ogni calcolo e ogni operazione sensibile si esegue **sul server (NestJS)**, partendo **solo
+> dai dati del database**. Il frontend **mostra** i risultati e **invia soltanto le scelte**
+> dell'utente (id, valori digitati, motivo); il server **non usa mai** importi, percentuali,
+> totali, stati, permessi o utente arrivati dal browser.
+> - **Calcoli**: provvigioni, scaglioni ed eccezioni, regole del subagente, netto dei
+>   documenti, differenze dei bollettini, liquidazione, storni, Analisi, totali delle
+>   tabelle, esportazioni (Excel/PDF/CSV generati dal server).
+> - **Operazioni sensibili**: cambi di stato, verifiche e chiusure (bollettino, trimestre),
+>   abbinamenti, correzioni, permessi (`requirePermesso`), utente e data dell'evento,
+>   registro eventi.
+> - Ogni richiesta che modifica qualcosa **ricarica dal database** ciò che serve, **ricontrolla**
+>   regole, vincoli e permessi e **ricalcola**; un valore calcolato mandato dal client si
+>   ignora (o la richiesta si rifiuta), mai si salva.
+> - Il prototipo calcola nel browser **solo perché è una dimostrazione senza server**: non è
+>   un modello da copiare.
+>
+> **Perché**: dal browser chiunque può cambiare qualsiasi valore; le provvigioni sono soldi e
+> il registro deve essere vero.
+
+In revisione si respinge ogni PR in cui il server usa un importo, una percentuale, un totale, uno stato, un permesso o un utente ricevuto dal client, o in cui il frontend calcola un valore che poi viene salvato.
+
 Ogni attività è una slice con ownership disgiunta (nessun file toccato da due agenti);
 una PR per attività con checklist §16.1 allegata; testi e stile presi dal prototipo,
 non inventati; prima del merge: checklist superata + test numerici seed §12 + eventi
@@ -2701,7 +2836,7 @@ descrive. Chi sviluppa:
 - se il codice deve discostarsi dalla specifica, lo dice nella PR con il motivo e si
   aggiunge una riga al §19;
 - nei punti non ovvi del codice un commento breve rimanda alla decisione (es.
-  `// storno alla liquidazione successiva, D-08 §19`).
+  `// storno alla liquidazione successiva, D-11 §19`).
 
 ---
 
@@ -2884,3 +3019,7 @@ rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in
 | D-22 | 18/10/2026 | Il modo di filtrare dell'Analisi diventa lo **standard** di tutte le barre dei filtri: entità con ricerca a selezione multipla (mai tendine), etichetta come segnaposto, riepilogo e azzeramento a icona; applicato a Pratiche (fornitore, cliente, subagente), Bollettini, Cliente → Pratiche | un solo modo di filtrare in tutta l'applicazione si impara una volta; le tendine non reggono centinaia di clienti; il riepilogo fa vedere in un clic perché un elenco è corto | Ugo | §16.4, §16.4.1, §7.2, §7.6, §7.7 |
 | D-23 | 18/10/2026 | Numeri e conteggi: ricalcolati **dal vivo** a ogni cambio di filtro (il numero di un segmento conta con tutti gli altri filtri applicati); ai cambiamenti dei dati fatti da altri o dai servizi i contatori si aggiornano da soli, le tabelle no: avviso *Ci sono aggiornamenti · Aggiorna* | un numero che non corrisponde a ciò che si vede fa perdere fiducia e fa cercare lavoro inesistente; righe che si spostano mentre si clicca fanno sbagliare riga | Ugo | §16.4.2 |
 | D-24 | 18/10/2026 | Il **prototipo ufficiale** è `prototipo-alternativo/`: è la sorgente di verità per struttura, stile (`stile.css`, Public Sans, niente Bootstrap), componenti, testi e numeri; `prototipo-crm/` resta come archivio | tutte le decisioni d'interfaccia degli ultimi lavori (D-09 → D-23) sono state prese e provate lì; tenere due riferimenti porterebbe chi sviluppa a copiare quello sbagliato | Ugo | V4, §3.1, §7.10, §16.1, §16.3, §16.4 |
+| D-25 | 18/10/2026 | Percentuali dei fornitori **con data di validità**: *Nuove percentuali da una data* crea una nuova versione; ogni documento si calcola con la versione in vigore alla sua data; resta il congelamento alla verifica del bollettino. Chiude B3 | le condizioni cambiano dal periodo in cui vengono riviste; il solo congelamento non copriva i documenti in attesa del bollettino né l'Analisi dei periodi passati; il cliente l'ha già vista nel prototipo | Ugo | §4.2.2, §5.11, §7.4, §10 |
+| D-26 | 18/10/2026 | Le **eccezioni personali** dei subagenti si inseriscono, modificano ed eliminano nel CRM (scheda del subagente) e il motore le applica; passano alla nuova versione delle percentuali. Chiude B1 | tutto il calcolo delle provvigioni sta nel CRM: un'eccezione gestita fuori non compare in liquidazione e Analisi | Ugo | §4.2.3, §5.2, §7.5, §8.1, §15.2.2 |
+| D-27 | 18/10/2026 | Regole del subagente: **% dell'agenzia** (per cliente × fornitore), **una fattura al mese** (la prima o la più alta), **correzione sul singolo documento** con motivo obbligatorio; ordine: correzione → mensile → agenzia → eccezione → scaglione. Lo sconto fittizio non serve più | gli accordi con i subagenti sono vari e non prevedibili (caso Bastasin): tre livelli coprono ogni caso senza toccare il codice; il fornitore resta controllato nel bollettino; ogni scostamento è motivato e tracciato | Ugo | §4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §10, D-26 |
+| D-28 | 18/10/2026 | **Ogni calcolo e operazione sensibile solo sul backend, partendo dal database, MAI da dati presi dal frontend**; il client mostra e invia solo scelte; il server ricarica, ricontrolla, ricalcola | dal browser si può alterare qualsiasi valore; provvigioni e liquidazioni sono soldi; registro eventi e permessi devono essere affidabili | Ugo | V12, §2, §10, §15.1, §16.5 |
