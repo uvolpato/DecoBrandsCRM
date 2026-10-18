@@ -78,7 +78,7 @@
     });
 
     /* ---------- Barra: periodo, durata, filtri ---------- */
-    const riga = CRM.blocco(corpo, 'barra-periodo');
+    const riga = CRM.blocco(corpo, 'barra-periodo barra-analisi');
     CRM.PeriodoMesi(riga, { da: per.da, mesi: BI.n, primo: primo, ultimo: ultimo, onChange: da => { BI.da = da; vista(); } });
     const nav = CRM.blocco(riga, 'sposta-periodo');
     [['‹', 'Sposta il periodo di un mese indietro', -1], ['›', 'Sposta il periodo di un mese avanti', 1]].forEach(x => {
@@ -93,18 +93,20 @@
       // cambiando durata il periodo finisce nello stesso mese di prima
       if (Number(v.n) !== BI.n) { BI.da = piu(per.a, -(Number(v.n) - 1)); BI.n = Number(v.n); vista(); }
     } });
-    // fornitori, subagenti, clienti: campi di ricerca a selezione multipla (stesso componente della
-    // ricerca articoli); il menu propone solo le voci con documenti nel periodo e compatibili con gli altri filtri
-    const rigaFiltri = CRM.blocco(corpo, 'filtri-bi');
+    // fornitori, subagenti, clienti sulla stessa riga del periodo: campi di ricerca a selezione multipla
+    // (stesso componente della ricerca articoli, D-20/D-21); il menu propone solo le voci con documenti
+    // nel periodo e compatibili con gli altri filtri
     const presenti = d => raggruppa(filtra(base, d), DIM[d].campo, DIM[d].nome).map(x => x.chiave);
-    CRM.FilterBar(rigaFiltri, { campi: ['f', 's', 'c'].map(d => ({ nome: d, tipo: 'ricerca', entita: ENT[d], multipla: true, etichetta: DIM[d].etichetta, valore: BI[d],
+    const fb = CRM.FilterBar(riga, { campi: ['f', 's', 'c'].map(d => ({ nome: d, tipo: 'ricerca', entita: ENT[d], multipla: true, etichetta: DIM[d].etichetta, valore: BI[d],
       placeholder: 'Tutti i ' + DIM[d].plurale, contesto: { limita: presenti(d), tutti: true } })),
       onChange: v => { Object.assign(BI, { f: v.f, s: v.s, c: v.c }); vista(); } });
-    if (filtriAttivi.length) {
-      const az = CRM.el('button', 'link-azzera', 'Togli tutti i filtri'); az.type = 'button';
-      az.addEventListener('click', () => { BI.f = []; BI.s = []; BI.c = []; vista(); });
-      rigaFiltri.appendChild(az);
-    }
+    fb.el.classList.add('filtri-entita');
+    const nomi = d => BI[d].map(k => { const x = fatti.find(r => String(r[DIM[d].campo]) === k); return { testo: x ? x[DIM[d].nome] : k, togli: () => { BI[d] = BI[d].filter(y => y !== k); vista(); } }; });
+    CRM.RiepilogoFiltri(riga, {
+      attivi: BI.f.length + BI.s.length + BI.c.length,
+      voci: [{ etichetta: 'Periodo', testo: etMese(per.da) + ' – ' + etMese(per.a) + ' (' + lung + ' mesi)' }].concat(['f', 's', 'c'].map(d => ({ etichetta: DIM[d].etichetta, valori: nomi(d) }))),
+      onAzzera: () => { BI.f = []; BI.s = []; BI.c = []; vista(); }
+    });
 
     /* ---------- Numeri ---------- */
     const conf = (v, p) => !conPrec ? { testo: 'nessun dato per il confronto' } : Math.abs(p) < 0.01 ? { testo: 'nessun importo ' + etPrec } :

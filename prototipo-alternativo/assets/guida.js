@@ -203,8 +203,9 @@
       pulsanti: [
         ['Periodo · ‹ ›', 'Sceglie il mese d’inizio o sposta il periodo di un mese.'],
         ['3 mesi · 6 mesi · 12 mesi', 'Durata del periodo; finisce nello stesso mese di prima.'],
-        ['Fornitore · Subagente · Cliente', 'Scrivi e scegli con Invio o clic: la voce diventa un’etichetta nel campo e puoi aggiungerne altre. ✓ nel menu = già scelta (scegli di nuovo per toglierla). Campo vuoto = tutti. Propongono solo le voci con documenti nel periodo.'],
-        ['× sull’etichetta · Backspace', 'Toglie quella voce; Backspace a campo vuoto toglie l’ultima. “Togli tutti i filtri” li toglie tutti.'],
+        ['Tutti i fornitori · subagenti · clienti', 'Clic nel campo: si apre il menu con in alto le voci già scelte (✓, clic per toglierle, “Togli tutti”) e sotto le altre; scrivi per restringere, clic o Invio per aggiungere. Il menu resta aperto: il filtro si applica quando lo chiudi (Esc o clic fuori). Il campo mostra il nome della voce scelta o “Filtro multiplo (n)”. Propongono solo le voci con documenti nel periodo.'],
+        ['Imbuto', 'Riepilogo di tutti i filtri, periodo compreso, con il numero delle voci scelte; × su una voce per toglierla.'],
+        ['Imbuto barrato', 'Toglie tutti i filtri.'],
         ['Lente (F4)', 'Apre la ricerca completa con le caselle: spunta più righe, “Scegli tutte le righe filtrate”, poi Applica.'],
         ['Clic su un grafico', 'Aggiunge fornitore, subagente o cliente al filtro; di nuovo per toglierlo. Il grafico continua a mostrare tutte le voci, con le scelte in risalto.'],
         ['Per subagente · Per fornitore · Per cliente · Per mese · Documenti', 'Raggruppamento della tabella; clic su una riga = aggiunge la voce al filtro.'],
