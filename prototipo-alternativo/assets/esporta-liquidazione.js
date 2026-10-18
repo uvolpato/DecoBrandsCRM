@@ -20,7 +20,9 @@
   ];
   const somma = (rr, k) => M.r2(rr.reduce((a, x) => a + x[k], 0));
   const docs = n => n + (n === 1 ? ' documento' : ' documenti');
-  const rigaDettaglio = x => [x.fornitore.nome, x.doc.numero, x.doc.data, x.codice_cliente || '', M.nomeCliente(x.cliente), x.importo, x.pct / 100, x.provvigione];
+  // storni e riaccrediti (§5.14): voce con il numero della fattura d'origine
+  const numDoc = x => (x.voce === 'storno' ? 'Storno ' : x.voce === 'riaccredito' ? 'Riaccredito ' : '') + x.doc.numero;
+  const rigaDettaglio = x => [x.fornitore.nome, numDoc(x), x.doc.data, x.codice_cliente || '', M.nomeCliente(x.cliente), x.importo, x.pct / 100, x.provvigione];
   const NOTA_DETTAGLIO = 'Importi in euro. Le note di credito hanno importo negativo e riducono la provvigione. Percentuale = quota del subagente in vigore alla data del documento.';
 
   function foglioSubagente(g, ctx) {
@@ -258,7 +260,7 @@
         .concat(m.gruppi.map(g => [g.s.nome, g.liq.length, n(somma(g.liq, 'importo'), 2), n(somma(g.liq, 'provvigione'), 2)].concat(att ? [n(somma(g.att, 'provvigione'), 2)] : [])));
     } else {
       righe = [['Subagente'].concat(COL_DETTAGLIO.map(c => c.t)).concat(['Stato'])];
-      m.gruppi.forEach(g => g.rr.forEach(x => righe.push([g.s.nome, x.fornitore.nome, x.doc.numero, M.data(x.doc.data), x.codice_cliente || '', M.nomeCliente(x.cliente),
+      m.gruppi.forEach(g => g.rr.forEach(x => righe.push([g.s.nome, x.fornitore.nome, numDoc(x), M.data(x.doc.data), x.codice_cliente || '', M.nomeCliente(x.cliente),
         n(x.importo, 2), n(x.pct, 2), n(x.provvigione, 2), x.liquidabile ? 'liquidabile' : 'in attesa del bollettino'])));
     }
     return new Blob(['﻿' + righe.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' });

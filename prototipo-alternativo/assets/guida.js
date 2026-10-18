@@ -57,7 +57,7 @@
       ],
       pulsanti: [
         ['Riquadri in alto', 'Filtrano la lista Da fare su un solo gruppo; secondo clic per tornare a tutti.'],
-        ['Prepara i solleciti', 'Gruppo conferme in ritardo: un testo per ogni fornitore con tutte le sue pratiche in ritardo.'],
+        ['Prepara i solleciti', 'Gruppo conferme in ritardo: un testo per ogni fornitore con tutte le sue pratiche in ritardo. Gruppo pagamenti: un testo per ogni cliente con le fatture non pagate.'],
         ['Apri la coda', 'Gruppo documenti: va in Documenti.'],
         ['Apri bollettini', 'Gruppo bollettini: va alla matrice dei bollettini.'],
         ['Apri · Abbina · Verifica · Chiudi · Vedi', 'Sulla singola voce: apre la pagina dove si completa.'],
@@ -68,7 +68,7 @@
         { nome: 'Solleciti di conferma', da: 'Prepara i solleciti', cosa: 'Un testo pronto per ogni fornitore, in schede, con l’elenco delle pratiche in ritardo.',
           azioni: [['Copia il testo', 'Copia negli appunti e passa al fornitore successivo; il sollecito resta nel registro.'], ['Chiudi', 'Esce senza registrare altro.']] }
       ],
-      sapere: ['Una conferma è in ritardo dopo i giorni di attesa fissati nelle condizioni del fornitore.', 'Il bollettino si sollecita solo dopo il giorno in cui il fornitore lo manda di solito.'] },
+      sapere: ['<b>Pagamenti da sollecitare</b>: fatture che il cliente non ha pagato (stornate dal fornitore o segnalate) e, sul maturato, fatture non ancora riconosciute oltre i giorni d’incasso del fornitore.', 'Una conferma è in ritardo dopo i giorni di attesa fissati nelle condizioni del fornitore.', 'Il bollettino si sollecita solo dopo il giorno in cui il fornitore lo manda di solito.'] },
 
     { id: 'documenti', titolo: 'Documenti', gruppo: 'Lavoro', vai: '#/documenti',
       sintesi: 'L’unico ingresso di tutti i documenti dei fornitori: ordini, conferme, fatture, note di credito, bollettini. Ogni documento viene letto, controllato e mandato al posto giusto.',
@@ -108,7 +108,9 @@
         ['Clic sulla riga', 'Apre la scheda della pratica.'],
         ['Carica un documento', 'Nella scheda: carica un documento già destinato a questa pratica.'],
         ['Consulta affiancati', 'Apre i documenti della pratica affiancati al confronto.'],
-        ['Clic su documento o riga a confronto', 'Apre la stessa finestra su quel documento o su quella riga.']
+        ['Clic su documento o riga a confronto', 'Apre la stessa finestra su quel documento o su quella riga.'],
+        ['Incasso del cliente', 'Riquadro della scheda: per ogni fattura pagata, non pagata, in attesa di incasso o da verificare.'],
+        ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Nel riquadro Incasso: sollecito al cliente, o segnalazione del fornitore ricevuta per email o telefono.']
       ],
       finestre: [
         { nome: 'Documenti della pratica', da: 'Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento.',
@@ -134,7 +136,8 @@
         ['Attendi il prossimo', 'Documento assente dal bollettino: lo aspetti nel mese successivo.'],
         ['Abbina il documento', 'Riga del fornitore senza documento nostro, ma il documento è in coda: va ad abbinarlo.'],
         ['Segna come verificato · Segna come contestato', 'Chiude il bollettino.'],
-        ['Prepara la contestazione', 'Testo per il fornitore con le righe contestate e gli importi attesi.']
+        ['Prepara la contestazione', 'Testo per il fornitore con le righe contestate e gli importi attesi.'],
+        ['Prepara il sollecito al cliente', 'Su una riga di storno: testo per il cliente con le fatture non pagate.']
       ],
       finestre: [
         { nome: 'Accetta · Contesta · Attendi', da: 'pulsanti sulla riga', cosa: 'Registra la decisione sulla riga.', campi: [['Motivo', 'Obbligatorio per contestare.']], azioni: [['Conferma · Contesta', 'Salva la decisione; la riga passa fra le decise.']] },
@@ -162,7 +165,7 @@
           azioni: [['Scarica', 'Genera il file; l’esportazione resta nel registro.']] },
         { nome: 'Chiudere la liquidazione', da: 'Chiudi il trimestre', cosa: 'Conferma della chiusura.', azioni: [['Chiudi il trimestre', 'Gli importi non cambiano più.']] }
       ],
-      sapere: ['Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga.', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
+      sapere: ['Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga: al subagente lo storno arriva nella liquidazione successiva come <b>voce negativa</b> (il riaccredito come voce positiva).', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
 
     /* ---------------- Anagrafiche ---------------- */
     { id: 'fornitori', titolo: 'Fornitori', gruppo: 'Anagrafiche', vai: '#/fornitori',

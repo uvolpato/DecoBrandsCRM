@@ -168,6 +168,13 @@
       })();
       const riga = { numero: r.numero, data: r.data, loro: { imponibile: r.imponibile, pct: r.pct, importo: r.importo }, nota_fornitore: r.nota_fornitore };
       if (!n) { riga.categoria = 'sconosciuta'; riga.noi = null; }
+      else if (r.tipo === 'storno' || r.tipo === 'riaccredito') {
+        // §5.14: storno (il cliente non ha pagato) e riaccredito (ha pagato) sul fatturato: non sono differenze da decidere
+        const perc = M.percentuali(n.pratica, n.doc.data), imp = M.importoDoc(n.doc), segno = r.tipo === 'storno' ? -1 : 1;
+        riga.pratica = n.pratica; riga.cliente = n.pratica.cliente_piva; riga.categoria = r.tipo; riga.incasso = true;
+        riga.noi = { imponibile: segno * imp, pct: perc ? perc.dal_fornitore : 0, importo: perc ? M.r2(segno * imp * perc.dal_fornitore / 100) : 0 };
+        riga.differenza = M.r2(r.importo - riga.noi.importo);
+      }
       else {
         const perc = M.percentuali(n.pratica, n.doc.data);
         const imp = M.importoDoc(n.doc);
@@ -175,22 +182,33 @@
         riga.noi = { imponibile: imp, pct: perc ? perc.dal_fornitore : 0, importo: perc ? M.r2(imp * perc.dal_fornitore / 100) : 0 };
         riga.differenza = M.r2(r.importo - riga.noi.importo);
         riga.categoria = Math.abs(riga.differenza) < 0.01 && Math.abs(r.imponibile - imp) < 0.01 ? 'quadra' : 'differenza';
+        // maturato: fattura di un mese precedente riconosciuta nel mese in cui il cliente ha pagato
+        if (riga.categoria === 'quadra' && n.doc.data.slice(0, 7) < b.anno + '-' + String(b.mese).padStart(2, '0') && M.fornitore(b.fornitore_id).maturazione === 'maturato') riga.pagamento = true;
       }
       righe.push(riga);
     });
+    const maturato = M.fornitore(b.fornitore_id).maturazione === 'maturato';
     nostri.filter(x => !b.righe.some(r => r.numero === x.doc.numero)).forEach(x => {
       const perc = M.percentuali(x.pratica, x.doc.data);
       const imp = M.importoDoc(x.doc);
       const atteso = perc ? M.r2(imp * perc.dal_fornitore / 100) : 0;
-      righe.push({ numero: x.doc.numero, data: x.doc.data, pratica: x.pratica, cliente: x.pratica.cliente_piva, loro: null,
-        noi: { imponibile: imp, pct: perc ? perc.dal_fornitore : 0, importo: atteso }, differenza: -atteso, categoria: 'mancante' });
+      const riga = { numero: x.doc.numero, data: x.doc.data, pratica: x.pratica, cliente: x.pratica.cliente_piva, loro: null,
+        noi: { imponibile: imp, pct: perc ? perc.dal_fornitore : 0, importo: atteso }, differenza: -atteso, categoria: 'mancante' };
+      // maturato (§5.14): una fattura assente non è "mancante": il cliente non ha ancora pagato
+      if (maturato && x.doc.tipo === 'fattura') {
+        const pag = M.S.bollettini.find(o => o !== b && o.fornitore_id === b.fornitore_id && o.righe.some(r => r.numero === x.doc.numero));
+        riga.incasso = true; riga.categoria = pag ? 'pagata_dopo' : 'attesa_incasso'; riga.pagata_in = pag || null;
+        riga.giorni = M.giorni(x.doc.data, M.oggi());
+      }
+      righe.push(riga);
     });
     righe.forEach(r => {
       r.decisione = b.decisioni[r.numero] || null;
-      r.aperta = r.categoria !== 'quadra' && !r.decisione;
+      r.aperta = r.categoria !== 'quadra' && !r.incasso && !r.decisione;
       if (!r.cliente && r.pratica) r.cliente = r.pratica.cliente_piva;
     });
-    const tot = k => M.r2(righe.reduce((s, r) => s + (r[k] ? r[k].importo : 0), 0));
+    // le fatture sul maturato non ancora pagate non entrano nei totali del bollettino
+    const tot = k => M.r2(righe.filter(r => r.categoria !== 'attesa_incasso' && r.categoria !== 'pagata_dopo').reduce((s, r) => s + (r[k] ? r[k].importo : 0), 0));
     return { righe: righe, riconosciuto: tot('loro'), atteso: tot('noi'), differenza: M.r2(tot('loro') - tot('noi')), aperte: righe.filter(r => r.aperta).length };
   };
 
@@ -223,33 +241,107 @@
     return M.S.bollettini.find(b => b.stato === 'verificato' && b.righe.some(r => r.numero === numero)) || null;
   };
 
+  /* ---------- Incassi dei clienti (§5.14) ----------
+     Decobrands non incassa: il fornitore segnala chi non paga. Stato d'incasso di una fattura:
+     da_incassare · pagata · insoluta (fatturato: storno nel bollettino, o segnalazione) · da_verificare
+     (maturato: non riconosciuta oltre i giorni d'incasso del fornitore). d.incasso = segnalazione a mano. */
+  M.righeBollettinoDi = numero => {
+    const out = [];
+    M.S.bollettini.forEach(b => b.righe.forEach(r => { if (r.numero === numero) out.push({ b: b, r: r }); }));
+    return out.sort((x, y) => (x.b.anno * 100 + x.b.mese) - (y.b.anno * 100 + y.b.mese));
+  };
+  M.statoIncasso = function (p, d) {
+    if (d.tipo !== 'fattura') return null;
+    const f = M.fornitore(p.fornitore_id), gg = M.giorni(d.data, M.oggi()), limite = Number(f.giorni_incasso) || 60;
+    const rb = M.righeBollettinoDi(d.numero);
+    const ultimo = rb.filter(x => x.r.tipo === 'storno' || x.r.tipo === 'riaccredito').pop();
+    let st;
+    if (f.maturazione === 'maturato') {
+      const ric = rb.find(x => !x.r.tipo);
+      st = ric ? { stato: 'pagata', etichetta: 'Pagata', dal: ric.b.anno + '-' + String(ric.b.mese).padStart(2, '0') + '-01', nota: 'riconosciuta nel bollettino di ' + M.meseMin(ric.b.mese) }
+        : gg > limite ? { stato: 'da_verificare', etichetta: 'Incasso da verificare', nota: 'non riconosciuta dopo ' + gg + ' giorni (atteso entro ' + limite + ')' }
+        : { stato: 'da_incassare', etichetta: 'In attesa di incasso', nota: gg + ' giorni dalla fattura' };
+    } else if (ultimo) {
+      st = ultimo.r.tipo === 'storno' ? { stato: 'insoluta', etichetta: 'Non pagata', dal: ultimo.b.ricevuto, nota: 'stornata nel bollettino di ' + M.meseMin(ultimo.b.mese) }
+        : { stato: 'pagata', etichetta: 'Pagata', dal: ultimo.b.ricevuto, nota: 'riaccreditata nel bollettino di ' + M.meseMin(ultimo.b.mese) };
+    } else st = { stato: 'da_incassare', etichetta: 'Nessuna segnalazione', nota: '' };
+    if (d.incasso && (!st.dal || d.incasso.dal >= st.dal)) st = { stato: d.incasso.stato, etichetta: d.incasso.stato === 'insoluta' ? 'Non pagata' : 'Pagata', dal: d.incasso.dal, nota: 'segnalata da ' + f.breve + (d.incasso.nota ? ': ' + d.incasso.nota : ''), manuale: true };
+    st.giorni = gg; st.solleciti = d.solleciti || 0; st.sollecitata_il = d.sollecitata_il || null;
+    return st;
+  };
+  /* Fatture da sollecitare al cliente: non pagate (fatturato) e incassi da verificare (maturato), dalla più vecchia. */
+  M.pagamentiDaSollecitare = function () {
+    const out = [];
+    M.S.pratiche.forEach(p => p.documenti.forEach(d => {
+      const st = M.statoIncasso(p, d);
+      if (st && (st.stato === 'insoluta' || st.stato === 'da_verificare')) out.push({ pratica: p, doc: d, cliente: p.cliente_piva, stato: st, importo: M.importoDoc(d) });
+    }));
+    return out.sort((x, y) => x.doc.data.localeCompare(y.doc.data));
+  };
+  M.segnaIncasso = function (p, d, stato, nota) {
+    d.incasso = { stato: stato, dal: M.oggi(), nota: nota || '' };
+    M.annota('Fattura ' + d.numero + ' segnata come ' + (stato === 'insoluta' ? 'non pagata' : 'pagata'));
+  };
+  M.registraSollecitoPagamento = function (righe) {
+    righe.forEach(x => { x.doc.solleciti = (x.doc.solleciti || 0) + 1; x.doc.sollecitata_il = M.oggi(); });
+    M.annota('Sollecito di pagamento a ' + M.nomeCliente(righe[0].cliente) + ' (' + righe.map(x => x.doc.numero).join(', ') + ')');
+  };
+
   /* ---------- Liquidazioni ai subagenti (trimestri fissi) ---------- */
   M.trimestre = iso => Math.floor((Number(iso.slice(5, 7)) - 1) / 3) + 1;
   M.limiti = (a, t) => ({ da: a + '-' + String((t - 1) * 3 + 1).padStart(2, '0') + '-01', a: M.fineMese(a, t * 3) });
   M.nomeTrimestre = t => ['gennaio–marzo', 'aprile–giugno', 'luglio–settembre', 'ottobre–dicembre'][t - 1];
 
+  /* Prima liquidazione ancora aperta a partire dal trimestre della data: dove va una voce che arriva in ritardo (storni, riaccrediti). */
+  M.trimestreLiquidazione = function (iso) {
+    let a = Number(iso.slice(0, 4)), t = M.trimestre(iso);
+    while (M.S.liquidazioni_chiuse.some(l => l.anno === a && l.trimestre === t)) { t++; if (t > 4) { t = 1; a++; } }
+    return { a: a, t: t };
+  };
   M.righeLiquidazione = function (a, t) {
     const lim = M.limiti(a, t);
     const out = [];
+    const nelTrimestre = iso => iso >= lim.da && iso <= lim.a;
     M.S.pratiche.forEach(p => M.fiscali(p).forEach(d => {
-      if (d.data < lim.da || d.data > lim.a) return;
+      const f = M.fornitore(p.fornitore_id);
       const perc = M.percentuali(p, d.data);
       if (!perc) return;
-      const f = M.fornitore(p.fornitore_id);
       const imp = M.importoDoc(d);
-      let liquidabile = true, motivo = '';
+      let liquidabile = true, motivo = '', incasso = false;
       if (f.maturazione === 'maturato') {
+        // maturato→maturato (§5.14): entra nel trimestre del bollettino che la riconosce (il mese in cui il cliente paga)
         const b = M.riconosciutoIn(d.numero);
-        if (!b) {
+        if (b) { if (!nelTrimestre(b.anno + '-' + String(b.mese).padStart(2, '0') + '-01')) return; }
+        else {
+          if (!nelTrimestre(d.data)) return;
           liquidabile = false;
           const bm = M.bollettinoDi(p.fornitore_id, Number(d.data.slice(0, 4)), Number(d.data.slice(5, 7)));
-          motivo = bm ? 'Il bollettino di ' + M.meseMin(bm.mese) + ' di ' + f.breve + ' non è ancora verificato' : 'Non ancora riconosciuto da ' + f.breve;
+          const ric = M.righeBollettinoDi(d.numero)[0];
+          if (bm && bm.stato === 'verificato' && !ric) { incasso = true; motivo = 'In attesa di incasso: ' + f.breve + ' la riconosce quando il cliente paga'; }
+          else motivo = ric ? 'Il bollettino di ' + M.meseMin(ric.b.mese) + ' di ' + f.breve + ' non è ancora verificato' : bm ? 'Il bollettino di ' + M.meseMin(bm.mese) + ' di ' + f.breve + ' non è ancora verificato' : 'Non ancora riconosciuto da ' + f.breve;
         }
-      }
+      } else if (!nelTrimestre(d.data)) return;
       const ab = M.abbinamento(p.cliente_piva, p.fornitore_id);
       out.push({
         pratica: p, doc: d, fornitore: f, subagente_id: perc.subagente_id, cliente: p.cliente_piva, codice_cliente: ab ? ab.codice : '',
-        importo: imp, pct: perc.sub, eccezione: perc.eccezione, provvigione: M.r2(imp * perc.sub / 100), liquidabile: liquidabile, motivo: motivo
+        importo: imp, pct: perc.sub, eccezione: perc.eccezione, provvigione: M.r2(imp * perc.sub / 100), liquidabile: liquidabile, motivo: motivo, incasso: incasso
+      });
+    }));
+    // storni e riaccrediti (fatturato, §5.14): per Decobrands arrivano nel bollettino del mese successivo;
+    // al subagente vanno nella liquidazione trimestrale successiva (la prima ancora aperta dopo la
+    // chiusura del bollettino), come voce negativa (storno) o positiva (riaccredito)
+    M.S.bollettini.filter(b => b.stato !== 'da_verificare').forEach(b => b.righe.forEach(r => {
+      if (r.tipo !== 'storno' && r.tipo !== 'riaccredito') return;
+      const quando = b.chiuso_il || b.ricevuto, dest = M.trimestreLiquidazione(quando);
+      if (dest.a !== a || dest.t !== t) return;
+      const p = M.praticaPerDocumento(r.numero); if (!p) return;
+      const d = p.documenti.find(x => x.numero === r.numero), perc = M.percentuali(p, d.data); if (!perc) return;
+      const segno = r.tipo === 'storno' ? -1 : 1, imp = M.r2(segno * M.importoDoc(d)), ab = M.abbinamento(p.cliente_piva, p.fornitore_id), f = M.fornitore(p.fornitore_id);
+      out.push({
+        pratica: p, doc: Object.assign({}, d, { data: quando, origine: d.data }), fornitore: f, subagente_id: perc.subagente_id, cliente: p.cliente_piva, codice_cliente: ab ? ab.codice : '',
+        importo: imp, pct: perc.sub, eccezione: perc.eccezione, provvigione: M.r2(imp * perc.sub / 100), liquidabile: true, voce: r.tipo,
+        motivo: (r.tipo === 'storno' ? 'Storno: il cliente non ha pagato la fattura del ' : 'Riaccredito: il cliente ha pagato la fattura del ') + M.data(d.data) +
+          ' (' + M.trimestre(d.data) + '° trimestre ' + d.data.slice(0, 4) + '; bollettino di ' + M.meseMin(b.mese) + ')'
       });
     }));
     return out.sort((x, y) => x.doc.data.localeCompare(y.doc.data));
@@ -487,6 +579,11 @@
         titolo: 'Sollecita la conferma di ' + p.numero,
         dettaglio: M.fornitore(p.fornitore_id).breve + ' · ' + M.nomeCliente(p.cliente_piva) + ' · in ritardo ' + s.nota, link: '#/pratiche/' + p.id, azione: 'Apri' });
     });
+    // pagamenti da sollecitare ai clienti (§5.14): fatture non pagate e incassi da verificare
+    M.pagamentiDaSollecitare().forEach(x => out.push({ peso: 2, tipo: 'pagamento', gruppo: 'pagamenti', pratica: x.pratica.id, cliente: x.cliente, giorni: x.stato.giorni,
+      titolo: (x.stato.stato === 'insoluta' ? 'Sollecita il pagamento della fattura ' : 'Verifica l’incasso della fattura ') + x.doc.numero,
+      dettaglio: M.nomeCliente(x.cliente) + ' · ' + M.fornitore(x.pratica.fornitore_id).breve + ' · ' + M.euro(x.importo) + ' · ' + x.stato.nota + (x.stato.solleciti ? ' · sollecitata ' + x.stato.solleciti + (x.stato.solleciti === 1 ? ' volta' : ' volte') : ''),
+      link: '#/pratiche/' + x.pratica.id, azione: 'Apri' }));
     const anni = [2026];
     M.S.fornitori.forEach(f => anni.forEach(a => { for (let m = 1; m <= 12; m++) {
       const c = M.casellaBollettino(f.id, a, m);

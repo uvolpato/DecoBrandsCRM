@@ -36,7 +36,7 @@
       { etichetta: 'Codice Integra', valore: e(f.codice_integra || '—') },
       { etichetta: 'Attesa della conferma', valore: f.giorni_conferma + ' giorni dall’ordine, poi parte il sollecito' },
       { etichetta: 'Bollettino mensile', valore: 'atteso entro il ' + (f.giorno_bollettino || 10) + ' del mese successivo, poi parte il sollecito' },
-      { etichetta: 'Pagamento provvigioni', valore: 'sul ' + f.maturazione + (f.maturazione === 'maturato' ? ' (quando incassa dai clienti)' : ' (all’emissione della fattura)') }
+      { etichetta: 'Pagamento provvigioni', valore: 'sul ' + f.maturazione + (f.maturazione === 'maturato' ? ' (riconosciute nel mese in cui il cliente paga; incasso da verificare dopo ' + (f.giorni_incasso || 60) + ' giorni)' : ' (all’emissione della fattura; se il cliente non paga le storna e le riaccredita al pagamento)') }
     ]);
     // percentuali e clienti seguiti in due schede: la scheda resta compatta e non scorre
     const clienti = M.S.abbinamenti.filter(a => a.fornitore_id === f.id);
@@ -82,10 +82,12 @@
       campi: [
         { nome: 'giorni_conferma', etichetta: 'Giorni di attesa della conferma', tipo: 'numero', valore: f.giorni_conferma },
         { nome: 'giorno_bollettino', etichetta: 'Bollettino atteso entro il giorno', tipo: 'numero', valore: f.giorno_bollettino || 10, aiuto: 'del mese successivo (1–28); dopo questa data in Oggi compare il sollecito' },
-        { nome: 'maturazione', etichetta: 'Pagamento provvigioni', tipo: 'select', valore: f.maturazione, opzioni: [{ value: 'maturato', label: 'Sul maturato (incassi)' }, { value: 'fatturato', label: 'Sul fatturato' }] }
+        { nome: 'maturazione', etichetta: 'Pagamento provvigioni', tipo: 'select', valore: f.maturazione, opzioni: [{ value: 'maturato', label: 'Sul maturato (incassi)' }, { value: 'fatturato', label: 'Sul fatturato' }] },
+        { nome: 'giorni_incasso', etichetta: 'Giorni per l’incasso dal cliente', tipo: 'numero', valore: f.giorni_incasso || 60, aiuto: 'sul maturato: dopo questi giorni dalla fattura non ancora riconosciuta l’incasso va verificato (§5.14)' }
       ],
       onConferma: v => {
         f.giorni_conferma = Number(v.giorni_conferma) || f.giorni_conferma; f.maturazione = v.maturazione;
+        f.giorni_incasso = Math.max(1, Number(v.giorni_incasso) || 60);
         f.giorno_bollettino = Math.min(28, Math.max(1, Number(v.giorno_bollettino) || 10));
         M.annota('Condizioni di ' + f.breve + ' aggiornate'); M.salva(); CRM.Avviso('Condizioni salvate'); CRM.naviga();
       }
@@ -267,11 +269,12 @@
         CRM.Nota(h, 'Un solo subagente per cliente e fornitore; il codice è unico per fornitore. Clic su una riga per modificarla.');
       } },
       { id: 'pratiche', etichetta: 'Pratiche', conta: pr.length, disegna: h => {
-        const ST = { aperte: p => M.statoPratica(p).chiave !== 'fatturata', ritardo: p => M.statoPratica(p).chiave === 'scaduta', fatturate: p => M.statoPratica(p).chiave === 'fatturata', tutte: () => true };
+        const nonPagata = p => p.documenti.some(d => { const st = M.statoIncasso(p, d); return st && (st.stato === 'insoluta' || st.stato === 'da_verificare'); });
+        const ST = { aperte: p => M.statoPratica(p).chiave !== 'fatturata', ritardo: p => M.statoPratica(p).chiave === 'scaduta', fatturate: p => M.statoPratica(p).chiave === 'fatturata', nonpagate: nonPagata, tutte: () => true };
         const forn = pr.map(p => p.fornitore_id).filter((x, i, arr) => arr.indexOf(x) === i);
         const filtra = () => { const q = (filtroPratiche.q || '').trim().toLowerCase(); return pr.filter(ST[filtroPratiche.vista]).filter(p => !filtroPratiche.f || String(p.fornitore_id) === filtroPratiche.f).filter(p => !q || p.numero.toLowerCase().indexOf(q) >= 0); };
         CRM.FilterBar(h, { campi: [
-          { nome: 'vista', tipo: 'segmenti', valore: filtroPratiche.vista, opzioni: [{ value: 'aperte', label: 'Aperte', n: pr.filter(ST.aperte).length }, { value: 'ritardo', label: 'In ritardo', n: pr.filter(ST.ritardo).length }, { value: 'fatturate', label: 'Fatturate', n: pr.filter(ST.fatturate).length }, { value: 'tutte', label: 'Tutte', n: pr.length }] },
+          { nome: 'vista', tipo: 'segmenti', valore: filtroPratiche.vista, opzioni: [{ value: 'aperte', label: 'Aperte', n: pr.filter(ST.aperte).length }, { value: 'ritardo', label: 'In ritardo', n: pr.filter(ST.ritardo).length }, { value: 'fatturate', label: 'Fatturate', n: pr.filter(ST.fatturate).length }, { value: 'nonpagate', label: 'Non pagate', n: pr.filter(ST.nonpagate).length }, { value: 'tutte', label: 'Tutte', n: pr.length }] },
           { nome: 'f', tipo: 'select', valore: filtroPratiche.f, opzioni: [{ value: '', label: 'Tutti i fornitori' }].concat(forn.map(f => ({ value: String(f), label: M.fornitore(f).breve }))) },
           { nome: 'q', tipo: 'cerca', valore: filtroPratiche.q, placeholder: 'Numero' }
         ], onChange: v => { filtroPratiche = v; tab.aggiorna(filtra()); } });

@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.7 — Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.8 — storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -812,11 +812,14 @@ telefono (*Segna come non pagata*, con data e nota).
    compare fra i **pagamenti da sollecitare** al cliente.
 3. Quando il cliente paga, un bollettino successivo contiene il **riaccredito** (riga
    positiva sulla fattura stornata): la fattura passa a `pagata`.
-4. **Subagenti**: per coerenza fatturato→fatturato, lo storno **riduce** la provvigione
-   del subagente nel trimestre del bollettino con lo storno (anche se la provvigione era
-   già stata liquidata in un trimestre precedente) e il riaccredito la **restituisce** nel
-   trimestre del riaccredito. Nel prospetto di liquidazione (§11) le due righe compaiono
-   con il riferimento alla fattura. *Da confermare con Decobrands.*
+4. **Storno alla liquidazione successiva, per entrambi** (confermato da Decobrands il
+   18/10/2026): per **Decobrands** lo storno arriva nel **bollettino mensile** successivo;
+   per il **subagente** va nella **liquidazione trimestrale successiva**, cioè la prima
+   ancora aperta dopo la chiusura del bollettino che contiene lo storno, come **voce
+   negativa** riferita alla fattura (anche se la provvigione originale era già stata
+   liquidata in un trimestre chiuso). Il riaccredito segue la stessa regola con una voce
+   positiva. Nel prospetto di liquidazione (§11) le righe compaiono come *Storno
+   F-…* / *Riaccredito F-…* con il trimestre della fattura d'origine.
 
 **Fornitori sul maturato**
 1. Una fattura **assente** dal bollettino del suo mese non è una riga "mancante" da
@@ -843,8 +846,6 @@ telefono (*Segna come non pagata*, con data e nota).
 - il sollecito al cliente lo manda Decobrands o il subagente che lo segue (in copia)?
 - i solleciti del fornitore arrivano per email in un formato ricorrente? Se sì possono
   entrare da Documenti come nuovo tipo `sollecito_insoluti`;
-- lo storno ai subagenti avviene davvero nel trimestre dello storno, anche se la
-  provvigione era già stata liquidata?
 - `giorni_incasso`: basta un valore per fornitore o dipende dal cliente (termini di
   pagamento diversi)?
 - l'email del cliente per il sollecito arriva da Integra (vista `v_clienti`)?
@@ -1170,8 +1171,8 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
     atteso del fornitore, da sollecitare (§5.6).
   - **Pagamenti da sollecitare** (§5.14): fatture insolute (storno nel bollettino o
     segnalazione del fornitore) e incassi da verificare (maturato oltre `giorni_incasso`),
-    dal più vecchio; *Prepara i solleciti* = un testo per cliente. *Non ancora nel
-    prototipo.*
+    dal più vecchio; *Prepara i solleciti* = un testo per cliente; riquadro *Pagamenti dei
+    clienti* fra quelli in alto.
 - **Colonna destra rivolta al futuro**:
   - due **schede** nello stesso riquadro (si ricorda l'ultima aperta): **Prossime scadenze** (15 giorni): conferme attese, bollettini del mese precedente
     attesi entro il giorno del fornitore (§5.6), fine del trimestre; ogni voce porta alla pagina relativa;
@@ -1301,8 +1302,8 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
     documenti nel trimestre**; gli altri sono contati nella testata ("4 con documenti ·
     8 senza"). Niente riquadri per subagente: con più di 4 non entrano in larghezza.
 - **Export** con i campi §11 nell'header del dettaglio.
-- **Storni e riaccrediti** (fatturato, §5.14): compaiono fra i documenti del trimestre del
-  bollettino che li contiene, con segno *Storno: cliente non pagante* (provvigione
+- **Storni e riaccrediti** (fatturato, §5.14): compaiono fra i documenti della prima
+  liquidazione ancora aperta dopo la chiusura del bollettino che li contiene, con segno *Storno: cliente non pagante* (provvigione
   negativa) o *Riaccredito*, e il riferimento alla fattura e al trimestre d'origine; si
   sommano alla liquidazione del subagente come le note di credito.
 
@@ -1902,7 +1903,7 @@ Anagrafiche di riferimento per il collaudo:
 | B5 | ~~Upload documenti~~ | chiuso: incluso nell'implementazione (multer, §3.4) |
 | B6 | Dati storici / popolamento iniziale | capire se importare le prassi dagli Excel manuali |
 | B7 | Casi cliente su più subagenti su fornitori diversi | risolti internamente da Marco |
-| B8 | Incassi dei clienti (§5.14) | regole chiarite il 16/10/2026; **non ancora nel prototipo**; restano le domande di §5.14 |
+| B8 | Incassi dei clienti (§5.14) | regole chiarite il 16 e 18/10/2026; nel prototipo; restano le domande di §5.14 (chi manda il sollecito, formato dei solleciti del fornitore, `giorni_incasso` per cliente, email del cliente) |
 
 ---
 

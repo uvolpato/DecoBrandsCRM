@@ -731,3 +731,7 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .guida-schema.stati .ramo { margin-top: 8px; padding: 8px 0 0 12px; border-left: 2px dashed var(--bordo); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 @media (max-width: 860px) { .guida-schema .freccia { display: none; } .guida-schema { gap: 8px; } .guida-pulsanti { grid-template-columns: 1fr; } .guida-pulsanti dt { border-bottom: 0; padding-bottom: 0; } }
 .guida-campi .tasto { white-space: normal; }
+
+/* ---------- Incasso del cliente (scheda pratica) ---------- */
+.incasso-riga { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--bordo-tenue); font-size: 13.5px; }
+.incasso-riga:last-child { border-bottom: 0; }

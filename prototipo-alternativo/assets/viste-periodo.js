@@ -61,7 +61,11 @@
       sottotitolo: 'Ricevuto il ' + M.data(b.ricevuto) + ' · ' + e(b.file) + ' · ' + e(f.breve) + ' paga sul ' + f.maturazione +
         (f.maturazione === 'maturato' ? ': verificando il bollettino si sbloccano le provvigioni dei subagenti su queste fatture.' : '.')
     });
-    const CATEG = { differenza: 'importo diverso', mancante: 'manca nel bollettino', sconosciuta: 'non è fra le nostre pratiche' };
+    const CATEG = { differenza: 'importo diverso', mancante: 'manca nel bollettino', sconosciuta: 'non è fra le nostre pratiche',
+      storno: 'storno: il cliente non ha pagato', riaccredito: 'riaccredito: il cliente ha pagato', attesa_incasso: 'non ancora pagata dal cliente', pagata_dopo: 'pagata dopo' };
+    const ESITO_INCASSO = x => x.categoria === 'storno' ? CRM.stato('errore', 'Non pagata') : x.categoria === 'riaccredito' ? CRM.stato('ok', 'Pagata')
+      : x.categoria === 'pagata_dopo' ? CRM.stato('ok', 'Riconosciuta a ' + M.meseMin(x.pagata_in.mese))
+      : x.categoria === 'attesa_incasso' ? CRM.stato(x.giorni > (Number(f.giorni_incasso) || 60) ? 'attesa' : 'neutro', x.giorni + ' giorni') : '';
     const modificabile = b.stato === 'da_verificare';
     const riga = x => {
       const inArrivo = x.categoria === 'sconosciuta' && M.S.in_arrivo.find(d => d.numero === x.numero);
@@ -77,23 +81,26 @@
       }
       return {
         titolo: x.pratica ? '<a href="#/pratiche/' + x.pratica.id + '"><b>' + e(x.numero) + '</b></a>' : '<b>' + e(x.numero) + '</b>',
-        dettagli: (x.cliente ? e(M.nomeCliente(x.cliente)) + ' · ' : '') + M.data(x.data) + (x.categoria !== 'quadra' ? ' · ' + CATEG[x.categoria] : '') +
+        dettagli: (x.cliente ? e(M.nomeCliente(x.cliente)) + ' · ' : '') + M.data(x.data) + (x.categoria !== 'quadra' ? ' · ' + CATEG[x.categoria] : x.pagamento ? ' · fattura di ' + M.meseMin(Number(x.data.slice(5, 7))) + ', il cliente ha pagato questo mese' : '') +
           (x.nota_fornitore ? '<br><span style="color:var(--attesa-testo)">Nota del fornitore: ' + e(x.nota_fornitore) + '</span>' : '') +
           (x.decisione && x.decisione.motivo ? '<br>Motivo: ' + e(x.decisione.motivo) : ''),
         sinistra: x.loro ? { importo: x.loro.importo, dett: M.pct(x.loro.pct) + ' di ' + M.euro(x.loro.imponibile) } : null,
         destra: x.noi ? { importo: x.noi.importo, dett: M.pct(x.noi.pct) + ' di ' + M.euro(x.noi.imponibile) } : null,
         differenza: x.loro && x.noi ? M.r2(x.loro.importo - x.noi.importo) : x.loro ? x.loro.importo : -x.noi.importo,
-        quadra: x.categoria === 'quadra', esito: esito, azioni: azioni
+        quadra: x.categoria === 'quadra' || !!x.incasso, esito: x.incasso ? ESITO_INCASSO(x) : esito,
+        azioni: x.categoria === 'storno' ? [{ etichetta: 'Prepara il sollecito al cliente', variante: 'sec', onClick: () => CRM.sollecitiPagamento(M.pagamentiDaSollecitare().filter(y => y.cliente === x.cliente)) }] : azioni
       };
     };
     const aperte = r.righe.filter(x => x.aperta), decise = r.righe.filter(x => x.decisione), quadrano = r.righe.filter(x => x.categoria === 'quadra' && !x.decisione);
+    const incassi = r.righe.filter(x => x.incasso && !x.decisione);
     CRM.Cerniera(corpo, {
       sinistra: f.breve + ' riconosce', destra: 'Noi calcoliamo',
       totali: { sinistra: r.riconosciuto, destra: r.atteso, differenza: r.differenza },
       gruppi: [
         { titolo: 'Da decidere', variante: 'attesa', righe: aperte.map(riga) },
         { titolo: 'Decise', variante: 'neutro', righe: decise.map(riga) },
-        { titolo: 'Quadrano', variante: 'ok', chiuso: aperte.length + decise.length > 0, righe: quadrano.map(riga) }
+        { titolo: 'Quadrano', variante: 'ok', chiuso: aperte.length + decise.length > 0, righe: quadrano.map(riga) },
+        { titolo: f.maturazione === 'maturato' ? 'Incassi dei clienti: fatture del mese non ancora pagate o pagate dopo' : 'Incassi dei clienti: storni e riaccrediti', variante: 'neutro', righe: incassi.map(riga) }
       ]
     });
 
@@ -107,11 +114,11 @@
       barra.innerHTML = '<span>' + contestate.length + (contestate.length === 1 ? ' riga da contestare' : ' righe da contestare') + ' a ' + e(f.breve) + '.</span>' +
         '<span style="display:flex;gap:8px"><button type="button" class="btn sec" id="prep">Prepara la contestazione</button><button type="button" class="btn" id="contesta">Segna come contestato</button></span>';
       CRM.$('#prep', barra).addEventListener('click', () => contestazione(b, f, contestate));
-      CRM.$('#contesta', barra).addEventListener('click', () => { b.stato = 'contestato'; M.annota('Bollettino ' + f.breve + ' ' + M.meseMin(b.mese) + ' contestato'); M.salva(); CRM.Avviso('Bollettino segnato come contestato'); CRM.naviga(); });
+      CRM.$('#contesta', barra).addEventListener('click', () => { b.stato = 'contestato'; b.chiuso_il = M.oggi(); M.annota('Bollettino ' + f.breve + ' ' + M.meseMin(b.mese) + ' contestato'); M.salva(); CRM.Avviso('Bollettino segnato come contestato'); CRM.naviga(); });
     } else {
       barra.innerHTML = '<span>Tutte le righe sono quadrate o decise.</span><button type="button" class="btn">Segna come verificato</button>';
       CRM.$('button', barra).addEventListener('click', () => {
-        const prima = sbloccate(); b.stato = 'verificato'; const dopo = sbloccate();
+        const prima = sbloccate(); b.stato = 'verificato'; b.chiuso_il = M.oggi(); const dopo = sbloccate();
         M.annota('Bollettino ' + f.breve + ' ' + M.meseMin(b.mese) + ' verificato'); M.salva();
         const sbl = M.r2(dopo - prima);
         CRM.Avviso('Bollettino verificato.' + (sbl ? ' Sbloccati ' + M.euro(sbl) + ' di provvigioni ai subagenti.' : ''));
@@ -121,7 +128,7 @@
   });
   function sbloccate() {
     let s = 0;
-    [1, 2, 3, 4].forEach(t => M.righeLiquidazione(ANNO, t).forEach(x => { if (x.liquidabile) s += x.provvigione; }));
+    [1, 2, 3, 4].forEach(t => M.righeLiquidazione(ANNO, t).forEach(x => { if (x.liquidabile && !x.voce) s += x.provvigione; }));
     return s;
   }
   function decidi(b, x, esito) {
@@ -162,7 +169,8 @@
     const a = Number(aS), t = Number(tS);
     const st = M.statoTrimestre(a, t);
     const righe = M.righeLiquidazione(a, t);
-    const inAttesa = righe.filter(r => !r.liquidabile), liquidabili = righe.filter(r => r.liquidabile);
+    // le fatture sul maturato in attesa di incasso non bloccano: entrano nel trimestre in cui il cliente paga (§5.14)
+    const inAttesa = righe.filter(r => !r.liquidabile && !r.incasso), liquidabili = righe.filter(r => r.liquidabile);
     const puoChiudere = st.chiave === 'da_liquidare' && !inAttesa.length;
     const perche = st.chiave === 'chiusa' ? 'Trimestre già liquidato' : st.chiave === 'futura' ? 'Il trimestre non è iniziato' :
       st.chiave === 'in_corso' ? 'Il trimestre si chiude il ' + M.data(M.limiti(a, t).a) : inAttesa.length ? 'Ci sono documenti in attesa dei bollettini' : '';
@@ -192,7 +200,8 @@
       const rr = righe.filter(x => x.subagente_id === s.id);
       return { id: s.id, nome: s.nome, attivo: s.attivo !== false, documenti: rr.length,
         liq: M.r2(rr.filter(x => x.liquidabile).reduce((x, r) => x + r.provvigione, 0)),
-        att: M.r2(rr.filter(x => !x.liquidabile).reduce((x, r) => x + r.provvigione, 0)) };
+        att: M.r2(rr.filter(x => !x.liquidabile).reduce((x, r) => x + r.provvigione, 0)),
+        storni: rr.filter(x => x.voce === 'storno').length };
     });
     const conDoc = perSub.filter(x => x.documenti), senza = perSub.length - conDoc.length;
     if (subSel && !conDoc.some(x => String(x.id) === subSel)) subSel = null;
@@ -205,7 +214,7 @@
       colonne: [
         { key: 'nome', header: 'Subagente', cell: x => '<b>' + e(x.nome) + '</b><span class="sec-riga">' + x.documenti + (x.documenti === 1 ? ' documento' : ' documenti') + (x.attivo ? '' : ' · non attivo') + '</span>' },
         { key: 'liq', header: st.chiave === 'chiusa' ? 'Liquidato' : 'Da liquidare', tipo: 'euro', totale: 'somma',
-          cell: x => '<b class="' + CRM.classeSegno(Math.min(0, x.liq)) + '">' + M.euro(x.liq) + '</b>' + (x.att ? '<span class="sec-riga testo-attesa">' + M.euro(x.att) + ' in attesa</span>' : '') }
+          cell: x => '<b class="' + CRM.classeSegno(Math.min(0, x.liq)) + '">' + M.euro(x.liq) + '</b>' + (x.att ? '<span class="sec-riga testo-attesa">' + M.euro(x.att) + ' in attesa</span>' : '') + (x.storni ? '<span class="sec-riga negativo">' + x.storni + (x.storni === 1 ? ' storno' : ' storni') + '</span>' : '') }
       ],
       etichettaTotale: 'Totale',
       piede: 'Clic su un subagente per vedere i suoi documenti, di nuovo per tutti.',
@@ -219,14 +228,17 @@
       nota: 'Totale da liquidare <b>' + M.euro(totLiq) + '</b>' + (inAttesa.length ? ' · ' + inAttesa.length + ' documenti in attesa · <a href="#/bollettini">vai ai bollettini</a>' : '') });
     const tab = CRM.DataTable(pan.corpo, {
       colonne: [
-        { key: 'numero', header: 'Documento', valore: r => r.doc.numero, cell: r => '<a href="#/pratiche/' + r.pratica.id + '">' + e(r.doc.numero) + '</a><span class="sec-riga">' + e(r.fornitore.breve) + ' · ' + M.data(r.doc.data) + '</span>' },
+        { key: 'numero', header: 'Documento', valore: r => r.doc.numero, cell: r => '<a href="#/pratiche/' + r.pratica.id + '">' + e(r.doc.numero) + '</a>' + (r.voce ? ' ' + CRM.stato(r.voce === 'storno' ? 'errore' : 'info', r.voce === 'storno' ? 'Storno' : 'Riaccredito') : '') + '<span class="sec-riga">' + e(r.fornitore.breve) + ' · ' + (r.doc.origine ? 'fattura del ' + M.data(r.doc.origine) : M.data(r.doc.data)) + '</span>' },
         { key: 'cliente', header: 'Cliente · subagente', grow: true, valore: r => M.nomeCliente(r.cliente), cell: r => e(M.nomeCliente(r.cliente)) + '<span class="sec-riga">' + e(M.subagente(r.subagente_id).nome) + ' · codice ' + e(r.codice_cliente) + '</span>' },
         { key: 'provvigione', header: 'Provvigione', tipo: 'euro', totale: 'somma', cell: r => '<b class="' + CRM.classeSegno(Math.min(0, r.provvigione)) + '">' + M.euro(r.provvigione) + '</b><span class="sec-riga">' + M.pct(r.pct) + (r.eccezione ? ' (eccezione)' : '') + ' di ' + M.euro(r.importo) + '</span>' },
         { key: 'stato', header: 'Stato', grow: true, sortValue: r => r.liquidabile ? 1 : 0,
-          cell: r => r.liquidabile ? CRM.stato('ok', st.chiave === 'chiusa' ? 'Liquidata' : 'Liquidabile') : CRM.stato('attesa', 'In attesa') + '<span class="sec-riga">' + e(r.motivo) + '</span>' }
+          cell: r => r.voce ? CRM.stato(r.voce === 'storno' ? 'errore' : 'ok', r.voce === 'storno' ? 'Da stornare' : 'Da riaccreditare') + '<span class="sec-riga">' + e(r.motivo) + '</span>'
+            : r.liquidabile ? CRM.stato('ok', st.chiave === 'chiusa' ? 'Liquidata' : 'Liquidabile')
+            : r.incasso ? CRM.stato('neutro', 'Attesa incasso') + '<span class="sec-riga">' + e(r.motivo) + '</span>'
+            : CRM.stato('attesa', 'In attesa') + '<span class="sec-riga">' + e(r.motivo) + '</span>' }
       ],
       righe: filtra(), ordinamentoIniziale: { key: 'stato', dir: 'asc' }, etichettaTotale: 'Totale in elenco, compresi i documenti in attesa',
-      piede: 'Entrano fatture e note di credito con data nel trimestre. Gasper e Ing’s pagano sul fatturato; Gries sul maturato: le sue fatture entrano quando il bollettino che le riconosce è verificato.',
+      piede: 'Fatturato (es. Gasper, Ing’s): entrano le fatture del trimestre; se il cliente non paga, lo storno è una voce negativa nella liquidazione successiva. Maturato (es. Gries): la fattura entra nel trimestre del bollettino che la riconosce, cioè quando il cliente paga.',
       emptyText: 'Nessun documento', emptyHint: 'Nessuna fattura o nota di credito con data in questo trimestre.'
     });
   });

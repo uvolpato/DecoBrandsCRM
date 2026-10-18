@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const e = CRM.esc;
-  const VARIANTE_FARE = { ritardo: 'errore', mancante: 'errore', documento: 'primario', bollettino: 'attesa' };
+  const VARIANTE_FARE = { ritardo: 'errore', mancante: 'errore', documento: 'primario', bollettino: 'attesa', pagamento: 'errore' };
 
   /* ---------- Oggi: ListaDaFare + Cifre del trimestre + Elenco operazioni ---------- */
   let schedaOggi = 'scadenze';
@@ -18,6 +18,7 @@
     const documenti = fare.filter(x => x.gruppo === 'documenti');
     const daDecidere = documenti.filter(x => x.stato !== 'pronto');
     const bollettini = fare.filter(x => x.gruppo === 'bollettini');
+    const pagamenti = fare.filter(x => x.gruppo === 'pagamenti').sort((a, b) => b.giorni - a.giorni);
     const conta = st => documenti.filter(x => x.stato === st).length;
     const voce = x => ({ tipo: VARIANTE_FARE[x.tipo], titolo: x.titolo, dettaglio: x.dettaglio, href: x.link, azione: x.azione });
     const fornConf = conferme.map(x => x.fornitore_id).filter((v, i, a) => a.indexOf(v) === i);
@@ -30,7 +31,9 @@
       { id: 'documenti', etichetta: 'Documenti in coda', valore: String(documenti.length), variante: 'primario',
         dettagli: [{ testo: daDecidere.length + ' chiedono una decisione' }, { testo: conta('pronto') + ' pronti da abbinare' }] },
       { id: 'bollettini', etichetta: 'Bollettini', valore: String(bollettini.length), variante: bollettini.length ? 'attesa' : 'ok',
-        dettagli: [{ testo: bollettini.filter(x => x.tipo === 'bollettino').length + ' da verificare o chiudere' }, { testo: bollettini.filter(x => x.tipo === 'mancante').length + ' da sollecitare' }] }
+        dettagli: [{ testo: bollettini.filter(x => x.tipo === 'bollettino').length + ' da verificare o chiudere' }, { testo: bollettini.filter(x => x.tipo === 'mancante').length + ' da sollecitare' }] },
+      { id: 'pagamenti', etichetta: 'Pagamenti dei clienti', valore: String(pagamenti.length), variante: pagamenti.length ? 'errore' : 'ok',
+        dettagli: pagamenti.length ? [{ testo: new Set(pagamenti.map(x => x.cliente)).size + ' clienti da sollecitare' }, { testo: 'il più vecchio da ' + pagamenti[0].giorni + ' giorni' }] : [{ testo: 'nessuna fattura non pagata' }] }
     ], { onSeleziona: id => gruppi.filtra(id) });
 
     const col = CRM.blocco(corpo, 'colonne riempi');
@@ -46,7 +49,10 @@
         voci: daDecidere.map(x => Object.assign(voce(x), { dettaglio: x.dettaglio + (x.stato === 'controllare' ? ' · dati letti da controllare' : '') })), vuoto: 'Nessun documento richiede una decisione.' },
       { id: 'bollettini', titolo: 'Bollettini', variante: 'attesa', conta: bollettini.length,
         azioni: [{ etichetta: 'Apri bollettini', href: '#/bollettini' }],
-        voci: bollettini.map(voce), vuoto: 'Nessun bollettino da verificare.' }
+        voci: bollettini.map(voce), vuoto: 'Nessun bollettino da verificare.' },
+      { id: 'pagamenti', titolo: 'Pagamenti da sollecitare', variante: 'errore', conta: pagamenti.length,
+        azioni: pagamenti.length ? [{ etichetta: 'Prepara i solleciti', icona: 'posta', onClick: () => CRM.sollecitiPagamento(M.pagamentiDaSollecitare()) }] : [],
+        voci: pagamenti.map(x => Object.assign(voce(x), { extra: '<span class="giorni">' + x.giorni + ' gg</span>' })), vuoto: 'Nessuna fattura non pagata.' }
     ], { titolo: 'Tutto in ordine', testo: 'Nessun documento da abbinare, nessuna conferma in ritardo, nessun bollettino da verificare.' });
 
     const destra = CRM.blocco(col, 'pila', 'overflow:auto;min-height:0');
@@ -694,6 +700,27 @@
       testo: CRM.icona('file') + ' ' + e(M.TIPI[d.tipo]) + ' <b>' + e(d.numero) + '</b> <span class="testo-tenue">del ' + M.data(d.data) + '</span>' + (d.riferimento ? '<span class="sec-riga">storna ' + e(d.riferimento) + (d.nota ? ' · ' + e(d.nota) : '') + '</span>' : ''),
       destra: '<span class="' + CRM.classeSegno(Math.min(0, M.importoDoc(d))) + '">' + M.euro(M.importoDoc(d)) + '</span>'
     })));
+    // incasso del cliente (§5.14): Decobrands non incassa; il fornitore segnala chi non paga
+    const fattureInc = p.documenti.filter(d => d.tipo === 'fattura');
+    if (fattureInc.length) {
+      const VAR = { insoluta: 'errore', da_verificare: 'attesa', pagata: 'ok', da_incassare: 'neutro' };
+      const inc = CRM.Pannello(destra, { titolo: 'Incasso del cliente', nota: M.fornitore(p.fornitore_id).maturazione === 'maturato' ? 'sul maturato' : 'sul fatturato' });
+      fattureInc.forEach(d => {
+        const st = M.statoIncasso(p, d), riga = CRM.blocco(inc.corpo, 'incasso-riga');
+        riga.innerHTML = '<div><b>' + e(d.numero) + '</b> ' + CRM.stato(VAR[st.stato], st.etichetta) + '<span class="sec-riga">' + e(st.nota || '') +
+          (st.solleciti ? ' · sollecitata ' + st.solleciti + (st.solleciti === 1 ? ' volta' : ' volte') + ', ultima il ' + M.data(st.sollecitata_il) : '') + '</span></div><div class="azioni-cella"></div>';
+        const az = CRM.$('.azioni-cella', riga);
+        const btn = (t, v, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn piccolo ' + v; b.textContent = t; b.addEventListener('click', fn); az.appendChild(b); };
+        if (st.stato === 'insoluta' || st.stato === 'da_verificare') {
+          btn('Sollecita il cliente', 'sec', () => CRM.sollecitiPagamento(M.pagamentiDaSollecitare().filter(x => x.doc === d)));
+          btn('Segna come pagata', 'testo', () => { M.segnaIncasso(p, d, 'pagata', 'segnalazione del fornitore'); M.salva(); CRM.Avviso('Fattura ' + d.numero + ' segnata come pagata'); CRM.naviga(); });
+        } else if (st.stato !== 'pagata') btn('Segna come non pagata', 'testo', () => CRM.FormModal({
+          titolo: 'Fattura ' + d.numero + ' non pagata', testo: 'Il fornitore segnala che il cliente non ha pagato. La fattura passa fra i pagamenti da sollecitare.', conferma: 'Segna come non pagata',
+          campi: [{ nome: 'nota', etichetta: 'Nota', tipo: 'area', valore: '', placeholder: 'es. email di ' + M.fornitore(p.fornitore_id).breve + ' del …' }],
+          onConferma: v => { M.segnaIncasso(p, d, 'insoluta', v.nota); M.salva(); CRM.Avviso('Fattura ' + d.numero + ' fra i pagamenti da sollecitare'); CRM.naviga(); }
+        }));
+      });
+    }
   });
 
   /* Solleciti di conferma raggruppati per fornitore: un testo per fornitore con tutte le sue pratiche in ritardo. */
@@ -732,6 +759,44 @@
       } }]
     });
   }
+
+  /* Solleciti di pagamento ai clienti (§5.14): un testo per cliente con le fatture non pagate. */
+  CRM.sollecitiPagamento = function (voci) {
+    if (!voci.length) { CRM.Avviso('Nessuna fattura da sollecitare'); return; }
+    const per = {};
+    voci.forEach(x => { (per[x.cliente] = per[x.cliente] || []).push(x); });
+    const ids = Object.keys(per);
+    const testo = piva => {
+      const vv = per[piva], tot = vv.reduce((s, x) => s + x.importo, 0);
+      return 'Gentile ' + M.nomeCliente(piva) + ',\n\nci risulta ancora da saldare ' + (vv.length === 1 ? 'la seguente fattura' : 'le seguenti fatture') + ':\n\n' +
+        vv.map(x => '- ' + x.doc.numero + ' del ' + M.data(x.doc.data) + ' · ' + M.fornitore(x.pratica.fornitore_id).nome + ' · ' + M.euro(x.importo) + ' (' + x.stato.giorni + ' giorni)').join('\n') +
+        '\n\nTotale: ' + M.euro(tot) + '.\nVi chiediamo di provvedere al pagamento o di comunicarci eventuali contestazioni. Se avete già pagato, ignorate questo messaggio.\n\nGrazie,\nDecobrands SRL';
+    };
+    let cur = ids[0];
+    const copiati = {};
+    CRM.Modale({
+      titolo: 'Solleciti di pagamento', testo: voci.length + (voci.length === 1 ? ' fattura non pagata, ' : ' fatture non pagate, ') + ids.length + (ids.length === 1 ? ' cliente' : ' clienti') + ': un testo per cliente da copiare e inviare. Il fornitore incassa, Decobrands sollecita.',
+      corpo: c => {
+        const disegna = () => {
+          c.innerHTML = '<div class="segmenti solleciti-schede" role="tablist">' + ids.map(piva => '<button type="button" role="tab" data-c="' + piva + '" aria-selected="' + (piva === cur) + '">' +
+            e(M.nomeCliente(piva)) + '<span class="n">' + per[piva].length + '</span>' + (copiati[piva] ? ' ✓' : '') + '</button>').join('') + '</div>' +
+            '<p class="testo-tenue" style="margin:0 0 6px">A: ' + e(M.nomeCliente(cur)) + '</p><textarea class="testo-email" aria-label="Testo da inviare">' + e(testo(cur)) + '</textarea>';
+          CRM.$$('[data-c]', c).forEach(b => b.addEventListener('click', () => { cur = b.dataset.c; disegna(); }));
+        };
+        disegna();
+      },
+      azioni: [{ etichetta: 'Chiudi', variante: 'sec' }, { etichetta: 'Copia il testo', onClick: (chiudi, corpo) => {
+        const t = CRM.$('textarea', corpo); t.select();
+        try { navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy')); } catch (x) { document.execCommand('copy'); }
+        M.registraSollecitoPagamento(per[cur]); M.salva();
+        copiati[cur] = true;
+        const prossimo = ids.find(piva => !copiati[piva]);
+        CRM.Avviso('Sollecito per ' + M.nomeCliente(cur) + ' copiato' + (prossimo ? ': ora ' + M.nomeCliente(prossimo) : ''));
+        if (prossimo) { cur = prossimo; CRM.$('[data-c="' + prossimo + '"]', corpo).click(); return false; }
+        CRM.naviga();
+      } }]
+    });
+  };
 
   function sollecito(p) {
     const f = M.fornitore(p.fornitore_id);
