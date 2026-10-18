@@ -309,6 +309,24 @@
       subagenti: Object.values(subagenti).map(fin).sort((x, y) => y.fatturato - x.fatturato) };
   };
 
+  /* ---------- Analisi (pagina #/analisi, §7.22): un fatto per documento fiscale ----------
+     Competenza = data del documento (non il trimestre di liquidazione né l'incasso): così i numeri
+     di un mese non cambiano quando arriva un bollettino. Storni e riaccrediti non sono fatti
+     (spostano solo il momento del pagamento, D-19 §19). Note di credito con importi negativi.
+     prese = provvigione da fornitore (importo × % dal fornitore), pagate = quota del subagente. */
+  M.fattiAnalisi = function () {
+    const out = [];
+    M.S.pratiche.forEach(p => M.fiscali(p).forEach(d => {
+      const perc = M.percentuali(p, d.data); if (!perc) return;
+      const imp = M.importoDoc(d), f = M.fornitore(p.fornitore_id), s = M.subagente(perc.subagente_id);
+      const prese = M.r2(imp * perc.dal_fornitore / 100), pagate = M.r2(imp * perc.sub / 100);
+      out.push({ numero: d.numero, data: d.data, mese: d.data.slice(0, 7), tipo: d.tipo, pratica_id: p.id,
+        fornitore_id: f.id, fornitore: f.breve, cliente: p.cliente_piva, nome_cliente: M.nomeCliente(p.cliente_piva),
+        subagente_id: s.id, subagente: s.nome, importo: imp, prese: prese, pagate: pagate, margine: M.r2(prese - pagate) });
+    }));
+    return out.sort((x, y) => x.data.localeCompare(y.data) || x.numero.localeCompare(y.numero));
+  };
+
   /* ---------- Liquidazioni ai subagenti (trimestri fissi) ---------- */
   M.trimestre = iso => Math.floor((Number(iso.slice(5, 7)) - 1) / 3) + 1;
   M.limiti = (a, t) => ({ da: a + '-' + String((t - 1) * 3 + 1).padStart(2, '0') + '-01', a: M.fineMese(a, t * 3) });

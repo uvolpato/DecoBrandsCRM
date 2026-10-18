@@ -788,3 +788,22 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .griglia-bi .pannello.largo { grid-column: 1 / -1; }
 .grafico { position: relative; width: 100%; }
 @media (max-width: 992px) { .griglia-bi { grid-template-columns: 1fr; } }
+
+/* ---------- Analisi (§7.22): filtri attivi, grafici cliccabili ---------- */
+.filtri-attivi { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 14px; font-size: 13px; }
+.chip-filtro { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--primario); background: var(--primario-tenue); color: var(--primario-testo, #084298);
+  border-radius: 999px; padding: 3px 8px 3px 11px; font: inherit; cursor: pointer; }
+.chip-filtro .icona { width: 14px; height: 14px; }
+.chip-filtro:hover, .chip-filtro:focus-visible { background: #cfe2ff; }
+.link-azzera { border: 0; background: none; color: var(--primario); font: inherit; cursor: pointer; text-decoration: underline; padding: 2px 4px; }
+.pannello-bi { margin-top: 16px; }
+.pannello-bi .filtri { margin-bottom: 10px; }
+.report-sub .kpi-riga { margin-bottom: 12px; }
+.report-sub .griglia-bi { margin-top: 12px; }
+.report-sub .pannello-testa h2 { font-size: 14px; }
+@media (max-width: 700px) {
+  .barra-periodo .filtri { flex-wrap: wrap; margin-left: 0; width: 100%; }
+  .barra-periodo .filtro-etichetta { flex: 1 1 100%; }
+  .barra-periodo .filtro-etichetta .filtro-select { flex: 1; min-width: 0; }
+  .pannello-bi .filtri .segmenti { overflow-x: auto; max-width: 100%; }
+}

@@ -230,14 +230,10 @@
       CRM.Pannello(corpo, {}).corpo.innerHTML = '<div class="vuoto"><b>Trimestre non ancora iniziato</b>Le provvigioni compariranno qui con le prime fatture di ' + M.nomeTrimestre(t).split('–')[0] + '.</div>';
       return;
     }
-    // Sintesi (piccola analisi con grafici) e dettaglio dei documenti in due schede (D-17 §19):
-    // il dettaglio serve per controllare, la sintesi per capire a colpo d'occhio
-    CRM.Schede(corpo, { riempi: true, attiva: schedaLiq, onCambia: id => { schedaLiq = id; }, schede: [
-      { id: 'sintesi', etichetta: 'Sintesi', disegna: h => sintesi(h, a, t) },
-      { id: 'dettaglio', etichetta: 'Subagenti e documenti', conta: righe.length, contaVariante: inAttesa.length ? 'attesa' : 'neutro', disegna: h => dettaglioDoc(h) }
-    ] });
-    function dettaglioDoc(h) {
-      // Subagenti: elenco che regge qualsiasi numero (DataTable), solo chi ha documenti nel trimestre; clic = filtro
+    // Due colonne: a sinistra i subagenti (filtro), a destra le schede Documenti · Report subagenti
+    // (D-18 §19): i documenti per controllare, il report per capire a colpo d'occhio come va ogni
+    // subagente; l'analisi completa (periodi, filtri, esportazione) è nella pagina Analisi.
+    {
       const perSub = M.S.subagenti.map(s => {
         const rr = righe.filter(x => x.subagente_id === s.id);
         return { id: s.id, nome: s.nome, attivo: s.attivo !== false, documenti: rr.length,
@@ -247,7 +243,7 @@
       });
       const conDoc = perSub.filter(x => x.documenti), senza = perSub.length - conDoc.length;
       if (subSel && !conDoc.some(x => String(x.id) === subSel)) subSel = null;
-      const col = CRM.blocco(h, 'colonne riempi', 'grid-template-columns:minmax(300px,0.8fr) minmax(0,2.2fr)');
+      const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(300px,0.8fr) minmax(0,2.2fr)');
       const ps = CRM.Pannello(col, { titolo: 'Subagenti', riempi: true, senzaMargine: true,
         nota: conDoc.length + (conDoc.length === 1 ? ' con documenti' : ' con documenti') + (senza ? ' · ' + senza + ' senza' : '') });
       const tabSub = CRM.DataTable(ps.corpo, {
@@ -260,15 +256,26 @@
         ],
         etichettaTotale: 'Totale',
         piede: 'Clic su un subagente per vedere i suoi documenti, di nuovo per tutti.',
-        onRowClick: x => { subSel = String(x.id) === subSel ? null : String(x.id); tabSub.aggiorna(conDoc); CRM.$('h2', pan.el).textContent = titolo(); tab.aggiorna(filtra()); },
+        onRowClick: x => {
+          subSel = String(x.id) === subSel ? null : String(x.id); tabSub.aggiorna(conDoc); CRM.$('h2', pan.el).textContent = titolo();
+          sk.conta('documenti', filtra().length);
+          if (sk.attiva() === 'documenti' && tab) tab.aggiorna(filtra()); else sk.ridisegna();
+        },
         emptyText: 'Nessun subagente', emptyHint: 'Nessun documento nel trimestre.'
       });
 
       const filtra = () => subSel ? righe.filter(x => String(x.subagente_id) === subSel) : righe;
-      const titolo = () => subSel ? 'Documenti di ' + M.subagente(Number(subSel)).nome : 'Tutti i documenti del trimestre';
+      const titolo = () => subSel ? M.subagente(Number(subSel)).nome : 'Tutti i subagenti';
       const pan = CRM.Pannello(col, { titolo: titolo(), riempi: true, senzaMargine: true,
-        nota: 'Totale da liquidare <b>' + M.euro(totLiq) + '</b>' + (inAttesa.length ? ' · ' + inAttesa.length + ' documenti in attesa · <a href="#/bollettini">vai ai bollettini</a>' : '') });
-      const tab = CRM.DataTable(pan.corpo, {
+        nota: 'Totale da liquidare <b>' + M.euro(totLiq) + '</b>' + (inAttesa.length ? ' · ' + inAttesa.length + ' documenti in attesa · <a href="#/bollettini">vai ai bollettini</a>' : ''),
+        azioni: [{ etichetta: 'Analisi completa', icona: 'analisi', onClick: () => CRM.apriAnalisi({ s: subSel || '', n: 3, da: M.limiti(a, t).da.slice(0, 7) }) }] });
+      let tab = null;
+      const sk = CRM.Schede(pan.corpo, { riempi: true, schede: [
+        { id: 'documenti', etichetta: 'Documenti', conta: filtra().length, contaVariante: inAttesa.length ? 'attesa' : 'neutro', disegna: h => documenti(h) },
+        { id: 'report', etichetta: 'Report subagenti', disegna: h => { tab = null; reportSubagenti(h, a, t, subSel); } }
+      ] });
+      function documenti(h) {
+      tab = CRM.DataTable(h, {
         colonne: [
           { key: 'numero', header: 'Documento', valore: r => r.doc.numero, cell: r => '<a href="#/pratiche/' + r.pratica.id + '">' + e(r.doc.numero) + '</a>' + (r.voce ? ' ' + CRM.stato(r.voce === 'storno' ? 'errore' : 'info', r.voce === 'storno' ? 'Storno' : 'Riaccredito') : '') + '<span class="sec-riga">' + e(r.fornitore.breve) + ' · ' + (r.doc.origine ? 'fattura del ' + M.data(r.doc.origine) : M.data(r.doc.data)) + '</span>' },
           { key: 'cliente', header: 'Cliente · subagente', grow: true, valore: r => M.nomeCliente(r.cliente), cell: r => e(M.nomeCliente(r.cliente)) + '<span class="sec-riga">' + e(M.subagente(r.subagente_id).nome) + ' · codice ' + e(r.codice_cliente) + '</span>' },
@@ -283,50 +290,62 @@
         piede: 'Fatturato (es. Gasper, Ing’s): entrano le fatture del trimestre; se il cliente non paga, lo storno è una voce negativa nella liquidazione successiva. Maturato (es. Gries): la fattura entra nel trimestre del bollettino che la riconosce, cioè quando il cliente paga.',
         emptyText: 'Nessun documento', emptyHint: 'Nessuna fattura o nota di credito con data in questo trimestre.'
       });
+      }
     }
   });
 
-  /* Sintesi del trimestre: 4 numeri e 3 grafici (Chart.js). Domande a cui risponde:
-     quanto abbiamo fatturato e guadagnato, come va rispetto agli altri trimestri,
-     da quali fornitori viene il fatturato, quanto produce ogni subagente. */
-  let schedaLiq = 'sintesi';
-  function sintesi(h, a, t) {
+  /* Report subagenti (scheda nel pannello di destra delle Liquidazioni, D-18 §19).
+     Stessi numeri del trimestre di liquidazione (M.analisiTrimestre), confronto con il trimestre prima.
+     Senza subagente scelto: un grafico e una riga per subagente. Con un subagente scelto: i suoi
+     numeri, i suoi trimestri dell'anno e i suoi clienti principali. Il resto è nella pagina Analisi. */
+  function reportSubagenti(h, a, t, sub) {
     const C = CRM.COLORI_GRAFICI;
-    const an = M.analisiTrimestre(a, t), tot = an.totale;
-    const prec = t > 1 ? M.analisiTrimestre(a, t - 1).totale : null;
-    const conf = (v, p) => p && Math.abs(p) > 0.01 ? { testo: (v >= p ? '+' : '−') + M.num(Math.abs(Math.round(100 * (v - p) / Math.abs(p)))) + '% sul ' + (t - 1) + '° trimestre', variante: v >= p ? 'ok' : 'errore' } : { testo: 'primo trimestre dell’anno' };
-    CRM.KpiRow(h, [
-      { id: 'f', etichetta: 'Fatturato dei clienti', valore: tot.fatturato, variante: 'primario', dettagli: [conf(tot.fatturato, prec && prec.fatturato), { testo: an.documenti + ' documenti' }] },
-      { id: 'p', etichetta: 'Provvigioni dai fornitori', valore: tot.prese, variante: 'info', dettagli: [conf(tot.prese, prec && prec.prese), { testo: tot.fatturato ? M.pct(M.r2(100 * tot.prese / tot.fatturato)) + ' del fatturato' : '' }] },
-      { id: 's', etichetta: 'Provvigioni ai subagenti', valore: tot.pagate, variante: 'attesa', dettagli: [conf(tot.pagate, prec && prec.pagate), { testo: an.subagenti.length + ' subagenti' }] },
-      { id: 'm', etichetta: 'Margine Decobrands', valore: tot.margine, variante: 'ok', dettagli: [conf(tot.margine, prec && prec.margine), { testo: tot.prese ? M.pct(M.r2(100 * tot.margine / tot.prese)) + ' delle provvigioni' : '' }] }
-    ]);
-    const griglia = CRM.blocco(h, 'griglia-bi');
-    // 1. andamento dei trimestri dell'anno: provvigioni prese e pagate (barre), margine (linea)
-    const trimestri = [1, 2, 3, 4].filter(q => M.statoTrimestre(a, q).chiave !== 'futura').map(q => M.analisiTrimestre(a, q));
-    const p1 = CRM.Pannello(griglia, { titolo: 'Andamento ' + a, nota: 'provvigioni per trimestre' });
-    CRM.Grafico(p1.corpo, { tipo: 'bar', titolo: 'Provvigioni prese, pagate e margine per trimestre', altezza: 250,
-      etichette: trimestri.map(x => x.t + '° trim.' + (x.t === t ? ' ●' : '')),
-      serie: [
-        { nome: 'Dai fornitori', valori: trimestri.map(x => x.totale.prese), colore: C.primario },
-        { nome: 'Ai subagenti', valori: trimestri.map(x => x.totale.pagate), colore: C.neutro },
-        { nome: 'Margine', valori: trimestri.map(x => x.totale.margine), colore: C.ok, tipo: 'line' }
-      ] });
-    // 2. da dove viene il fatturato: i fornitori del trimestre (i primi 6, gli altri insieme)
-    const fo = an.fornitori.slice(0, 6), altri = an.fornitori.slice(6);
-    if (altri.length) fo.push({ nome: 'Altri ' + altri.length, fatturato: altri.reduce((x, y) => x + y.fatturato, 0) });
-    const p2 = CRM.Pannello(griglia, { titolo: 'Fatturato per fornitore', nota: t + '° trimestre' });
-    CRM.Grafico(p2.corpo, { tipo: 'doughnut', titolo: 'Distribuzione del fatturato per fornitore', altezza: 250, etichette: fo.map(x => x.nome),
-      serie: [{ nome: 'Fatturato', valori: fo.map(x => M.r2(x.fatturato)), colore: ['#0d6efd', '#6ea8fe', '#198754', '#75b798', '#ffc107', '#adb5bd', '#dee2e6'] }] });
-    // 3. produttività dei subagenti: provvigioni generate dai loro clienti, divise fra subagente e Decobrands
-    const p3 = CRM.Pannello(griglia, { titolo: 'Subagenti', nota: 'provvigioni generate dai loro clienti nel ' + t + '° trimestre' });
-    p3.el.classList.add('largo');
-    const su = an.subagenti.slice().sort((x, y) => y.prese - x.prese);
-    CRM.Grafico(p3.corpo, { tipo: 'bar', orizzontale: true, impilato: true, titolo: 'Provvigioni generate per subagente', altezza: Math.max(150, 40 * su.length + 60), etichette: su.map(x => x.nome),
-      serie: [{ nome: 'Al subagente', valori: su.map(x => x.pagate), colore: C.neutro }, { nome: 'Margine Decobrands', valori: su.map(x => x.margine), colore: C.ok }] });
-    CRM.Elenco(p3.corpo, su.map(x => ({ testo: '<b>' + e(x.nome) + '</b> <span class="testo-tenue">' + x.clienti + (x.clienti === 1 ? ' cliente' : ' clienti') + ' · ' + x.documenti + (x.documenti === 1 ? ' documento' : ' documenti') + '</span>',
-      destra: 'fatturato ' + M.euro(x.fatturato) })));
-    CRM.Nota(h, 'Importi di competenza calcolati sui documenti del trimestre, compresi quelli ancora in attesa dei bollettini e le voci di storno; non sono gli importi incassati. Il dettaglio documento per documento è nella scheda <b>Subagenti e documenti</b>.');
+    const box = CRM.blocco(h, 'report-sub', 'padding:14px 16px');
+    const an = M.analisiTrimestre(a, t);
+    const pa = t > 1 ? a : a - 1, pt = t > 1 ? t - 1 : 4;
+    const prec = M.analisiTrimestre(pa, pt);
+    const precDi = id => prec.subagenti.find(x => String(x.chiave) === String(id));
+    const delta = (v, p) => p && Math.abs(p) > 0.01 ? Math.round(100 * (v - p) / Math.abs(p)) : null;
+    const etPrec = 'sul ' + pt + '° trimestre' + (pa !== a ? ' ' + pa : '');
+    if (!sub) {
+      const su = an.subagenti.slice().sort((x, y) => y.prese - x.prese);
+      if (!su.length) { box.innerHTML = '<div class="vuoto"><b>Nessun subagente con documenti</b></div>'; return; }
+      CRM.Grafico(box, { tipo: 'bar', orizzontale: true, impilato: true, titolo: 'Provvigioni generate per subagente', altezza: Math.max(140, 30 * su.length + 56), etichette: su.map(x => x.nome),
+        serie: [{ nome: 'Al subagente', valori: su.map(x => x.pagate), colore: C.neutro }, { nome: 'Margine Decobrands', valori: su.map(x => x.margine), colore: C.ok }] });
+      su.forEach(x => { const p = precDi(x.chiave); x.delta = delta(x.pagate, p && p.pagate); x.quota = x.prese ? M.r2(100 * x.pagate / x.prese) : 0; });
+      CRM.DataTable(box, { naturale: true, compatta: true, perPagina: false, righe: su, ordinamentoIniziale: { key: 'pagate', dir: 'desc' }, etichettaTotale: 'Totale',
+        colonne: [
+          { key: 'nome', header: 'Subagente', grow: true, cell: x => '<b>' + e(x.nome) + '</b><span class="sec-riga">' + x.clienti + (x.clienti === 1 ? ' cliente' : ' clienti') + ' · ' + x.documenti + (x.documenti === 1 ? ' documento' : ' documenti') + '</span>' },
+          { key: 'fatturato', header: 'Fatturato', tipo: 'euro', totale: 'somma' },
+          { key: 'pagate', header: 'Provvigione', tipo: 'euro', totale: 'somma' },
+          { key: 'margine', header: 'Margine', tipo: 'euro', totale: 'somma' },
+          { key: 'delta', header: 'Sul ' + pt + '° trim.', tipo: 'numero', sortValue: x => x.delta == null ? -1e9 : x.delta,
+            cell: x => x.delta == null ? '<span class="testo-tenue">—</span>' : '<span class="' + (x.delta >= 0 ? 'positivo' : 'negativo') + '">' + (x.delta >= 0 ? '+' : '−') + M.num(Math.abs(x.delta)) + '%</span>' }
+        ], piede: 'Margine = provvigioni dai fornitori meno la provvigione al subagente. Ultima colonna: provvigione al subagente ' + etPrec + '. Clic su un subagente a sinistra per il suo report.' });
+      CRM.Nota(box, 'Numeri del trimestre di liquidazione, compresi i documenti in attesa e le voci di storno. Altri periodi, filtri ed esportazione: <a href="#/analisi" data-analisi>Analisi completa</a>.');
+    } else {
+      const x = an.subagenti.find(y => String(y.chiave) === String(sub)) || { fatturato: 0, prese: 0, pagate: 0, margine: 0, clienti: 0, documenti: 0 };
+      const p = precDi(sub) || {};
+      const conf = (v, q) => { const d = delta(v, q); return d == null ? { testo: 'nessun importo ' + etPrec } : { testo: (d >= 0 ? '+' : '−') + M.num(Math.abs(d)) + '% ' + etPrec, variante: d >= 0 ? 'ok' : 'errore' }; };
+      CRM.KpiRow(box, [
+        { id: 'f', etichetta: 'Fatturato dei suoi clienti', valore: x.fatturato, variante: 'primario', dettagli: [conf(x.fatturato, p.fatturato), { testo: x.clienti + (x.clienti === 1 ? ' cliente' : ' clienti') + ' · ' + x.documenti + (x.documenti === 1 ? ' documento' : ' documenti') }] },
+        { id: 's', etichetta: 'Provvigione al subagente', valore: x.pagate, variante: 'attesa', dettagli: [conf(x.pagate, p.pagate)] },
+        { id: 'm', etichetta: 'Margine Decobrands', valore: x.margine, variante: 'ok', dettagli: [conf(x.margine, p.margine), { testo: x.prese ? M.pct(M.r2(100 * x.margine / x.prese)) + ' delle provvigioni' : '' }] }
+      ]);
+      const griglia = CRM.blocco(box, 'griglia-bi');
+      const trim = [1, 2, 3, 4].filter(q => M.statoTrimestre(a, q).chiave !== 'futura').map(q => ({ q: q, s: M.analisiTrimestre(a, q).subagenti.find(y => String(y.chiave) === String(sub)) || { pagate: 0, margine: 0 } }));
+      const p1 = CRM.Pannello(griglia, { titolo: 'Trimestri ' + a });
+      CRM.Grafico(p1.corpo, { tipo: 'bar', impilato: true, titolo: 'Provvigioni generate per trimestre', altezza: 200, etichette: trim.map(y => y.q + '° trim.' + (y.q === t ? ' ●' : '')),
+        serie: [{ nome: 'Al subagente', valori: trim.map(y => y.s.pagate), colore: C.neutro }, { nome: 'Margine Decobrands', valori: trim.map(y => y.s.margine), colore: C.ok }] });
+      const perCli = {};
+      M.righeLiquidazione(a, t).filter(r => String(r.subagente_id) === String(sub)).forEach(r => { const c = perCli[r.cliente] = perCli[r.cliente] || { nome: M.nomeCliente(r.cliente), fatturato: 0, provvigione: 0 }; c.fatturato += r.importo; c.provvigione += r.provvigione; });
+      const cli = Object.values(perCli).sort((u, v) => v.fatturato - u.fatturato);
+      const p2 = CRM.Pannello(griglia, { titolo: 'Clienti principali', nota: cli.length > 5 ? 'primi 5 di ' + cli.length : '' });
+      CRM.Elenco(p2.corpo, cli.slice(0, 5).map(c => ({ testo: '<b>' + e(c.nome) + '</b> <span class="testo-tenue">fatturato ' + M.euro(M.r2(c.fatturato)) + '</span>', destra: M.euro(M.r2(c.provvigione)) })), 'Nessun cliente');
+      CRM.Nota(box, 'Numeri del trimestre di liquidazione. Altri periodi, confronti ed esportazione: <a href="#/analisi" data-analisi>Analisi completa di ' + e(M.subagente(Number(sub)).nome) + '</a>.');
+    }
+    const ln = CRM.$('[data-analisi]', box);
+    if (ln) ln.addEventListener('click', ev => { ev.preventDefault(); CRM.apriAnalisi({ s: sub || '', n: 3, da: M.limiti(a, t).da.slice(0, 7) }); });
   }
   /* Esporta in Excel: tutto il trimestre (riepilogo + un foglio per subagente), un solo subagente, o solo il riepilogo. */
   let formatoEsporta = 'xlsx';

@@ -167,16 +167,17 @@
       sintesi: 'Le provvigioni ai subagenti per trimestre: cosa è liquidabile, cosa è ancora in attesa dei bollettini, il prospetto da inviare.',
       flusso: [
         ['Scegli il trimestre', 'Quattro riquadri fissi: liquidato, in corso, da liquidare, non iniziato.'],
-        ['Guarda la Sintesi', 'Fatturato, provvigioni dai fornitori e ai subagenti, margine, con il confronto sul trimestre precedente; andamento dell’anno, fatturato per fornitore, provvigioni per subagente.'],
-        ['Controlla il dettaglio', 'Scheda Subagenti e documenti: a sinistra i subagenti (clic = filtro; in rosso quanti storni hanno), a destra i documenti con stato liquidabile o in attesa, più le voci di storno e riaccredito.'],
+        ['Controlla i documenti', 'A sinistra i subagenti (clic = filtro; in rosso quanti storni hanno); a destra la scheda Documenti con stato liquidabile o in attesa, più le voci di storno e riaccredito.'],
+        ['Guarda il Report subagenti', 'Nella scheda accanto: per ogni subagente fatturato, provvigione, margine Decobrands e variazione sul trimestre prima; scegliendo un subagente a sinistra, i suoi numeri, i suoi trimestri e i clienti principali.'],
         ['Esporta', 'Il prospetto per subagente in Excel, PDF o CSV.'],
         ['Chiudi il trimestre', 'A trimestre finito e senza documenti in attesa: gli importi si fissano.']
       ],
       pulsanti: [
         ['Riquadri dei trimestri', 'Cambiano trimestre.'],
-        ['Sintesi · Subagenti e documenti', 'Le due schede: prima i numeri e i grafici, poi il dettaglio documento per documento.'],
-        ['Grafici', 'Passando col mouse su una barra o una fetta si legge l’importo; clic su una voce della legenda la nasconde o la mostra.'],
-        ['Riga del subagente', 'Filtra i documenti su quel subagente; secondo clic per tutti.'],
+        ['Documenti · Report subagenti', 'Le due schede del pannello di destra: il dettaglio per controllare, il report per capire come va ogni subagente.'],
+        ['Analisi completa', 'Apre la pagina Analisi sul trimestre, filtrata sul subagente scelto.'],
+        ['Grafici', 'Passando col mouse su una barra si legge l’importo; clic su una voce della legenda la nasconde o la mostra.'],
+        ['Riga del subagente', 'Filtra documenti e report su quel subagente; secondo clic per tutti.'],
         ['vai ai bollettini', 'Se ci sono documenti in attesa: porta ai bollettini da verificare.'],
         ['Esporta in Excel', 'Apre la finestra di esportazione.'],
         ['Chiudi il trimestre', 'Fissa gli importi; chiede conferma.'],
@@ -188,7 +189,32 @@
           azioni: [['Scarica', 'Genera il file; l’esportazione resta nel registro.']] },
         { nome: 'Chiudere la liquidazione', da: 'Chiudi il trimestre', cosa: 'Conferma della chiusura.', azioni: [['Chiudi il trimestre', 'Gli importi non cambiano più.']] }
       ],
-      sapere: ['La Sintesi mostra importi di competenza (compresi i documenti in attesa e gli storni), non quelli incassati. Margine = provvigioni dai fornitori − provvigioni ai subagenti.', 'Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga: al subagente lo storno arriva nella liquidazione successiva come <b>voce negativa</b> (il riaccredito come voce positiva).', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
+      sapere: ['Il Report subagenti usa i numeri del trimestre di liquidazione (compresi i documenti in attesa e gli storni), non quelli incassati. Margine = provvigioni dai fornitori − provvigioni ai subagenti. Per altri periodi, filtri ed esportazione c’è la pagina <b>Analisi</b>.', 'Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga: al subagente lo storno arriva nella liquidazione successiva come <b>voce negativa</b> (il riaccredito come voce positiva).', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
+
+    { id: 'analisi', titolo: 'Analisi', gruppo: 'Lavoro', vai: '#/analisi',
+      sintesi: 'Quanto fatturano i clienti, quanto riconoscono i fornitori, quanto va ai subagenti e quanto resta a Decobrands: per periodo, fornitore, subagente e cliente, con il confronto sul periodo prima.',
+      flusso: [
+        ['Scegli il periodo', '3, 6 o 12 mesi; il mese d’inizio dal selettore a mesi, ‹ › per spostarlo di un mese.'],
+        ['Filtra', 'Tendine fornitore, subagente, cliente; oppure un clic su una fetta, una barra o una riga.'],
+        ['Leggi', '4 numeri con la variazione sul periodo precedente, l’andamento mese per mese, i pesi di fornitori, subagenti e clienti.'],
+        ['Approfondisci', 'Tabella Dettaglio per subagente, fornitore, cliente, mese o documento per documento.'],
+        ['Esporta', 'Excel con i grafici, PDF o CSV, con gli stessi filtri.']
+      ],
+      pulsanti: [
+        ['Periodo · ‹ ›', 'Sceglie il mese d’inizio o sposta il periodo di un mese.'],
+        ['3 mesi · 6 mesi · 12 mesi', 'Durata del periodo; finisce nello stesso mese di prima.'],
+        ['Fornitore · Subagente · Cliente', 'Filtrano tutta la pagina; mostrano solo le voci presenti.'],
+        ['Etichetta del filtro ×', 'Toglie quel filtro; “Togli tutti i filtri” li toglie tutti.'],
+        ['Clic su un grafico', 'Fornitore, subagente o cliente diventano filtro; di nuovo per toglierlo. Il grafico continua a mostrare tutte le voci, con la scelta in risalto.'],
+        ['Per subagente · Per fornitore · Per cliente · Per mese · Documenti', 'Raggruppamento della tabella; clic su una riga = filtro.'],
+        ['Esporta', 'Apre la finestra di esportazione.']
+      ],
+      finestre: [
+        { nome: 'Esporta l’analisi', da: 'Esporta', cosa: 'Periodo e filtri attivi sono quelli della pagina.',
+          campi: [['Formato', 'Excel: riepilogo con i grafici, un foglio per subagente, fornitore, cliente e mese, l’elenco dei documenti · PDF con lo stesso contenuto · CSV con i soli documenti.']],
+          azioni: [['Scarica', 'Genera il file.']] }
+      ],
+      sapere: ['Gli importi sono per <b>data del documento</b> (competenza): fatture e note di credito abbinate alle pratiche, anche se non ancora riconosciute nei bollettini. Non cambiano quando arriva un bollettino.', 'Gli storni per mancato pagamento non cambiano questi numeri: spostano solo il momento in cui la provvigione è pagata (vedi Liquidazioni).', 'Dai fornitori = imponibile × % che il fornitore riconosce a Decobrands; ai subagenti = imponibile × % del subagente; margine = differenza.'] },
 
     { id: 'incassi', titolo: 'Incassi dei clienti', gruppo: 'Lavoro', vai: '#/', schema: 'incassi',
       sintesi: 'Decobrands non incassa: incassa il fornitore. Se il cliente non paga, il fornitore sollecita Decobrands e Decobrands sollecita il cliente. Il CRM segue per ogni fattura se è stata pagata e aiuta a sollecitare.',

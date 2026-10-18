@@ -120,6 +120,14 @@
       if (b.tipo === 'titolo') {
         r += 2; ws.mergeCells(r, 1, r, n);
         Object.assign(ws.getCell(r, 1), { value: b.testo, font: { name: FONT, size: 10.5, bold: true, color: { argb: X.attesaTesto } } });
+      } else if (b.tipo === 'immagine') {
+        // grafico (PNG) ancorato sotto l'ultima riga; occupa righe da 20 px circa
+        r += 2;
+        const id = wb.addImage({ base64: b.dati, extension: 'png' });
+        const w = b.larghezzaPx || 640, h = Math.round(w * b.altezza / b.larghezza);
+        if (b.testo) { Object.assign(ws.getCell(r, 1), { value: b.testo, font: { name: FONT, size: 10.5, bold: true, color: { argb: X.primarioTesto } } }); r++; }
+        ws.addImage(id, { tl: { col: 0, row: r - 1 }, ext: { width: w, height: h } });
+        r += Math.ceil(h / 20);
       } else if (b.tipo === 'nota') {
         r += b.stretta ? 1 : 2; ws.mergeCells(r, 1, r, n);
         Object.assign(ws.getCell(r, 1), { value: b.testo, font: { name: FONT, size: 9, italic: true, color: { argb: X.tenue } }, alignment: { wrapText: true, vertical: 'top' } });
@@ -144,6 +152,9 @@
         });
         if (!b.righe.length && b.vuoto) { r++; ws.mergeCells(r, 1, r, n); Object.assign(ws.getCell(r, 1), { value: b.vuoto, font: { name: FONT, size: 10, italic: true, color: { argb: X.tenue } } }); }
         const ultima = r;
+        if (b.filtro && b.righe.length) ws.autoFilter = { from: { row: intest, column: 1 }, to: { row: ultima, column: n } };
+        primaTabella = false;
+        if (!b.totale) return;
         r++; const rt = ws.getRow(r); rt.height = 22;
         for (let c = 1; c <= n; c++) Object.assign(rt.getCell(c), {
           fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: att ? X.attesaTenue : X.sfondo } },
@@ -155,8 +166,6 @@
           rt.getCell(Number(i) + 1).value = { formula: b.righe.length ? 'SUM(' + L + prima + ':' + L + ultima + ')' : '0', result: b.totale.valori[i] };
           rt.getCell(Number(i) + 1).numFmt = FMT[c.tipo];
         });
-        if (b.filtro && b.righe.length) ws.autoFilter = { from: { row: intest, column: 1 }, to: { row: ultima, column: n } };
-        primaTabella = false;
       }
     });
     ws.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
@@ -192,6 +201,12 @@
       f.blocchi.forEach(b => {
         if (b.tipo === 'titolo') {
           y += 4; doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...P.attesaTesto); doc.text(b.testo, MX, y); y += 2.5;
+        } else if (b.tipo === 'immagine') {
+          const w = Math.min(larghezza, b.larghezzaMm || 180), h = w * b.altezza / b.larghezza;
+          if (y + h + 10 > H - MY) { doc.addPage(); y = MY; }
+          y += 5;
+          if (b.testo) { doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...P.primarioTesto); doc.text(b.testo, MX, y); y += 2.5; }
+          doc.addImage(b.dati, 'PNG', MX, y, w, h); y += h;
         } else if (b.tipo === 'nota') {
           y += b.stretta ? 3 : 6;
           doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(...P.tenue);
@@ -203,10 +218,10 @@
           const corpo = b.righe.map(v => v.map((val, i) => testoValore(b.colonne[i], val)));
           if (!corpo.length && b.vuoto) corpo.push([{ content: b.vuoto, colSpan: b.colonne.length, styles: { fontStyle: 'italic', textColor: P.tenue } }]);
           // etichetta del totale estesa fino alla prima colonna con un valore (come la cella unita dell'Excel stampato)
-          const primo = Math.max(1, Math.min.apply(null, Object.keys(b.totale.valori).map(Number)));
-          const piede = [[{ content: b.totale.etichetta, colSpan: primo }].concat(b.colonne.slice(primo).map((c, k) => { const i = k + primo; return b.totale.valori[i] != null ? testoValore(c, b.totale.valori[i]) : ''; }))];
+          const primo = b.totale ? Math.max(1, Math.min.apply(null, Object.keys(b.totale.valori).map(Number))) : 1;
+          const piede = !b.totale ? [] : [[{ content: b.totale.etichetta, colSpan: primo }].concat(b.colonne.slice(primo).map((c, k) => { const i = k + primo; return b.totale.valori[i] != null ? testoValore(c, b.totale.valori[i]) : ''; }))];
           doc.autoTable({
-            startY: y, margin: { left: MX, right: MX, top: MY, bottom: MY + 4 }, tableWidth: larghezza, theme: 'plain',
+            startY: y + (b.spazio || 0), margin: { left: MX, right: MX, top: MY, bottom: MY + 4 }, tableWidth: larghezza, theme: 'plain',
             head: [b.colonne.map(c => c.t)], body: corpo, foot: piede, showFoot: 'lastPage', showHead: 'everyPage',
             styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 1.6, bottom: 1.6, left: 1.8, right: 1.8 }, textColor: att ? P.tenue : P.testo, fontStyle: att ? 'italic' : 'normal', lineColor: P.bordoTenue, overflow: 'linebreak' },
             headStyles: { fillColor: P.primarioTenue, textColor: P.primarioTesto, fontStyle: 'bold', fontSize: 8.5 },
@@ -216,7 +231,7 @@
               const c = b.colonne[d.column.index];
               if (d.section === 'head') d.cell.styles.halign = allinea(c);
               if (d.section === 'foot') d.cell.styles.halign = d.column.index === 0 ? 'left' : 'right';
-              const raw = d.section === 'body' ? (b.righe[d.row.index] || [])[d.column.index] : d.section === 'foot' ? b.totale.valori[d.column.index] : null;
+              const raw = d.section === 'body' ? (b.righe[d.row.index] || [])[d.column.index] : d.section === 'foot' && b.totale ? b.totale.valori[d.column.index] : null;
               if (c && c.tipo === 'euro' && typeof raw === 'number' && raw < 0 && !att) d.cell.styles.textColor = P.negativo;
               if (d.section === 'body' && b.link && d.column.index === 0) { d.cell.styles.textColor = P.primario; }
             },
@@ -254,7 +269,8 @@
     const q = v => { const s = String(v == null ? '' : v); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const n = (v, d) => (Math.round(v * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d).replace('.', ',');
     let righe;
-    if (m.scelta === 'riepilogo') {
+    if (m.csv) righe = m.csv.map(r => r.map(v => typeof v === 'number' ? n(v, 2) : v));
+    else if (m.scelta === 'riepilogo') {
       const att = m.fogli[0].colonne.length > 4;
       righe = [['Subagente', 'Documenti', 'Imponibile', 'Provvigione da liquidare'].concat(att ? ['In attesa dei bollettini'] : [])]
         .concat(m.gruppi.map(g => [g.s.nome, g.liq.length, n(somma(g.liq, 'importo'), 2), n(somma(g.liq, 'provvigione'), 2)].concat(att ? [n(somma(g.att, 'provvigione'), 2)] : [])));
@@ -277,5 +293,14 @@
     CRM.scarica(nome, blob, blob.type);
     return nome;
   };
-  CRM.modelloLiquidazione = modello;   // per prove e per il catalogo
+  CRM.modelloLiquidazione = modello;
+  /* Esportazione di un modello qualsiasi (stessi fogli → blocchi): usata dall'Analisi (§7.22).
+     m: { nome, titolo, fogli: [{ nome, titolo, colonne, ctx: { periodo, contesto }, blocchi }], csv: [[...]] } */
+  CRM.esportaModello = async function (m, formato) {
+    if (formato === 'xlsx' && !window.ExcelJS || formato === 'pdf' && !(window.jspdf && window.jspdf.jsPDF)) { CRM.Avviso('Libreria per il formato ' + formato.toUpperCase() + ' non caricata'); return null; }
+    const blob = formato === 'pdf' ? pdf(m) : formato === 'csv' ? csv(m) : await xlsx(m);
+    const nome = m.nome + '.' + formato;
+    CRM.scarica(nome, blob, blob.type);
+    return nome;
+  };   // per prove e per il catalogo
 })();

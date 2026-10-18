@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -1360,36 +1360,52 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
 
 ### 7.8 Liquidazione (`/liquidazione`)
 
-**Struttura (prototipo `prototipo-alternativo/`, D-17 §19):** sotto i quattro trimestri due
-**schede**: **Sintesi** (si apre per prima) e **Subagenti e documenti** (il dettaglio
-descritto più sotto, con il numero dei documenti nel titolo, giallo se ce ne sono in attesa).
+**Struttura (prototipo `prototipo-alternativo/`, D-18 §19):** sotto i quattro trimestri ci sono due
+colonne. A sinistra l'**elenco dei subagenti**, che fa da filtro. A destra un pannello con due
+**schede**:
+- **Documenti**, che si apre per prima. Il titolo mostra il numero dei documenti, in giallo
+  se ce ne sono in attesa.
+- **Report subagenti**.
 
-**Sintesi del trimestre**: quattro numeri e tre grafici, da leggere in pochi secondi.
-- **Numeri** (KpiRow, non cliccabili), ognuno con il confronto in % sul trimestre precedente:
-  *Fatturato dei clienti* (imponibile dei documenti, con il numero di documenti),
-  *Provvigioni dai fornitori* (con la % sul fatturato), *Provvigioni ai subagenti* (con
-  il numero di subagenti), *Margine Decobrands* = dai fornitori − ai subagenti (con la %
-  sulle provvigioni).
-- **Andamento dell'anno**: barre per trimestre con le provvigioni dai fornitori (blu) e ai
-  subagenti (grigio), linea del margine (verde); il trimestre scelto è segnato con ●.
-- **Fatturato per fornitore**: ciambella con i primi 6 fornitori del trimestre, gli altri
-  uniti in "Altri N".
-- **Subagenti**: barre orizzontali impilate con le provvigioni generate dai clienti di ogni
-  subagente, divise fra la sua quota (grigio) e il margine di Decobrands (verde), ordinate
-  dalla più grande; sotto, per ognuno, clienti, documenti e fatturato.
-- Nota fissa: importi **di competenza** calcolati sui documenti del trimestre (compresi
-  quelli in attesa dei bollettini e le voci di storno), non importi incassati.
-- **Calcolo** (`analisiTrimestre(a, t)`, sulle stesse righe della liquidazione):
-  fatturato = Σ imponibile; dai fornitori = Σ imponibile × % che il fornitore riconosce a
-  Decobrands (agente + subagente, §5.1) alla data del documento; ai subagenti = Σ
-  provvigione liquidata; margine = differenza. Nell'app: `GET /api/liquidazione/sintesi?anno=&trimestre=`.
-- **Grafici**: Chart.js (licenza MIT), componente Grafico (§16.4).
-- **Perché**: il dettaglio documento per documento serve per controllare, ma non è
-  l'informazione principale: chi apre la liquidazione vuole capire a colpo d'occhio quanto
-  si è fatturato e guadagnato, come va rispetto agli altri trimestri, da quali fornitori
-  viene il fatturato e quanto produce ogni subagente.
+Nella testata del pannello il pulsante **Analisi completa** apre la pagina Analisi (§7.22) sul
+trimestre, filtrata sul subagente scelto. La scheda *Sintesi* a tutta pagina della versione
+4.4 (D-17) è sostituita: i suoi grafici sono nella pagina Analisi.
 
-Dettaglio (scheda *Subagenti e documenti*):
+**Report subagenti** è un riepilogo breve, da leggere in pochi secondi:
+- usa gli stessi numeri del trimestre di liquidazione (`analisiTrimestre(a, t)`);
+- il confronto è sul trimestre prima; per il 1° trimestre è il 4° dell'anno precedente.
+
+Il contenuto cambia se a sinistra è scelto un subagente:
+- **Nessun subagente scelto**:
+  - barre orizzontali impilate con le provvigioni generate dai clienti di ogni subagente,
+    divise fra la sua quota (grigio) e il margine di Decobrands (verde);
+  - sotto, una tabella con una riga per subagente: clienti e documenti, fatturato,
+    provvigione al subagente, margine Decobrands, variazione % della provvigione sul
+    trimestre prima; riga totale.
+- **Subagente scelto**:
+  - tre numeri, ognuno con il confronto: fatturato dei suoi clienti, provvigione, margine
+    Decobrands;
+  - barre dei trimestri dell'anno (sua quota + margine), con il trimestre scelto segnato
+    con ●;
+  - i primi 5 clienti per fatturato, con la provvigione.
+
+In fondo una nota con il collegamento *Analisi completa*, con gli stessi filtri del pulsante.
+
+**Calcolo** (`analisiTrimestre(a, t)`, sulle stesse righe della liquidazione):
+- fatturato = Σ imponibile;
+- dai fornitori = Σ imponibile × % che il fornitore riconosce a Decobrands (agente +
+  subagente, §5.1) alla data del documento;
+- al subagente = Σ provvigione;
+- margine = dai fornitori − al subagente.
+
+Il calcolo comprende i documenti in attesa dei bollettini e le voci di storno.
+Nell'app: `GET /api/liquidazione/report?anno=&trimestre=&subagente=`.
+
+**Perché**: chi controlla la liquidazione vuole vedere i documenti e, nello stesso posto,
+come va ogni subagente. L'analisi vera (periodi, filtri, esportazione) ha bisogno di una
+pagina sua e non deve togliere spazio al controllo (D-18).
+
+Dettaglio (colonna sinistra e scheda *Documenti*):
 
 - **Filtri in card**: fornitore (**multifiltro a checkbox**: selezione multipla,
   "Tutti i fornitori" di default, etichetta con contatore; nessun fornitore
@@ -1715,6 +1731,119 @@ Ogni salvataggio scrive un evento con i campi cambiati (mai le password).
 - I contenuti stanno in un solo file di dati (`CRM.GUIDA`, prototipo `assets/guida.js`):
   nell'app sono un file di contenuti versionato con il codice, da aggiornare **nella
   stessa attività** che cambia una pagina (regola di consegna §16.5).
+
+### 7.22 Analisi (`/analisi`) — tutti
+
+È la **BI** del CRM. Risponde a queste domande:
+- quanto fatturano i clienti;
+- quanto riconoscono i fornitori;
+- quanto si paga ai subagenti;
+- quanto resta a Decobrands;
+- da chi viene e come cambia nel tempo.
+
+Nel menu è la voce *Analisi*, nel gruppo *Ogni trimestre*, sotto Liquidazioni.
+Prototipo: `assets/viste-analisi.js`.
+
+#### Dati: un fatto per documento fiscale (`fattiAnalisi()`)
+
+Ogni fatto contiene:
+- data e mese;
+- fornitore, cliente, subagente, pratica;
+- tipo: fattura, oppure nota di credito con importi negativi;
+- imponibile;
+- *dai fornitori* = imponibile × % dal fornitore alla data del documento;
+- *ai subagenti* = imponibile × % del subagente;
+- *margine* = dai fornitori − ai subagenti.
+
+Regole:
+- **Competenza = data del documento** (D-19).
+- Storni e riaccrediti non sono fatti: cambiano il momento del pagamento, non il fatturato.
+
+Nell'app:
+- vista `v_analisi_documenti`;
+- `GET /api/analisi?da=&a=&fornitore=&subagente=&cliente=`;
+- le aggregazioni si fanno sul server; il client riceve fatti già filtrati per periodo.
+
+#### Periodo
+
+- Durata di 3, 6 o 12 mesi, scelta con i segmenti.
+- Il mese d'inizio si sceglie con PeriodoMesi (§16.4); ‹ › sposta di un mese.
+- Il periodo resta dentro i mesi con dati, dal primo documento al mese in corso.
+- Cambiando durata, il periodo finisce nello stesso mese di prima.
+- Predefinito: gli ultimi 12 mesi.
+
+#### Filtri
+
+- Fornitore, subagente, cliente.
+- Le tendine mostrano solo le voci presenti nel periodo e compatibili con gli altri filtri.
+- I filtri attivi compaiono come **etichette** sotto la barra; ognuna ha una × per toglierla.
+- Con più di un filtro attivo compare *Togli tutti i filtri*.
+
+#### Filtro incrociato
+
+- Un clic su una fetta o una barra (fornitore, subagente, cliente) filtra su quella voce.
+- Lo stesso vale per un clic su una riga della tabella raggruppata.
+- Un secondo clic toglie il filtro.
+- Ogni grafico per dimensione **ignora il proprio filtro**: mette in risalto la voce scelta
+  e schiarisce le altre. Così si vede sempre il peso della scelta sul totale.
+
+#### Numeri
+
+Quattro valori:
+- fatturato dei clienti, con il numero di fatture e di clienti;
+- provvigioni dai fornitori, con la % sul fatturato;
+- provvigioni ai subagenti, con la % delle provvigioni;
+- margine Decobrands, con la % delle provvigioni.
+
+Ognuno mostra la variazione % sul periodo precedente della stessa durata, con gli stessi
+filtri:
+- con 12 mesi la scritta è "sullo stesso periodo dell'anno prima";
+- se prima non c'è nulla la scritta è "nessun dato per il confronto".
+
+#### Grafici
+
+Quattro grafici:
+- *Andamento*, mese per mese: barre dai fornitori e ai subagenti, linea del margine. I mesi
+  vuoti compaiono comunque.
+- *Fatturato per fornitore*: ciambella con i primi 7 fornitori e "Altri N".
+- *Subagenti*: barre impilate con la quota del subagente e il margine.
+- *Primi 10 clienti* per fatturato.
+
+#### Dettaglio
+
+Una tabella con i segmenti *Per subagente · Per fornitore · Per cliente · Per mese ·
+Documenti*.
+- Nei raggruppamenti le colonne sono: fatture e clienti, fatturato, dai fornitori, ai
+  subagenti, margine, quota del fatturato. I totali valgono su tutte le righe (§16.4).
+- In *Documenti* le colonne sono: data, numero (apre la pratica), cliente con fornitore e
+  subagente, importi.
+
+#### Esporta
+
+Il pulsante apre una finestra in cui si sceglie il formato:
+
+| Formato | Contenuto |
+|---|---|
+| **Excel** | foglio *Riepilogo* (4 numeri con periodo precedente e variazione, i 4 grafici come immagini); fogli *Per subagente*, *Per fornitore*, *Per cliente*, *Per mese* con totali a formule; foglio *Documenti*. Intestazione con periodo e filtri |
+| **PDF** | stesso contenuto e stessa impaginazione dell'Excel |
+| **CSV** | l'elenco dei documenti filtrati, separatore `;` |
+
+- Il modello è lo stesso della liquidazione (§11): fogli → blocchi, con in più il blocco
+  *immagine* per i grafici.
+- Nell'app i grafici si generano sul server (stessa configurazione Chart.js) oppure arrivano
+  dal client come PNG.
+
+#### Ruoli
+
+Tutti consultano ed esportano, anche il ruolo *sola lettura* (D-05).
+
+#### Perché
+
+- La sintesi nella liquidazione era legata al trimestre. Per capire l'andamento, la
+  produttività dei subagenti e il peso dei fornitori servono periodi liberi, filtri
+  combinabili ed esportazione (D-18).
+- La competenza per data del documento rende i numeri stabili: non cambiano quando arriva un
+  bollettino o uno storno (D-19).
 
 ### Vendita diretta (§7.18–§7.21) — **ampliamento futuro (§17), non in questa fase**
 
@@ -2388,8 +2517,8 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 | **Intestazione** | testata pagina | titolo, icona, sottotitolo, azioni; pulsante **"Torna a …"** automatico (§7.12). Il parametro `briciole` (percorso "Elenco › Dettaglio") esiste ma **non si usa** nelle pagine di dettaglio: ripete il *Torna a …* e la voce evidenziata nella barra (D-12, §19) |
 | **Stepper**, **Nota**, badge | passi di stato, note, stati | — |
 | **FinestraAffiancata** | documento a sinistra, dati a destra, divisore trascinabile; usata da "Correggi i dati letti" (§6.5) e dalla consultazione dei documenti della pratica (§7.3) | titolo, sottotitolo, larghezza iniziale, `sinistra(host)`, `destra(host)`, azioni del piede |
-| **PeriodoMesi** | periodo di N mesi scelto con anno e griglia dei mesi (Bollettini, §7.7) | mese d'inizio, numero di mesi (6), primo e ultimo mese con dati, `onChange(da, a)`; scorciatoie *Ultimi N mesi* e semestri; completamento automatico dentro i mesi con dati; anteprima al passaggio del mouse. Stesso schema del selettore di date del Portale Luis (`react-date-range`: pulsante "da → a" e riquadro con scorciatoie), ma a mesi: nell'app un componente proprio, la libreria non sceglie mesi |
-| **Grafico** | grafici della sintesi (Liquidazioni, §7.8) | `tipo` barre / linea / ciambella, etichette, serie (`nome`, `valori`, `colore`, `tipo` per barre+linea), `orizzontale`, `impilato`, `altezza`, importi in euro all'italiana su assi e suggerimenti, legenda in basso. Libreria **Chart.js** 4 (MIT; nel prototipo `assets/lib/chart.umd.min.js`, nell'app `chart.js` + `react-chartjs-2`); colori dell'app (`COLORI_GRAFICI`) |
+| **PeriodoMesi** | periodo di N mesi scelto con anno e griglia dei mesi (Bollettini §7.7 con 6 mesi, Analisi §7.22 con 3, 6 o 12) | mese d'inizio, numero di mesi (6), primo e ultimo mese con dati, `onChange(da, a)`; scorciatoie *Ultimi N mesi* e semestri; completamento automatico dentro i mesi con dati; anteprima al passaggio del mouse. Stesso schema del selettore di date del Portale Luis (`react-date-range`: pulsante "da → a" e riquadro con scorciatoie), ma a mesi: nell'app un componente proprio, la libreria non sceglie mesi |
+| **Grafico** | Report subagenti (Liquidazioni, §7.8), Analisi (§7.22) | `tipo` barre / linea / ciambella, etichette, serie (`nome`, `valori`, `colore`, `tipo` per barre+linea), `orizzontale`, `impilato`, `altezza`, importi in euro all'italiana su assi e suggerimenti, legenda in basso; `onClick(indice)` per usare il grafico come filtro (puntatore a mano), `evidenzia` (indice in risalto, gli altri schiariti), `immagine()` → PNG su fondo bianco per Excel e PDF. Libreria **Chart.js** 4 (MIT; nel prototipo `assets/lib/chart.umd.min.js`, nell'app `chart.js` + `react-chartjs-2`); colori dell'app (`COLORI_GRAFICI`) |
 | **GruppiDaFare** | lista "Da fare" della pagina Oggi (§7.1) | gruppi (`id`, titolo, variante, contatore, voci, riassunto, azioni di gruppo, testo se vuoto); `filtra(id)` collegato ai riquadri |
 | **Elenco** | liste semplici (documenti, registro) | voci (testo, destra, `onClick` facoltativo: voce cliccabile anche da tastiera) |
 | **CampoRicerca** + **RicercaEntita** | ogni campo collegato a un'entità: fornitore, cliente, subagente, codice cliente del fornitore, articolo (articoli già usati dal fornitore: un articolo nuovo è ammesso col pallino rosso), pratica, fattura/nota di credito | autocompletamento con le prime 5 voci, lente / F4 che apre la maschera di ricerca (FilterBar + DataTable), pallino verde/rosso se il valore esiste in anagrafica; entità definite una volta (voci da `/api/lookup/*`, chiave, testo, colonne, filtri, contesto) |
@@ -2605,3 +2734,5 @@ rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in
 | D-15 | 18/10/2026 | Documenti: dettaglio a schede, prima l'azione proposta (*Pratica proposta* · *Nuova pratica* · *Scegli la pratica* · *Cosa farne*), poi *Righe lette* con il contatore delle righe incerte e avviso nella prima scheda | si apre un documento per decidere cosa farne; le righe contano solo se la lettura è incerta; stessa logica e stesso aspetto della pratica (D-12) | Ugo | §7.9 |
 | D-16 | 18/10/2026 | Bollettini: **sempre 6 mesi**, completati da soli dentro i mesi con dati; scelta del mese d'inizio con un selettore anno + griglia dei mesi con scorciatoie (come il selettore di date del Portale Luis), al posto delle tendine *Da*/*A* | una tendina con tutti i mesi diventa ingestibile in pochi anni; con sempre 6 colonne la matrice è sempre piena e leggibile | Ugo | §7.7, §16.4 |
 | D-17 | 18/10/2026 | Liquidazioni a schede: prima la **Sintesi** (4 numeri con confronto sul trimestre precedente, andamento dell'anno, fatturato per fornitore, provvigioni generate per subagente), poi *Subagenti e documenti*; grafici con Chart.js (MIT) | il dettaglio delle fatture serve per controllare ma non è l'informazione principale; serve un'idea immediata di fatturato, margine e produttività | Ugo | §7.8, §16.4 |
+| D-18 | 18/10/2026 | Liquidazioni: tornano le due colonne; nel pannello di destra le schede *Documenti* e *Report subagenti* (piccolo report per subagente); la BI completa va in una pagina nuova **Analisi** (periodo 3/6/12 mesi, filtri, filtro incrociato con un clic, confronto, tabella raggruppabile, esportazione Excel con grafici, PDF, CSV). Sostituisce la *Sintesi* di D-17 | la liquidazione serve a controllare e chiudere un trimestre: il report deve stare accanto ai documenti, non al loro posto; l'analisi ha bisogno di periodi liberi, filtri ed esportazione, che in una scheda del trimestre non entrano | Ugo | §7.8, §7.22, §16.4 |
+| D-19 | 18/10/2026 | Analisi per **competenza = data del documento**; storni e riaccrediti esclusi dai fatti; grafici per dimensione che ignorano il proprio filtro e mettono in risalto la scelta | numeri stabili nel tempo (non cambiano all'arrivo di un bollettino) e confrontabili fra periodi; lo storno sposta il pagamento, non il fatturato; vedere la voce scelta sul totale evita di perdere il contesto | Ugo | §7.22 |

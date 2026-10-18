@@ -35,6 +35,7 @@
     abbinamenti: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
     componenti: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     cerca: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    analisi: '<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
     sistema: '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
     impostazioni: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     cestino: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
@@ -534,8 +535,9 @@
      carattere e colori dell'app, importi in euro all'italiana, legenda in basso, niente
      animazioni vistose. D-17 §19.
      opz: { tipo: 'bar'|'line'|'doughnut', etichette: [..], serie: [{ nome, valori, colore, tipo, asse }],
-            orizzontale, impilato, altezza (px), euro (true: valori in euro), titolo (aria) }
-     → { el, grafico }
+            orizzontale, impilato, altezza (px), euro (true: valori in euro), titolo (aria),
+            onClick(indice) (clic su una barra o fetta: usato come filtro), evidenzia (indice da mettere in risalto: gli altri si schiariscono) }
+     → { el, grafico, immagine() → PNG base64 su fondo bianco, per le esportazioni }
      ========================================================= */
   CRM.COLORI_GRAFICI = { primario: '#0d6efd', primarioTenue: '#9ec5fe', neutro: '#adb5bd', ok: '#198754', attesa: '#ffc107', errore: '#dc3545', testo: '#495057', griglia: '#e9ecef' };
   CRM.Grafico = function (host, opz) {
@@ -550,16 +552,25 @@
     Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
     Chart.defaults.color = C.testo;
     const tondo = opz.tipo === 'doughnut';
+    // evidenzia: il punto scelto resta pieno, gli altri diventano trasparenti (filtro attivo da un clic)
+    const schiarisci = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c + '4d' : c;
+    const colore = s => {
+      const c = s.colore || C.primario;
+      if (opz.evidenzia == null || s.tipo === 'line') return c;
+      return s.valori.map((v, i) => { const x = Array.isArray(c) ? c[i % c.length] : c; return i === opz.evidenzia ? x : schiarisci(x); });
+    };
     const g = new Chart($('canvas', box), {
       type: opz.tipo || 'bar',
       data: { labels: opz.etichette, datasets: opz.serie.map(s => ({
         label: s.nome, data: s.valori, type: s.tipo, yAxisID: s.asse,
-        backgroundColor: s.colore || C.primario, borderColor: s.tipo === 'line' ? (s.colore || C.ok) : (tondo ? '#fff' : 'transparent'),
+        backgroundColor: colore(s), borderColor: s.tipo === 'line' ? (s.colore || C.ok) : (tondo ? '#fff' : 'transparent'),
         borderWidth: s.tipo === 'line' ? 2.5 : (tondo ? 2 : 0), borderRadius: tondo ? 0 : 4, pointRadius: s.tipo === 'line' ? 4 : 0,
         maxBarThickness: 34, order: s.tipo === 'line' ? 0 : 1 })) },
       options: {
         responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
         indexAxis: opz.orizzontale ? 'y' : 'x',
+        onClick: opz.onClick ? (ev, els) => { if (els.length) opz.onClick(els[0].index, els[0].datasetIndex); } : undefined,
+        onHover: opz.onClick ? (ev, els) => { ev.native.target.style.cursor = els.length ? 'pointer' : 'default'; } : undefined,
         plugins: {
           legend: { display: opz.serie.length > 1 || tondo, position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2, padding: 14, sort: (x, y) => x.datasetIndex - y.datasetIndex } },
           tooltip: { callbacks: { label: c => ' ' + (c.dataset.label ? c.dataset.label + ': ' : '') + fmt(tondo ? c.parsed : (opz.orizzontale ? c.parsed.x : c.parsed.y)) } }
@@ -570,7 +581,15 @@
         }
       }
     });
-    return { el: box, grafico: g };
+    if (opz.onClick) box.classList.add('cliccabile');
+    // immagine per Excel e PDF: il canvas è trasparente, lo si copia su fondo bianco a risoluzione doppia
+    const immagine = () => {
+      const cv = $('canvas', box), k = document.createElement('canvas');
+      k.width = cv.width; k.height = cv.height;
+      const x = k.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, k.width, k.height); x.drawImage(cv, 0, 0);
+      return { dati: k.toDataURL('image/png'), larghezza: cv.width, altezza: cv.height };
+    };
+    return { el: box, grafico: g, immagine: immagine };
   };
 
   /* ---------- Nota (testo informativo) ---------- */
@@ -973,7 +992,8 @@
       { id: 'documenti', href: '#/documenti', t: 'Documenti', icona: 'arrivo' },
       { id: 'pratiche', href: '#/pratiche', t: 'Pratiche', icona: 'pratiche' }] },
     { gruppo: 'Ogni mese', voci: [{ id: 'bollettini', href: '#/bollettini', t: 'Bollettini', icona: 'bollettini' }] },
-    { gruppo: 'Ogni trimestre', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni' }] },
+    { gruppo: 'Ogni trimestre', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni' },
+      { id: 'analisi', href: '#/analisi', t: 'Analisi', icona: 'analisi' }] },
     { gruppo: 'Vendita diretta', ampliamento: 'vendita', voci: [
       { id: 'ordini-cliente', href: '#/ordini-cliente', t: 'Ordini cliente', icona: 'carrello' },
       { id: 'articoli', href: '#/articoli', t: 'Articoli', icona: 'scatola' },
