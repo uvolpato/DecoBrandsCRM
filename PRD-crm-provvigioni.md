@@ -1100,7 +1100,8 @@ F0 blocca tutto il resto; F1–F6 procedono in parallelo; F7 chiude.
 | Da svolgere, margine incluso | 89 | € 4.895 |
 | **Totale** | **105** | **€ 6.175** (IVA esclusa) |
 | Riferimento senza AI | 228 h da svolgere | € 15.960 + € 1.280 |
-| Fuori preventivo da approvare (§10.3) | 53 | ≈ € 2.915 🔶 |
+| Fuori preventivo da approvare (§10.3, preventivo §5) | 53 | € 2.915 |
+| **Totale con tutte le variazioni** | **158** | **€ 9.090** |
 | Ampliamento vendita diretta (indicativo) | 12 | da quotare |
 | Supporto alle decisioni, prova (indicativo) | 18 | da quotare |
 

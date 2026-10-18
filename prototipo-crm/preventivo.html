@@ -27,7 +27,7 @@
 
   <div class="alert alert-light border small">
     <strong>Redatto da:</strong> Ugo Volpato — AI Consultant<br>
-    <strong>Data:</strong> 04/09/2026 — aggiornato il 18/10/2026 (grafica del prototipo ufficiale, margine 18 h, percentuali datate ed eccezioni da approvare) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
+    <strong>Data:</strong> 04/09/2026 — aggiornato il 18/10/2026 (variazioni da approvare §5: 53 h; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
     <strong>Cliente:</strong> Decobrands S.r.l. (da confermare)<br>
     <strong>Modalità di sviluppo:</strong> assistita da AI (analisi, generazione e codifica tramite modelli AI)
   </div>
@@ -42,7 +42,7 @@
 <li>far entrare <strong>tutti i documenti</strong> (ordini a fornitore, conferme, fatture, note di credito, bollettini) da un <strong>ingresso documenti interno</strong>: casella email e caricamento, coda nel database, lettura con <strong>GLM-OCR su un server locale con GPU</strong>, affidabilità per campo, controllo dell'operatore con il PDF a fianco — <strong>senza n8n e senza servizi esterni</strong>.</li>
 </ul>
 <p>La <strong>sostituzione della Gestione Ordini</strong> (ordini cliente, CSV Integra) è prevista in una fase successiva, <strong>esclusa</strong> da questo preventivo (spec §17).</p>
-<p>Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v2.0 (validata con il cliente; stack §3.4, §16.3; ingresso documenti §6.5) · piano: <code>piano-lavoro-crm.md</code>.</p>
+<p>Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v5.3 (stack §3.4, §16.3; ingresso documenti §6.5; registro delle decisioni §19) · piano: <code>piano-lavoro-crm.md</code> v1.7 · sintesi: <code>PRD-crm-provvigioni.md</code> · prototipo ufficiale: <code>prototipo-alternativo/</code>.</p>
 <h2 id="sez-2">2. Tariffe applicate (indicative, mercato Italia)</h2>
 <table class="table table-bordered bg-white">
 <thead>
@@ -235,7 +235,95 @@
 </tr>
 </tbody>
 </table>
-<h2 id="sez-5">5. Riepilogo economico</h2>
+<h2 id="sez-5">5. Variazioni da approvare (fuori preventivo)</h2>
+<p>Funzioni nate dal confronto con il cliente dopo la specifica iniziale e già presenti nel
+prototipo ufficiale. Si sviluppano <strong>solo se approvate</strong>; ognuna è indipendente dalle altre.</p>
+<table class="table table-bordered bg-white">
+<thead>
+<tr>
+<th>#</th>
+<th>Attività (piano)</th>
+<th>Perché</th>
+<th>Ore (AI)</th>
+<th>Importo (AI)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V1</td>
+<td>Prova di fattibilità dell'<strong>evidenziazione del valore nel documento</strong> (F0-A7)</td>
+<td>rendere certa o escludere una funzione vista nel prototipo (D-06)</td>
+<td>6</td>
+<td>€ 330,00</td>
+</tr>
+<tr>
+<td>V2</td>
+<td><strong>Sincronizzazione da Integra</strong> di clienti e fornitori dalle viste del database, ogni 60 s (F1-A4)</td>
+<td>sostituisce l'import da file (D-01, D-07)</td>
+<td>3</td>
+<td>€ 165,00</td>
+</tr>
+<tr>
+<td>V3</td>
+<td><strong>Percentuali con data di validità</strong> ed <strong>eccezioni personali</strong> dei subagenti inserite nel CRM (F1-A5)</td>
+<td>i documenti si calcolano con le percentuali in vigore alla loro data (D-25, D-26)</td>
+<td>3</td>
+<td>€ 165,00</td>
+</tr>
+<tr>
+<td>V4</td>
+<td><strong>Regole del subagente</strong>: % per cliente, una fattura al mese, correzione sul singolo documento con motivo (F1-A6)</td>
+<td>ogni accordo con i subagenti si gestisce senza cambiare il programma (D-27)</td>
+<td>4</td>
+<td>€ 220,00</td>
+</tr>
+<tr>
+<td>V5</td>
+<td><strong>Incassi dei clienti</strong>: storno e riaccredito, riconoscimento al pagamento, pagamenti da sollecitare (F3-A3)</td>
+<td>regole chiarite il 16 e il 18/10/2026 (D-11)</td>
+<td>4</td>
+<td>€ 220,00</td>
+</tr>
+<tr>
+<td>V6</td>
+<td><strong>Esportazione completa</strong> della liquidazione: tre contenuti × Excel, PDF, CSV (F4-A3, era 1 h)</td>
+<td>i tre usi reali del prospetto (D-04)</td>
+<td>3</td>
+<td>€ 165,00</td>
+</tr>
+<tr>
+<td>V7</td>
+<td><strong>Report subagenti</strong> e pagina <strong>Analisi</strong> con filtri, grafici ed esportazione (F4-A4, F4-A5)</td>
+<td>controllo e analisi hanno bisogni diversi (D-18, D-19)</td>
+<td>13</td>
+<td>€ 715,00</td>
+</tr>
+<tr>
+<td>V8</td>
+<td><strong>Filtri standard</strong> e numeri aggiornati dal vivo (F4-A6)</td>
+<td>un solo modo di filtrare in tutte le pagine (D-22, D-23)</td>
+<td>4</td>
+<td>€ 220,00</td>
+</tr>
+<tr>
+<td>V9</td>
+<td><strong>Pagine di gestione</strong>: ruoli e permessi, utenti, stato del sistema, impostazioni, documenti scartati, guida in linea (F5-A3…A8)</td>
+<td>amministrazione senza intervento tecnico (D-05)</td>
+<td>13</td>
+<td>€ 715,00</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>Totale variazioni</strong></td>
+<td></td>
+<td><strong>53</strong></td>
+<td><strong>€ 2.915,00</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 13 h, € 715,00),
+usato solo se serve e rendicontato a ore.</p>
+<h2 id="sez-6">6. Riepilogo economico</h2>
 <table class="table table-bordered bg-white">
 <thead>
 <tr>
@@ -256,15 +344,30 @@
 <td>€ 4.895,00</td>
 </tr>
 <tr>
-<td><strong>Totale complessivo</strong></td>
+<td><strong>Totale del preventivo</strong></td>
 <td><strong>105</strong></td>
 <td><strong>€ 6.175,00</strong></td>
+</tr>
+<tr>
+<td>Variazioni da approvare (§5), tutte</td>
+<td>53</td>
+<td>€ 2.915,00</td>
+</tr>
+<tr>
+<td><strong>Totale con tutte le variazioni</strong></td>
+<td><strong>158</strong></td>
+<td><strong>€ 9.090,00</strong></td>
+</tr>
+<tr>
+<td>Margine sulle variazioni (riserva, solo se usato)</td>
+<td>fino a 13</td>
+<td>fino a € 715,00</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Riferimento senza AI</strong> — lo sviluppo tradizionale richiederebbe <strong>228 ore</strong> (≈ 2,6× le ore assistite, margine incluso): 228 h × € 70,00 = <strong>€ 15.960,00</strong>, per un totale di <strong>€ 17.240,00</strong> (€ 1.280,00 già svolto + € 15.960,00 sviluppo).</p>
 <p>L'approccio assistito da AI consente un <strong>risparmio di € 11.065,00</strong> sul solo sviluppo (€ 15.960,00 → € 4.895,00, <strong>−69%</strong>).</p>
-<h2 id="sez-6">6. Note</h2>
+<h2 id="sez-7">7. Note</h2>
 <ul>
 <li>
 <p>⚠ <strong>Ogni calcolo e operazione sensibile si esegue sul server, dai dati del database, mai da dati presi dal frontend</strong> (spec V12, D-28): è compreso nelle ore delle attività 4 e 5.</p>
@@ -286,8 +389,9 @@
 <li>Fatture su più ordini e ordini fatturati in più tranche sono <strong>inclusi</strong> (spec §5.9, documenti a ponte).</li>
 <li><strong>Esclusa la sostituzione della Gestione Ordini</strong> (ordini cliente, controlli articoli/alias/kit, giacenze, CSV Integra, spegnimento di n8n): fase successiva, da quotare a parte dopo la messa in esercizio del CRM (spec §17).</li>
 <li><strong>Esclusioni</strong> (backlog spec §13): riga bollettino con solo totale cliente (B2), <strong>popolamento dei dati storici dagli Excel manuali</strong> (B6). Il consolidamento sconto (B4) è già definito nella specifica.</li>
-<li><strong>Percentuali con data di validità (B3) ed eccezioni personali inserite nel CRM (B1)</strong>: ora comprese (spec D-25, D-26), <strong>3 h fuori preventivo da approvare</strong> (piano F1-A5).</li>
-<li><strong>Regole del subagente per cliente e per documento</strong> (% dell'agenzia, una fattura al mese, correzione con motivo; spec D-27): <strong>4 h fuori preventivo da approvare</strong> (piano F1-A6).</li>
+<li><strong>Percentuali con data di validità (B3) ed eccezioni personali (B1)</strong>: non più escluse, sono la variazione V3 (§5).</li>
+<li><strong>Analisi e lavoro di prototipazione dopo il 15/10/2026</strong> (prototipo ufficiale, PRD, regole del subagente, documenti della fase LLM): non conteggiati nelle attività già svolte; da concordare.</li>
+<li><strong>Esclusa la fase successiva con modelli linguistici e agenti in locale</strong> (spec §18, <code>specifica-automazione-llm.md</code>): stima indicativa 46 h, da quotare a parte dopo la messa in esercizio.</li>
 </ul>
 
 </div>

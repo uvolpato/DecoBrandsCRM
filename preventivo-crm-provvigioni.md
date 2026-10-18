@@ -1,7 +1,7 @@
 # Preventivo — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
 **Redatto da:** Ugo Volpato — AI Consultant
-**Data:** 04/09/2026 — aggiornato il 18/10/2026 (grafica del prototipo ufficiale, margine 18 h, percentuali datate ed eccezioni da approvare) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)
+**Data:** 04/09/2026 — aggiornato il 18/10/2026 (variazioni da approvare §5: 53 h; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)
 **Cliente:** Decobrands S.r.l. (da confermare)
 **Modalità di sviluppo:** assistita da AI (analisi, generazione e codifica tramite modelli AI)
 
@@ -19,7 +19,7 @@ Web app full-stack con **lo stesso stack del Portale B2B Luis** (**Next.js 16 + 
 
 La **sostituzione della Gestione Ordini** (ordini cliente, CSV Integra) è prevista in una fase successiva, **esclusa** da questo preventivo (spec §17).
 
-Riferimento tecnico: `specifica-crm-provvigioni.md` v2.0 (validata con il cliente; stack §3.4, §16.3; ingresso documenti §6.5) · piano: `piano-lavoro-crm.md`.
+Riferimento tecnico: `specifica-crm-provvigioni.md` v5.3 (stack §3.4, §16.3; ingresso documenti §6.5; registro delle decisioni §19) · piano: `piano-lavoro-crm.md` v1.7 · sintesi: `PRD-crm-provvigioni.md` · prototipo ufficiale: `prototipo-alternativo/`.
 
 ## 2. Tariffe applicate (indicative, mercato Italia)
 
@@ -61,19 +61,43 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 | 12 | **Margine di rischio (25 %)**: imprevisti su lettura documenti, server GPU, accesso condiviso e dati reali. Riserva usata solo se necessaria e rendicontata a ore | 18 | 46 | € 990,00 |
 | **Subtotale da svolgere** | | **89** | **228** | **€ 4.895,00** |
 
-## 5. Riepilogo economico
+## 5. Variazioni da approvare (fuori preventivo)
+
+Funzioni nate dal confronto con il cliente dopo la specifica iniziale e già presenti nel
+prototipo ufficiale. Si sviluppano **solo se approvate**; ognuna è indipendente dalle altre.
+
+| # | Attività (piano) | Perché | Ore (AI) | Importo (AI) |
+|---|---|---|---|---|
+| V1 | Prova di fattibilità dell'**evidenziazione del valore nel documento** (F0-A7) | rendere certa o escludere una funzione vista nel prototipo (D-06) | 6 | € 330,00 |
+| V2 | **Sincronizzazione da Integra** di clienti e fornitori dalle viste del database, ogni 60 s (F1-A4) | sostituisce l'import da file (D-01, D-07) | 3 | € 165,00 |
+| V3 | **Percentuali con data di validità** ed **eccezioni personali** dei subagenti inserite nel CRM (F1-A5) | i documenti si calcolano con le percentuali in vigore alla loro data (D-25, D-26) | 3 | € 165,00 |
+| V4 | **Regole del subagente**: % per cliente, una fattura al mese, correzione sul singolo documento con motivo (F1-A6) | ogni accordo con i subagenti si gestisce senza cambiare il programma (D-27) | 4 | € 220,00 |
+| V5 | **Incassi dei clienti**: storno e riaccredito, riconoscimento al pagamento, pagamenti da sollecitare (F3-A3) | regole chiarite il 16 e il 18/10/2026 (D-11) | 4 | € 220,00 |
+| V6 | **Esportazione completa** della liquidazione: tre contenuti × Excel, PDF, CSV (F4-A3, era 1 h) | i tre usi reali del prospetto (D-04) | 3 | € 165,00 |
+| V7 | **Report subagenti** e pagina **Analisi** con filtri, grafici ed esportazione (F4-A4, F4-A5) | controllo e analisi hanno bisogni diversi (D-18, D-19) | 13 | € 715,00 |
+| V8 | **Filtri standard** e numeri aggiornati dal vivo (F4-A6) | un solo modo di filtrare in tutte le pagine (D-22, D-23) | 4 | € 220,00 |
+| V9 | **Pagine di gestione**: ruoli e permessi, utenti, stato del sistema, impostazioni, documenti scartati, guida in linea (F5-A3…A8) | amministrazione senza intervento tecnico (D-05) | 13 | € 715,00 |
+| | **Totale variazioni** | | **53** | **€ 2.915,00** |
+
+Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 13 h, € 715,00),
+usato solo se serve e rendicontato a ore.
+
+## 6. Riepilogo economico
 
 | Voce | Ore | Importo |
 |---|---|---|
 | Attività già svolte | 16 | € 1.280,00 |
 | Attività da svolgere (incluso margine 18 h) | 89 | € 4.895,00 |
-| **Totale complessivo** | **105** | **€ 6.175,00** |
+| **Totale del preventivo** | **105** | **€ 6.175,00** |
+| Variazioni da approvare (§5), tutte | 53 | € 2.915,00 |
+| **Totale con tutte le variazioni** | **158** | **€ 9.090,00** |
+| Margine sulle variazioni (riserva, solo se usato) | fino a 13 | fino a € 715,00 |
 
 **Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **228 ore** (≈ 2,6× le ore assistite, margine incluso): 228 h × € 70,00 = **€ 15.960,00**, per un totale di **€ 17.240,00** (€ 1.280,00 già svolto + € 15.960,00 sviluppo).
 
 L'approccio assistito da AI consente un **risparmio di € 11.065,00** sul solo sviluppo (€ 15.960,00 → € 4.895,00, **−69%**).
 
-## 6. Note
+## 7. Note
 
 - ⚠ **Ogni calcolo e operazione sensibile si esegue sul server, dai dati del database, mai da dati presi dal frontend** (spec V12, D-28): è compreso nelle ore delle attività 4 e 5.
 
@@ -92,5 +116,6 @@ L'approccio assistito da AI consente un **risparmio di € 11.065,00** sul solo 
 - Fatture su più ordini e ordini fatturati in più tranche sono **inclusi** (spec §5.9, documenti a ponte).
 - **Esclusa la sostituzione della Gestione Ordini** (ordini cliente, controlli articoli/alias/kit, giacenze, CSV Integra, spegnimento di n8n): fase successiva, da quotare a parte dopo la messa in esercizio del CRM (spec §17).
 - **Esclusioni** (backlog spec §13): riga bollettino con solo totale cliente (B2), **popolamento dei dati storici dagli Excel manuali** (B6). Il consolidamento sconto (B4) è già definito nella specifica.
-- **Percentuali con data di validità (B3) ed eccezioni personali inserite nel CRM (B1)**: ora comprese (spec D-25, D-26), **3 h fuori preventivo da approvare** (piano F1-A5).
-- **Regole del subagente per cliente e per documento** (% dell'agenzia, una fattura al mese, correzione con motivo; spec D-27): **4 h fuori preventivo da approvare** (piano F1-A6).
+- **Percentuali con data di validità (B3) ed eccezioni personali (B1)**: non più escluse, sono la variazione V3 (§5).
+- **Analisi e lavoro di prototipazione dopo il 15/10/2026** (prototipo ufficiale, PRD, regole del subagente, documenti della fase LLM): non conteggiati nelle attività già svolte; da concordare.
+- **Esclusa la fase successiva con modelli linguistici e agenti in locale** (spec §18, `specifica-automazione-llm.md`): stima indicativa 46 h, da quotare a parte dopo la messa in esercizio.
