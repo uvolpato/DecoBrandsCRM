@@ -327,12 +327,17 @@
       sottotitolo: e(M.nomeCliente(p.cliente_piva)) + ' · ' + e(M.fornitore(p.fornitore_id).nome) + '. A sinistra il documento, a destra il confronto con un altro documento della pratica: selezionando una riga la vedi nel documento.',
       larghezza: 46, azioni: [{ etichetta: 'Chiudi', variante: 'sec' }]
     });
+    // nota di credito: storna solo le righe che contiene; quelle assenti non sono "tolte",
+    // semplicemente non stornate, quindi non si confrontano
+    const soloNC = () => cur.tipo === 'nota_credito' || (rif && rif.tipo === 'nota_credito');
     const confronta = () => {
       const codici = [];
-      [rif, cur].filter(Boolean).forEach(d => d.righe.forEach(r => { if (codici.indexOf(r.codice) < 0) codici.push(r.codice); }));
+      (soloNC() ? [[rif, cur].find(d => d && d.tipo === 'nota_credito')] : [rif, cur].filter(Boolean)).forEach(d => d.righe.forEach(r => { if (codici.indexOf(r.codice) < 0) codici.push(r.codice); }));
       return codici.map(c => {
         const a = rif ? rif.righe.find(r => r.codice === c) || null : null, b = cur.righe.find(r => r.codice === c) || null;
         const varia = !!rif && (!a || !b || a.qta !== b.qta || a.prezzo !== b.prezzo);
+        // con la nota di credito la differenza è lo storno della riga (importo della nota), non nota − fattura
+        if (soloNC()) { const nc = cur.tipo === 'nota_credito' ? b : a; return { codice: c, descrizione: (b || a).descrizione, a: a, b: b, varia: !!rif, delta: M.r2(nc ? M.importoRiga(nc) : 0) }; }
         return { codice: c, descrizione: (b || a).descrizione, a: a, b: b, varia: varia, delta: M.r2((b ? M.importoRiga(b) : 0) - (a ? M.importoRiga(a) : 0)) };
       });
     };
@@ -352,12 +357,14 @@
       const dx = fin.destra; dx.innerHTML = '';
       const righe = confronta(), variate = righe.filter(r => r.varia);
       const imp = M.importoDoc(cur), impR = rif ? M.importoDoc(rif) : null;
+      // nota di credito: la differenza è quanto storna (il suo importo), non la differenza fra i totali
+      const diff = !rif ? 0 : soloNC() ? M.importoDoc(cur.tipo === 'nota_credito' ? cur : rif) : imp - impR;
       CRM.Dettagli(dx, [
         { etichetta: M.TIPI[cur.tipo], valore: '<b>' + e(cur.numero) + '</b><span class="sec-riga">del ' + M.data(cur.data) + '</span>' },
         { etichetta: 'Importo', valore: M.euro(imp) },
         { etichetta: 'Confrontato con', valore: '<select class="filtro-select aff-rif" aria-label="Documento con cui confrontare"><option value="">Nessun confronto</option>' +
           docs.filter(d => d !== cur).map(d => '<option value="' + d.id + '"' + (d === rif ? ' selected' : '') + '>' + e(M.TIPI[d.tipo] + ' ' + d.numero) + '</option>').join('') + '</select>' },
-        { etichetta: 'Differenza', valore: rif ? (Math.abs(imp - impR) < 0.01 ? '<span class="testo-tenue">nessuna</span>' : '<b class="' + CRM.classeSegno(imp - impR) + '">' + CRM.euroSegno(imp - impR) + '</b><span class="sec-riga">' + variate.length + (variate.length === 1 ? ' riga cambia' : ' righe cambiano') + '</span>') : '—' }
+        { etichetta: 'Differenza', valore: rif ? (Math.abs(diff) < 0.01 ? '<span class="testo-tenue">nessuna</span>' : '<b class="' + CRM.classeSegno(diff) + '">' + CRM.euroSegno(diff) + '</b><span class="sec-riga">' + variate.length + (variate.length === 1 ? ' riga ' + (soloNC() ? 'stornata' : 'cambia') : ' righe ' + (soloNC() ? 'stornate' : 'cambiano')) + '</span>') : '—' }
       ], { inColonne: true });
       CRM.$('.aff-rif', dx).addEventListener('change', ev => { rif = docs.find(d => d.id === Number(ev.target.value)) || null; disegna(); });
       if (rif && variate.length) {

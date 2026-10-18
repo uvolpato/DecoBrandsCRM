@@ -397,7 +397,7 @@ a.m-cella:hover { background: #f1f6ff; }
 
 /* ---------- FinestraAffiancata ---------- */
 .velo.velo-pieno { padding: 16px; place-items: stretch; }
-.affiancata { background: var(--superficie); border-radius: var(--r-medio); display: flex; flex-direction: column; min-height: 0; height: calc(100vh - 32px); box-shadow: 0 18px 50px rgba(0, 0, 0, .3); }
+.affiancata { background: var(--superficie); border-radius: var(--r-medio); display: flex; flex-direction: column; min-height: 0; min-width: 0; /* la tabella di destra non deve allargare la finestra oltre lo schermo */ height: calc(100vh - 32px); box-shadow: 0 18px 50px rgba(0, 0, 0, .3); }
 .aff-testa { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--bordo-tenue); }
 /* pulsante di chiusura delle finestre: grigio, bordo arrotondato al passaggio del mouse */
 .btn-chiudi { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; flex: none;
@@ -483,6 +483,12 @@ a.m-cella:hover { background: #f1f6ff; }
   .aff-corpo { flex-direction: column; }
   .aff-sx { flex-basis: 40% !important; }
   .aff-divisore { display: none; }
+}
+@media (max-width: 575px) {
+  .velo.velo-pieno { padding: 0; }
+  .affiancata { height: 100vh; border-radius: 0; }
+  .aff-sx { padding: 12px; }
+  .aff-dx { padding: 12px; }
 }
 .aff-dx { display: flex; flex-direction: column; }
 .aff-dx > * { flex: none; }

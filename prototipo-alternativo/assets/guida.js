@@ -128,7 +128,7 @@
         ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Nel riquadro Incasso: sollecito al cliente, o segnalazione del fornitore ricevuta per email o telefono.']
       ],
       finestre: [
-        { nome: 'Documenti della pratica', da: 'Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento.',
+        { nome: 'Documenti della pratica', da: 'Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato.',
           campi: [['Confrontato con', 'Sceglie il documento di confronto.'], ['Solo righe che cambiano · Tutte', 'Filtra il confronto.']],
           azioni: [['Clic su una riga', 'La evidenzia nel documento a sinistra.'], ['Esc', 'Chiude.']] },
         { nome: 'Fattura non pagata', da: 'Segna come non pagata', cosa: 'Registra la segnalazione del fornitore che il cliente non ha pagato.', campi: [['Nota', 'Facoltativa, es. “email di Gasper del 12/09”.']], azioni: [['Segna come non pagata', 'La fattura va fra i pagamenti da sollecitare in Oggi.']] },
