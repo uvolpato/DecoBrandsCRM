@@ -837,7 +837,9 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .btn-icona:hover:not(:disabled), .btn-icona:focus-visible, .btn-icona[aria-expanded="true"] { border-color: var(--primario); color: var(--primario); outline: none; }
 .btn-icona:disabled { opacity: .45; cursor: default; }
 .btn-icona .icona { width: 17px; height: 17px; }
-.btn-icona-conta { position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--primario); color: #fff; font-size: 11px; line-height: 17px; text-align: center; }
+/* numero dei filtri DENTRO il pulsante, accanto all'imbuto: un cerchio sporgente veniva tagliato dall'area che scorre */
+.btn-icona.con-conta { display: inline-flex; align-items: center; gap: 5px; width: auto; padding: 0 8px; border-color: var(--primario); color: var(--primario); }
+.btn-icona-conta { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--primario); color: #fff; font-size: 11.5px; font-weight: 600; line-height: 18px; text-align: center; }
 .riepilogo-pop { position: absolute; z-index: 70; top: calc(100% + 6px); right: 0; width: 340px; max-width: calc(100vw - 32px); padding: 14px 16px; background: #fff;
   border: 1px solid var(--bordo); border-radius: var(--r-piccolo); box-shadow: 0 10px 28px rgba(0, 0, 0, .18); font-size: 13px; }
 .riepilogo-titolo { margin: 0 0 8px; font-weight: 600; color: var(--testo); }

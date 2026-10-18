@@ -500,7 +500,7 @@
   CRM.RiepilogoFiltri = function (host, opz) {
     const n = opz.attivi || 0;
     const box = el('div', 'riepilogo-filtri');
-    box.innerHTML = '<button type="button" class="btn-icona" data-riepilogo aria-haspopup="dialog" aria-expanded="false" title="Riepilogo dei filtri" aria-label="Riepilogo dei filtri' + (n ? ': ' + n + ' attivi' : '') + '">' + CRM.icona('filtro') + (n ? '<span class="btn-icona-conta">' + n + '</span>' : '') + '</button>' +
+    box.innerHTML = '<button type="button" class="btn-icona' + (n ? ' con-conta' : '') + '" data-riepilogo aria-haspopup="dialog" aria-expanded="false" title="Riepilogo dei filtri" aria-label="Riepilogo dei filtri' + (n ? ': ' + n + ' attivi' : '') + '">' + CRM.icona('filtro') + (n ? '<span class="btn-icona-conta">' + n + '</span>' : '') + '</button>' +
       '<button type="button" class="btn-icona" data-azzera title="Togli tutti i filtri" aria-label="Togli tutti i filtri"' + (n ? '' : ' disabled') + '>' + CRM.icona('filtro-via') + '</button>' +
       '<div class="riepilogo-pop" role="dialog" aria-label="Filtri attivi" hidden></div>';
     const btn = $('[data-riepilogo]', box), pop = $('.riepilogo-pop', box);
