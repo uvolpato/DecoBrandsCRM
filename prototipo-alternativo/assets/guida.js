@@ -140,6 +140,10 @@
       ],
       pulsanti: [
         ['Carica un bollettino', 'In testata: carica il file del bollettino.'],
+        ['Da · A', 'Scelgono i mesi da vedere, al massimo 6: se ne scegli di più, l’altro estremo si sposta da solo e un avviso lo dice.'],
+        ['‹ Mese prima · Mese dopo ›', 'Spostano tutto il periodo di un mese.'],
+        ['Fornitore', 'Mostra un solo fornitore.'],
+        ['Tutti · Con qualcosa da fare', 'Solo i fornitori con un bollettino da decidere, pronto, contestato o non arrivato nel periodo.'],
         ['Cella della matrice', 'Fornitore × mese: verificato, da decidere, pronto, atteso, non arrivato. Clic apre il bollettino.'],
         ['Sollecita', 'Cella non arrivato: prepara il testo di sollecito con i documenti del mese.'],
         ['Accetta il loro importo', 'Sulla riga: accetti quanto dice il fornitore, con motivo.'],

@@ -748,3 +748,9 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .avviso-variazioni .icona { flex: none; width: 18px; height: 18px; }
 .avviso-variazioni > span { flex: 1; }
 @media (max-width: 992px) { .colonne.riepilogo-pratica { grid-template-columns: 1fr; } }
+
+/* Bollettini: periodo e filtri */
+.barra-periodo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.barra-periodo .filtri { margin: 0; }
+.filtro-etichetta { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--testo-tenue); }
+.sposta-periodo { display: inline-flex; gap: 6px; margin-left: auto; }

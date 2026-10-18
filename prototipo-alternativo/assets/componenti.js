@@ -554,7 +554,7 @@
 
   /* =========================================================
      FilterBar
-     opz: { campi: [{ nome, tipo: 'segmenti'|'cerca'|'select', opzioni: [{ value, label, n }], valore, placeholder }], onChange(valori) }
+     opz: { campi: [{ nome, tipo: 'segmenti'|'cerca'|'select', opzioni: [{ value, label, n }], valore, placeholder, etichetta (solo select) }], onChange(valori) }
      → { el, valori() }
      ========================================================= */
   CRM.FilterBar = function (host, opz) {
@@ -582,8 +582,11 @@
       } else {
         const s = el('select', 'filtro-select', c.opzioni.map(o => '<option value="' + esc(o.value) + '">' + esc(o.label) + '</option>').join(''));
         s.value = val[c.nome];
+        s.setAttribute('aria-label', c.etichetta || c.nome);
         s.addEventListener('change', () => { val[c.nome] = s.value; opz.onChange(Object.assign({}, val)); });
-        bar.appendChild(s);
+        // etichetta facoltativa davanti alla tendina (es. "Da", "A", "Fornitore")
+        if (c.etichetta) { const l = el('label', 'filtro-etichetta', '<span>' + esc(c.etichetta) + '</span>'); l.appendChild(s); bar.appendChild(l); }
+        else bar.appendChild(s);
       }
     });
     ospite(host).appendChild(bar);

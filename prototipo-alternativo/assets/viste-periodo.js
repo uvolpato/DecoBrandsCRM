@@ -5,45 +5,93 @@
 (function () {
   'use strict';
   const e = CRM.esc;
-  const MESI_VISTA = [5, 6, 7, 8, 9];
   const ANNO = 2026;
 
-  /* ---------- Bollettini: Matrice fornitore × mese ---------- */
-  CRM.rotta(/^\/bollettini$/, function () {
+  /* ---------- Bollettini: Matrice fornitore × mese ----------
+     Periodo scelto con "Da" e "A" (al massimo 6 mesi, D-14 §19: oltre la matrice non entra
+     in larghezza e le celle diventano illeggibili) e filtro sul fornitore. */
+  const MAX_MESI = 6;
+  const chiave = (a, m) => a + '-' + String(m).padStart(2, '0');
+  const daChiave = k => ({ a: Number(k.slice(0, 4)), m: Number(k.slice(5, 7)) });
+  const piuMesi = (k, n) => { const x = daChiave(k), t = x.a * 12 + (x.m - 1) + n; return chiave(Math.floor(t / 12), t % 12 + 1); };
+  const distanza = (da, a) => { const x = daChiave(da), y = daChiave(a); return (y.a * 12 + y.m) - (x.a * 12 + x.m); };
+  const meseOggi = () => M.oggi().slice(0, 7);
+  const PRIMO = '2026-01';   // primo mese con dati nel CRM (nell'app: il mese del primo bollettino registrato)
+  let filtroBoll = null;   // { da, a, f, vista } — iniziale: gli ultimi 5 mesi fino al mese in corso
+  function vistaBollettini() {
+    if (!filtroBoll) filtroBoll = { da: piuMesi(meseOggi(), -4), a: meseOggi(), f: '', vista: 'tutti' };
     const corpo = CRM.Pagina({ voce: 'bollettini', titolo: 'Bollettini',
       sottotitolo: 'Ogni mese ogni fornitore ci comunica le provvigioni che ci riconosce. Qui vedi quali sono arrivati e quali vanno ancora verificati.',
       azioni: [{ etichetta: 'Carica un bollettino', icona: 'carica', onClick: () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.caricaDocumenti(f, 'bollettino') }) }] });
+    const mesi = [];
+    for (let k = PRIMO; k <= meseOggi(); k = piuMesi(k, 1)) mesi.push(k);
+    const etichetta = k => { const x = daChiave(k); return M.mese(x.m, x.a); };
+    const colonne = [];
+    for (let k = filtroBoll.da; k <= filtroBoll.a; k = piuMesi(k, 1)) colonne.push(daChiave(k));
+    const DA_FARE = ['da_verificare', 'pronto', 'mancante', 'contestato'];
+    const daFare = f => colonne.some(c => DA_FARE.indexOf(M.casellaBollettino(f.id, c.a, c.m).tipo) >= 0);
+    const fornitori = M.S.fornitori.filter(f => !filtroBoll.f || String(f.id) === filtroBoll.f).filter(f => filtroBoll.vista !== 'dafare' || daFare(f));
+
+    // barra: periodo (Da · A · ‹ ›), fornitore, solo chi ha qualcosa da fare
+    const riga = CRM.blocco(corpo, 'barra-periodo');
+    CRM.FilterBar(riga, { campi: [
+      { nome: 'da', tipo: 'select', etichetta: 'Da', valore: filtroBoll.da, opzioni: mesi.map(k => ({ value: k, label: etichetta(k) })) },
+      { nome: 'a', tipo: 'select', etichetta: 'A', valore: filtroBoll.a, opzioni: mesi.map(k => ({ value: k, label: etichetta(k) })) },
+      { nome: 'f', tipo: 'select', etichetta: 'Fornitore', valore: filtroBoll.f, opzioni: [{ value: '', label: 'Tutti i fornitori' }].concat(M.S.fornitori.map(f => ({ value: String(f.id), label: f.breve }))) },
+      { nome: 'vista', tipo: 'segmenti', valore: filtroBoll.vista, opzioni: [{ value: 'tutti', label: 'Tutti', n: M.S.fornitori.length }, { value: 'dafare', label: 'Con qualcosa da fare', n: M.S.fornitori.filter(daFare).length }] }
+    ], onChange: v => {
+      let { da, a } = v, avviso = '';
+      if (da !== filtroBoll.da && (a < da || distanza(da, a) >= MAX_MESI)) { a = piuMesi(da, MAX_MESI - 1); if (a > meseOggi()) a = meseOggi(); avviso = 'Al massimo 6 mesi: “A” spostato a ' + etichetta(a); }
+      else if (a !== filtroBoll.a && (a < da || distanza(da, a) >= MAX_MESI)) { da = piuMesi(a, -(MAX_MESI - 1)); if (da < PRIMO) da = PRIMO; avviso = 'Al massimo 6 mesi: “Da” spostato a ' + etichetta(da); }
+      filtroBoll = { da: da, a: a, f: v.f, vista: v.vista };
+      vistaBollettini();
+      if (avviso) CRM.Avviso(avviso);
+    } });
+    const nav = CRM.blocco(riga, 'sposta-periodo');
+    const btn = (testo, tit, n) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.textContent = testo; b.title = tit;
+      const da = piuMesi(filtroBoll.da, n), a = piuMesi(filtroBoll.a, n);
+      b.disabled = da < PRIMO || a > meseOggi();
+      b.addEventListener('click', () => { filtroBoll = Object.assign({}, filtroBoll, { da: da, a: a }); vistaBollettini(); });
+      nav.appendChild(b);
+    };
+    btn('‹ Mese prima', 'Sposta il periodo di un mese indietro', -1);
+    btn('Mese dopo ›', 'Sposta il periodo di un mese avanti', 1);
+
     const imp = b => M.euro(b.righe.reduce((s, r) => s + r.importo, 0));
+    if (!fornitori.length) { CRM.Pannello(corpo, {}).corpo.innerHTML = '<div class="vuoto"><b>Nessun fornitore con qualcosa da fare in questo periodo</b>Scegli “Tutti” o cambia i mesi.</div>'; return; }
     CRM.Matrice(corpo, {
       angolo: 'Fornitore',
-      colonne: MESI_VISTA.map(m => M.mese(m, ANNO)),
-      righe: M.S.fornitori.map(f => ({
+      colonne: colonne.map(c => M.mese(c.m, c.a)),
+      righe: fornitori.map(f => ({
         titolo: f.nome, sotto: 'paga sul ' + f.maturazione,
-        celle: MESI_VISTA.map(m => {
-          const c = M.casellaBollettino(f.id, ANNO, m);
-          switch (c.tipo) {
-            case 'verificato': return { href: '#/bollettini/' + c.b.id, stato: CRM.stato('ok', 'Verificato'), valore: imp(c.b) };
-            case 'contestato': return { href: '#/bollettini/' + c.b.id, stato: CRM.stato('errore', 'Contestato'), valore: imp(c.b) };
-            case 'da_verificare': return { href: '#/bollettini/' + c.b.id, stato: CRM.stato('attesa', c.aperte + (c.aperte === 1 ? ' riga da decidere' : ' righe da decidere')), valore: imp(c.b) };
-            case 'pronto': return { href: '#/bollettini/' + c.b.id, stato: CRM.stato('primario', 'Pronto da chiudere'), valore: imp(c.b) };
-            case 'mancante': return { stato: CRM.stato('errore', 'Non arrivato'), azione: { etichetta: 'Sollecita', onClick: () => sollecitoBollettino(f, m) } };
-            case 'atteso': return { stato: CRM.stato('neutro', 'Atteso entro il ' + M.data(c.entro).slice(0, 5)) };
+        celle: colonne.map(c => {
+          const x = M.casellaBollettino(f.id, c.a, c.m);
+          switch (x.tipo) {
+            case 'verificato': return { href: '#/bollettini/' + x.b.id, stato: CRM.stato('ok', 'Verificato'), valore: imp(x.b) };
+            case 'contestato': return { href: '#/bollettini/' + x.b.id, stato: CRM.stato('errore', 'Contestato'), valore: imp(x.b) };
+            case 'da_verificare': return { href: '#/bollettini/' + x.b.id, stato: CRM.stato('attesa', x.aperte + (x.aperte === 1 ? ' riga da decidere' : ' righe da decidere')), valore: imp(x.b) };
+            case 'pronto': return { href: '#/bollettini/' + x.b.id, stato: CRM.stato('primario', 'Pronto da chiudere'), valore: imp(x.b) };
+            case 'mancante': return { stato: CRM.stato('errore', 'Non arrivato'), azione: { etichetta: 'Sollecita', onClick: () => sollecitoBollettino(f, c.m, c.a) } };
+            case 'atteso': return { stato: CRM.stato('neutro', 'Atteso entro il ' + M.data(x.entro).slice(0, 5)) };
             case 'in_corso': return { vuota: 'Mese in corso' };
             default: return { vuota: 'Nessuna fattura' };
           }
         })
       }))
     });
-    CRM.Nota(corpo, 'Un bollettino è atteso per ogni mese chiuso in cui il fornitore ci ha fatturato qualcosa. Le righe si confrontano con quanto calcoliamo dalle pratiche: le differenze vanno accettate o contestate prima di chiudere il bollettino.');
-  });
-  function sollecitoBollettino(f, m) {
-    const docs = M.fiscaliDelMese(f.id, ANNO, m);
+    CRM.Nota(corpo, 'Un bollettino è atteso per ogni mese chiuso in cui il fornitore ci ha fatturato qualcosa. Le righe si confrontano con quanto calcoliamo dalle pratiche: le differenze vanno accettate o contestate prima di chiudere il bollettino. Si vedono al massimo 6 mesi alla volta.');
+  }
+  CRM.rotta(/^\/bollettini$/, vistaBollettini);
+  function sollecitoBollettino(f, m, a) {
+    a = a || ANNO;
+    const docs = M.fiscaliDelMese(f.id, a, m);
     CRM.TestoDaInviare({
-      titolo: 'Sollecito bollettino · ' + f.breve + ' ' + M.meseMin(m), destinatario: f.nome,
-      testo: 'Gentili colleghi di ' + f.nome + ',\n\nnon abbiamo ancora ricevuto il bollettino provvigioni di ' + M.meseMin(m) + ' ' + ANNO + '.\nCi risultano questi documenti del mese:\n' +
+      titolo: 'Sollecito bollettino · ' + f.breve + ' ' + M.meseMin(m) + ' ' + a, destinatario: f.nome,
+      testo: 'Gentili colleghi di ' + f.nome + ',\n\nnon abbiamo ancora ricevuto il bollettino provvigioni di ' + M.meseMin(m) + ' ' + a + '.\nCi risultano questi documenti del mese:\n' +
         docs.map(x => '- ' + x.doc.numero + ' del ' + M.data(x.doc.data) + ', ' + M.nomeCliente(x.pratica.cliente_piva) + ', ' + M.euro(M.importoDoc(x.doc))).join('\n') +
         '\n\nVi chiediamo di inviarcelo appena possibile.\n\nGrazie,\nDecobrands SRL',
-      onCopia: () => { M.annota('Sollecito bollettino ' + M.meseMin(m) + ' preparato per ' + f.breve); M.salva(); }
+      onCopia: () => { M.annota('Sollecito bollettino ' + M.meseMin(m) + ' ' + a + ' preparato per ' + f.breve); M.salva(); }
     });
   }
 
