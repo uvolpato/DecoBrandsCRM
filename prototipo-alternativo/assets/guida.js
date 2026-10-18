@@ -84,6 +84,8 @@
         ['Trascina qui · Scegli i file', 'Carica PDF ed Excel.'],
         ['N scartati', 'In alto all’elenco: apre i documenti scartati.'],
         ['Correggi i dati letti', 'Apre la finestra di correzione; il numero sul pulsante sono i punti da controllare.'],
+        ['Schede del documento', 'Prima l’azione proposta (Pratica proposta · Nuova pratica · Scegli la pratica · Cosa farne), poi Righe lette: il contatore dice quante righe sono incerte.'],
+        ['Vedi le righe', 'Nell’avviso giallo: apre la scheda Righe lette con le righe incerte evidenziate.'],
         ['Abbina a …', 'Abbina il documento alla pratica proposta (codice cliente + articoli in comune).'],
         ['Apri la pratica', 'Per un ordine: crea la pratica nuova.'],
         ['Registra e verifica', 'Per un bollettino: lo registra e apre la verifica.'],
@@ -99,7 +101,7 @@
         { nome: 'Lettura con affidabilità bassa', da: 'Abbina, con lettura poco sicura', cosa: 'Chiede conferma prima di abbinare un documento letto male.',
           azioni: [['Abbina comunque', 'Procede.'], ['Annulla', 'Torna indietro per correggere.']] }
       ],
-      sapere: ['⚠ L’evidenziazione del valore nel documento è da verificare sui file reali: precisa su PDF da gestionale ed Excel, approssimata o assente sugli scansionati.'] },
+      sapere: ['Le righe stanno nella seconda scheda perché qui si decide cosa fare del documento; se sono incerte, l’avviso e il contatore lo dicono subito.', '⚠ L’evidenziazione del valore nel documento è da verificare sui file reali: precisa su PDF da gestionale ed Excel, approssimata o assente sugli scansionati.'] },
 
     { id: 'pratiche', titolo: 'Pratiche', gruppo: 'Lavoro', vai: '#/pratiche', schema: 'stati',
       sintesi: 'Ogni ordine a fornitore è una pratica. Lo stato non si scrive a mano: si ricava dai documenti arrivati. La scheda della pratica ha il binario delle fasi e due schede: Riepilogo e Righe a confronto.',
