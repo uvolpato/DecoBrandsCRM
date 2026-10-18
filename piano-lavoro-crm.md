@@ -247,6 +247,8 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 ## 12. Regole di consegna per agente (riepilogo)
 
+
+- **Perché prima del cosa**: prima di implementare o cambiare un comportamento leggere il motivo nel registro delle decisioni (spec §19); se il codice si discosta dalla specifica, motivo nella PR e nuova riga al §19; commento breve nel codice che rimanda alla decisione nei punti non ovvi.
 1. **Prima** leggere la sezione di specifica citata nell'attività + i file prototipo indicati. **Il prototipo vince** su ogni interpretazione stilistica.
 2. CSS: si usa `crm.css` così com'è; nuove regole solo se il prototipo le ha (altrimenti si replica il pattern più vicino e si segnala).
 3. Testi: copiare le stringhe dal prototipo; niente sinonimi "migliori".

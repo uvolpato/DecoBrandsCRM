@@ -10,7 +10,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 |---|---|---|
 | Ogni giorno | **Oggi** | Riquadri per tipo di lavoro (fanno da filtro); "Da fare" in gruppi richiudibili: **conferme in ritardo** (dalla più vecchia, *Prepara i solleciti* = un testo per fornitore), **documenti da decidere** (solo quelli che chiedono una decisione; gli altri contati), **bollettini**; a destra **prossime scadenze**, trimestre, ultime operazioni |
 | | **Documenti** | Unico ingresso di **tutti** i documenti (ordini, conferme, fatture, note di credito, bollettini): si caricano trascinandoli o con *Carica documenti* nella barra, da qualsiasi pagina. Lettura automatica, controllo dei dati letti (*Correggi i dati letti*), poi: l'ordine apre una pratica, conferme e fatture si abbinano alla pratica proposta (codice cliente + articoli in comune), il bollettino si registra e si verifica |
-| | **Pratiche** | Elenco filtrabile; la scheda mostra il **binario** ordine → conferma → fattura → nota di credito con le differenze fra le fasi. I documenti si consultano **affiancati**: a sinistra il documento, a destra il confronto riga per riga con un altro documento della pratica (clic su un documento, su *Consulta affiancati* o su una riga a confronto) |
+| | **Pratiche** | Elenco filtrabile; la scheda mostra il **binario** ordine → conferma → fattura → nota di credito e due schede: **Riepilogo** (provvigione, incasso del cliente, documenti; avviso se le fasi cambiano righe) e **Righe a confronto** (contatore rosso delle variazioni nel titolo; si apre per prima se arrivi dal filtro *Con variazioni*). I documenti si consultano **affiancati**: a sinistra il documento, a destra il confronto riga per riga con un altro documento della pratica (clic su un documento, su *Consulta affiancati* o su una riga a confronto) |
 | Ogni mese | **Bollettini** | Matrice fornitore × mese: verificato, da decidere, pronto, atteso (fino al giorno del fornitore), non arrivato (con sollecito) |
 | | Bollettino | Riconciliazione **a cerniera**: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura |
 | Ogni trimestre | **Liquidazioni** | Trimestri fissi, elenco dei subagenti con documenti nel trimestre (clic = filtro, regge qualsiasi numero), documenti liquidabili o in attesa, esportazione (completa per subagente, un solo subagente, solo riepilogo) in Excel, PDF identico all'Excel o CSV di soli dati, chiusura |
@@ -104,3 +104,7 @@ assets/viste-componenti.js    catalogo dei componenti
 assets/stile.css              palette Decobrands e stile dei componenti
 assets/logo-decobrands.png    logo
 ```
+
+## Perché
+
+Ogni scelta del prototipo ha il suo motivo nel **registro delle decisioni** della specifica (§19). Prima di cambiare un comportamento che sembra strano, leggi lì perché è così.

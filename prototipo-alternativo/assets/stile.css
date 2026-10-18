@@ -741,3 +741,10 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .guida-schema.incassi .passi { display: flex; align-items: stretch; flex-wrap: wrap; }
 .guida-schema.incassi .stato-nodo { flex: 1 1 150px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--bordo); border-radius: 10px; font-size: 12.5px; color: var(--testo-tenue); }
 @media (max-width: 860px) { .guida-schema.incassi .corsia { grid-template-columns: 1fr; } }
+
+/* Pratica: riepilogo in due colonne e avviso sulle variazioni */
+.colonne.riepilogo-pratica { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; flex: none; }
+.avviso-variazioni { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; background: var(--attesa-tenue); color: var(--attesa-testo); font-size: 13.5px; flex: none; }
+.avviso-variazioni .icona { flex: none; width: 18px; height: 18px; }
+.avviso-variazioni > span { flex: 1; }
+@media (max-width: 992px) { .colonne.riepilogo-pratica { grid-template-columns: 1fr; } }

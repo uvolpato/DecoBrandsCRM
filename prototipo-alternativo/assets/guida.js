@@ -102,11 +102,19 @@
       sapere: ['⚠ L’evidenziazione del valore nel documento è da verificare sui file reali: precisa su PDF da gestionale ed Excel, approssimata o assente sugli scansionati.'] },
 
     { id: 'pratiche', titolo: 'Pratiche', gruppo: 'Lavoro', vai: '#/pratiche', schema: 'stati',
-      sintesi: 'Ogni ordine a fornitore è una pratica. Lo stato non si scrive a mano: si ricava dai documenti arrivati.',
+      sintesi: 'Ogni ordine a fornitore è una pratica. Lo stato non si scrive a mano: si ricava dai documenti arrivati. La scheda della pratica ha il binario delle fasi e due schede: Riepilogo e Righe a confronto.',
+      flusso: [
+        ['Guarda il binario', 'Ordine → conferma → fattura → nota di credito, con la differenza di ogni fase rispetto alla precedente.'],
+        ['Leggi il Riepilogo', 'Provvigione, incasso del cliente, documenti. Se le fasi cambiano delle righe, un avviso giallo lo dice in alto.'],
+        ['Controlla le righe se serve', 'Scheda Righe a confronto: il numero rosso nel titolo dice quante righe cambiano.']
+      ],
       pulsanti: [
-        ['Segmenti di stato', 'Tutte · Conferma in ritardo · Attesa conferma · Attesa fattura · Fatturate · Con variazioni.'],
+        ['Segmenti di stato', 'Tutte · Conferma in ritardo · Attesa conferma · Attesa fattura · Fatturate · Con variazioni. Con questo filtro la pratica si apre direttamente sulle righe.'],
         ['Cerca', 'Per pratica, cliente o numero di documento.'],
         ['Clic sulla riga', 'Apre la scheda della pratica.'],
+        ['Riepilogo · Righe a confronto', 'Le due schede della pratica; tornando indietro si riapre quella lasciata.'],
+        ['Vedi le righe', 'Nell’avviso delle variazioni: apre la scheda Righe a confronto.'],
+        ['Solo righe che cambiano · Tutte le righe', 'Nella scheda Righe: filtra il confronto.'],
         ['Carica un documento', 'Nella scheda: carica un documento già destinato a questa pratica.'],
         ['Consulta affiancati', 'Apre i documenti della pratica affiancati al confronto.'],
         ['Clic su documento o riga a confronto', 'Apre la stessa finestra su quel documento o su quella riga.'],
@@ -120,7 +128,7 @@
         { nome: 'Fattura non pagata', da: 'Segna come non pagata', cosa: 'Registra la segnalazione del fornitore che il cliente non ha pagato.', campi: [['Nota', 'Facoltativa, es. “email di Gasper del 12/09”.']], azioni: [['Segna come non pagata', 'La fattura va fra i pagamenti da sollecitare in Oggi.']] },
         { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }
       ],
-      sapere: ['Nella scheda: binario ordine → conferma → fattura → nota di credito, righe a confronto con la differenza, provvigione prevista, documenti e incasso del cliente.', 'Stati d’incasso: <b>Pagata</b> · <b>Non pagata</b> (stornata o segnalata) · <b>Incasso da verificare</b> (maturato, oltre i giorni d’incasso) · <b>In attesa di incasso</b> · <b>Nessuna segnalazione</b>. Vedi <a href="#/guida/incassi">Incassi dei clienti</a>.'] },
+      sapere: ['Le righe contano soprattutto quando qualcosa non torna: per questo stanno nella seconda scheda, ma il contatore rosso e l’avviso nel Riepilogo non le lasciano passare inosservate.', 'Stati d’incasso: <b>Pagata</b> · <b>Non pagata</b> (stornata o segnalata) · <b>Incasso da verificare</b> (maturato, oltre i giorni d’incasso) · <b>In attesa di incasso</b> · <b>Nessuna segnalazione</b>. Vedi <a href="#/guida/incassi">Incassi dei clienti</a>.'] },
 
     { id: 'bollettini', titolo: 'Bollettini', gruppo: 'Lavoro', vai: '#/bollettini',
       sintesi: 'Ogni mese ogni fornitore comunica le provvigioni che riconosce. Il CRM le confronta con il proprio calcolo e mostra cosa quadra e cosa no.',

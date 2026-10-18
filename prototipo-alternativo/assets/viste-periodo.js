@@ -57,7 +57,6 @@
     const badge = b.stato === 'verificato' ? CRM.stato('ok', 'Verificato') : b.stato === 'contestato' ? CRM.stato('errore', 'Contestato') : r.aperte ? CRM.stato('attesa', 'Da verificare') : CRM.stato('primario', 'Pronto da chiudere');
     const corpo = CRM.Pagina({
       voce: 'bollettini', pieno: true, titolo: f.breve + ' · ' + M.mese(b.mese, b.anno), badge: badge,
-      briciole: [{ etichetta: 'Bollettini', href: '#/bollettini' }, { etichetta: f.breve + ' ' + M.meseMin(b.mese) }],
       sottotitolo: 'Ricevuto il ' + M.data(b.ricevuto) + ' · ' + e(b.file) + ' · ' + e(f.breve) + ' paga sul ' + f.maturazione +
         (f.maturazione === 'maturato' ? ': verificando il bollettino si sbloccano le provvigioni dei subagenti su queste fatture.' : '.')
     });

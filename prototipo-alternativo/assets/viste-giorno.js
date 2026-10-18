@@ -588,6 +588,7 @@
 
   /* ---------- Pratiche: FilterBar + DataTable ---------- */
   let filtri = { stato: 'tutte', q: '' };
+  let apriRighe = false;   // pratica aperta dal filtro "Con variazioni": parte dalla scheda Righe
   CRM.rotta(/^\/pratiche$/, function () {
     const corpo = CRM.Pagina({ voce: 'pratiche', titolo: 'Pratiche', pieno: true, sottotitolo: 'Ogni ordine a fornitore con i suoi documenti. Lo stato avanza quando arrivano conferma e fattura.' });
     const tutte = M.S.pratiche;
@@ -615,9 +616,10 @@
         { key: 'sub', header: 'Subagente', valore: p => { const a = M.abbinamento(p.cliente_piva, p.fornitore_id); return a ? M.subagente(a.subagente_id).nome : '—'; } }
       ],
       ordinamentoIniziale: { key: 'stato', dir: 'asc' },
-      onRowClick: p => { location.hash = '#/pratiche/' + p.id; },
+      onRowClick: p => { apriRighe = filtri.stato === 'variazioni'; location.hash = '#/pratiche/' + p.id; },
       emptyText: 'Nessuna pratica', emptyHint: 'Prova a togliere il filtro o a cambiare la ricerca.'
     });
+    tab.el.addEventListener('click', ev => { if (ev.target.closest('a[href^="#/pratiche/"]')) apriRighe = filtri.stato === 'variazioni'; });
     function aggiorna() {
       const q = filtri.q.trim().toLowerCase();
       tab.aggiorna(tutte.filter(REGOLE[filtri.stato]).filter(p => !q || [p.numero, M.nomeCliente(p.cliente_piva), M.fornitore(p.fornitore_id).nome].concat(p.documenti.map(d => d.numero)).some(x => x.toLowerCase().indexOf(q) >= 0)));
@@ -635,7 +637,6 @@
     const s = M.statoPratica(p);
     const corpo = CRM.Pagina({
       voce: 'pratiche', pieno: true, titolo: p.numero, badge: CRM.statoPratica(p),
-      briciole: [{ etichetta: 'Pratiche', href: '#/pratiche' }, { etichetta: p.numero }],
       sottotitolo: e(M.nomeCliente(p.cliente_piva)) + ' · ' + e(f.nome) + (sub ? ' · seguita da ' + e(sub.nome) : ' · nessun subagente abbinato'),
       azioni: [{ etichetta: 'Carica un documento', icona: 'carica', variante: 'sec', onClick: () => CRM.scegliFile({ accetta: ACCETTA, onFile: f => carica(f) }) }]
         .concat(s.chiave === 'scaduta' || s.chiave === 'attesa' ? [{ etichetta: 'Prepara il sollecito', icona: 'posta', variante: s.chiave === 'scaduta' ? 'primario' : 'sec', onClick: () => sollecito(p) }] : [])
@@ -655,71 +656,91 @@
       nc.length ? { titolo: 'Nota di credito', fatta: true, numero: nc[0].numero, data: nc[0].data, importo: imp(nc) } : { titolo: 'Nota di credito', assente: true, testo: 'Nessuna' }
     ]);
 
-    const col = CRM.blocco(corpo, 'colonne riempi');
+    // Riepilogo (provvigione, incasso, documenti) e righe a confronto in due schede (§7.3):
+    // le righe contano solo quando qualcosa non torna, e allora il titolo della scheda lo dice
     const fasi = M.fasi(p);
-    const conf2 = CRM.Pannello(col, { titolo: 'Righe a confronto', senzaMargine: true, riempi: true,
-      nota: fasi.length > 1 ? (M.haVariazioni(p) ? 'le righe evidenziate cambiano fra le fasi' : 'nessuna variazione fra le fasi') : 'il confronto parte quando arriva la conferma' });
     const tutte = M.confronto(p), variate = tutte.filter(r => r.varia);
-    if (variate.length) {
-      const fb = CRM.FilterBar(conf2.corpo, { campi: [{ nome: 'vista', tipo: 'segmenti', valore: 'variate', opzioni: [
+    const deltaTot = M.r2(variate.reduce((x, r) => x + r.delta, 0));
+    const iniziale = apriRighe && variate.length ? 'righe' : 'riepilogo';
+    apriRighe = false;
+    const sk = CRM.Schede(corpo, { riempi: true, attiva: iniziale, schede: [
+      { id: 'riepilogo', etichetta: 'Riepilogo', disegna: c => riepilogo(c) },
+      { id: 'righe', etichetta: 'Righe a confronto', conta: variate.length ? variate.length + (variate.length === 1 ? ' variazione' : ' variazioni') : tutte.length,
+        contaVariante: variate.length ? 'errore' : 'neutro', disegna: c => righe(c) }
+    ] });
+
+    function righe(c) {
+      CRM.Nota(c, fasi.length > 1 ? (variate.length ? 'Le righe evidenziate cambiano fra le fasi. Clic su una riga per vederla nel documento.' : 'Nessuna variazione fra le fasi. Clic su una riga per vederla nel documento.') : 'Il confronto parte quando arriva la conferma.');
+      let tabConf;
+      if (variate.length) CRM.FilterBar(c, { campi: [{ nome: 'vista', tipo: 'segmenti', valore: 'variate', opzioni: [
         { value: 'variate', label: 'Solo righe che cambiano', n: variate.length }, { value: 'tutte', label: 'Tutte le righe', n: tutte.length }] }],
         onChange: v => tabConf.aggiorna(v.vista === 'tutte' ? tutte : variate) });
-      fb.el.style.cssText = 'padding:10px 14px;flex:none';
-    }
-    const tabConf = CRM.DataTable(conf2.corpo, {
-      compatta: true, righe: variate.length ? variate : tutte, rowClass: r => r.varia ? 'evidenzia' : '',
-      onRowClick: r => { const ult = fasi[fasi.length - 1]; consultaDocumenti(p, ult.id, r.codice); },
-      colonne: [{ key: 'codice', header: 'Articolo', grow: true, cell: r => '<b>' + e(r.codice) + '</b><span class="sec-riga">' + e(r.descrizione) + '</span>' }]
-        .concat(fasi.map((d, i) => ({ key: 'f' + i, header: M.TIPI[d.tipo], align: 'right', sortValue: r => r.per[i] ? M.importoRiga(r.per[i]) : -1,
-          cell: r => r.per[i] ? M.num(r.per[i].qta) + ' × ' + M.euro(r.per[i].prezzo) + '<span class="sec-riga">' + M.euro(M.importoRiga(r.per[i])) + '</span>' : '<span class="testo-tenue">assente</span>' })))
-        .concat(fasi.length > 1 ? [{ key: 'delta', header: 'Differenza', tipo: 'euro', cell: r => Math.abs(r.delta) < 0.01 ? '<span class="testo-tenue">—</span>' : '<b class="' + CRM.classeSegno(r.delta) + '">' + CRM.euroSegno(r.delta) + '</b>' }] : [])
-    });
-
-    const destra = CRM.blocco(col, 'pila', 'overflow:auto');
-    const perc = M.percentuali(p, (fatture[0] || ordine).data);
-    const base = M.importoPratica(p);
-    const prov = CRM.Pannello(destra, { titolo: 'Provvigione', nota: M.fiscali(p).length ? 'sul netto fatturato' : 'prevista' });
-    if (!perc) CRM.Nota(prov.corpo, 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni. <a href="#/clienti/' + p.cliente_piva + '">Aggiungi l’agenzia nella scheda del cliente</a>.');
-    else {
-      CRM.Cifre(prov.corpo, [
-        { etichetta: 'Imponibile', valore: base },
-        { etichetta: 'Sconto al cliente', valore: M.pct(perc.sconto), nota: 'percentuali in vigore dal ' + M.data(perc.scaglione.valido_dal) },
-        { etichetta: 'Da ' + f.breve + ' a Decobrands: ' + M.pct(perc.agente) + ' + ' + M.pct(perc.sub_standard), valore: base * perc.dal_fornitore / 100 },
-        { etichetta: 'A ' + sub.nome + ': ' + M.pct(perc.sub) + (perc.eccezione ? ' (eccezione personale)' : ''), valore: base * perc.sub / 100 }
-      ]);
-      CRM.Nota(prov.corpo, e(f.breve) + (f.maturazione === 'maturato' ? ' paga sul maturato: la provvigione del subagente si sblocca quando ' + e(f.breve) + ' la riconosce in un bollettino verificato.' : ' paga sul fatturato: la provvigione del subagente entra nel trimestre della fattura.')).style.marginTop = '10px';
-      if (f.maturazione === 'maturato' && M.fiscali(p).length) CRM.Elenco(prov.corpo, M.fiscali(p).map(d => {
-        const b = M.riconosciutoIn(d.numero), bb = M.S.bollettini.find(x => x.righe.some(r => r.numero === d.numero));
-        return { testo: e(d.numero), destra: b ? CRM.stato('ok', 'riconosciuta da ' + f.breve) : bb ? CRM.stato('attesa', 'nel bollettino di ' + M.meseMin(bb.mese) + ', da verificare') : CRM.stato('neutro', 'non ancora nei bollettini') };
-      }));
-    }
-    const docs = CRM.Pannello(destra, { titolo: 'Documenti', nota: String(p.documenti.length),
-      azioni: [{ etichetta: 'Consulta affiancati', icona: 'file', onClick: () => consultaDocumenti(p) }] });
-    CRM.Elenco(docs.corpo, p.documenti.map(d => ({
-      onClick: () => consultaDocumenti(p, d.id), titolo: 'Apri ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero + ' accanto al confronto',
-      testo: CRM.icona('file') + ' ' + e(M.TIPI[d.tipo]) + ' <b>' + e(d.numero) + '</b> <span class="testo-tenue">del ' + M.data(d.data) + '</span>' + (d.riferimento ? '<span class="sec-riga">storna ' + e(d.riferimento) + (d.nota ? ' · ' + e(d.nota) : '') + '</span>' : ''),
-      destra: '<span class="' + CRM.classeSegno(Math.min(0, M.importoDoc(d))) + '">' + M.euro(M.importoDoc(d)) + '</span>'
-    })));
-    // incasso del cliente (§5.14): Decobrands non incassa; il fornitore segnala chi non paga
-    const fattureInc = p.documenti.filter(d => d.tipo === 'fattura');
-    if (fattureInc.length) {
-      const VAR = { insoluta: 'errore', da_verificare: 'attesa', pagata: 'ok', da_incassare: 'neutro' };
-      const inc = CRM.Pannello(destra, { titolo: 'Incasso del cliente', nota: M.fornitore(p.fornitore_id).maturazione === 'maturato' ? 'sul maturato' : 'sul fatturato' });
-      fattureInc.forEach(d => {
-        const st = M.statoIncasso(p, d), riga = CRM.blocco(inc.corpo, 'incasso-riga');
-        riga.innerHTML = '<div><b>' + e(d.numero) + '</b> ' + CRM.stato(VAR[st.stato], st.etichetta) + '<span class="sec-riga">' + e(st.nota || '') +
-          (st.solleciti ? ' · sollecitata ' + st.solleciti + (st.solleciti === 1 ? ' volta' : ' volte') + ', ultima il ' + M.data(st.sollecitata_il) : '') + '</span></div><div class="azioni-cella"></div>';
-        const az = CRM.$('.azioni-cella', riga);
-        const btn = (t, v, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn piccolo ' + v; b.textContent = t; b.addEventListener('click', fn); az.appendChild(b); };
-        if (st.stato === 'insoluta' || st.stato === 'da_verificare') {
-          btn('Sollecita il cliente', 'sec', () => CRM.sollecitiPagamento(M.pagamentiDaSollecitare().filter(x => x.doc === d)));
-          btn('Segna come pagata', 'testo', () => { M.segnaIncasso(p, d, 'pagata', 'segnalazione del fornitore'); M.salva(); CRM.Avviso('Fattura ' + d.numero + ' segnata come pagata'); CRM.naviga(); });
-        } else if (st.stato !== 'pagata') btn('Segna come non pagata', 'testo', () => CRM.FormModal({
-          titolo: 'Fattura ' + d.numero + ' non pagata', testo: 'Il fornitore segnala che il cliente non ha pagato. La fattura passa fra i pagamenti da sollecitare.', conferma: 'Segna come non pagata',
-          campi: [{ nome: 'nota', etichetta: 'Nota', tipo: 'area', valore: '', placeholder: 'es. email di ' + M.fornitore(p.fornitore_id).breve + ' del …' }],
-          onConferma: v => { M.segnaIncasso(p, d, 'insoluta', v.nota); M.salva(); CRM.Avviso('Fattura ' + d.numero + ' fra i pagamenti da sollecitare'); CRM.naviga(); }
-        }));
+      tabConf = CRM.DataTable(CRM.blocco(c, 'riempi'), {
+        compatta: true, righe: variate.length ? variate : tutte, rowClass: r => r.varia ? 'evidenzia' : '',
+        onRowClick: r => { const ult = fasi[fasi.length - 1]; consultaDocumenti(p, ult.id, r.codice); },
+        colonne: [{ key: 'codice', header: 'Articolo', grow: true, cell: r => '<b>' + e(r.codice) + '</b><span class="sec-riga">' + e(r.descrizione) + '</span>' }]
+          .concat(fasi.map((d, i) => ({ key: 'f' + i, header: M.TIPI[d.tipo], align: 'right', sortValue: r => r.per[i] ? M.importoRiga(r.per[i]) : -1,
+            cell: r => r.per[i] ? M.num(r.per[i].qta) + ' × ' + M.euro(r.per[i].prezzo) + '<span class="sec-riga">' + M.euro(M.importoRiga(r.per[i])) + '</span>' : '<span class="testo-tenue">assente</span>' })))
+          .concat(fasi.length > 1 ? [{ key: 'delta', header: 'Differenza', tipo: 'euro', cell: r => Math.abs(r.delta) < 0.01 ? '<span class="testo-tenue">—</span>' : '<b class="' + CRM.classeSegno(r.delta) + '">' + CRM.euroSegno(r.delta) + '</b>' }] : [])
       });
+    }
+
+    function riepilogo(c) {
+      // le variazioni non devono passare inosservate: avviso con collegamento alla seconda scheda
+      if (variate.length) {
+        const av = CRM.blocco(c, 'avviso-variazioni');
+        av.innerHTML = CRM.icona('avviso') + '<span><b>' + (fasi.length > 2 ? 'Le fasi cambiano ' : 'La ' + M.TIPI[fasi[fasi.length - 1].tipo].toLowerCase() + ' cambia ') + variate.length + (variate.length === 1 ? ' riga' : ' righe') + '</b> rispetto all’ordine, in totale <b>' +
+          CRM.euroSegno(deltaTot) + '</b>.</span>';
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.textContent = 'Vedi le righe';
+        b.addEventListener('click', () => sk.vai('righe')); av.appendChild(b);
+      }
+      const col = CRM.blocco(c, 'colonne riepilogo-pratica');
+      const sx = CRM.blocco(col, 'pila'), dx = CRM.blocco(col, 'pila');
+      const perc = M.percentuali(p, (fatture[0] || ordine).data);
+      const base = M.importoPratica(p);
+      const prov = CRM.Pannello(sx, { titolo: 'Provvigione', nota: M.fiscali(p).length ? 'sul netto fatturato' : 'prevista' });
+      if (!perc) CRM.Nota(prov.corpo, 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni. <a href="#/clienti/' + p.cliente_piva + '">Aggiungi l’agenzia nella scheda del cliente</a>.');
+      else {
+        CRM.Cifre(prov.corpo, [
+          { etichetta: 'Imponibile', valore: base },
+          { etichetta: 'Sconto al cliente', valore: M.pct(perc.sconto), nota: 'percentuali in vigore dal ' + M.data(perc.scaglione.valido_dal) },
+          { etichetta: 'Da ' + f.breve + ' a Decobrands: ' + M.pct(perc.agente) + ' + ' + M.pct(perc.sub_standard), valore: base * perc.dal_fornitore / 100 },
+          { etichetta: 'A ' + sub.nome + ': ' + M.pct(perc.sub) + (perc.eccezione ? ' (eccezione personale)' : ''), valore: base * perc.sub / 100 }
+        ]);
+        CRM.Nota(prov.corpo, e(f.breve) + (f.maturazione === 'maturato' ? ' paga sul maturato: la provvigione del subagente si sblocca quando ' + e(f.breve) + ' la riconosce in un bollettino verificato.' : ' paga sul fatturato: la provvigione del subagente entra nel trimestre della fattura.')).style.marginTop = '10px';
+        if (f.maturazione === 'maturato' && M.fiscali(p).length) CRM.Elenco(prov.corpo, M.fiscali(p).map(d => {
+          const b = M.riconosciutoIn(d.numero), bb = M.S.bollettini.find(x => x.righe.some(r => r.numero === d.numero));
+          return { testo: e(d.numero), destra: b ? CRM.stato('ok', 'riconosciuta da ' + f.breve) : bb ? CRM.stato('attesa', 'nel bollettino di ' + M.meseMin(bb.mese) + ', da verificare') : CRM.stato('neutro', 'non ancora nei bollettini') };
+        }));
+      }
+      // incasso del cliente (§5.14): Decobrands non incassa; il fornitore segnala chi non paga
+      const fattureInc = p.documenti.filter(d => d.tipo === 'fattura');
+      if (fattureInc.length) {
+        const VAR = { insoluta: 'errore', da_verificare: 'attesa', pagata: 'ok', da_incassare: 'neutro' };
+        const inc = CRM.Pannello(dx, { titolo: 'Incasso del cliente', nota: f.maturazione === 'maturato' ? 'sul maturato' : 'sul fatturato' });
+        fattureInc.forEach(d => {
+          const st = M.statoIncasso(p, d), riga = CRM.blocco(inc.corpo, 'incasso-riga');
+          riga.innerHTML = '<div><b>' + e(d.numero) + '</b> ' + CRM.stato(VAR[st.stato], st.etichetta) + '<span class="sec-riga">' + e(st.nota || '') +
+            (st.solleciti ? ' · sollecitata ' + st.solleciti + (st.solleciti === 1 ? ' volta' : ' volte') + ', ultima il ' + M.data(st.sollecitata_il) : '') + '</span></div><div class="azioni-cella"></div>';
+          const az = CRM.$('.azioni-cella', riga);
+          const btn = (t, v, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn piccolo ' + v; b.textContent = t; b.addEventListener('click', fn); az.appendChild(b); };
+          if (st.stato === 'insoluta' || st.stato === 'da_verificare') {
+            btn('Sollecita il cliente', 'sec', () => CRM.sollecitiPagamento(M.pagamentiDaSollecitare().filter(x => x.doc === d)));
+            btn('Segna come pagata', 'testo', () => { M.segnaIncasso(p, d, 'pagata', 'segnalazione del fornitore'); M.salva(); CRM.Avviso('Fattura ' + d.numero + ' segnata come pagata'); CRM.naviga(); });
+          } else if (st.stato !== 'pagata') btn('Segna come non pagata', 'testo', () => CRM.FormModal({
+            titolo: 'Fattura ' + d.numero + ' non pagata', testo: 'Il fornitore segnala che il cliente non ha pagato. La fattura passa fra i pagamenti da sollecitare.', conferma: 'Segna come non pagata',
+            campi: [{ nome: 'nota', etichetta: 'Nota', tipo: 'area', valore: '', placeholder: 'es. email di ' + f.breve + ' del …' }],
+            onConferma: v => { M.segnaIncasso(p, d, 'insoluta', v.nota); M.salva(); CRM.Avviso('Fattura ' + d.numero + ' fra i pagamenti da sollecitare'); CRM.naviga(); }
+          }));
+        });
+      }
+      const docs = CRM.Pannello(dx, { titolo: 'Documenti', nota: String(p.documenti.length),
+        azioni: [{ etichetta: 'Consulta affiancati', icona: 'file', onClick: () => consultaDocumenti(p) }] });
+      CRM.Elenco(docs.corpo, p.documenti.map(d => ({
+        onClick: () => consultaDocumenti(p, d.id), titolo: 'Apri ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero + ' accanto al confronto',
+        testo: CRM.icona('file') + ' ' + e(M.TIPI[d.tipo]) + ' <b>' + e(d.numero) + '</b> <span class="testo-tenue">del ' + M.data(d.data) + '</span>' + (d.riferimento ? '<span class="sec-riga">storna ' + e(d.riferimento) + (d.nota ? ' · ' + e(d.nota) : '') + '</span>' : ''),
+        destra: '<span class="' + CRM.classeSegno(Math.min(0, M.importoDoc(d))) + '">' + M.euro(M.importoDoc(d)) + '</span>'
+      })));
     }
   });
 

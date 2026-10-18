@@ -269,7 +269,6 @@
     const giorni = M.S.impostazioni.conservazione.scartati_giorni;
     const lista = M.S.scartati;
     const corpo = CRM.Pagina({ voce: 'scartati', titolo: 'Documenti scartati', pieno: true,
-      briciole: [{ etichetta: 'Documenti', href: '#/documenti' }, { etichetta: 'Scartati' }],
       sottotitolo: 'Restano qui ' + giorni + ' giorni (Impostazioni › Conservazione), poi vengono eliminati. Recupera un documento scartato per errore: torna fra quelli da controllare.' });
     const motivi = lista.map(x => x.motivo).filter((m, i, a) => a.indexOf(m) === i);
     CRM.FilterBar(corpo, { campi: [

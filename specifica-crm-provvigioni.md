@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.9 — incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 4.0 — pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -1199,6 +1199,36 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
 
 ### 7.3 Dettaglio pratica (`/ordini-fornitore/:id`)
 
+**Struttura (prototipo `prototipo-alternativo/`, decisione del 18/10/2026, D-12 §19):**
+
+- **Testata** senza percorso ("Pratiche › …"): titolo con lo stato, cliente · fornitore ·
+  subagente, azioni *Carica un documento* e, se la conferma è attesa o in ritardo,
+  *Prepara il sollecito*.
+- **Binario** ordine → conferma → fattura → nota di credito, sempre visibile sopra le schede
+  (con la differenza di ogni fase rispetto alla precedente).
+- Due **schede** (componente Schede, §16.4):
+  1. **Riepilogo** (si apre per prima): se ci sono variazioni fra le fasi, in alto un
+     **avviso** giallo "La conferma cambia N righe rispetto all'ordine, in totale ±X €" con
+     *Vedi le righe*; sotto due colonne che stanno nello schermo: a sinistra
+     **Provvigione** (imponibile, sconto e percentuali in vigore, quota a Decobrands e al
+     subagente, regola maturato/fatturato e, sul maturato, riconoscimento di ogni
+     documento), a destra **Incasso del cliente** e **Documenti**.
+  2. **Righe a confronto**: nel titolo il contatore **rosso "N variazioni"** se quantità o
+     prezzi cambiano o righe sono aggiunte/tolte, altrimenti grigio con il numero di righe;
+     dentro la nota, i segmenti *Solo righe che cambiano · Tutte le righe* e la DataTable
+     del confronto; clic su una riga apre il documento affiancato su quella riga.
+- **Scheda iniziale**: *Riepilogo*; *Righe a confronto* se la pratica è aperta dall'elenco
+  con il filtro *Con variazioni* (chi usa quel filtro cerca proprio le righe). Tornando
+  indietro si riapre la scheda lasciata (§7.12).
+- **Perché**: in questa fase chi apre una pratica vuole sapere quanto vale la provvigione,
+  se è stata riconosciuta o pagata e quali documenti ci sono; le righe contano solo quando
+  qualcosa non torna. Prima la tabella delle righe occupava metà schermo anche con "nessuna
+  variazione" e i dati utili scorrevano. L'avviso nel Riepilogo esiste perché una scheda
+  chiusa si ignora facilmente: le variazioni non devono passare inosservate.
+
+Contenuti di dettaglio (dal primo prototipo, restano validi come elenco dei dati):
+
+
 - **Stepper** stato pratica: `inviato → confermato → fatturato`.
 - **Strip riepilogo**: fornitore, cliente, agente, importo merce, scadenza conferma.
 - **Tab a flusso**:
@@ -1419,7 +1449,7 @@ Regola valida per **tutte** le schermate. Da qualunque schermata si apre un'altr
 da Clienti si apre una pratica, da una pratica un documento, dal fornitore un cliente) si
 deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'era**.
 
-- **Pulsante "‹ Torna a <schermata precedente>"** in testa alla pagina, sopra le briciole,
+- **Pulsante "‹ Torna a <schermata precedente>"** in testa alla pagina,
   presente quando esiste una schermata precedente dell'app; equivale al tasto Indietro del
   browser (Alt + ←), che deve dare lo stesso risultato.
 - **Cosa si ripristina:** filtri (FilterBar: segmenti, ricerca, select), riquadri KPI
@@ -2282,7 +2312,7 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 | **Schede** | contenuti alternativi nello stesso spazio, quando una scheda di dettaglio impilerebbe più tabelle (§7.1, §7.4, §7.13, §7.18, §7.21) | schede (`id`, etichetta, contatore con variante neutro/giallo/rosso/verde, `disegna`), scheda attiva, `riempi`, `onCambia`; tastiera ← → Home Fine; **ricorda la scheda** per ogni passo della cronologia (§7.12). Le schede stanno **in alto**. Non sostituiscono i segmenti della FilterBar: i segmenti filtrano le stesse righe, le schede mostrano contenuti diversi |
 | **Pannello** | card con testata | titolo, icona, azioni, piede |
 | **Form / FormModal** | moduli e finestre modali | campi (`nome`, `etichetta`, `tipo`, `opzioni`, `col`, `obbligatorio`, `aiuto`, `onChange`), pulsante / `onConferma` |
-| **Intestazione** | testata pagina | titolo, icona, sottotitolo, briciole, azioni; pulsante **"Torna a …"** automatico (§7.12) |
+| **Intestazione** | testata pagina | titolo, icona, sottotitolo, azioni; pulsante **"Torna a …"** automatico (§7.12). Il parametro `briciole` (percorso "Elenco › Dettaglio") esiste ma **non si usa** nelle pagine di dettaglio: ripete il *Torna a …* e la voce evidenziata nella barra (D-12, §19) |
 | **Stepper**, **Nota**, badge | passi di stato, note, stati | — |
 | **FinestraAffiancata** | documento a sinistra, dati a destra, divisore trascinabile; usata da "Correggi i dati letti" (§6.5) e dalla consultazione dei documenti della pratica (§7.3) | titolo, sottotitolo, larghezza iniziale, `sinistra(host)`, `destra(host)`, azioni del piede |
 | **GruppiDaFare** | lista "Da fare" della pagina Oggi (§7.1) | gruppi (`id`, titolo, variante, contatore, voci, riassunto, azioni di gruppo, testo se vuoto); `filtra(id)` collegato ai riquadri |
@@ -2315,6 +2345,16 @@ Ogni attività è una slice con ownership disgiunta (nessun file toccato da due 
 una PR per attività con checklist §16.1 allegata; testi e stile presi dal prototipo,
 non inventati; prima del merge: checklist superata + test numerici seed §12 + eventi
 §15.2 completi. Casi limite §13 restano backlog, non toccati dal piano.
+
+**Il perché accompagna sempre il cosa.** Ogni regola o scelta d'interfaccia ha il suo
+motivo nel registro delle decisioni (§19) o in una riga *Perché* nella sezione che la
+descrive. Chi sviluppa:
+- prima di cambiare un comportamento legge il perché: se il motivo vale ancora, il
+  comportamento resta anche se sembra strano;
+- se il codice deve discostarsi dalla specifica, lo dice nella PR con il motivo e si
+  aggiunge una riga al §19;
+- nei punti non ovvi del codice un commento breve rimanda alla decisione (es.
+  `// storno alla liquidazione successiva, D-08 §19`).
 
 ---
 
@@ -2463,3 +2503,26 @@ registro eventi (§7.15). È la base per tarare e misurare.
   piattaforme provate.
 - vLLM e GLM-OCR: vedi §6.6.4.
 
+---
+
+## 19. Registro delle decisioni: cosa e perché
+
+Una riga per ogni scelta che cambia il comportamento. **Perché** è il motivo per cui la
+scelta è stata fatta: serve a chi sviluppa per capire cosa non va "semplificato" e a chi
+rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in fondo.
+
+| # | Data | Decisione | Perché | Chi | Dove |
+|---|---|---|---|---|---|
+| D-01 | 15/10/2026 | Clienti e fornitori solo da Integra, in sola lettura; i subagenti si gestiscono per intero nel CRM | un'anagrafica deve avere un solo padrone; i subagenti in Integra non ci sono | Decobrands | §4.1, §7.6 |
+| D-02 | 15/10/2026 | Si torna sempre alla schermata precedente nello stesso punto (filtri, ordinamento, pagina, scorrimento, scheda) | il lavoro è un andare e tornare fra elenco e dettaglio: ricominciare ogni volta da capo fa perdere il filo | Ugo | §7.12 |
+| D-03 | 15/10/2026 | Bollettino atteso entro un giorno fissato per fornitore; il sollecito parte solo dopo | i fornitori mandano il bollettino in giorni diversi: sollecitare a fine mese sarebbe sbagliato e fastidioso | Decobrands | §4.2.1, §5.6 |
+| D-04 | 15/10/2026 | Esportazione della liquidazione per trimestre: completa per subagente, un subagente o solo riepilogo; Excel, PDF identico, CSV | sono i tre usi reali: invio a tutti, invio a uno, controllo dei totali | Decobrands | §11 |
+| D-05 | 15/10/2026 | Ruolo *sola lettura*: consulta ed esporta, non modifica; i permessi si verificano anche sul server | chi deve solo vedere non deve poter cambiare; nascondere i pulsanti non basta | Ugo | §8.3 |
+| D-06 | 15/10/2026 | Evidenziazione del valore nel documento **da verificare** con la prova F0-A7 | funziona bene su PDF da gestionale ed Excel, non è garantita sugli scansionati: il cliente non deve darla per certa | Ugo | §6.6 |
+| D-07 | 16/10/2026 | Dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, non da file | dati sempre allineati senza import manuali; utente in sola lettura, nessuna scrittura su Integra | Ugo | §4.1, §4.5 |
+| D-08 | 16/10/2026 | Vendita diretta (ordini cliente, articoli, giacenze, alias e kit) progettata ma **spenta**: ampliamento futuro | prima va messo in esercizio il lavoro di agenzia; il progetto resta pronto e documentato | Ugo | §17 |
+| D-09 | 16/10/2026 | Componente **Schede** dove un dettaglio impila più tabelle; i segmenti restano per filtrare le stesse righe | evitare colonne che scorrono e tabelle tagliate; due strumenti diversi per due bisogni diversi | Ugo | §16.4 |
+| D-10 | 16/10/2026 | Paginazione delle tabelle con ordinamento, filtri e totali su **tutto** l'elenco | ordinare solo la pagina darebbe risultati sbagliati (il "più alto" non sarebbe il più alto) | Ugo | §16.4 |
+| D-11 | 16 e 18/10/2026 | Incassi: Decobrands non incassa; sul fatturato storno e riaccredito, sul maturato riconoscimento nel mese del pagamento; **storno alla liquidazione successiva**: mese dopo per Decobrands, trimestre dopo per il subagente come voce negativa | è come lavorano i fornitori; il subagente non restituisce soldi già pagati ma si vede la voce negativa nel prospetto successivo | Decobrands (Matteo Caironi) | §5.5, §5.14, §7.8 |
+| D-12 | 18/10/2026 | Pratica a schede: *Riepilogo* (provvigione, incasso, documenti) e *Righe a confronto* con il contatore delle variazioni nel titolo; tolto il percorso "Pratiche › …" nelle pagine di dettaglio | in questa fase le righe contano solo quando qualcosa non torna; il percorso ripeteva il *Torna a …* | Ugo | §7.3, §16.4 |
+| D-13 | 18/10/2026 | Ogni decisione si registra con il suo perché (questa tabella) | chi sviluppa deve sapere cosa non "semplificare"; più facile far funzionare il codice come previsto | Ugo | §16.5 |
