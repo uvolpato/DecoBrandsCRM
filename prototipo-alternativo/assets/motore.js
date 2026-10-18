@@ -287,6 +287,28 @@
     M.annota('Sollecito di pagamento a ' + M.nomeCliente(righe[0].cliente) + ' (' + righe.map(x => x.doc.numero).join(', ') + ')');
   };
 
+  /* ---------- Analisi del trimestre (sintesi delle Liquidazioni, §7.8) ----------
+     Sugli stessi documenti della liquidazione (righeLiquidazione, compresi quelli in attesa e le
+     voci di storno/riaccredito): fatturato = imponibile; provvigioni dai fornitori = imponibile ×
+     % che il fornitore riconosce a Decobrands (agente + subagente); ai subagenti = provvigione
+     liquidata; margine = differenza. Sono importi di competenza, non incassati. */
+  M.analisiTrimestre = function (a, t) {
+    const righe = M.righeLiquidazione(a, t);
+    const per = (chiave, nome) => { const m = {}; righe.forEach(r => { const k = chiave(r); (m[k] = m[k] || { chiave: k, nome: nome(r), fatturato: 0, prese: 0, pagate: 0, clienti: new Set(), documenti: 0 }); }); return m; };
+    const tot = { fatturato: 0, prese: 0, pagate: 0 };
+    const fornitori = per(r => r.fornitore.id, r => r.fornitore.breve), subagenti = per(r => r.subagente_id, r => M.subagente(r.subagente_id).nome);
+    righe.forEach(r => {
+      const perc = M.percentuali(r.pratica, r.doc.origine || r.doc.data);
+      const prese = perc ? M.r2(r.importo * perc.dal_fornitore / 100) : 0;
+      [tot, fornitori[r.fornitore.id], subagenti[r.subagente_id]].forEach(x => { x.fatturato += r.importo; x.prese += prese; x.pagate += r.provvigione; });
+      [fornitori[r.fornitore.id], subagenti[r.subagente_id]].forEach(x => { x.clienti.add(r.cliente); if (!r.voce) x.documenti++; });
+    });
+    const fin = x => Object.assign(x, { fatturato: M.r2(x.fatturato), prese: M.r2(x.prese), pagate: M.r2(x.pagate), margine: M.r2(x.prese - x.pagate), clienti: x.clienti ? x.clienti.size : undefined });
+    return { a: a, t: t, documenti: righe.filter(r => !r.voce).length, totale: fin(tot),
+      fornitori: Object.values(fornitori).map(fin).sort((x, y) => y.fatturato - x.fatturato),
+      subagenti: Object.values(subagenti).map(fin).sort((x, y) => y.fatturato - x.fatturato) };
+  };
+
   /* ---------- Liquidazioni ai subagenti (trimestri fissi) ---------- */
   M.trimestre = iso => Math.floor((Number(iso.slice(5, 7)) - 1) / 3) + 1;
   M.limiti = (a, t) => ({ da: a + '-' + String((t - 1) * 3 + 1).padStart(2, '0') + '-01', a: M.fineMese(a, t * 3) });

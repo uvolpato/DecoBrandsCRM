@@ -782,3 +782,9 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .barra-periodo .filtri { margin-left: auto; }
 .pm-mesi.in-anteprima button.dentro:not(.anteprima), .pm-mesi.in-anteprima button.estremo:not(.anteprima) { background: none; color: var(--testo); font-weight: 400; }
 .pm-mesi.in-anteprima button.anteprima { background: var(--primario-tenue); color: var(--primario); }
+
+/* Liquidazioni: sintesi */
+.griglia-bi { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+.griglia-bi .pannello.largo { grid-column: 1 / -1; }
+.grafico { position: relative; width: 100%; }
+@media (max-width: 992px) { .griglia-bi { grid-template-columns: 1fr; } }

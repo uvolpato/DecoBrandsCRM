@@ -167,12 +167,15 @@
       sintesi: 'Le provvigioni ai subagenti per trimestre: cosa è liquidabile, cosa è ancora in attesa dei bollettini, il prospetto da inviare.',
       flusso: [
         ['Scegli il trimestre', 'Quattro riquadri fissi: liquidato, in corso, da liquidare, non iniziato.'],
-        ['Controlla', 'A sinistra i subagenti (clic = filtro; in rosso quanti storni hanno), a destra i documenti con stato liquidabile o in attesa, più le voci di storno e riaccredito.'],
+        ['Guarda la Sintesi', 'Fatturato, provvigioni dai fornitori e ai subagenti, margine, con il confronto sul trimestre precedente; andamento dell’anno, fatturato per fornitore, provvigioni per subagente.'],
+        ['Controlla il dettaglio', 'Scheda Subagenti e documenti: a sinistra i subagenti (clic = filtro; in rosso quanti storni hanno), a destra i documenti con stato liquidabile o in attesa, più le voci di storno e riaccredito.'],
         ['Esporta', 'Il prospetto per subagente in Excel, PDF o CSV.'],
         ['Chiudi il trimestre', 'A trimestre finito e senza documenti in attesa: gli importi si fissano.']
       ],
       pulsanti: [
         ['Riquadri dei trimestri', 'Cambiano trimestre.'],
+        ['Sintesi · Subagenti e documenti', 'Le due schede: prima i numeri e i grafici, poi il dettaglio documento per documento.'],
+        ['Grafici', 'Passando col mouse su una barra o una fetta si legge l’importo; clic su una voce della legenda la nasconde o la mostra.'],
         ['Riga del subagente', 'Filtra i documenti su quel subagente; secondo clic per tutti.'],
         ['vai ai bollettini', 'Se ci sono documenti in attesa: porta ai bollettini da verificare.'],
         ['Esporta in Excel', 'Apre la finestra di esportazione.'],
@@ -185,7 +188,7 @@
           azioni: [['Scarica', 'Genera il file; l’esportazione resta nel registro.']] },
         { nome: 'Chiudere la liquidazione', da: 'Chiudi il trimestre', cosa: 'Conferma della chiusura.', azioni: [['Chiudi il trimestre', 'Gli importi non cambiano più.']] }
       ],
-      sapere: ['Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga: al subagente lo storno arriva nella liquidazione successiva come <b>voce negativa</b> (il riaccredito come voce positiva).', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
+      sapere: ['La Sintesi mostra importi di competenza (compresi i documenti in attesa e gli storni), non quelli incassati. Margine = provvigioni dai fornitori − provvigioni ai subagenti.', 'Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga: al subagente lo storno arriva nella liquidazione successiva come <b>voce negativa</b> (il riaccredito come voce positiva).', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
 
     { id: 'incassi', titolo: 'Incassi dei clienti', gruppo: 'Lavoro', vai: '#/', schema: 'incassi',
       sintesi: 'Decobrands non incassa: incassa il fornitore. Se il cliente non paga, il fornitore sollecita Decobrands e Decobrands sollecita il cliente. Il CRM segue per ogni fattura se è stata pagata e aiuta a sollecitare.',

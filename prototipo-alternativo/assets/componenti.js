@@ -529,6 +529,50 @@
     return { el: box, valori: () => Object.assign({}, cur) };
   };
 
+  /* =========================================================
+     Grafico: involucro di Chart.js (MIT, assets/lib/chart.umd.min.js) con lo stile del CRM:
+     carattere e colori dell'app, importi in euro all'italiana, legenda in basso, niente
+     animazioni vistose. D-17 §19.
+     opz: { tipo: 'bar'|'line'|'doughnut', etichette: [..], serie: [{ nome, valori, colore, tipo, asse }],
+            orizzontale, impilato, altezza (px), euro (true: valori in euro), titolo (aria) }
+     → { el, grafico }
+     ========================================================= */
+  CRM.COLORI_GRAFICI = { primario: '#0d6efd', primarioTenue: '#9ec5fe', neutro: '#adb5bd', ok: '#198754', attesa: '#ffc107', errore: '#dc3545', testo: '#495057', griglia: '#e9ecef' };
+  CRM.Grafico = function (host, opz) {
+    const box = el('div', 'grafico');
+    box.style.height = (opz.altezza || 240) + 'px';
+    box.innerHTML = '<canvas role="img" aria-label="' + esc(opz.titolo || 'Grafico') + '"></canvas>';
+    ospite(host).appendChild(box);
+    if (!window.Chart) { box.innerHTML = '<p class="nota">Grafico non disponibile.</p>'; return { el: box, grafico: null }; }
+    const C = CRM.COLORI_GRAFICI, euro = opz.euro !== false;
+    const fmt = v => euro ? M.euro(v).replace(',00', '') : M.num(v);
+    const fmtAsse = v => euro ? (Math.abs(v) >= 1000 ? M.num(Math.round(v / 100) / 10) + ' k€' : M.num(v) + ' €') : M.num(v);
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.color = C.testo;
+    const tondo = opz.tipo === 'doughnut';
+    const g = new Chart($('canvas', box), {
+      type: opz.tipo || 'bar',
+      data: { labels: opz.etichette, datasets: opz.serie.map(s => ({
+        label: s.nome, data: s.valori, type: s.tipo, yAxisID: s.asse,
+        backgroundColor: s.colore || C.primario, borderColor: s.tipo === 'line' ? (s.colore || C.ok) : (tondo ? '#fff' : 'transparent'),
+        borderWidth: s.tipo === 'line' ? 2.5 : (tondo ? 2 : 0), borderRadius: tondo ? 0 : 4, pointRadius: s.tipo === 'line' ? 4 : 0,
+        maxBarThickness: 34, order: s.tipo === 'line' ? 0 : 1 })) },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+        indexAxis: opz.orizzontale ? 'y' : 'x',
+        plugins: {
+          legend: { display: opz.serie.length > 1 || tondo, position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2, padding: 14, sort: (x, y) => x.datasetIndex - y.datasetIndex } },
+          tooltip: { callbacks: { label: c => ' ' + (c.dataset.label ? c.dataset.label + ': ' : '') + fmt(tondo ? c.parsed : (opz.orizzontale ? c.parsed.x : c.parsed.y)) } }
+        },
+        scales: tondo ? {} : {
+          x: { stacked: !!opz.impilato, grid: { display: !!opz.orizzontale, color: C.griglia }, ticks: opz.orizzontale ? { callback: fmtAsse } : {} },
+          y: { stacked: !!opz.impilato, grid: { display: !opz.orizzontale, color: C.griglia }, ticks: opz.orizzontale ? {} : { callback: fmtAsse }, beginAtZero: true }
+        }
+      }
+    });
+    return { el: box, grafico: g };
+  };
+
   /* ---------- Nota (testo informativo) ---------- */
   CRM.Nota = function (host, html) { const n = el('p', 'nota', html); ospite(host).appendChild(n); return n; };
 
