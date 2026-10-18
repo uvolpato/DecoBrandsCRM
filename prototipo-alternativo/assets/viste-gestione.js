@@ -314,6 +314,11 @@
        ['Ogni mese', 'Bollettini', 'il fornitore riconosce, noi verifichiamo', 'bollettini', '#/bollettini'], ['Ogni trimestre', 'Liquidazioni', 'si paga ai subagenti', 'liquidazioni', '#/liquidazioni']]
         .map((x, i) => (i ? '<span class="freccia" aria-hidden="true"></span>' : '') + '<a class="nodo" href="' + x[4] + '"><span class="cadenza">' + x[0] + '</span>' + CRM.icona(x[3]) + '<b>' + x[1] + '</b><span>' + x[2] + '</span></a>').join('') +
       '</div><p class="guida-sotto-schema">' + CRM.icona('oggi') + '<span><b>Oggi</b> raccoglie da tutte e quattro le fasi quello che chiede un’azione.</span></p>',
+    incassi: () => '<div class="guida-schema incassi" role="img" aria-label="Incassi sul fatturato e sul maturato">' +
+      [['Sul fatturato', [['ok', 'Fattura', 'provvigione nel bollettino del mese'], ['errore', 'Storno', '1–2 mesi dopo se il cliente non paga'], ['ok', 'Riaccredito', 'nel mese in cui il cliente paga']]],
+       ['Sul maturato', [['neutro', 'Fattura', 'nessuna provvigione finché il cliente non paga'], ['attesa', 'Da verificare', 'oltre i giorni d’incasso'], ['ok', 'Riconosciuta', 'nel mese in cui il cliente paga']]]]
+        .map(c => '<div class="corsia"><b>' + c[0] + '</b><div class="passi">' + c[1].map((x, i) => (i ? '<span class="freccia" aria-hidden="true"></span>' : '') + '<div class="stato-nodo">' + CRM.stato(x[0], x[1]) + '<span>' + x[2] + '</span></div>').join('') + '</div></div>').join('') +
+      '</div><p class="guida-sotto-schema">' + CRM.icona('liquidazioni') + '<span>Al subagente lo storno arriva nella <b>liquidazione del trimestre successivo</b> come voce negativa.</span></p>',
     stati: () => '<div class="guida-schema stati" role="img" aria-label="Stati della pratica">' +
       '<div class="stato-nodo">' + CRM.stato('info', 'Attesa conferma') + '<span>arriva l’ordine</span><div class="ramo">' + CRM.stato('errore', 'Conferma in ritardo') + '<span>passati i giorni di attesa del fornitore</span></div></div>' +
       '<span class="freccia" aria-hidden="true"></span><div class="stato-nodo">' + CRM.stato('primario', 'Confermata') + '<span>arriva la conferma</span></div>' +

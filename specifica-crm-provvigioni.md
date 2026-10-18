@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 3.8 — storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 3.9 — incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -839,6 +839,12 @@ telefono (*Segna come non pagata*, con data e nota).
   fatture non pagate (numero, data, fornitore, importo, giorni di ritardo), come per i
   solleciti di conferma (§7.1). Copiando il testo si registra il sollecito
   (`sollecitata_il`, `solleciti`) e l'evento (§15).
+- Finestra **Solleciti di pagamento** (da Oggi, dal bollettino con *Prepara il sollecito al
+  cliente*, dalla pratica con *Sollecita il cliente*): in alto una scheda per cliente con il
+  numero di fatture (✓ quando il testo è stato copiato), sotto il destinatario e il testo
+  modificabile (fatture con numero, data, fornitore, importo e giorni, totale, invito a
+  pagare o a segnalare contestazioni). *Copia il testo* copia, registra il sollecito e
+  passa al cliente successivo; *Chiudi* esce.
 - Nella **pratica** la fattura mostra lo stato d'incasso; nel **cliente** (§7.6) la scheda
   Pratiche ha il filtro *Non pagate*.
 
@@ -1154,7 +1160,8 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
 - **Riquadri in testa** (KpiRow) che fanno da **filtro**: *Conferme in ritardo* (con la
   più vecchia e il numero di fornitori da sollecitare), *Documenti in coda* (quanti
   chiedono una decisione e quanti sono pronti), *Bollettini* (da verificare o chiudere,
-  da sollecitare). Clic = mostra solo quel gruppo; secondo clic = tutti.
+  da sollecitare), *Pagamenti dei clienti* (fatture da sollecitare, quanti clienti, giorni
+  della più vecchia; §5.14). Clic = mostra solo quel gruppo; secondo clic = tutti.
 - **"Da fare" in gruppi richiudibili** (componente GruppiDaFare, §16.4); aperti o chiusi
   restano come l'utente li lascia; la lista scorre nel suo riquadro, le intestazioni dei
   gruppi restano visibili:
@@ -1209,6 +1216,16 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
     evidenziato e righe di articoli aggiunti/tolti; in coda le **note di credito** e lo
     **scostamento complessivo** della pratica (§5.8).
 - Cambio stato guidato con accesso alla fase successiva.
+- Riquadro **Incasso del cliente** (§5.14, solo se la pratica ha fatture), con la nota *sul
+  fatturato* o *sul maturato*: per ogni fattura lo stato d'incasso (*Pagata* verde ·
+  *Non pagata* rosso · *Incasso da verificare* giallo · *In attesa di incasso* /
+  *Nessuna segnalazione* grigio), da dove viene (bollettino di …, segnalata dal fornitore)
+  e i solleciti già fatti (quante volte, ultima data). Pulsanti:
+  - fattura non pagata o da verificare: *Sollecita il cliente* (finestra *Solleciti di
+    pagamento* su quella fattura) e *Segna come pagata*;
+  - altrimenti: *Segna come non pagata*, che apre la finestra **Fattura … non pagata**
+    con una nota (es. "email di Gasper del …") e porta la fattura fra i pagamenti da
+    sollecitare.
 - **Consultazione dei documenti affiancata al confronto** (componente FinestraAffiancata,
   stesso schema di "Correggi i dati letti", §6.5, ma in sola lettura):
   - si apre con clic su un documento dell'elenco, con *Consulta affiancati* o con clic su
@@ -1231,7 +1248,10 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
 - Elenco con n° scaglioni e ordini aperti.
 - Anagrafica (ragione sociale, P.IVA, codice Integra) **da Integra in sola lettura**;
   nel CRM si modificano solo le condizioni: giorni attesa conferma, **giorno entro cui
-  arriva il bollettino** (§5.6), `payment_type` (maturato/fatturato), note, attivo.
+  arriva il bollettino** (§5.6), `payment_type` (maturato/fatturato), **giorni per
+  l'incasso dal cliente** (`giorni_incasso`, iniziale 60, §5.14), note, attivo. Nei dati
+  del fornitore la riga *Pagamento provvigioni* spiega la regola (sul maturato:
+  riconosciute nel mese in cui il cliente paga, incasso da verificare dopo N giorni).
 - Sotto i dati del fornitore due **schede**: **Percentuali** (in vigore da una data, con
   *Nuove percentuali da una data* e le versioni) e **Clienti seguiti** in sola lettura
   (vista inversa delle agenzie, §7.6); ogni scheda ha la sua tabella che riempie lo spazio.
@@ -1262,7 +1282,8 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
     sconti proposti seguono gli scaglioni del fornitore scelto. Vincoli: un solo
     subagente per cliente × fornitore (§5.10), codice unico per fornitore.
   - **Pratiche** (meno usata, con filtro): segmenti *Aperte · In ritardo · Fatturate ·
-    Tutte* (iniziale *Aperte*), fornitore, ricerca per numero; colonne pratica,
+    Non pagate · Tutte* (iniziale *Aperte*; *Non pagate* = pratiche con una fattura non
+    pagata o da verificare, §5.14), fornitore, ricerca per numero; colonne pratica,
     fornitore, data, importo, stato; clic apre la pratica; nel piede le provvigioni ai
     subagenti del trimestre.
 - **Vista inversa** nel dettaglio fornitore (§7.4): "Clienti seguiti per <fornitore>", in
@@ -1576,13 +1597,16 @@ Ogni salvataggio scrive un evento con i campi cambiati (mai le password).
 - **Ogni argomento** ha la stessa struttura, sintetica ma completa:
   1. **sintesi** (a cosa serve, in due righe);
   2. **schema** dove aiuta (es. stati della pratica con i rami *Conferma in ritardo* e
-     *Nota di credito*);
+     *Nota di credito*; incassi sul fatturato e sul maturato con lo storno al subagente);
   3. **Come si lavora**: i passi in ordine, numerati;
   4. **Pulsanti e comandi**: ogni pulsante della pagina con cosa fa;
   5. **Finestre**: ogni finestra che la pagina apre, con *si apre da*, cosa contiene
      (campi) e i suoi pulsanti;
   6. **Da sapere**: regole e avvertenze;
   7. **chi può modificare** (dai ruoli, §8.3).
+- Argomento trasversale **Incassi dei clienti** (§5.14): chi incassa, fatturato e maturato
+  a confronto, dove compaiono le fatture non pagate (Oggi, bollettino, pratica, cliente), la
+  finestra *Solleciti di pagamento* e la regola dello storno alla liquidazione successiva.
 - **Aiuto contestuale**: ogni pagina con un argomento ha in testata il pulsante *Guida*
   che apre l'argomento giusto. Gli argomenti di gestione si vedono solo con il permesso.
 - I contenuti stanno in un solo file di dati (`CRM.GUIDA`, prototipo `assets/guida.js`):

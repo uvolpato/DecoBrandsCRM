@@ -51,7 +51,7 @@
     { id: 'oggi', titolo: 'Oggi', gruppo: 'Lavoro', vai: '#/',
       sintesi: 'Cosa c’è da fare adesso, diviso per tipo di lavoro, più le scadenze dei prossimi giorni e l’andamento del trimestre.',
       flusso: [
-        ['Guarda i riquadri', 'Conferme in ritardo, documenti in coda, bollettini: quanti sono e quanto sono vecchi.'],
+        ['Guarda i riquadri', 'Conferme in ritardo, documenti in coda, bollettini, pagamenti dei clienti: quanti sono e quanto sono vecchi.'],
         ['Lavora per gruppo', 'Nella lista Da fare ogni gruppo si apre e chiude; le voci sono in ordine di urgenza.'],
         ['Agisci sulla voce', 'Il pulsante a destra porta dove si risolve: pratica, documento, bollettino.']
       ],
@@ -65,8 +65,9 @@
         ['Apri liquidazione', 'Riquadro del trimestre: va alla liquidazione del trimestre in corso.']
       ],
       finestre: [
-        { nome: 'Solleciti di conferma', da: 'Prepara i solleciti', cosa: 'Un testo pronto per ogni fornitore, in schede, con l’elenco delle pratiche in ritardo.',
-          azioni: [['Copia il testo', 'Copia negli appunti e passa al fornitore successivo; il sollecito resta nel registro.'], ['Chiudi', 'Esce senza registrare altro.']] }
+        { nome: 'Solleciti di conferma', da: 'Prepara i solleciti (conferme)', cosa: 'Un testo pronto per ogni fornitore, in schede, con l’elenco delle pratiche in ritardo.',
+          azioni: [['Copia il testo', 'Copia negli appunti e passa al fornitore successivo; il sollecito resta nel registro.'], ['Chiudi', 'Esce senza registrare altro.']] },
+        { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }
       ],
       sapere: ['<b>Pagamenti da sollecitare</b>: fatture che il cliente non ha pagato (stornate dal fornitore o segnalate) e, sul maturato, fatture non ancora riconosciute oltre i giorni d’incasso del fornitore.', 'Una conferma è in ritardo dopo i giorni di attesa fissati nelle condizioni del fornitore.', 'Il bollettino si sollecita solo dopo il giorno in cui il fornitore lo manda di solito.'] },
 
@@ -115,16 +116,18 @@
       finestre: [
         { nome: 'Documenti della pratica', da: 'Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento.',
           campi: [['Confrontato con', 'Sceglie il documento di confronto.'], ['Solo righe che cambiano · Tutte', 'Filtra il confronto.']],
-          azioni: [['Clic su una riga', 'La evidenzia nel documento a sinistra.'], ['Esc', 'Chiude.']] }
+          azioni: [['Clic su una riga', 'La evidenzia nel documento a sinistra.'], ['Esc', 'Chiude.']] },
+        { nome: 'Fattura non pagata', da: 'Segna come non pagata', cosa: 'Registra la segnalazione del fornitore che il cliente non ha pagato.', campi: [['Nota', 'Facoltativa, es. “email di Gasper del 12/09”.']], azioni: [['Segna come non pagata', 'La fattura va fra i pagamenti da sollecitare in Oggi.']] },
+        { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }
       ],
-      sapere: ['Nella scheda: binario ordine → conferma → fattura → nota di credito, righe a confronto con la differenza, provvigione prevista e documenti.'] },
+      sapere: ['Nella scheda: binario ordine → conferma → fattura → nota di credito, righe a confronto con la differenza, provvigione prevista, documenti e incasso del cliente.', 'Stati d’incasso: <b>Pagata</b> · <b>Non pagata</b> (stornata o segnalata) · <b>Incasso da verificare</b> (maturato, oltre i giorni d’incasso) · <b>In attesa di incasso</b> · <b>Nessuna segnalazione</b>. Vedi <a href="#/guida/incassi">Incassi dei clienti</a>.'] },
 
     { id: 'bollettini', titolo: 'Bollettini', gruppo: 'Lavoro', vai: '#/bollettini',
       sintesi: 'Ogni mese ogni fornitore comunica le provvigioni che riconosce. Il CRM le confronta con il proprio calcolo e mostra cosa quadra e cosa no.',
       flusso: [
         ['Arriva', 'Dal fornitore entro il giorno fissato nelle sue condizioni; si carica da Documenti o da qui.'],
         ['Si confronta', 'A cerniera: a sinistra il fornitore, a destra il nostro calcolo, al centro la differenza.'],
-        ['Decidi le righe', 'Ogni riga che non quadra si accetta o si contesta; se manca un documento si attende il prossimo.'],
+        ['Decidi le righe', 'Ogni riga che non quadra si accetta o si contesta; se manca un documento si attende il prossimo. Storni, riaccrediti e fatture non ancora pagate stanno nel gruppo Incassi dei clienti e non vanno decisi.'],
         ['Chiudi', 'Verificato o contestato. Per chi paga sul maturato si sbloccano le provvigioni dei subagenti.']
       ],
       pulsanti: [
@@ -141,14 +144,16 @@
       ],
       finestre: [
         { nome: 'Accetta · Contesta · Attendi', da: 'pulsanti sulla riga', cosa: 'Registra la decisione sulla riga.', campi: [['Motivo', 'Obbligatorio per contestare.']], azioni: [['Conferma · Contesta', 'Salva la decisione; la riga passa fra le decise.']] },
-        { nome: 'Sollecito · Contestazione', da: 'Sollecita · Prepara la contestazione', cosa: 'Testo pronto da inviare al fornitore.', azioni: [['Copia il testo', 'Copia negli appunti e lo annota nel registro.']] }
-      ] },
+        { nome: 'Sollecito · Contestazione', da: 'Sollecita · Prepara la contestazione', cosa: 'Testo pronto da inviare al fornitore.', azioni: [['Copia il testo', 'Copia negli appunti e lo annota nel registro.']] },
+        { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }
+      ],
+      sapere: ['Gruppo <b>Incassi dei clienti</b> in fondo al bollettino. Sul fatturato: <i>storno</i> (il cliente non ha pagato: fattura Non pagata) e <i>riaccredito</i> (ha pagato). Sul maturato: fatture del mese non ancora pagate, con i giorni dalla fattura (gialli oltre i giorni d’incasso), e fatture di mesi precedenti riconosciute ora che il cliente ha pagato.'] },
 
     { id: 'liquidazioni', titolo: 'Liquidazioni', gruppo: 'Lavoro', vai: '#/liquidazioni',
       sintesi: 'Le provvigioni ai subagenti per trimestre: cosa è liquidabile, cosa è ancora in attesa dei bollettini, il prospetto da inviare.',
       flusso: [
         ['Scegli il trimestre', 'Quattro riquadri fissi: liquidato, in corso, da liquidare, non iniziato.'],
-        ['Controlla', 'A sinistra i subagenti (clic = filtro), a destra i documenti con stato liquidabile o in attesa.'],
+        ['Controlla', 'A sinistra i subagenti (clic = filtro; in rosso quanti storni hanno), a destra i documenti con stato liquidabile o in attesa, più le voci di storno e riaccredito.'],
         ['Esporta', 'Il prospetto per subagente in Excel, PDF o CSV.'],
         ['Chiudi il trimestre', 'A trimestre finito e senza documenti in attesa: gli importi si fissano.']
       ],
@@ -157,7 +162,8 @@
         ['Riga del subagente', 'Filtra i documenti su quel subagente; secondo clic per tutti.'],
         ['vai ai bollettini', 'Se ci sono documenti in attesa: porta ai bollettini da verificare.'],
         ['Esporta in Excel', 'Apre la finestra di esportazione.'],
-        ['Chiudi il trimestre', 'Fissa gli importi; chiede conferma.']
+        ['Chiudi il trimestre', 'Fissa gli importi; chiede conferma.'],
+        ['Voce Storno · Riaccredito', 'Fra i documenti: provvigione negativa o positiva su una fattura di un trimestre precedente; nell’esportazione compare come “Storno F-…”.']
       ],
       finestre: [
         { nome: 'Esporta la liquidazione', da: 'Esporta in Excel', cosa: 'Scegli cosa e in che formato.',
@@ -167,18 +173,40 @@
       ],
       sapere: ['Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga: al subagente lo storno arriva nella liquidazione successiva come <b>voce negativa</b> (il riaccredito come voce positiva).', 'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.'] },
 
+    { id: 'incassi', titolo: 'Incassi dei clienti', gruppo: 'Lavoro', vai: '#/', schema: 'incassi',
+      sintesi: 'Decobrands non incassa: incassa il fornitore. Se il cliente non paga, il fornitore sollecita Decobrands e Decobrands sollecita il cliente. Il CRM segue per ogni fattura se è stata pagata e aiuta a sollecitare.',
+      flusso: [
+        ['Il fornitore segnala', 'Con uno storno nel bollettino (fatturato) o non riconoscendo la fattura (maturato); oppure per email o telefono: Segna come non pagata nella pratica.'],
+        ['Compare in Oggi', 'Gruppo Pagamenti da sollecitare: fatture non pagate e incassi da verificare, dal più vecchio.'],
+        ['Solleciti il cliente', 'Prepara i solleciti: un testo per cliente; copiandolo il sollecito resta registrato sulla fattura.'],
+        ['Il cliente paga', 'Riaccredito nel bollettino (fatturato) o riconoscimento nel mese del pagamento (maturato); oppure Segna come pagata.']
+      ],
+      pulsanti: [
+        ['Pagamenti dei clienti', 'Riquadro in Oggi: quante fatture, quanti clienti, la più vecchia.'],
+        ['Prepara i solleciti', 'Gruppo Pagamenti da sollecitare in Oggi.'],
+        ['Prepara il sollecito al cliente', 'Su una riga di storno nel bollettino.'],
+        ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Riquadro Incasso del cliente nella pratica.'],
+        ['Non pagate', 'Filtro nella scheda Pratiche del cliente.']
+      ],
+      finestre: [{ nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }],
+      sapere: [
+        '<b>Fatturato</b>: la provvigione arriva nel bollettino del mese della fattura; se il cliente non paga viene stornata 1–2 mesi dopo e riaccreditata quando paga.',
+        '<b>Maturato</b>: la provvigione arriva solo nel bollettino del mese in cui il cliente paga; se non arriva entro i giorni d’incasso del fornitore (iniziale 60) l’incasso è da verificare.',
+        '<b>Lo storno va alla liquidazione successiva</b>: per Decobrands nel bollettino del mese dopo, per il subagente nella liquidazione del trimestre dopo come voce negativa (anche se la provvigione era già stata liquidata). Il riaccredito allo stesso modo, come voce positiva.'
+      ] },
+
     /* ---------------- Anagrafiche ---------------- */
     { id: 'fornitori', titolo: 'Fornitori', gruppo: 'Anagrafiche', vai: '#/fornitori',
       sintesi: 'Anagrafica da Integra in sola lettura; nel CRM si gestiscono le condizioni e le percentuali di provvigione per sconto, con la data da cui valgono.',
       pulsanti: [
         ['Riga del fornitore', 'Apre la scheda a destra.'],
-        ['Modifica condizioni', 'Giorni di attesa della conferma, giorno del bollettino, pagamento sul maturato o sul fatturato.'],
+        ['Modifica condizioni', 'Giorni di attesa della conferma, giorno del bollettino, pagamento sul maturato o sul fatturato, giorni per l’incasso dal cliente.'],
         ['Schede Percentuali · Clienti seguiti', 'Percentuali in vigore e versioni; clienti seguiti per quel fornitore (si modificano dal cliente).'],
         ['Nuove percentuali da una data', 'Inserisce una nuova versione delle percentuali.']
       ],
       finestre: [
         { nome: 'Condizioni del fornitore', da: 'Modifica condizioni', cosa: 'Regole che fanno scattare solleciti e liquidazioni.',
-          campi: [['Giorni di attesa della conferma', 'Dopo, la pratica è in ritardo.'], ['Bollettino atteso entro il giorno', 'Del mese successivo (1–28); dopo, compare il sollecito.'], ['Pagamento provvigioni', 'Maturato o fatturato.']], azioni: [['Salva condizioni', 'Applica subito.']] },
+          campi: [['Giorni di attesa della conferma', 'Dopo, la pratica è in ritardo.'], ['Bollettino atteso entro il giorno', 'Del mese successivo (1–28); dopo, compare il sollecito.'], ['Pagamento provvigioni', 'Maturato o fatturato.'], ['Giorni per l’incasso dal cliente', 'Sul maturato: dopo questi giorni dalla fattura non ancora riconosciuta, l’incasso è da verificare (iniziale 60).']], azioni: [['Salva condizioni', 'Applica subito.']] },
         { nome: 'Nuove percentuali', da: 'Nuove percentuali da una data', cosa: 'Per ogni sconto: % a Decobrands e % al subagente.', campi: [['Valide dal', 'I documenti precedenti restano calcolati con le percentuali di allora.']], azioni: [['Salva', 'Crea la nuova versione.']] }
       ] },
     { id: 'subagenti', titolo: 'Subagenti', gruppo: 'Anagrafiche', vai: '#/subagenti',
@@ -191,7 +219,7 @@
         ['Segmenti', 'Tutti · Con agenzie · Senza agenzie · Diretta.'],
         ['Scheda Agenzie', 'Ricerca fra le agenzie; clic su una riga per modificarla; contatore giallo se manca un codice cliente.'],
         ['Aggiungi agenzia', 'Nuovo fornitore per questo cliente.'],
-        ['Scheda Pratiche', 'Pratiche del cliente con filtro: Aperte · In ritardo · Fatturate · Tutte, fornitore, numero.']
+        ['Scheda Pratiche', 'Pratiche del cliente con filtro: Aperte · In ritardo · Fatturate · Non pagate · Tutte, fornitore, numero.']
       ],
       finestre: [{ nome: 'Agenzia', da: 'Aggiungi agenzia · clic su una riga', cosa: 'Il cliente è fisso.',
         campi: [['Fornitore', 'Campo con ricerca.'], ['Codice cliente del fornitore', 'Come il fornitore chiama il cliente: serve ad abbinare i documenti in automatico.'], ['Seguito da', 'Subagente, campo con ricerca.'], ['Sconto al cliente', 'Gli sconti proposti seguono le percentuali del fornitore.']],
