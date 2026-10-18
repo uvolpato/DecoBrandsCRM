@@ -116,6 +116,10 @@ assets/stile.css              palette Decobrands e stile dei componenti
 assets/logo-decobrands.png    logo
 ```
 
+## Prove
+
+`python strumenti/prove/flusso.py` (dalla radice del repository; servono `playwright` con Chromium e `openpyxl`): percorre tutti i flussi e stampa una riga OK/KO per controllo; deve chiudere con 0 KO.
+
 ## Perché
 
 Ogni scelta del prototipo ha il suo motivo nel **registro delle decisioni** della specifica (§19). Prima di cambiare un comportamento che sembra strano, leggi lì perché è così.

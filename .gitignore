@@ -1,2 +1,5 @@
 .od-skills/
 *.artifact.json
+# file locali da non pubblicare
+image.png
+Claude outputs/
