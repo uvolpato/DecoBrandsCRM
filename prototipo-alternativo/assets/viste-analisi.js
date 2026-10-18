@@ -97,16 +97,12 @@
     // (stesso componente della ricerca articoli, D-20/D-21); il menu propone solo le voci con documenti
     // nel periodo e compatibili con gli altri filtri
     const presenti = d => raggruppa(filtra(base, d), DIM[d].campo, DIM[d].nome).map(x => x.chiave);
+    // barra dei filtri standard (D-22): campi di ricerca multipli + riepilogo con il periodo
     const fb = CRM.FilterBar(riga, { campi: ['f', 's', 'c'].map(d => ({ nome: d, tipo: 'ricerca', entita: ENT[d], multipla: true, etichetta: DIM[d].etichetta, valore: BI[d],
       placeholder: 'Tutti i ' + DIM[d].plurale, contesto: { limita: presenti(d), tutti: true } })),
+      riepilogo: { prima: [{ etichetta: 'Periodo', testo: etMese(per.da) + ' – ' + etMese(per.a) + ' (' + lung + ' mesi)' }] },
       onChange: v => { Object.assign(BI, { f: v.f, s: v.s, c: v.c }); vista(); } });
     fb.el.classList.add('filtri-entita');
-    const nomi = d => BI[d].map(k => { const x = fatti.find(r => String(r[DIM[d].campo]) === k); return { testo: x ? x[DIM[d].nome] : k, togli: () => { BI[d] = BI[d].filter(y => y !== k); vista(); } }; });
-    CRM.RiepilogoFiltri(riga, {
-      attivi: BI.f.length + BI.s.length + BI.c.length,
-      voci: [{ etichetta: 'Periodo', testo: etMese(per.da) + ' – ' + etMese(per.a) + ' (' + lung + ' mesi)' }].concat(['f', 's', 'c'].map(d => ({ etichetta: DIM[d].etichetta, valori: nomi(d) }))),
-      onAzzera: () => { BI.f = []; BI.s = []; BI.c = []; vista(); }
-    });
 
     /* ---------- Numeri ---------- */
     const conf = (v, p) => !conPrec ? { testo: 'nessun dato per il confronto' } : Math.abs(p) < 0.01 ? { testo: 'nessun importo ' + etPrec } :

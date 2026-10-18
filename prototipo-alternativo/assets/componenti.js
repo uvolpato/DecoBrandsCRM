@@ -498,16 +498,24 @@
      opz: { voci: [{ etichetta, testo } | { etichetta, valori: [{ testo, togli() }] }], attivi (n), onAzzera() }
      ========================================================= */
   CRM.RiepilogoFiltri = function (host, opz) {
-    const n = opz.attivi || 0;
     const box = el('div', 'riepilogo-filtri');
-    box.innerHTML = '<button type="button" class="btn-icona' + (n ? ' con-conta' : '') + '" data-riepilogo aria-haspopup="dialog" aria-expanded="false" title="Riepilogo dei filtri" aria-label="Riepilogo dei filtri' + (n ? ': ' + n + ' attivi' : '') + '">' + CRM.icona('filtro') + (n ? '<span class="btn-icona-conta">' + n + '</span>' : '') + '</button>' +
-      '<button type="button" class="btn-icona" data-azzera title="Togli tutti i filtri" aria-label="Togli tutti i filtri"' + (n ? '' : ' disabled') + '>' + CRM.icona('filtro-via') + '</button>' +
+    box.innerHTML = '<button type="button" class="btn-icona" data-riepilogo aria-haspopup="dialog" aria-expanded="false" title="Riepilogo dei filtri"></button>' +
+      '<button type="button" class="btn-icona" data-azzera title="Togli tutti i filtri" aria-label="Togli tutti i filtri">' + CRM.icona('filtro-via') + '</button>' +
       '<div class="riepilogo-pop" role="dialog" aria-label="Filtri attivi" hidden></div>';
-    const btn = $('[data-riepilogo]', box), pop = $('.riepilogo-pop', box);
-    pop.innerHTML = '<p class="riepilogo-titolo">Filtri attivi</p><dl>' + opz.voci.map((v, i) => '<dt>' + esc(v.etichetta) + '</dt><dd>' +
-      (v.valori ? (v.valori.length ? v.valori.map((x, j) => '<span class="scelta">' + esc(x.testo) + '<button type="button" class="scelta-togli" data-v="' + i + '" data-j="' + j + '" aria-label="Togli ' + esc(x.testo) + '" title="Togli">' + CRM.icona('chiudi') + '</button></span>').join('') : '<span class="testo-tenue">tutti</span>')
-        : esc(v.testo)) + '</dd>').join('') + '</dl>' +
-      (n ? '<button type="button" class="link-azzera" data-azzera-pop>Togli tutti i filtri</button>' : '<p class="testo-tenue">Nessun filtro su fornitori, subagenti e clienti.</p>');
+    const btn = $('[data-riepilogo]', box), pop = $('.riepilogo-pop', box), az = $('[data-azzera]', box);
+    let voci = [];
+    function disegna(o) {
+      voci = o.voci; const n = o.attivi || 0;
+      btn.className = 'btn-icona' + (n ? ' con-conta' : '');
+      btn.setAttribute('aria-label', 'Riepilogo dei filtri' + (n ? ': ' + n + ' attivi' : ''));
+      btn.innerHTML = CRM.icona('filtro') + (n ? '<span class="btn-icona-conta">' + n + '</span>' : '');
+      az.disabled = !n;
+      pop.innerHTML = '<p class="riepilogo-titolo">Filtri attivi</p><dl>' + voci.map((v, i) => '<dt>' + esc(v.etichetta) + '</dt><dd>' +
+        (v.valori ? (v.valori.length ? v.valori.map((x, j) => '<span class="filtro-voce">' + esc(x.testo) + (x.togli ? '<button type="button" class="filtro-voce-togli" data-v="' + i + '" data-j="' + j + '" aria-label="Togli ' + esc(x.testo) + '" title="Togli">' + CRM.icona('chiudi') + '</button>' : '') + '</span>').join('') : '<span class="testo-tenue">' + esc(v.vuoto || 'tutti') + '</span>')
+          : esc(v.testo)) + '</dd>').join('') + '</dl>' +
+        (n ? '<button type="button" class="link-azzera" data-azzera-pop>Togli tutti i filtri</button>' : '<p class="testo-tenue">Nessun filtro attivo.</p>');
+    }
+    disegna(opz);
     const fuori = ev => { if (!box.contains(ev.target)) chiudi(); };
     const tasto = ev => { if (ev.key === 'Escape') { chiudi(); btn.focus(); } };
     function chiudi() { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', fuori); document.removeEventListener('keydown', tasto); }
@@ -517,12 +525,12 @@
       setTimeout(() => document.addEventListener('click', fuori)); document.addEventListener('keydown', tasto);
     });
     pop.addEventListener('click', ev => {
-      const t = ev.target.closest('.scelta-togli'); if (t) { chiudi(); opz.voci[Number(t.dataset.v)].valori[Number(t.dataset.j)].togli(); return; }
+      const t = ev.target.closest('.filtro-voce-togli'); if (t) { chiudi(); voci[Number(t.dataset.v)].valori[Number(t.dataset.j)].togli(); return; }
       if (ev.target.closest('[data-azzera-pop]')) { chiudi(); opz.onAzzera(); }
     });
-    $('[data-azzera]', box).addEventListener('click', () => opz.onAzzera());
+    az.addEventListener('click', () => opz.onAzzera());
     ospite(host).appendChild(box);
-    return { el: box };
+    return { el: box, aggiorna: disegna };
   };
 
   /* Campo di ricerca già attivo, da usare fuori dai moduli (filtri delle pagine) */
@@ -889,55 +897,112 @@
   };
 
   /* =========================================================
-     FilterBar
-     opz: { campi: [{ nome, tipo: 'segmenti'|'cerca'|'select'|'ricerca', opzioni: [{ value, label, n }], valore, placeholder, etichetta (select e ricerca) }], onChange(valori) }
-     tipo 'ricerca': campo di ricerca su un'entità (entita, multipla, contesto); valore = chiave o, se multipla, elenco di chiavi
-     → { el, valori() }
+     FilterBar — barra dei filtri STANDARD (D-22 §19)
+     opz: { campi: [{ nome, tipo: 'segmenti'|'cerca'|'select'|'ricerca', opzioni: [{ value, label, n }], valore,
+                      placeholder, etichetta, predefinito (valore "senza filtro"; di norma la prima opzione, '' o []),
+                      nelRiepilogo (false: non compare nel riepilogo e non si azzera, es. la durata) }],
+            riepilogo (true | { prima: [{ etichetta, testo }] }: icone Riepilogo dei filtri e Togli tutti i filtri in fondo),
+            onChange(valori) }
+     tipo 'ricerca': campo di ricerca su un'entità (entita, multipla, contesto); valore = chiave o, se multipla, elenco
+       di chiavi. REGOLA: i filtri su fornitori, subagenti, clienti (e ogni altra entità) sono sempre campi 'ricerca'
+       con multipla: true, mai tendine; con due o più filtri la barra ha il riepilogo.
+     → { el, valori(), imposta(nome, valore) (aggiorna campo e riepilogo, emette onChange), azzera(),
+         conta(nome, { valore: n }) (aggiorna dal vivo i numeri dei segmenti) }
+     REGOLA dei conteggi (D-23): il numero di ogni segmento conta le righe con TUTTI gli altri filtri
+       applicati (fornitore, ricerca, …) tranne il segmento stesso, e si aggiorna a ogni cambio di filtro.
      ========================================================= */
   CRM.FilterBar = function (host, opz) {
     const bar = el('div', 'filtri');
-    const val = {};
+    const val = {}, slot = {};
     const rip = CRM.registra('filtri', () => Object.assign({}, val));
-    let cambiati = false;
-    opz.campi.forEach(c => {
+    let cambiati = false, riep = null;
+    const predef = c => c.predefinito != null ? (Array.isArray(c.predefinito) ? c.predefinito.map(String) : String(c.predefinito))
+      : c.tipo === 'ricerca' && c.multipla ? [] : c.tipo === 'segmenti' ? String(c.opzioni[0].value) : c.tipo === 'select' ? String(c.opzioni[0].value) : '';
+    const uguale = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+    const emetti = () => { if (riep) riep.aggiorna(vociRiepilogo()); opz.onChange(Object.assign({}, val)); };
+    function disegnaCampo(c) {
+      const h = slot[c.nome]; h.innerHTML = ''; h.className = 'filtro-slot';
       if (c.tipo === 'ricerca') {
-        val[c.nome] = c.multipla ? (c.valore || []).map(String) : (c.valore == null ? '' : String(c.valore));
-        if (rip && rip[c.nome] != null && JSON.stringify(rip[c.nome]) !== JSON.stringify(val[c.nome])) { val[c.nome] = rip[c.nome]; cambiati = true; }
-        const l = el('div', 'filtro-etichetta filtro-ricerca', c.etichetta ? '<span>' + esc(c.etichetta) + '</span>' : '');
-        CRM.CampoRicerca(l, { entita: c.entita, multipla: c.multipla, valori: c.multipla ? val[c.nome] : null, valore: c.multipla ? null : val[c.nome],
-          contesto: c.contesto, placeholder: c.placeholder, etichetta: c.etichetta, onChange: v => { val[c.nome] = v; opz.onChange(Object.assign({}, val)); } });
-        bar.appendChild(l);
-        return;
-      }
-      val[c.nome] = c.valore != null ? String(c.valore) : (c.tipo === 'segmenti' ? String(c.opzioni[0].value) : '');
-      if (rip && rip[c.nome] != null && rip[c.nome] !== val[c.nome] && (c.tipo === 'cerca' || c.opzioni.some(o => String(o.value) === rip[c.nome]))) { val[c.nome] = rip[c.nome]; cambiati = true; }
-      if (c.tipo === 'segmenti') {
+        h.className = 'filtro-slot filtro-etichetta filtro-ricerca';
+        if (c.etichetta) h.innerHTML = '<span>' + esc(c.etichetta) + '</span>';
+        CRM.CampoRicerca(h, { entita: c.entita, multipla: c.multipla, valori: c.multipla ? val[c.nome] : null, valore: c.multipla ? null : val[c.nome],
+          contesto: c.contesto, placeholder: c.placeholder, etichetta: c.etichetta, onChange: v => { val[c.nome] = v; emetti(); } });
+      } else if (c.tipo === 'segmenti') {
         const g = el('div', 'segmenti');
         g.setAttribute('role', 'tablist');
         g.innerHTML = c.opzioni.map(o => '<button type="button" role="tab" data-v="' + esc(o.value) + '" aria-selected="' + (String(o.value) === val[c.nome]) + '">' + esc(o.label) + (o.n != null ? '<span class="n">' + o.n + '</span>' : '') + '</button>').join('');
         $$('button', g).forEach(b => b.addEventListener('click', () => {
           $$('button', g).forEach(x => x.setAttribute('aria-selected', String(x === b)));
-          val[c.nome] = b.dataset.v; opz.onChange(Object.assign({}, val));
+          val[c.nome] = b.dataset.v; emetti();
         }));
-        bar.appendChild(g);
+        h.appendChild(g);
       } else if (c.tipo === 'cerca') {
         const l = el('label', 'cerca', CRM.icona('cerca') + '<input type="search" aria-label="Cerca" placeholder="' + esc(c.placeholder || 'Cerca') + '">');
         const i = $('input', l); i.value = val[c.nome];
-        i.addEventListener('input', () => { val[c.nome] = i.value; opz.onChange(Object.assign({}, val)); });
-        bar.appendChild(l);
+        i.addEventListener('input', () => { val[c.nome] = i.value; emetti(); });
+        h.appendChild(l);
       } else {
-        const s = el('select', 'filtro-select', c.opzioni.map(o => '<option value="' + esc(o.value) + '">' + esc(o.label) + '</option>').join(''));
-        s.value = val[c.nome];
-        s.setAttribute('aria-label', c.etichetta || c.nome);
-        s.addEventListener('change', () => { val[c.nome] = s.value; opz.onChange(Object.assign({}, val)); });
-        // etichetta facoltativa davanti alla tendina (es. "Da", "A", "Fornitore")
-        if (c.etichetta) { const l = el('label', 'filtro-etichetta', '<span>' + esc(c.etichetta) + '</span>'); l.appendChild(s); bar.appendChild(l); }
-        else bar.appendChild(s);
+        const sel = el('select', 'filtro-select', c.opzioni.map(o => '<option value="' + esc(o.value) + '">' + esc(o.label) + '</option>').join(''));
+        sel.value = val[c.nome];
+        sel.setAttribute('aria-label', c.etichetta || c.nome);
+        sel.addEventListener('change', () => { val[c.nome] = sel.value; emetti(); });
+        // etichetta facoltativa davanti alla tendina (es. "Da", "A")
+        if (c.etichetta) { const l = el('label', 'filtro-etichetta', '<span>' + esc(c.etichetta) + '</span>'); l.appendChild(sel); h.appendChild(l); }
+        else h.appendChild(sel);
       }
+    }
+    // riepilogo: una voce per campo; le voci tolte riportano il campo al valore "senza filtro"
+    const nomiEntita = (c, chiavi) => {
+      const ent = ENTITA[c.entita], tutte = ent.voci(Object.assign({}, c.contesto || {}, { limita: null, tutti: true }));
+      return chiavi.map(k => { const r = tutte.find(x => String(ent.chiave(x)) === String(k)); return r ? ent.testo(r) : String(k); });
+    };
+    function vociRiepilogo() {
+      const prima = (opz.riepilogo && opz.riepilogo.prima) || [];
+      let attivi = 0;
+      const voci = prima.slice();
+      opz.campi.filter(c => c.nelRiepilogo !== false).forEach(c => {
+        const v = val[c.nome], d = predef(c), attivo = !uguale(v, d);
+        const et = c.etichetta || (c.tipo === 'cerca' ? 'Ricerca' : c.tipo === 'segmenti' ? 'Vista' : c.nome);
+        if (c.tipo === 'ricerca' && c.multipla) {
+          attivi += v.length;
+          voci.push({ etichetta: et, valori: nomiEntita(c, v).map((t, j) => ({ testo: t, togli: () => imposta(c.nome, v.filter((x, k) => k !== j)) })) });
+          return;
+        }
+        if (attivo) attivi++;
+        const testo = c.tipo === 'ricerca' ? (v ? nomiEntita(c, [v])[0] : '') : c.tipo === 'cerca' ? (v ? '“' + v + '”' : '') : ((c.opzioni.find(o => String(o.value) === v) || {}).label || v);
+        voci.push({ etichetta: et, vuoto: c.tipo === 'cerca' ? 'nessuna' : 'tutti', valori: attivo && testo ? [{ testo: testo, togli: () => imposta(c.nome, d) }] : (c.tipo === 'segmenti' || c.tipo === 'select') ? [{ testo: testo }] : [] });
+      });
+      return { voci: voci, attivi: attivi };
+    }
+    function imposta(nome, v) {
+      const c = opz.campi.find(x => x.nome === nome);
+      val[nome] = Array.isArray(v) ? v.map(String) : String(v == null ? '' : v);
+      disegnaCampo(c); emetti();
+    }
+    function azzera() {
+      opz.campi.filter(c => c.nelRiepilogo !== false).forEach(c => { val[c.nome] = predef(c); disegnaCampo(c); });
+      emetti();
+    }
+    opz.campi.forEach(c => {
+      if (c.tipo === 'ricerca') {
+        val[c.nome] = c.multipla ? (c.valore || []).map(String) : (c.valore == null ? '' : String(c.valore));
+        if (rip && rip[c.nome] != null && !uguale(rip[c.nome], val[c.nome])) { val[c.nome] = rip[c.nome]; cambiati = true; }
+      } else {
+        val[c.nome] = c.valore != null ? String(c.valore) : predef(c);
+        if (rip && rip[c.nome] != null && rip[c.nome] !== val[c.nome] && (c.tipo === 'cerca' || c.opzioni.some(o => String(o.value) === rip[c.nome]))) { val[c.nome] = rip[c.nome]; cambiati = true; }
+      }
+      slot[c.nome] = el('div', 'filtro-slot'); bar.appendChild(slot[c.nome]);
+      disegnaCampo(c);
     });
+    if (opz.riepilogo) { bar.classList.add('con-riepilogo'); riep = CRM.RiepilogoFiltri(bar, Object.assign(vociRiepilogo(), { onAzzera: azzera })); }
     ospite(host).appendChild(bar);
-    if (cambiati) CRM.dopoDisegno(() => opz.onChange(Object.assign({}, val)));
-    return { el: bar, valori: () => Object.assign({}, val) };
+    if (cambiati) CRM.dopoDisegno(() => emetti());
+    function conta(nome, mappa) {
+      const c = opz.campi.find(x => x.nome === nome);
+      c.opzioni.forEach(o => { if (mappa[o.value] != null) o.n = mappa[o.value]; });
+      $$('[data-v]', slot[nome]).forEach(b => { const n = $('.n', b); if (n && mappa[b.dataset.v] != null) n.textContent = mappa[b.dataset.v]; });
+    }
+    return { el: bar, valori: () => Object.assign({}, val), imposta: imposta, azzera: azzera, conta: conta };
   };
 
   /* =========================================================

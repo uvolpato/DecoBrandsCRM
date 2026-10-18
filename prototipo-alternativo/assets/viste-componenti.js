@@ -50,8 +50,8 @@
     { nome: 'Grafico', gruppo: 'Dati', testo: 'Grafici con Chart.js (MIT) nello stile dell’app: barre, linea, ciambella; importi in euro all’italiana; legenda in basso. Clic su una barra o fetta come filtro (onClick, evidenzia); immagine() per Excel e PDF. Usato nel Report subagenti delle Liquidazioni e nell’Analisi.',
       firma: "CRM.Grafico(host, { tipo: 'bar'|'line'|'doughnut', etichette, serie: [{ nome, valori, colore, tipo }], orizzontale, impilato, altezza, euro, onClick(indice), evidenzia }) → { el, grafico, immagine() }",
       demo: h => { CRM.Grafico(h, { tipo: 'bar', altezza: 200, etichette: ['1° trim.', '2° trim.', '3° trim.'], serie: [{ nome: 'Dai fornitori', valori: [2100, 3200, 7780] }, { nome: 'Ai subagenti', valori: [700, 1050, 2390], colore: CRM.COLORI_GRAFICI.neutro }, { nome: 'Margine', valori: [1400, 2150, 5390], colore: CRM.COLORI_GRAFICI.ok, tipo: 'line' }] }); } },
-    { nome: 'FilterBar', gruppo: 'Dati', testo: 'Filtri sopra una tabella: segmenti con conteggio, ricerca, select. Chiama onChange con tutti i valori.',
-      firma: 'CRM.FilterBar(host, { campi: [{ nome, tipo: segmenti|cerca|select, opzioni: [{ value, label, n }], valore, placeholder }], onChange(valori) }) → { el, valori() }',
+    { nome: 'FilterBar', gruppo: 'Dati', testo: 'Barra dei filtri standard: segmenti con conteggio aggiornato dal vivo, ricerca, campi di ricerca multipli sulle anagrafiche (mai tendine), riepilogo e azzeramento a icona. Chiama onChange con tutti i valori.',
+      firma: "CRM.FilterBar(host, { campi: [{ nome, tipo: 'segmenti'|'cerca'|'select'|'ricerca', opzioni, valore, placeholder, etichetta, entita, multipla, contesto, predefinito, nelRiepilogo }], riepilogo: true | { prima: [{ etichetta, testo }] }, onChange(valori) })\n→ { el, valori(), imposta(nome, valore), azzera(), conta(nome, { valore: n }) }\nStandard (D-22): entità sempre 'ricerca' multipla; riepilogo con imbuto e imbuto barrato; numeri dei segmenti con gli altri filtri (D-23)",
       demo: h => {
         const t = CRM.DataTable(CRM.el('div'), { colonne: COLONNE, righe: RIGHE, naturale: true, compatta: true });
         let v = { stato: 'tutte', q: '' };

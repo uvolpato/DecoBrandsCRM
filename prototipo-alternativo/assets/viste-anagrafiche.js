@@ -204,7 +204,7 @@
   let filtroClienti = { vista: 'tutti', q: '' };
   const agenzie = piva => M.S.abbinamenti.filter(a => a.cliente_piva === piva);
   const praticheAperte = piva => M.S.pratiche.filter(p => p.cliente_piva === piva && M.statoPratica(p).chiave !== 'fatturata');
-  let schedaCliente = 'agenzie', filtroAgenzie = '', filtroPratiche = { vista: 'aperte', f: '', q: '' };
+  let schedaCliente = 'agenzie', filtroAgenzie = '', filtroPratiche = { vista: 'aperte', f: [], q: '' };
   function vistaClienti(pivaSel) {
     const corpo = CRM.Pagina({ voce: 'clienti', titolo: 'Clienti', pieno: true,
       sottotitolo: 'Anagrafica da Integra. Per ogni cliente: le agenzie (fornitori per cui Decobrands fa da agente), chi lo segue e con quale sconto.' });
@@ -272,12 +272,15 @@
         const nonPagata = p => p.documenti.some(d => { const st = M.statoIncasso(p, d); return st && (st.stato === 'insoluta' || st.stato === 'da_verificare'); });
         const ST = { aperte: p => M.statoPratica(p).chiave !== 'fatturata', ritardo: p => M.statoPratica(p).chiave === 'scaduta', fatturate: p => M.statoPratica(p).chiave === 'fatturata', nonpagate: nonPagata, tutte: () => true };
         const forn = pr.map(p => p.fornitore_id).filter((x, i, arr) => arr.indexOf(x) === i);
-        const filtra = () => { const q = (filtroPratiche.q || '').trim().toLowerCase(); return pr.filter(ST[filtroPratiche.vista]).filter(p => !filtroPratiche.f || String(p.fornitore_id) === filtroPratiche.f).filter(p => !q || p.numero.toLowerCase().indexOf(q) >= 0); };
-        CRM.FilterBar(h, { campi: [
-          { nome: 'vista', tipo: 'segmenti', valore: filtroPratiche.vista, opzioni: [{ value: 'aperte', label: 'Aperte', n: pr.filter(ST.aperte).length }, { value: 'ritardo', label: 'In ritardo', n: pr.filter(ST.ritardo).length }, { value: 'fatturate', label: 'Fatturate', n: pr.filter(ST.fatturate).length }, { value: 'nonpagate', label: 'Non pagate', n: pr.filter(ST.nonpagate).length }, { value: 'tutte', label: 'Tutte', n: pr.length }] },
-          { nome: 'f', tipo: 'select', valore: filtroPratiche.f, opzioni: [{ value: '', label: 'Tutti i fornitori' }].concat(forn.map(f => ({ value: String(f), label: M.fornitore(f).breve }))) },
-          { nome: 'q', tipo: 'cerca', valore: filtroPratiche.q, placeholder: 'Numero' }
-        ], onChange: v => { filtroPratiche = v; tab.aggiorna(filtra()); } });
+        // base = tutti i filtri tranne la vista: serve anche per i numeri dei segmenti, aggiornati dal vivo (D-23)
+        const base = () => { const q = (filtroPratiche.q || '').trim().toLowerCase(); return pr.filter(p => !filtroPratiche.f.length || filtroPratiche.f.indexOf(String(p.fornitore_id)) >= 0).filter(p => !q || p.numero.toLowerCase().indexOf(q) >= 0); };
+        const filtra = () => base().filter(ST[filtroPratiche.vista]);
+        const conteggi = () => { const b = base(), n = {}; Object.keys(ST).forEach(k => { n[k] = b.filter(ST[k]).length; }); return n; };
+        const fbp = CRM.FilterBar(h, { campi: [
+          { nome: 'vista', tipo: 'segmenti', etichetta: 'Stato', valore: filtroPratiche.vista, opzioni: [{ value: 'aperte', label: 'Aperte', n: pr.filter(ST.aperte).length }, { value: 'ritardo', label: 'In ritardo', n: pr.filter(ST.ritardo).length }, { value: 'fatturate', label: 'Fatturate', n: pr.filter(ST.fatturate).length }, { value: 'nonpagate', label: 'Non pagate', n: pr.filter(ST.nonpagate).length }, { value: 'tutte', label: 'Tutte', n: pr.length }] },
+          { nome: 'f', tipo: 'ricerca', entita: 'fornitore', multipla: true, etichetta: 'Fornitore', valore: filtroPratiche.f, placeholder: 'Tutti i fornitori', contesto: { limita: forn.map(String) } },
+          { nome: 'q', tipo: 'cerca', etichetta: 'Numero', valore: filtroPratiche.q, placeholder: 'Numero' }
+        ], riepilogo: true, onChange: v => { filtroPratiche = v; fbp.conta('vista', conteggi()); tab.aggiorna(filtra()); } });
         const tab = CRM.DataTable(CRM.blocco(h, 'riempi'), {
           compatta: true, righe: filtra(), ordinamentoIniziale: { key: 'data', dir: 'desc' },
           colonne: [

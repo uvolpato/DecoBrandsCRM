@@ -604,21 +604,27 @@
   CRM.rotta(/^\/documenti\/(\d+)$/, id => vistaDocumenti(id));
 
   /* ---------- Pratiche: FilterBar + DataTable ---------- */
-  let filtri = { stato: 'tutte', q: '' };
+  let filtri = { stato: 'tutte', q: '', f: [], s: [], c: [] };
   let apriRighe = false;   // pratica aperta dal filtro "Con variazioni": parte dalla scheda Righe
   CRM.rotta(/^\/pratiche$/, function () {
     const corpo = CRM.Pagina({ voce: 'pratiche', titolo: 'Pratiche', pieno: true, sottotitolo: 'Ogni ordine a fornitore con i suoi documenti. Lo stato avanza quando arrivano conferma e fattura.' });
     const tutte = M.S.pratiche;
+    const subDi = p => { const a = M.abbinamento(p.cliente_piva, p.fornitore_id); return a ? a.subagente_id : null; };
     const REGOLE = {
       tutte: () => true, scaduta: p => M.statoPratica(p).chiave === 'scaduta', attesa: p => M.statoPratica(p).chiave === 'attesa',
       confermata: p => M.statoPratica(p).chiave === 'confermata', fatturata: p => M.statoPratica(p).chiave === 'fatturata', variazioni: p => M.haVariazioni(p)
     };
     const ETICH = { tutte: 'Tutte', scaduta: 'Conferma in ritardo', attesa: 'Attesa conferma', confermata: 'Attesa fattura', fatturata: 'Fatturate', variazioni: 'Con variazioni' };
-    CRM.FilterBar(corpo, {
+    const fb = CRM.FilterBar(corpo, {
       campi: [
-        { nome: 'stato', tipo: 'segmenti', valore: filtri.stato, opzioni: Object.keys(REGOLE).map(k => ({ value: k, label: ETICH[k], n: tutte.filter(REGOLE[k]).length })) },
-        { nome: 'q', tipo: 'cerca', valore: filtri.q, placeholder: 'Cerca pratica, cliente, documento' }
+        { nome: 'stato', tipo: 'segmenti', etichetta: 'Stato', valore: filtri.stato, opzioni: Object.keys(REGOLE).map(k => ({ value: k, label: ETICH[k], n: tutte.filter(REGOLE[k]).length })) },
+        { nome: 'q', tipo: 'cerca', etichetta: 'Ricerca', valore: filtri.q, placeholder: 'Cerca pratica, cliente, documento' },
+        // filtri standard sulle entità (D-22): ricerca a selezione multipla, solo le voci presenti fra le pratiche
+        { nome: 'f', tipo: 'ricerca', entita: 'fornitore', multipla: true, etichetta: 'Fornitore', valore: filtri.f, placeholder: 'Tutti i fornitori', contesto: { limita: tutte.map(p => String(p.fornitore_id)) } },
+        { nome: 'c', tipo: 'ricerca', entita: 'cliente', multipla: true, etichetta: 'Cliente', valore: filtri.c, placeholder: 'Tutti i clienti', contesto: { limita: tutte.map(p => p.cliente_piva) } },
+        { nome: 's', tipo: 'ricerca', entita: 'subagente', multipla: true, etichetta: 'Subagente', valore: filtri.s, placeholder: 'Tutti i subagenti', contesto: { limita: tutte.map(subDi).filter(Boolean).map(String), tutti: true } }
       ],
+      riepilogo: true,
       onChange: v => { filtri = v; aggiorna(); }
     });
     const tab = CRM.DataTable(CRM.blocco(corpo, 'riempi'), {
@@ -639,7 +645,12 @@
     tab.el.addEventListener('click', ev => { if (ev.target.closest('a[href^="#/pratiche/"]')) apriRighe = filtri.stato === 'variazioni'; });
     function aggiorna() {
       const q = filtri.q.trim().toLowerCase();
-      tab.aggiorna(tutte.filter(REGOLE[filtri.stato]).filter(p => !q || [p.numero, M.nomeCliente(p.cliente_piva), M.fornitore(p.fornitore_id).nome].concat(p.documenti.map(d => d.numero)).some(x => x.toLowerCase().indexOf(q) >= 0)));
+      const in_ = (arr, v) => !arr.length || arr.indexOf(String(v)) >= 0;
+      // tutti i filtri tranne lo stato: base dei conteggi dei segmenti (D-23), poi lo stato
+      const base = tutte.filter(p => in_(filtri.f, p.fornitore_id) && in_(filtri.c, p.cliente_piva) && in_(filtri.s, subDi(p))).filter(p => !q || [p.numero, M.nomeCliente(p.cliente_piva), M.fornitore(p.fornitore_id).nome].concat(p.documenti.map(d => d.numero)).some(x => x.toLowerCase().indexOf(q) >= 0));
+      const n = {}; Object.keys(REGOLE).forEach(k => { n[k] = base.filter(REGOLE[k]).length; });
+      fb.conta('stato', n);
+      tab.aggiorna(base.filter(REGOLE[filtri.stato]));
     }
     aggiorna();
   });

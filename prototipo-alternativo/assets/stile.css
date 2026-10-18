@@ -819,19 +819,20 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .ricerca.multipla .ricerca-menu li[aria-selected="true"] b { color: var(--primario-testo); }
 .ricerca-scelta-barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; }
 /* etichetta di una voce (riepilogo dei filtri) */
-.scelta { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 2px 3px 2px 8px; border-radius: 999px;
+.filtro-voce { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 2px 3px 2px 8px; border-radius: 999px;
   background: var(--primario-tenue); color: var(--primario-testo); font-size: 12.5px; line-height: 1.4; }
-.scelta-togli { display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; padding: 0; }
-.scelta-togli:hover, .scelta-togli:focus-visible { background: #cfe2ff; outline: none; }
-.scelta-togli .icona { width: 12px; height: 12px; }
+.filtro-voce-togli { display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; padding: 0; }
+.filtro-voce-togli:hover, .filtro-voce-togli:focus-visible { background: #cfe2ff; outline: none; }
+.filtro-voce-togli .icona { width: 12px; height: 12px; }
 /* Analisi: periodo, durata, fornitori, subagenti, clienti e riepilogo su una riga */
 .barra-analisi { flex-wrap: wrap; }
 .barra-analisi .filtri { margin-left: 0; }
 .barra-analisi { gap: 10px; }
 .barra-analisi .filtri-entita { flex: 1 1 480px; flex-wrap: nowrap; min-width: 0; gap: 10px; }
-.filtro-ricerca { display: flex; align-items: center; gap: 6px; flex: 1 1 0; min-width: 0; font-size: 13px; color: var(--testo-tenue); }
+.filtro-slot { display: contents; }
+.filtro-ricerca { display: flex !important; align-items: center; gap: 6px; flex: 1 1 170px; max-width: 320px; min-width: 0; font-size: 13px; color: var(--testo-tenue); }
 .filtro-ricerca .campo-ricerca { flex: 1 1 auto; min-width: 130px; }
-.barra-analisi .filtro-ricerca > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }   /* il segnaposto "Tutti i …" fa da etichetta */
+.filtri .filtro-ricerca > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }   /* il segnaposto "Tutti i …" fa da etichetta */
 .riepilogo-filtri { position: relative; display: flex; gap: 6px; }
 .btn-icona { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; color: var(--testo-intest); cursor: pointer; padding: 0; }
 .btn-icona:hover:not(:disabled), .btn-icona:focus-visible, .btn-icona[aria-expanded="true"] { border-color: var(--primario); color: var(--primario); outline: none; }
@@ -849,3 +850,8 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .riepilogo-pop .link-azzera { padding: 0; }
 @media (max-width: 900px) { .barra-analisi .filtri-entita { flex-wrap: wrap; flex-basis: 100%; } .filtro-ricerca { flex-basis: 100%; } }
 .ricerca.multipla .ricerca-menu li[aria-selected="false"] b { color: var(--testo); }
+
+/* barra dei filtri standard (D-22): campi di ricerca multipli e, in fondo, Riepilogo / Togli tutti */
+.filtri.con-riepilogo { flex-wrap: wrap; }
+.filtri.con-riepilogo > .riepilogo-filtri { margin-left: auto; }
+.barra-analisi .filtri-entita .filtro-ricerca { max-width: none; }

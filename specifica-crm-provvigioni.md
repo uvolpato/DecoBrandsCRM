@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -1191,8 +1191,9 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
 
 ### 7.2 Elenco ordini fornitore (`/ordini-fornitore`)
 
-- Filtri: stato (`inviato`/`confermato`/`fatturato`), testo libero (numero ordine,
-  cliente, fornitore). Paginazione.
+- Filtri: stato (segmenti con i conteggi calcolati sugli altri filtri, §16.4.2), testo
+  libero (numero ordine, cliente, fornitore, documento), **fornitore, cliente, subagente**
+  (filtri standard a selezione multipla, §16.4.1), riepilogo dei filtri. Paginazione.
 - Colonna con n° righe; accesso al dettaglio.
 - **Flag variazioni**: le pratiche con scostamenti di composizione fra fasi o con note di
   credito mostrano un badge, così l'operatore le individua subito (§5.8).
@@ -1313,7 +1314,9 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
     subagente per cliente × fornitore (§5.10), codice unico per fornitore.
   - **Pratiche** (meno usata, con filtro): segmenti *Aperte · In ritardo · Fatturate ·
     Non pagate · Tutte* (iniziale *Aperte*; *Non pagate* = pratiche con una fattura non
-    pagata o da verificare, §5.14), fornitore, ricerca per numero; colonne pratica,
+    pagata o da verificare, §5.14; numeri dei segmenti calcolati con gli altri filtri,
+    §16.4.2), fornitore (filtro standard a selezione multipla, §16.4.1), ricerca per
+    numero, riepilogo dei filtri; colonne pratica,
     fornitore, data, importo, stato; clic apre la pratica; nel piede le provvigioni ai
     subagenti del trimestre.
 - **Vista inversa** nel dettaglio fornitore (§7.4): "Clienti seguiti per <fornitore>", in
@@ -1338,9 +1341,11 @@ sono le sue **agenzie**: i fornitori per cui Decobrands fa da agente verso quel 
     si allunga in avanti; passando col mouse su un mese si vedono i 6 mesi che verrebbero
     scelti; i mesi senza dati sono spenti; Esc o clic fuori chiude;
   - *‹* · *›* accanto: spostano tutto il periodo di un mese, spenti ai limiti;
-  - **Fornitore**: tendina *Tutti i fornitori* o uno solo;
+  - **Fornitore**: filtro standard a selezione multipla (§16.4.1); in fondo alla barra
+    *Riepilogo dei filtri* (con il periodo) e *Togli tutti i filtri*;
   - segmenti *Tutti · Con qualcosa da fare* (fornitori con un bollettino da decidere,
-    pronto, contestato o non arrivato nel periodo), con i conteggi;
+    pronto, contestato o non arrivato nel periodo), con i conteggi calcolati sui fornitori
+    scelti (§16.4.2);
   - la scelta si ricorda tornando indietro (§7.12); nell'app la matrice si chiede al server
     per periodo e fornitore (`GET /api/bollettini/matrice?da=2026-04&a=2026-09&fornitore=`);
     "mesi con dati" = dal mese del primo bollettino registrato al mese in corso.
@@ -2529,7 +2534,7 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 | Componente | Uso | Parametri principali |
 |---|---|---|
 | **DataTable** | ogni tabella dell'app (modello DataTable di Luis B2B) | colonne (`key`, `header`, `tipo` testo/numero/euro/pct/data/stato/conteggio, `align`, `width`, `grow`, `valore`, `cell`, `sortable`, `totale`), righe, azioni di riga, testata (titolo, contatore, azioni, link), selezione, paginazione facoltativa, `onRowClick`, testo "nessun dato" |
-| **FilterBar** | filtri sopra le tabelle | campi `select` (con `etichetta` facoltativa davanti, es. *Da*, *A*, *Fornitore*) / `multi` (selezione multipla con "Tutti") / `cerca` / `numero` / `segmenti`, `onChange`, Reset |
+| **FilterBar** | barra dei filtri **standard** (§16.4.1) | campi `segmenti` (con conteggi aggiornati dal vivo: `conta`), `cerca`, `select` (solo per valori fissi, mai per entità), `ricerca` su un'entità con `multipla`; `predefinito` (valore senza filtro), `nelRiepilogo`; `riepilogo` (icone *Riepilogo dei filtri* e *Togli tutti i filtri*, con voci esterne come il periodo); `onChange`; metodi `imposta`, `azzera`, `conta` |
 | **KpiRow** | riquadri numerici | voci (etichetta, valore, variante colore) |
 | **Riepilogo** | schede compatte del dettaglio pratica | voci (etichetta, icona, valore, variante) |
 | **Schede** | contenuti alternativi nello stesso spazio, quando una scheda di dettaglio impilerebbe più tabelle (§7.1, §7.4, §7.13, §7.18, §7.21) | schede (`id`, etichetta, contatore con variante neutro/giallo/rosso/verde, `disegna`), scheda attiva, `riempi`, `onCambia`; tastiera ← → Home Fine; **ricorda la scheda** per ogni passo della cronologia (§7.12). Le schede stanno **in alto**. Non sostituiscono i segmenti della FilterBar: i segmenti filtrano le stesse righe, le schede mostrano contenuti diversi |
@@ -2560,6 +2565,78 @@ stessi nomi e gli stessi parametri** (attività F0-A4).
 - non scende mai sotto ~3 righe visibili: se lo spazio manca scorre la scheda o la pagina;
 - **ricorda ordinamento e scorrimento** per ogni passo della cronologia; FilterBar e KpiRow
   ricordano i valori scelti (§7.12).
+
+#### 16.4.1 Filtri standard (D-22)
+
+Ogni barra dei filtri si costruisce con FilterBar e segue queste regole.
+
+- **Filtri su entità** (fornitori, clienti, subagenti, articoli, …): sempre un campo di
+  ricerca (CampoRicerca) a **selezione multipla**, mai una tendina. Il campo:
+  - è vuoto ("Tutti i …") quando non filtra;
+  - mostra il nome quando è scelta una sola voce;
+  - mostra *Filtro multiplo (n)* quando le voci sono più d'una;
+  - apre il menu con le voci scelte in alto.
+
+  Il menu propone solo le voci presenti nell'elenco filtrato (`contesto.limita`).
+- **Etichette**: non stanno davanti al campo. Le sostituisce il segnaposto ("Tutti i
+  fornitori"); l'etichetta resta per chi usa il lettore di schermo e nel riepilogo.
+- **Riepilogo** (FilterBar `riepilogo`): con due o più filtri, in fondo alla barra ci sono le
+  icone *Riepilogo dei filtri* e *Togli tutti i filtri* (RiepilogoFiltri).
+  - Il riepilogo elenca ogni filtro della barra, più quelli esterni come il periodo
+    (`riepilogo.prima`).
+  - Ogni voce ha una × che la riporta al valore "senza filtro" (`predefinito`).
+  - Il numero sull'imbuto conta le voci scelte e i filtri diversi dal predefinito.
+  - I campi con `nelRiepilogo: false` (es. la durata dell'Analisi) non si azzerano.
+- **Combinazione**: più voci nello stesso campo valgono in **o**; campi diversi valgono in
+  **e**.
+- **Memoria**: i valori si ricordano tornando indietro (§7.12).
+- **Dove si applica oggi**:
+
+  | Pagina | Filtri |
+  |---|---|
+  | Pratiche | fornitore, cliente, subagente |
+  | Bollettini | fornitore |
+  | Cliente → Pratiche | fornitore |
+  | Analisi | fornitore, subagente, cliente |
+
+  Le liste a sinistra delle anagrafiche hanno solo la ricerca libera e non cambiano.
+- **API**: i parametri di filtro su entità accettano più valori separati da virgola
+  (`?fornitore=1,2`).
+
+#### 16.4.2 Numeri e conteggi: quando si aggiornano (D-23)
+
+Riguarda tutti i valori aggregati dell'interfaccia: i numeri nei segmenti, i KPI, i
+totali delle tabelle, i contatori della barra laterale e delle schede.
+
+**Rispetto ai filtri (dal vivo, nel browser).**
+- Ogni cambio di filtro ricalcola subito i numeri, senza ricaricare la pagina.
+- Il numero di un segmento conta le righe con **tutti gli altri filtri applicati**,
+  escluso il segmento stesso. Esempio: con il fornitore Gries, *Tutte 12 · Fatturate 7*.
+  Così si vede quante righe si otterrebbero cliccando.
+- Componente: FilterBar `conta(nome, mappa)`.
+- Si applica anche ai KPI cliccabili (KpiRow) e alle schede con contatore.
+
+**Rispetto ai dati (cambiamenti fatti da altri o dai servizi).** Esempi: un documento
+arrivato nella casella, una sincronizzazione da Integra, un salvataggio di un altro
+utente.
+- Il server pubblica un evento *dati cambiati* con l'elenco delle aree toccate (pratiche,
+  documenti, bollettini, …). Il canale è `GET /api/eventi/flusso`, Server-Sent Events;
+  in alternativa un controllo ogni 30 s.
+- La pagina aperta reagisce in due modi:
+  - **contatori** (barra laterale, schede, segmenti, KPI): si aggiornano **da soli**,
+    senza toccare filtri, ordinamento e scorrimento;
+  - **elenchi e tabelle**: **non** cambiano sotto le mani di chi lavora. In alto compare
+    l'avviso *Ci sono aggiornamenti · Aggiorna*, che ridisegna la pagina mantenendo filtri,
+    ordinamento, pagina e scheda (§7.12).
+- Le modifiche fatte dall'utente stesso (salvataggi, abbinamenti, verifiche) ridisegnano
+  subito la pagina, come nel prototipo.
+- Nel prototipo non ci sono altri utenti né servizi: i dati cambiano solo per le azioni
+  dell'utente, e ogni azione ridisegna la pagina con i numeri ricalcolati.
+- **Perché**:
+  - i numeri devono dire il vero in ogni momento: un contatore vecchio porta a cercare
+    lavoro che non c'è più, o a non vedere quello nuovo;
+  - spostare le righe mentre si legge o si clicca, invece, fa sbagliare riga: per questo
+    le tabelle si aggiornano su richiesta.
 
 **Layout:** la pagina è alta quanto lo schermo; intestazione, filtri, KPI e note hanno
 altezza propria, l'elemento "riempi" (di norma la DataTable) prende il resto. Sotto i
@@ -2760,3 +2837,5 @@ rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in
 | D-19 | 18/10/2026 | Analisi per **competenza = data del documento**; storni e riaccrediti esclusi dai fatti; grafici per dimensione che ignorano il proprio filtro e mettono in risalto la scelta | numeri stabili nel tempo (non cambiano all'arrivo di un bollettino) e confrontabili fra periodi; lo storno sposta il pagamento, non il fatturato; vedere la voce scelta sul totale evita di perdere il contesto | Ugo | §7.22 |
 | D-20 | 18/10/2026 | Campi di ricerca con selezione **singola o multipla** nello stesso componente (quello della ricerca articoli); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla, al posto delle tendine | con molti clienti una tendina non si usa; confrontare due o tre fornitori o subagenti insieme è una domanda frequente; un solo componente riutilizzabile evita due modi diversi di cercare la stessa cosa. Le righe dei documenti restano a selezione singola: una riga ha un solo articolo | Ugo | §7.22, §16.4 |
 | D-21 | 18/10/2026 | Selezione multipla senza etichette nel campo: il campo mostra il nome della sola voce o *Filtro multiplo (n)*; le voci scelte stanno in alto nel menu, dove si tolgono; filtri sulla stessa riga del periodo; icone *Riepilogo dei filtri* e *Togli tutti i filtri*. Sostituisce le etichette nel campo di D-20 | con più voci le etichette allungavano i campi su più righe e spingevano giù la pagina; una riga sola lascia spazio ai numeri; il riepilogo mostra comunque tutto in un clic; applicare alla chiusura del menu evita di ridisegnare la pagina a ogni voce | Ugo | §7.22, §16.4 |
+| D-22 | 18/10/2026 | Il modo di filtrare dell'Analisi diventa lo **standard** di tutte le barre dei filtri: entità con ricerca a selezione multipla (mai tendine), etichetta come segnaposto, riepilogo e azzeramento a icona; applicato a Pratiche (fornitore, cliente, subagente), Bollettini, Cliente → Pratiche | un solo modo di filtrare in tutta l'applicazione si impara una volta; le tendine non reggono centinaia di clienti; il riepilogo fa vedere in un clic perché un elenco è corto | Ugo | §16.4, §16.4.1, §7.2, §7.6, §7.7 |
+| D-23 | 18/10/2026 | Numeri e conteggi: ricalcolati **dal vivo** a ogni cambio di filtro (il numero di un segmento conta con tutti gli altri filtri applicati); ai cambiamenti dei dati fatti da altri o dai servizi i contatori si aggiornano da soli, le tabelle no: avviso *Ci sono aggiornamenti · Aggiorna* | un numero che non corrisponde a ciò che si vede fa perdere fiducia e fa cercare lavoro inesistente; righe che si spostano mentre si clicca fanno sbagliare riga | Ugo | §16.4.2 |

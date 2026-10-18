@@ -79,6 +79,15 @@ Palette Decobrands da `STILE-GUIDA-DECOBRANDS.md` §2, la stessa del primo proto
 
 Logo monocromatico, bianco sulla barra scura. Carattere **Public Sans** (OFL, incorporato in `assets/font/public-sans.css`), cifre tabellari; la guida prevede il carattere di sistema: si può tornare a quello cambiando una riga di `stile.css`. Importi in formato italiano (`1.234,56 €`).
 
+## Filtri standard
+
+Tutte le barre dei filtri funzionano allo stesso modo (spec §16.4.1, §16.4.2):
+- fornitori, clienti e subagenti si filtrano con un campo di ricerca a selezione multipla (nome della voce o *Filtro multiplo (n)*, voci scelte in alto nel menu);
+- in fondo alla barra, l'imbuto apre il riepilogo dei filtri e l'imbuto barrato li toglie tutti;
+- i numeri dei segmenti contano con gli altri filtri applicati e si aggiornano subito.
+
+Si vedono in Pratiche, Bollettini, Cliente → Pratiche e Analisi.
+
 ## Componenti
 
 **Schede** (`CRM.Schede`) dove un dettaglio impilava più tabelle: fornitore (percentuali · clienti seguiti), cliente (agenzie · pratiche con filtro; prova *Garden Store Brianza*: 10 agenzie e 34 pratiche), utente (dati · permessi), Oggi (scadenze · ultime operazioni), Alias e kit, esportazione per Integra.

@@ -34,7 +34,9 @@
         ['‹ Torna a …', 'In alto a sinistra: torna alla schermata precedente con filtri, ordinamento, pagina e scorrimento come li avevi lasciati. Anche Alt + ← o il tasto Indietro del browser.'],
         ['Carica documenti', 'Nella barra, da qualsiasi pagina: scegli o trascina PDF ed Excel; finiscono in Documenti.'],
         ['Guida', 'In alto a destra di ogni pagina: apre l’argomento di quella pagina.'],
-        ['Segmenti (Tutti · Aperte · …)', 'Filtrano le righe della tabella sotto; il numero è quante righe restano.'],
+        ['Segmenti (Tutti · Aperte · …)', 'Filtrano le righe della tabella sotto; il numero dice quante righe resterebbero, tenendo conto degli altri filtri. Si aggiorna subito, senza ricaricare la pagina.'],
+        ['Tutti i fornitori · clienti · subagenti', 'I filtri sulle anagrafiche sono tutti uguali: clic nel campo, in alto le voci già scelte (clic per toglierle), sotto le altre (scrivi per restringere, clic o Invio per aggiungere). Il filtro si applica quando chiudi il menu (Esc o clic fuori). Il campo mostra il nome o “Filtro multiplo (n)”. Più voci nello stesso campo = una o l’altra; campi diversi = tutte insieme.'],
+        ['Imbuto · Imbuto barrato', 'In fondo alla barra dei filtri: l’imbuto (con il numero dei filtri attivi) apre il riepilogo di tutti i filtri, ognuno con × per toglierlo; l’imbuto barrato li toglie tutti.'],
         ['Riquadri numerici', 'Dove sono cliccabili fanno da filtro: un clic mostra solo quel gruppo, un secondo clic tutto.'],
         ['Schede', 'Contenuti diversi nello stesso spazio (es. Agenzie · Pratiche); il numero dice quanti elementi ci sono. Frecce ← → per passare da una all’altra.'],
         ['Intestazione di colonna', 'Clic: ordina crescente ▲, di nuovo decrescente ▼. L’ordinamento vale su tutto l’elenco, non solo sulla pagina.'],
@@ -43,6 +45,7 @@
         ['× / Esc', 'Chiudono la finestra in primo piano senza salvare.']
       ],
       sapere: [
+        'I numeri (segmenti, riquadri, contatori della barra) seguono i filtri senza ricaricare la pagina. Nell’applicazione, se altri o i servizi cambiano i dati, i contatori si aggiornano da soli; le tabelle no: compare “Ci sono aggiornamenti · Aggiorna”, così le righe non si spostano mentre lavori.',
         'Con il profilo <b>sola lettura</b> compare una fascia in alto: si consulta e si esporta, i pulsanti che modificano sono spenti.',
         '<b>Prova come</b> (in fondo alla barra, solo nel prototipo) cambia utente per vedere cosa vede ogni ruolo.'
       ] },
@@ -112,6 +115,7 @@
       ],
       pulsanti: [
         ['Segmenti di stato', 'Tutte · Conferma in ritardo · Attesa conferma · Attesa fattura · Fatturate · Con variazioni. Con questo filtro la pratica si apre direttamente sulle righe.'],
+        ['Tutti i fornitori · clienti · subagenti', 'Filtri standard a selezione multipla; i numeri dei segmenti si ricalcolano subito. Imbuto per il riepilogo, imbuto barrato per toglierli tutti.'],
         ['Cerca', 'Per pratica, cliente o numero di documento.'],
         ['Clic sulla riga', 'Apre la scheda della pratica.'],
         ['Riepilogo · Righe a confronto', 'Le due schede della pratica; tornando indietro si riapre quella lasciata.'],
@@ -144,7 +148,8 @@
         ['Carica un bollettino', 'In testata: carica il file del bollettino.'],
         ['apr 2026 → set 2026', 'Il periodo: sempre 6 mesi. Clic: a sinistra le scorciatoie (Ultimi 6 mesi, semestri), a destra l’anno e i mesi; scegli il mese d’inizio e il periodo si completa da solo (passando col mouse vedi quali mesi prende).'],
         ['‹ · ›', 'Spostano tutto il periodo di un mese.'],
-        ['Fornitore', 'Mostra un solo fornitore.'],
+        ['Tutti i fornitori', 'Filtro standard: uno o più fornitori. I numeri di Tutti · Con qualcosa da fare contano solo i fornitori scelti.'],
+        ['Imbuto · Imbuto barrato', 'Riepilogo dei filtri (con il periodo) · togli tutti i filtri.'],
         ['Tutti · Con qualcosa da fare', 'Solo i fornitori con un bollettino da decidere, pronto, contestato o non arrivato nel periodo.'],
         ['Cella della matrice', 'Fornitore × mese: verificato, da decidere, pronto, atteso, non arrivato. Clic apre il bollettino.'],
         ['Sollecita', 'Cella non arrivato: prepara il testo di sollecito con i documenti del mese.'],
@@ -267,7 +272,7 @@
         ['Segmenti', 'Tutti · Con agenzie · Senza agenzie · Diretta.'],
         ['Scheda Agenzie', 'Ricerca fra le agenzie; clic su una riga per modificarla; contatore giallo se manca un codice cliente.'],
         ['Aggiungi agenzia', 'Nuovo fornitore per questo cliente.'],
-        ['Scheda Pratiche', 'Pratiche del cliente con filtro: Aperte · In ritardo · Fatturate · Non pagate · Tutte, fornitore, numero.']
+        ['Scheda Pratiche', 'Pratiche del cliente con filtro: Aperte · In ritardo · Fatturate · Non pagate · Tutte (numeri calcolati con gli altri filtri), fornitori (filtro standard), numero; imbuto per il riepilogo.']
       ],
       finestre: [{ nome: 'Agenzia', da: 'Aggiungi agenzia · clic su una riga', cosa: 'Il cliente è fisso.',
         campi: [['Fornitore', 'Campo con ricerca.'], ['Codice cliente del fornitore', 'Come il fornitore chiama il cliente: serve ad abbinare i documenti in automatico.'], ['Seguito da', 'Subagente, campo con ricerca.'], ['Sconto al cliente', 'Gli sconti proposti seguono le percentuali del fornitore.']],
