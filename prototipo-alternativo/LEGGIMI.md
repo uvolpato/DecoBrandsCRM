@@ -21,9 +21,9 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | | **Articoli**, **Giacenze** | Da Integra in sola lettura (viste sul database, sincronizzazione ogni 15–60 secondi). Disponibile = giacenza di Integra − impegni; riquadri esauriti, negativi, con impegni aperti |
 | | **Alias e kit** | Codici vecchio → nuovo (con "chiede conferma") e kit (articolo → componenti × quantità, acceso/spento); modifiche solo all'amministratore |
 | Anagrafiche | Fornitori, Subagenti, Clienti | Clienti e fornitori da Integra in **sola lettura**; nel CRM condizioni, percentuali **datate**, eccezioni, subagenti e **agenzie del cliente** (fornitore, codice, subagente, sconto) |
-| Gestione (gruppo richiudibile) | **Utenti e ruoli** | Utenti condivisi con la Gestione Ordini; ruoli *Amministratore*, *Operatore*, *Sola lettura*; nuova password via email; tabella di cosa può fare ogni ruolo |
-| | **Stato del sistema** | Casella dei documenti, server di lettura, sincronizzazione da Integra, posta in uscita: stato, problemi da vedere (contatore nella barra), ultime esecuzioni |
-| | **Impostazioni** | Dati azienda, casella IMAP, server di lettura e soglie, posta in uscita, sincronizzazione da Integra (database, viste, ogni quanti secondi), conservazione; password mai rilette |
+| Gestione (gruppo richiudibile) | **Utenti e ruoli** | Utenti propri del CRM (D-29), solo su invito: accesso con Microsoft 365 o link via email, senza password (D-30); ruoli *Amministratore*, *Operatore*, *Sola lettura*; invito e link di accesso; tabella di cosa può fare ogni ruolo |
+| | **Stato del sistema** | Casella dei documenti, server di lettura, sincronizzazione da Integra, posta in uscita: stato, problemi da vedere (contatore nella barra), ultime esecuzioni. Nell'app è una vista del registro unico di eventi e anomalie (D-31) |
+| | **Impostazioni** | Dati azienda, casella IMAP, server di lettura e soglie, posta in uscita, accesso con Microsoft 365 (tenant, applicazione, segreto), sincronizzazione da Integra (database ponte, viste, ogni quanti secondi, D-32), conservazione; password e segreti mai riletti |
 | | **Documenti scartati** | Scarto con motivo; recupero (operatore) o eliminazione definitiva (amministratore) |
 | | **Guida** | *Come funziona il CRM* (schema del ciclo) e *Comandi comuni*; per ogni pagina sintesi, passi, pulsanti, finestre e regole; ricerca in tutto il testo; pulsante *Guida* in testata a ogni pagina. Contenuti in `assets/guida.js` |
 

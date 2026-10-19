@@ -16,10 +16,11 @@
      Utenti e ruoli: elenco + scheda + cosa può fare ogni ruolo
      ========================================================= */
   let filtroUtenti = { vista: 'attivi', q: '' }, schedaUtente = 'utente';
+  const ACCESSO = { microsoft: 'Microsoft 365', email: 'Link via email' };
   function vistaUtenti(idSel) {
     if (!CRM.permesso('gestione', 'utenti', 'Utenti e ruoli')) return;
     const corpo = CRM.Pagina({ voce: 'utenti', titolo: 'Utenti e ruoli', pieno: true,
-      sottotitolo: 'Gli stessi utenti della Gestione Ordini, con le stesse credenziali. Il ruolo decide cosa si può fare nel CRM.',
+      sottotitolo: 'Si entra solo su invito: con l’account Microsoft 365 o con un link via email, senza password. Il ruolo decide cosa si può fare.',
       azioni: [{ etichetta: 'Nuovo utente', icona: 'piu', onClick: () => modificaUtente(null) }] });
     const utenti = M.S.utenti;
     const u = utenti.find(x => x.id === Number(idSel)) || utenti[0];
@@ -27,17 +28,17 @@
     const sx = CRM.blocco(col, 'pila riempi');
     const VISTE = { attivi: x => x.attivo, disattivati: x => !x.attivo, tutti: () => true };
     CRM.FilterBar(sx, { campi: [
-      { nome: 'q', tipo: 'cerca', valore: filtroUtenti.q, placeholder: 'Nome, utente o email' },
+      { nome: 'q', tipo: 'cerca', valore: filtroUtenti.q, placeholder: 'Nome o email' },
       { nome: 'vista', tipo: 'segmenti', valore: filtroUtenti.vista, opzioni: [
         { value: 'attivi', label: 'Attivi', n: utenti.filter(VISTE.attivi).length }, { value: 'disattivati', label: 'Disattivati', n: utenti.filter(VISTE.disattivati).length }, { value: 'tutti', label: 'Tutti', n: utenti.length }] }
     ], onChange: v => { filtroUtenti = v; tab.aggiorna(filtra()); } });
-    const filtra = () => { const q = (filtroUtenti.q || '').toLowerCase(); return utenti.filter(VISTE[filtroUtenti.vista]).filter(x => !q || [x.nome, x.utente, x.email].some(t => t.toLowerCase().indexOf(q) >= 0)); };
+    const filtra = () => { const q = (filtroUtenti.q || '').toLowerCase(); return utenti.filter(VISTE[filtroUtenti.vista]).filter(x => !q || [x.nome, x.email].some(t => t.toLowerCase().indexOf(q) >= 0)); };
     const tab = CRM.DataTable(CRM.blocco(sx, 'riempi'), {
       righe: filtra(), ordinamentoIniziale: { key: 'nome', dir: 'asc' }, rowClass: x => x.id === u.id ? 'selezionata' : '',
       colonne: [
-        { key: 'nome', header: 'Utente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === M.utente().id ? ' <span class="testo-tenue">(tu)</span>' : '') + '<span class="sec-riga">' + e(x.utente) + ' · ' + e(x.email) + '</span>' },
+        { key: 'nome', header: 'Utente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === M.utente().id ? ' <span class="testo-tenue">(tu)</span>' : '') + '<span class="sec-riga">' + e(x.email) + '</span>' },
         { key: 'ruolo', header: 'Ruolo', valore: x => M.RUOLI[x.ruolo].nome, cell: x => x.sistema ? CRM.stato('neutro', 'Servizi automatici') : CRM.stato(x.ruolo === 'amministratore' ? 'primario' : x.ruolo === 'operatore' ? 'info' : 'neutro', M.RUOLI[x.ruolo].nome) },
-        { key: 'accesso', header: 'Ultimo accesso', valore: x => x.ultimo_accesso || '', cell: x => x.attivo ? quando(x.ultimo_accesso) : CRM.stato('neutro', 'Disattivato') }
+        { key: 'accesso', header: 'Ultimo accesso', valore: x => x.ultimo_accesso || '', cell: x => !x.attivo ? CRM.stato('neutro', 'Disattivato') : x.ultimo_accesso || x.sistema ? quando(x.ultimo_accesso) : CRM.stato('attesa', 'Invitato') }
       ],
       onRowClick: x => { location.hash = '#/utenti/' + x.id; },
       emptyText: 'Nessun utente', emptyHint: 'Cambia la ricerca o il filtro.'
@@ -45,19 +46,18 @@
 
     const io = M.utente(), protetto = !!u.sistema;
     const p = CRM.Pannello(col, { titolo: u.nome, nota: u.sistema ? 'utente dei servizi automatici' : '', riempi: true,
-      azioni: protetto ? [] : [{ etichetta: 'Modifica', onClick: () => modificaUtente(u) }, { etichetta: 'Invia nuova password', icona: 'chiave', onClick: () => inviaPassword(u) }] });
+      azioni: protetto ? [] : [{ etichetta: 'Modifica', onClick: () => modificaUtente(u) }, { etichetta: u.ultimo_accesso ? 'Invia un link di accesso' : 'Invia di nuovo l’invito', icona: 'chiave', onClick: () => invia(u) }] });
     const ruoli = Object.keys(M.RUOLI);
     // dati dell'utente e tabella dei permessi in due schede: niente scorrimento nella colonna
     CRM.Schede(p.corpo, { riempi: true, attiva: schedaUtente, onCambia: id => { schedaUtente = id; }, schede: [
       { id: 'utente', etichetta: 'Dati dell’utente', disegna: c => {
         CRM.Dettagli(c, [
-          { etichetta: 'Nome utente', valore: e(u.utente) },
           { etichetta: 'Email', valore: e(u.email) },
           { etichetta: 'Ruolo', valore: e(M.RUOLI[u.ruolo].nome) },
           { etichetta: 'Stato', valore: u.attivo ? CRM.stato('ok', 'Attivo') : CRM.stato('neutro', 'Disattivato') },
           { etichetta: 'Ultimo accesso', valore: quando(u.ultimo_accesso) },
-          { etichetta: 'Password', valore: u.cambio_password ? CRM.stato('attesa', 'da cambiare al prossimo accesso') : 'impostata dall’utente' },
-          { etichetta: 'Ultimo invio password', valore: u.ultimo_invio ? quando(u.ultimo_invio.quando) + (u.ultimo_invio.errore ? '<span class="sec-riga negativo">' + e(u.ultimo_invio.errore) + '</span>' : '') : '—' }
+          { etichetta: 'Accesso', valore: u.sistema ? '—' : ACCESSO[u.accesso] },
+          { etichetta: 'Ultimo invio', valore: u.ultimo_invio ? (u.ultimo_invio.tipo === 'invito' ? 'Invito · ' : 'Link · ') + quando(u.ultimo_invio.quando) + (u.ultimo_invio.errore ? '<span class="sec-riga negativo">' + e(u.ultimo_invio.errore) + '</span>' : '') : '—' }
         ], { inColonne: true });
         if (protetto) { CRM.Nota(c, 'Utente usato dai servizi automatici (lettura della casella, sincronizzazione da Integra): non si modifica e non accede all’app.'); return; }
         const az = CRM.blocco(c, 'azioni-riga');
@@ -86,51 +86,55 @@
   function modificaUtente(u) {
     const nuovo = !u, io = M.utente();
     CRM.FormModal({
-      titolo: nuovo ? 'Nuovo utente' : 'Modifica ' + u.nome, conferma: nuovo ? 'Crea e invia la password' : 'Salva', colonne: 2,
-      testo: nuovo ? 'L’utente riceve per email una password temporanea da cambiare al primo accesso.' : null,
+      titolo: nuovo ? 'Nuovo utente' : 'Modifica ' + u.nome, conferma: nuovo ? 'Crea e invia l’invito' : 'Salva', colonne: 2,
+      testo: nuovo ? 'L’utente riceve per email l’invito. Entra solo chi è in questo elenco ed è attivo.' : null,
       campi: [
         { nome: 'nome', etichetta: 'Nome e cognome', valore: u ? u.nome : '' },
-        { nome: 'utente', etichetta: 'Nome utente', valore: u ? u.utente : '', placeholder: 'nome.cognome', aiuto: nuovo ? 'Per accedere; non si cambia dopo.' : 'Non si cambia.' },
-        { nome: 'email', etichetta: 'Email', valore: u ? u.email : '', largo: true },
+        { nome: 'email', etichetta: 'Email', valore: u ? u.email : '' },
+        { nome: 'accesso', etichetta: 'Accesso', tipo: 'select', valore: u ? u.accesso : 'microsoft', largo: true, opzioni: Object.keys(ACCESSO).map(k => ({ value: k, label: ACCESSO[k] })),
+          aiuto: 'Microsoft 365 per gli account Decobrands; link via email per chi non ce l’ha (subagenti, esterni).' },
         { nome: 'ruolo', etichetta: 'Ruolo', tipo: 'select', valore: u ? u.ruolo : 'operatore', largo: true, opzioni: Object.keys(M.RUOLI).map(r => ({ value: r, label: M.RUOLI[r].nome })),
           aiuto: 'Amministratore: tutto. Operatore: lavoro quotidiano e anagrafiche del CRM. Sola lettura: consulta ed esporta.' }
       ],
-      dopo: form => { if (!nuovo) form.campo('utente').readOnly = true; if (u && u.id === io.id) { form.campo('ruolo').disabled = true; form.aiuto('ruolo', 'Non puoi cambiare il tuo ruolo.'); } },
+      dopo: form => { if (u && u.id === io.id) { form.campo('ruolo').disabled = true; form.aiuto('ruolo', 'Non puoi cambiare il tuo ruolo.'); } },
       onConferma: (v, form) => {
-        if (!v.nome || !v.utente || !v.email) { form.errore('Compila nome, nome utente ed email.'); return false; }
+        if (!v.nome || !v.email) { form.errore('Compila nome ed email.'); return false; }
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { form.errore('L’email ' + v.email + ' non è valida.'); return false; }
-        if (M.S.utenti.some(x => x !== u && x.utente.toLowerCase() === v.utente.toLowerCase())) { form.errore('Il nome utente ' + v.utente + ' è già usato.'); return false; }
         if (M.S.utenti.some(x => x !== u && x.email.toLowerCase() === v.email.toLowerCase())) { form.errore('L’email ' + v.email + ' è già di un altro utente.'); return false; }
         const ruolo = u && u.id === io.id ? u.ruolo : v.ruolo;
         if (u && u.ruolo === 'amministratore' && ruolo !== 'amministratore' && u.attivo && !amministratoriAttivi(u)) { form.errore('Deve restare almeno un amministratore attivo.'); return false; }
         if (nuovo) {
-          const rec = { id: Math.max.apply(null, M.S.utenti.map(x => x.id)) + 1, utente: v.utente, nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo, attivo: true, ultimo_accesso: null, cambio_password: true, ultimo_invio: { quando: M.oggi() + 'T' + new Date().toTimeString().slice(0, 5), errore: null } };
-          M.S.utenti.push(rec); M.annota('Nuovo utente ' + rec.utente + ' (' + M.RUOLI[ruolo].nome.toLowerCase() + '), password inviata');
-          M.salva(); CRM.Avviso('Utente creato: password inviata a ' + rec.email); location.hash = '#/utenti/' + rec.id; return;
+          const rec = { id: Math.max.apply(null, M.S.utenti.map(x => x.id)) + 1, nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo, accesso: v.accesso, attivo: true, ultimo_accesso: null, ultimo_invio: { quando: M.oggi() + 'T' + new Date().toTimeString().slice(0, 5), tipo: 'invito', errore: null } };
+          M.S.utenti.push(rec); M.annota('Nuovo utente ' + rec.nome + ' (' + M.RUOLI[ruolo].nome.toLowerCase() + '), invito inviato');
+          M.salva(); CRM.Avviso('Utente creato: invito inviato a ' + rec.email); location.hash = '#/utenti/' + rec.id; return;
         }
-        Object.assign(u, { nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo });
-        M.annota('Utente ' + u.utente + ' aggiornato'); M.salva(); CRM.Avviso('Utente salvato'); CRM.naviga();
+        Object.assign(u, { nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo, accesso: v.accesso });
+        M.annota('Utente ' + u.nome + ' aggiornato'); M.salva(); CRM.Avviso('Utente salvato'); CRM.naviga();
       }
     });
   }
-  async function inviaPassword(u) {
-    if (!(await CRM.Conferma('Inviare una nuova password a ' + u.nome + '?', 'Riceve a ' + e(u.email) + ' una password temporanea da cambiare al primo accesso. Quella attuale smette di funzionare.', 'Invia'))) return;
+  // D-30 §3.3: niente password; l'invito (prima volta) o un link monouso di 15 minuti, anche come riserva se Microsoft non risponde
+  async function invia(u) {
+    const tipo = u.ultimo_accesso ? 'link' : 'invito', nome = tipo === 'link' ? 'Link di accesso' : 'Invito';
+    if (!(await CRM.Conferma('Inviare ' + (tipo === 'link' ? 'un link di accesso' : 'di nuovo l’invito') + ' a ' + u.nome + '?', tipo === 'link'
+      ? 'Riceve a ' + e(u.email) + ' un link valido una sola volta per 15 minuti: serve anche quando Microsoft non risponde.'
+      : 'Riceve a ' + e(u.email) + ' l’invito, valido 7 giorni; quello precedente smette di funzionare.', 'Invia'))) return;
     const errore = /bianchi/.test(u.email) ? 'Casella inesistente (550 5.1.1)' : null;   // nel prototipo: l'indirizzo di Luca Bianchi non esiste più
-    u.ultimo_invio = { quando: M.oggi() + 'T' + new Date().toTimeString().slice(0, 5), errore: errore }; u.cambio_password = true;
-    M.annota('Nuova password inviata a ' + u.utente + (errore ? ' (non recapitata)' : ''));
-    if (errore) M.S.sistema.problemi.unshift({ id: Date.now(), quando: u.ultimo_invio.quando, servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: 'Password a ' + u.email + ': ' + errore + '.', visto: false });
-    M.salva(); CRM.Avviso(errore ? 'Invio non riuscito: ' + errore : 'Password inviata a ' + u.email); CRM.naviga();
+    u.ultimo_invio = { quando: M.oggi() + 'T' + new Date().toTimeString().slice(0, 5), tipo: tipo, errore: errore };
+    M.annota(nome + ' inviato a ' + u.nome + (errore ? ' (non recapitato)' : ''));
+    if (errore) M.S.sistema.problemi.unshift({ id: Date.now(), quando: u.ultimo_invio.quando, servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: nome + ' a ' + u.email + ': ' + errore + '.', visto: false });
+    M.salva(); CRM.Avviso(errore ? 'Invio non riuscito: ' + errore : nome + ' inviato a ' + u.email); CRM.naviga();
   }
   function attiva(u, si) {
     if (!si && u.ruolo === 'amministratore' && !amministratoriAttivi(u)) { CRM.Avviso('Deve restare almeno un amministratore attivo'); return; }
-    u.attivo = si; M.annota('Utente ' + u.utente + (si ? ' riattivato' : ' disattivato')); M.salva(); CRM.Avviso(si ? 'Utente riattivato' : 'Utente disattivato: non può più accedere'); CRM.naviga();
+    u.attivo = si; M.annota('Utente ' + u.nome + (si ? ' riattivato' : ' disattivato')); M.salva(); CRM.Avviso(si ? 'Utente riattivato' : 'Utente disattivato: non può più accedere'); CRM.naviga();
   }
   async function elimina(u) {
     if (u.ruolo === 'amministratore' && u.attivo && !amministratoriAttivi(u)) { CRM.Avviso('Deve restare almeno un amministratore attivo'); return; }
     if (u.ultimo_accesso) {
       if (!(await CRM.Conferma('Eliminare ' + u.nome + '?', u.nome + ' ha già usato l’app: il suo nome resta nel registro eventi. Se deve solo smettere di accedere, conviene disattivarlo.', 'Elimina', true))) return;
     } else if (!(await CRM.Conferma('Eliminare ' + u.nome + '?', 'Non ha mai effettuato l’accesso.', 'Elimina', true))) return;
-    M.S.utenti.splice(M.S.utenti.indexOf(u), 1); M.annota('Utente ' + u.utente + ' eliminato'); M.salva(); CRM.Avviso('Utente eliminato'); location.hash = '#/utenti';
+    M.S.utenti.splice(M.S.utenti.indexOf(u), 1); M.annota('Utente ' + u.nome + ' eliminato'); M.salva(); CRM.Avviso('Utente eliminato'); location.hash = '#/utenti';
   }
 
   /* =========================================================
@@ -204,12 +208,16 @@
       { nome: 'modello', etichetta: 'Modello', valore: s.modello }, { nome: 'attesa_s', etichetta: 'Tempo massimo per documento (s)', tipo: 'numero', valore: s.attesa_s },
       { nome: 'soglia_ok', etichetta: 'Affidabile da', tipo: 'numero', passo: '0.01', valore: s.soglia_ok, aiuto: 'Campi sopra questa soglia: nessun controllo (spec §6.5).' },
       { nome: 'soglia_bassa', etichetta: 'Affidabilità bassa sotto', tipo: 'numero', passo: '0.01', valore: s.soglia_bassa, aiuto: 'Fra le due soglie: da controllare; sotto: bassa.' }] },
-    { id: 'posta', titolo: 'Posta in uscita', sotto: 'password agli utenti, avvisi', campi: s => [
+    { id: 'posta', titolo: 'Posta in uscita', sotto: 'inviti e link di accesso agli utenti, avvisi', campi: s => [
       { nome: 'server', etichetta: 'Server (SMTP)', valore: s.server }, { nome: 'porta', etichetta: 'Porta', tipo: 'numero', valore: s.porta },
       { nome: 'utente', etichetta: 'Utente', valore: s.utente }, { nome: 'password', etichetta: 'Password', tipo: 'password', impostata: s.password },
       { nome: 'mittente', etichetta: 'Mittente', valore: s.mittente, largo: true }] },
-    { id: 'integra', titolo: 'Sincronizzazione da Integra', sotto: 'viste sul database di Integra', campi: s => [
-      { nome: 'server', etichetta: 'Server del database', valore: s.server }, { nome: 'database', etichetta: 'Database', valore: s.database },
+    { id: 'accesso', titolo: 'Accesso con Microsoft 365', sotto: 'app registrata in Entra ID (D-30)', campi: s => [
+      { nome: 'tenant', etichetta: 'ID del tenant', valore: s.tenant, largo: true },
+      { nome: 'client_id', etichetta: 'ID dell’applicazione', valore: s.client_id, largo: true },
+      { nome: 'segreto', etichetta: 'Segreto dell’applicazione', tipo: 'password', impostata: s.segreto, largo: true }] },
+    { id: 'integra', titolo: 'Sincronizzazione da Integra', sotto: 'viste nel database ponte collegato a Integra (D-32)', campi: s => [
+      { nome: 'server', etichetta: 'Server del database ponte', valore: s.server }, { nome: 'database', etichetta: 'Database', valore: s.database },
       { nome: 'utente', etichetta: 'Utente (sola lettura)', valore: s.utente }, { nome: 'password', etichetta: 'Password', tipo: 'password', impostata: s.password },
       { nome: 'schema', etichetta: 'Schema delle viste', valore: s.schema, aiuto: CRM.AMPLIAMENTI.vendita ? 'Clienti, fornitori, articoli, giacenze, registrazioni degli ordini.' : 'Clienti e fornitori.' },
       { nome: 'secondi', etichetta: 'Anagrafiche ogni (secondi)', tipo: 'numero', valore: s.secondi, aiuto: 'Da 10 a 3600.' },
@@ -238,9 +246,9 @@
     const az = CRM.blocco(p.corpo, 'azioni-riga');
     const salva = document.createElement('button'); salva.type = 'button'; salva.className = 'btn'; salva.textContent = 'Salva ' + sez.titolo.toLowerCase();
     az.appendChild(salva);
-    if (sez.id === 'casella' || sez.id === 'lettura' || sez.id === 'posta' || sez.id === 'integra') {
+    if (sez.id === 'casella' || sez.id === 'lettura' || sez.id === 'posta' || sez.id === 'integra' || sez.id === 'accesso') {
       const prova = document.createElement('button'); prova.type = 'button'; prova.className = 'btn sec consentito'; prova.textContent = 'Prova la connessione';
-      prova.addEventListener('click', () => CRM.Avviso(sez.id === 'lettura' ? 'Server di lettura raggiungibile · modello ' + (dati.modello || '') : sez.id === 'integra' ? 'Database di Integra raggiungibile · 6 viste lette · ultima sincronizzazione ' + quando(M.S.sincronizzato) : 'Connessione riuscita'));
+      prova.addEventListener('click', () => CRM.Avviso(sez.id === 'lettura' ? 'Server di lettura raggiungibile · modello ' + (dati.modello || '') : sez.id === 'accesso' ? 'Microsoft 365 risponde · app riconosciuta' : sez.id === 'integra' ? 'Database ponte raggiungibile · 6 viste lette · ultima sincronizzazione ' + quando(M.S.sincronizzato) : 'Connessione riuscita'));
       az.appendChild(prova);
     }
     salva.addEventListener('click', () => {

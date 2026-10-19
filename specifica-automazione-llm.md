@@ -466,7 +466,7 @@ eventi solo le azioni delle persone e i cambi di configurazione:
 
 L'azione vera (abbinamento, verifica, scarto) scrive i **suoi** eventi come oggi.
 
-Da aggiungere ai valori ammessi di `eventi_app.entita` (§4.2.11): `suggerimento`, `assistente`,
+Da aggiungere ai valori ammessi di `registro.entita` (§4.2.11, registro unico D-31): `suggerimento`, `assistente`,
 `regola_lettura`.
 
 ---

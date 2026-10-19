@@ -1072,11 +1072,11 @@ window.DATI_DEMO = {
      amministratore (tutto), operatore (lavoro quotidiano e anagrafiche CRM), lettura (consulta ed esporta). */
   utente_corrente: 1,
   utenti: [
-    { id: 1, utente: 'ugo.volpato', nome: 'Ugo Volpato', email: 'ugo.volpato@decobrands.it', ruolo: 'amministratore', attivo: true, ultimo_accesso: '2026-09-04T08:12', cambio_password: false, ultimo_invio: { quando: '2026-03-02T10:15', errore: null } },
-    { id: 2, utente: 'matteo.caironi', nome: 'Matteo Caironi', email: 'matteo.caironi@decobrands.it', ruolo: 'operatore', attivo: true, ultimo_accesso: '2026-09-04T08:47', cambio_password: false, ultimo_invio: { quando: '2026-03-02T10:16', errore: null } },
-    { id: 3, utente: 'giulia.ferri', nome: 'Giulia Ferri', email: 'amministrazione@decobrands.it', ruolo: 'lettura', attivo: true, ultimo_accesso: '2026-09-01T17:30', cambio_password: false, ultimo_invio: { quando: '2026-06-10T09:00', errore: null } },
-    { id: 4, utente: 'luca.bianchi', nome: 'Luca Bianchi', email: 'luca.bianchi@decobrands.it', ruolo: 'operatore', attivo: false, ultimo_accesso: '2026-05-28T12:05', cambio_password: true, ultimo_invio: { quando: '2026-05-29T08:30', errore: 'Casella inesistente (550 5.1.1)' } },
-    { id: 5, utente: 'servizi', nome: 'Servizi automatici', email: 'noreply@decobrands.it', ruolo: 'amministratore', attivo: true, sistema: true, ultimo_accesso: null, cambio_password: false, ultimo_invio: null }
+    { id: 1, nome: 'Ugo Volpato', email: 'ugo.volpato@decobrands.it', ruolo: 'amministratore', attivo: true, ultimo_accesso: '2026-09-04T08:12', accesso: 'microsoft', ultimo_invio: { quando: '2026-03-02T10:15', tipo: 'invito', errore: null } },
+    { id: 2, nome: 'Matteo Caironi', email: 'matteo.caironi@decobrands.it', ruolo: 'operatore', attivo: true, ultimo_accesso: '2026-09-04T08:47', accesso: 'microsoft', ultimo_invio: { quando: '2026-03-02T10:16', tipo: 'invito', errore: null } },
+    { id: 3, nome: 'Giulia Ferri', email: 'amministrazione@decobrands.it', ruolo: 'lettura', attivo: true, ultimo_accesso: '2026-09-01T17:30', accesso: 'microsoft', ultimo_invio: { quando: '2026-06-10T09:00', tipo: 'invito', errore: null } },
+    { id: 4, nome: 'Luca Bianchi', email: 'luca.bianchi@decobrands.it', ruolo: 'operatore', accesso: 'email', attivo: false, ultimo_accesso: '2026-05-28T12:05', ultimo_invio: { quando: '2026-05-29T08:30', tipo: 'link', errore: 'Casella inesistente (550 5.1.1)' } },
+    { id: 5, nome: 'Servizi automatici', email: 'noreply@decobrands.it', ruolo: 'amministratore', attivo: true, sistema: true, ultimo_accesso: null, ultimo_invio: null }
   ],
 
   /* Stato dei servizi che girano da soli (spec §7.13). */
@@ -1084,7 +1084,7 @@ window.DATI_DEMO = {
     servizi: [
       { id: 'casella', nome: 'Casella dei documenti', icona: 'posta', stato: 'ok', dove: 'documenti@decobrands.it · cartella Fornitori', ultimo: '2026-09-04T09:58', ritmo: 'ogni 2 minuti', nota: '6 allegati letti oggi' },
       { id: 'lettura', nome: 'Server di lettura (GLM-OCR)', icona: 'arrivo', stato: 'attesa', dove: 'gpu-decobrands:8080', ultimo: '2026-09-04T09:57', ritmo: 'a ogni documento', nota: 'lento: 9,8 s per pagina (di solito 4 s)' },
-      { id: 'integra', nome: 'Sincronizzazione da Integra', icona: 'abbinamenti', stato: 'errore', dove: 'viste sul database di Integra · clienti e fornitori', ultimo: '2026-09-04T09:59:40', ritmo: 'ogni 60 secondi', nota: '2 clienti non sincronizzati' },
+      { id: 'integra', nome: 'Sincronizzazione da Integra', icona: 'abbinamenti', stato: 'errore', dove: 'viste del database ponte · clienti e fornitori', ultimo: '2026-09-04T09:59:40', ritmo: 'ogni 60 secondi', nota: '2 clienti non sincronizzati' },
       { id: 'posta', nome: 'Posta in uscita', icona: 'posta', stato: 'ok', dove: 'smtp.office365.com · noreply@decobrands.it', ultimo: '2026-09-03T16:20', ritmo: 'a ogni invio', nota: 'ultimo invio riuscito' }
     ],
     problemi: [
@@ -1092,7 +1092,7 @@ window.DATI_DEMO = {
       { id: 2, quando: '2026-09-04T09:12:40', servizio: 'integra', livello: 'errore', testo: 'Cliente non sincronizzato: P.IVA già usata', dettaglio: 'Codice Integra C00944 ha la stessa P.IVA di C00412 (Vivaio Verde Azzurro): unire o correggere in Integra.', visto: false },
       { id: 3, quando: '2026-09-04T09:41', servizio: 'lettura', livello: 'attenzione', testo: 'Lettura lenta', dettaglio: 'Ings_F-2026-0961_scansione.pdf: 3 pagine in 29 s. Se si ripete, controllare il carico della scheda video.', visto: false },
       { id: 4, quando: '2026-09-03T11:02', servizio: 'casella', livello: 'attenzione', testo: 'Allegato non leggibile', dettaglio: 'Email di ordini@gasper.de del 03/09 alle 11:01: allegato «Lieferschein.zip» non è PDF né Excel; ignorato.', visto: false },
-      { id: 5, quando: '2026-08-29T08:15', servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: 'Password a luca.bianchi@decobrands.it: casella inesistente (550 5.1.1).', visto: true },
+      { id: 5, quando: '2026-08-29T08:15', servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: 'Link di accesso a luca.bianchi@decobrands.it: casella inesistente (550 5.1.1).', visto: true },
       { id: 6, quando: '2026-08-21T02:10', servizio: 'lettura', livello: 'errore', testo: 'Server di lettura non raggiungibile per 14 minuti', dettaglio: 'Riavvio automatico del servizio alle 02:24; 2 documenti riletti.', visto: true }
     ],
     esecuzioni: [
@@ -1112,7 +1112,8 @@ window.DATI_DEMO = {
     casella: { server: 'outlook.office365.com', porta: 993, utente: 'documenti@decobrands.it', password: true, cartella: 'Fornitori', cartella_lette: 'Fornitori/Letti', minuti: 2 },
     lettura: { indirizzo: 'http://gpu-decobrands:8080/v1', modello: 'zai-org/GLM-OCR', soglia_ok: 0.90, soglia_bassa: 0.70, attesa_s: 120 },
     posta: { server: 'smtp.office365.com', porta: 587, utente: 'noreply@decobrands.it', password: true, mittente: 'Decobrands CRM <noreply@decobrands.it>' },
-    integra: { server: 'srv-integra', database: 'INTEGRA_DECOBRANDS', utente: 'crm_lettura', password: true, schema: 'crm_viste', secondi: 60, secondi_giacenze: 15 },
+    accesso: { tenant: 'decobrands.onmicrosoft.com', client_id: '3f2a9c1e-7b40-4d6a-9e1f-0c5b8d2e4a71', segreto: true },
+    integra: { server: 'srv-crm', database: 'integra_ponte', utente: 'crm_lettura', password: true, schema: 'crm_viste', secondi: 60, secondi_giacenze: 15 },
     conservazione: { eventi_mesi: 36, scartati_giorni: 90, righe_pagina: 25 }
   },
 

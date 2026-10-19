@@ -1,6 +1,6 @@
 # PRD — CRM Ordini a fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 1.0 · **Data:** 18/10/2026 · **Autore:** Ugo Volpato (con Claude Code)
+**Versione:** 1.1 · **Data:** 19/10/2026 (D-29…D-32: CRM staccato dalla Gestione Ordini, accesso con Microsoft 365 o link via email, registro unico, database ponte per Integra) · **Autore:** Ugo Volpato (con Claude Code)
 **Stato:** bozza da rivedere con Decobrands (Matteo Caironi) prima della condivisione
 **Fonti sintetizzate:** `specifica-crm-provvigioni.md` v4.9 (fonte di verità), `piano-lavoro-crm.md` v1.4,
 `preventivo-crm-provvigioni.md` (aggiornato al 15/10/2026), `ANALISI_CRM_PROVVIGIONI.md`,
@@ -39,7 +39,7 @@ mese invece che mai, liquidazione trimestrale prodotta senza ricalcoli a mano, d
 escono dall'azienda.
 
 **Investimento:** 105 h, € 6.175 (16 h già svolte + 89 h da svolgere, margine incluso).
-In più ci sono **53 h fuori preventivo da approvare** (§10.3).
+In più ci sono **59 h fuori preventivo da approvare** (§10.3).
 
 ---
 
@@ -602,8 +602,8 @@ quadrano.
 
 #### E7 · Anagrafiche e Integra (spec §4.1, §4.5, §7.4–7.6 · piano F1)
 
-**E7.1 — Sincronizzazione da Integra** (D-01, D-07, piano F1-A4, **da approvare**).
-- [ ] Viste `v_clienti` e `v_fornitori` lette ogni 60 s, in modo incrementale, con un utente
+**E7.1 — Sincronizzazione da Integra** (D-01, D-07, D-32, piano F0-A8 e F1-A4, **da approvare**).
+- [ ] Viste `v_clienti` e `v_fornitori` lette dal **database ponte** ogni 60 s, in modo incrementale, con un utente
       in sola lettura (`crm_lettura`).
 - [ ] Si aggiornano solo i campi di Integra; i dati del CRM non si toccano.
 - [ ] Problemi aperti in automatico: P.IVA mancante o doppia, vista mancante, connessione
@@ -662,14 +662,16 @@ quadrano.
 #### E9 · Gestione (spec §7.11, §7.13–7.17, §8.3, §15 · piano F5)
 
 **E9.1 — Ruoli e permessi** (D-05, F5-A3, **da approvare**).
-- [ ] Ruoli *Amministratore*, *Operatore*, *Sola lettura* (tabella `crm_ruoli_utente`).
+- [ ] Ruoli *Amministratore*, *Operatore*, *Sola lettura* (`utenti.ruolo`).
 - [ ] I permessi si verificano sul server (`requirePermesso`).
 - [ ] Per la sola lettura: fascia "Profilo in sola lettura", pulsanti di modifica spenti,
       pagine non permesse con "Pagina riservata".
 
 **E9.2 — Utenti** (F5-A4, **da approvare**).
-- [ ] Utenti condivisi con la Gestione Ordini.
-- [ ] Nuova password via email, con cambio obbligatorio al primo accesso.
+- [ ] Utenti propri del CRM, nessun legame con la Gestione Ordini (D-29).
+- [ ] Si entra solo su invito, con Microsoft 365 o con un link via email; nessuna password (D-30).
+- [ ] Chi non è invitato o è disattivato non entra, nemmeno con un account Microsoft valido.
+- [ ] *Invia di nuovo l'invito* e *Invia un link di accesso*; un invio non recapitato apre un'anomalia.
 - [ ] Deve restare almeno un amministratore attivo.
 - [ ] Nessuno cambia il proprio ruolo, si disattiva o si elimina.
 
@@ -677,12 +679,12 @@ quadrano.
 - [ ] 4 servizi (casella, lettura, Integra, posta), ciascuno con un controllo di salute ogni
       5 minuti.
 - [ ] Stato verde, giallo o rosso secondo le regole della spec §7.14.2.
-- [ ] Catalogo dei problemi con apertura, ripetizione e chiusura automatica.
+- [ ] Catalogo dei problemi con apertura, ripetizione e chiusura automatica; i problemi sono anomalie del registro unico (D-31).
 - [ ] *Segna come visto*, *Controlla adesso*, aggiornamento da solo ogni 30 s.
 
 **E9.4 — Impostazioni** (F5-A6, **da approvare**).
-- [ ] 6 sezioni: azienda, casella, server di lettura e soglie, posta, Integra, conservazione.
-- [ ] Le password sono cifrate e non si rileggono mai.
+- [ ] 7 sezioni: azienda, casella, server di lettura e soglie, posta, accesso con Microsoft 365, Integra (database ponte), conservazione.
+- [ ] Password e segreti sono cifrati e non si rileggono mai.
 - [ ] *Prova la connessione*.
 - [ ] Ogni salvataggio scrive un evento, mai le password.
 
@@ -692,14 +694,17 @@ quadrano.
       modificare.
 - [ ] Pulsante *Guida* nella testata di ogni pagina.
 
-**E9.6 — Registro degli eventi** (V10, spec §15).
-- [ ] Tabella `eventi_app` di sola aggiunta, scritta nella **stessa transazione**
-      dell'operazione, con l'unico helper `logEvent()`.
+**E9.6 — Registro unico di eventi e anomalie** (V10, D-31, spec §15, piano F5-A2).
+- [ ] Una sola tabella `registro`: campi comuni (quando, genere, livello, codice, servizio,
+      entità, utente, messaggio, operazione) e `dettaglio` JSON controllato da uno schema per codice.
+- [ ] Eventi di sola aggiunta, scritti nella **stessa transazione** dell'operazione con
+      `logEvent()`; anomalie aperte con `apriAnomalia()`, contate invece di ripetersi, chiuse da sole.
 - [ ] Catalogo tassativo: né più né meno eventi di quelli previsti.
 - [ ] Le letture non scrivono eventi.
 - [ ] Mai password, token o contenuto dei documenti.
-- [ ] Pagina `/eventi` per l'amministratore: filtri, dettaglio JSON, esportazione CSV.
-- [ ] Conservazione di 36 mesi.
+- [ ] Pagina `/registro` per l'amministratore: filtri standard, *Anomalie aperte*, *Stessa
+      operazione*, dettaglio, esportazione CSV.
+- [ ] Conservazione: `info` 12 mesi, il resto 36 mesi; le anomalie aperte restano.
 
 #### E10 · Regole trasversali dell'interfaccia (spec §7.12, §16.4)
 
@@ -729,10 +734,10 @@ quadrano.
 
 - ⚠ **Ogni storia** ha un criterio di accettazione implicito: il calcolo o l'operazione si fa sul server dai dati del database; un valore calcolato inviato dal browser si ignora o si rifiuta (V12, D-28).
 
-- **Le tabelle della Gestione Ordini non si modificano** (V2): il CRM legge `users`,
-  `clienti` e `ordini_cliente_*`, e scrive solo nelle sue tabelle.
-- **Accesso unico con la Gestione Ordini**: si verifica in F0-A3. Se le sessioni non sono
-  compatibili, il login è separato con le stesse credenziali, senza ore in più.
+- **Il CRM è staccato dalla Gestione Ordini** (V2, D-29): database e utenti propri, nessuna
+  tabella della Gestione Ordini; la ingloberà con la vendita diretta (§17 della spec).
+- **Accesso** (D-30): Microsoft 365 o link via email, solo su invito; serve la registrazione
+  dell'app in Entra ID da parte di Decobrands.
 - **Codice cliente del fornitore mancante**: l'abbinamento resta manuale (*Scegli la pratica*).
 - **Articoli nuovi del fornitore**: si accettano con il pallino rosso; non sono un errore.
 - **Fornitore con cadenza non mensile**: è uno solo e verrà dismesso; non si gestisce.
@@ -768,7 +773,7 @@ quadrano.
 | Casella email dei documenti (IMAP) e posta in uscita (SMTP) | Decobrands | F6-A1, utenti, solleciti |
 | Server Windows con PostgreSQL `decobrands`, Caddy, Node 24 | Decobrands / Ugo | F0-A1, rilascio |
 | Moduli di infrastruttura del Portale B2B Luis | Ugo | F0-A1, F0-A3, F0-A5 |
-| Approvazione delle 53 h fuori preventivo | Decobrands | le attività segnate **da approvare** |
+| Approvazione delle 59 h fuori preventivo | Decobrands | le attività segnate **da approvare** |
 
 ### 9.2 Rischi e contromisure
 
@@ -808,7 +813,8 @@ quadrano.
 - 🔵 Quota di PDF digitali e scansionati; scala e origine di `bbox_2d` nel pacchetto
   installato in proprio (F0-A7).
 - 🔵 Il PDF originale si salva nel database (`BYTEA`) o su disco? Da decidere in F0.
-- 🔵 Compatibilità delle sessioni con la Gestione Ordini (F0-A3).
+- 🔵 Registrazione dell'app in Entra ID: chi la fa in Decobrands e quando (F0-A3).
+- 🔵 Colonne vere delle viste nel database ponte, compresa l'email del cliente (F0-A8).
 
 ### 10.3 Ore fuori preventivo da approvare
 
@@ -816,6 +822,9 @@ quadrano.
 |---|---|---|
 | F0-A7 Prova di fattibilità dell'evidenziazione | 6 | rendere certa o escludere una funzione vista nel prototipo |
 | F1-A4 Sincronizzazione da Integra (viste) | 3 | sostituisce l'import da file (D-07) |
+| F0-A8 Viste di Integra sul database ponte | 2 | colonne e chiavi sui dati veri (D-32) |
+| F0-A3 Accesso con Microsoft 365 o link via email | +2 | niente password, solo su invito (D-30) |
+| F5-A2 Registro unico di eventi e anomalie | +2 | un solo posto per tutto (D-31) |
 | F3-A3 Incassi dei clienti | 4 | regole chiarite il 16 e 18/10/2026 (D-11) |
 | F4-A3 Esportazione completa (3 contenuti × 3 formati) | +3 | D-04 (era 1 h) |
 | F4-A4 Report subagenti + F4-A5 Analisi (BI) | 13 | D-18, D-19 |
@@ -823,7 +832,7 @@ quadrano.
 | F1-A5 Percentuali datate ed eccezioni personali | 3 | D-25, D-26 (chiudono B3 e B1) |
 | F1-A6 Regole del subagente (agenzia, mensile, correzione) | 4 | D-27 |
 | F5-A3…A8 Pagine di gestione (ruoli, utenti, stato del sistema, impostazioni, scartati, guida) | 13 | spec §7.13–§7.17, §8.3 |
-| **Totale** | **53** | ≈ € 2.915 alla tariffa di sviluppo assistito (€ 55/h) 🔶 da confermare |
+| **Totale** | **59** | ≈ € 3.245 alla tariffa di sviluppo assistito (€ 55/h) 🔶 da confermare |
 
 ### 10.4 Incoerenze trovate fra i documenti (da sistemare)
 
@@ -1004,7 +1013,7 @@ La gravità indica l'effetto su chi sviluppa o sul cliente:
   - spec §15.2.4 (`:2306`): per il PUT che fa avanzare di fase le righe, l'evento ha
     `tipo = stato`, `azione = snapshot_righe`;
   - contro: spec §4.2.11 (`:463`), dove la colonna `azione` ammette solo `create · update ·
-    delete · upload · export · change_state · verify · login · logout · change_password ·
+    delete · upload · export · change_state · verify · login · logout · link_requested · invite ·
     reset_requested · access_denied · error`.
 - **Perché conta**: il §15.1 dice che il catalogo è **tassativo** ("né più né meno eventi").
   Se `azione` diventa un vincolo `CHECK` o un `enum` Prisma, quell'evento fallisce. Siccome
@@ -1100,8 +1109,8 @@ F0 blocca tutto il resto; F1–F6 procedono in parallelo; F7 chiude.
 | Da svolgere, margine incluso | 89 | € 4.895 |
 | **Totale** | **105** | **€ 6.175** (IVA esclusa) |
 | Riferimento senza AI | 228 h da svolgere | € 15.960 + € 1.280 |
-| Fuori preventivo da approvare (§10.3, preventivo §5) | 53 | € 2.915 |
-| **Totale con tutte le variazioni** | **158** | **€ 9.090** |
+| Fuori preventivo da approvare (§10.3, preventivo §5) | 59 | € 3.245 |
+| **Totale con tutte le variazioni** | **164** | **€ 9.420** |
 | Ampliamento vendita diretta (indicativo) | 12 | da quotare |
 | Supporto alle decisioni, prova (indicativo) | 18 | da quotare |
 
@@ -1148,6 +1157,10 @@ F0 blocca tutto il resto; F1–F6 procedono in parallelo; F7 chiude.
 | D-26 | Eccezioni personali inserite nel CRM | tutto il calcolo sta nel CRM |
 | D-27 | Regole del subagente: agenzia, una fattura al mese, correzione sul documento | ogni accordo si gestisce senza toccare il codice, con il motivo |
 | D-28 | **Tutto sul backend, mai dai dati del frontend** | dal browser si può alterare tutto; sono soldi |
+| D-29 | CRM staccato dalla Gestione Ordini: database e utenti propri; la ingloberà con la vendita diretta | non sovrapporre le prove; niente compatibilità da buttare |
+| D-30 | Accesso con Microsoft 365 o link via email, solo su invito, senza password | Decobrands usa Microsoft 365; il link copre gli esterni |
+| D-31 | Registro unico di eventi e anomalie, `dettaglio` JSON con schema per codice | un solo posto dove guardare |
+| D-32 | Viste di Integra in un database PostgreSQL ponte | si provano senza toccare Integra |
 
 ---
 
@@ -1166,7 +1179,7 @@ F0 blocca tutto il resto; F1–F6 procedono in parallelo; F7 chiude.
 | **Storno / riaccredito** | sul fatturato: provvigione tolta se il cliente non paga / restituita quando paga |
 | **Liquidazione** | pagamento trimestrale ai subagenti (Gen-Mar, Apr-Giu, Lug-Set, Ott-Dic) |
 | **Integra** | gestionale di Decobrands, padrone delle anagrafiche clienti e fornitori |
-| **Gestione Ordini** | applicazione esistente per gli ordini cliente (Express + EJS + n8n + LlamaIndex), resta in esercizio |
+| **Gestione Ordini** | applicazione esistente per gli ordini cliente (Express + EJS + n8n + LlamaIndex), resta in esercizio separata dal CRM, che la ingloberà con la vendita diretta (D-29) |
 | **GLM-OCR** | modello di lettura dei documenti, servito in locale da vLLM sul server con GPU |
 | **Seed** | dati di prova (spec §12, `dati.js`): la prova numerica della replica del prototipo |
 
@@ -1181,9 +1194,9 @@ F0 blocca tutto il resto; F1–F6 procedono in parallelo; F7 chiude.
 - **Ipotesi da verificare per prime**:
   1. GLM-OCR legge i documenti reali con affidabilità sufficiente (F0-A6);
   2. l'evidenziazione nel PDF è fattibile (F0-A7);
-  3. le sessioni sono compatibili con la Gestione Ordini (F0-A3).
+  3. le viste del database ponte hanno i dati che servono (F0-A8).
 - **Prossimo passo consigliato**:
   1. rivedere con Matteo i §6 (valori di partenza e obiettivi) e §10.1 (domande);
-  2. far approvare le 53 h del §10.3;
+  2. far approvare le 59 h del §10.3;
   3. sistemare le incoerenze del §10.4 nella specifica e nel preventivo;
   4. poi avviare F0.

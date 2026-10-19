@@ -1,6 +1,6 @@
 # Piano di lavoro — CRM Decobrands (fasi e attività parallele)
 
-**Versione:** 1.7 · **Data:** 18/10/2026 (regola V12: tutto sul backend) · versione 1.6 (F1-A6 regole del subagente, da approvare) · versione 1.5 (F1-A5 percentuali datate ed eccezioni, da approvare; riferimento alla checklist §1.1) · versione 1.4 (prototipo ufficiale `prototipo-alternativo/`, D-24: checklist §1.1 e file sorgente delle attività riscritti) · versione 1.3 del 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
+**Versione:** 1.8 · **Data:** 19/10/2026 (CRM staccato dalla Gestione Ordini, accesso con Microsoft 365 o link via email, registro unico, viste di Integra dal database ponte: F0-A3, F0-A8, F5-A2, F5-A5 con ore da approvare; spec D-29…D-32) · versione 1.7 (regola V12: tutto sul backend) · versione 1.6 (F1-A6 regole del subagente, da approvare) · versione 1.5 (F1-A5 percentuali datate ed eccezioni, da approvare; riferimento alla checklist §1.1) · versione 1.4 (prototipo ufficiale `prototipo-alternativo/`, D-24: checklist §1.1 e file sorgente delle attività riscritti) · versione 1.3 del 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
 **Derivato da:** `specifica-crm-provvigioni.md` v2.0 (§16) · **Ore:** 71 h di attività + 18 h di margine = 89 h (preventivo §4)
 **Scopo:** suddividere l'implementazione in fasi e attività indipendenti, assegnabili ad **agenti in parallelo**, con **replicazione maniacale** del prototipo navigabile.
 
@@ -54,11 +54,12 @@ Lo stack **ricalca il Portale B2B Luis** (spec V7, §3.3, §3.4, §16.3):
 - **Varie:** `@nestjs/schedule` (conferme scadute, lettura casella), `exceljs` (bollettini/export), Jest + supertest;
 - **Ingresso documenti (spec §6.5):** `imapflow`, coda su PostgreSQL (`FOR UPDATE SKIP LOCKED`), `pdftoppm`, **GLM-OCR su vLLM** nel server GPU locale — **nessun n8n**.
 
-**Riuso da Luis B2B:** solo infrastruttura (accesso, sicurezza, Prisma, registro eventi, utilità comuni, inoltro `/api/*`, pubblicazione) — elenco moduli in spec §16.3. **Nessun componente o CSS di Luis: layout e grafica sono quelli del prototipo** (§1.1).
+**Riuso da Luis B2B:** solo infrastruttura (sessioni, sicurezza, Prisma, registro eventi, utilità comuni, inoltro `/api/*`, pubblicazione) — elenco moduli in spec §16.3. **Nessun componente o CSS di Luis: layout e grafica sono quelli del prototipo** (§1.1).
 
-**Prisma e DB condiviso (V2):** lo schema Prisma copre **solo le tabelle nuove del CRM
-(§4.2)**; le tabelle esistenti della Gestione Ordini si leggono in sola lettura, **mai
-migrate**.
+**Prisma e database proprio (V2, D-29):** lo schema Prisma copre **tutte** le tabelle del
+CRM (§4.2), nel database proprio `crm`; nessuna tabella della Gestione Ordini si legge o si
+scrive. Le viste di Integra si leggono dal database ponte con un client `pg` in sola
+lettura, fuori da Prisma (§4.5, D-32).
 
 ---
 
@@ -107,17 +108,18 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 #### F0-A2 · Schema dati + seed — 6 h
 - **Dipende da:** F0-A1 · **Blocca:** F1–F6 (lette/scritture), F0-A5
-- **Riferimenti:** spec §4.2.1–4.2.13 (tabelle nuove, incl. `documenti_in_arrivo`/`documenti_campi`), §4.1 (tabelle legacy read-only), §12 (seed), §4.3 (relazioni), §4.4 (note schema, `ordine_cliente_id`, `codice_cliente_fornitore`)
+- **Riferimenti:** spec §4.2.1–4.2.13 (tabelle nuove, incl. `documenti_in_arrivo`/`documenti_campi`), §4.2.18 (`utenti`, `accessi_link`), §12 (seed), §4.3 (relazioni), §4.4 (note schema, `ordine_cliente_id`, `codice_cliente_fornitore`)
 - **Sorgente prototipo:** `prototipo-alternativo/assets/dati.js` (struttura dei dati di prova = forma del seed)
-- **Output:** schema Prisma tabelle CRM + migrazioni; introspection letta sulle tabelle esistenti **senza migrazione** (V2); aggregatore seed con `seed/00-base`.
-- **DoD:** migrazioni riusate su DB `decobrands`; seed §12 caricato; vincoli chiave presenti (`UNIQUE(fornitore_id, mese, anno)` bollettini, `UNIQUE(fornitore_id, codice_cliente_fornitore)` interscambio, FK `ordine_cliente_id`).
+- **Output:** schema Prisma tabelle CRM + migrazioni; nessuna tabella della Gestione Ordini (D-29); aggregatore seed con `seed/00-base`.
+- **DoD:** migrazioni applicate sul database `crm`; seed §12 caricato; vincoli chiave presenti (`UNIQUE(fornitore_id, mese, anno)` bollettini, `UNIQUE(fornitore_id, codice_cliente_fornitore)` interscambio, FK `ordine_cliente_id`).
 
-#### F0-A3 · Autenticazione condivisa — 3 h
-- **Dipende da:** F0-A1 · **Blocca:** tutte le schermate login-guardate
-- **Riferimenti:** spec §3.3, §8.3, preventivo §4 att. 2 (sessioni server-side su PostgreSQL, argon2, remember cookie, `requireAuth`/`requireAdmin` — stessa tabella `users`)
-- **Sorgente prototipo:** il prototipo ufficiale **non ha la pagina di accesso**: si disegna con `stile.css` e i componenti (riquadro centrato con logo, utente, password, *Accedi*, errore sotto il campo) e si fa approvare prima di svilupparla; in fondo alla barra laterale utente, ruolo ed *Esci* come nel prototipo (`componenti.js`, `CRM.Barra`)
-- **Output:** moduli di accesso ripresi da Luis B2B (sessioni, CSRF, Helmet, throttler) sulla tabella `users` condivisa; login/logout/reset/cambio password, guard admin, pagina di accesso approvata; **verifica compatibilità sessioni con la Gestione Ordini** (se incompatibili: login separato, stesse credenziali — spec §3.3).
-- **DoD:** accesso con utenti della Gestione Ordini; pagina di accesso approvata (checklist §1.1); eventi `auth/*` §15.2.1 scritti da `logEvent()` (F0-A5).
+#### F0-A3 · Accesso misto solo su invito — 3 h + 2 h **da approvare**
+- **Dipende da:** F0-A1 · **Blocca:** tutte le schermate login-guardate · **Serve dal cliente:** registrazione dell'app in Entra ID (tenant, ID applicazione, segreto, indirizzo di ritorno) fatta dall'amministratore di Microsoft 365
+- **Riferimenti:** spec §3.3, §4.2.18, §8.3, §15.2.1, D-29, D-30
+- **Sorgente prototipo:** il prototipo ufficiale **non ha la pagina di accesso**: si disegna con `stile.css` e i componenti (riquadro centrato con logo, *Entra con Microsoft 365*, sotto "oppure ricevi un link via email" con il campo email, messaggio sempre uguale dopo l'invio) e si fa approvare prima di svilupparla; in fondo alla barra laterale utente, ruolo ed *Esci* come nel prototipo (`componenti.js`, `CRM.Barra`)
+- **Output:** sessioni, CSRF, Helmet, throttler ripresi da Luis B2B; tabella `utenti` propria; accesso con Microsoft 365 (OpenID Connect, `openid-client`, PKCE, un tenant, legame su `microsoft_oid`); link monouso via email (`accessi_link`, impronta SHA-256, 15 minuti; invito 7 giorni); comando per creare il primo amministratore; pagina di accesso approvata. Nessuna password.
+- **DoD:** entra solo chi è invitato e attivo (provato anche con un account Microsoft non invitato); link usato o scaduto rifiutato; risposta della richiesta del link uguale per email registrate e non; eventi `auth/*` §15.2.1 scritti da `logEvent()` (F0-A5).
+- **Ore:** 3 h del preventivo (sessioni, guard, pagina) + **2 h da approvare** (Microsoft 365 e link via email al posto delle password, D-30).
 
 #### F0-A4 · Shell layout comune + componenti standard — 5 h
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate
@@ -148,6 +150,12 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 ---
 
+#### F0-A8 · Viste di Integra sul database ponte — 2 h · **FUORI PREVENTIVO, DA APPROVARE**
+- **Dipende da:** database ponte pronto (lo prepara Ugo, collegato a Integra) · **Blocca:** F1-A4
+- **Riferimenti:** spec §4.5, §5.14 (email del cliente), D-32
+- **Output:** lettura dei dati veri delle viste `v_clienti` e `v_fornitori`; colonne, tipi, chiave (codice Integra), data di ultima modifica per la lettura incrementale, email del cliente; casi da scartare (P.IVA mancante o doppia) contati sui dati reali; spec §4.5 aggiornata con il testo delle viste.
+- **DoD:** spec §4.5 con le colonne vere; utente `crm_lettura` provato in sola lettura; domanda §5.14 sull'email del cliente chiusa o riportata a Matteo.
+
 ## 5. Fase 1 — Anagrafiche (6 h, 3 agenti in parallelo)
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
@@ -155,13 +163,13 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 | **F1-A1** Fornitori + scaglioni (CRUD, dettaglio, flag/stati) | 2 | F0 | `prototipo-alternativo/assets/viste-anagrafiche.js` (Fornitori: elenco, dettaglio a schede *Percentuali · Clienti seguiti*) | §4.2.1, §4.2.2, §7.4, §8.1, §15.2.2 |
 | **F1-A2** Agenti + subagenti | 2 | F0 | `prototipo-alternativo/assets/viste-anagrafiche.js` (Subagenti: elenco e scheda) | §4.2.4, §4.2.5, §7.5, §8.1, §15.2.3 |
 | **F1-A3** Clienti e agenzie (interscambio + codice cliente fornitore) | 2 | F0 | `prototipo-alternativo/assets/viste-anagrafiche.js` (Clienti: anagrafica da Integra in sola lettura, schede *Agenzie · Pratiche*, finestra dell'agenzia con campi di ricerca, blocco duplicati per fornitore) | §4.2.6, §4.4, §7.6, §8.1, §15.2.3 |
-| **F1-A4** Sincronizzazione da Integra delle **anagrafiche clienti e fornitori**: viste sul database (`v_clienti`, `v_fornitori`), utente in sola lettura, processo ogni 60 s, incrementale, aggiorna solo i campi di Integra senza toccare i dati del CRM, registri di esecuzione e problemi (cliente senza P.IVA o P.IVA doppia), sezione delle impostazioni e *Prova la connessione*; sostituisce l'import da file | 3 · **da approvare** | F0-A2 | `prototipo-alternativo/assets/dati.js` (`sistema`, `impostazioni.integra`), `viste-gestione.js` (Impostazioni → Sincronizzazione da Integra) | §4.1, §4.5, §7.14, §7.15 |
+| **F1-A4** Sincronizzazione da Integra delle **anagrafiche clienti e fornitori**: viste sul database (`v_clienti`, `v_fornitori`), utente in sola lettura, processo ogni 60 s, incrementale, aggiorna solo i campi di Integra senza toccare i dati del CRM, registri di esecuzione e problemi (cliente senza P.IVA o P.IVA doppia), sezione delle impostazioni e *Prova la connessione*; sostituisce l'import da file | 3 · **da approvare** | F0-A2, F0-A8 | `prototipo-alternativo/assets/dati.js` (`sistema`, `impostazioni.integra`), `viste-gestione.js` (Impostazioni → Sincronizzazione da Integra) | §4.1, §4.5, §7.14, §7.15 |
 | **F1-A5** Percentuali con data di validità (`valido_dal`, nuova versione da una data, calcolo per documento alla sua data) ed **eccezioni personali** dei subagenti (inserisci, modifica, elimina dalla scheda del subagente; copia sulla nuova versione), API `/api/fornitori/:id/percentuali` e `/api/eccezioni`, eventi §15.2.2 | 3 · **da approvare** | F1-A1, F1-A2, F0-A5 | `prototipo-alternativo/assets/viste-anagrafiche.js` (`nuovePercentuali`, `modificaEccezione`), `motore.js` (`scaglione`, `percentuali`) | §4.2.2, §4.2.3, §5.2, §5.11, §7.4, §7.5, §10, D-25, D-26 |
 | **F1-A6** Regole del subagente (D-27): % dell'agenzia e *una fattura al mese* nella finestra dell'agenzia; tabella `provvigioni_correzioni` e finestra *Correggi* in Liquidazioni con motivo obbligatorio; motore con l'ordine correzione → mensile → agenzia → eccezione → scaglione, usato da liquidazione, Analisi, pratica ed esportazione; API ed eventi | 4 · **da approvare** | F1-A3, F1-A5, F4-A2 | `motore.js` (`quotaSub`, `fatturaDelMese`), `viste-anagrafiche.js` (`modificaAgenzia`), `viste-periodo.js` (`correggiQuota`), `esporta-liquidazione.js` | §4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §10, D-27 |
 
 - **F1-A6: 4 h fuori preventivo, da approvare** (agenzia 1 h, regola mensile 1,5 h, correzione sul documento 1,5 h).
 - **F1-A5: 3 h fuori preventivo, da approvare** (percentuali datate 2 h, eccezioni 1 h; chiudono B3 e B1, spec D-25, D-26).
-- **F1-A4: 3 h fuori preventivo, da approvare** (la sincronizzazione dalle viste sostituisce l'import da file, non previsto nel preventivo originale). Le viste le crea chi gestisce Integra.
+- **F1-A4: 3 h fuori preventivo, da approvare** (la sincronizzazione dalle viste sostituisce l'import da file, non previsto nel preventivo originale). Le viste stanno nel database ponte (F0-A8, D-32).
 - **Output per ciascuna:** rotta pagina + API CRUD + eventi §15.2 + test delle regole univocità.
 - **DoD comune:** checklist §1.1 superata; CRUD completo; eventi esatti (es. fornitore non eliminabile ma `attivo=false` §15.2.2).
 
@@ -203,21 +211,22 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **F4-A4 + F4-A5: 13 h fuori preventivo, da approvare** (sostituiscono le 3 h della sintesi, D-17 → D-18). Ripartizione F4-A5: dati e API 3 h, pagina con filtri e grafici 4 h, selezione multipla nel componente di ricerca (campo e maschera) 1 h, esportazione con grafici 3 h.
 - **DoD:** solo pratiche `fatturate` del trimestre del subagente; KPI = somma righe; export = 8 campi §11; evento `export/export` solo al download.
 
-## 9. Fase 5 — Dashboard + log eventi (2 h, 2 agenti in parallelo)
+## 9. Fase 5 — Dashboard + registro (2 h, 2 agenti in parallelo)
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
 | **F5-A1** Oggi: gruppi di lavoro (documenti, conferme in ritardo, bollettini, pagamenti da sollecitare), scadenze, ultime operazioni, contatori della barra | 1 | F0 (+ dati da F1–F4 per popolare) | `prototipo-alternativo/assets/viste-giorno.js` (Oggi: gruppi di lavoro, scadenze, ultime operazioni) | §7.1, §5.12, §6.1 |
-| **F5-A2** Schermata `/eventi` (filtri, dettaglio JSON in modale, export CSV, rotazione 36 mesi) | 1 | F0-A5 | — (nessuna schermata prototipo: nuova, stile identico alle liste) | §7.11, §8.1, §15.6, §15.7 |
+| **F5-A2** **Registro unico** (D-31): tabella `registro` per eventi e anomalie, `logEvent()` e `apriAnomalia()` con uno schema (zod) per codice, schermata `/registro` (filtri standard, *Anomalie aperte*, *Stessa operazione*, dettaglio in finestra, esporta CSV), pulizia notturna | 1 + 2 · **2 da approvare** | F0-A5 | — (nessuna schermata prototipo: nuova, stile identico alle liste) | §4.2.11, §7.11, §8.1, §15, D-31 |
 
-| **F5-A3** Ruoli e permessi: tabella `crm_ruoli_utente`, `requirePermesso()` su ogni rotta, interfaccia in sola lettura, barra per ruolo | 2 · **da approvare** | F0-A3 | `prototipo-alternativo/assets/motore.js` (`M.PERMESSI`), `componenti.js` (barra) | §8.3 |
-| **F5-A4** Utenti e ruoli `/utenti` (elenco, scheda, nuova password via email, vincoli) | 2 · **da approvare** | F5-A3 | `prototipo-alternativo/assets/viste-gestione.js` | §7.13 |
-| **F5-A5** Stato del sistema `/sistema` + registri `servizi_esecuzioni` / `servizi_problemi` scritti dai servizi: controlli di salute ogni 5 minuti, calcolo dello stato, catalogo dei problemi con apertura, ripetizione e chiusura automatica, *Controlla adesso*, pulizia notturna | 3 · **da approvare** | F6-A1 | idem | §7.14–§7.14.5, §4.2.15 |
-| **F5-A6** Impostazioni `/impostazioni` (6 sezioni, password cifrate mai rilette, prova connessione) | 3 · **da approvare** | F0 | idem | §7.15, §4.2.14 |
+| **F5-A3** Ruoli e permessi: `utenti.ruolo`, `requirePermesso()` su ogni rotta, interfaccia in sola lettura, barra per ruolo | 2 · **da approvare** | F0-A3 | `prototipo-alternativo/assets/motore.js` (`M.PERMESSI`), `componenti.js` (barra) | §8.3 |
+| **F5-A4** Utenti e ruoli `/utenti` (elenco, scheda, modo di accesso, invito e link di accesso, vincoli) | 2 · **da approvare** | F5-A3 | `prototipo-alternativo/assets/viste-gestione.js` | §7.13 |
+| **F5-A5** Stato del sistema `/sistema` + giri in `servizi_esecuzioni` e problemi come **anomalie del registro** (F5-A2), scritti dai servizi: controlli di salute ogni 5 minuti, calcolo dello stato, catalogo dei problemi con apertura, ripetizione e chiusura automatica, *Controlla adesso*, pulizia notturna | 3 · **da approvare** | F6-A1 | idem | §7.14–§7.14.5, §4.2.15 |
+| **F5-A6** Impostazioni `/impostazioni` (7 sezioni con *Accesso con Microsoft 365*, password e segreti cifrati mai riletti, prova connessione) | 3 · **da approvare** | F0 | idem | §7.15, §4.2.14 |
 | **F5-A7** Documenti scartati `/scartati` (motivo, recupero, eliminazione automatica) | 1 · **da approvare** | F6-A4 | idem | §7.16 |
 | **F5-A8** Guida in linea `/guida` + pulsante *Guida* nelle testate | 2 · **da approvare** | F0-A4 | idem (`CRM.GUIDA`) | §7.17 |
 
 - **Pagine di gestione (F5-A3…A8): 13 h fuori preventivo, da approvare.**
+- **F5-A2: 2 h fuori preventivo, da approvare** (registro unico al posto di `eventi_app` + `servizi_problemi`: schema per codice, vita delle anomalie, pagina con le anomalie; D-31).
 - **Nota:** la scrittura degli eventi **non** è di F5: la fa l'attività che implementa ogni operazione (§15.2 tassativo). F5 costruisce solo lettura/filtri/export.
 
 ## 10. Fase 6 — Ingresso documenti senza n8n (17 h, 2–3 agenti)

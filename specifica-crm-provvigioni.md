@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 5.3 — confronto con la nota di credito: solo le righe stornate, differenza = importo stornato (§7.3); FinestraAffiancata a tutto schermo sui telefoni (§16.4); versione 5.2 — **regola V12: ogni calcolo e operazione sensibile solo sul backend, mai da dati del frontend** (§2, §16.5, D-28); versione 5.1 — regole del subagente per cliente e per documento: % dell'agenzia, una fattura al mese, correzione sul documento con motivo (§4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §8.1, §10, §15.2.3, D-27); versione 5.0 — fotografia delle righe registrata nel cambio di stato della pratica, senza l'azione `snapshot_righe` (§15.2.4); percentuali dei fornitori con data di validità e calcolo per documento alla sua data; eccezioni personali dei subagenti inserite nel CRM; rotte delle pagine come il prototipo ufficiale; tolti i filtri vecchi della liquidazione; formula §10 sul netto dei documenti (§4.2.2, §4.2.3, §5.2, §5.11, §7, §7.5, §7.8, §8.1, §10, §13, §15.2.2, D-25, D-26); versione 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 5.4 — CRM staccato dalla Gestione Ordini: database e utenti propri, la Gestione Ordini si ingloberà con la vendita diretta (§1, V2, §4.1, §17, D-29); accesso misto con Microsoft 365 o link via email, solo su invito, senza password (V3, §3.3, §4.2.18, §7.13, §7.15, §8.3, §15.2.1, D-30); **registro unico** di eventi e anomalie con campi comuni e dettaglio JSON controllato per codice, Stato del sistema come vista del registro (V10, §4.2.11, §4.2.15, §7.11, §7.14, §15, D-31); viste di Integra lette da un database PostgreSQL ponte (§4.5, D-32); versione 5.3 — confronto con la nota di credito: solo le righe stornate, differenza = importo stornato (§7.3); FinestraAffiancata a tutto schermo sui telefoni (§16.4); versione 5.2 — **regola V12: ogni calcolo e operazione sensibile solo sul backend, mai da dati del frontend** (§2, §16.5, D-28); versione 5.1 — regole del subagente per cliente e per documento: % dell'agenzia, una fattura al mese, correzione sul documento con motivo (§4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §8.1, §10, §15.2.3, D-27); versione 5.0 — fotografia delle righe registrata nel cambio di stato della pratica, senza l'azione `snapshot_righe` (§15.2.4); percentuali dei fornitori con data di validità e calcolo per documento alla sua data; eccezioni personali dei subagenti inserite nel CRM; rotte delle pagine come il prototipo ufficiale; tolti i filtri vecchi della liquidazione; formula §10 sul netto dei documenti (§4.2.2, §4.2.3, §5.2, §5.11, §7, §7.5, §7.8, §8.1, §10, §13, §15.2.2, D-25, D-26); versione 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -39,8 +39,9 @@ affidabilità per campo e controlli → **controllo dell'operatore** con il PDF 
 abbinamento alla pratica o al bollettino. **Nessun n8n e nessun servizio di lettura
 esterno**: tutto il flusso è codice del CRM, versionato con git.
 
-La **Gestione Ordini** attuale resta in esercizio, invariata, per gli ordini cliente e
-l'esportazione verso Integra. La sua **sostituzione** con un modulo del CRM, che userà lo
+La **Gestione Ordini** attuale resta in esercizio, invariata e **separata**, per gli ordini
+cliente e l'esportazione verso Integra: il CRM non ne usa né gli utenti né le tabelle
+(D-29). La sua **sostituzione** con un modulo del CRM, che userà lo
 stesso ingresso documenti, è prevista in una **fase successiva** (§17), fuori da questo
 preventivo.
 
@@ -51,16 +52,16 @@ preventivo.
 | # | Vincolo | Valore |
 |---|---------|--------|
 | V1 | Unica applicazione | Tutte le funzioni in un'unica applicazione web |
-| V2 | Database condiviso | Stesso PostgreSQL (`decobrands`) della Gestione Ordini: tabelle esistenti riusate senza modificarle + tabelle nuove del CRM. I documenti del CRM entrano dall'**ingresso documenti interno** (§6.5), non dalla pipeline n8n della Gestione Ordini |
-| V3 | Autenticazione | Tabella `users` con ruoli; utente di default `admin` (ruolo `admin`); sessione su cookie HttpOnly/Secure/SameSite + protezione CSRF (§3.3) |
+| V2 | Database proprio | PostgreSQL con un database **proprio del CRM** (`crm`): **nessuna tabella della Gestione Ordini**, né in lettura né in scrittura (D-29). Clienti e fornitori arrivano dalle viste di Integra nel database ponte (§4.5, D-32). I documenti del CRM entrano dall'**ingresso documenti interno** (§6.5), non dalla pipeline n8n della Gestione Ordini |
+| V3 | Accesso | Solo su **invito** dell'amministratore; si entra con **Microsoft 365** (account Decobrands) o con un **link via email** (chi non ha l'account); **nessuna password** nel CRM; sessione su cookie HttpOnly/Secure/SameSite + protezione CSRF (§3.3, D-30) |
 | V4 | Stile grafico | Quello del prototipo ufficiale `prototipo-alternativo/` (D-24): `stile.css` con la palette Decobrands (primario `#0d6efd`, scuro `#212529`, sfondo `#f5f6f8`, stessi colori della Gestione Ordini), carattere Public Sans, barra laterale scura con logo; niente Bootstrap |
 | V5 | Lingua | Tutte le interfacce in italiano |
 | V6 | Responsive | Desktop + tablet + mobile |
-| V7 | Stack | **Stesso stack del Portale B2B Luis**: Node 24, frontend Next.js 16 (App Router) + React 19 + TypeScript, backend NestJS 11, ORM Prisma 7 (adapter `pg`), PostgreSQL condiviso (V2). Due processi Node dietro Caddy; Docker solo in sviluppo (§3.4) |
+| V7 | Stack | **Stesso stack del Portale B2B Luis**: Node 24, frontend Next.js 16 (App Router) + React 19 + TypeScript, backend NestJS 11, ORM Prisma 7 (adapter `pg`), PostgreSQL (V2). Due processi Node dietro Caddy; Docker solo in sviluppo (§3.4) |
 | V8 | Fidelità | Alta fedeltà — dati reali, interazioni reali |
 | V9 | Contenitori dati stabili | Ogni tabella è una **DataTable standard** (§16.4): occupa tutto lo spazio disponibile, intestazione fissa, righe scorrevoli, intestazioni ordinabili; il layout non cambia al variare del numero di righe |
 | V11 | Lettura documenti in locale | **GLM-OCR** servito da **vLLM** su un server aziendale con GPU, chiamato direttamente dal backend NestJS; nessun n8n, nessun servizio esterno; i documenti non escono dall'azienda (§6.5) |
-| V10 | Tracciamento eventi | Il sistema registra automaticamente gli eventi applicativi (CRUD, cambi di stato, upload/export, autenticazione) ed errori su `eventi_app` (§4.2.11), consultabili in sola lettura da `/eventi` (§7.11, §15); le tabelle della Gestione Ordini non vengono modificate (V2) |
+| V10 | Registro unico | Eventi applicativi (CRUD, cambi di stato, upload/export, accesso) e **anomalie** (errori dell'app, problemi dei servizi, errori di lettura, dati di Integra scartati) in **una sola tabella** `registro` (§4.2.11), con campi comuni e dettaglio JSON controllato per codice; consultabile da `/registro` (§7.11, §15, D-31) |
 | **V12** | **Calcoli e operazioni sensibili solo sul backend** | **Ogni calcolo e ogni operazione sensibile si esegue sul server partendo dai dati del database, MAI da dati presi dal frontend**: il client mostra e invia solo le scelte dell'utente (vedi la regola qui sotto, D-28) |
 
 > ⚠ **REGOLA FONDAMENTALE — tutto sul backend, MAI dai dati del frontend (V12, D-28).**
@@ -130,21 +131,39 @@ motore della sezione §10 su dati dimostrativi.
 
 ### 3.3 Autenticazione e autorizzazione
 
-Moduli ripresi dal Portale B2B Luis:
+Accesso **misto e solo su invito** (D-30). Da Luis si riprendono sessioni, CSRF, Helmet,
+throttler e guard; non il login con password.
 
-- Tabella `users` **condivisa con la Gestione Ordini** (stessi ruoli); utente di default
-  `admin` (ruolo `admin`).
-- Sessioni server-side in PostgreSQL (`express-session` + `connect-pg-simple`), password
-  con hash argon2; cambio password, reset via token, "resta connesso".
+- **Utenti propri del CRM** (`utenti`, §4.2.18): nessun legame con la Gestione Ordini (D-29).
+- **Invito**: l'amministratore crea l'utente (nome, email, ruolo, modo di accesso) e il CRM
+  manda l'email d'invito (valida 7 giorni). Chi non è nell'elenco, o è disattivato, **non
+  entra**, nemmeno con un account Microsoft valido.
+- **Microsoft 365** (modo `microsoft`, per gli account Decobrands): OpenID Connect con
+  Entra ID, flusso *authorization code* + PKCE, un solo tenant (quello di Decobrands),
+  libreria `openid-client`. Al primo accesso l'utente si lega all'`oid` di Microsoft
+  (`utenti.microsoft_oid`); dopo si riconosce dall'`oid`, non dall'email, che può cambiare.
+  Serve la registrazione dell'app in Entra ID (la fa l'amministratore di Microsoft 365 di
+  Decobrands); tenant, applicazione e segreto in Impostazioni → Accesso (§7.15).
+- **Link via email** (modo `email`, per chi non ha l'account: subagenti, esterni): si
+  scrive l'email, arriva un link **monouso** valido 15 minuti; nel database si salva solo
+  l'**impronta** del codice (SHA-256, `accessi_link`). La risposta è sempre la stessa
+  ("se l'email è registrata, riceverai un link"), così non si scopre chi è registrato.
+- **Nessuna password** nel CRM: niente hash, cambio o reset della password.
+- **Riserva**: se Microsoft non risponde, l'amministratore manda un link via email anche a
+  un utente `microsoft` (*Invia un link di accesso*, §7.13).
+- Sessioni server-side in PostgreSQL (`express-session` + `connect-pg-simple`), "resta
+  connesso" 30 giorni; disattivare un utente chiude le sue sessioni.
 - Cookie di sessione HttpOnly + Secure + SameSite, protezione CSRF sulle richieste che
-  modificano dati, Helmet, limite tentativi sul login (`@nestjs/throttler`), CORS
-  ristretto all'origine del frontend, validazione input con DTO (`class-validator`).
-- `requireAuth`: tutte le viste tranne login/reset.
-- `requireAdmin`: viste sensibili (clienti, utenti, eventi).
+  modificano dati, Helmet, limite tentativi sulla richiesta del link e sul ritorno da
+  Microsoft (`@nestjs/throttler`), CORS ristretto all'origine del frontend, validazione
+  input con DTO (`class-validator`).
+- `requireAuth`: tutte le viste tranne `/login` e `/accesso/:codice`.
+- `requirePermesso(...)`: su ogni rotta, secondo il ruolo (§8.3).
 
-**Accesso unico con la Gestione Ordini (da verificare in F0-A3):** se la Gestione Ordini
-salva le sessioni nello stesso formato, la sessione è condivisa; altrimenti il CRM ha un
-proprio accesso sulla **stessa** tabella `users` (stesse credenziali, login separato).
+*Perché (D-30):* Decobrands usa Microsoft 365: niente password da ricordare né da gestire, e
+chi lascia l'azienda perde l'accesso quando gli si chiude l'account. Il link via email copre
+chi non ha l'account senza reintrodurre password. L'invito impedisce che entri chiunque
+abbia un account Microsoft.
 
 ### 3.4 Esercizio
 
@@ -160,7 +179,7 @@ Browser ──HTTPS 443──► Caddy (certificato automatico)
                  Backend NestJS    (localhost:8002)
                           │
                           ▼
-                 PostgreSQL `decobrands` (condiviso, V2)
+                 PostgreSQL `crm` (proprio, V2)      
 ```
 
 - Esposte solo le porte 80/443; frontend, backend e database restano locali.
@@ -174,16 +193,21 @@ Browser ──HTTPS 443──► Caddy (certificato automatico)
 
 ## 4. Modello dati
 
-### 4.1 Tabelle esistenti riusate (database condiviso)
+### 4.1 Tabelle della Gestione Ordini (non usate: riferimento per §17)
 
-Il CRM **condivide il database** con la gestione degli ordini: stesso schema
-PostgreSQL, nessuna tabella esistente viene modificata. Le tabelle sotto sono quelle
-già presenti che il CRM riusa (in lettura e, dove previsto, in scrittura).
+**Il CRM non usa queste tabelle** (D-29): ha un database proprio, utenti propri (`utenti`,
+§4.2.18) e una propria copia dei clienti (`clienti`, stesse colonne, scritta solo dalla
+sincronizzazione da Integra, §4.5). L'elenco resta come riferimento per l'ampliamento
+§17, quando il CRM ingloberà la Gestione Ordini e ne migrerà i dati.
+
+*Perché (D-29):* la Gestione Ordini è la vendita diretta, oggi spenta. Tenere separati i
+due flussi evita di sovrapporre le prove; legarsi a utenti, sessioni e tabelle di un'app
+che verrà sostituita obbligava a compatibilità (password bcrypt, sessioni, ruoli) da
+buttare dopo.
 
 | Tabella | Uso nel CRM |
 |---------|-------------|
-| `users` | autenticazione e ruoli (condivisa con la Gestione Ordini). Il CRM legge il ruolo da una tabella propria `crm_ruoli_utente` (`user_id`, `ruolo` = `amministratore` \| `operatore` \| `lettura`): i ruoli della Gestione Ordini (`admin`/`operator`) non cambiano (§8.3) |
-| `remember_tokens` | sessione persistente |
+| `users` · `remember_tokens` | accesso della Gestione Ordini: **non usate**; il CRM ha `utenti` propri (§4.2.18, D-29) |
 | `clienti` | anagrafica cliente importata da Integra (P.IVA univoca, ragione sociale, indirizzo, codice Integra, flag vendita diretta): **sola lettura** nel CRM |
 | `articoli` | catalogo (codice, descrizione, EAN, UM) **sincronizzato dalle viste di Integra** (§4.5): sola lettura |
 | `giacenze` | giacenza di Integra per codice, **sincronizzata** (§4.5): sola lettura. Il disponibile mostrato dal CRM = giacenza − impegni aperti (§4.2.16) |
@@ -423,7 +447,7 @@ su ogni altra regola; non cambia quanto riconosce il fornitore.
 | `tipo` | VARCHAR(10) | `pct` (altra percentuale) · `nessuna` · `importo` (importo fisso in euro) |
 | `valore` | NUMERIC(12,2) | % (0–100) o euro; 0 per `nessuna` |
 | `motivo` | TEXT NOT NULL | obbligatorio; compare nel prospetto del subagente (§11) |
-| `creato_da` · `creato_il` | BIGINT FK → `users` · TIMESTAMPTZ | |
+| `creato_da` · `creato_il` | BIGINT FK → `utenti` · TIMESTAMPTZ | |
 
 Si modifica solo finché il trimestre di liquidazione del documento è aperto.
 
@@ -495,31 +519,52 @@ ha calcolato.
 > `pct_calcolata` / `importo_calcolato` vengono **congelati alla verifica**: è il modo
 > per rileggere un mese vecchio con le percentuali di allora (§5.11).
 
-### 4.2.11 `eventi_app`
+### 4.2.11 `registro` — eventi e anomalie in un solo posto (D-31)
 
-Registro **append-only** degli eventi applicativi (audit trail): CRUD, cambi di
-stato, upload/export e autenticazione. Compilazione esclusivamente server-side (§15);
-nessuna UPDATE/DELETE in esercizio.
+Una sola tabella per **tutto ciò che succede**: eventi applicativi (chi ha fatto cosa) e
+**anomalie** (errori dell'app, problemi dei servizi, errori di lettura dei documenti, dati
+di Integra scartati). I campi comuni servono a filtrare e cercare; i dati propri di ogni
+caso stanno in `dettaglio` (JSONB), con una **forma fissa per ogni `codice`** (§15.4). La
+scrive solo il server (§15).
 
 | Colonna | Tipo | Note |
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
-| `ts` | TIMESTAMPTZ | data/ora evento (server) |
-| `utente_id` | BIGINT FK → `users` | NULL per eventi di sistema / login non riuscito |
-| `sessione_id` | VARCHAR(100) | sessione server-side (per eventi `auth`) |
-| `tipo` | VARCHAR(30) | `auth` · `crud` · `stato` · `documento` · `calcolo` · `export` · `errore` |
-| `entita` | VARCHAR(50) | `fornitore`, `scaglione`, `eccezione`, `correzione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `documento`, `bollettino`, `riga_bollettino`, `liquidazione`, `ordine_cliente`, `alias`, `kit`, `utente`, `sistema` |
-| `entita_id` | BIGINT | id dell'entità coinvolta (dove applicabile) |
-| `azione` | VARCHAR(30) | `create` · `update` · `delete` · `upload` · `export` · `change_state` · `verify` · `login` · `logout` · `change_password` · `reset_requested` · `access_denied` · `error` |
+| `ts` | TIMESTAMPTZ DEFAULT now() | quando (dal server, mai dal client); per un'anomalia, la prima volta |
+| `genere` | VARCHAR(10) | `evento` (è successo qualcosa) · `anomalia` (c'è qualcosa da guardare) |
+| `livello` | VARCHAR(10) | `info` · `attenzione` · `errore` · `critico` |
+| `codice` | VARCHAR(50) | dal catalogo: eventi `tipo.azione` (es. `stato.change_state`, §15.2), anomalie §7.14.3 (es. `integra.piva_mancante`) |
+| `tipo` · `azione` | VARCHAR(30) | eventi: come nel catalogo §15.2 (`auth`, `crud`, `stato`, `documento`, `calcolo`, `export`, `errore`; `create`, `update`, `delete`, `upload`, `export`, `change_state`, `verify`, `login`, `logout`, `link_requested`, `invite`, `access_denied`, `error`); anomalie: `servizio` · `apri` |
+| `servizio` | VARCHAR(15) | `casella` · `lettura` · `integra` · `posta` · `accesso` · `app`; NULL per gli eventi delle persone |
+| `entita` · `entita_id` | VARCHAR(50) · BIGINT | cosa riguarda: `fornitore`, `scaglione`, `eccezione`, `correzione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `documento`, `bollettino`, `riga_bollettino`, `liquidazione`, `cliente`, `utente`, `sistema` |
 | `esito` | VARCHAR(10) | `successo` · `errore` · `negato` |
-| `dettaglio` | JSONB | sempre la chiave `etichetta`; diff `prima`/`dopo`, nuovo stato, riferimento documento / `documenti_in_arrivo`, errore tecnico breve (§15.4) |
-| `ip` | VARCHAR(45) | indirizzo client (solo eventi `auth`/`negato`) |
-| `created_at` | TIMESTAMPTZ | |
+| `messaggio` | VARCHAR(300) | frase in italiano da mostrare, con l'etichetta (numero, ragione sociale); frase fissa con segnaposto (§7.14.3) |
+| `dettaglio` | JSONB | i dati propri del codice: diff `prima`/`dopo`, nuovo stato, `documento_id`, misure, errore tecnico breve (§15.4) |
+| `utente_id` | BIGINT FK → `utenti` | chi; NULL per i servizi e per un accesso non riconosciuto |
+| `operazione_id` | UUID | lega le righe di una stessa operazione (es. arrivo email → lettura → abbinamento) |
+| `sessione_id` · `ip` | VARCHAR(100) · VARCHAR(45) | solo eventi `auth` e `negato` |
+| **Solo anomalie** | | |
+| `chiave` | VARCHAR(120) | cosa riguarda, per riconoscere i doppioni (es. `C00931`, nome dell'allegato, email); vuota se riguarda il servizio intero |
+| `volte` · `ultimo` | INT DEFAULT 1 · TIMESTAMPTZ | quante volte si è ripresentata e l'ultima volta |
+| `stato` | VARCHAR(10) | `aperta` · `chiusa` |
+| `visto_il` · `visto_da` | TIMESTAMPTZ · BIGINT FK → `utenti` | *Segna come visto* (§7.14.4) |
+| `chiusa_il` | TIMESTAMPTZ | quando la causa è sparita |
 
-> Tabella **append-only**: nessuna modifica/eliminazione manuale. La riga viene scritta
-> **nella stessa transazione** dell'operazione che la genera (§15.3); un job di pulizia
-> elimina le righe più vecchie di 36 mesi (§15.7). Indici: `(tipo, ts)`,
-> `(entita, entita_id)`, `(utente_id, ts)`.
+> **Eventi: solo aggiunta.** Le righe `evento` non si modificano né si cancellano a mano e
+> si scrivono **nella stessa transazione** dell'operazione (§15.3). **Anomalie: cambia solo
+> la loro vita** (`volte`, `ultimo`, `stato`, `visto_*`, `chiusa_il`, §7.14.4); *Segna come
+> visto* scrive a sua volta un evento, così la storia resta completa.
+>
+> Indici: `(ts DESC)`, `(genere, livello, ts)`, `(codice, ts)`, `(entita, entita_id)`,
+> `(utente_id, ts)`, `(operazione_id)`; univoco `(servizio, codice, chiave) WHERE genere =
+> 'anomalia' AND stato = 'aperta'` (una sola anomalia aperta per causa); GIN su
+> `dettaglio`. Pulizia: §15.7.
+
+*Perché (D-31):* eventi, problemi dei servizi ed errori di lettura stavano in tre tabelle e
+due pagine; per capire cosa era successo a un documento bisognava incrociarle. Con un solo
+registro un filtro (o l'`operazione_id`) mostra tutta la storia; i campi comuni bastano per
+filtrare, il JSON tiene i dettagli senza colonne nuove per ogni caso e lo schema per codice
+impedisce che diventi testo libero.
 
 ### 4.2.12 `documenti_in_arrivo`
 
@@ -566,13 +611,15 @@ alla **taratura** delle soglie sui documenti reali.
 
 ### 4.2.14 `impostazioni`
 
-Una riga per sezione (`chiave` = `azienda` · `casella` · `lettura` · `posta` · `integra` · `conservazione`), `valore` JSONB, `aggiornato_il`, `aggiornato_da`. Le password (casella IMAP, posta in uscita) sono **cifrate** (chiave nel file d'ambiente del server) e **non vengono mai restituite** dalle API: si sostituiscono soltanto. Ogni modifica scrive un evento (§15).
+Una riga per sezione (`chiave` = `azienda` · `casella` · `lettura` · `posta` · `accesso` · `integra` · `conservazione`), `valore` JSONB, `aggiornato_il`, `aggiornato_da`. Le password (casella IMAP, posta in uscita) sono **cifrate** (chiave nel file d'ambiente del server) e **non vengono mai restituite** dalle API: si sostituiscono soltanto. Ogni modifica scrive un evento (§15).
 
-### 4.2.15 `servizi_esecuzioni` e `servizi_problemi`
+### 4.2.15 `servizi_esecuzioni`
 
-Registro dei servizi automatici, letto dalla pagina Stato del sistema (§7.14). Li scrivono
-**solo i servizi** (mai l'interfaccia, salvo *Segna come visto*), con un'unica funzione
-`registraEsecuzione()` / `apriProblema()` nel livello dei servizi.
+Giri dei servizi automatici, letti dalla pagina Stato del sistema (§7.14). Li scrivono
+**solo i servizi**, con un'unica funzione `registraEsecuzione()`. I **problemi** dei servizi
+non hanno una tabella propria: sono **anomalie del `registro`** (§4.2.11, D-31), aperte con
+`apriAnomalia()`. Le esecuzioni restano fuori dal registro perché sono misure, non fatti
+da guardare (la sincronizzazione ne scrive una al minuto).
 
 `servizi_esecuzioni` — una riga per ogni giro di lavoro o controllo di un servizio.
 
@@ -585,30 +632,10 @@ Registro dei servizi automatici, letto dalla pagina Stato del sistema (§7.14). 
 | `esito` | VARCHAR(10) | `ok` · `attenzione` · `errore` |
 | `testo` | VARCHAR(300) | cosa ha fatto, leggibile (es. "1 email, 1 allegato (Gries_AB-77120.pdf)") |
 | `misure` | JSONB | numeri del giro: `{email, allegati, ignorati}` · `{pagine, secondi, secondi_pagina, documento_id}` · `{vista, lette, aggiornate, scartate}` · `{destinatario, codice_smtp}` |
-| `avviato_da` | BIGINT FK → `users` | NULL se pianificato; l'utente se da *Controlla adesso* |
+| `avviato_da` | BIGINT FK → `utenti` | NULL se pianificato; l'utente se da *Controlla adesso* |
 
-`servizi_problemi` — una riga per problema **aperto o chiuso**; lo stesso problema che si
-ripete aggiorna la riga esistente invece di crearne una nuova.
-
-| Colonna | Tipo | Note |
-|---|---|---|
-| `id` | BIGSERIAL PK | |
-| `servizio` | VARCHAR(15) | come sopra |
-| `codice` | VARCHAR(40) | dal catalogo §7.14.3 (es. `casella.connessione`) |
-| `chiave` | VARCHAR(120) | cosa riguarda, per riconoscere i doppioni (es. `C00931`, nome dell'allegato, email del destinatario); vuota se il problema è del servizio intero |
-| `livello` | VARCHAR(10) | `errore` · `attenzione` |
-| `testo` | VARCHAR(200) | titolo (es. "Cliente non sincronizzato: P.IVA mancante") |
-| `dettaglio` | TEXT | cosa è successo e **cosa fare** |
-| `primo` · `ultimo` | TIMESTAMPTZ | prima e ultima volta che si è presentato |
-| `volte` | INT DEFAULT 1 | quante volte |
-| `chiuso_il` | TIMESTAMPTZ | NULL = aperto; valorizzato quando la causa sparisce (chiusura automatica, §7.14.4) |
-| `visto_il` · `visto_da` | TIMESTAMPTZ · BIGINT FK → `users` | *Segna come visto* |
-
-Indici: `servizi_esecuzioni (servizio, inizio DESC)`; `servizi_problemi (servizio, codice,
-chiave) WHERE chiuso_il IS NULL` univoco (un solo problema aperto per causa),
-`servizi_problemi (visto_il) WHERE visto_il IS NULL`. Conservazione: esecuzioni 90 giorni
-(sono molte: la sincronizzazione ne scrive una al minuto), problemi come il registro
-eventi (`eventi_mesi`, §7.15); pulizia con un lavoro notturno.
+Indici: `servizi_esecuzioni (servizio, inizio DESC)`. Conservazione: 90 giorni; pulizia
+con un lavoro notturno.
 
 ### 4.2.16 `impegni_giacenza` — **ampliamento futuro (§17), non in questa fase**
 
@@ -624,7 +651,7 @@ registrazione dell'ordine in Integra.
 | `qta` | NUMERIC(12,2) | |
 | `stato` | VARCHAR(12) | `impegnato` · `registrato` · `rilasciato` |
 | `nota` | VARCHAR(200) | es. "alias VASA-3050 → VASA-3050N (nuovo)", "componente del kit KIT-ORTO" |
-| `creato_il` · `creato_da` | TIMESTAMPTZ · BIGINT FK → `users` | |
+| `creato_il` · `creato_da` | TIMESTAMPTZ · BIGINT FK → `utenti` | |
 | `chiuso_il` | TIMESTAMPTZ | quando è passato a `registrato` o `rilasciato` |
 
 - **Disponibile** = giacenza di Integra − somma degli impegni `impegnato` del codice.
@@ -644,6 +671,32 @@ Una riga per esportazione verso Integra (le tabelle della Gestione Ordini non si
 dell'operatore), `annullata_il`, `annullata_da`. L'ordine è "esportato" se ha
 un'esportazione non annullata.
 
+### 4.2.18 `utenti` e `accessi_link` (D-29, D-30)
+
+`utenti` — gli utenti del CRM; nessun legame con la tabella `users` della Gestione Ordini. Si
+entra con l'email: non c'è un nome utente.
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `email` | VARCHAR(200) UNIQUE | in minuscolo; serve per l'invito e per il link |
+| `nome` | VARCHAR(120) | |
+| `ruolo` | VARCHAR(15) | `amministratore` · `operatore` · `lettura` (§8.3) |
+| `accesso` | VARCHAR(10) | `microsoft` · `email` (§3.3) |
+| `microsoft_oid` | VARCHAR(64) UNIQUE | `oid` di Entra ID, scritto al primo accesso con Microsoft |
+| `attivo` | BOOLEAN DEFAULT true | disattivato = non entra; i dati restano |
+| `sistema` | BOOLEAN DEFAULT false | utente dei servizi automatici: non accede |
+| `invitato_il` · `ultimo_accesso` | TIMESTAMPTZ | `ultimo_accesso` NULL = invitato, non ancora entrato |
+| `ultimo_invio` | JSONB | `{quando, tipo: invito \| link, errore}`: l'ultimo invio e l'eventuale errore di recapito |
+
+`accessi_link` — inviti e link via email: `id`, `utente_id` FK, `tipo` (`invito` · `link`),
+`impronta` CHAR(64) UNIQUE (SHA-256 del codice: il codice in chiaro non si salva),
+`scade_il` (15 minuti il link, 7 giorni l'invito), `usato_il`, `ip`. Un codice usato o
+scaduto non vale più; uno nuovo annulla i precedenti dello stesso utente.
+
+Il primo amministratore si crea all'installazione con un comando del server (email, nome);
+riceve l'invito come tutti.
+
 ### 4.3 Diagramma relazionale
 
 ```
@@ -655,7 +708,7 @@ ordini_fornitore_testata 1 ── n ordini_fornitore_documenti (fatture e note d
 interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)
 interscambio (fornitore_id, codice_cliente_fornitore) → ordini_fornitore_testata (cliente_piva, fornitore_id)
 ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1)
-users 1 ── n eventi_app  (audit append-only, §15)
+utenti 1 ── n registro  (eventi e anomalie, §15)
 ```
 
 ### 4.4 Note di schema
@@ -685,7 +738,7 @@ users 1 ── n eventi_app  (audit append-only, §15)
 
 ### 4.5 Sincronizzazione da Integra
 
-| Dato | Vista su Integra (schema `crm_viste`) | Ogni | Note |
+| Dato | Vista nel database ponte (schema `crm_viste`) | Ogni | Note |
 |---|---|---|---|
 | Clienti | `v_clienti` (P.IVA, ragione sociale, indirizzo, codice cliente) | 60 s | un cliente senza P.IVA valida è segnalato in Stato del sistema |
 | Fornitori | `v_fornitori` (P.IVA, ragione sociale, paese, codice fornitore) | 60 s | |
@@ -695,8 +748,15 @@ users 1 ── n eventi_app  (audit append-only, §15)
 
 - **In questa fase** si sincronizzano solo **clienti e fornitori** (piano F1-A4); articoli,
   giacenze e ordini registrati arrivano con l'ampliamento (§17).
-- **Accesso**: utente del database **in sola lettura** (`crm_lettura`), solo sulle viste;
-  le viste le crea chi gestisce Integra. Parametri in Impostazioni → Sincronizzazione da
+- **Database ponte** (D-32): le viste stanno in un **database PostgreSQL** preparato da
+  Ugo e collegato a Integra (schema `crm_viste`); il CRM legge solo da lì, con un utente
+  **in sola lettura** (`crm_lettura`), e non si collega mai al database di Integra.
+  Colonne, chiavi e data di modifica delle viste si fissano guardando i dati veri del ponte
+  (piano F0-A8), compresa l'email del cliente (§5.14).
+  *Perché (D-32):* le viste si provano e si correggono senza toccare Integra; il CRM parla
+  solo PostgreSQL; un guasto di Integra resta fuori dal CRM e si vede come anomalia
+  `integra.connessione`.
+- Parametri in Impostazioni → Sincronizzazione da
   Integra (§7.15).
 - **Incrementale**: dove la vista ha la data di ultima modifica si leggono solo le righe
   cambiate; le giacenze si leggono intere (sono poche migliaia di righe).
@@ -1218,7 +1278,7 @@ senza `#`.
 
 | # | Rotta | Schermata |
 |---|-------|-----------|
-| 1 | `/login`, `/cambia-password`, `/richiedi-reset`, `/reset-password` | Credenziali (condivise con la Gestione Ordini) |
+| 1 | `/login`, `/accesso/:codice` | Accesso con Microsoft 365 o link via email, solo su invito (§3.3) |
 | 2 | `/` | Oggi: cose da fare per gruppi (home dopo l'accesso, §7.1) |
 | 3 | `/documenti`, `/documenti/:id` | Ingresso documenti (§7.9) |
 | 4 | `/pratiche`, `/pratiche/:id` | Elenco e dettaglio delle pratiche (§7.2, §7.3) |
@@ -1229,7 +1289,7 @@ senza `#`.
 | 9 | `/subagenti`, `/subagenti/:id` | Subagenti con eccezioni personali (§7.5) |
 | 10 | `/clienti`, `/clienti/:piva` | Clienti (da Integra) con le loro agenzie (§7.6) |
 | 11 | `/utenti/:id`, `/sistema`, `/impostazioni/:sezione`, `/scartati`, `/guida/:argomento` | Gestione (§7.13–§7.17) |
-| 12 | `/eventi` | Registro eventi (amministratore, §7.11) |
+| 12 | `/registro` | Registro di eventi e anomalie (amministratore, §7.11) |
 | — | `/ordini-cliente`, `/articoli`, `/giacenze`, `/alias-kit` | Vendita diretta: spenta, ampliamento futuro (§17) |
 
 ### 7.1 Oggi (`/dashboard`)
@@ -1610,8 +1670,8 @@ Considerazioni:
     dati (§16.4.2).
 - **Utente**: in fondo alla barra laterale ci sono l'utente e il ruolo. Nel prototipo *Prova
   come* cambia utente, *Ripristina i dati di prova* riporta i dati all'inizio e la data di
-  lavoro è simulata (04/09/2026). In esercizio (V3) l'accesso usa la tabella `users`
-  (§3.3).
+  lavoro è simulata (04/09/2026). In esercizio (V3) si entra con Microsoft 365 o con un
+  link via email (§3.3).
 - **Oggi come punto d'ingresso**: raccoglie per gruppi di lavoro ciò che c'è da fare
   (documenti da controllare, conferme in ritardo, bollettini, pagamenti da sollecitare);
   da qui si entra nelle pagine.
@@ -1632,17 +1692,21 @@ Considerazioni:
   (D-12, D-15). Le tabelle riempiono lo spazio rimasto e scorrono dentro, così il
   layout non salta al variare del numero di righe.
 
-### 7.11 Log eventi applicativi (`/eventi`)
+### 7.11 Registro (`/registro`) — amministratore
 
-- **Sola lettura, admin**: nessuna modifica/eliminazione di eventi; accesso con ruolo
-  `admin` (§3.3).
-- **Filtri**: tipo evento, entità, utente, periodo (da/a), esito; filtro rapido
-  "solo errori".
-- **Tabella** (contenitore stabile V9): data/ora, utente, tipo, entità, riferimento
-  (es. pratica/bollettino), esito; intestazione fissa, scroll interno, paginazione.
-- **Dettaglio evento** in modale: JSON `dettaglio` formattato (diff `prima`/`dopo`,
-  nuovo stato, riferimento documento / `documenti_in_arrivo`).
-- **Export CSV** del log filtrato (§8.1).
+- **Una pagina per eventi e anomalie** (D-31), **sola lettura** salvo *Segna come visto*
+  sulle anomalie. Il prototipo non la mostra: si disegna con i componenti standard
+  (DataTable, FilterBar, FormModal) come le altre liste.
+- **Filtri standard** (§16.4.1): segmenti *Tutto · Anomalie aperte · Errori*; genere,
+  livello, servizio, codice, utente, entità, periodo, testo sul messaggio. *Stessa
+  operazione* su una riga mostra tutte le righe con la sua `operazione_id`.
+- **Tabella** (contenitore stabile V9): quando, livello, messaggio, utente o servizio,
+  riferimento (apre la pratica, il documento, il bollettino), volte; paginazione.
+- **Dettaglio** in finestra: campi comuni e `dettaglio` mostrato come elenco di campi
+  leggibili (diff `prima`/`dopo` affiancato).
+- **Esporta** CSV delle righe filtrate (§8.1).
+- La pagina **Stato del sistema** (§7.14) è una vista di questo registro: le anomalie dei
+  servizi, con i giri di `servizi_esecuzioni`.
 - Dettagli di progettazione in §15.
 
 ---
@@ -1677,23 +1741,24 @@ deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'er
 
 ### 7.13 Utenti e ruoli (`/utenti`, `/utenti/:id`) — solo amministratore
 
-- Gli **utenti sono quelli della Gestione Ordini** (tabella `users` condivisa, stesse
-  credenziali); il **ruolo nel CRM** è proprio (`crm_ruoli_utente`, §4.1).
-- **Elenco** (sinistra): ricerca per nome, utente o email; segmenti *Attivi · Disattivati ·
-  Tutti*; colonne utente (con nome utente ed email), ruolo, ultimo accesso.
-- **Scheda** (destra): nome utente, email, ruolo, stato, ultimo accesso, stato della
-  password (da cambiare al prossimo accesso), **ultimo invio password con eventuale
-  errore di recapito**; azioni *Modifica*, *Invia nuova password*, *Disattiva/Riattiva*,
+- Gli **utenti sono propri del CRM** (`utenti`, §4.2.18, D-29); si entra con **Microsoft
+  365** o con un **link via email**, solo su invito, senza password (§3.3, D-30).
+- **Elenco** (sinistra): ricerca per nome o email; segmenti *Attivi · Disattivati · Tutti*;
+  colonne utente (con email), ruolo, ultimo accesso (*Invitato* se non è ancora entrato).
+- **Scheda** (destra): email, ruolo, stato, ultimo accesso, modo di accesso (*Microsoft 365*
+  · *Link via email*), **ultimo invio (invito o link) con l'eventuale errore di recapito**;
+  azioni *Modifica*, *Invia di nuovo l'invito* (chi non è ancora entrato) oppure *Invia un
+  link di accesso* (anche come riserva se Microsoft non risponde), *Disattiva/Riattiva*,
   *Elimina*.
 - La scheda ha due **schede**: *Dati dell'utente* e **Cosa può fare ogni ruolo** (tabella
   attività × ruoli, la stessa di §8.3, con la colonna del ruolo dell'utente evidenziata).
-- *Nuovo utente*: nome, nome utente (non modificabile dopo), email, ruolo; parte l'email
-  con la password temporanea da cambiare al primo accesso (`must_change_password`).
-- **Vincoli**: nome utente ed email unici; **deve restare almeno un amministratore
+- *Nuovo utente*: nome, email, modo di accesso (proposto *Microsoft 365*), ruolo; parte
+  l'email d'invito.
+- **Vincoli**: email unica; **deve restare almeno un amministratore
   attivo**; nessuno può cambiare il proprio ruolo, disattivarsi o eliminarsi; l'**utente
   dei servizi automatici** non si modifica e non accede all'app; eliminare un utente che
   ha già usato l'app chiede conferma e suggerisce di disattivarlo (il nome resta nel
-  registro eventi). Un invio non recapitato crea un problema in §7.14.
+  registro eventi). Un invio non recapitato apre l'anomalia `posta.respinta` (§7.14).
 
 ### 7.14 Stato del sistema (`/sistema`) — amministratore e operatore
 
@@ -1712,12 +1777,12 @@ deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'er
 - *Controlla adesso*: esegue subito il giro della casella e il controllo di tutti i servizi
   (§7.14.1), poi ridisegna la pagina.
 - La pagina si **aggiorna da sola** ogni 30 secondi mentre è aperta.
-- Sostituisce la pagina "Errori" della Gestione Ordini per il CRM.
+- È una **vista del registro** (§7.11, D-31): le anomalie dei servizi con i loro giri.
 
 #### 7.14.1 Da dove vengono i dati: cosa scrive ogni servizio
 
 Tutti i servizi girano nel server del CRM come **lavori pianificati** (stessa coda dei
-lavori di §6.5) e scrivono in `servizi_esecuzioni` / `servizi_problemi` (§4.2.15). Oltre
+lavori di §6.5) e scrivono in `servizi_esecuzioni` (§4.2.15) e aprono anomalie nel `registro` (§4.2.11). Oltre
 al lavoro vero, ogni servizio ha un **controllo di salute** ogni 5 minuti, così si sa se
 funziona anche quando non c'è nulla da fare.
 
@@ -1726,7 +1791,7 @@ funziona anche quando non c'è nulla da fare.
 | **Casella dei documenti** (`casella`) | ogni N minuti (Impostazioni → Casella): legge le email nuove della cartella, salva gli allegati PDF/Excel in `documenti_in_arrivo`, sposta le email lette (§6.5 punti 1–2) | accesso IMAP e presenza delle due cartelle | email, allegati presi, allegati ignorati |
 | **Server di lettura** (`lettura`) | a ogni documento: invio a GLM-OCR, risposta, campi letti (§6.5 punti 3–4) | chiamata di prova al servizio (`/health` o modello caricato) e tempo di risposta | pagine, secondi, secondi per pagina, documento |
 | **Sincronizzazione da Integra** (`integra`) | ogni 60 s per le anagrafiche (§4.5); una riga per giro con il riepilogo di tutte le viste | connessione al database e lettura di una riga per vista | per vista: righe lette, aggiornate, scartate |
-| **Posta in uscita** (`posta`) | a ogni invio (password, solleciti se inviati dal CRM) | accesso SMTP senza inviare | destinatario, codice di risposta del server |
+| **Posta in uscita** (`posta`) | a ogni invio (inviti, link di accesso, solleciti se inviati dal CRM) | accesso SMTP senza inviare | destinatario, codice di risposta del server |
 
 #### 7.14.2 Come si calcola lo stato del riquadro
 
@@ -1762,10 +1827,11 @@ del giallo ("2 clienti non sincronizzati", "lento: 9,8 s per pagina (di solito 4
 | integra | `integra.lenta` | attenzione | un giro dura più del suo intervallo | segnalare a chi gestisce Integra (carico del database) | al primo giro nei tempi |
 | posta | `posta.connessione` | errore | accesso SMTP fallito | controllare server, utente e password in Impostazioni → Posta | al primo invio o controllo riuscito |
 | posta | `posta.respinta` | errore | il server rifiuta il destinatario (chiave = indirizzo) | correggere l'email dell'utente o del destinatario | no |
+| accesso | `accesso.microsoft` | errore | il ritorno da Microsoft fallisce 3 volte di fila (Entra ID non risponde, segreto scaduto) | controllare Impostazioni → Accesso; nel frattempo *Invia un link di accesso* agli utenti | al primo accesso con Microsoft riuscito |
 
 Testi e dettagli sono **frasi fisse con segnaposto** (nome del file, codice Integra,
 secondi…) definite in un solo file del server; nessun messaggio tecnico grezzo nel testo
-(il messaggio tecnico va in `servizi_esecuzioni.misure`).
+(il messaggio tecnico va nel `dettaglio` dell'anomalia e in `servizi_esecuzioni.misure`).
 
 #### 7.14.4 Vita di un problema
 
@@ -1774,11 +1840,11 @@ secondi…) definite in un solo file del server; nessun messaggio tecnico grezzo
 2. **Si ripete**: se c'è, si aggiornano `ultimo` e `volte` e si **azzera `visto_il`** solo
    se il livello è `errore` (un errore che torna va rivisto).
 3. **Si chiude da solo** quando la causa sparisce (colonna "si chiude da solo" di §7.14.3):
-   `chiuso_il = adesso`; resta in *Tutti* con *Risolto il …* e non conta più nella barra.
+   `stato = chiusa`, `chiusa_il = adesso`; resta in *Tutti* con *Risolto il …* e non conta più nella barra.
 4. **Visto**: *Segna come visto* toglie il problema dal contatore della barra ma non lo
    chiude; un problema visto e ancora aperto continua a colorare il riquadro.
-5. Ogni apertura e chiusura di un problema di livello `errore` scrive anche un evento
-   (§15.2.7).
+5. Il problema è **una riga `anomalia` del registro** (§4.2.11): apertura, ripetizione e
+   chiusura aggiornano quella riga; *Segna come visto* scrive anche un evento (D-31).
 
 #### 7.14.5 Interfacce del server
 
@@ -1801,7 +1867,8 @@ dove serve, *Prova la connessione*.
 | Casella dei documenti | server IMAP, porta, utente, password, cartella da leggere, cartella dove spostare le email lette, ogni quanti minuti (1–60) |
 | Server di lettura | indirizzo, modello, tempo massimo per documento, **soglie di affidabilità** (affidabile da, bassa sotto; §6.5) |
 | Posta in uscita | server SMTP, porta, utente, password, mittente |
-| Sincronizzazione da Integra | server del database, nome del database, utente in sola lettura, password, schema delle viste, ogni quanti secondi (anagrafiche, 10–3600), ogni quanti secondi le giacenze (5–600, solo con l'ampliamento §17) (§4.5) |
+| Accesso con Microsoft 365 | ID del tenant, ID dell'applicazione, segreto dell'applicazione (registrazione in Entra ID, §3.3) |
+| Sincronizzazione da Integra | server del database ponte (§4.5), nome del database, utente in sola lettura, password, schema delle viste, ogni quanti secondi (anagrafiche, 10–3600), ogni quanti secondi le giacenze (5–600, solo con l'ampliamento §17) (§4.5) |
 | Conservazione dei dati | registro eventi (mesi), documenti scartati (giorni), righe per pagina |
 
 Le **password non si rileggono**: il campo mostra "impostata", si scrive solo per
@@ -2120,11 +2187,11 @@ pratiche).
 | PUT | `/api/documenti/:id` | correzione dei dati letti (campi verificati) |
 | POST | `/api/documenti/:id/abbina` · `/apri-pratica` · `/registra-bollettino` | esito del controllo |
 | POST | `/api/documenti/:id/scarta` · `/rileggi` | scarto · nuova lettura |
-| GET | `/eventi` | log eventi applicativi (admin) |
+| GET | `/registro` | registro di eventi e anomalie (admin) |
 | GET · POST | `/api/sistema*` | Stato del sistema, vedi §7.14.5 |
-| GET | `/api/eventi` | elenco eventi filtrato (admin) |
-| GET | `/api/eventi/:id` | dettaglio evento (admin) |
-| GET | `/api/eventi/export` | export CSV del log filtrato (admin) |
+| GET | `/api/registro` | elenco eventi filtrato (admin) |
+| GET | `/api/registro/:id` | dettaglio evento (admin) |
+| GET | `/api/registro/export` | export CSV del log filtrato (admin) |
 
 ### 8.2 Vendita diretta (§7.18–§7.21) — **ampliamento futuro (§17), non in questa fase**
 
@@ -2143,12 +2210,14 @@ nella fase successiva (§17).
 
 ### 8.3 Autenticazione
 
-`/login` (POST), `/logout` (POST), `/cambia-password`, `/richiedi-reset`,
-`/reset-password` (stessi della Gestione Ordini). Guard `requireAuth` su tutte le
+`GET /api/accesso/microsoft` (porta a Microsoft) e `GET /api/accesso/microsoft/ritorno`;
+`POST /api/accesso/link` (chiede il link, risposta sempre uguale) e `GET /accesso/:codice`
+(usa il link o l'invito); `POST /logout`; `POST /api/utenti/:id/invito` e
+`POST /api/utenti/:id/link` (amministratore). Nessuna rotta di password (D-30). Guard `requireAuth` su tutte le
 rotte; ogni rotta dichiara il **permesso** richiesto, verificato lato server
 (`requirePermesso('modifica')` ecc.), non solo nascondendo i pulsanti.
 
-**Ruoli del CRM** (`crm_ruoli_utente`, §4.1):
+**Ruoli del CRM** (`utenti.ruolo`, §4.2.18):
 
 | Attività (permesso) | Amministratore | Operatore | Sola lettura |
 |---|:-:|:-:|:-:|
@@ -2291,10 +2360,10 @@ Anagrafiche di riferimento per il collaudo:
   pratica **fatturata in più tranche** e una con **nota di credito parziale**
   (documento `nota_credito`, importo negativo, §5.3/§5.9) per validare il confronto fasi
   e il netto documenti.
-- **Eventi**: esempi di `eventi_app` coerenti con i dati sopra (login admin, creazione
+- **Eventi**: esempi di `registro` (eventi e alcune anomalie) coerenti con i dati sopra (login admin, creazione
   fornitore, modifica scaglione, cambio stato pratica, verifica bollettino, export
   liquidazione) + **un evento di tipo `errore`** per collaudare filtri e dettaglio
-  della schermata `/eventi` (§7.11, §15).
+  della schermata `/registro` (§7.11, §15).
 
 ---
 
@@ -2332,23 +2401,25 @@ eseguito al volo nel browser.
 
 ---
 
-## 15. Tracciamento eventi applicativi, CRUD ed errori
+## 15. Registro unico: eventi, anomalie ed errori
 
 ### 15.1 Principi
 
-L'applicazione registra su una tabella **append-only** (`eventi_app`, §4.2.11) gli
-eventi applicativi: operazioni CRUD, cambi di stato, upload/export di documenti,
-autenticazione ed errori. Scopo: tracciabilità (chi/cosa/quando), storico di pratiche
+L'applicazione registra in **una sola tabella** (`registro`, §4.2.11, D-31) gli eventi
+applicativi (operazioni CRUD, cambi di stato, upload/export di documenti, accesso) e le
+**anomalie** (errori dell'app, problemi dei servizi, errori di lettura). Due funzioni del
+livello dei servizi: `logEvent()` per gli eventi e `apriAnomalia()` per le anomalie
+(§7.14.4). Scopo: tracciabilità (chi/cosa/quando), storico di pratiche
 e bollettini, diagnosi degli errori.
 
 - **Scrittura automatica server-side**: ogni operazione di scrittura sulle tabelle
   CRM, ogni cambio di stato, ogni upload/export e ogni evento di autenticazione
-  produce una riga in `eventi_app`. La scrittura avviene nel **service layer**,
+  produce una riga in `registro`. La scrittura avviene nel **service layer**,
   mai fidandosi di ciò che dichiara il client.
-- **Nessuna modifica alle tabelle esistenti** (V2): `eventi_app` è una tabella nuova
-  del CRM; gli errori di lettura documenti restano in `documenti_in_arrivo` (§4.2.12)
-  e vengono solo **referenziati** dagli eventi, non duplicati.
-- **Solo lettura per l'utente**: gli eventi non si modificano e non si eliminano
+- **Un solo posto**: un errore di lettura resta come stato del documento in
+  `documenti_in_arrivo` (§4.2.12) e apre l'anomalia `lettura.fallita` con il
+  `documento_id`; non c'è una seconda tabella degli errori.
+- **Solo lettura per l'utente** (salvo *Segna come visto* sulle anomalie): gli eventi non si modificano e non si eliminano
   dall'interfaccia (nemmeno dagli admin). L'eventuale correzione di errori passa
   dalle normali operazioni di business, che generano nuovi eventi.
 - **Una riga per operazione**: il catalogo §15.2 definisce **esattamente** quali
@@ -2370,12 +2441,12 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
-| POST `/login` riuscita | `auth` | `login` | `utente` | `successo` | `{etichetta, sessione_id}` |
-| POST `/login` fallita (password errata o utente inesistente) | `auth` | `login` | `utente` | `errore` | `{etichetta: utente tentato, motivo}` (`utente_id` solo se l'account esiste; `ip` sempre) |
+| Accesso riuscito (Microsoft o link) | `auth` | `login` | `utente` | `successo` | `{etichetta, modo: microsoft \| email, sessione_id}` |
+| Accesso rifiutato (non invitato, disattivato, link scaduto o già usato, ritorno da Microsoft non valido) | `auth` | `login` | `utente` | `errore` | `{etichetta: email tentata, modo, motivo}` (`utente_id` solo se l'utente esiste; `ip` sempre) |
 | POST `/logout` | `auth` | `logout` | `utente` | `successo` | `{etichetta, sessione_id}` |
-| POST `/cambia-password` | `auth` | `change_password` | `utente` | `successo` | `{etichetta}` (esito `errore` se la richiesta fallisce) |
-| POST `/richiedi-reset` | `auth` | `reset_requested` | `utente` | `successo` | `{etichetta}` |
-| Richiesta a rotta `requireAdmin` senza il ruolo (§3.3) | `auth` | `access_denied` | `utente` | `negato` | `{etichetta, rotta, metodo}` (`ip` valorizzato) |
+| POST `/api/accesso/link` (richiesta del link) | `auth` | `link_requested` | `utente` | `successo` | `{etichetta}` (anche se l'email non è registrata: `utente_id` NULL) |
+| Invito o link mandato dall'amministratore | `auth` | `invite` | `utente` | `successo` | `{etichetta, tipo: invito \| link}` |
+| Richiesta a una rotta senza il permesso (§3.3) | `auth` | `access_denied` | `utente` | `negato` | `{etichetta, rotta, metodo}` (`ip` valorizzato) |
 
 #### 15.2.2 Anagrafiche — fornitori, percentuali ed eccezioni (§8.1)
 
@@ -2477,14 +2548,14 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 ### 15.3 Regole di scrittura (transazionali)
 
 - **Un solo helper** `logEvent({tipo, azione, entita, entita_id, esito, etichetta, dettaglio, req})`
-  nel service layer: ogni endpoint che genera eventi lo chiama; nessuna scrittura
+  (e `apriAnomalia()` per le anomalie) nel service layer: ogni endpoint che genera eventi lo chiama; nessuna scrittura
   diretta dal client (`req` si usa solo per estrarre sessione e IP lato server).
-- **Stessa transazione**: la riga di `eventi_app` viene scritta **nella stessa
+- **Stessa transazione**: la riga di `registro` viene scritta **nella stessa
   transazione** dell'operazione di business — se l'operazione fa rollback non resta
   alcun evento (coerenza). Eccezione: `auth` (login/logout) e gli eventi `negato`,
   che non hanno transazione di business e usano una scrittura diretta
   **best-effort**.
-- **Il log non fallisce mai l'operazione**: se la scrittura di `eventi_app` va in
+- **Il log non fallisce mai l'operazione**: se la scrittura di `registro` va in
   errore fuori dalla transazione di business, l'errore viene inviato al **log
   applicativo** (file/console) e l'operazione prosegue.
 - **`utente_id`**: l'utente autenticato della sessione; NULL solo per eventi di
@@ -2493,6 +2564,11 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 
 ### 15.4 Formato del `dettaglio` (JSONB)
 
+- **Uno schema per codice** (D-31): ogni `codice` del catalogo (§15.2, §7.14.3) ha uno
+  schema (zod) in un solo file del server; `logEvent()` e `apriAnomalia()` rifiutano un
+  `dettaglio` che non lo rispetta (errore nelle prove, anomalia `app.dettaglio_non_valido`
+  in esercizio, la riga si scrive lo stesso). Così il JSON resta interrogabile, ad esempio
+  `dettaglio->>'documento_id'`, e non diventa testo libero.
 - **Sempre** la chiave `etichetta` (stringa descrittiva per la colonna
   "riferimento": numero ordine, fattura, ragione sociale…), leggibile senza aprire
   il dettaglio.
@@ -2514,29 +2590,29 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
   intermedio: nessuna eccezione gestita silenziosamente (catalogo §15.2.7).
 - Al frontend viene restituito solo un **messaggio user-friendly**; il dettaglio
   tecnico (classe, messaggio) resta nel log e non viene mai esposto nel browser.
-- Gli **errori di lettura documenti** stanno in `documenti_in_arrivo` (stato `errore`,
-  campo `errore`) e compaiono nel log come riferimento (§15.4) — non vengono
-  duplicati nel testo dell'evento.
+- Gli **errori di lettura documenti** lasciano il documento in `documenti_in_arrivo`
+  (stato `errore`) e aprono l'anomalia `lettura.fallita` con `documento_id` (§7.14.3).
 
-### 15.6 Schermata `/eventi`
+### 15.6 Schermata `/registro`
 
 Comportamento di schermata in §7.11; specifiche operative:
 
-- **Filtri**: tipo, esito, entità, utente (select), periodo `da/a` (date), testo
+- **Filtri**: genere, livello, servizio, codice, tipo, esito, entità, utente (select), periodo `da/a` (date), testo
   libero su `etichetta`; combinabili. Filtro rapido "solo errori".
 - **Tabella** (contenitore stabile V9): `ts` (DESC), utente, tipo, entità, azione,
   riferimento (`etichetta` + `entita_id`), esito; paginazione 50 righe.
 - **Dettaglio evento** in modale: JSON `dettaglio` formattato + colonne rimanenti
   (`sessione_id`, `ip`).
 - **Export CSV** (`GET /api/eventi/export`): stesse righe filtrate, colonne fisse
-  `ts;utente;tipo;entita;entita_id;azione;esito;etichetta;dettaglio(JSON)`.
+  `ts;genere;livello;codice;utente;servizio;entita;entita_id;esito;messaggio;dettaglio(JSON)`.
 - Nella **dashboard** (§7.1) gli admin vedono un contatore "errori di oggi" con
   collegamento al log filtrato.
 - **Sola lettura**: nessun pulsante di modifica/eliminazione.
 
 ### 15.7 Conservazione e rotazione
 
-- Job di pulizia notturno: `DELETE FROM eventi_app WHERE ts < now() - interval '36 months';`
+- Job di pulizia notturno: righe `info` dopo 12 mesi, le altre dopo `eventi_mesi` (36,
+  §7.15); le anomalie aperte non si cancellano mai.
   (nessuna cancellazione manuale).
 - Gli eventi eliminati non sono recuperabili: gli storici "permanenti" (es. verifica
   bollettini) sono garantiti dai dati congelati in `bollettini_righe` (§5.11), non
@@ -2544,7 +2620,7 @@ Comportamento di schermata in §7.11; specifiche operative:
 
 ### 15.8 Cosa NON si traccia
 
-- **Password, hash, token e cookie di sessione**: solo l'esito e il `sessione_id`.
+- **Codici dei link, segreti, token e cookie di sessione**: solo l'esito e il `sessione_id`.
 - **Contenuto dei documenti/allegati**: solo `att_filename` e dimensione.
 - **Body HTTP integrale**: solo i campi significativi del catalogo §15.2.
 - **Dati sensibili del cliente** oltre agli identificativi di dominio (P.IVA,
@@ -2564,7 +2640,7 @@ filtri e dettaglio.
 
 ### 15.10 Riferimenti
 
-Tabella: §4.2.11 · Schermata: §7.11 · API: §8.1 · Seed: §12 · Deliverable: §14 ·
+Tabella: §4.2.11 (e §4.2.15 per i giri dei servizi) · Schermate: §7.11, §7.14 · API: §8.1 · Seed: §12 · Deliverable: §14 ·
 Requisito: V10
 
 ---
@@ -2630,7 +2706,7 @@ verificano in tre modi:
 | F2 | Pratiche ordini (lista, dettaglio, documenti, upload) | A1–A3 | 3 | 6 |
 | F3 | Bollettini mensili | A1–A2 | 2 | 4 |
 | F4 | Liquidazione (filtri, dettaglio, export) | A1–A3 | 2–3 | 3 |
-| F5 | Dashboard + log eventi (`/eventi`) | A1–A2 | 2 | 2 |
+| F5 | Dashboard + registro (`/registro`) | A1–A2 | 2 | 2 |
 | F6 | Ingresso documenti senza n8n: email + caricamento, coda, lettura GLM-OCR, affidabilità e controlli, `/documenti` con finestra di correzione (§6.5, §7.9) | A1–A5 | 2–3 | 17 |
 | F7 | Collaudo, replicazione, rilascio | A1–A2 | 1–2 | 5 |
 | | | **23** | | **71** (preventivo §4) |
@@ -2654,8 +2730,8 @@ A — solo Next.js — e C — Express + EJS — sono scartate):
 | Frontend | Next.js 16 (App Router) + React 19 + TypeScript |
 | Backend | NestJS 11 (Express), DTO con `class-validator` |
 | Accesso ai dati | Prisma 7 + `@prisma/adapter-pg` |
-| Database | PostgreSQL condiviso `decobrands` (V2) |
-| Accesso | `express-session` + `connect-pg-simple`, argon2, CSRF, Helmet, throttler (§3.3) |
+| Database | PostgreSQL, database proprio `crm` (V2); viste di Integra dal database ponte (§4.5) |
+| Accesso | Microsoft 365 (OpenID Connect, `openid-client`) + link via email; `express-session` + `connect-pg-simple`, CSRF, Helmet, throttler (§3.3) |
 | Esercizio | Caddy + due processi Node (8001/8002), Docker solo in sviluppo (§3.4) |
 | Lavori pianificati / Excel / test | `@nestjs/schedule` · `exceljs` · Jest + supertest |
 | Ingresso documenti | `imapflow` (casella email) · coda su PostgreSQL (`FOR UPDATE SKIP LOCKED`) · PDF → immagini (`pdftoppm`) · **GLM-OCR** su **vLLM** (server GPU locale, interfaccia compatibile OpenAI, uscita vincolata allo schema, `logprobs`) — **nessun n8n** |
@@ -2666,10 +2742,10 @@ A — solo Next.js — e C — Express + EJS — sono scartate):
 | Da Luis (`backend/src`, `frontend/`) | Uso nel CRM |
 |---|---|
 | `main.ts` (Helmet, CORS, cookie, sessione su PostgreSQL, controllo CSRF) | copiato, adattato a porte e origini del CRM |
-| `auth/` (login, logout, cambio password, guard autenticazione/ruoli) | adattato alla tabella `users` della Gestione Ordini e ai ruoli `admin`/utente; tolti i gruppi di permessi |
+| `auth/` (login, logout, cambio password, guard autenticazione/ruoli) | ripresi sessioni, logout e guard; il login con password si sostituisce con Microsoft 365 + link via email (D-30); tabella `utenti` propria; tolti i gruppi di permessi |
 | `prisma/` (servizio Prisma) | copiato |
-| `common/`: `password.ts`, `http-error.filter.ts`, `request-context*`, `access-log.interceptor.ts`, `env.ts`, `xlsx.ts`, `audit.extension.ts` | copiati; `audit.extension` e `xlsx` alla base di §15 e di bollettini/export |
-| `audit/`, `events/` | base del registro eventi `eventi_app` e di `/eventi` (§15) |
+| `common/`: `http-error.filter.ts`, `request-context*`, `access-log.interceptor.ts`, `env.ts`, `xlsx.ts`, `audit.extension.ts` | copiati; `audit.extension` e `xlsx` alla base di §15 e di bollettini/export |
+| `audit/`, `events/` | base del registro unico `registro` e di `/registro` (§15) |
 | `health/` | copiato (controllo stato servizio) |
 | Throttler in `app.module.ts` | copiato |
 | `frontend/next.config.ts` (inoltro `/api/*`, intestazioni di sicurezza) | copiato |
@@ -2850,7 +2926,8 @@ descrive. Chi sviluppa:
 Decisione: la **vendita diretta** (articoli che Decobrands compra e rivende in proprio) e la
 sostituzione della Gestione Ordini attuale (Express + EJS + n8n + LlamaIndex) sono un
 **ampliamento successivo**, **non in questa fase** e fuori da questo preventivo. Fino ad
-allora la Gestione Ordini resta in esercizio, invariata, sullo stesso database.
+allora la Gestione Ordini resta in esercizio, invariata e separata dal CRM (D-29);
+con l'ampliamento il CRM la **ingloba** e ne migra i dati.
 
 ### 17.1 Cosa è già progettato
 
@@ -3030,3 +3107,7 @@ rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in
 | D-26 | 18/10/2026 | Le **eccezioni personali** dei subagenti si inseriscono, modificano ed eliminano nel CRM (scheda del subagente) e il motore le applica; passano alla nuova versione delle percentuali. Chiude B1 | tutto il calcolo delle provvigioni sta nel CRM: un'eccezione gestita fuori non compare in liquidazione e Analisi | Ugo | §4.2.3, §5.2, §7.5, §8.1, §15.2.2 |
 | D-27 | 18/10/2026 | Regole del subagente: **% dell'agenzia** (per cliente × fornitore), **una fattura al mese** (la prima o la più alta), **correzione sul singolo documento** con motivo obbligatorio; ordine: correzione → mensile → agenzia → eccezione → scaglione. Lo sconto fittizio non serve più | gli accordi con i subagenti sono vari e non prevedibili (caso Bastasin): tre livelli coprono ogni caso senza toccare il codice; il fornitore resta controllato nel bollettino; ogni scostamento è motivato e tracciato | Ugo | §4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §10, D-26 |
 | D-28 | 18/10/2026 | **Ogni calcolo e operazione sensibile solo sul backend, partendo dal database, MAI da dati presi dal frontend**; il client mostra e invia solo scelte; il server ricarica, ricontrolla, ricalcola | dal browser si può alterare qualsiasi valore; provvigioni e liquidazioni sono soldi; registro eventi e permessi devono essere affidabili | Ugo | V12, §2, §10, §15.1, §16.5 |
+| D-29 | 19/10/2026 | Il CRM si **stacca dalla Gestione Ordini**: database e utenti propri, nessuna tabella della Gestione Ordini né in lettura né in scrittura; la Gestione Ordini resta in esercizio, separata, e il CRM la ingloberà con la vendita diretta (§17), migrandone i dati | la Gestione Ordini è la vendita diretta, oggi spenta: tenerle separate evita di sovrapporre le prove dei due flussi; legare utenti e sessioni a un'app che verrà sostituita obbligava a compatibilità (bcrypt, sessioni, ruoli) da buttare dopo | Ugo | §1, V2, §3.3, §4.1, §4.2.18, §17 |
+| D-30 | 19/10/2026 | **Accesso misto, solo su invito**: Microsoft 365 (Entra ID, OpenID Connect) per gli account Decobrands, link monouso via email per gli altri; nessuna password nel CRM; l'amministratore invita e sceglie il modo; il link fa da riserva se Microsoft non risponde | Decobrands usa Microsoft 365: niente password da gestire e accesso tolto insieme all'account; il link copre subagenti ed esterni; l'invito impedisce l'accesso a chiunque abbia un account Microsoft | Ugo | V3, §3.3, §4.2.18, §7.13, §7.15, §8.3, §15.2.1 |
+| D-31 | 19/10/2026 | **Registro unico** `registro`: eventi e anomalie (errori dell'app, problemi dei servizi, errori di lettura) in una tabella con campi comuni (quando, genere, livello, codice, servizio, entità, utente, messaggio, operazione) e `dettaglio` JSON controllato da uno schema per codice; le anomalie hanno una vita (aperta · vista · chiusa) e si contano invece di ripetersi; Stato del sistema è una vista del registro. Sostituisce `eventi_app` e `servizi_problemi` | un solo posto dove guardare e una sola storia per documento o pratica; i campi comuni bastano a filtrare, il JSON tiene i dettagli senza colonne nuove, lo schema impedisce il testo libero | Ugo | V10, §4.2.11, §4.2.15, §7.11, §7.14, §15 |
+| D-32 | 19/10/2026 | Le viste di Integra stanno in un **database PostgreSQL ponte** preparato da Ugo e collegato a Integra; il CRM legge solo da lì, in sola lettura; colonne e chiavi si fissano sui dati veri (F0-A8) | le viste si provano e si correggono senza toccare Integra; il CRM parla solo PostgreSQL; un guasto di Integra resta fuori dal CRM | Ugo | §4.5, §5.14, §7.15 |

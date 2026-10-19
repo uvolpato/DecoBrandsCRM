@@ -168,6 +168,11 @@ Regole del codice del prototipo:
 - Filtri standard e conteggi dal vivo (D-20 → D-23).
 - Prototipo ufficiale `prototipo-alternativo/` (D-24).
 - ⚠ **Tutto sul backend, mai dai dati del frontend** (V12, D-28).
+- CRM **staccato dalla Gestione Ordini**: database e utenti propri; la ingloberà con la
+  vendita diretta (D-29).
+- Accesso con **Microsoft 365 o link via email**, solo su invito, nessuna password (D-30).
+- **Registro unico** di eventi e anomalie, `dettaglio` JSON con schema per codice (D-31).
+- Viste di Integra lette da un **database PostgreSQL ponte** (D-32).
 - Vendita diretta spenta, ampliamento futuro (D-08).
 - Evidenziazione dei valori nel PDF/Excel: **da verificare** con una prova di fattibilità
   prima di prometterla (D-06). Il cliente prende per certo ciò che vede nel prototipo:
@@ -180,17 +185,17 @@ Lo stack ricalca il **Portale B2B Luis** (spec §16.3):
 | Livello | Scelta |
 |---|---|
 | Frontend | Next.js 16 + React 19 + TypeScript |
-| Backend | NestJS 11 + Prisma 7, PostgreSQL condiviso `decobrands` |
+| Backend | NestJS 11 + Prisma 7, PostgreSQL con database proprio `crm` (D-29) |
 | Stile | `stile.css` del prototipo ufficiale, Public Sans, niente Bootstrap |
 | Grafici | Chart.js |
 | Excel | `exceljs` |
 | Processi | Node 24, Caddy, due processi (porte 8001 e 8002) |
 
 - ⚠ **Calcoli e operazioni sensibili solo nel backend NestJS, dal database; mai fidarsi dei dati del frontend** (V12, D-28).
-- Da Luis si riusa **solo l'infrastruttura** (accesso, sessioni, CSRF, Prisma, registro
-  eventi). Non si riusano le sue interfacce né il suo CSS.
-- Le tabelle esistenti (Gestione Ordini, Integra) si leggono in sola lettura e non si
-  migrano.
+- Da Luis si riusa **solo l'infrastruttura** (sessioni, CSRF, Prisma, registro eventi). Non
+  si riusano il suo login con password, le sue interfacce né il suo CSS.
+- Nessuna tabella della Gestione Ordini (D-29); Integra si legge in sola lettura dalle viste
+  del database ponte (D-32).
 - Le attività sono nel piano: ogni attività è una slice con file propri, si consegna
   quando la checklist §16.1 è superata e i numeri sul seed §12 coincidono con il
   prototipo.

@@ -27,7 +27,7 @@
 
   <div class="alert alert-light border small">
     <strong>Redatto da:</strong> Ugo Volpato — AI Consultant<br>
-    <strong>Data:</strong> 04/09/2026 — aggiornato il 18/10/2026 (variazioni da approvare §5: 53 h; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
+    <strong>Data:</strong> 04/09/2026 — aggiornato il 19/10/2026 (variazioni da approvare §5: 59 h, con accesso Microsoft 365, registro unico e database ponte; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
     <strong>Cliente:</strong> Decobrands S.r.l. (da confermare)<br>
     <strong>Modalità di sviluppo:</strong> assistita da AI (analisi, generazione e codifica tramite modelli AI)
   </div>
@@ -42,7 +42,7 @@
 <li>far entrare <strong>tutti i documenti</strong> (ordini a fornitore, conferme, fatture, note di credito, bollettini) da un <strong>ingresso documenti interno</strong>: casella email e caricamento, coda nel database, lettura con <strong>GLM-OCR su un server locale con GPU</strong>, affidabilità per campo, controllo dell'operatore con il PDF a fianco — <strong>senza n8n e senza servizi esterni</strong>.</li>
 </ul>
 <p>La <strong>sostituzione della Gestione Ordini</strong> (ordini cliente, CSV Integra) è prevista in una fase successiva, <strong>esclusa</strong> da questo preventivo (spec §17).</p>
-<p>Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v5.3 (stack §3.4, §16.3; ingresso documenti §6.5; registro delle decisioni §19) · piano: <code>piano-lavoro-crm.md</code> v1.7 · sintesi: <code>PRD-crm-provvigioni.md</code> · prototipo ufficiale: <code>prototipo-alternativo/</code>.</p>
+<p>Riferimento tecnico: <code>specifica-crm-provvigioni.md</code> v5.4 (stack §3.4, §16.3; ingresso documenti §6.5; registro delle decisioni §19) · piano: <code>piano-lavoro-crm.md</code> v1.8 · sintesi: <code>PRD-crm-provvigioni.md</code> · prototipo ufficiale: <code>prototipo-alternativo/</code>.</p>
 <h2 id="sez-2">2. Tariffe applicate (indicative, mercato Italia)</h2>
 <table class="table table-bordered bg-white">
 <thead>
@@ -137,21 +137,21 @@
 <tbody>
 <tr>
 <td>1</td>
-<td>Setup progetto sul modello Luis B2B (Next.js + NestJS + Prisma), collegamento al <strong>PostgreSQL condiviso</strong> <code>decobrands</code>, Caddy + due processi Node (8001/8002), Docker solo in sviluppo</td>
+<td>Setup progetto sul modello Luis B2B (Next.js + NestJS + Prisma), database PostgreSQL <strong>proprio</strong> <code>crm</code> (nessuna tabella della Gestione Ordini, D-29), Caddy + due processi Node (8001/8002), Docker solo in sviluppo</td>
 <td>3</td>
 <td>8</td>
 <td>€ 165,00</td>
 </tr>
 <tr>
 <td>2</td>
-<td>Autenticazione <strong>ripresa da Luis B2B</strong> sulla tabella <code>users</code> condivisa: sessioni nel DB, argon2, CSRF, Helmet, limite tentativi, cambio password / reset, guard <code>requireAuth</code>/<code>requireAdmin</code>; verifica accesso unico con la Gestione Ordini</td>
+<td>Accesso <strong>ripreso da Luis B2B</strong> su una tabella <code>utenti</code> propria: sessioni nel DB, CSRF, Helmet, limite tentativi, guard <code>requireAuth</code>/permessi, pagina di accesso (il modo di accesso è la variazione V10)</td>
 <td>3</td>
 <td>8</td>
 <td>€ 165,00</td>
 </tr>
 <tr>
 <td>3</td>
-<td>Schema Prisma delle <strong>nuove tabelle CRM</strong> (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe + documenti, bollettini + righe, eventi) + lettura delle tabelle esistenti condivise (ordini cliente, clienti, articoli, giacenze, log)</td>
+<td>Schema Prisma delle <strong>nuove tabelle CRM</strong> (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe + documenti, bollettini + righe, eventi, utenti, copia dei clienti da Integra)</td>
 <td>6</td>
 <td>16</td>
 <td>€ 330,00</td>
@@ -313,15 +313,36 @@ prototipo ufficiale. Si sviluppano <strong>solo se approvate</strong>; ognuna è
 <td>€ 715,00</td>
 </tr>
 <tr>
+<td>V10</td>
+<td><strong>Accesso con Microsoft 365 o link via email</strong>, solo su invito, senza password (F0-A3)</td>
+<td>Decobrands usa Microsoft 365; il link copre subagenti ed esterni (D-30)</td>
+<td>2</td>
+<td>€ 110,00</td>
+</tr>
+<tr>
+<td>V11</td>
+<td><strong>Registro unico</strong> di eventi e anomalie, con dettaglio controllato per codice e pagina delle anomalie (F5-A2)</td>
+<td>un solo posto dove guardare cosa è successo (D-31)</td>
+<td>2</td>
+<td>€ 110,00</td>
+</tr>
+<tr>
+<td>V12</td>
+<td><strong>Viste di Integra sul database ponte</strong>: colonne e chiavi fissate sui dati veri (F0-A8)</td>
+<td>le viste si provano senza toccare Integra (D-32)</td>
+<td>2</td>
+<td>€ 110,00</td>
+</tr>
+<tr>
 <td></td>
 <td><strong>Totale variazioni</strong></td>
 <td></td>
-<td><strong>53</strong></td>
-<td><strong>€ 2.915,00</strong></td>
+<td><strong>59</strong></td>
+<td><strong>€ 3.245,00</strong></td>
 </tr>
 </tbody>
 </table>
-<p>Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 13 h, € 715,00),
+<p>Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 15 h, € 825,00),
 usato solo se serve e rendicontato a ore.</p>
 <h2 id="sez-6">6. Riepilogo economico</h2>
 <table class="table table-bordered bg-white">
@@ -350,18 +371,18 @@ usato solo se serve e rendicontato a ore.</p>
 </tr>
 <tr>
 <td>Variazioni da approvare (§5), tutte</td>
-<td>53</td>
-<td>€ 2.915,00</td>
+<td>59</td>
+<td>€ 3.245,00</td>
 </tr>
 <tr>
 <td><strong>Totale con tutte le variazioni</strong></td>
-<td><strong>158</strong></td>
-<td><strong>€ 9.090,00</strong></td>
+<td><strong>164</strong></td>
+<td><strong>€ 9.420,00</strong></td>
 </tr>
 <tr>
 <td>Margine sulle variazioni (riserva, solo se usato)</td>
-<td>fino a 13</td>
-<td>fino a € 715,00</td>
+<td>fino a 15</td>
+<td>fino a € 825,00</td>
 </tr>
 </tbody>
 </table>
@@ -378,14 +399,14 @@ usato solo se serve e rendicontato a ore.</p>
 <li><strong>Ingresso documenti senza n8n (attività 7)</strong>: sostituisce l'integrazione del modulo ordini cliente (6 h) prevista nella versione precedente; la lettura dei documenti non passa più dalla pipeline n8n + LlamaIndex della Gestione Ordini ma da GLM-OCR in locale: nessun costo per pagina, documenti che non escono dall'azienda, regole nel codice del CRM.</li>
 <li><strong>Server GPU</strong> per GLM-OCR: hardware, sistema operativo e driver a carico del cliente; l'attività 7 copre installazione del servizio di lettura e taratura iniziale.</li>
 <li><strong>Stack allineato al Portale B2B Luis</strong> (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di <strong>5 ore</strong>, reinvestite nella <strong>prova di lettura dei documenti fornitore</strong> (attività 11), principale rischio tecnico del progetto.</li>
-<li><strong>Margine di rischio 25 % (18 h, € 990,00)</strong>: copre gli imprevisti più probabili (formati dei documenti fornitore, compatibilità dell'accesso con la Gestione Ordini, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.</li>
+<li><strong>Margine di rischio 25 % (18 h, € 990,00)</strong>: copre gli imprevisti più probabili (formati dei documenti fornitore, configurazione di Microsoft 365, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.</li>
 <li>Il motore di calcolo è <strong>solo lato server</strong> (spec §10): eliminata la voce "motore lato client" della versione precedente.</li>
-<li><strong>Accesso unico con la Gestione Ordini</strong>: confermato se le sessioni sono compatibili (verifica nell'attività 2); in caso contrario login separato sulla stessa tabella utenti, senza variazione di ore.</li>
+<li><strong>CRM separato dalla Gestione Ordini</strong> (spec D-29): database e utenti propri; la Gestione Ordini resta in esercizio e sarà inglobata con la vendita diretta (fase successiva). Per l'accesso con Microsoft 365 serve la registrazione dell'app in Entra ID da parte dell'amministratore di Microsoft 365 di Decobrands.</li>
+<li><strong>Database ponte per Integra</strong> (spec D-32): lo prepara Ugo, collegato a Integra; il CRM legge solo le sue viste.</li>
 <li><strong>Grafica</strong>: <code>stile.css</code> del prototipo ufficiale <code>prototipo-alternativo/</code>, carattere Public Sans, <strong>niente Bootstrap</strong> (spec D-24); stessa palette della Gestione Ordini.</li>
 <li>L'esito dell'attività 11 può richiedere una <strong>stima aggiuntiva</strong> per adattare la lettura ai formati dei singoli fornitori; sarà quotata a parte prima di procedere.</li>
 <li>Il costo ridotto dello sviluppo riflette la <strong>velocizzazione dell'AI</strong>, non una riduzione di qualità o delle garanzie.</li>
 <li>Tariffe indicative e personalizzabili; <strong>IVA esclusa</strong>.</li>
-<li>Il progetto <strong>condivide il database</strong> con la Gestione Ordini: le tabelle esistenti vengono riusate <strong>senza modifiche</strong>; il CRM aggiunge solo le proprie tabelle (§4.2).</li>
 <li>Fatture su più ordini e ordini fatturati in più tranche sono <strong>inclusi</strong> (spec §5.9, documenti a ponte).</li>
 <li><strong>Esclusa la sostituzione della Gestione Ordini</strong> (ordini cliente, controlli articoli/alias/kit, giacenze, CSV Integra, spegnimento di n8n): fase successiva, da quotare a parte dopo la messa in esercizio del CRM (spec §17).</li>
 <li><strong>Esclusioni</strong> (backlog spec §13): riga bollettino con solo totale cliente (B2), <strong>popolamento dei dati storici dagli Excel manuali</strong> (B6). Il consolidamento sconto (B4) è già definito nella specifica.</li>
