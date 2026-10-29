@@ -6,6 +6,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { IsString } from 'class-validator';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { Pubblica } from '../src/accesso';
 import { configura } from '../src/main';
 import { PrismaService } from '../src/prisma.service';
 
@@ -15,10 +16,10 @@ class Prova {
 
 @Controller('prova')
 class ProvaController {
-  @Post() eco(@Body() b: Prova) {
+  @Post() @Pubblica() eco(@Body() b: Prova) {
     return b;
   }
-  @Get('rotto') rotto() {
+  @Get('rotto') @Pubblica() rotto() {
     throw new Error('password=segreta nel messaggio interno');
   }
 }
