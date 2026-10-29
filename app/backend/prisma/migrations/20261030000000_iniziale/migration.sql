@@ -1,18 +1,24 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
+-- btree_gist: EXCLUDE con uguaglianza su colonne normali (interscambio, D-35)
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 -- CreateTable
 CREATE TABLE "fornitori" (
     "id" BIGSERIAL NOT NULL,
     "ragione_sociale" VARCHAR(255) NOT NULL,
     "piva" VARCHAR(20),
-    "codice_integra" VARCHAR(20),
+    "codice_integra" VARCHAR(20) NOT NULL,
     "giorni_attesa_conferma" INTEGER NOT NULL DEFAULT 30,
     "giorno_bollettino" SMALLINT NOT NULL DEFAULT 10,
-    "payment_type" VARCHAR(20) NOT NULL DEFAULT 'invoiced',
+    "tipo_provvigione" VARCHAR(20) NOT NULL DEFAULT 'fatturato',
     "giorni_incasso" SMALLINT NOT NULL DEFAULT 60,
-    "discount" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "note" TEXT,
     "attivo" BOOLEAN NOT NULL DEFAULT true,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "modificato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sincronizzato_il" TIMESTAMPTZ(6),
 
     CONSTRAINT "fornitori_pkey" PRIMARY KEY ("id")
 );
@@ -40,12 +46,10 @@ CREATE TABLE "provvigioni_scaglioni" (
     "id" BIGSERIAL NOT NULL,
     "fornitore_id" BIGINT NOT NULL,
     "sconto_min" DECIMAL(5,2) NOT NULL DEFAULT 0,
-    "sconto_max" DECIMAL(5,2) NOT NULL DEFAULT 100,
     "pct_agente" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "pct_subagente" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "valido_dal" DATE NOT NULL,
-    "ordinamento" INTEGER NOT NULL DEFAULT 0,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "provvigioni_scaglioni_pkey" PRIMARY KEY ("id")
 );
@@ -55,8 +59,8 @@ CREATE TABLE "provvigioni_eccezioni" (
     "id" BIGSERIAL NOT NULL,
     "scaglione_id" BIGINT NOT NULL,
     "subagente_id" BIGINT NOT NULL,
-    "pct_override" DECIMAL(5,2) NOT NULL,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "pct_personale" DECIMAL(5,2) NOT NULL,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "provvigioni_eccezioni_pkey" PRIMARY KEY ("id")
 );
@@ -70,7 +74,7 @@ CREATE TABLE "agenti" (
     "email" VARCHAR(255),
     "telefono" VARCHAR(50),
     "attivo" BOOLEAN NOT NULL DEFAULT true,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "agenti_pkey" PRIMARY KEY ("id")
 );
@@ -95,11 +99,12 @@ CREATE TABLE "interscambio" (
     "cliente_piva" VARCHAR(20) NOT NULL,
     "fornitore_id" BIGINT NOT NULL,
     "codice_cliente_fornitore" VARCHAR(50),
-    "discount" DECIMAL(5,2) NOT NULL DEFAULT 0,
+    "sconto" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "pct_subagente" DECIMAL(5,2),
     "regola_mensile" VARCHAR(10),
-    "attivo" BOOLEAN NOT NULL DEFAULT true,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "valido_dal" DATE NOT NULL,
+    "valido_al" DATE,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "interscambio_pkey" PRIMARY KEY ("id")
 );
@@ -109,25 +114,17 @@ CREATE TABLE "ordini_fornitore_testata" (
     "id" BIGSERIAL NOT NULL,
     "fornitore_id" BIGINT NOT NULL,
     "ordine_cliente_id" BIGINT,
-    "numero_ordine" VARCHAR(50),
-    "data_ordine" DATE,
-    "cliente_piva" VARCHAR(20),
-    "cliente_ragione_sociale" VARCHAR(255),
+    "numero_ordine" VARCHAR(50) NOT NULL,
+    "data_ordine" DATE NOT NULL,
+    "cliente_piva" VARCHAR(20) NOT NULL,
     "agente_id" BIGINT,
     "importo_merce" DECIMAL(12,2),
     "stato" VARCHAR(20) NOT NULL DEFAULT 'inviato',
-    "att_filename_ordine" TEXT,
-    "att_filename_conferma" TEXT,
-    "att_filename_fattura" TEXT,
     "conferma_data" DATE,
     "conferma_numero" VARCHAR(50),
-    "conferma_scadenza" DATE,
-    "fattura_numero" VARCHAR(50),
-    "fattura_data" DATE,
-    "fattura_importo" DECIMAL(12,2),
     "note" TEXT,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "modificato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ordini_fornitore_testata_pkey" PRIMARY KEY ("id")
 );
@@ -137,20 +134,21 @@ CREATE TABLE "ordini_fornitore_documenti" (
     "id" BIGSERIAL NOT NULL,
     "testata_id" BIGINT NOT NULL,
     "tipo" VARCHAR(20) NOT NULL,
-    "numero" VARCHAR(50),
-    "data" DATE,
-    "importo" DECIMAL(12,2),
+    "numero" VARCHAR(50) NOT NULL,
+    "data" DATE NOT NULL,
+    "importo" DECIMAL(12,2) NOT NULL,
     "storno_totale" BOOLEAN NOT NULL DEFAULT false,
-    "fattura_riferimento" VARCHAR(50),
+    "fattura_id" BIGINT,
     "stato_incasso" VARCHAR(15) NOT NULL DEFAULT 'da_incassare',
     "insoluta_dal" DATE,
     "pagata_il" DATE,
     "fonte_incasso" VARCHAR(20),
     "sollecitata_il" DATE,
     "solleciti" SMALLINT NOT NULL DEFAULT 0,
-    "att_filename" TEXT,
+    "arrivo_id" BIGINT,
+    "liquidazione_id" BIGINT,
     "note" TEXT,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ordini_fornitore_documenti_pkey" PRIMARY KEY ("id")
 );
@@ -190,13 +188,12 @@ CREATE TABLE "bollettini_testata" (
     "fornitore_id" BIGINT NOT NULL,
     "mese" INTEGER NOT NULL,
     "anno" INTEGER NOT NULL,
-    "att_filename" TEXT,
-    "importo_riconosciuto" DECIMAL(12,2),
-    "importo_calcolato" DECIMAL(12,2),
     "stato" VARCHAR(20) NOT NULL DEFAULT 'da_verificare',
+    "chiuso_il" TIMESTAMPTZ(6),
+    "chiuso_da" BIGINT,
     "note" TEXT,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "modificato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "bollettini_testata_pkey" PRIMARY KEY ("id")
 );
@@ -205,18 +202,20 @@ CREATE TABLE "bollettini_testata" (
 CREATE TABLE "bollettini_righe" (
     "id" BIGSERIAL NOT NULL,
     "testata_id" BIGINT NOT NULL,
-    "fattura_numero" VARCHAR(50),
+    "fattura_numero" VARCHAR(50) NOT NULL,
     "fattura_data" DATE,
     "cliente_piva" VARCHAR(20),
     "importo_merce" DECIMAL(12,2),
     "pct_riconosciuta" DECIMAL(5,2),
-    "importo_riconosciuto" DECIMAL(12,2),
+    "importo_riconosciuto" DECIMAL(12,2) NOT NULL,
     "pct_calcolata" DECIMAL(5,2),
     "importo_calcolato" DECIMAL(12,2),
-    "differenza" DECIMAL(12,2),
+    "differenza" DECIMAL(12,2) GENERATED ALWAYS AS ("importo_riconosciuto" - COALESCE("importo_calcolato", 0)) STORED,
     "tipo_riga" VARCHAR(15) NOT NULL DEFAULT 'provvigione',
     "fattura_mese" DATE,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "documento_id" BIGINT,
+    "liquidazione_id" BIGINT,
+    "creato_il" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "bollettini_righe_pkey" PRIMARY KEY ("id")
 );
@@ -241,14 +240,11 @@ CREATE TABLE "documenti_in_arrivo" (
     "email_oggetto" TEXT,
     "file_nome" TEXT NOT NULL,
     "file_hash" CHAR(64) NOT NULL,
-    "file" BYTEA,
     "stato" VARCHAR(16) NOT NULL DEFAULT 'in_coda',
     "tentativi" INTEGER NOT NULL DEFAULT 0,
     "errore" TEXT,
     "tipo" VARCHAR(16),
     "fornitore_id" BIGINT,
-    "dati_letti" JSONB,
-    "affidabilita" DECIMAL(4,3),
     "livello" VARCHAR(12),
     "controlli" JSONB,
     "modello" TEXT,
@@ -317,8 +313,8 @@ CREATE TABLE "accessi_link" (
 CREATE TABLE "sessioni" (
     "sid" VARCHAR NOT NULL,
     "sess" JSONB NOT NULL,
-    "expire" TIMESTAMP(6) NOT NULL,
-    "utente_id" BIGINT,
+    "expire" TIMESTAMPTZ(6) NOT NULL,
+    "utente_id" BIGINT GENERATED ALWAYS AS ((("sess"->>'utente_id'))::bigint) STORED,
 
     CONSTRAINT "sessioni_pkey" PRIMARY KEY ("sid")
 );
@@ -388,7 +384,7 @@ CREATE UNIQUE INDEX "fornitori_codice_integra_key" ON "fornitori"("codice_integr
 CREATE UNIQUE INDEX "clienti_codice_integra_key" ON "clienti"("codice_integra");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "clienti_piva_key" ON "clienti"("piva");
+CREATE INDEX "clienti_piva_idx" ON "clienti"("piva");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "provvigioni_scaglioni_fornitore_id_sconto_min_valido_dal_key" ON "provvigioni_scaglioni"("fornitore_id", "sconto_min", "valido_dal");
@@ -403,13 +399,10 @@ CREATE UNIQUE INDEX "agenti_codice_key" ON "agenti"("codice");
 CREATE UNIQUE INDEX "subagenti_codice_key" ON "subagenti"("codice");
 
 -- CreateIndex
-CREATE INDEX "interscambio_cliente_piva_idx" ON "interscambio"("cliente_piva");
+CREATE INDEX "interscambio_subagente_id_idx" ON "interscambio"("subagente_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "interscambio_subagente_id_cliente_piva_fornitore_id_key" ON "interscambio"("subagente_id", "cliente_piva", "fornitore_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "interscambio_fornitore_id_codice_cliente_fornitore_key" ON "interscambio"("fornitore_id", "codice_cliente_fornitore");
+CREATE INDEX "interscambio_fornitore_id_codice_cliente_fornitore_idx" ON "interscambio"("fornitore_id", "codice_cliente_fornitore");
 
 -- CreateIndex
 CREATE INDEX "ordini_fornitore_testata_fornitore_id_stato_idx" ON "ordini_fornitore_testata"("fornitore_id", "stato");
@@ -419,6 +412,18 @@ CREATE INDEX "ordini_fornitore_testata_cliente_piva_idx" ON "ordini_fornitore_te
 
 -- CreateIndex
 CREATE INDEX "ordini_fornitore_documenti_numero_tipo_idx" ON "ordini_fornitore_documenti"("numero", "tipo");
+
+-- CreateIndex
+CREATE INDEX "ordini_fornitore_documenti_testata_id_idx" ON "ordini_fornitore_documenti"("testata_id");
+
+-- CreateIndex
+CREATE INDEX "ordini_fornitore_documenti_fattura_id_idx" ON "ordini_fornitore_documenti"("fattura_id");
+
+-- CreateIndex
+CREATE INDEX "ordini_fornitore_documenti_liquidazione_id_idx" ON "ordini_fornitore_documenti"("liquidazione_id");
+
+-- CreateIndex
+CREATE INDEX "ordini_fornitore_documenti_arrivo_id_idx" ON "ordini_fornitore_documenti"("arrivo_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "provvigioni_correzioni_documento_id_key" ON "provvigioni_correzioni"("documento_id");
@@ -433,6 +438,15 @@ CREATE UNIQUE INDEX "bollettini_testata_fornitore_id_mese_anno_key" ON "bolletti
 CREATE INDEX "bollettini_righe_fattura_numero_idx" ON "bollettini_righe"("fattura_numero");
 
 -- CreateIndex
+CREATE INDEX "bollettini_righe_testata_id_idx" ON "bollettini_righe"("testata_id");
+
+-- CreateIndex
+CREATE INDEX "bollettini_righe_documento_id_idx" ON "bollettini_righe"("documento_id");
+
+-- CreateIndex
+CREATE INDEX "bollettini_righe_liquidazione_id_idx" ON "bollettini_righe"("liquidazione_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "liquidazioni_anno_trimestre_key" ON "liquidazioni"("anno", "trimestre");
 
 -- CreateIndex
@@ -440,6 +454,15 @@ CREATE UNIQUE INDEX "documenti_in_arrivo_file_hash_key" ON "documenti_in_arrivo"
 
 -- CreateIndex
 CREATE INDEX "documenti_in_arrivo_stato_idx" ON "documenti_in_arrivo"("stato");
+
+-- CreateIndex
+CREATE INDEX "documenti_in_arrivo_fornitore_id_idx" ON "documenti_in_arrivo"("fornitore_id");
+
+-- CreateIndex
+CREATE INDEX "documenti_in_arrivo_abbinato_pratica_id_idx" ON "documenti_in_arrivo"("abbinato_pratica_id");
+
+-- CreateIndex
+CREATE INDEX "documenti_in_arrivo_abbinato_bollettino_id_idx" ON "documenti_in_arrivo"("abbinato_bollettino_id");
 
 -- CreateIndex
 CREATE INDEX "documenti_campi_documento_id_idx" ON "documenti_campi"("documento_id");
@@ -484,6 +507,9 @@ CREATE INDEX "registro_operazione_id_idx" ON "registro"("operazione_id");
 CREATE INDEX "registro_dettaglio_idx" ON "registro" USING GIN ("dettaglio" jsonb_path_ops);
 
 -- CreateIndex
+CREATE INDEX "registro_visto_da_idx" ON "registro"("visto_da");
+
+-- CreateIndex
 CREATE INDEX "servizi_esecuzioni_servizio_inizio_idx" ON "servizi_esecuzioni"("servizio", "inizio" DESC);
 
 -- AddForeignKey
@@ -499,10 +525,10 @@ ALTER TABLE "provvigioni_eccezioni" ADD CONSTRAINT "provvigioni_eccezioni_subage
 ALTER TABLE "subagenti" ADD CONSTRAINT "subagenti_agente_id_fkey" FOREIGN KEY ("agente_id") REFERENCES "agenti"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_subagente_id_fkey" FOREIGN KEY ("subagente_id") REFERENCES "subagenti"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_subagente_id_fkey" FOREIGN KEY ("subagente_id") REFERENCES "subagenti"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_fornitore_id_fkey" FOREIGN KEY ("fornitore_id") REFERENCES "fornitori"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_fornitore_id_fkey" FOREIGN KEY ("fornitore_id") REFERENCES "fornitori"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ordini_fornitore_testata" ADD CONSTRAINT "ordini_fornitore_testata_fornitore_id_fkey" FOREIGN KEY ("fornitore_id") REFERENCES "fornitori"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -511,16 +537,28 @@ ALTER TABLE "ordini_fornitore_testata" ADD CONSTRAINT "ordini_fornitore_testata_
 ALTER TABLE "ordini_fornitore_testata" ADD CONSTRAINT "ordini_fornitore_testata_agente_id_fkey" FOREIGN KEY ("agente_id") REFERENCES "agenti"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "ordini_fornitore_documenti" ADD CONSTRAINT "ordini_fornitore_documenti_fattura_id_fkey" FOREIGN KEY ("fattura_id") REFERENCES "ordini_fornitore_documenti"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ordini_fornitore_documenti" ADD CONSTRAINT "ordini_fornitore_documenti_arrivo_id_fkey" FOREIGN KEY ("arrivo_id") REFERENCES "documenti_in_arrivo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ordini_fornitore_documenti" ADD CONSTRAINT "ordini_fornitore_documenti_liquidazione_id_fkey" FOREIGN KEY ("liquidazione_id") REFERENCES "liquidazioni"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "ordini_fornitore_documenti" ADD CONSTRAINT "ordini_fornitore_documenti_testata_id_fkey" FOREIGN KEY ("testata_id") REFERENCES "ordini_fornitore_testata"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "provvigioni_correzioni" ADD CONSTRAINT "provvigioni_correzioni_documento_id_fkey" FOREIGN KEY ("documento_id") REFERENCES "ordini_fornitore_documenti"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "provvigioni_correzioni" ADD CONSTRAINT "provvigioni_correzioni_creato_da_fkey" FOREIGN KEY ("creato_da") REFERENCES "utenti"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "provvigioni_correzioni" ADD CONSTRAINT "provvigioni_correzioni_creato_da_fkey" FOREIGN KEY ("creato_da") REFERENCES "utenti"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ordini_fornitore_righe" ADD CONSTRAINT "ordini_fornitore_righe_testata_id_fkey" FOREIGN KEY ("testata_id") REFERENCES "ordini_fornitore_testata"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bollettini_testata" ADD CONSTRAINT "bollettini_testata_chiuso_da_fkey" FOREIGN KEY ("chiuso_da") REFERENCES "utenti"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "bollettini_testata" ADD CONSTRAINT "bollettini_testata_fornitore_id_fkey" FOREIGN KEY ("fornitore_id") REFERENCES "fornitori"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -529,7 +567,13 @@ ALTER TABLE "bollettini_testata" ADD CONSTRAINT "bollettini_testata_fornitore_id
 ALTER TABLE "bollettini_righe" ADD CONSTRAINT "bollettini_righe_testata_id_fkey" FOREIGN KEY ("testata_id") REFERENCES "bollettini_testata"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "liquidazioni" ADD CONSTRAINT "liquidazioni_chiusa_da_fkey" FOREIGN KEY ("chiusa_da") REFERENCES "utenti"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "bollettini_righe" ADD CONSTRAINT "bollettini_righe_documento_id_fkey" FOREIGN KEY ("documento_id") REFERENCES "ordini_fornitore_documenti"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bollettini_righe" ADD CONSTRAINT "bollettini_righe_liquidazione_id_fkey" FOREIGN KEY ("liquidazione_id") REFERENCES "liquidazioni"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "liquidazioni" ADD CONSTRAINT "liquidazioni_chiusa_da_fkey" FOREIGN KEY ("chiusa_da") REFERENCES "utenti"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "documenti_in_arrivo" ADD CONSTRAINT "documenti_in_arrivo_fornitore_id_fkey" FOREIGN KEY ("fornitore_id") REFERENCES "fornitori"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -568,22 +612,32 @@ ALTER TABLE "impostazioni" ADD CONSTRAINT "impostazioni_aggiornato_da_fkey" FORE
 ALTER TABLE "servizi_esecuzioni" ADD CONSTRAINT "servizi_esecuzioni_avviato_da_fkey" FOREIGN KEY ("avviato_da") REFERENCES "utenti"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- ---------------------------------------------------------------------------
--- Vincoli che Prisma non esprime (spec §4.2, D-33). Prisma non li vede: non toglierli.
+-- Vincoli che Prisma non esprime (spec §4.2, D-33…D-35). Prisma non li vede: non toglierli.
+-- Le prove stanno in test/vincoli.spec.ts (npm test).
 -- ---------------------------------------------------------------------------
 
 -- Valori ammessi
 ALTER TABLE "fornitori" ADD CONSTRAINT "fornitori_giorno_bollettino_check" CHECK ("giorno_bollettino" BETWEEN 1 AND 28);
-ALTER TABLE "fornitori" ADD CONSTRAINT "fornitori_payment_type_check" CHECK ("payment_type" IN ('matured', 'invoiced'));
+ALTER TABLE "fornitori" ADD CONSTRAINT "fornitori_tipo_provvigione_check" CHECK ("tipo_provvigione" IN ('maturato', 'fatturato'));
+ALTER TABLE "provvigioni_scaglioni" ADD CONSTRAINT "provvigioni_scaglioni_pct_check" CHECK ("sconto_min" BETWEEN 0 AND 100 AND "pct_agente" BETWEEN 0 AND 100 AND "pct_subagente" BETWEEN 0 AND 100);
+ALTER TABLE "provvigioni_eccezioni" ADD CONSTRAINT "provvigioni_eccezioni_pct_check" CHECK ("pct_personale" BETWEEN 0 AND 100);
 ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_regola_mensile_check" CHECK ("regola_mensile" IS NULL OR "regola_mensile" IN ('prima', 'piu_alta'));
+ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_sconto_check" CHECK ("sconto" BETWEEN 0 AND 100);
+ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_pct_subagente_check" CHECK ("pct_subagente" IS NULL OR "pct_subagente" BETWEEN 0 AND 100);
+ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_periodo_check" CHECK ("valido_al" IS NULL OR "valido_al" > "valido_dal");
 ALTER TABLE "ordini_fornitore_testata" ADD CONSTRAINT "ordini_fornitore_testata_stato_check" CHECK ("stato" IN ('inviato', 'confermato', 'fatturato'));
 ALTER TABLE "ordini_fornitore_documenti" ADD CONSTRAINT "ordini_fornitore_documenti_tipo_check" CHECK ("tipo" IN ('fattura', 'nota_credito'));
 ALTER TABLE "ordini_fornitore_documenti" ADD CONSTRAINT "ordini_fornitore_documenti_stato_incasso_check" CHECK ("stato_incasso" IN ('da_incassare', 'pagata', 'insoluta'));
+ALTER TABLE "ordini_fornitore_documenti" ADD CONSTRAINT "ordini_fornitore_documenti_fattura_id_check" CHECK ("fattura_id" IS NULL OR "tipo" = 'nota_credito');
 ALTER TABLE "provvigioni_correzioni" ADD CONSTRAINT "provvigioni_correzioni_tipo_check" CHECK ("tipo" IN ('pct', 'nessuna', 'importo'));
 ALTER TABLE "provvigioni_correzioni" ADD CONSTRAINT "provvigioni_correzioni_motivo_check" CHECK (length(trim("motivo")) > 0);
 ALTER TABLE "ordini_fornitore_righe" ADD CONSTRAINT "ordini_fornitore_righe_fase_check" CHECK ("fase" IN ('ordine', 'conferma', 'fattura'));
 ALTER TABLE "bollettini_testata" ADD CONSTRAINT "bollettini_testata_mese_check" CHECK ("mese" BETWEEN 1 AND 12);
 ALTER TABLE "bollettini_testata" ADD CONSTRAINT "bollettini_testata_stato_check" CHECK ("stato" IN ('da_verificare', 'verificato', 'contestato'));
+-- chiuso_il decide il trimestre di storni e riaccrediti (D-11, D-35)
+ALTER TABLE "bollettini_testata" ADD CONSTRAINT "bollettini_testata_chiuso_check" CHECK (("stato" = 'da_verificare') = ("chiuso_il" IS NULL));
 ALTER TABLE "bollettini_righe" ADD CONSTRAINT "bollettini_righe_tipo_riga_check" CHECK ("tipo_riga" IN ('provvigione', 'storno', 'riaccredito'));
+ALTER TABLE "bollettini_righe" ADD CONSTRAINT "bollettini_righe_liquidazione_check" CHECK ("liquidazione_id" IS NULL OR "tipo_riga" IN ('storno', 'riaccredito'));
 ALTER TABLE "liquidazioni" ADD CONSTRAINT "liquidazioni_trimestre_check" CHECK ("trimestre" BETWEEN 1 AND 4);
 ALTER TABLE "utenti" ADD CONSTRAINT "utenti_ruolo_check" CHECK ("ruolo" IN ('amministratore', 'operatore', 'lettura'));
 ALTER TABLE "utenti" ADD CONSTRAINT "utenti_accesso_check" CHECK ("accesso" IN ('microsoft', 'email'));
@@ -591,15 +645,16 @@ ALTER TABLE "utenti" ADD CONSTRAINT "utenti_email_minuscolo_check" CHECK ("email
 ALTER TABLE "accessi_link" ADD CONSTRAINT "accessi_link_tipo_check" CHECK ("tipo" IN ('invito', 'link'));
 ALTER TABLE "registro" ADD CONSTRAINT "registro_genere_check" CHECK ("genere" IN ('evento', 'anomalia'));
 
--- Una sola anomalia aperta per causa (§4.2.11, D-31)
-CREATE UNIQUE INDEX "registro_anomalia_aperta_key" ON "registro" ("servizio", "codice", COALESCE("chiave", ''))
-  WHERE "genere" = 'anomalia' AND "stato" = 'aperta';
+-- Interscambio datato: un solo subagente per cliente × fornitore in ogni giorno (§5.10),
+-- e il codice del fornitore indica un solo cliente in ogni giorno (§4.4, D-35)
+ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_cliente_periodo_excl" EXCLUDE USING gist
+  ("cliente_piva" WITH =, "fornitore_id" WITH =, daterange("valido_dal", "valido_al") WITH &&);
+ALTER TABLE "interscambio" ADD CONSTRAINT "interscambio_codice_periodo_excl" EXCLUDE USING gist
+  ("fornitore_id" WITH =, "codice_cliente_fornitore" WITH =, daterange("valido_dal", "valido_al") WITH &&);
 
--- Sessioni: utente_id ricavato da sess, per chiudere le sessioni di un utente (§3.3, D-33)
-DROP INDEX "sessioni_utente_id_idx";
-ALTER TABLE "sessioni" DROP COLUMN "utente_id";
-ALTER TABLE "sessioni" ADD COLUMN "utente_id" BIGINT GENERATED ALWAYS AS ((("sess"->>'utente_id'))::bigint) STORED;
-CREATE INDEX "sessioni_utente_id_idx" ON "sessioni"("utente_id");
+-- Una sola anomalia aperta per causa, anche senza servizio (§4.2.11, D-31)
+CREATE UNIQUE INDEX "registro_anomalia_aperta_key" ON "registro" (COALESCE("servizio", ''), "codice", COALESCE("chiave", ''))
+  WHERE "genere" = 'anomalia' AND "stato" = 'aperta';
 
 -- Registro: gli eventi non si modificano e non si cancellano (§15.1). Eccezioni:
 -- * la pulizia notturna (§15.7) cancella dopo SET LOCAL decobrands.pulizia_registro = 'si';

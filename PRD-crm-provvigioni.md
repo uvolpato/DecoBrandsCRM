@@ -441,7 +441,7 @@ riguardano Decobrands e poterli recuperare.
 
 **E2.1 — Lo stato si ricava dai documenti.** Come operatore, non voglio scrivere lo stato a
 mano.
-- [ ] Ordine → *inviato*: in attesa, oppure in ritardo dopo `conferma_scadenza`.
+- [ ] Ordine → *inviato*: in attesa, oppure in ritardo dopo la scadenza della conferma (`data_ordine + giorni_attesa_conferma`).
 - [ ] Conferma → *confermato*.
 - [ ] Fattura → *fatturato*: la pratica entra nel calcolo delle provvigioni.
 - [ ] La nota di credito è un documento, non uno stato.
