@@ -432,7 +432,9 @@ abbia un account Microsoft.</p>
 </code></pre>
 <ul>
 <li>Esposte solo le porte 80/443; frontend, backend e database restano locali.</li>
-<li>Porte 8001/8002 per non collidere con la Gestione Ordini e con altre applicazioni sul server.</li>
+<li>Porte 8001/8002 per non collidere con la Gestione Ordini e con altre applicazioni sul server.
+  Il backend ascolta solo su <code>127.0.0.1</code>; <code>GET /api/salute</code> risponde <code>{ok: true}</code> senza sessione
+  se il server e il database rispondono (per Caddy e per l'avvio), e non dice altro.</li>
 <li>Lavori pianificati (<code>@nestjs/schedule</code>): controllo giornaliero delle conferme scadute (§5.12).</li>
 <li>File Excel (lettura bollettini, export) con <code>exceljs</code>; upload documenti con <code>multer</code>
   (incluso in NestJS).</li>

@@ -22,7 +22,7 @@ parte di F0-A4 e F0-A5, F5-A3, F5-A4.
 | # | Passo | Attività | Fatto |
 |---|---|---|:-:|
 | 1.1 | Database `decobrands_db` sull'istanza PostgreSQL locale (PG 16, 5432); utente `decobrands` proprietario; nome allineato in spec, piano, PRD, preventivo, `CLAUDE.md` | F0-A2 | [x] |
-| 1.2 | Scheletro `app/backend` (NestJS 11, Prisma 7.8 con `adapter-pg`, config, Helmet, validazione DTO, errori generici) sulla porta 8002 | F0-A1 | [ ] |
+| 1.2 | Scheletro `app/backend` (NestJS 11, Prisma 7.8 con `adapter-pg`, config, Helmet, validazione DTO che rifiuta i campi non dichiarati, errori generici con codice da cercare nel log) sulla porta 8002, solo `127.0.0.1`; `GET /api/salute`; prova `test/avvio.spec.ts` | F0-A1 | [x] |
 | 1.3 | Scheletro `app/frontend` (Next 16.2, React 19.2, TypeScript), `stile.css` e Public Sans copiati dal prototipo senza modifiche, inoltro `/api/*` alla 8002, porta 8001; `avvia.bat`, `.env.example` | F0-A1 | [ ] |
 | 1.4 | Schema Prisma **completo** (§4.2, D-33: 22 tabelle, 27 FK, 18 CHECK, anomalia aperta unica, `sessioni.utente_id` generata, eventi del registro immutabili salvo pulizia §15.7 e utente eliminato); migrazione unica `iniziale` (D-33…D-37: interscambio datato, scaglioni a soglia, legami di riconciliazione e liquidazione, niente copie, nomi in italiano); vincoli provati da `npm test` (`test/vincoli.spec.ts`, 18 casi). Manca il seed dei 4 utenti di `dati.js` + utente dei servizi | F0-A2 | [~] |
 | 1.5 | `logEvent(tx, …)` nella stessa transazione dell'operazione (V13, D-36), formato `dettaglio` §15.4; eventi `auth/*` §15.2.1 | F0-A5 | [ ] |

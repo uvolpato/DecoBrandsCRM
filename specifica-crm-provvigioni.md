@@ -209,6 +209,8 @@ Browser ──HTTPS 443──► Caddy (certificato automatico)
 
 - Esposte solo le porte 80/443; frontend, backend e database restano locali.
 - Porte 8001/8002 per non collidere con la Gestione Ordini e con altre applicazioni sul server.
+  Il backend ascolta solo su `127.0.0.1`; `GET /api/salute` risponde `{ok: true}` senza sessione
+  se il server e il database rispondono (per Caddy e per l'avvio), e non dice altro.
 - Lavori pianificati (`@nestjs/schedule`): controllo giornaliero delle conferme scadute (§5.12).
 - File Excel (lettura bollettini, export) con `exceljs`; upload documenti con `multer`
   (incluso in NestJS).
