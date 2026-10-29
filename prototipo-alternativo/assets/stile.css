@@ -593,7 +593,7 @@ body.sola-lettura .velo .modale-corpo .btn:not(.sec):not(.consentito) { opacity:
 body.sola-lettura .principale::before { content: 'Profilo in sola lettura: puoi consultare ed esportare, non modificare'; display: block; flex: none; padding: 6px 12px; border-radius: 8px; background: var(--primario-tenue); color: var(--primario-testo); font-size: 13px; font-weight: 600; }
 /* utente nella barra */
 .barra-piede .io { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: #fff; }
-.barra-piede .io > span:last-child { display: flex; flex-direction: column; line-height: 1.25; font-size: 12px; color: rgba(255,255,255,.65); }
+.barra-piede .io > span:not(.io-sigla) { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; font-size: 12px; color: rgba(255,255,255,.65); }
 .barra-piede .io b { color: #fff; font-size: 13px; }
 .io-sigla { width: 30px; height: 30px; border-radius: 50%; background: var(--primario); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex: none; }
 .io-cambia { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; font-size: 11.5px; color: rgba(255,255,255,.6); }
@@ -861,3 +861,29 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .filtri.con-riepilogo { flex-wrap: wrap; }
 .filtri.con-riepilogo > .riepilogo-filtri { margin-left: auto; }
 .barra-analisi .filtri-entita .filtro-ricerca { max-width: none; }
+
+/* ---------- Accesso (D-39, spec §7.0): stessa barra scura con il marchio, pannello al centro ---------- */
+.io-esci { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-piccolo); color: rgba(255,255,255,.65); flex: none; }
+.io-esci:hover { background: rgba(255,255,255,.1); color: #fff; }
+body.in-accesso .principale { align-items: center; justify-content: center; overflow: auto; }
+.accesso { width: 100%; max-width: 400px; }
+.accesso .pannello-corpo { padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 14px; }
+.accesso h1 { font-size: 20px; font-weight: 700; }
+.accesso .modulo .btn.largo { justify-content: center; width: 100%; padding: 10px 14px; font-weight: 600; margin-top: 4px; }
+.accesso .campo input { padding: 9px 11px; }
+.accesso-link { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; font-size: 13px; padding-top: 2px; }
+.campo-password { position: relative; display: flex; }
+.campo-password input { flex: 1; min-width: 0; padding-right: 44px !important; }
+.campo-password .mostra { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; display: grid; place-items: center; border: 0; background: none; color: var(--testo-tenue); border-radius: var(--r-piccolo); cursor: pointer; }
+.campo-password .mostra:hover { color: var(--testo); background: var(--sfondo); }
+.campo-casella { flex-direction: row; align-items: center; gap: 8px; }
+.campo-casella input { width: 16px; height: 16px; margin: 0; accent-color: var(--primario); }
+.campo-casella label { font-weight: 400; font-size: 14px; }
+@media (max-width: 860px) {
+  body.in-accesso .barra { position: static; padding: 18px 16px 6px; }
+  body.in-accesso .marchio { display: flex; padding: 0; }
+  body.in-accesso .principale { height: auto; padding: 18px 16px 32px; justify-content: flex-start; }
+  .accesso .pannello-corpo { padding: 22px 18px 20px; }
+  .accesso .campo input { font-size: 16px; }   /* niente zoom automatico su iPhone */
+}
+

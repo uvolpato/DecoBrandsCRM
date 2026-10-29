@@ -1071,12 +1071,15 @@ window.DATI_DEMO = {
      Utenti: tabella condivisa con la Gestione Ordini (stesse credenziali). Ruoli del CRM:
      amministratore (tutto), operatore (lavoro quotidiano e anagrafiche CRM), lettura (consulta ed esporta). */
   utente_corrente: 1,
+  collegato: true,   // D-39: la demo parte con la sessione aperta; *Esci* porta alla pagina di accesso
   utenti: [
-    { id: 1, nome: 'Ugo Volpato', email: 'ugo.volpato@decobrands.it', ruolo: 'amministratore', attivo: true, ultimo_accesso: '2026-09-04T08:12', accesso: 'microsoft', ultimo_invio: { quando: '2026-03-02T10:15', tipo: 'invito', errore: null } },
-    { id: 2, nome: 'Matteo Caironi', email: 'matteo.caironi@decobrands.it', ruolo: 'operatore', attivo: true, ultimo_accesso: '2026-09-04T08:47', accesso: 'microsoft', ultimo_invio: { quando: '2026-03-02T10:16', tipo: 'invito', errore: null } },
-    { id: 3, nome: 'Giulia Ferri', email: 'amministrazione@decobrands.it', ruolo: 'lettura', attivo: true, ultimo_accesso: '2026-09-01T17:30', accesso: 'microsoft', ultimo_invio: { quando: '2026-06-10T09:00', tipo: 'invito', errore: null } },
-    { id: 4, nome: 'Luca Bianchi', email: 'luca.bianchi@decobrands.it', ruolo: 'operatore', accesso: 'email', attivo: false, ultimo_accesso: '2026-05-28T12:05', ultimo_invio: { quando: '2026-05-29T08:30', tipo: 'link', errore: 'Casella inesistente (550 5.1.1)' } },
-    { id: 5, nome: 'Servizi automatici', email: 'noreply@decobrands.it', ruolo: 'amministratore', attivo: true, sistema: true, ultimo_accesso: null, ultimo_invio: null }
+    { id: 1, username: 'ugo', nome: 'Ugo Volpato', email: 'ugo.volpato@decobrands.it', ruolo: 'amministratore', attivo: true, ultimo_accesso: '2026-09-04T08:12', ultimo_invio: { quando: '2026-03-02T10:15', tipo: 'benvenuto', errore: null } },
+    { id: 2, username: 'matteo', nome: 'Matteo Caironi', email: 'matteo.caironi@decobrands.it', ruolo: 'operatore', attivo: true, ultimo_accesso: '2026-09-04T08:47', ultimo_invio: { quando: '2026-03-02T10:16', tipo: 'benvenuto', errore: null } },
+    { id: 3, username: 'giulia', nome: 'Giulia Ferri', email: 'amministrazione@decobrands.it', ruolo: 'lettura', attivo: true, ultimo_accesso: '2026-09-01T17:30', ultimo_invio: { quando: '2026-06-10T09:00', tipo: 'benvenuto', errore: null } },
+    { id: 4, username: 'luca', nome: 'Luca Bianchi', email: 'luca.bianchi@decobrands.it', ruolo: 'operatore', attivo: false, ultimo_accesso: '2026-05-28T12:05', ultimo_invio: { quando: '2026-05-29T08:30', tipo: 'password', errore: 'Casella inesistente (550 5.1.1)' } },
+    { id: 5, username: 'servizi', nome: 'Servizi automatici', email: 'noreply@decobrands.it', ruolo: 'amministratore', attivo: true, sistema: true, ultimo_accesso: null, ultimo_invio: null },
+    // D-39: il superutente si crea all'installazione con un comando del server; crea gli amministratori
+    { id: 6, username: 'superutente', nome: 'Superutente', email: 'it@decobrands.it', ruolo: 'superutente', attivo: true, ultimo_accesso: '2026-03-02T10:05', ultimo_invio: { quando: '2026-03-02T10:00', tipo: 'benvenuto', errore: null } }
   ],
 
   /* Stato dei servizi che girano da soli (spec §7.13). */
@@ -1112,7 +1115,6 @@ window.DATI_DEMO = {
     casella: { server: 'outlook.office365.com', porta: 993, utente: 'documenti@decobrands.it', password: true, cartella: 'Fornitori', cartella_lette: 'Fornitori/Letti', minuti: 2 },
     lettura: { indirizzo: 'http://gpu-decobrands:8080/v1', modello: 'zai-org/GLM-OCR', soglia_ok: 0.90, soglia_bassa: 0.70, attesa_s: 120 },
     posta: { server: 'smtp.office365.com', porta: 587, utente: 'noreply@decobrands.it', password: true, mittente: 'Decobrands CRM <noreply@decobrands.it>' },
-    accesso: { tenant: 'decobrands.onmicrosoft.com', client_id: '3f2a9c1e-7b40-4d6a-9e1f-0c5b8d2e4a71', segreto: true },
     integra: { server: 'srv-crm', database: 'integra_ponte', utente: 'crm_lettura', password: true, schema: 'crm_viste', secondi: 60, secondi_giacenze: 15 },
     conservazione: { eventi_mesi: 36, scartati_giorni: 90, righe_pagina: 25 }
   },

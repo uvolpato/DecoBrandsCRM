@@ -14,13 +14,18 @@
 
   /* =========================================================
      Utenti e ruoli: elenco + scheda + cosa può fare ogni ruolo
+     D-39 §7.13: nome utente (o email) e password; il superutente crea gli amministratori,
+     gli amministratori creano operatori e utenti in sola lettura
      ========================================================= */
   let filtroUtenti = { vista: 'attivi', q: '' }, schedaUtente = 'utente';
-  const ACCESSO = { microsoft: 'Microsoft 365', email: 'Link via email' };
+  const ULTIMA_EMAIL = { benvenuto: 'Benvenuto con la password provvisoria', password: 'Nuova password provvisoria', reset: 'Password dimenticata' };
+  const ora = () => M.oggi() + 'T' + new Date().toTimeString().slice(0, 5);
+  // chi può gestire chi (D-39): nessuno tocca il superutente né l'utente dei servizi; gli amministratori li gestisce il superutente
+  const gestibile = u => !u.sistema && u.ruolo !== 'superutente' && (u.ruolo !== 'amministratore' || M.puo('amministratori'));
   function vistaUtenti(idSel) {
     if (!CRM.permesso('gestione', 'utenti', 'Utenti e ruoli')) return;
     const corpo = CRM.Pagina({ voce: 'utenti', titolo: 'Utenti e ruoli', pieno: true,
-      sottotitolo: 'Si entra solo su invito: con l’account Microsoft 365 o con un link via email, senza password. Il ruolo decide cosa si può fare.',
+      sottotitolo: 'Si entra con nome utente (o email) e password. La password provvisoria arriva per email e va cambiata al primo accesso. Il ruolo decide cosa si può fare.',
       azioni: [{ etichetta: 'Nuovo utente', icona: 'piu', onClick: () => modificaUtente(null) }] });
     const utenti = M.S.utenti;
     const u = utenti.find(x => x.id === Number(idSel)) || utenti[0];
@@ -28,44 +33,48 @@
     const sx = CRM.blocco(col, 'pila riempi');
     const VISTE = { attivi: x => x.attivo, disattivati: x => !x.attivo, tutti: () => true };
     CRM.FilterBar(sx, { campi: [
-      { nome: 'q', tipo: 'cerca', valore: filtroUtenti.q, placeholder: 'Nome o email' },
+      { nome: 'q', tipo: 'cerca', valore: filtroUtenti.q, placeholder: 'Nome, nome utente o email' },
       { nome: 'vista', tipo: 'segmenti', valore: filtroUtenti.vista, opzioni: [
         { value: 'attivi', label: 'Attivi', n: utenti.filter(VISTE.attivi).length }, { value: 'disattivati', label: 'Disattivati', n: utenti.filter(VISTE.disattivati).length }, { value: 'tutti', label: 'Tutti', n: utenti.length }] }
     ], onChange: v => { filtroUtenti = v; tab.aggiorna(filtra()); } });
-    const filtra = () => { const q = (filtroUtenti.q || '').toLowerCase(); return utenti.filter(VISTE[filtroUtenti.vista]).filter(x => !q || [x.nome, x.email].some(t => t.toLowerCase().indexOf(q) >= 0)); };
+    const filtra = () => { const q = (filtroUtenti.q || '').toLowerCase(); return utenti.filter(VISTE[filtroUtenti.vista]).filter(x => !q || [x.nome, x.username, x.email].some(t => t.toLowerCase().indexOf(q) >= 0)); };
     const tab = CRM.DataTable(CRM.blocco(sx, 'riempi'), {
       righe: filtra(), ordinamentoIniziale: { key: 'nome', dir: 'asc' }, rowClass: x => x.id === u.id ? 'selezionata' : '',
       colonne: [
-        { key: 'nome', header: 'Utente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === M.utente().id ? ' <span class="testo-tenue">(tu)</span>' : '') + '<span class="sec-riga">' + e(x.email) + '</span>' },
-        { key: 'ruolo', header: 'Ruolo', valore: x => M.RUOLI[x.ruolo].nome, cell: x => x.sistema ? CRM.stato('neutro', 'Servizi automatici') : CRM.stato(x.ruolo === 'amministratore' ? 'primario' : x.ruolo === 'operatore' ? 'info' : 'neutro', M.RUOLI[x.ruolo].nome) },
-        { key: 'accesso', header: 'Ultimo accesso', valore: x => x.ultimo_accesso || '', cell: x => !x.attivo ? CRM.stato('neutro', 'Disattivato') : x.ultimo_accesso || x.sistema ? quando(x.ultimo_accesso) : CRM.stato('attesa', 'Invitato') }
+        { key: 'nome', header: 'Utente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === M.utente().id ? ' <span class="testo-tenue">(tu)</span>' : '') + '<span class="sec-riga">' + e(x.username) + ' · ' + e(x.email) + '</span>' },
+        { key: 'ruolo', header: 'Ruolo', valore: x => M.RUOLI[x.ruolo].nome, cell: x => x.sistema ? CRM.stato('neutro', 'Servizi automatici') : CRM.stato(x.ruolo === 'superutente' || x.ruolo === 'amministratore' ? 'primario' : x.ruolo === 'operatore' ? 'info' : 'neutro', M.RUOLI[x.ruolo].nome) },
+        { key: 'accesso', header: 'Ultimo accesso', valore: x => x.ultimo_accesso || '', cell: x => !x.attivo ? CRM.stato('neutro', 'Disattivato') : x.ultimo_accesso || x.sistema ? quando(x.ultimo_accesso) : CRM.stato('attesa', 'Mai entrato') }
       ],
       onRowClick: x => { location.hash = '#/utenti/' + x.id; },
       emptyText: 'Nessun utente', emptyHint: 'Cambia la ricerca o il filtro.'
     });
 
-    const io = M.utente(), protetto = !!u.sistema;
+    const io = M.utente(), sonoIo = u.id === io.id, modificabile = sonoIo || gestibile(u);
     const p = CRM.Pannello(col, { titolo: u.nome, nota: u.sistema ? 'utente dei servizi automatici' : '', riempi: true,
-      azioni: protetto ? [] : [{ etichetta: 'Modifica', onClick: () => modificaUtente(u) }, { etichetta: u.ultimo_accesso ? 'Invia un link di accesso' : 'Invia di nuovo l’invito', icona: 'chiave', onClick: () => invia(u) }] });
+      azioni: !modificabile ? [] : [{ etichetta: 'Modifica', onClick: () => modificaUtente(u) }].concat(sonoIo
+        ? [{ etichetta: 'Cambia la tua password', icona: 'chiave', onClick: () => { location.hash = '#/accesso/cambia'; } }]
+        : [{ etichetta: 'Reimposta la password', icona: 'chiave', onClick: () => reimposta(u) }]) });
     const ruoli = Object.keys(M.RUOLI);
     // dati dell'utente e tabella dei permessi in due schede: niente scorrimento nella colonna
     CRM.Schede(p.corpo, { riempi: true, attiva: schedaUtente, onCambia: id => { schedaUtente = id; }, schede: [
       { id: 'utente', etichetta: 'Dati dell’utente', disegna: c => {
         CRM.Dettagli(c, [
+          { etichetta: 'Nome utente', valore: e(u.username) },
           { etichetta: 'Email', valore: e(u.email) },
           { etichetta: 'Ruolo', valore: e(M.RUOLI[u.ruolo].nome) },
-          { etichetta: 'Stato', valore: u.attivo ? CRM.stato('ok', 'Attivo') : CRM.stato('neutro', 'Disattivato') },
+          { etichetta: 'Stato', valore: u.attivo ? CRM.stato('ok', 'Attivo') + (u.deve_cambiare_password ? ' ' + CRM.stato('attesa', 'Password provvisoria') : '') : CRM.stato('neutro', 'Disattivato') },
           { etichetta: 'Ultimo accesso', valore: quando(u.ultimo_accesso) },
-          { etichetta: 'Accesso', valore: u.sistema ? '—' : ACCESSO[u.accesso] },
-          { etichetta: 'Ultimo invio', valore: u.ultimo_invio ? (u.ultimo_invio.tipo === 'invito' ? 'Invito · ' : 'Link · ') + quando(u.ultimo_invio.quando) + (u.ultimo_invio.errore ? '<span class="sec-riga negativo">' + e(u.ultimo_invio.errore) + '</span>' : '') : '—' }
+          { etichetta: 'Ultima email', valore: u.ultimo_invio ? e(ULTIMA_EMAIL[u.ultimo_invio.tipo] || u.ultimo_invio.tipo) + ' · ' + quando(u.ultimo_invio.quando) + (u.ultimo_invio.errore ? '<span class="sec-riga negativo">' + e(u.ultimo_invio.errore) + '</span>' : '') : '—' }
         ], { inColonne: true });
-        if (protetto) { CRM.Nota(c, 'Utente usato dai servizi automatici (lettura della casella, sincronizzazione da Integra): non si modifica e non accede all’app.'); return; }
+        if (u.sistema) { CRM.Nota(c, 'Utente usato dai servizi automatici (lettura della casella, sincronizzazione da Integra): non si modifica e non accede all’app.'); return; }
+        if (u.ruolo === 'superutente' && !sonoIo) { CRM.Nota(c, 'Il superutente si crea all’installazione e non si modifica da qui: crea e gestisce gli amministratori.'); return; }
+        if (!modificabile) { CRM.Nota(c, 'Gli amministratori li gestisce il superutente.'); return; }
         const az = CRM.blocco(c, 'azioni-riga');
         const b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'btn sec piccolo'; b1.textContent = u.attivo ? 'Disattiva' : 'Riattiva';
         b1.addEventListener('click', () => attiva(u, !u.attivo)); az.appendChild(b1);
         const b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'btn pericolo piccolo'; b2.textContent = 'Elimina';
         b2.addEventListener('click', () => elimina(u)); az.appendChild(b2);
-        if (u.id === io.id) { b1.disabled = b2.disabled = true; b1.title = b2.title = 'Non puoi disattivare o eliminare te stesso'; }
+        if (sonoIo) { b1.disabled = b2.disabled = true; b1.title = b2.title = 'Non puoi disattivare o eliminare te stesso'; }
       } },
       { id: 'ruoli', etichetta: 'Cosa può fare ogni ruolo', conta: M.PERMESSI.length, disegna: c => {
         CRM.DataTable(CRM.blocco(c, 'riempi'), {
@@ -85,45 +94,48 @@
   const amministratoriAttivi = escluso => M.S.utenti.filter(x => x.attivo && !x.sistema && x.ruolo === 'amministratore' && x !== escluso).length;
   function modificaUtente(u) {
     const nuovo = !u, io = M.utente();
+    // il superutente sceglie anche "Amministratore"; l'amministratore solo operatore e sola lettura (D-39)
+    const scelte = ['amministratore', 'operatore', 'lettura'].filter(r => r !== 'amministratore' || M.puo('amministratori') || (u && u.ruolo === r));
     CRM.FormModal({
-      titolo: nuovo ? 'Nuovo utente' : 'Modifica ' + u.nome, conferma: nuovo ? 'Crea e invia l’invito' : 'Salva', colonne: 2,
-      testo: nuovo ? 'L’utente riceve per email l’invito. Entra solo chi è in questo elenco ed è attivo.' : null,
+      titolo: nuovo ? 'Nuovo utente' : 'Modifica ' + u.nome, conferma: nuovo ? 'Crea e manda la password' : 'Salva', colonne: 2,
+      testo: nuovo ? 'L’utente riceve per email il nome utente e una password provvisoria, da cambiare al primo accesso.' : null,
       campi: [
-        { nome: 'nome', etichetta: 'Nome e cognome', valore: u ? u.nome : '' },
+        { nome: 'nome', etichetta: 'Nome e cognome', valore: u ? u.nome : '', largo: true },
+        { nome: 'username', etichetta: 'Nome utente', valore: u ? u.username : '', aiuto: 'Minuscole, numeri, punto, trattino; senza @.' },
         { nome: 'email', etichetta: 'Email', valore: u ? u.email : '' },
-        { nome: 'accesso', etichetta: 'Accesso', tipo: 'select', valore: u ? u.accesso : 'microsoft', largo: true, opzioni: Object.keys(ACCESSO).map(k => ({ value: k, label: ACCESSO[k] })),
-          aiuto: 'Microsoft 365 per gli account Decobrands; link via email per chi non ce l’ha (subagenti, esterni).' },
-        { nome: 'ruolo', etichetta: 'Ruolo', tipo: 'select', valore: u ? u.ruolo : 'operatore', largo: true, opzioni: Object.keys(M.RUOLI).map(r => ({ value: r, label: M.RUOLI[r].nome })),
-          aiuto: 'Amministratore: tutto. Operatore: lavoro quotidiano e anagrafiche del CRM. Sola lettura: consulta ed esporta.' }
+        { nome: 'ruolo', etichetta: 'Ruolo', tipo: 'select', valore: u ? u.ruolo : 'operatore', largo: true, opzioni: (u && u.ruolo === 'superutente' ? ['superutente'] : scelte).map(r => ({ value: r, label: M.RUOLI[r].nome })),
+          aiuto: (M.puo('amministratori') ? 'Amministratore: tutto tranne gli amministratori. ' : '') + 'Operatore: lavoro quotidiano e anagrafiche del CRM. Sola lettura: consulta ed esporta.' }
       ],
       dopo: form => { if (u && u.id === io.id) { form.campo('ruolo').disabled = true; form.aiuto('ruolo', 'Non puoi cambiare il tuo ruolo.'); } },
       onConferma: (v, form) => {
-        if (!v.nome || !v.email) { form.errore('Compila nome ed email.'); return false; }
+        const username = (v.username || '').toLowerCase();
+        if (!v.nome || !username || !v.email) { form.errore('Compila nome, nome utente ed email.'); return false; }
+        if (!/^[a-z0-9._-]{2,50}$/.test(username)) { form.errore('Il nome utente ' + username + ' non va bene: minuscole, numeri, punto o trattino, senza @.'); return false; }
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { form.errore('L’email ' + v.email + ' non è valida.'); return false; }
+        if (M.S.utenti.some(x => x !== u && x.username === username)) { form.errore('Il nome utente ' + username + ' è già di un altro utente.'); return false; }
         if (M.S.utenti.some(x => x !== u && x.email.toLowerCase() === v.email.toLowerCase())) { form.errore('L’email ' + v.email + ' è già di un altro utente.'); return false; }
-        const ruolo = u && u.id === io.id ? u.ruolo : v.ruolo;
+        const ruolo = u && (u.id === io.id || u.ruolo === 'superutente') ? u.ruolo : v.ruolo;
         if (u && u.ruolo === 'amministratore' && ruolo !== 'amministratore' && u.attivo && !amministratoriAttivi(u)) { form.errore('Deve restare almeno un amministratore attivo.'); return false; }
         if (nuovo) {
-          const rec = { id: Math.max.apply(null, M.S.utenti.map(x => x.id)) + 1, nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo, accesso: v.accesso, attivo: true, ultimo_accesso: null, ultimo_invio: { quando: M.oggi() + 'T' + new Date().toTimeString().slice(0, 5), tipo: 'invito', errore: null } };
-          M.S.utenti.push(rec); M.annota('Nuovo utente ' + rec.nome + ' (' + M.RUOLI[ruolo].nome.toLowerCase() + '), invito inviato');
-          M.salva(); CRM.Avviso('Utente creato: invito inviato a ' + rec.email); location.hash = '#/utenti/' + rec.id; return;
+          const rec = { id: Math.max.apply(null, M.S.utenti.map(x => x.id)) + 1, username: username, nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo, attivo: true, deve_cambiare_password: true, ultimo_accesso: null, ultimo_invio: { quando: ora(), tipo: 'benvenuto', errore: null } };
+          M.S.utenti.push(rec); M.annota('Nuovo utente ' + rec.nome + ' (' + M.RUOLI[ruolo].nome.toLowerCase() + '), password provvisoria mandata');
+          M.salva(); CRM.Avviso('Utente creato: nome utente e password provvisoria mandati a ' + rec.email); location.hash = '#/utenti/' + rec.id; return;
         }
-        Object.assign(u, { nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo, accesso: v.accesso });
+        Object.assign(u, { nome: v.nome, username: username, email: v.email.toLowerCase(), ruolo: ruolo });
         M.annota('Utente ' + u.nome + ' aggiornato'); M.salva(); CRM.Avviso('Utente salvato'); CRM.naviga();
       }
     });
   }
-  // D-30 §3.3: niente password; l'invito (prima volta) o un link monouso di 15 minuti, anche come riserva se Microsoft non risponde
-  async function invia(u) {
-    const tipo = u.ultimo_accesso ? 'link' : 'invito', nome = tipo === 'link' ? 'Link di accesso' : 'Invito';
-    if (!(await CRM.Conferma('Inviare ' + (tipo === 'link' ? 'un link di accesso' : 'di nuovo l’invito') + ' a ' + u.nome + '?', tipo === 'link'
-      ? 'Riceve a ' + e(u.email) + ' un link valido una sola volta per 15 minuti: serve anche quando Microsoft non risponde.'
-      : 'Riceve a ' + e(u.email) + ' l’invito, valido 7 giorni; quello precedente smette di funzionare.', 'Invia'))) return;
+  // D-39 §7.13: nuova password provvisoria per email; quella di prima smette di funzionare
+  async function reimposta(u) {
+    if (!(await CRM.Conferma('Mandare una nuova password provvisoria a ' + u.nome + '?',
+      'Riceve a ' + e(u.email) + ' una password provvisoria: quella attuale smette di funzionare e al primo accesso ne sceglie una nuova.', 'Manda la password'))) return;
     const errore = /bianchi/.test(u.email) ? 'Casella inesistente (550 5.1.1)' : null;   // nel prototipo: l'indirizzo di Luca Bianchi non esiste più
-    u.ultimo_invio = { quando: M.oggi() + 'T' + new Date().toTimeString().slice(0, 5), tipo: tipo, errore: errore };
-    M.annota(nome + ' inviato a ' + u.nome + (errore ? ' (non recapitato)' : ''));
-    if (errore) M.S.sistema.problemi.unshift({ id: Date.now(), quando: u.ultimo_invio.quando, servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: nome + ' a ' + u.email + ': ' + errore + '.', visto: false });
-    M.salva(); CRM.Avviso(errore ? 'Invio non riuscito: ' + errore : nome + ' inviato a ' + u.email); CRM.naviga();
+    u.ultimo_invio = { quando: ora(), tipo: 'password', errore: errore };
+    u.deve_cambiare_password = true;
+    M.annota('Nuova password provvisoria mandata a ' + u.nome + (errore ? ' (non recapitata)' : ''));
+    if (errore) M.S.sistema.problemi.unshift({ id: Date.now(), quando: u.ultimo_invio.quando, servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: 'Password provvisoria a ' + u.email + ': ' + errore + '.', visto: false });
+    M.salva(); CRM.Avviso(errore ? 'Invio non riuscito: ' + errore : 'Password provvisoria mandata a ' + u.email); CRM.naviga();
   }
   function attiva(u, si) {
     if (!si && u.ruolo === 'amministratore' && !amministratoriAttivi(u)) { CRM.Avviso('Deve restare almeno un amministratore attivo'); return; }
@@ -136,6 +148,90 @@
     } else if (!(await CRM.Conferma('Eliminare ' + u.nome + '?', 'Non ha mai effettuato l’accesso.', 'Elimina', true))) return;
     M.S.utenti.splice(M.S.utenti.indexOf(u), 1); M.annota('Utente ' + u.nome + ' eliminato'); M.salva(); CRM.Avviso('Utente eliminato'); location.hash = '#/utenti';
   }
+
+  /* =========================================================
+     Accesso (D-39, spec §7.0): nome utente (o email) e password, password provvisoria da
+     cambiare, password dimenticata. Nel prototipo la password di tutti è "decobrands".
+     ========================================================= */
+  const PROVA = 'Prototipo: entra con <b>ugo</b>, <b>matteo</b>, <b>giulia</b> o <b>superutente</b> e la password <b>decobrands</b>.';
+  const NUOVA = [
+    { nome: 'nuova', etichetta: 'Nuova password', tipo: 'password', completa: 'new-password' },
+    { nome: 'ripeti', etichetta: 'Ripeti la nuova password', tipo: 'password', completa: 'new-password' }
+  ];
+  // stessi controlli del server (§8.3): almeno 8 caratteri, nessuna regola di composizione
+  const nuovaNonValida = v => v.nuova.length < 8 ? 'La nuova password deve avere almeno 8 caratteri.' : v.nuova !== v.ripeti ? 'Le due password non coincidono.' : '';
+  const dopoAccesso = () => { const h = M.S.dopo_accesso; M.S.dopo_accesso = null; M.salvaSempre(); location.replace(h && !/^\/accesso/.test(h) ? '#' + h : '#/'); };   // replace: le pagine di accesso non restano nella cronologia
+  CRM.rotta(/^\/accesso$/, () => {
+    if (M.S.collegato) { location.replace('#/'); return; }
+    CRM.Accesso({
+      titolo: 'Accedi', testo: 'Usa il nome utente (o l’email) e la password che ti ha mandato l’amministratore.', avviso: PROVA,
+      campi: [
+        { nome: 'utente', etichetta: 'Nome utente o email', completa: 'username' },
+        { nome: 'password', etichetta: 'Password', tipo: 'password' },
+        { nome: 'resta', etichetta: 'Resta collegato su questo computer', tipo: 'casella', valore: true }
+      ],
+      conferma: 'Entra', link: [{ testo: 'Password dimenticata?', href: '#/accesso/dimenticata' }],
+      onConferma: (v, form) => {
+        const chi = v.utente.toLowerCase();
+        const u = M.S.utenti.find(x => !x.sistema && (x.username === chi || x.email === chi));
+        // un solo messaggio per nome sconosciuto, password sbagliata o utente disattivato (§3.3)
+        if (!u || v.password !== 'decobrands' || !u.attivo) { form.errore('Credenziali non valide.'); return; }
+        M.S.utente_corrente = u.id; M.S.collegato = true; u.ultimo_accesso = ora();
+        M.annota('Accesso di ' + u.nome); M.salvaSempre();
+        if (u.deve_cambiare_password) location.replace('#/accesso/cambia'); else dopoAccesso();
+      }
+    });
+  });
+  CRM.rotta(/^\/accesso\/esci$/, () => {
+    M.annota('Uscita di ' + M.utente().nome); M.S.collegato = false; M.S.dopo_accesso = null; M.salvaSempre();
+    location.replace('#/accesso'); CRM.Avviso('Sei uscito');
+  });
+  CRM.rotta(/^\/accesso\/cambia$/, () => {
+    if (!M.S.collegato) { location.replace('#/accesso'); return; }
+    const u = M.utente(), obbligo = !!u.deve_cambiare_password;
+    CRM.Accesso({
+      titolo: obbligo ? 'Scegli la tua password' : 'Cambia la password',
+      testo: obbligo ? 'Stai usando la password provvisoria arrivata per email: scegline una tua prima di continuare.' : 'Ciao ' + e(u.nome) + ', scegli la nuova password.',
+      campi: [{ nome: 'attuale', etichetta: obbligo ? 'Password provvisoria' : 'Password attuale', tipo: 'password' }].concat(NUOVA),
+      conferma: obbligo ? 'Salva e continua' : 'Salva la password',
+      link: obbligo ? [{ testo: 'Esci', href: '#/accesso/esci' }] : [{ testo: 'Annulla', href: '#/' }],
+      onConferma: (v, form) => {
+        const err = v.attuale !== 'decobrands' ? 'La password attuale non è giusta.' : nuovaNonValida(v) || (v.nuova === v.attuale ? 'La nuova password deve essere diversa da quella attuale.' : '');
+        if (err) { form.errore(err); return; }
+        u.deve_cambiare_password = false; M.annota('Password cambiata da ' + u.nome); M.salvaSempre();
+        CRM.Avviso('Password salvata'); dopoAccesso();
+      }
+    });
+  });
+  CRM.rotta(/^\/accesso\/dimenticata$/, () => {
+    CRM.Accesso({
+      titolo: 'Password dimenticata', testo: 'Scrivi l’email del tuo utente: ti mandiamo un link per sceglierne una nuova, valido un’ora.',
+      campi: [{ nome: 'email', etichetta: 'Email', completa: 'email' }],
+      conferma: 'Manda il link', link: [{ testo: 'Torna all’accesso', href: '#/accesso' }],
+      onConferma: (v, form) => {
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { form.errore('Scrivi un’email valida.'); return; }
+        // risposta sempre uguale: non dice se l'email è registrata (§3.3)
+        CRM.Accesso({
+          titolo: 'Controlla la posta', testo: 'Se <b>' + e(v.email) + '</b> è l’email di un utente, tra poco arriva un link per scegliere una nuova password. Vale un’ora e una volta sola.',
+          avviso: 'Prototipo: il link dell’email apre <a href="#/accesso/password/prova">questa pagina</a>.',
+          conferma: 'Torna all’accesso', onConferma: () => { location.hash = '#/accesso'; }
+        });
+      }
+    });
+  });
+  CRM.rotta(/^\/accesso\/password\/([\w-]+)$/, codice => {
+    CRM.Accesso({
+      titolo: 'Nuova password', testo: 'Scegli la nuova password: almeno 8 caratteri. Dopo, entra con quella.',
+      avviso: 'Prototipo: il link <a href="#/accesso/password/scaduto">scaduto</a> mostra l’errore.',
+      campi: NUOVA, conferma: 'Salva la password', link: [{ testo: 'Torna all’accesso', href: '#/accesso' }],
+      onConferma: (v, form) => {
+        if (codice === 'scaduto') { form.errore('Il link non è valido o è scaduto: chiedine uno nuovo da “Password dimenticata?”.'); return; }
+        const err = nuovaNonValida(v); if (err) { form.errore(err); return; }
+        // la nuova password chiude tutte le sessioni dell'utente: si rientra (§3.3)
+        M.S.collegato = false; M.salvaSempre(); location.hash = '#/accesso'; CRM.Avviso('Password salvata: entra con la nuova password');
+      }
+    });
+  });
 
   /* =========================================================
      Stato del sistema: servizi (riquadri-filtro), problemi da vedere, ultime esecuzioni
@@ -212,10 +308,6 @@
       { nome: 'server', etichetta: 'Server (SMTP)', valore: s.server }, { nome: 'porta', etichetta: 'Porta', tipo: 'numero', valore: s.porta },
       { nome: 'utente', etichetta: 'Utente', valore: s.utente }, { nome: 'password', etichetta: 'Password', tipo: 'password', impostata: s.password },
       { nome: 'mittente', etichetta: 'Mittente', valore: s.mittente, largo: true }] },
-    { id: 'accesso', titolo: 'Accesso con Microsoft 365', sotto: 'app registrata in Entra ID (D-30)', campi: s => [
-      { nome: 'tenant', etichetta: 'ID del tenant', valore: s.tenant, largo: true },
-      { nome: 'client_id', etichetta: 'ID dell’applicazione', valore: s.client_id, largo: true },
-      { nome: 'segreto', etichetta: 'Segreto dell’applicazione', tipo: 'password', impostata: s.segreto, largo: true }] },
     { id: 'integra', titolo: 'Sincronizzazione da Integra', sotto: 'viste nel database ponte collegato a Integra (D-32)', campi: s => [
       { nome: 'server', etichetta: 'Server del database ponte', valore: s.server }, { nome: 'database', etichetta: 'Database', valore: s.database },
       { nome: 'utente', etichetta: 'Utente (sola lettura)', valore: s.utente }, { nome: 'password', etichetta: 'Password', tipo: 'password', impostata: s.password },
@@ -246,9 +338,9 @@
     const az = CRM.blocco(p.corpo, 'azioni-riga');
     const salva = document.createElement('button'); salva.type = 'button'; salva.className = 'btn'; salva.textContent = 'Salva ' + sez.titolo.toLowerCase();
     az.appendChild(salva);
-    if (sez.id === 'casella' || sez.id === 'lettura' || sez.id === 'posta' || sez.id === 'integra' || sez.id === 'accesso') {
+    if (sez.id === 'casella' || sez.id === 'lettura' || sez.id === 'posta' || sez.id === 'integra') {
       const prova = document.createElement('button'); prova.type = 'button'; prova.className = 'btn sec consentito'; prova.textContent = 'Prova la connessione';
-      prova.addEventListener('click', () => CRM.Avviso(sez.id === 'lettura' ? 'Server di lettura raggiungibile · modello ' + (dati.modello || '') : sez.id === 'accesso' ? 'Microsoft 365 risponde · app riconosciuta' : sez.id === 'integra' ? 'Database ponte raggiungibile · 6 viste lette · ultima sincronizzazione ' + quando(M.S.sincronizzato) : 'Connessione riuscita'));
+      prova.addEventListener('click', () => CRM.Avviso(sez.id === 'lettura' ? 'Server di lettura raggiungibile · modello ' + (dati.modello || '') : sez.id === 'integra' ? 'Database ponte raggiungibile · 6 viste lette · ultima sincronizzazione ' + quando(M.S.sincronizzato) : 'Connessione riuscita'));
       az.appendChild(prova);
     }
     salva.addEventListener('click', () => {

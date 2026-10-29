@@ -394,7 +394,7 @@ model utenti {
 model accessi_link {
   id        BigInt    @id @default(autoincrement())
   utente_id BigInt
-  tipo      String    @db.VarChar(10) // invito | link
+  tipo      String    @db.VarChar(10) // reset (password dimenticata, D-39)
   impronta  String    @unique @db.Char(64)
   scade_il  DateTime  @db.Timestamptz(6)
   usato_il  DateTime? @db.Timestamptz(6)

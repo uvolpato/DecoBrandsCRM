@@ -8,6 +8,7 @@ import { Richiede } from '../src/accesso';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
+import * as posta from '../src/posta';
 import { PrismaService } from '../src/prisma.service';
 
 @Controller('prova')
@@ -47,7 +48,7 @@ afterAll(async () => {
   const utenti = (await db.utenti.findMany({ where: { email: { endsWith: DOMINIO } } })).map((u) => u.id);
   await db.$transaction([
     db.$executeRaw`SET LOCAL decobrands.pulizia_registro = 'si'`,
-    db.registro.deleteMany({ where: { OR: [{ utente_id: { in: utenti } }, { codice: 'auth.login', utente_id: null }] } }),
+    db.registro.deleteMany({ where: { OR: [{ utente_id: { in: utenti } }, { codice: { in: ['auth.login', 'auth.password_reset_requested', 'auth.password_reset'] }, utente_id: null }] } }),
     db.sessioni.deleteMany({ where: { utente_id: { in: utenti } } }),
     db.utenti.deleteMany({ where: { id: { in: utenti } } }),
   ]);
@@ -125,6 +126,58 @@ describe('password provvisoria e cambio', () => {
     await altro.get('/api/accesso/io').expect(401);
     await io.get('/api/accesso/io').expect(200);
     await db.utenti.update({ where: { id: id.ammi }, data: { password_hash: await cifra(PW) } });
+  });
+});
+
+describe('password dimenticata (passo 1.8)', () => {
+  /** Chiede il link e restituisce il codice dall'email (in sviluppo la posta va nel log). */
+  async function chiedi(email: string) {
+    const spia = jest.spyOn(posta, 'invia').mockResolvedValue();
+    await request(app.getHttpServer()).post('/api/accesso/dimenticata').send({ email }).expect(204);
+    // l'invio parte dopo la risposta: si aspetta l'email (al massimo 2 secondi)
+    for (let i = 0; i < 40 && !spia.mock.calls.length; i++) await new Promise((ok) => setTimeout(ok, 50));
+    const testo = spia.mock.calls[0]?.[3].testo;
+    spia.mockRestore();
+    return testo?.match(/\/accesso\/password\/([\w-]+)/)?.[1];
+  }
+  const reimposta = (codice: string, nuova: string) =>
+    request(app.getHttpServer()).post('/api/accesso/reimposta').send({ codice, nuova });
+
+  it('email sconosciuta: stessa risposta, nessun link', async () => {
+    expect(await chiedi('nessuno' + DOMINIO)).toBeUndefined();
+  });
+
+  it('il link cambia la password, chiude tutte le sessioni e vale una volta sola', async () => {
+    await crea('smemorato', 'operatore');
+    const aperta = await entra('smemorato');
+    const codice = (await chiedi('smemorato' + DOMINIO))!;
+    expect(codice).toMatch(/^[\w-]{43}$/);
+    const salvata = await db.accessi_link.findFirstOrThrow({ where: { utente_id: id.smemorato } });
+    expect(salvata.impronta).not.toContain(codice); // in chiaro solo nell'email
+    await reimposta(codice, 'corta').expect(400);
+    await reimposta(codice, 'password-nuova').expect(204);
+    await aperta.get('/api/accesso/io').expect(401);
+    await reimposta(codice, 'altra-password').expect(400, /non è valido/);
+    await request(app.getHttpServer()).post('/api/accesso/entra').send({ utente: 'smemorato', password: 'password-nuova' }).expect(200);
+  });
+
+  it('un link nuovo annulla il precedente; un link scaduto non vale', async () => {
+    await crea('doppio', 'operatore');
+    const vecchio = (await chiedi('doppio' + DOMINIO))!;
+    const nuovo = (await chiedi('doppio' + DOMINIO))!;
+    await reimposta(vecchio, 'password-nuova').expect(400);
+    await db.accessi_link.updateMany({ where: { utente_id: id.doppio }, data: { scade_il: new Date(Date.now() - 1000) } });
+    await reimposta(nuovo, 'password-nuova').expect(400);
+    const ev = await db.registro.findFirstOrThrow({ where: { codice: 'auth.password_reset', utente_id: id.doppio }, orderBy: { id: 'desc' } });
+    expect(ev.dettaglio).toMatchObject({ motivo: 'scaduto' });
+  });
+
+  it("esito dell'invio nella scheda dell'utente", async () => {
+    await crea('posta', 'operatore');
+    await request(app.getHttpServer()).post('/api/accesso/dimenticata').send({ email: 'posta' + DOMINIO }).expect(204);
+    for (let i = 0; i < 40 && !(await db.utenti.findUniqueOrThrow({ where: { id: id.posta } })).ultimo_invio; i++) await new Promise((ok) => setTimeout(ok, 50));
+    const u = await db.utenti.findUniqueOrThrow({ where: { id: id.posta } });
+    expect(u.ultimo_invio).toMatchObject({ tipo: 'reset', errore: null });
   });
 });
 

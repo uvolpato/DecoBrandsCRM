@@ -43,6 +43,9 @@
     cestino: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
     guida: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.5V14M12 17.5v.5"/>',
     chiave: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+    occhio: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    'occhio-chiuso': '<path d="M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.9 8.3 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+    esci: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
     lucchetto: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     indietro: '<path d="M15 18l-6-6 6-6"/>',
     chiudi: '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -185,7 +188,11 @@
     if (c.tipo === 'ricerca') ctl = CRM.campoRicercaHtml({ nome: c.nome, entita: c.entita, valore: c.valore, multipla: c.multipla, valori: c.valori, id: id, placeholder: c.placeholder });
     else if (c.tipo === 'select') ctl = '<select id="' + id + '" name="' + c.nome + '">' + c.opzioni.map(o => '<option value="' + esc(o.value) + '"' + (String(o.value) === String(c.valore) ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>';
     else if (c.tipo === 'area') ctl = '<textarea id="' + id + '" name="' + c.nome + '" rows="' + (c.righe || 3) + '">' + esc(c.valore || '') + '</textarea>';
-    else ctl = '<input id="' + id + '" name="' + c.nome + '" type="' + ({ numero: 'number', data: 'date' }[c.tipo] || 'text') + '"' + (c.passo ? ' step="' + c.passo + '"' : '') +
+    // casella: l'etichetta sta a destra; password: con il pulsante mostra/nascondi (D-39)
+    else if (c.tipo === 'casella') return '<div class="campo campo-casella' + (c.largo ? ' largo' : '') + '"><input id="' + id + '" name="' + c.nome + '" type="checkbox"' + (c.valore ? ' checked' : '') + '><label for="' + id + '">' + esc(c.etichetta) + '</label></div>';
+    else if (c.tipo === 'password') ctl = '<div class="campo-password"><input id="' + id + '" name="' + c.nome + '" type="password" autocomplete="' + (c.completa || 'current-password') + '" spellcheck="false">' +
+      '<button type="button" class="mostra" aria-label="Mostra la password" aria-pressed="false" data-mostra="' + id + '">' + CRM.icona('occhio') + '</button></div>';
+    else ctl = '<input id="' + id + '" name="' + c.nome + '" type="' + ({ numero: 'number', data: 'date' }[c.tipo] || 'text') + '"' + (c.passo ? ' step="' + c.passo + '"' : '') + (c.completa ? ' autocomplete="' + c.completa + '"' : '') +
       ' value="' + esc(c.valore == null ? '' : c.valore) + '"' + (c.placeholder ? ' placeholder="' + esc(c.placeholder) + '"' : '') + '>';
     return '<div class="campo' + (c.largo ? ' largo' : '') + '">' + (c.etichetta ? '<label for="' + id + '">' + esc(c.etichetta) + '</label>' : '') + ctl +
       '<span class="aiuto" data-aiuto="' + c.nome + '"' + (c.aiuto ? '' : ' hidden') + '>' + (c.aiuto || '') + '</span></div>';
@@ -194,15 +201,52 @@
     const f = el('form', 'modulo modulo-' + (opz.colonne || 1));
     f.addEventListener('submit', e => e.preventDefault());
     f.innerHTML = opz.campi.map(campoHtml).join('') + '<p class="modulo-errore" role="alert" hidden></p>';
+    f.addEventListener('click', ev => {   // mostra/nascondi la password
+      const b = ev.target.closest('[data-mostra]'); if (!b) return;
+      const i = f.querySelector('#' + b.dataset.mostra), vedi = i.type === 'password';
+      i.type = vedi ? 'text' : 'password'; b.setAttribute('aria-pressed', String(vedi));
+      b.setAttribute('aria-label', vedi ? 'Nascondi la password' : 'Mostra la password'); b.innerHTML = CRM.icona(vedi ? 'occhio-chiuso' : 'occhio');
+    });
     ospite(host).appendChild(f);
     CRM.attivaRicerche(f, opz.contesto);
     return {
       el: f,
-      valori: () => { const v = {}; $$('[name]', f).forEach(x => { v[x.name] = x.closest('.ricerca.multipla') ? leggiScelte(x) : x.value.trim(); }); return v; },   // ricerca multipla: elenco di chiavi
+      valori: () => { const v = {}; $$('[name]', f).forEach(x => { v[x.name] = x.type === 'checkbox' ? x.checked : x.type === 'password' ? x.value : x.closest('.ricerca.multipla') ? leggiScelte(x) : x.value.trim(); }); return v; },   // ricerca multipla: elenco di chiavi
       campo: n => f.elements[n],
       aiuto: (n, html, errore) => { const a = $('[data-aiuto="' + n + '"]', f); a.innerHTML = html || ''; a.hidden = !html; a.classList.toggle('errore', !!errore); },
       errore: t => { const p = $('.modulo-errore', f); p.textContent = t || ''; p.hidden = !t; }
     };
+  };
+
+  /* =========================================================
+     Accesso (D-39, spec §7.0): pagina fuori dall'app, senza barra di navigazione.
+     A sinistra il marchio come nella barra; al centro un pannello con titolo, testo, modulo,
+     pulsante principale e collegamenti. Stessi campi di CRM.Form (anche 'password' e 'casella').
+     opz: { titolo, testo, campi, conferma, link: [{ testo, href }], avviso (testo in evidenza),
+            onConferma(valori, form) → Promise | void (il pulsante resta in attesa fino alla fine) }
+     ========================================================= */
+  CRM.Accesso = function (opz) {
+    document.body.classList.add('in-accesso');
+    document.body.classList.remove('sola-lettura');
+    document.title = opz.titolo + ' · Decobrands';
+    $('#barra').innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Pratiche e provvigioni</span></div>' +
+      '<div class="barra-piede">Accesso riservato a chi lavora con Decobrands. Gli utenti li crea l’amministratore.</div>';
+    const p = $('#principale'); p.innerHTML = '';
+    const pan = CRM.Pannello(CRM.blocco(p, 'accesso'), {});
+    pan.corpo.innerHTML = '<h1>' + esc(opz.titolo) + '</h1>' + (opz.testo ? '<p class="nota">' + opz.testo + '</p>' : '') +
+      (opz.avviso ? '<p class="nota nota-attesa" role="status">' + opz.avviso + '</p>' : '');
+    const form = CRM.Form(pan.corpo, { campi: opz.campi || [] });
+    const btn = el('button', 'btn largo'); btn.type = 'submit'; btn.textContent = opz.conferma || 'Continua';
+    form.el.appendChild(btn);
+    if (opz.link && opz.link.length) CRM.blocco(pan.corpo, 'accesso-link').innerHTML = opz.link.map(l => '<a href="' + l.href + '">' + esc(l.testo) + '</a>').join('');
+    form.el.addEventListener('submit', async () => {
+      form.errore('');
+      btn.disabled = true; const t = btn.textContent; btn.textContent = 'Attendi…';
+      try { await opz.onConferma(form.valori(), form); } finally { btn.disabled = false; btn.textContent = t; }
+      const err = $('.modulo-errore', form.el); if (!err.hidden) { const primo = form.el.querySelector('input'); if (primo) primo.focus(); }
+    });
+    const primo = form.el.querySelector('input:not([type=checkbox])'); if (primo) primo.focus();
+    return form;
   };
 
   /* =========================================================
@@ -1290,6 +1334,7 @@
   ];
   let gestioneAperta = false;
   CRM.Barra = function (attiva) {
+    document.body.classList.remove('in-accesso');
     const fare = M.daFare();
     const conta = {
       oggi: { n: fare.length },
@@ -1315,9 +1360,9 @@
         return '<a class="voce' + (v.id === attiva ? ' attiva' : '') + '" href="' + v.href + '"' + (v.id === attiva ? ' aria-current="page"' : '') + '>' + CRM.icona(v.icona) + '<span>' + v.t + '</span>' +
           (k && k.n ? '<span class="conta' + (k.urgente ? ' urgente' : '') + '">' + k.n + '</span>' : '') + '</a>';
       }).join('') + (g.richiudibile ? '</details>' : '</nav>'); }).join('') + '</div>' +
-      '<div class="barra-piede"><div class="io"><span class="io-sigla" aria-hidden="true">' + esc(io.nome.split(' ').map(x => x[0]).join('').slice(0, 2)) + '</span><span><b>' + esc(io.nome) + '</b>' + esc(M.RUOLI[io.ruolo].nome) + '</span></div>' +
+      '<div class="barra-piede"><div class="io"><span class="io-sigla" aria-hidden="true">' + esc(io.nome.split(' ').map(x => x[0]).join('').slice(0, 2)) + '</span><span><b>' + esc(io.nome) + '</b>' + esc(M.RUOLI[io.ruolo].nome) + '</span><a class="io-esci" href="#/accesso/esci" title="Esci" aria-label="Esci">' + CRM.icona('esci') + '</a></div>' +
       '<label class="io-cambia">Prova come <select id="accedi-come" aria-label="Prova il prototipo come">' + M.S.utenti.filter(u => u.attivo && !u.sistema).map(u => '<option value="' + u.id + '"' + (u.id === io.id ? ' selected' : '') + '>' + esc(u.nome + ' · ' + M.RUOLI[u.ruolo].breve) + '</option>').join('') + '</select></label>' +
-      'Data simulata: ' + M.dataLunga(M.oggi()) + '<br><button type="button" id="ripristina">Ripristina i dati di prova</button> · <a href="#/componenti"' + (attiva === 'componenti' ? ' aria-current="page"' : '') + '>Componenti</a></div>';
+      '<a href="#/accesso/cambia">Cambia la password</a><br>Data simulata: ' + M.dataLunga(M.oggi()) + '<br><button type="button" id="ripristina">Ripristina i dati di prova</button> · <a href="#/componenti"' + (attiva === 'componenti' ? ' aria-current="page"' : '') + '>Componenti</a></div>';
     const det = $('details.richiudibile', b); if (det) det.addEventListener('toggle', () => { gestioneAperta = det.open; });
     $('#carica-barra').addEventListener('click', () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.alCaricamento && CRM.alCaricamento(f) }));
     $('#accedi-come').addEventListener('change', ev => { M.S.utente_corrente = Number(ev.target.value); M.salvaSempre(); CRM.Avviso('Ora sei ' + M.utente().nome + ' · ' + M.RUOLI[M.utente().ruolo].nome); CRM.naviga(); });
@@ -1360,10 +1405,15 @@
     return st;
   }
   function salvaMemoria() { try { sessionStorage.setItem('crm-memoria', JSON.stringify(MEM)); } catch (e) { /* memoria solo per la sessione */ } }
-  CRM.indietro = () => { const st = history.state; return st && st.prec && MEM[st.prec] ? { titolo: MEM[st.prec].titolo, vai: () => history.back() } : null; };
+  // niente "Torna a…" verso le pagine di accesso (D-39): dopo l'accesso non si torna lì
+  CRM.indietro = () => { const st = history.state; return st && st.prec && MEM[st.prec] && MEM[st.prec].hash.indexOf('/accesso') !== 0 ? { titolo: MEM[st.prec].titolo, vai: () => history.back() } : null; };
   CRM.naviga = function () {
     if (voce && MEM[voce.n]) { MEM[voce.n].stato = cattura(); }
     const h = (location.hash || '#/').slice(1);
+    // D-39: senza sessione si va alla pagina di accesso e, dopo, si torna alla pagina chiesta (D-38)
+    if (!M.S.collegato && !/^\/accesso/.test(h)) { M.S.dopo_accesso = h; location.replace('#/accesso'); return; }
+    // con la password provvisoria si apre solo il cambio (§8.3, D-39)
+    if (M.S.collegato && M.utente().deve_cambiare_password && !/^\/accesso\/(cambia|esci)$/.test(h)) { location.replace('#/accesso/cambia'); return; }
     let st = history.state, n;
     if (st && st.crm) n = st.crm;
     else { n = ++contatore; history.replaceState({ crm: n, prec: voce ? voce.n : null }, ''); }

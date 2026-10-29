@@ -16,6 +16,8 @@
   M.S = carica();
   // dati salvati da una versione precedente della demo: completa le parti nuove
   Object.keys(window.DATI_DEMO).forEach(k => { if (M.S[k] === undefined) M.S[k] = clona(window.DATI_DEMO[k]); });
+  // D-39: utenti salvati prima del nome utente e del superutente → quelli nuovi della demo
+  if (M.S.utenti.some(u => !u.username)) { M.S.utenti = clona(window.DATI_DEMO.utenti); M.S.collegato = true; }
   M.salva = function () {
     // profilo in sola lettura: nessuna modifica viene salvata (rete di sicurezza oltre ai pulsanti disattivati)
     if (!M.puo('modifica')) { M.S = carica(); Object.keys(window.DATI_DEMO).forEach(k => { if (M.S[k] === undefined) M.S[k] = clona(window.DATI_DEMO[k]); }); if (window.CRM && CRM.Avviso) CRM.Avviso('Profilo in sola lettura: la modifica non è stata salvata'); return; }
@@ -26,20 +28,22 @@
   /* ---------- Ruoli (spec §8.3) ----------
      amministratore: tutto · operatore: lavoro quotidiano e anagrafiche del CRM · lettura: consulta ed esporta */
   M.RUOLI = {
+    superutente: { nome: 'Superutente', breve: 'Super' },   // D-39: uno solo, crea gli amministratori
     amministratore: { nome: 'Amministratore', breve: 'Admin' },
     operatore: { nome: 'Operatore', breve: 'Operatore' },
     lettura: { nome: 'Sola lettura', breve: 'Lettura' }
   };
   M.PERMESSI = [
-    { id: 'consulta', testo: 'Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche', ruoli: ['amministratore', 'operatore', 'lettura'] },
-    { id: 'esporta', testo: 'Esportare le liquidazioni (Excel, PDF, CSV)', ruoli: ['amministratore', 'operatore', 'lettura'] },
-    { id: 'modifica', testo: 'Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti', ruoli: ['amministratore', 'operatore'] },
-    { id: 'anagrafiche', testo: 'Condizioni dei fornitori, agenzie dei clienti, subagenti', ruoli: ['amministratore', 'operatore'] },
-    { id: 'chiudi', testo: 'Chiudere la liquidazione del trimestre', ruoli: ['amministratore', 'operatore'] },
-    { id: 'scartati', testo: 'Vedere e recuperare i documenti scartati', ruoli: ['amministratore', 'operatore'] },
-    { id: 'sistema', testo: 'Vedere lo stato del sistema e segnare i problemi come visti', ruoli: ['amministratore', 'operatore'] },
-    { id: 'magazzino', testo: 'Alias e kit: creare, modificare, eliminare', ruoli: ['amministratore'] },
-    { id: 'gestione', testo: 'Utenti e ruoli, impostazioni, eliminazione definitiva degli scartati', ruoli: ['amministratore'] }
+    { id: 'consulta', testo: 'Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche', ruoli: ['superutente', 'amministratore', 'operatore', 'lettura'] },
+    { id: 'esporta', testo: 'Esportare le liquidazioni (Excel, PDF, CSV)', ruoli: ['superutente', 'amministratore', 'operatore', 'lettura'] },
+    { id: 'modifica', testo: 'Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti', ruoli: ['superutente', 'amministratore', 'operatore'] },
+    { id: 'anagrafiche', testo: 'Condizioni dei fornitori, agenzie dei clienti, subagenti', ruoli: ['superutente', 'amministratore', 'operatore'] },
+    { id: 'chiudi', testo: 'Chiudere la liquidazione del trimestre', ruoli: ['superutente', 'amministratore', 'operatore'] },
+    { id: 'scartati', testo: 'Vedere e recuperare i documenti scartati', ruoli: ['superutente', 'amministratore', 'operatore'] },
+    { id: 'sistema', testo: 'Vedere lo stato del sistema e segnare i problemi come visti', ruoli: ['superutente', 'amministratore', 'operatore'] },
+    { id: 'magazzino', testo: 'Alias e kit: creare, modificare, eliminare', ruoli: ['superutente', 'amministratore'] },
+    { id: 'gestione', testo: 'Utenti (operatori e sola lettura), impostazioni, eliminazione definitiva degli scartati', ruoli: ['superutente', 'amministratore'] },
+    { id: 'amministratori', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] }   // D-39
   ];
   M.utente = () => M.S.utenti.find(u => u.id === M.S.utente_corrente) || M.S.utenti[0];
   M.puo = azione => { const u = M.utente(); const p = M.PERMESSI.find(x => x.id === azione); return !!(u && p && p.ruoli.indexOf(u.ruolo) >= 0); };

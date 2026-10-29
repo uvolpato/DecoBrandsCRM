@@ -1,14 +1,15 @@
 import {
-  BadRequestException, Body, CanActivate, Controller, ExecutionContext, ForbiddenException, Get, HttpCode, Injectable, Post, Req,
+  BadRequestException, Body, CanActivate, Logger, Controller, ExecutionContext, ForbiddenException, Get, HttpCode, Injectable, Post, Req,
   SetMetadata, UnauthorizedException, UseGuards,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
-import { randomBytes } from 'node:crypto';
+import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { createHash, randomBytes } from 'node:crypto';
 import type { Request } from 'express';
 import type { utenti } from '@prisma/client';
 import { cifra, MASSIMO, MINIMO, verifica } from './password';
+import { indirizzo, invia } from './posta';
 import { PrismaService } from './prisma.service';
 import { Contesto, logEvent, logEventSicuro } from './registro';
 
@@ -114,20 +115,35 @@ class CambiaPassword {
   @IsString() @MaxLength(MASSIMO) nuova!: string;
 }
 
+class Dimenticata {
+  @IsEmail() @MaxLength(200) email!: string;
+}
+
+class Reimposta {
+  @IsString() @MaxLength(100) codice!: string;
+  @IsString() @MaxLength(MASSIMO) nuova!: string;
+}
+
 const NON_VALIDE = 'Credenziali non valide';
+const UN_ORA = 3600 * 1000;
+const impronta = (codice: string) => createHash('sha256').update(codice).digest('hex');
 
 /** Limite ai tentativi per IP e nome utente tentato: in ufficio tutti escono con lo stesso IP,
  *  un limite solo per IP bloccherebbe tutti; così si ferma chi prova password su un account. */
 @Injectable()
 class TentativiGuard extends ThrottlerGuard {
   protected getTracker(req: Request) {
-    const chi = typeof req.body?.utente === 'string' ? req.body.utente.trim().toLowerCase() : '';
+    const b = req.body as { utente?: unknown; email?: unknown } | undefined;
+    const tentato = typeof b?.utente === 'string' ? b.utente : typeof b?.email === 'string' ? b.email : '';
+    const chi = tentato.trim().toLowerCase();
     return Promise.resolve(`${req.ip}|${chi || req.session?.utente_id || ''}`);
   }
 }
 
 @Controller('accesso')
 export class AccessoController {
+  private readonly log = new Logger('Accesso');
+
   constructor(private readonly db: PrismaService) {}
 
   /** Chi sono e cosa posso fare: il frontend costruisce barra e pagine da qui (D-38). */
@@ -206,6 +222,64 @@ export class AccessoController {
       await tx.utenti.update({ where: { id: u.id }, data: { password_hash: hash, deve_cambiare_password: false } });
       await tx.sessioni.deleteMany({ where: { utente_id: u.id, NOT: { sid: req.sessionID } } });
       await logEvent(tx, { ...evento, esito: 'successo', dettaglio: { etichetta: u.username } }, contesto(req));
+    });
+  }
+
+  /** Password dimenticata: link monouso di 1 ora; risposta sempre uguale (§3.3, D-39). */
+  @Post('dimenticata')
+  @HttpCode(204)
+  @Pubblica()
+  @UseGuards(TentativiGuard)
+  async dimenticata(@Req() req: Request, @Body() b: Dimenticata) {
+    const email = b.email.trim().toLowerCase();
+    const u = await this.db.utenti.findFirst({ where: { email, attivo: true, sistema: false } });
+    await logEventSicuro(this.db, {
+      tipo: 'auth', azione: 'password_reset_requested', entita: 'utente', entita_id: u?.id, esito: 'successo',
+      dettaglio: { etichetta: email },
+    }, { utente_id: u?.id, ip: req.ip });
+    if (!u) return;
+    // tutto il lavoro dopo la risposta: il tempo non dice se l'email è registrata, perché il
+    // limite ai tentativi conta per IP ed email e non ferma chi prova molte email diverse
+    void this.mandaLink(u, req.ip).catch((e: unknown) => this.log.error(`link non creato per ${u.id}: ${String(e)}`));
+  }
+
+  private async mandaLink(u: utenti, ip: string | undefined) {
+    const codice = randomBytes(32).toString('base64url'); // in chiaro solo nell'email
+    await this.db.$transaction([
+      this.db.accessi_link.deleteMany({ where: { utente_id: u.id, usato_il: null } }), // uno nuovo annulla i precedenti
+      this.db.accessi_link.create({ data: { utente_id: u.id, tipo: 'reset', impronta: impronta(codice), scade_il: new Date(Date.now() + UN_ORA), ip } }),
+    ]);
+    await invia(this.db, u.id, 'reset', {
+      a: u.email,
+      oggetto: 'Decobrands: reimposta la password',
+      testo: `Ciao ${u.nome},\n\nper scegliere una nuova password apri questo link entro un'ora:\n${indirizzo()}/accesso/password/${codice}\n\n` +
+        "Se non l'hai chiesto tu, ignora questa email: la password resta quella di prima.",
+    });
+  }
+
+  /** Nuova password dal link: il link vale una volta; chiude tutte le sessioni dell'utente. */
+  @Post('reimposta')
+  @HttpCode(204)
+  @Pubblica()
+  @UseGuards(TentativiGuard)
+  async reimposta(@Req() req: Request, @Body() b: Reimposta) {
+    const link = await this.db.accessi_link.findUnique({ where: { impronta: impronta(b.codice) }, include: { utente: true } });
+    const motivo = !link || !link.utente.attivo ? 'sconosciuto' : link.usato_il ? 'usato' : link.scade_il < new Date() ? 'scaduto' : null;
+    const evento = { tipo: 'auth', azione: 'password_reset', entita: 'utente', entita_id: link?.utente_id } as const;
+    const ctx = { utente_id: link?.utente_id, ip: req.ip };
+    if (motivo) {
+      await logEventSicuro(this.db, { ...evento, esito: 'errore', dettaglio: { etichetta: link?.utente.username ?? '-', motivo } }, ctx);
+      throw new BadRequestException('Il link non è valido o è scaduto: chiedine uno nuovo');
+    }
+    if (b.nuova.length < MINIMO) throw new BadRequestException(`La nuova password deve avere almeno ${MINIMO} caratteri`);
+    const hash = await cifra(b.nuova);
+    await this.db.$transaction(async (tx) => {
+      // usato una volta sola anche con due richieste insieme: vince chi lo segna per primo
+      const { count } = await tx.accessi_link.updateMany({ where: { id: link!.id, usato_il: null }, data: { usato_il: new Date() } });
+      if (count !== 1) throw new BadRequestException('Il link non è valido o è scaduto: chiedine uno nuovo');
+      await tx.utenti.update({ where: { id: link!.utente_id }, data: { password_hash: hash, deve_cambiare_password: false } });
+      await tx.sessioni.deleteMany({ where: { utente_id: link!.utente_id } });
+      await logEvent(tx, { ...evento, esito: 'successo', dettaglio: { etichetta: link!.utente.username } }, ctx);
     });
   }
 }
