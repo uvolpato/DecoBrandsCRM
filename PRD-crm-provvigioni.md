@@ -224,7 +224,7 @@ dell'agente. Sono due conti sullo stesso imponibile.
 per ogni documento d (fattura > 0, nota di credito < 0):
   versione  = percentuali del fornitore con valido_dal ≤ d.data, la più recente
   scaglione = interscambio.discount ∈ [sconto_min, sconto_max] → pct_agente, pct_subagente
-              (pct_override dell'eccezione del subagente, se presente)
+              (pct_personale dell'eccezione del subagente, se presente)
   provv_agente(d)    = d.importo × pct_agente / 100
   provv_subagente(d) = regole del subagente (D-27), altrimenti d.importo × pct_subagente / 100
 pratica = somma sui documenti; nessuna provvigione su ordine o conferma
@@ -1060,7 +1060,7 @@ La gravità indica l'effetto su chi sviluppa o sul cliente:
       subagente;
     - il seed comprende Bastasin 3 % sullo scaglione 1 %.
 - **Cosa è chiaro e cosa no**:
-  - il **calcolo** è dentro (§10: "o `pct_override` … se presente");
+  - il **calcolo** è dentro (§10: "o `pct_personale` … se presente");
   - la **visualizzazione** è nel prototipo, quindi dentro per la regola D-24;
   - la **creazione e modifica** dall'interfaccia è in backlog.
 
