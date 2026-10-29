@@ -7,6 +7,7 @@ import { IsString } from 'class-validator';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
+import { PrismaService } from '../src/prisma.service';
 
 class Prova {
   @IsString() nome!: string;
@@ -50,6 +51,15 @@ it("l'errore interno non esce verso il browser", async () => {
   expect(r.body.message).toBe('Errore interno');
   expect(JSON.stringify(r.body)).not.toContain('segreta');
   expect(r.body.codice).toMatch(/^[0-9a-f-]{36}$/);
+  // il codice ritrova l'evento errore.error nel registro (§15.2.7); poi lo si toglie con la pulizia (§15.7)
+  const db = app.get(PrismaService);
+  const ev = await db.registro.findFirstOrThrow({ where: { operazione_id: r.body.codice } });
+  expect(ev).toMatchObject({ codice: 'errore.error', esito: 'errore', ip: null });
+  expect(ev.dettaglio).toMatchObject({ rotta: '/api/prova/rotto', http_status: 500, errore: { classe: 'Error' } });
+  await db.$transaction([
+    db.$executeRaw`SET LOCAL decobrands.pulizia_registro = 'si'`,
+    db.registro.delete({ where: { id: ev.id } }),
+  ]);
 });
 
 it('rotta sconosciuta: 404', () => request(app.getHttpServer()).get('/api/niente').expect(404));

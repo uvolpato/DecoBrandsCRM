@@ -1,4 +1,6 @@
 import { Controller, Get, Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { ErroriFilter } from './errori.filter';
 import { PrismaModule, PrismaService } from './prisma.service';
 
 @Controller('salute')
@@ -13,5 +15,9 @@ class SaluteController {
   }
 }
 
-@Module({ imports: [PrismaModule], controllers: [SaluteController] })
+@Module({
+  imports: [PrismaModule],
+  controllers: [SaluteController],
+  providers: [{ provide: APP_FILTER, useClass: ErroriFilter }], // con Prisma iniettato: scrive nel registro
+})
 export class AppModule {}

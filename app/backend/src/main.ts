@@ -4,7 +4,6 @@ import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { ErroriFilter } from './errori.filter';
 
 // Impostazioni comuni all'avvio e alle prove (supertest): un solo posto.
 export function configura(app: NestExpressApplication) {
@@ -13,7 +12,6 @@ export function configura(app: NestExpressApplication) {
   app.use(helmet());
   // whitelist + forbidNonWhitelisted: il server accetta solo i campi dichiarati nei DTO (V12, D-28)
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-  app.useGlobalFilters(new ErroriFilter());
   return app;
 }
 
