@@ -12,7 +12,8 @@ import { AppModule } from './app.module';
 // Impostazioni comuni all'avvio e alle prove (supertest): un solo posto.
 export function configura(app: NestExpressApplication) {
   app.setGlobalPrefix('api');
-  app.set('trust proxy', 1); // dietro Caddy (§3.4)
+  // Caddy e Next stanno sulla stessa macchina: l'IP vero è il primo che non è locale (§3.4)
+  app.set('trust proxy', 'loopback');
   app.use(helmet());
   if (!process.env.SESSION_SECRET) throw new Error('SESSION_SECRET non definita in .env');
   // Sessioni sul server, tabella sessioni (§3.3): nel cookie solo l'identificativo firmato
@@ -34,7 +35,11 @@ export function configura(app: NestExpressApplication) {
   // CSRF: chi ha una sessione manda il token avuto da /api/accesso/io in x-csrf-token su ogni
   // richiesta che modifica. Senza sessione non c'è niente da rubare: decide il guard (401).
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || !req.session.utente_id) return next();
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+    // Senza sessione (es. /entra) si accetta solo JSON: un <form> di un altro sito non può far
+    // entrare il browser in un account scelto da altri (login CSRF); il JSON da un altro sito
+    // richiede il preflight, che senza CORS fallisce.
+    if (!req.session.utente_id) return req.is('application/json') || !req.headers['content-length'] ? next() : res.status(415).end();
     if (req.session.csrf && req.get('x-csrf-token') === req.session.csrf) return next();
     res.status(403).json({ statusCode: 403, message: 'Token di sicurezza mancante o scaduto: ricarica la pagina' });
   });

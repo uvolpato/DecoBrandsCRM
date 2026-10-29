@@ -29,8 +29,10 @@ export interface Evento {
 export const SCHEMI: Record<string, string[]> = {
   'auth.login': ['modo'],
   'auth.logout': [],
-  'auth.link_requested': [],
-  'auth.invite': ['tipo'],
+  'auth.password_change': [],
+  'auth.password_reset_requested': [],
+  'auth.password_reset': [],
+  'auth.password_temp': ['tipo'],
   'auth.access_denied': ['rotta', 'metodo'],
   'errore.error': ['rotta', 'metodo', 'http_status', 'errore'],
 };

@@ -23,7 +23,7 @@ beforeAll(() => db.connect());
 afterAll(() => db.end());
 beforeEach(async () => {
   await q('BEGIN');
-  await q(`INSERT INTO utenti (id, email, nome, ruolo) VALUES (1, 'ugo@decobrands.it', 'Ugo', 'amministratore')`);
+  await q(`INSERT INTO utenti (id, username, email, nome, ruolo, password_hash) VALUES (1, 'ugo', 'ugo@decobrands.it', 'Ugo', 'amministratore', 'x')`);
   await q(`INSERT INTO fornitori (id, ragione_sociale, codice_integra) VALUES (1, 'Gries', 'F1')`);
   await q(`INSERT INTO agenti (id, codice, nome, cognome) VALUES (1, 'DECO', 'Decobrands', 'SRL')`);
   await q(`INSERT INTO subagenti (id, agente_id, codice, nome, cognome) VALUES (1, 1, 'S1', 'Anna', 'R'), (2, 1, 'S2', 'Luca', 'B')`);
@@ -130,9 +130,20 @@ describe('clienti da Integra', () => {
 });
 
 describe('utenti, sessioni, registro (D-30, D-31, D-33)', () => {
-  it('email in minuscolo e ruolo ammesso', async () => {
-    expect(await errore(`INSERT INTO utenti (email, nome, ruolo) VALUES ('Anna@X.it', 'Anna', 'operatore')`)).toMatch('check');
-    expect(await errore(`INSERT INTO utenti (email, nome, ruolo) VALUES ('anna@x.it', 'Anna', 'capo')`)).toMatch('check');
+  it('nome utente ed email in minuscolo, ruolo ammesso, password obbligatoria per chi accede', async () => {
+    const ins = `INSERT INTO utenti (username, email, nome, ruolo, password_hash, sistema) VALUES ($1, $2, 'Anna', $3, $4, $5)`;
+    expect(await errore(ins, ['anna', 'Anna@X.it', 'operatore', 'x', false])).toMatch('utenti_email_minuscolo_check');
+    expect(await errore(ins, ['Anna', 'anna@x.it', 'operatore', 'x', false])).toMatch('utenti_username_check');
+    expect(await errore(ins, ['anna', 'anna@x.it', 'capo', 'x', false])).toMatch('utenti_ruolo_check');
+    expect(await errore(ins, ['anna', 'anna@x.it', 'operatore', null, false])).toMatch('utenti_password_check');
+    expect(await errore(ins, ['servizi', 'servizi@x.it', 'operatore', null, true])).toBe('');
+    expect(await errore(ins, ['anna@x.it', 'anna2@x.it', 'operatore', 'x', false])).toMatch('utenti_username_senza_chiocciola_check');
+  });
+
+  it('un solo superutente (D-39)', async () => {
+    const ins = `INSERT INTO utenti (username, email, nome, ruolo, password_hash) VALUES ($1, $2, 'S', 'superutente', 'x')`;
+    expect(await errore(ins, ['su1', 'su1@x.it'])).toBe('');
+    expect(await errore(ins, ['su2', 'su2@x.it'])).toMatch('utenti_superutente_key');
   });
 
   it('sessioni.utente_id si ricava dalla sessione', async () => {

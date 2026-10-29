@@ -1013,7 +1013,7 @@ La gravità indica l'effetto su chi sviluppa o sul cliente:
   - spec §15.2.4 (`:2306`): per il PUT che fa avanzare di fase le righe, l'evento ha
     `tipo = stato`, `azione = snapshot_righe`;
   - contro: spec §4.2.11 (`:463`), dove la colonna `azione` ammette solo `create · update ·
-    delete · upload · export · change_state · verify · login · logout · link_requested · invite ·
+    delete · upload · export · change_state · verify · login · logout · password_change · password_reset_requested · password_reset · password_temp ·
     reset_requested · access_denied · error`.
 - **Perché conta**: il §15.1 dice che il catalogo è **tassativo** ("né più né meno eventi").
   Se `azione` diventa un vincolo `CHECK` o un `enum` Prisma, quell'evento fallisce. Siccome

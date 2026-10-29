@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 6.3 — guard unico con `@Richiede`/`@Pubblica` (rotta senza dichiarazione negata), CSRF dal token di `GET /api/accesso/io`, nessun CORS (stessa origine) (§3.3, §8.3); versione 6.2 — `logEvent(tx, …)` e `logEventSicuro()`, schemi per codice, codice dell'errore 500 = `operazione_id` dell'evento (§15.2.7, §15.3–§15.4); versione 6.1 — utente corrente `GET /api/accesso/io`, ruolo riletto dal database a ogni richiesta, sessione rigenerata all'accesso, ritorno alla pagina chiesta (§8.3, D-38); versione 6.0 — schema snellito: tolti `ordinamento`, `cliente_ragione_sociale`, `conferma_scadenza` (calcolata), `dati_letti` e l'affidabilità del documento; migrazioni unite in una sola `iniziale` (D-37); versione 5.9 — V13: ogni operazione che scrive su più tabelle sta in una sola transazione, con blocco della riga sulle chiusure (§2, D-36); versione 5.8 — interscambio con periodi di validità, scaglioni a soglia, P.IVA dei clienti non univoca, chiusura del bollettino e storni legati al trimestre liquidato, prova automatica dei vincoli (D-35); versione 5.7 — revisione dello schema: un solo subagente attivo per cliente × fornitore, righe del bollettino legate al documento, documenti legati al trimestre liquidato e la nota di credito alla fattura, niente copie nella pratica e nel bollettino, nomi in italiano, file su disco (D-34); versione 5.6 — schema completato: `liquidazioni`, `clienti` da Integra, `sessioni` per utente, FK verso `utenti` nei documenti (§4.2.18–§4.2.20, §4.3, D-33); versione 5.5 — database `decobrands_db` sull'istanza PostgreSQL locale (V2, §3.4, §16.3); versione 5.4 — CRM staccato dalla Gestione Ordini: database e utenti propri, la Gestione Ordini si ingloberà con la vendita diretta (§1, V2, §4.1, §17, D-29); accesso misto con Microsoft 365 o link via email, solo su invito, senza password (V3, §3.3, §4.2.18, §7.13, §7.15, §8.3, §15.2.1, D-30); **registro unico** di eventi e anomalie con campi comuni e dettaglio JSON controllato per codice, Stato del sistema come vista del registro (V10, §4.2.11, §4.2.15, §7.11, §7.14, §15, D-31); viste di Integra lette da un database PostgreSQL ponte (§4.5, D-32); versione 5.3 — confronto con la nota di credito: solo le righe stornate, differenza = importo stornato (§7.3); FinestraAffiancata a tutto schermo sui telefoni (§16.4); versione 5.2 — **regola V12: ogni calcolo e operazione sensibile solo sul backend, mai da dati del frontend** (§2, §16.5, D-28); versione 5.1 — regole del subagente per cliente e per documento: % dell'agenzia, una fattura al mese, correzione sul documento con motivo (§4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §8.1, §10, §15.2.3, D-27); versione 5.0 — fotografia delle righe registrata nel cambio di stato della pratica, senza l'azione `snapshot_righe` (§15.2.4); percentuali dei fornitori con data di validità e calcolo per documento alla sua data; eccezioni personali dei subagenti inserite nel CRM; rotte delle pagine come il prototipo ufficiale; tolti i filtri vecchi della liquidazione; formula §10 sul netto dei documenti (§4.2.2, §4.2.3, §5.2, §5.11, §7, §7.5, §7.8, §8.1, §10, §13, §15.2.2, D-25, D-26); versione 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 7.0 — accesso con nome utente (o email) e password come nella Gestione Ordini, superutente che crea gli amministratori, password provvisoria e password dimenticata; tolti Microsoft 365 e il link di accesso (§3.3, §4.2.18, §7.13, §8.3, §15.2.1, D-39 sostituisce D-30); versione 6.3 — guard unico con `@Richiede`/`@Pubblica` (rotta senza dichiarazione negata), CSRF dal token di `GET /api/accesso/io`, nessun CORS (stessa origine) (§3.3, §8.3); versione 6.2 — `logEvent(tx, …)` e `logEventSicuro()`, schemi per codice, codice dell'errore 500 = `operazione_id` dell'evento (§15.2.7, §15.3–§15.4); versione 6.1 — utente corrente `GET /api/accesso/io`, ruolo riletto dal database a ogni richiesta, sessione rigenerata all'accesso, ritorno alla pagina chiesta (§8.3, D-38); versione 6.0 — schema snellito: tolti `ordinamento`, `cliente_ragione_sociale`, `conferma_scadenza` (calcolata), `dati_letti` e l'affidabilità del documento; migrazioni unite in una sola `iniziale` (D-37); versione 5.9 — V13: ogni operazione che scrive su più tabelle sta in una sola transazione, con blocco della riga sulle chiusure (§2, D-36); versione 5.8 — interscambio con periodi di validità, scaglioni a soglia, P.IVA dei clienti non univoca, chiusura del bollettino e storni legati al trimestre liquidato, prova automatica dei vincoli (D-35); versione 5.7 — revisione dello schema: un solo subagente attivo per cliente × fornitore, righe del bollettino legate al documento, documenti legati al trimestre liquidato e la nota di credito alla fattura, niente copie nella pratica e nel bollettino, nomi in italiano, file su disco (D-34); versione 5.6 — schema completato: `liquidazioni`, `clienti` da Integra, `sessioni` per utente, FK verso `utenti` nei documenti (§4.2.18–§4.2.20, §4.3, D-33); versione 5.5 — database `decobrands_db` sull'istanza PostgreSQL locale (V2, §3.4, §16.3); versione 5.4 — CRM staccato dalla Gestione Ordini: database e utenti propri, la Gestione Ordini si ingloberà con la vendita diretta (§1, V2, §4.1, §17, D-29); accesso misto con Microsoft 365 o link via email, solo su invito, senza password (V3, §3.3, §4.2.18, §7.13, §7.15, §8.3, §15.2.1, D-30); **registro unico** di eventi e anomalie con campi comuni e dettaglio JSON controllato per codice, Stato del sistema come vista del registro (V10, §4.2.11, §4.2.15, §7.11, §7.14, §15, D-31); viste di Integra lette da un database PostgreSQL ponte (§4.5, D-32); versione 5.3 — confronto con la nota di credito: solo le righe stornate, differenza = importo stornato (§7.3); FinestraAffiancata a tutto schermo sui telefoni (§16.4); versione 5.2 — **regola V12: ogni calcolo e operazione sensibile solo sul backend, mai da dati del frontend** (§2, §16.5, D-28); versione 5.1 — regole del subagente per cliente e per documento: % dell'agenzia, una fattura al mese, correzione sul documento con motivo (§4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §8.1, §10, §15.2.3, D-27); versione 5.0 — fotografia delle righe registrata nel cambio di stato della pratica, senza l'azione `snapshot_righe` (§15.2.4); percentuali dei fornitori con data di validità e calcolo per documento alla sua data; eccezioni personali dei subagenti inserite nel CRM; rotte delle pagine come il prototipo ufficiale; tolti i filtri vecchi della liquidazione; formula §10 sul netto dei documenti (§4.2.2, §4.2.3, §5.2, §5.11, §7, §7.5, §7.8, §8.1, §10, §13, §15.2.2, D-25, D-26); versione 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -53,7 +53,7 @@ preventivo.
 |---|---------|--------|
 | V1 | Unica applicazione | Tutte le funzioni in un'unica applicazione web |
 | V2 | Database proprio | PostgreSQL con un database **proprio del CRM** (`decobrands_db`): **nessuna tabella della Gestione Ordini**, né in lettura né in scrittura (D-29). Clienti e fornitori arrivano dalle viste di Integra nel database ponte (§4.5, D-32). I documenti del CRM entrano dall'**ingresso documenti interno** (§6.5), non dalla pipeline n8n della Gestione Ordini |
-| V3 | Accesso | Solo su **invito** dell'amministratore; si entra con **Microsoft 365** (account Decobrands) o con un **link via email** (chi non ha l'account); **nessuna password** nel CRM; sessione su cookie HttpOnly/Secure/SameSite + protezione CSRF (§3.3, D-30) |
+| V3 | Accesso | Si entra con **nome utente (o email) e password**, come nella Gestione Ordini; gli utenti li crea il superutente (amministratori) o un amministratore (operatori, sola lettura); password provvisoria per email da cambiare al primo accesso, password dimenticata con link monouso; sessione su cookie HttpOnly/Secure/SameSite + protezione CSRF (§3.3, D-39) |
 | V4 | Stile grafico | Quello del prototipo ufficiale `prototipo-alternativo/` (D-24): `stile.css` con la palette Decobrands (primario `#0d6efd`, scuro `#212529`, sfondo `#f5f6f8`, stessi colori della Gestione Ordini), carattere Public Sans, barra laterale scura con logo; niente Bootstrap |
 | V5 | Lingua | Tutte le interfacce in italiano |
 | V6 | Responsive | Desktop + tablet + mobile |
@@ -156,42 +156,51 @@ motore della sezione §10 su dati dimostrativi.
 
 ### 3.3 Autenticazione e autorizzazione
 
-Accesso **misto e solo su invito** (D-30). Da Luis si riprendono sessioni, CSRF, Helmet,
-throttler e guard; non il login con password.
+Si entra con **nome utente (o email) e password**, come nella Gestione Ordini di Decobrands
+(D-39). Gli utenti li crea chi amministra: nessuno si registra da solo. Da Luis si riprendono
+solo sessioni, CSRF, Helmet, throttler e guard.
 
 - **Utenti propri del CRM** (`utenti`, §4.2.18): nessun legame con la Gestione Ordini (D-29).
-- **Invito**: l'amministratore crea l'utente (nome, email, ruolo, modo di accesso) e il CRM
-  manda l'email d'invito (valida 7 giorni). Chi non è nell'elenco, o è disattivato, **non
-  entra**, nemmeno con un account Microsoft valido.
-- **Microsoft 365** (modo `microsoft`, per gli account Decobrands): OpenID Connect con
-  Entra ID, flusso *authorization code* + PKCE, un solo tenant (quello di Decobrands),
-  libreria `openid-client`. Al primo accesso l'utente si lega all'`oid` di Microsoft
-  (`utenti.microsoft_oid`); dopo si riconosce dall'`oid`, non dall'email, che può cambiare.
-  Serve la registrazione dell'app in Entra ID (la fa l'amministratore di Microsoft 365 di
-  Decobrands); tenant, applicazione e segreto in Impostazioni → Accesso (§7.15).
-- **Link via email** (modo `email`, per chi non ha l'account: subagenti, esterni): si
-  scrive l'email, arriva un link **monouso** valido 15 minuti; nel database si salva solo
-  l'**impronta** del codice (SHA-256, `accessi_link`). La risposta è sempre la stessa
-  ("se l'email è registrata, riceverai un link"), così non si scopre chi è registrato.
-- **Nessuna password** nel CRM: niente hash, cambio o reset della password.
-- **Riserva**: se Microsoft non risponde, l'amministratore manda un link via email anche a
-  un utente `microsoft` (*Invia un link di accesso*, §7.13).
-- Sessioni server-side in PostgreSQL (`express-session` + `connect-pg-simple`), "resta
-  connesso" 30 giorni; disattivare un utente chiude le sue sessioni.
+- **Superutente**: uno solo, creato all'installazione con un comando del server (nome utente,
+  nome, email). Crea e gestisce gli **amministratori**; non si modifica, non si disattiva e
+  non si elimina dall'interfaccia.
+- **Amministratori**: creano e gestiscono operatori e utenti in sola lettura (non altri
+  amministratori).
+- **Nuovo utente**: chi lo crea scrive nome utente, nome, email e ruolo; il CRM genera una
+  **password provvisoria** e la manda per email (*benvenuto*). Al primo accesso la password
+  va **cambiata**: prima non si apre nessuna pagina.
+- **Password**: almeno 8 caratteri, nessuna regola di composizione (ASVS 5.0, 6.2.5);
+  salvate solo come hash **scrypt** con sale (libreria standard di Node, `node:crypto`), mai
+  in chiaro, mai nel registro né nel log.
+- **Password dimenticata**: si scrive l'email e arriva un link monouso valido **1 ora**; nel
+  database si salva solo l'impronta del codice (SHA-256, `accessi_link`). La risposta è
+  sempre la stessa, così non si scopre chi è registrato. L'amministratore può anche
+  mandare una **nuova password provvisoria** (*Reimposta la password*, §7.13).
+- **Resta collegato** (casella della pagina di accesso): sessione di 30 giorni; senza, la
+  sessione finisce alla chiusura del browser.
+- Sessioni server-side in PostgreSQL (`express-session` + `connect-pg-simple`).
+  Disattivare un utente chiude le sue sessioni; cambiare la password chiude le **altre**
+  sessioni dello stesso utente.
+- Messaggio unico per nome utente sbagliato, password sbagliata o utente disattivato
+  ("Credenziali non valide"): non dice chi esiste.
+- Limite ai tentativi per **IP e nome utente tentato** (10 in 15 minuti): un limite solo per IP
+  bloccherebbe tutto l'ufficio, che esce con un solo IP. Senza sessione le richieste che
+  modificano si accettano solo in JSON (contro il login CSRF). Il nome utente non contiene `@`.
 - Cookie di sessione HttpOnly + Secure + SameSite, protezione CSRF sulle richieste che
-  modificano dati, Helmet, limite tentativi sulla richiesta del link e sul ritorno da
-  Microsoft (`@nestjs/throttler`), nessun CORS (il browser parla solo con il frontend, che inoltra `/api/*`: stessa origine), validazione
-  input con DTO (`class-validator`).
-- `requireAuth`: tutte le viste tranne `/login` e `/accesso/:codice`.
+  modificano dati, Helmet, limite ai tentativi sull'accesso e sulla password dimenticata
+  (`@nestjs/throttler`), nessun CORS (il browser parla solo con il frontend, che inoltra
+  `/api/*`: stessa origine), validazione input con DTO (`class-validator`).
+- `requireAuth`: tutte le viste tranne `/accesso` e `/accesso/password/:codice`.
 - `requirePermesso(...)`: su ogni rotta, secondo il ruolo (§8.3). Nel backend è un guard unico su tutte le rotte
   (`AccessoGuard`, `app/backend/src/accesso.ts`): ogni rotta dichiara `@Richiede('permesso')` o `@Pubblica()`;
   una rotta senza dichiarazione è **negata a tutti**. CSRF: token nella sessione, dato da `GET /api/accesso/io`,
   richiesto in `x-csrf-token` su ogni richiesta che modifica da chi ha una sessione.
 
-*Perché (D-30):* Decobrands usa Microsoft 365: niente password da ricordare né da gestire, e
-chi lascia l'azienda perde l'accesso quando gli si chiude l'account. Il link via email copre
-chi non ha l'account senza reintrodurre password. L'invito impedisce che entri chiunque
-abbia un account Microsoft.
+*Perché (D-39, sostituisce D-30):* in Decobrands si lavora già così nella Gestione Ordini:
+stesse abitudini per chi usa le due app, nessuna attesa della registrazione in Entra ID, e
+il CRM sarà inglobato nella Gestione Ordini (D-29) con lo stesso modo di entrare. Il
+superutente è uno solo e non si tocca dall'interfaccia, così nessuno resta senza chi
+può creare gli amministratori.
 
 ### 3.4 Esercizio
 
@@ -317,7 +326,6 @@ si incassa / si paga**.
 | Vincolo | `UNIQUE(fornitore_id, sconto_min, valido_dal)` | uno scaglione per sconto in ogni versione |
 
 *Perché (D-35):* con `sconto_min` e `sconto_max` due scaglioni potevano sovrapporsi; con la sola soglia, come nel prototipo, la sovrapposizione è impossibile. Percentuali con CHECK 0–100.
-
 
 *Nuove percentuali da una data* (scheda del fornitore, §7.4) crea una nuova versione di
 tutti gli scaglioni del fornitore con la data indicata; le versioni precedenti restano e
@@ -570,7 +578,7 @@ scrive solo il server (§15).
 | `genere` | VARCHAR(10) | `evento` (è successo qualcosa) · `anomalia` (c'è qualcosa da guardare) |
 | `livello` | VARCHAR(10) | `info` · `attenzione` · `errore` · `critico` |
 | `codice` | VARCHAR(50) | dal catalogo: eventi `tipo.azione` (es. `stato.change_state`, §15.2), anomalie §7.14.3 (es. `integra.piva_mancante`) |
-| `tipo` · `azione` | VARCHAR(30) | eventi: come nel catalogo §15.2 (`auth`, `crud`, `stato`, `documento`, `calcolo`, `export`, `errore`; `create`, `update`, `delete`, `upload`, `export`, `change_state`, `verify`, `login`, `logout`, `link_requested`, `invite`, `access_denied`, `error`); anomalie: `servizio` · `apri` |
+| `tipo` · `azione` | VARCHAR(30) | eventi: come nel catalogo §15.2 (`auth`, `crud`, `stato`, `documento`, `calcolo`, `export`, `errore`; `create`, `update`, `delete`, `upload`, `export`, `change_state`, `verify`, `login`, `logout`, `password_change`, `password_reset_requested`, `password_reset`, `password_temp`, `access_denied`, `error`); anomalie: `servizio` · `apri` |
 | `servizio` | VARCHAR(15) | `casella` · `lettura` · `integra` · `posta` · `accesso` · `app`; NULL per gli eventi delle persone |
 | `entita` · `entita_id` | VARCHAR(50) · BIGINT | cosa riguarda: `fornitore`, `scaglione`, `eccezione`, `correzione`, `agente`, `subagente`, `interscambio`, `pratica`, `riga_pratica`, `documento`, `bollettino`, `riga_bollettino`, `liquidazione`, `cliente`, `utente`, `sistema` |
 | `esito` | VARCHAR(10) | `successo` · `errore` · `negato` |
@@ -704,31 +712,31 @@ Una riga per esportazione verso Integra (le tabelle della Gestione Ordini non si
 dell'operatore), `annullata_il`, `annullata_da`. L'ordine è "esportato" se ha
 un'esportazione non annullata.
 
-### 4.2.18 `utenti` e `accessi_link` (D-29, D-30)
+### 4.2.18 `utenti` e `accessi_link` (D-29, D-39)
 
-`utenti` — gli utenti del CRM; nessun legame con la tabella `users` della Gestione Ordini. Si
-entra con l'email: non c'è un nome utente.
+`utenti` — gli utenti del CRM; nessun legame con la tabella `users` della Gestione Ordini.
 
 | Colonna | Tipo | Note |
 |---|---|---|
 | `id` | BIGSERIAL PK | |
-| `email` | VARCHAR(200) UNIQUE | in minuscolo; serve per l'invito e per il link |
+| `username` | VARCHAR(50) UNIQUE NOT NULL | nome utente, in minuscolo; si entra con questo o con l'email |
+| `email` | VARCHAR(200) UNIQUE | in minuscolo; password provvisoria e password dimenticata |
 | `nome` | VARCHAR(120) | |
-| `ruolo` | VARCHAR(15) | `amministratore` · `operatore` · `lettura` (§8.3) |
-| `accesso` | VARCHAR(10) | `microsoft` · `email` (§3.3) |
-| `microsoft_oid` | VARCHAR(64) UNIQUE | `oid` di Entra ID, scritto al primo accesso con Microsoft |
+| `ruolo` | VARCHAR(15) | `superutente` · `amministratore` · `operatore` · `lettura` (§8.3); **un solo** superutente (indice univoco parziale) |
+| `password_hash` | VARCHAR(200) | `scrypt$N$r$p$sale$hash`; NULL solo per l'utente dei servizi (CHECK) |
+| `deve_cambiare_password` | BOOLEAN DEFAULT true | password provvisoria: va cambiata al primo accesso |
 | `attivo` | BOOLEAN DEFAULT true | disattivato = non entra; i dati restano |
 | `sistema` | BOOLEAN DEFAULT false | utente dei servizi automatici: non accede |
-| `invitato_il` · `ultimo_accesso` | TIMESTAMPTZ | `ultimo_accesso` NULL = invitato, non ancora entrato |
-| `ultimo_invio` | JSONB | `{quando, tipo: invito \| link, errore}`: l'ultimo invio e l'eventuale errore di recapito |
+| `creato_il` · `ultimo_accesso` | TIMESTAMPTZ | `ultimo_accesso` NULL = non ancora entrato |
+| `ultimo_invio` | JSONB | `{quando, tipo: benvenuto \| password \| reset, errore}`: l'ultima email e l'eventuale errore di recapito |
 
-`accessi_link` — inviti e link via email: `id`, `utente_id` FK, `tipo` (`invito` · `link`),
+`accessi_link` — i link di *password dimenticata*: `id`, `utente_id` FK, `tipo` (`reset`),
 `impronta` CHAR(64) UNIQUE (SHA-256 del codice: il codice in chiaro non si salva),
-`scade_il` (15 minuti il link, 7 giorni l'invito), `usato_il`, `ip`. Un codice usato o
-scaduto non vale più; uno nuovo annulla i precedenti dello stesso utente.
+`scade_il` (1 ora), `usato_il`, `ip`. Un codice usato o scaduto non vale più; uno nuovo
+annulla i precedenti dello stesso utente.
 
-Il primo amministratore si crea all'installazione con un comando del server (email, nome);
-riceve l'invito come tutti.
+Il superutente si crea all'installazione con un comando del server (nome utente, nome,
+email); riceve la password provvisoria per email come tutti.
 
 `sessioni` — le sessioni di `connect-pg-simple` (§3.3): `sid` VARCHAR PK, `sess` JSONB (con
 `utente_id`, `ip`, `agente` del browser, `creata_il`), `expire` TIMESTAMPTZ; in più
@@ -1369,7 +1377,7 @@ senza `#`.
 
 | # | Rotta | Schermata |
 |---|-------|-----------|
-| 1 | `/login`, `/accesso/:codice` | Accesso con Microsoft 365 o link via email, solo su invito (§3.3) |
+| 1 | `/accesso`, `/accesso/password/:codice` | Accesso con nome utente (o email) e password; cambio della password provvisoria; password dimenticata (§3.3) |
 | 2 | `/` | Oggi: cose da fare per gruppi (home dopo l'accesso, §7.1) |
 | 3 | `/documenti`, `/documenti/:id` | Ingresso documenti (§7.9) |
 | 4 | `/pratiche`, `/pratiche/:id` | Elenco e dettaglio delle pratiche (§7.2, §7.3) |
@@ -1459,7 +1467,6 @@ cruscotto di numeri (prototipo: `prototipo-alternativo/`, pagina Oggi).
   chiusa si ignora facilmente: le variazioni non devono passare inosservate.
 
 Contenuti di dettaglio (dal primo prototipo, restano validi come elenco dei dati):
-
 
 - **Stepper** stato pratica: `inviato → confermato → fatturato`.
 - **Strip riepilogo**: fornitore, cliente, agente, importo merce, scadenza conferma.
@@ -1761,8 +1768,8 @@ Considerazioni:
     dati (§16.4.2).
 - **Utente**: in fondo alla barra laterale ci sono l'utente e il ruolo. Nel prototipo *Prova
   come* cambia utente, *Ripristina i dati di prova* riporta i dati all'inizio e la data di
-  lavoro è simulata (04/09/2026). In esercizio (V3) si entra con Microsoft 365 o con un
-  link via email (§3.3).
+  lavoro è simulata (04/09/2026). In esercizio (V3) si entra con nome utente (o email) e
+  password (§3.3).
 - **Oggi come punto d'ingresso**: raccoglie per gruppi di lavoro ciò che c'è da fare
   (documenti da controllare, conferme in ritardo, bollettini, pagamenti da sollecitare);
   da qui si entra nelle pagine.
@@ -1830,26 +1837,29 @@ deve **poter sempre tornare indietro e ritrovare la schermata esattamente com'er
   nessuna schermata scrive codice proprio per questo. Nel prototipo: `CRM.naviga`,
   `CRM.registra`, `CRM.indietro` in `componenti.js`.
 
-### 7.13 Utenti e ruoli (`/utenti`, `/utenti/:id`) — solo amministratore
+### 7.13 Utenti e ruoli (`/utenti`, `/utenti/:id`) — superutente e amministratore
 
-- Gli **utenti sono propri del CRM** (`utenti`, §4.2.18, D-29); si entra con **Microsoft
-  365** o con un **link via email**, solo su invito, senza password (§3.3, D-30).
-- **Elenco** (sinistra): ricerca per nome o email; segmenti *Attivi · Disattivati · Tutti*;
-  colonne utente (con email), ruolo, ultimo accesso (*Invitato* se non è ancora entrato).
-- **Scheda** (destra): email, ruolo, stato, ultimo accesso, modo di accesso (*Microsoft 365*
-  · *Link via email*), **ultimo invio (invito o link) con l'eventuale errore di recapito**;
-  azioni *Modifica*, *Invia di nuovo l'invito* (chi non è ancora entrato) oppure *Invia un
-  link di accesso* (anche come riserva se Microsoft non risponde), *Disattiva/Riattiva*,
-  *Elimina*.
+- Gli **utenti sono propri del CRM** (`utenti`, §4.2.18, D-29); si entra con nome utente (o
+  email) e password, come nella Gestione Ordini (§3.3, D-39).
+- **Elenco** (sinistra): ricerca per nome, nome utente o email; segmenti *Attivi ·
+  Disattivati · Tutti*; colonne utente (con nome utente ed email), ruolo, ultimo accesso
+  (*Mai entrato* se non è ancora entrato).
+- **Scheda** (destra): nome utente, email, ruolo, stato, ultimo accesso, **ultima email
+  (benvenuto o nuova password) con l'eventuale errore di recapito**; azioni *Modifica*,
+  *Reimposta la password* (nuova password provvisoria per email, da cambiare al primo
+  accesso), *Disattiva/Riattiva*, *Elimina*.
 - La scheda ha due **schede**: *Dati dell'utente* e **Cosa può fare ogni ruolo** (tabella
   attività × ruoli, la stessa di §8.3, con la colonna del ruolo dell'utente evidenziata).
-- *Nuovo utente*: nome, email, modo di accesso (proposto *Microsoft 365*), ruolo; parte
-  l'email d'invito.
-- **Vincoli**: email unica; **deve restare almeno un amministratore
-  attivo**; nessuno può cambiare il proprio ruolo, disattivarsi o eliminarsi; l'**utente
-  dei servizi automatici** non si modifica e non accede all'app; eliminare un utente che
-  ha già usato l'app chiede conferma e suggerisce di disattivarlo (il nome resta nel
-  registro eventi). Un invio non recapitato apre l'anomalia `posta.respinta` (§7.14).
+- *Nuovo utente*: nome utente, nome, email, ruolo; parte l'email di benvenuto con la
+  password provvisoria. Il superutente sceglie anche *Amministratore*; l'amministratore
+  solo *Operatore* e *Sola lettura*.
+- **Vincoli**: nome utente ed email unici; **deve restare almeno un amministratore
+  attivo**; nessuno può cambiare il proprio ruolo, disattivarsi o eliminarsi;
+  l'amministratore non modifica né elimina altri amministratori né il superutente; il
+  **superutente** e l'**utente dei servizi automatici** non si modificano dall'interfaccia;
+  eliminare un utente che ha già usato l'app chiede conferma e suggerisce di disattivarlo
+  (il nome resta nel registro eventi). Un invio non recapitato apre l'anomalia
+  `posta.respinta` (§7.14).
 
 ### 7.14 Stato del sistema (`/sistema`) — amministratore e operatore
 
@@ -1882,7 +1892,7 @@ funziona anche quando non c'è nulla da fare.
 | **Casella dei documenti** (`casella`) | ogni N minuti (Impostazioni → Casella): legge le email nuove della cartella, salva gli allegati PDF/Excel in `documenti_in_arrivo`, sposta le email lette (§6.5 punti 1–2) | accesso IMAP e presenza delle due cartelle | email, allegati presi, allegati ignorati |
 | **Server di lettura** (`lettura`) | a ogni documento: invio a GLM-OCR, risposta, campi letti (§6.5 punti 3–4) | chiamata di prova al servizio (`/health` o modello caricato) e tempo di risposta | pagine, secondi, secondi per pagina, documento |
 | **Sincronizzazione da Integra** (`integra`) | ogni 60 s per le anagrafiche (§4.5); una riga per giro con il riepilogo di tutte le viste | connessione al database e lettura di una riga per vista | per vista: righe lette, aggiornate, scartate |
-| **Posta in uscita** (`posta`) | a ogni invio (inviti, link di accesso, solleciti se inviati dal CRM) | accesso SMTP senza inviare | destinatario, codice di risposta del server |
+| **Posta in uscita** (`posta`) | a ogni invio (password provvisorie, link di password dimenticata, solleciti se inviati dal CRM) | accesso SMTP senza inviare | destinatario, codice di risposta del server |
 
 #### 7.14.2 Come si calcola lo stato del riquadro
 
@@ -1918,7 +1928,6 @@ del giallo ("2 clienti non sincronizzati", "lento: 9,8 s per pagina (di solito 4
 | integra | `integra.lenta` | attenzione | un giro dura più del suo intervallo | segnalare a chi gestisce Integra (carico del database) | al primo giro nei tempi |
 | posta | `posta.connessione` | errore | accesso SMTP fallito | controllare server, utente e password in Impostazioni → Posta | al primo invio o controllo riuscito |
 | posta | `posta.respinta` | errore | il server rifiuta il destinatario (chiave = indirizzo) | correggere l'email dell'utente o del destinatario | no |
-| accesso | `accesso.microsoft` | errore | il ritorno da Microsoft fallisce 3 volte di fila (Entra ID non risponde, segreto scaduto) | controllare Impostazioni → Accesso; nel frattempo *Invia un link di accesso* agli utenti | al primo accesso con Microsoft riuscito |
 
 Testi e dettagli sono **frasi fisse con segnaposto** (nome del file, codice Integra,
 secondi…) definite in un solo file del server; nessun messaggio tecnico grezzo nel testo
@@ -1958,7 +1967,7 @@ dove serve, *Prova la connessione*.
 | Casella dei documenti | server IMAP, porta, utente, password, cartella da leggere, cartella dove spostare le email lette, ogni quanti minuti (1–60) |
 | Server di lettura | indirizzo, modello, tempo massimo per documento, **soglie di affidabilità** (affidabile da, bassa sotto; §6.5) |
 | Posta in uscita | server SMTP, porta, utente, password, mittente |
-| Accesso con Microsoft 365 | ID del tenant, ID dell'applicazione, segreto dell'applicazione (registrazione in Entra ID, §3.3) |
+
 | Sincronizzazione da Integra | server del database ponte (§4.5), nome del database, utente in sola lettura, password, schema delle viste, ogni quanti secondi (anagrafiche, 10–3600), ogni quanti secondi le giacenze (5–600, solo con l'ampliamento §17) (§4.5) |
 | Conservazione dei dati | registro eventi (mesi), documenti scartati (giorni), righe per pagina |
 
@@ -2301,22 +2310,29 @@ nella fase successiva (§17).
 
 ### 8.3 Autenticazione
 
-`GET /api/accesso/microsoft` (porta a Microsoft) e `GET /api/accesso/microsoft/ritorno`;
-`POST /api/accesso/link` (chiede il link, risposta sempre uguale) e `GET /accesso/:codice`
-(usa il link o l'invito); `POST /logout`; `POST /api/utenti/:id/invito` e
-`POST /api/utenti/:id/link` (amministratore). Nessuna rotta di password (D-30). Guard `requireAuth` su tutte le
+| Metodo | Rotta | Descrizione |
+|---|---|---|
+| POST | `/api/accesso/entra` | `{utente, password, resta}` (`utente` = nome utente o email); "Credenziali non valide" uguale per ogni errore |
+| POST | `/api/accesso/esci` | chiude la sessione |
+| POST | `/api/accesso/password` | cambio password `{attuale, nuova}`; obbligatorio con la password provvisoria; chiude le altre sessioni |
+| POST | `/api/accesso/dimenticata` | `{email}` → link monouso di 1 ora; risposta sempre uguale |
+| POST | `/api/accesso/reimposta` | `{codice, nuova}` dal link; chiude tutte le sessioni dell'utente |
+| POST | `/api/utenti/:id/password` | nuova password provvisoria per email (`gestione`; un amministratore solo per operatori e sola lettura) |
+
+Con la password provvisoria (`deve_cambiare_password`) ogni rotta risponde 403 `cambia_password`,
+tranne `io`, `password` ed `esci`. Nessun accesso con Microsoft 365 (D-39). Guard `requireAuth` su tutte le
 rotte; ogni rotta dichiara il **permesso** richiesto, verificato lato server
 (`@Richiede('modifica')` ecc.), non solo nascondendo i pulsanti.
 
 **Sessione e utente corrente (D-38):**
-- `GET /api/accesso/io` → `{id, nome, email, ruolo, permessi: [...]}` dell'utente della
+- `GET /api/accesso/io` → `{id, username, nome, email, ruolo, permessi: [...], cambia_password, csrf}` dell'utente della
   sessione, oppure 401. Il frontend lo legge all'avvio e a ogni cambio pagina: costruisce
   barra, fascia "Profilo in sola lettura" e "Pagina riservata". I permessi vengono dal
   server (tabella dei ruoli qui sotto), il frontend non li calcola.
 - La sessione contiene **solo `utente_id`**: ruolo e stato `attivo` si rileggono dal
   database a ogni richiesta, così un cambio di ruolo o una disattivazione valgono
   subito, senza aspettare un nuovo accesso.
-- All'accesso (link, invito o Microsoft) la sessione si **rigenera** (nuovo identificativo),
+- All'accesso la sessione si **rigenera** (nuovo identificativo),
   si aggiorna `ultimo_accesso` e si scrive `auth/login`; *Esci* distrugge la sessione e
   cancella la riga in `sessioni` (`auth/logout`).
 - Senza sessione il frontend porta a `/accesso` e, dopo l'accesso, torna alla pagina
@@ -2329,17 +2345,18 @@ si può fissare in anticipo (session fixation).
 
 **Ruoli del CRM** (`utenti.ruolo`, §4.2.18):
 
-| Attività (permesso) | Amministratore | Operatore | Sola lettura |
-|---|:-:|:-:|:-:|
-| Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche (`consulta`) | ✓ | ✓ | ✓ |
-| Esportare le liquidazioni in Excel, PDF, CSV (`esporta`) | ✓ | ✓ | ✓ |
-| Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti (`modifica`) | ✓ | ✓ | — |
-| Condizioni e percentuali dei fornitori, agenzie dei clienti, subagenti ed eccezioni personali (`anagrafiche`) | ✓ | ✓ | — |
-| Chiudere la liquidazione del trimestre (`chiudi`) | ✓ | ✓ | — |
-| Vedere e recuperare i documenti scartati (`scartati`) | ✓ | ✓ | — |
-| Stato del sistema, segnare i problemi come visti (`sistema`) | ✓ | ✓ | — |
-| Alias e kit: creare, modificare, eliminare (`magazzino`, ampliamento §17) | ✓ | — | — |
-| Utenti e ruoli, impostazioni, eliminazione definitiva degli scartati (`gestione`) | ✓ | — | — |
+| Attività (permesso) | Superutente | Amministratore | Operatore | Sola lettura |
+|---|:-:|:-:|:-:|:-:|
+| Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche (`consulta`) | ✓ | ✓ | ✓ | ✓ |
+| Esportare le liquidazioni in Excel, PDF, CSV (`esporta`) | ✓ | ✓ | ✓ | ✓ |
+| Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti (`modifica`) | ✓ | ✓ | ✓ | — |
+| Condizioni e percentuali dei fornitori, agenzie dei clienti, subagenti ed eccezioni personali (`anagrafiche`) | ✓ | ✓ | ✓ | — |
+| Chiudere la liquidazione del trimestre (`chiudi`) | ✓ | ✓ | ✓ | — |
+| Vedere e recuperare i documenti scartati (`scartati`) | ✓ | ✓ | ✓ | — |
+| Stato del sistema, segnare i problemi come visti (`sistema`) | ✓ | ✓ | ✓ | — |
+| Alias e kit: creare, modificare, eliminare (`magazzino`, ampliamento §17) | ✓ | ✓ | — | — |
+| Utenti (operatori e sola lettura), impostazioni, eliminazione definitiva degli scartati (`gestione`) | ✓ | ✓ | — | — |
+| Amministratori: creare, modificare, disattivare (`amministratori`) | ✓ | — | — | — |
 
 **Sola lettura** nell'interfaccia: fascia "Profilo in sola lettura: puoi consultare ed
 esportare, non modificare"; caricamento nascosto; pulsanti che modificano spenti
@@ -2551,12 +2568,14 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
-| Accesso riuscito (Microsoft o link) | `auth` | `login` | `utente` | `successo` | `{etichetta, modo: microsoft \| email, sessione_id}` |
-| Accesso rifiutato (non invitato, disattivato, link scaduto o già usato, ritorno da Microsoft non valido) | `auth` | `login` | `utente` | `errore` | `{etichetta: email tentata, modo, motivo}` (`utente_id` solo se l'utente esiste; `ip` sempre) |
-| POST `/logout` | `auth` | `logout` | `utente` | `successo` | `{etichetta, sessione_id}` |
-| POST `/api/accesso/link` (richiesta del link) | `auth` | `link_requested` | `utente` | `successo` | `{etichetta}` (anche se l'email non è registrata: `utente_id` NULL) |
-| Invito o link mandato dall'amministratore | `auth` | `invite` | `utente` | `successo` | `{etichetta, tipo: invito \| link}` |
-| Richiesta a una rotta senza il permesso (§3.3) | `auth` | `access_denied` | `utente` | `negato` | `{etichetta, rotta, metodo}` (`ip` valorizzato) |
+| Accesso riuscito | `auth` | `login` | `utente` | `successo` | `{etichetta, modo: password, sessione_id}` |
+| Accesso rifiutato (credenziali sbagliate, utente disattivato) | `auth` | `login` | `utente` | `errore` | `{etichetta: nome utente o email tentati, modo: password, motivo: credenziali \| disattivato}` (`utente_id` solo se l'utente esiste; `ip` sempre; mai la password) |
+| POST `/api/accesso/esci` | `auth` | `logout` | `utente` | `successo` | `{etichetta, sessione_id}` |
+| POST `/api/accesso/password` (cambio) | `auth` | `password_change` | `utente` | `successo` · `errore` | `{etichetta, motivo?: attuale_errata \| troppo_corta \| uguale}` |
+| POST `/api/accesso/dimenticata` | `auth` | `password_reset_requested` | `utente` | `successo` | `{etichetta: email}` (anche se l'email non è registrata: `utente_id` NULL) |
+| POST `/api/accesso/reimposta` | `auth` | `password_reset` | `utente` | `successo` · `errore` | `{etichetta, motivo?: scaduto \| usato \| sconosciuto}` |
+| Password provvisoria mandata (nuovo utente o *Reimposta la password*) | `auth` | `password_temp` | `utente` | `successo` | `{etichetta, tipo: benvenuto \| password}` |
+| Richiesta una rotta senza il permesso (§3.3) | `auth` | `access_denied` | `utente` | `negato` | `{etichetta, rotta, metodo}` (`ip` valorizzato) |
 
 #### 15.2.2 Anagrafiche — fornitori, percentuali ed eccezioni (§8.1)
 
@@ -2842,7 +2861,7 @@ A — solo Next.js — e C — Express + EJS — sono scartate):
 | Backend | NestJS 11 (Express), DTO con `class-validator` |
 | Accesso ai dati | Prisma 7 + `@prisma/adapter-pg` |
 | Database | PostgreSQL, database proprio `decobrands_db` (V2); viste di Integra dal database ponte (§4.5) |
-| Accesso | Microsoft 365 (OpenID Connect, `openid-client`) + link via email; `express-session` + `connect-pg-simple`, CSRF, Helmet, throttler (§3.3) |
+| Accesso | Nome utente (o email) e password con hash `scrypt` (`node:crypto`), password provvisoria e password dimenticata; `express-session` + `connect-pg-simple`, CSRF, Helmet, throttler (§3.3, D-39) |
 | Esercizio | Caddy + due processi Node (8001/8002), Docker solo in sviluppo (§3.4) |
 | Lavori pianificati / Excel / test | `@nestjs/schedule` · `exceljs` · Jest + supertest |
 | Ingresso documenti | `imapflow` (casella email) · coda su PostgreSQL (`FOR UPDATE SKIP LOCKED`) · PDF → immagini (`pdftoppm`) · **GLM-OCR** su **vLLM** (server GPU locale, interfaccia compatibile OpenAI, uscita vincolata allo schema, `logprobs`) — **nessun n8n** |
@@ -2853,7 +2872,7 @@ A — solo Next.js — e C — Express + EJS — sono scartate):
 | Da Luis (`backend/src`, `frontend/`) | Uso nel CRM |
 |---|---|
 | `main.ts` (Helmet, CORS, cookie, sessione su PostgreSQL, controllo CSRF) | copiato, adattato a porte e origini del CRM |
-| `auth/` (login, logout, cambio password, guard autenticazione/ruoli) | ripresi sessioni, logout e guard; il login con password si sostituisce con Microsoft 365 + link via email (D-30); tabella `utenti` propria; tolti i gruppi di permessi |
+| `auth/` (login, logout, cambio password, guard autenticazione/ruoli) | ripresi sessioni, logout e guard; accesso con password come nella Gestione Ordini Decobrands (D-39), hash `scrypt` invece di bcrypt; tabella `utenti` propria; tolti i gruppi di permessi |
 | `prisma/` (servizio Prisma) | copiato |
 | `common/`: `http-error.filter.ts`, `request-context*`, `access-log.interceptor.ts`, `env.ts`, `xlsx.ts`, `audit.extension.ts` | copiati; `audit.extension` e `xlsx` alla base di §15 e di bollettini/export |
 | `audit/`, `events/` | base del registro unico `registro` e di `/registro` (§15) |
@@ -3219,7 +3238,7 @@ rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in
 | D-27 | 18/10/2026 | Regole del subagente: **% dell'agenzia** (per cliente × fornitore), **una fattura al mese** (la prima o la più alta), **correzione sul singolo documento** con motivo obbligatorio; ordine: correzione → mensile → agenzia → eccezione → scaglione. Lo sconto fittizio non serve più | gli accordi con i subagenti sono vari e non prevedibili (caso Bastasin): tre livelli coprono ogni caso senza toccare il codice; il fornitore resta controllato nel bollettino; ogni scostamento è motivato e tracciato | Ugo | §4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §10, D-26 |
 | D-28 | 18/10/2026 | **Ogni calcolo e operazione sensibile solo sul backend, partendo dal database, MAI da dati presi dal frontend**; il client mostra e invia solo scelte; il server ricarica, ricontrolla, ricalcola | dal browser si può alterare qualsiasi valore; provvigioni e liquidazioni sono soldi; registro eventi e permessi devono essere affidabili | Ugo | V12, §2, §10, §15.1, §16.5 |
 | D-29 | 19/10/2026 | Il CRM si **stacca dalla Gestione Ordini**: database e utenti propri, nessuna tabella della Gestione Ordini né in lettura né in scrittura; la Gestione Ordini resta in esercizio, separata, e il CRM la ingloberà con la vendita diretta (§17), migrandone i dati | la Gestione Ordini è la vendita diretta, oggi spenta: tenerle separate evita di sovrapporre le prove dei due flussi; legare utenti e sessioni a un'app che verrà sostituita obbligava a compatibilità (bcrypt, sessioni, ruoli) da buttare dopo | Ugo | §1, V2, §3.3, §4.1, §4.2.18, §17 |
-| D-30 | 19/10/2026 | **Accesso misto, solo su invito**: Microsoft 365 (Entra ID, OpenID Connect) per gli account Decobrands, link monouso via email per gli altri; nessuna password nel CRM; l'amministratore invita e sceglie il modo; il link fa da riserva se Microsoft non risponde | Decobrands usa Microsoft 365: niente password da gestire e accesso tolto insieme all'account; il link copre subagenti ed esterni; l'invito impedisce l'accesso a chiunque abbia un account Microsoft | Ugo | V3, §3.3, §4.2.18, §7.13, §7.15, §8.3, §15.2.1 |
+| D-30 | 19/10/2026 | ~~Sostituita da D-39~~ **Accesso misto, solo su invito**: Microsoft 365 (Entra ID, OpenID Connect) per gli account Decobrands, link monouso via email per gli altri; nessuna password nel CRM; l'amministratore invita e sceglie il modo; il link fa da riserva se Microsoft non risponde | Decobrands usa Microsoft 365: niente password da gestire e accesso tolto insieme all'account; il link copre subagenti ed esterni; l'invito impedisce l'accesso a chiunque abbia un account Microsoft | Ugo | V3, §3.3, §4.2.18, §7.13, §7.15, §8.3, §15.2.1 |
 | D-31 | 19/10/2026 | **Registro unico** `registro`: eventi e anomalie (errori dell'app, problemi dei servizi, errori di lettura) in una tabella con campi comuni (quando, genere, livello, codice, servizio, entità, utente, messaggio, operazione) e `dettaglio` JSON controllato da uno schema per codice; le anomalie hanno una vita (aperta · vista · chiusa) e si contano invece di ripetersi; Stato del sistema è una vista del registro. Sostituisce `eventi_app` e `servizi_problemi` | un solo posto dove guardare e una sola storia per documento o pratica; i campi comuni bastano a filtrare, il JSON tiene i dettagli senza colonne nuove, lo schema impedisce il testo libero | Ugo | V10, §4.2.11, §4.2.15, §7.11, §7.14, §15 |
 | D-32 | 19/10/2026 | Le viste di Integra stanno in un **database PostgreSQL ponte** preparato da Ugo e collegato a Integra; il CRM legge solo da lì, in sola lettura; colonne e chiavi si fissano sui dati veri (F0-A8) | le viste si provano e si correggono senza toccare Integra; il CRM parla solo PostgreSQL; un guasto di Integra resta fuori dal CRM | Ugo | §4.5, §5.14, §7.15 |
 | D-33 | 29/10/2026 | Schema completato: tabelle `liquidazioni` (trimestri chiusi con fotografia del prospetto), `clienti` (copia locale di `v_clienti`), `sessioni` con `utente_id` calcolato; `ordine_cliente_id` senza FK fino alla vendita diretta; chi opera sui documenti è una FK verso `utenti` | la spec non diceva dove salvare trimestri chiusi e clienti sincronizzati; chiudere le sessioni di un utente disattivato e tracciare ogni operazione per utente richiede legami espliciti | Ugo | §4.2.18–§4.2.20, §4.3 |
@@ -3228,3 +3247,4 @@ rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in
 | D-36 | 29/10/2026 | Regola V13: ogni operazione che scrive su più tabelle o più righe legate si esegue in una sola transazione (`prisma.$transaction`, registro compreso); chiusure, verifiche e abbinamenti bloccano la riga con `SELECT … FOR UPDATE`; email e chiamate al servizio di lettura solo dopo il commit; il file su disco si scrive prima, con l'impronta come nome | un'operazione a metà lascia provvigioni sbagliate che nessuno vede; due chiusure contemporanee dello stesso trimestre non devono riuscire entrambe | Ugo | §2 (V13), §15.3 |
 | D-37 | 30/10/2026 | Schema snellito prima del codice: tolti `provvigioni_scaglioni.ordinamento` (l'ordine è la soglia), `ordini_fornitore_testata.cliente_ragione_sociale` (si legge da `clienti`), `conferma_scadenza` (si calcola), `documenti_in_arrivo.dati_letti` e `affidabilita` (i valori letti stanno solo in `documenti_campi`); le migrazioni unite in una sola `iniziale`. `agenti` e `ordine_cliente_id` restano per la vendita diretta | colonne morte o copie di dati che si possono calcolare divergono; a database vuoto unire le migrazioni costa zero | Ugo | §4.2.2, §4.2.7, §4.2.12, §5, §6.1 |
 | D-38 | 30/10/2026 | `GET /api/accesso/io` con ruolo e permessi calcolati dal server; nella sessione solo `utente_id`, ruolo e `attivo` riletti a ogni richiesta; sessione rigenerata all'accesso, distrutta (riga cancellata) all'uscita; senza sessione si va a `/accesso` e si torna alla pagina chiesta | il frontend non deve indovinare i permessi; declassare o disattivare un utente deve valere subito; evita la session fixation | Ugo | §8.3 |
+| D-39 | 30/10/2026 | **Accesso con nome utente (o email) e password, come nella Gestione Ordini Decobrands** (sostituisce D-30): un **superutente** unico, creato da un comando del server, crea gli amministratori; gli amministratori creano operatori e utenti in sola lettura; password provvisoria per email da cambiare al primo accesso; password dimenticata con link monouso di 1 ora; *Reimposta la password* dall'amministratore; hash `scrypt`; tolti Microsoft 365 e il link di accesso | Decobrands lavora già così nella Gestione Ordini, che inglobierà il CRM (D-29); nessuna dipendenza dalla registrazione in Entra ID; chi crea gli amministratori è uno solo e non si può togliere per errore | Ugo | V3, §3.3, §4.2.18, §7.13, §8.3, §15.2.1 |
