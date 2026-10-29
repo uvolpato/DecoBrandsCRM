@@ -22,7 +22,7 @@ parte di F0-A4 e F0-A5, F5-A3, F5-A4.
 | 1.1 | Database `decobrands_db` sull'istanza PostgreSQL locale (PG 16, 5432); utente `decobrands` proprietario; nome allineato in spec, piano, PRD, preventivo, `CLAUDE.md` | F0-A2 | [x] |
 | 1.2 | Scheletro `app/backend` (NestJS 11, Prisma 7.8 con `adapter-pg`, config, Helmet, validazione DTO, errori generici) sulla porta 8002 | F0-A1 | [ ] |
 | 1.3 | Scheletro `app/frontend` (Next 16.2, React 19.2, TypeScript), `stile.css` e Public Sans copiati dal prototipo senza modifiche, inoltro `/api/*` alla 8002, porta 8001; `avvia.bat`, `.env.example` | F0-A1 | [ ] |
-| 1.4 | Schema Prisma: `utenti`, `accessi_link` (§4.2.18), `registro` (§4.2.11, D-31), tabella delle sessioni; prima migrazione; seed dei 4 utenti di `dati.js` + utente dei servizi | F0-A2 | [ ] |
+| 1.4 | Schema Prisma **completo** (§4.2, D-33: 22 tabelle, 27 FK, 18 CHECK, anomalia aperta unica, `sessioni.utente_id` generata, eventi del registro immutabili salvo pulizia §15.7 e utente eliminato); migrazione `iniziale` applicata. Manca il seed dei 4 utenti di `dati.js` + utente dei servizi | F0-A2 | [~] |
 | 1.5 | `logEvent()` nella stessa transazione, formato `dettaglio` §15.4; eventi `auth/*` §15.2.1 | F0-A5 | [ ] |
 | 1.6 | Sessioni (`express-session` + `connect-pg-simple`), CSRF, throttler; guard `requireAuth` su tutto e `requirePermesso()` con la tabella `M.PERMESSI` (§8.3); nega se manca la dichiarazione | F0-A3, F5-A3 | [ ] |
 | 1.7 | Link via email: richiesta con risposta sempre uguale, codice monouso (SHA-256, 15 min; invito 7 giorni; uno nuovo annulla i precedenti), `GET /accesso/:codice`, logout; invio SMTP con esito in `ultimo_invio` | F0-A3 | [ ] |

@@ -1,0 +1,469 @@
+// Schema del database decobrands_db (spec §4.2, D-29, D-33).
+// Nomi di tabelle e colonne uguali alla spec: chi legge la spec trova lo stesso nome qui.
+// Vincoli che Prisma non esprime (CHECK, indice univoco parziale, colonna generata) stanno
+// nella migrazione iniziale, in fondo al file SQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Anagrafiche (§4.2.1–§4.2.6) ----------
+
+/// Fornitori: dati anagrafici da Integra in sola lettura (D-01), condizioni gestite nel CRM.
+model fornitori {
+  id                     BigInt   @id @default(autoincrement())
+  ragione_sociale        String   @db.VarChar(255)
+  piva                   String?  @unique @db.VarChar(20)
+  codice_integra         String?  @unique @db.VarChar(20)
+  giorni_attesa_conferma Int      @default(30)
+  giorno_bollettino      Int      @default(10) @db.SmallInt // CHECK 1–28 (§5.6, D-03)
+  payment_type           String   @default("invoiced") @db.VarChar(20) // matured | invoiced (§5.5)
+  giorni_incasso         Int      @default(60) @db.SmallInt // §5.14
+  discount               Decimal  @default(0) @db.Decimal(5, 2)
+  note                   String?
+  attivo                 Boolean  @default(true)
+  created_at             DateTime @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  scaglioni  provvigioni_scaglioni[]
+  agenzie    interscambio[]
+  pratiche   ordini_fornitore_testata[]
+  bollettini bollettini_testata[]
+  documenti  documenti_in_arrivo[]
+}
+
+/// Copia locale di v_clienti, scritta solo dalla sincronizzazione (§4.2.20, D-33).
+model clienti {
+  id               BigInt    @id @default(autoincrement())
+  codice_integra   String    @unique @db.VarChar(20)
+  piva             String?   @unique @db.VarChar(20)
+  ragione_sociale  String    @db.VarChar(255)
+  indirizzo        String?   @db.VarChar(255)
+  cap              String?   @db.VarChar(10)
+  citta            String?   @db.VarChar(100)
+  provincia        String?   @db.VarChar(5)
+  email            String?   @db.VarChar(200)
+  attivo           Boolean   @default(true)
+  modificato_il    DateTime? @db.Timestamptz(6)
+  sincronizzato_il DateTime? @db.Timestamptz(6)
+}
+
+/// Percentuali per scaglione di sconto, in versioni datate (§5.11, D-25).
+model provvigioni_scaglioni {
+  id            BigInt   @id @default(autoincrement())
+  fornitore_id  BigInt
+  sconto_min    Decimal  @default(0) @db.Decimal(5, 2)
+  sconto_max    Decimal  @default(100) @db.Decimal(5, 2)
+  pct_agente    Decimal  @default(0) @db.Decimal(5, 2)
+  pct_subagente Decimal  @default(0) @db.Decimal(5, 2)
+  valido_dal    DateTime @db.Date
+  ordinamento   Int      @default(0)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  fornitore fornitori               @relation(fields: [fornitore_id], references: [id], onDelete: Cascade)
+  eccezioni provvigioni_eccezioni[]
+
+  @@unique([fornitore_id, sconto_min, valido_dal])
+}
+
+/// Eccezioni personali del subagente su uno scaglione (§4.2.3, D-26).
+model provvigioni_eccezioni {
+  id           BigInt   @id @default(autoincrement())
+  scaglione_id BigInt
+  subagente_id BigInt
+  pct_override Decimal  @db.Decimal(5, 2)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  scaglione provvigioni_scaglioni @relation(fields: [scaglione_id], references: [id], onDelete: Cascade)
+  subagente subagenti             @relation(fields: [subagente_id], references: [id])
+
+  @@unique([scaglione_id, subagente_id])
+}
+
+model agenti {
+  id         BigInt   @id @default(autoincrement())
+  codice     String   @unique @db.VarChar(50)
+  nome       String   @db.VarChar(100)
+  cognome    String   @db.VarChar(100)
+  email      String?  @db.VarChar(255)
+  telefono   String?  @db.VarChar(50)
+  attivo     Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  subagenti subagenti[]
+  pratiche  ordini_fornitore_testata[]
+}
+
+model subagenti {
+  id        BigInt  @id @default(autoincrement())
+  agente_id BigInt
+  codice    String  @unique @db.VarChar(50)
+  nome      String  @db.VarChar(100)
+  cognome   String  @db.VarChar(100)
+  email     String? @db.VarChar(255)
+  attivo    Boolean @default(true)
+
+  agente    agenti                  @relation(fields: [agente_id], references: [id], onDelete: Cascade)
+  eccezioni provvigioni_eccezioni[]
+  agenzie   interscambio[]
+}
+
+/// Subagente × cliente × fornitore: chi segue il cliente e con che sconto (§4.2.6, D-27).
+model interscambio {
+  id                       BigInt   @id @default(autoincrement())
+  subagente_id             BigInt
+  cliente_piva             String   @db.VarChar(20)
+  fornitore_id             BigInt
+  codice_cliente_fornitore String?  @db.VarChar(50)
+  discount                 Decimal  @default(0) @db.Decimal(5, 2)
+  pct_subagente            Decimal? @db.Decimal(5, 2)
+  regola_mensile           String?  @db.VarChar(10) // prima | piu_alta
+  attivo                   Boolean  @default(true)
+  created_at               DateTime @default(now()) @db.Timestamptz(6)
+
+  subagente subagenti @relation(fields: [subagente_id], references: [id], onDelete: Cascade)
+  fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Cascade)
+
+  @@unique([subagente_id, cliente_piva, fornitore_id])
+  @@unique([fornitore_id, codice_cliente_fornitore])
+  @@index([cliente_piva])
+}
+
+// ---------- Pratiche (§4.2.7–§4.2.8) ----------
+
+model ordini_fornitore_testata {
+  id                      BigInt    @id @default(autoincrement())
+  fornitore_id            BigInt
+  ordine_cliente_id       BigInt? // senza FK fino alla vendita diretta (§17, D-33)
+  numero_ordine           String?   @db.VarChar(50)
+  data_ordine             DateTime? @db.Date
+  cliente_piva            String?   @db.VarChar(20)
+  cliente_ragione_sociale String?   @db.VarChar(255)
+  agente_id               BigInt?
+  importo_merce           Decimal?  @db.Decimal(12, 2)
+  stato                   String    @default("inviato") @db.VarChar(20) // inviato | confermato | fatturato
+  att_filename_ordine     String?
+  att_filename_conferma   String?
+  att_filename_fattura    String?
+  conferma_data           DateTime? @db.Date
+  conferma_numero         String?   @db.VarChar(50)
+  conferma_scadenza       DateTime? @db.Date
+  fattura_numero          String?   @db.VarChar(50)
+  fattura_data            DateTime? @db.Date
+  fattura_importo         Decimal?  @db.Decimal(12, 2)
+  note                    String?
+  created_at              DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  fornitore fornitori                    @relation(fields: [fornitore_id], references: [id])
+  agente    agenti?                      @relation(fields: [agente_id], references: [id])
+  righe     ordini_fornitore_righe[]
+  documenti ordini_fornitore_documenti[]
+  arrivati  documenti_in_arrivo[]
+
+  @@index([fornitore_id, stato])
+  @@index([cliente_piva])
+}
+
+/// Fatture e note di credito della pratica: la base delle provvigioni (§4.2.7.1, §5.3).
+model ordini_fornitore_documenti {
+  id                  BigInt    @id @default(autoincrement())
+  testata_id          BigInt
+  tipo                String    @db.VarChar(20) // fattura | nota_credito
+  numero              String?   @db.VarChar(50)
+  data                DateTime? @db.Date
+  importo             Decimal?  @db.Decimal(12, 2) // negativo per la nota di credito
+  storno_totale       Boolean   @default(false)
+  fattura_riferimento String?   @db.VarChar(50)
+  stato_incasso       String    @default("da_incassare") @db.VarChar(15) // §5.14
+  insoluta_dal        DateTime? @db.Date
+  pagata_il           DateTime? @db.Date
+  fonte_incasso       String?   @db.VarChar(20)
+  sollecitata_il      DateTime? @db.Date
+  solleciti           Int       @default(0) @db.SmallInt
+  att_filename        String?
+  note                String?
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+
+  testata    ordini_fornitore_testata @relation(fields: [testata_id], references: [id], onDelete: Cascade)
+  correzione provvigioni_correzioni?
+
+  @@index([numero, tipo])
+}
+
+/// Correzione della quota del subagente su un documento (§4.2.7.2, D-27).
+model provvigioni_correzioni {
+  id           BigInt   @id @default(autoincrement())
+  documento_id BigInt   @unique
+  tipo         String   @db.VarChar(10) // pct | nessuna | importo
+  valore       Decimal  @default(0) @db.Decimal(12, 2)
+  motivo       String
+  creato_da    BigInt?
+  creato_il    DateTime @default(now()) @db.Timestamptz(6)
+
+  documento ordini_fornitore_documenti @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+  autore    utenti?                    @relation(fields: [creato_da], references: [id], onDelete: SetNull)
+}
+
+/// Righe per fase: tre fotografie che non si sovrascrivono (§4.2.8, §5.8).
+model ordini_fornitore_righe {
+  id              BigInt   @id @default(autoincrement())
+  testata_id      BigInt
+  fase            String   @default("ordine") @db.VarChar(20) // ordine | conferma | fattura
+  numero_riga     Int
+  codice          String?  @db.VarChar(100)
+  descrizione     String?  @db.VarChar(255)
+  um              String?  @db.VarChar(20)
+  quantita        Decimal? @db.Decimal(12, 3)
+  prezzo_unitario Decimal? @db.Decimal(12, 4)
+  importo         Decimal? @db.Decimal(12, 2)
+
+  testata ordini_fornitore_testata @relation(fields: [testata_id], references: [id], onDelete: Cascade)
+
+  @@unique([testata_id, fase, numero_riga])
+}
+
+// ---------- Bollettini (§4.2.9–§4.2.10) ----------
+
+model bollettini_testata {
+  id                   BigInt   @id @default(autoincrement())
+  fornitore_id         BigInt
+  mese                 Int // CHECK 1–12
+  anno                 Int
+  att_filename         String?
+  importo_riconosciuto Decimal? @db.Decimal(12, 2)
+  importo_calcolato    Decimal? @db.Decimal(12, 2)
+  stato                String   @default("da_verificare") @db.VarChar(20) // da_verificare | verificato | contestato
+  note                 String?
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  fornitore fornitori             @relation(fields: [fornitore_id], references: [id])
+  righe     bollettini_righe[]
+  arrivati  documenti_in_arrivo[]
+
+  @@unique([fornitore_id, mese, anno])
+}
+
+/// Righe del bollettino; pct_calcolata e importo_calcolato si congelano alla verifica (§5.11).
+model bollettini_righe {
+  id                   BigInt    @id @default(autoincrement())
+  testata_id           BigInt
+  fattura_numero       String?   @db.VarChar(50)
+  fattura_data         DateTime? @db.Date
+  cliente_piva         String?   @db.VarChar(20)
+  importo_merce        Decimal?  @db.Decimal(12, 2)
+  pct_riconosciuta     Decimal?  @db.Decimal(5, 2)
+  importo_riconosciuto Decimal?  @db.Decimal(12, 2)
+  pct_calcolata        Decimal?  @db.Decimal(5, 2)
+  importo_calcolato    Decimal?  @db.Decimal(12, 2)
+  differenza           Decimal?  @db.Decimal(12, 2)
+  tipo_riga            String    @default("provvigione") @db.VarChar(15) // provvigione | storno | riaccredito
+  fattura_mese         DateTime? @db.Date
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+
+  testata bollettini_testata @relation(fields: [testata_id], references: [id], onDelete: Cascade)
+
+  @@index([fattura_numero])
+}
+
+// ---------- Liquidazioni (§4.2.19, D-33) ----------
+
+model liquidazioni {
+  id        BigInt   @id @default(autoincrement())
+  anno      Int      @db.SmallInt
+  trimestre Int      @db.SmallInt // CHECK 1–4
+  chiusa_il DateTime @default(now()) @db.Timestamptz(6)
+  chiusa_da BigInt?
+  totali    Json // fotografia del prospetto pagato
+
+  autore utenti? @relation(fields: [chiusa_da], references: [id], onDelete: SetNull)
+
+  @@unique([anno, trimestre])
+}
+
+// ---------- Ingresso documenti (§4.2.12–§4.2.13) ----------
+
+model documenti_in_arrivo {
+  id                     BigInt    @id @default(autoincrement())
+  origine                String    @db.VarChar(12) // email | caricamento
+  email_da               String?
+  email_oggetto          String?
+  file_nome              String
+  file_hash              String    @unique @db.Char(64)
+  file                   Bytes? // oppure percorso su disco: da decidere in F0 (§4.2.12)
+  stato                  String    @default("in_coda") @db.VarChar(16)
+  tentativi              Int       @default(0)
+  errore                 String?
+  tipo                   String?   @db.VarChar(16)
+  fornitore_id           BigInt?
+  dati_letti             Json?
+  affidabilita           Decimal?  @db.Decimal(4, 3)
+  livello                String?   @db.VarChar(12)
+  controlli              Json?
+  modello                String?
+  ricevuto_il            DateTime  @default(now()) @db.Timestamptz(6)
+  letto_il               DateTime? @db.Timestamptz(6)
+  controllato_il         DateTime? @db.Timestamptz(6)
+  abbinato_pratica_id    BigInt?
+  abbinato_bollettino_id BigInt?
+  utente_id              BigInt? // chi ha caricato o controllato (D-33)
+  scartato_il            DateTime? @db.Timestamptz(6)
+  scartato_da            BigInt?
+  motivo_scarto          String?   @db.VarChar(40)
+  nota_scarto            String?
+
+  fornitore  fornitori?                @relation(fields: [fornitore_id], references: [id])
+  pratica    ordini_fornitore_testata? @relation(fields: [abbinato_pratica_id], references: [id])
+  bollettino bollettini_testata?       @relation(fields: [abbinato_bollettino_id], references: [id])
+  utente     utenti?                   @relation("documento_utente", fields: [utente_id], references: [id], onDelete: SetNull)
+  scartatore utenti?                   @relation("documento_scartato", fields: [scartato_da], references: [id], onDelete: SetNull)
+  campi      documenti_campi[]
+
+  @@index([stato])
+}
+
+model documenti_campi {
+  id            BigInt    @id @default(autoincrement())
+  documento_id  BigInt
+  campo         String
+  valore_letto  String?
+  valore_finale String?
+  affidabilita  Decimal?  @db.Decimal(4, 3)
+  posizione     Json? // §6.6
+  precisione    String?   @db.VarChar(12) // esatta | approssimata | assente
+  verificato    Boolean   @default(false)
+  corretto_da   BigInt?
+  corretto_il   DateTime? @db.Timestamptz(6)
+
+  documento documenti_in_arrivo @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+  autore    utenti?             @relation(fields: [corretto_da], references: [id], onDelete: SetNull)
+
+  @@index([documento_id])
+}
+
+// ---------- Gestione (§4.2.11, §4.2.14, §4.2.15, §4.2.18) ----------
+
+/// Utenti propri del CRM: si entra solo su invito, senza password (D-29, D-30).
+model utenti {
+  id             BigInt    @id @default(autoincrement())
+  email          String    @unique @db.VarChar(200) // sempre in minuscolo
+  nome           String    @db.VarChar(120)
+  ruolo          String    @db.VarChar(15) // amministratore | operatore | lettura (§8.3)
+  accesso        String    @default("microsoft") @db.VarChar(10) // microsoft | email
+  microsoft_oid  String?   @unique @db.VarChar(64)
+  attivo         Boolean   @default(true)
+  sistema        Boolean   @default(false) // utente dei servizi automatici: non accede
+  invitato_il    DateTime? @db.Timestamptz(6)
+  ultimo_accesso DateTime? @db.Timestamptz(6)
+  ultimo_invio   Json? // {quando, tipo: invito | link, errore}
+
+  link               accessi_link[]
+  eventi             registro[]               @relation("registro_utente")
+  visti              registro[]               @relation("registro_visto")
+  correzioni         provvigioni_correzioni[]
+  liquidazioni       liquidazioni[]
+  documenti          documenti_in_arrivo[]    @relation("documento_utente")
+  documenti_scartati documenti_in_arrivo[]    @relation("documento_scartato")
+  campi_corretti     documenti_campi[]
+  esecuzioni         servizi_esecuzioni[]
+  impostazioni       impostazioni[]
+}
+
+/// Inviti e link monouso: si salva solo l'impronta SHA-256 del codice (§4.2.18).
+model accessi_link {
+  id        BigInt    @id @default(autoincrement())
+  utente_id BigInt
+  tipo      String    @db.VarChar(10) // invito | link
+  impronta  String    @unique @db.Char(64)
+  scade_il  DateTime  @db.Timestamptz(6)
+  usato_il  DateTime? @db.Timestamptz(6)
+  ip        String?   @db.VarChar(45)
+
+  utente utenti @relation(fields: [utente_id], references: [id], onDelete: Cascade)
+
+  @@index([utente_id])
+}
+
+/// Sessioni di connect-pg-simple (§3.3). utente_id è una colonna generata da sess
+/// (vedi la migrazione): non si scrive mai, serve a chiudere le sessioni di un utente (D-33).
+model sessioni {
+  sid       String   @id @db.VarChar
+  sess      Json
+  expire    DateTime @db.Timestamp(6)
+  utente_id BigInt?  @default(dbgenerated("((sess ->> 'utente_id'::text))::bigint"))
+
+  @@index([expire])
+  @@index([utente_id])
+}
+
+/// Registro unico di eventi e anomalie (§4.2.11, §15, D-31). Lo scrive solo il server.
+model registro {
+  id            BigInt    @id @default(autoincrement())
+  ts            DateTime  @default(now()) @db.Timestamptz(6)
+  genere        String    @db.VarChar(10) // evento | anomalia
+  livello       String    @default("info") @db.VarChar(10)
+  codice        String    @db.VarChar(50)
+  tipo          String?   @db.VarChar(30)
+  azione        String?   @db.VarChar(30)
+  servizio      String?   @db.VarChar(15)
+  entita        String?   @db.VarChar(50)
+  entita_id     BigInt?
+  esito         String?   @db.VarChar(10)
+  messaggio     String?   @db.VarChar(300)
+  dettaglio     Json?
+  utente_id     BigInt?
+  operazione_id String?   @db.Uuid
+  sessione_id   String?   @db.VarChar(100)
+  ip            String?   @db.VarChar(45)
+  // solo anomalie
+  chiave        String?   @db.VarChar(120)
+  volte         Int       @default(1)
+  ultimo        DateTime? @db.Timestamptz(6)
+  stato         String?   @db.VarChar(10) // aperta | chiusa
+  visto_il      DateTime? @db.Timestamptz(6)
+  visto_da      BigInt?
+  chiusa_il     DateTime? @db.Timestamptz(6)
+
+  utente utenti? @relation("registro_utente", fields: [utente_id], references: [id], onDelete: SetNull)
+  vista  utenti? @relation("registro_visto", fields: [visto_da], references: [id], onDelete: SetNull)
+
+  @@index([ts(sort: Desc)])
+  @@index([genere, livello, ts])
+  @@index([codice, ts])
+  @@index([entita, entita_id])
+  @@index([utente_id, ts])
+  @@index([operazione_id])
+  @@index([dettaglio(ops: JsonbPathOps)], type: Gin)
+}
+
+/// Una riga per sezione; le password sono cifrate e non escono dalle API (§4.2.14).
+model impostazioni {
+  chiave        String   @id @db.VarChar(20)
+  valore        Json
+  aggiornato_il DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  aggiornato_da BigInt?
+
+  autore utenti? @relation(fields: [aggiornato_da], references: [id], onDelete: SetNull)
+}
+
+/// Giri dei servizi automatici, per lo Stato del sistema (§4.2.15).
+model servizi_esecuzioni {
+  id         BigInt    @id @default(autoincrement())
+  servizio   String    @db.VarChar(15)
+  tipo       String    @db.VarChar(10) // lavoro | controllo
+  inizio     DateTime  @default(now()) @db.Timestamptz(6)
+  fine       DateTime? @db.Timestamptz(6)
+  esito      String?   @db.VarChar(10)
+  testo      String?   @db.VarChar(300)
+  misure     Json?
+  avviato_da BigInt?
+
+  autore utenti? @relation(fields: [avviato_da], references: [id], onDelete: SetNull)
+
+  @@index([servizio, inizio(sort: Desc)])
+}
