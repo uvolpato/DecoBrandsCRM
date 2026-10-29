@@ -223,7 +223,7 @@ dell'agente. Sono due conti sullo stesso imponibile.
 ```
 per ogni documento d (fattura > 0, nota di credito < 0):
   versione  = percentuali del fornitore con valido_dal ≤ d.data, la più recente
-  scaglione = interscambio.discount ∈ [sconto_min, sconto_max] → pct_agente, pct_subagente
+  scaglione = soglia sconto_min più alta ≤ interscambio.sconto → pct_agente, pct_subagente
               (pct_personale dell'eccezione del subagente, se presente)
   provv_agente(d)    = d.importo × pct_agente / 100
   provv_subagente(d) = regole del subagente (D-27), altrimenti d.importo × pct_subagente / 100

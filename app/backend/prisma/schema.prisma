@@ -40,7 +40,7 @@ model fornitori {
 model clienti {
   id               BigInt    @id @default(autoincrement())
   codice_integra   String    @unique @db.VarChar(20)
-  piva             String?   @unique @db.VarChar(20)
+  piva             String?   @db.VarChar(20) // non univoca: Integra può avere P.IVA doppie (D-35)
   ragione_sociale  String    @db.VarChar(255)
   indirizzo        String?   @db.VarChar(255)
   cap              String?   @db.VarChar(10)
@@ -50,6 +50,8 @@ model clienti {
   attivo           Boolean   @default(true)
   modificato_il    DateTime? @db.Timestamptz(6)
   sincronizzato_il DateTime? @db.Timestamptz(6)
+
+  @@index([piva])
 }
 
 /// Percentuali per scaglione di sconto, in versioni datate (§5.11, D-25).
@@ -57,7 +59,6 @@ model provvigioni_scaglioni {
   id            BigInt   @id @default(autoincrement())
   fornitore_id  BigInt
   sconto_min    Decimal  @default(0) @db.Decimal(5, 2)
-  sconto_max    Decimal  @default(100) @db.Decimal(5, 2)
   pct_agente    Decimal  @default(0) @db.Decimal(5, 2)
   pct_subagente Decimal  @default(0) @db.Decimal(5, 2)
   valido_dal    DateTime @db.Date
@@ -114,22 +115,24 @@ model subagenti {
 
 /// Subagente × cliente × fornitore: chi segue il cliente e con che sconto (§4.2.6, D-27).
 model interscambio {
-  id                       BigInt   @id @default(autoincrement())
+  id                       BigInt    @id @default(autoincrement())
   subagente_id             BigInt
-  cliente_piva             String   @db.VarChar(20)
+  cliente_piva             String    @db.VarChar(20)
   fornitore_id             BigInt
-  codice_cliente_fornitore String?  @db.VarChar(50)
-  sconto                   Decimal  @default(0) @db.Decimal(5, 2)
-  pct_subagente            Decimal? @db.Decimal(5, 2)
-  regola_mensile           String?  @db.VarChar(10) // prima | piu_alta
-  attivo                   Boolean  @default(true)
-  creato_il                DateTime @default(now()) @db.Timestamptz(6)
+  codice_cliente_fornitore String?   @db.VarChar(50)
+  sconto                   Decimal   @default(0) @db.Decimal(5, 2)
+  pct_subagente            Decimal?  @db.Decimal(5, 2)
+  regola_mensile           String?   @db.VarChar(10) // prima | piu_alta
+  valido_dal               DateTime  @db.Date // il documento va al subagente valido alla sua data (D-35)
+  valido_al                DateTime? @db.Date // escluso; NULL = segue il cliente oggi
+  creato_il                DateTime  @default(now()) @db.Timestamptz(6)
 
-  subagente subagenti @relation(fields: [subagente_id], references: [id], onDelete: Cascade)
-  fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Cascade)
+  subagente subagenti @relation(fields: [subagente_id], references: [id], onDelete: Restrict)
+  fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Restrict)
 
-  @@unique([fornitore_id, codice_cliente_fornitore])
+  // periodi senza sovrapposizioni per cliente e per codice: EXCLUDE nella migrazione revisione_periodi
   @@index([subagente_id])
+  @@index([fornitore_id, codice_cliente_fornitore])
 }
 
 // ---------- Pratiche (§4.2.7–§4.2.8) ----------
@@ -233,15 +236,18 @@ model ordini_fornitore_righe {
 // ---------- Bollettini (§4.2.9–§4.2.10) ----------
 
 model bollettini_testata {
-  id            BigInt   @id @default(autoincrement())
+  id            BigInt    @id @default(autoincrement())
   fornitore_id  BigInt
   mese          Int // CHECK 1–12
   anno          Int
-  stato         String   @default("da_verificare") @db.VarChar(20) // da_verificare | verificato | contestato
+  stato         String    @default("da_verificare") @db.VarChar(20) // da_verificare | verificato | contestato
+  chiuso_il     DateTime? @db.Timestamptz(6) // verificato o contestato: decide il trimestre di storni e riaccrediti (D-11)
+  chiuso_da     BigInt?
   note          String?
-  creato_il     DateTime @default(now()) @db.Timestamptz(6)
-  modificato_il DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  creato_il     DateTime  @default(now()) @db.Timestamptz(6)
+  modificato_il DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
+  chiusore  utenti?               @relation(fields: [chiuso_da], references: [id], onDelete: Restrict)
   fornitore fornitori             @relation(fields: [fornitore_id], references: [id])
   righe     bollettini_righe[]
   arrivati  documenti_in_arrivo[]
@@ -265,14 +271,17 @@ model bollettini_righe {
   tipo_riga            String    @default("provvigione") @db.VarChar(15) // provvigione | storno | riaccredito
   fattura_mese         DateTime? @db.Date
   documento_id         BigInt? // documento abbinato dalla riconciliazione (§5.11)
+  liquidazione_id      BigInt? // storno o riaccredito: trimestre in cui è andato al subagente (D-11)
   creato_il            DateTime  @default(now()) @db.Timestamptz(6)
 
-  testata   bollettini_testata          @relation(fields: [testata_id], references: [id], onDelete: Cascade)
-  documento ordini_fornitore_documenti? @relation(fields: [documento_id], references: [id], onDelete: SetNull)
+  testata      bollettini_testata          @relation(fields: [testata_id], references: [id], onDelete: Cascade)
+  documento    ordini_fornitore_documenti? @relation(fields: [documento_id], references: [id], onDelete: SetNull)
+  liquidazione liquidazioni?               @relation(fields: [liquidazione_id], references: [id], onDelete: Restrict)
 
   @@index([fattura_numero])
   @@index([testata_id])
   @@index([documento_id])
+  @@index([liquidazione_id])
 }
 
 // ---------- Liquidazioni (§4.2.19, D-33) ----------
@@ -286,6 +295,7 @@ model liquidazioni {
   totali    Json // fotografia del prospetto pagato
 
   documenti ordini_fornitore_documenti[]
+  storni    bollettini_righe[]
 
   autore utenti? @relation(fields: [chiusa_da], references: [id], onDelete: Restrict)
 
@@ -376,6 +386,7 @@ model utenti {
   visti              registro[]               @relation("registro_visto")
   correzioni         provvigioni_correzioni[]
   liquidazioni       liquidazioni[]
+  bollettini_chiusi  bollettini_testata[]
   documenti          documenti_in_arrivo[]    @relation("documento_utente")
   documenti_scartati documenti_in_arrivo[]    @relation("documento_scartato")
   campi_corretti     documenti_campi[]
