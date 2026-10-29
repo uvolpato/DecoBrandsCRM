@@ -193,6 +193,7 @@ model ordini_fornitore_documenti {
   correzione provvigioni_correzioni?
 
   @@index([numero, tipo])
+  @@index([testata_id])
 }
 
 /// Correzione della quota del subagente su un documento (§4.2.7.2, D-27).
@@ -269,6 +270,7 @@ model bollettini_righe {
   testata bollettini_testata @relation(fields: [testata_id], references: [id], onDelete: Cascade)
 
   @@index([fattura_numero])
+  @@index([testata_id])
 }
 
 // ---------- Liquidazioni (§4.2.19, D-33) ----------
@@ -325,6 +327,9 @@ model documenti_in_arrivo {
   campi      documenti_campi[]
 
   @@index([stato])
+  @@index([fornitore_id])
+  @@index([abbinato_pratica_id])
+  @@index([abbinato_bollettino_id])
 }
 
 model documenti_campi {
@@ -394,7 +399,7 @@ model accessi_link {
 model sessioni {
   sid       String   @id @db.VarChar
   sess      Json
-  expire    DateTime @db.Timestamp(6)
+  expire    DateTime @db.Timestamptz(6)
   utente_id BigInt?  @default(dbgenerated("((sess ->> 'utente_id'::text))::bigint"))
 
   @@index([expire])
@@ -439,6 +444,7 @@ model registro {
   @@index([utente_id, ts])
   @@index([operazione_id])
   @@index([dettaglio(ops: JsonbPathOps)], type: Gin)
+  @@index([visto_da])
 }
 
 /// Una riga per sezione; le password sono cifrate e non escono dalle API (§4.2.14).
