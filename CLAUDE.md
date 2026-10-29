@@ -113,6 +113,7 @@ Regole del codice del prototipo:
 ## 4. Regole di lavoro (obbligatorie)
 
 0. ⚠ **Tutto sul backend, MAI dai dati del frontend** (spec V12, D-28): ogni calcolo (provvigioni, bollettini, liquidazione, Analisi, totali, esportazioni) e ogni operazione sensibile (stati, verifiche, chiusure, abbinamenti, correzioni, permessi, eventi) si esegue sul server partendo dal database; il frontend mostra e invia solo le scelte (id, valori digitati, motivo); il server ricarica, ricontrolla e ricalcola, e non salva mai un valore calcolato arrivato dal browser. Il prototipo calcola nel browser solo perché è una dimostrazione.
+0b. ⚠ **Una operazione, una transazione** (spec V13, D-36): se un'operazione scrive su più tabelle (o più righe legate) si usa **una sola transazione** (`prisma.$transaction(async (tx) => …)`, tutto da `tx`, registro compreso); chiusure, verifiche e abbinamenti bloccano la riga con `SELECT … FOR UPDATE`; email e lettura dei documenti solo dopo il commit, il file su disco prima.
 1. **Lingua**: si scrive in italiano, semplice e conciso, senza parole inglesi inutili:
    - interfaccia: "Esporta", "Riepilogo", "Filtro multiplo", non "export" o "dashboard";
    - risposte a Ugo: brevi, tecniche, senza ripetere quello che si vede;
@@ -192,6 +193,7 @@ Lo stack ricalca il **Portale B2B Luis** (spec §16.3):
 | Processi | Node 24, Caddy, due processi (porte 8001 e 8002) |
 
 - ⚠ **Calcoli e operazioni sensibili solo nel backend NestJS, dal database; mai fidarsi dei dati del frontend** (V12, D-28).
+- ⚠ **Più tabelle nello stesso processo = una transazione** (V13, D-36).
 - Da Luis si riusa **solo l'infrastruttura** (sessioni, CSRF, Prisma, registro eventi). Non
   si riusano il suo login con password, le sue interfacce né il suo CSS.
 - Nessuna tabella della Gestione Ordini (D-29); Integra si legge in sola lettura dalle viste
