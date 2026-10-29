@@ -13,6 +13,16 @@ app/
 └── README.md
 ```
 
+## Avvio in sviluppo
+
+1. `backend/.env` da `backend/.env.example` (password del database), poi in `backend/`:
+   `npm install`, `npx prisma migrate deploy`, `npm test`.
+2. In `frontend/`: `npm install`.
+3. `avvia.bat` apre backend (8002) e frontend (8001): http://localhost:8001
+
+`stile.css` e `public-sans.css` in `frontend/app/stile/` sono **copie** del prototipo
+(D-24): si cambiano nel prototipo e si ricopiano, mai qui.
+
 ## Pubblicazione: solo la cartella `app/`
 
 Primo scaricamento sul server (scarica solo i file di `app/`):
