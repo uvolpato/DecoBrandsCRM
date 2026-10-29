@@ -1,4 +1,4 @@
-# Decobrands CRM — applicazione
+# Decobrands — applicazione
 
 Unica cartella che va in produzione. Analisi, specifica, preventivo e prototipo restano
 nella radice del repository e **non** vengono scaricati sul server.

@@ -7,6 +7,8 @@ Regole per ogni passo: si replica il prototipo `prototipo-alternativo/` (struttu
 classi di `stile.css`, numeri); calcoli e controlli solo sul backend (V12, D-28); prove e
 schermate a 1440 e 390 px prima di chiudere; documenti allineati nello stesso commit.
 
+Nomi: l'applicazione si chiama **Decobrands** (titolo, pacchetti, servizi); `decobrands_db` è solo il database, `decobrands` il suo utente.
+
 Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto
 
 ## Blocco 1 — Gestione degli utenti (prima consegna)
@@ -17,7 +19,7 @@ parte di F0-A4 e F0-A5, F5-A3, F5-A4.
 
 | # | Passo | Attività | Fatto |
 |---|---|---|:-:|
-| 1.1 | Database `decobrands_db` sull'istanza PostgreSQL locale (PG 16, 5432); utente `decobrands_app` proprietario; nome allineato in spec, piano, PRD, preventivo, `CLAUDE.md` | F0-A2 | [x] |
+| 1.1 | Database `decobrands_db` sull'istanza PostgreSQL locale (PG 16, 5432); utente `decobrands` proprietario; nome allineato in spec, piano, PRD, preventivo, `CLAUDE.md` | F0-A2 | [x] |
 | 1.2 | Scheletro `app/backend` (NestJS 11, Prisma 7.8 con `adapter-pg`, config, Helmet, validazione DTO, errori generici) sulla porta 8002 | F0-A1 | [ ] |
 | 1.3 | Scheletro `app/frontend` (Next 16.2, React 19.2, TypeScript), `stile.css` e Public Sans copiati dal prototipo senza modifiche, inoltro `/api/*` alla 8002, porta 8001; `avvia.bat`, `.env.example` | F0-A1 | [ ] |
 | 1.4 | Schema Prisma: `utenti`, `accessi_link` (§4.2.18), `registro` (§4.2.11, D-31), tabella delle sessioni; prima migrazione; seed dei 4 utenti di `dati.js` + utente dei servizi | F0-A2 | [ ] |
