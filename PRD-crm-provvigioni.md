@@ -305,7 +305,7 @@ caricamento ──┴─► coda (PostgreSQL, SKIP LOCKED) ─► GLM-OCR su vLL
 |---|---|
 | Frontend | Next.js 16 + React 19 + TypeScript; `stile.css` del prototipo, Public Sans, niente Bootstrap; Chart.js |
 | Backend | NestJS 11 + Prisma 7 (solo tabelle nuove del CRM), DTO `class-validator` |
-| Database | PostgreSQL `decobrands`, condiviso; tabelle esistenti in sola lettura |
+| Database | PostgreSQL `decobrands_db`, proprio del CRM (D-29); Integra dal database ponte in sola lettura (D-32) |
 | Accesso | sessioni su PostgreSQL, argon2, CSRF, Helmet, throttler; tabella `users` condivisa, ruoli CRM in `crm_ruoli_utente` |
 | Documenti | `imapflow`, coda su PostgreSQL, `pdftoppm`, GLM-OCR (`zai-org/GLM-OCR`, 0,9 miliardi di parametri) su vLLM ≥ 0.19 |
 | Esercizio | server Windows: Caddy (HTTPS) → Next.js `:8001` → `/api/*` → NestJS `:8002`; Node 24; Docker solo in sviluppo; in produzione va solo `app/` (sparse checkout) |
@@ -771,7 +771,7 @@ quadrano.
 | Campione di documenti reali: Gries, Gasper, Ing's + 1 fornitore; circa 100–120 file, scansionati compresi | Decobrands | F0-A6, F0-A7 |
 | Viste `v_clienti` e `v_fornitori` su Integra + utente in sola lettura | chi gestisce Integra | F1-A4 |
 | Casella email dei documenti (IMAP) e posta in uscita (SMTP) | Decobrands | F6-A1, utenti, solleciti |
-| Server Windows con PostgreSQL `decobrands`, Caddy, Node 24 | Decobrands / Ugo | F0-A1, rilascio |
+| Server Windows con PostgreSQL `decobrands_db`, Caddy, Node 24 | Decobrands / Ugo | F0-A1, rilascio |
 | Moduli di infrastruttura del Portale B2B Luis | Ugo | F0-A1, F0-A3, F0-A5 |
 | Approvazione delle 59 h fuori preventivo | Decobrands | le attività segnate **da approvare** |
 

@@ -185,7 +185,7 @@ Lo stack ricalca il **Portale B2B Luis** (spec §16.3):
 | Livello | Scelta |
 |---|---|
 | Frontend | Next.js 16 + React 19 + TypeScript |
-| Backend | NestJS 11 + Prisma 7, PostgreSQL con database proprio `crm` (D-29) |
+| Backend | NestJS 11 + Prisma 7, PostgreSQL con database proprio `decobrands_db` (D-29) |
 | Stile | `stile.css` del prototipo ufficiale, Public Sans, niente Bootstrap |
 | Grafici | Chart.js |
 | Excel | `exceljs` |

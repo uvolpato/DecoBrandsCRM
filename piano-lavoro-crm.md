@@ -50,14 +50,14 @@ Lo stack **ricalca il Portale B2B Luis** (spec V7, §3.3, §3.4, §16.3):
 - **Frontend:** Next.js 16 (App Router) + React 19 + TypeScript, `stile.css` del prototipo ufficiale (niente Bootstrap), Chart.js, ExcelJS, jsPDF;
 - **Backend:** NestJS 11, DTO con `class-validator`, Prisma 7 (`@prisma/adapter-pg`);
 - **Accesso e sicurezza:** `express-session` + `connect-pg-simple`, argon2, CSRF, Helmet, throttler;
-- **Esercizio:** Caddy (HTTPS) → Next.js `localhost:8001` → inoltro `/api/*` → NestJS `localhost:8002` → PostgreSQL `decobrands`; Docker solo in sviluppo; Node 24;
+- **Esercizio:** Caddy (HTTPS) → Next.js `localhost:8001` → inoltro `/api/*` → NestJS `localhost:8002` → PostgreSQL `decobrands_db` (istanza locale, PG 16); Docker solo in sviluppo; Node 24;
 - **Varie:** `@nestjs/schedule` (conferme scadute, lettura casella), `exceljs` (bollettini/export), Jest + supertest;
 - **Ingresso documenti (spec §6.5):** `imapflow`, coda su PostgreSQL (`FOR UPDATE SKIP LOCKED`), `pdftoppm`, **GLM-OCR su vLLM** nel server GPU locale — **nessun n8n**.
 
 **Riuso da Luis B2B:** solo infrastruttura (sessioni, sicurezza, Prisma, registro eventi, utilità comuni, inoltro `/api/*`, pubblicazione) — elenco moduli in spec §16.3. **Nessun componente o CSS di Luis: layout e grafica sono quelli del prototipo** (§1.1).
 
 **Prisma e database proprio (V2, D-29):** lo schema Prisma copre **tutte** le tabelle del
-CRM (§4.2), nel database proprio `crm`; nessuna tabella della Gestione Ordini si legge o si
+CRM (§4.2), nel database proprio `decobrands_db`; nessuna tabella della Gestione Ordini si legge o si
 scrive. Le viste di Integra si leggono dal database ponte con un client `pg` in sola
 lettura, fuori da Prisma (§4.5, D-32).
 
@@ -111,7 +111,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **Riferimenti:** spec §4.2.1–4.2.13 (tabelle nuove, incl. `documenti_in_arrivo`/`documenti_campi`), §4.2.18 (`utenti`, `accessi_link`), §12 (seed), §4.3 (relazioni), §4.4 (note schema, `ordine_cliente_id`, `codice_cliente_fornitore`)
 - **Sorgente prototipo:** `prototipo-alternativo/assets/dati.js` (struttura dei dati di prova = forma del seed)
 - **Output:** schema Prisma tabelle CRM + migrazioni; nessuna tabella della Gestione Ordini (D-29); aggregatore seed con `seed/00-base`.
-- **DoD:** migrazioni applicate sul database `crm`; seed §12 caricato; vincoli chiave presenti (`UNIQUE(fornitore_id, mese, anno)` bollettini, `UNIQUE(fornitore_id, codice_cliente_fornitore)` interscambio, FK `ordine_cliente_id`).
+- **DoD:** migrazioni applicate sul database `decobrands_db`; seed §12 caricato; vincoli chiave presenti (`UNIQUE(fornitore_id, mese, anno)` bollettini, `UNIQUE(fornitore_id, codice_cliente_fornitore)` interscambio, FK `ordine_cliente_id`).
 
 #### F0-A3 · Accesso misto solo su invito — 3 h + 2 h **da approvare**
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate login-guardate · **Serve dal cliente:** registrazione dell'app in Entra ID (tenant, ID applicazione, segreto, indirizzo di ritorno) fatta dall'amministratore di Microsoft 365

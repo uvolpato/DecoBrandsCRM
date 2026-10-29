@@ -46,7 +46,7 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 
 | # | Attività | Ore (AI) | Ore (senza AI) | Importo (AI) |
 |---|---|---|---|---|
-| 1 | Setup progetto sul modello Luis B2B (Next.js + NestJS + Prisma), database PostgreSQL **proprio** `crm` (nessuna tabella della Gestione Ordini, D-29), Caddy + due processi Node (8001/8002), Docker solo in sviluppo | 3 | 8 | € 165,00 |
+| 1 | Setup progetto sul modello Luis B2B (Next.js + NestJS + Prisma), database PostgreSQL **proprio** `decobrands_db` (nessuna tabella della Gestione Ordini, D-29), Caddy + due processi Node (8001/8002), Docker solo in sviluppo | 3 | 8 | € 165,00 |
 | 2 | Accesso **ripreso da Luis B2B** su una tabella `utenti` propria: sessioni nel DB, CSRF, Helmet, limite tentativi, guard `requireAuth`/permessi, pagina di accesso (il modo di accesso è la variazione V10) | 3 | 8 | € 165,00 |
 | 3 | Schema Prisma delle **nuove tabelle CRM** (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe + documenti, bollettini + righe, eventi, utenti, copia dei clienti da Integra) | 6 | 16 | € 330,00 |
 | 4 | Motore provvigioni **solo lato server**: scaglioni, eccezioni, maturato/fatturato, congelamento percentuali alla verifica, note di credito, confronto bollettini riconosciuto vs calcolato (§4.2, §5.3, §5.5, §5.11, §10) | 5 | 14 | € 275,00 |

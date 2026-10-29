@@ -53,7 +53,7 @@ Browser ─HTTPS─► Caddy ─►│ Next.js :8001 ─/api/*─► NestJS :800
                          │                         │    ├─ coda lavori (PostgreSQL SKIP LOCKED)│
                          │                         │    └─ registro `suggerimenti`            │
                          │                         └─ motore, regole, permessi, eventi (§15)  │
-                         │ PostgreSQL `decobrands` (+ viste `crm_assistente.*` in sola lettura)│
+                         │ PostgreSQL `decobrands_db` (+ viste `crm_assistente.*`, sola lettura)│
                          └────────────────────────────────────────┬──────────────────────────┘
                                                                   │ rete interna, mai esposta
                                      ┌────────────────────────────┴─────────────────┐
