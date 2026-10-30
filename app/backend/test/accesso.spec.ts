@@ -5,7 +5,7 @@ import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { Richiede } from '../src/accesso';
-import { AppModule } from '../src/app.module';
+import { AppModule, limiti } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import * as posta from '../src/posta';
@@ -259,5 +259,21 @@ describe('limite ai tentativi', () => {
     expect(codici.slice(0, 10).every((c) => c === 401)).toBe(true);
     expect(codici.slice(10)).toEqual([429, 429]);
     await entra('oper'); // stesso IP, altro nome utente: passa
+  });
+
+  it('password dimenticata: il limite conta per email, i colleghi dello stesso IP la chiedono', async () => {
+    const codici: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      codici.push((await request(app.getHttpServer()).post('/api/accesso/dimenticata').send({ email: `bersaglio${DOMINIO}` })).status);
+    }
+    expect(codici.slice(0, 10).every((c) => c === 204)).toBe(true);
+    expect(codici[10]).toBe(429);
+    await request(app.getHttpServer()).post('/api/accesso/dimenticata').send({ email: `collega${DOMINIO}` }).expect(204);
+  });
+
+  it('valori dal .env, con quelli predefiniti se mancano o non sono numeri', () => {
+    expect(limiti({ TENTATIVI: '5', TENTATIVI_IP: '300', TENTATIVI_MINUTI: '1' }).map((l) => [l.name, l.limit, l.ttl]))
+      .toEqual([['persona', 5, 60_000], ['ip', 300, 60_000]]);
+    expect(limiti({ TENTATIVI: 'x', TENTATIVI_IP: '0.5', TENTATIVI_MINUTI: 'Infinity' }).map((l) => [l.limit, l.ttl])).toEqual([[10, 900_000], [100, 900_000]]);
   });
 });

@@ -128,15 +128,18 @@ const NON_VALIDE = 'Credenziali non valide';
 const UN_ORA = 3600 * 1000;
 const impronta = (codice: string) => createHash('sha256').update(codice).digest('hex');
 
-/** Limite ai tentativi per IP e nome utente tentato: in ufficio tutti escono con lo stesso IP,
- *  un limite solo per IP bloccherebbe tutti; così si ferma chi prova password su un account. */
+/** Limite ai tentativi (D-41): ogni persona ha il suo contatore (IP e nome utente, email, link o
+ *  sessione), perché in ufficio tutti escono con lo stesso IP; il tetto largo per solo IP (in
+ *  app.module) ferma chi prova tanti nomi o email diversi. Valori nel .env, si azzerano da soli. */
+const CAMPO: Record<string, 'utente' | 'email' | 'codice'> = { entra: 'utente', dimenticata: 'email', reimposta: 'codice' };
+
 @Injectable()
 class TentativiGuard extends ThrottlerGuard {
-  protected getTracker(req: Request) {
-    const b = req.body as { utente?: unknown; codice?: unknown } | undefined;
-    // entra: IP e nome utente; reimposta: IP e link; cambio password: IP e sessione;
-    // password dimenticata: solo IP (chi prova tante email diverse si ferma lo stesso)
-    const chi = typeof b?.utente === 'string' ? b.utente.trim().toLowerCase() : typeof b?.codice === 'string' ? b.codice : req.session?.utente_id;
+  protected getTracker(req: Request, ctx?: ExecutionContext) { // la libreria passa anche il contesto
+    // il campo lo decide la rotta, non chi scrive il corpo; cambio password: la sessione
+    const campo = ctx && CAMPO[ctx.getHandler().name];
+    const v = campo && (req.body as Record<string, unknown> | undefined)?.[campo];
+    const chi = typeof v === 'string' ? v.trim().toLowerCase() : req.session?.utente_id;
     return Promise.resolve(`${req.ip}|${chi ?? ''}`);
   }
 }
@@ -240,8 +243,8 @@ export class AccessoController {
       dettaglio: { etichetta: email },
     }, { utente_id: u?.id, ip: req.ip });
     if (!u) return;
-    // tutto il lavoro dopo la risposta: il tempo non dice se l'email è registrata, perché il
-    // limite ai tentativi conta per IP ed email e non ferma chi prova molte email diverse
+    // tutto il lavoro dopo la risposta: il tempo non dice se l'email è registrata (chi prova
+    // tante email diverse lo ferma solo il tetto per IP, che è largo)
     void this.mandaLink(u, req.ip).catch((e: unknown) => this.log.error(`link non creato per ${u.id}: ${String(e)}`));
   }
 

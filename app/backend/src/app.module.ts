@@ -19,8 +19,20 @@ class SaluteController {
   }
 }
 
+/** Limite ai tentativi, solo dove c'è TentativiGuard (D-41): per persona e, più largo, per IP;
+ *  ogni operazione (entra, dimenticata, …) ha i suoi contatori, così chi riempie una pagina non
+ *  blocca le altre. Finestra in minuti; finita la finestra il contatore riparte da zero. */
+export function limiti(env = process.env) {
+  const n = (v: string | undefined, d: number) => (Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : d);
+  const ttl = n(env.TENTATIVI_MINUTI, 15) * 60_000;
+  return [
+    { name: 'persona', ttl, limit: n(env.TENTATIVI, 10) },
+    { name: 'ip', ttl, limit: n(env.TENTATIVI_IP, 100), getTracker: (req: Record<string, unknown>) => String(req.ip) },
+  ];
+}
+
 @Module({
-  imports: [PrismaModule, ThrottlerModule.forRoot([{ ttl: 15 * 60_000, limit: 10 }])], // 10 tentativi in 15 minuti, solo dove c'è TentativiGuard
+  imports: [PrismaModule, ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
   controllers: [SaluteController, AccessoController, UtentiController],
   providers: [
     { provide: APP_FILTER, useClass: ErroriFilter }, // con Prisma iniettato: scrive nel registro

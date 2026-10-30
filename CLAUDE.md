@@ -143,7 +143,14 @@ Regole del codice del prototipo:
 6. **Git**:
    - si lavora su `main`, con commit piccoli e messaggi in italiano;
    - non committare `image.png`, né le cartelle di uscita degli strumenti;
-   - pubblica (`git push`) solo se Ugo lo chiede.
+   - pubblica (`git push`) solo se Ugo lo chiede;
+   - **prima di ogni commit di codice, tre controlli**, caricando davvero le skill (non a memoria):
+     1. sicurezza: `owasp-security` (o `vibesec`); per SQL e migrazioni anche `postgresql-code-review`;
+     2. correttezza: `/code-review`;
+     3. complessità: `/ponytail:ponytail-review`.
+
+     Si correggono i rilievi veri; nel messaggio finale a Ugo si dice quali controlli sono stati
+     fatti, cosa hanno trovato e cosa resta aperto.
 7. **Domande**: se una richiesta è ambigua o va contro una decisione del §19, chiedi
    prima di procedere. I dubbi aperti con il cliente stanno nella spec, ad esempio §5.14:
    - chi manda il sollecito di pagamento;

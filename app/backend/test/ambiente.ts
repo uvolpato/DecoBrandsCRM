@@ -5,4 +5,5 @@
 import 'dotenv/config';
 
 process.env.DATABASE_URL = (process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL!.replace(/\/decobrands_db\b/, '/decobrands_test'));
+process.env.TENTATIVI_IP ??= '1000'; // le prove escono tutte da 127.0.0.1
 if (!/decobrands_test/.test(process.env.DATABASE_URL)) throw new Error('Le prove girano solo su decobrands_test');
