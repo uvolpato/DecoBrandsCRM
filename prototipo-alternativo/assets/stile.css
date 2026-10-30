@@ -863,11 +863,36 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .filtri.con-riepilogo > .riepilogo-filtri { margin-left: auto; }
 .barra-analisi .filtri-entita .filtro-ricerca { max-width: none; }
 
-/* ---------- Accesso (D-39, spec §7.0): stessa barra scura con il marchio, pannello al centro ---------- */
+/* ---------- Accesso (D-39, D-42, spec §7.0): pagina scura come la barra, logo al centro, modulo in finestra ---------- */
 .io-esci { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-piccolo); color: rgba(255,255,255,.65); flex: none; }
 .io-esci:hover { background: rgba(255,255,255,.1); color: #fff; }
-body.in-accesso .principale { align-items: center; justify-content: center; overflow: auto; }
-.accesso { width: 100%; max-width: 400px; }
+body.in-accesso { grid-template-columns: 1fr; background: var(--scuro); }
+body.in-accesso .barra { display: none; }
+body.in-accesso .principale { padding: 0; overflow: auto; }
+.accesso-scena { flex: 1; min-height: 100%; display: grid; place-items: center; padding: 24px 16px 84px; position: relative; }
+.accesso-scena > * { grid-area: 1 / 1; }
+.accesso-logo { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; animation: accesso-entra .9s ease-out both; transition: opacity .2s, transform .2s; }
+.accesso-logo img { width: min(340px, 70vw); filter: brightness(0) invert(1); }
+.accesso-logo span { font-size: 15px; color: rgba(255,255,255,.55); letter-spacing: .04em; }
+.accesso-invito { margin: 28px 0 0; padding: 8px 14px; border: 0; border-radius: var(--r-piccolo); background: none; font: inherit; font-size: 13px; color: rgba(255,255,255,.45); cursor: pointer; animation: accesso-invito 2.4s ease-in-out 1s infinite both; }
+.accesso-piede { position: absolute; left: 16px; right: 16px; bottom: 16px; text-align: center; font-size: 12px; line-height: 1.6; color: rgba(255,255,255,.4); }
+.accesso-piede p { margin: 0; }
+.accesso-licenza { padding: 0; border: 0; background: none; font: inherit; color: rgba(255,255,255,.7); text-decoration: underline; cursor: pointer; }
+.accesso-licenza:hover { color: #fff; }
+.licenza h3 { font-size: 14px; margin: 14px 0 4px; }
+.licenza p, .licenza ul { margin: 0 0 8px; }
+.accesso-scena.aperta .accesso-logo { opacity: .07; transform: scale(1.06); animation: none; }
+.accesso-scena.aperta .accesso-invito { visibility: hidden; }
+/* chiusa: nascosta anche a Tab e ai lettori di schermo (visibility), che arrivano al pulsante dell'invito */
+.accesso { width: 100%; max-width: 400px; opacity: 0; transform: translateY(10px) scale(.97); visibility: hidden; }
+.accesso-scena.aperta .accesso { opacity: 1; transform: none; visibility: visible; transition: opacity .16s ease-out, transform .16s ease-out; }
+.accesso .pannello { box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+@keyframes accesso-entra { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+@keyframes accesso-invito { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .accesso-logo, .accesso-invito { animation: none; }
+  .accesso-logo, .accesso-scena.aperta .accesso { transition: none; }
+}
 .accesso .pannello-corpo { padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 14px; }
 .accesso h1 { font-size: 20px; font-weight: 700; }
 .accesso .modulo .btn.largo { justify-content: center; width: 100%; padding: 10px 14px; font-weight: 600; margin-top: 4px; }
@@ -881,9 +906,8 @@ body.in-accesso .principale { align-items: center; justify-content: center; over
 .campo-casella input { width: 16px; height: 16px; margin: 0; accent-color: var(--primario); }
 .campo-casella label { font-weight: 400; font-size: 14px; }
 @media (max-width: 860px) {
-  body.in-accesso .barra { position: static; padding: 18px 16px 6px; }
-  body.in-accesso .marchio { display: flex; padding: 0; }
-  body.in-accesso .principale { height: auto; padding: 18px 16px 32px; justify-content: flex-start; }
+  body.in-accesso .principale { height: 100vh; height: 100dvh; }
+  .accesso-scena { padding-bottom: 112px; } /* il piede va su 4 righe: non copre la finestra */
   .accesso .pannello-corpo { padding: 22px 18px 20px; }
   .accesso .campo input { font-size: 16px; }   /* niente zoom automatico su iPhone */
 }

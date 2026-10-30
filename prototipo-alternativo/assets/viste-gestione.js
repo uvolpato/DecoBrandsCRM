@@ -164,7 +164,7 @@
   CRM.rotta(/^\/accesso$/, () => {
     if (M.S.collegato) { location.replace('#/'); return; }
     CRM.Accesso({
-      titolo: 'Accedi', testo: 'Usa il nome utente (o l’email) e la password che ti ha mandato l’amministratore.', avviso: PROVA,
+      titolo: 'Accedi', presentazione: true, testo: 'Usa il nome utente (o l’email) e la password che ti ha mandato l’amministratore.', avviso: PROVA,
       campi: [
         { nome: 'utente', etichetta: 'Nome utente o email', completa: 'username' },
         { nome: 'password', etichetta: 'Password', tipo: 'password' },
@@ -184,6 +184,7 @@
   });
   CRM.rotta(/^\/accesso\/esci$/, () => {
     M.annota('Uscita di ' + M.utente().nome); M.S.collegato = false; M.S.dopo_accesso = null; M.salvaSempre();
+    document.getElementById('principale').innerHTML = ''; // dopo Esci sempre la presentazione col logo (D-42)
     location.replace('#/accesso'); CRM.Avviso('Sei uscito');
   });
   CRM.rotta(/^\/accesso\/cambia$/, () => {
@@ -207,14 +208,14 @@
     CRM.Accesso({
       titolo: 'Password dimenticata', testo: 'Scrivi l’email del tuo utente: ti mandiamo un link per sceglierne una nuova, valido un’ora.',
       campi: [{ nome: 'email', etichetta: 'Email', completa: 'email' }],
-      conferma: 'Manda il link', link: [{ testo: 'Torna all’accesso', href: '#/accesso' }],
+      presentazione: true, conferma: 'Manda il link', link: [{ testo: 'Torna all’accesso', href: '#/accesso' }],
       onConferma: (v, form) => {
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { form.errore('Scrivi un’email valida.'); return; }
         // risposta sempre uguale: non dice se l'email è registrata (§3.3)
         CRM.Accesso({
           titolo: 'Controlla la posta', testo: 'Se <b>' + e(v.email) + '</b> è l’email di un utente, tra poco arriva un link per scegliere una nuova password. Vale un’ora e una volta sola.',
           avviso: 'Prototipo: il link dell’email apre <a href="#/accesso/password/prova">questa pagina</a>.',
-          conferma: 'Torna all’accesso', onConferma: () => { location.hash = '#/accesso'; }
+          presentazione: true, conferma: 'Torna all’accesso', onConferma: () => { location.hash = '#/accesso'; }
         });
       }
     });

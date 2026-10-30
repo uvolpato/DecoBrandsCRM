@@ -6,6 +6,12 @@ leggili prima di cambiare qualcosa.
 
 ## 1. Il progetto in breve
 
+> ⚠ **Il CRM è il primo pezzo del Sistema Informativo Aziendale di Decobrands** (D-43): un
+> portale aziendale generale in cui entreranno altri moduli (vendita diretta, Gestione Ordini,
+> …). Nomi, accesso, utenti, ruoli e stile si pensano per il portale, non solo per le
+> provvigioni. È **software proprietario** sviluppato internamente (patent box): niente
+> licenze open source sul codice nostro, copyright Decobrands S.r.l.
+
 Decobrands SRL fa da **agente** per alcuni fornitori (Gries, Gasper, Ing's, Nordgarten, …)
 verso i clienti (garden center, vivai) e si appoggia a **subagenti** che seguono i clienti.
 Il CRM segue il ciclo delle provvigioni:
@@ -178,7 +184,9 @@ Regole del codice del prototipo:
 - ⚠ **Tutto sul backend, mai dai dati del frontend** (V12, D-28).
 - CRM **staccato dalla Gestione Ordini**: database e utenti propri; la ingloberà con la
   vendita diretta (D-29).
-- Accesso con **Microsoft 365 o link via email**, solo su invito, nessuna password (D-30).
+- Accesso con **nome utente (o email) e password** come nella Gestione Ordini: il superutente crea
+  gli amministratori, gli amministratori gli utenti; password provvisoria da cambiare (D-39,
+  sostituisce D-30). Limite ai tentativi per persona e per IP (D-41).
 - **Registro unico** di eventi e anomalie, `dettaglio` JSON con schema per codice (D-31).
 - Viste di Integra lette da un **database PostgreSQL ponte** (D-32).
 - Vendita diretta spenta, ampliamento futuro (D-08).

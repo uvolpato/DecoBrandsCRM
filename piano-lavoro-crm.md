@@ -113,13 +113,13 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **Output:** schema Prisma tabelle CRM + migrazioni; nessuna tabella della Gestione Ordini (D-29); aggregatore seed con `seed/00-base`.
 - **DoD:** migrazioni applicate sul database `decobrands_db`; seed §12 caricato; vincoli chiave presenti (`UNIQUE(fornitore_id, mese, anno)` bollettini, `UNIQUE(fornitore_id, codice_cliente_fornitore)` interscambio, FK `ordine_cliente_id`).
 
-#### F0-A3 · Accesso con nome utente e password, come nella Gestione Ordini — 3 h + 1 h **da approvare**
+#### F0-A3 · Accesso con nome utente e password, come nella Gestione Ordini — 3 h + 2 h **da approvare**
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate login-guardate · **Serve dal cliente:** casella SMTP per le email (password provvisoria, password dimenticata)
 - **Riferimenti:** spec §3.3, §4.2.18, §7.13, §8.3, §15.2.1, D-29, D-39
 - **Sorgente prototipo:** il prototipo ufficiale **non ha la pagina di accesso**: si disegna con `stile.css` e i componenti (riquadro centrato con logo, nome utente o email, password, *Resta collegato*, *Entra*, *Password dimenticata?*; pagina del cambio password obbligatorio) e si fa approvare prima di svilupparla; la pagina Utenti del prototipo passa a nome utente, *Reimposta la password* e ruolo Superutente; in fondo alla barra laterale utente, ruolo ed *Esci* come nel prototipo (`componenti.js`, `CRM.Barra`)
 - **Output:** sessioni, CSRF, Helmet, throttler ripresi da Luis B2B; tabella `utenti` propria con `username`, `password_hash` (scrypt), `deve_cambiare_password`; superutente unico creato da un comando del server; accesso, uscita, cambio password, password dimenticata (`accessi_link`, impronta SHA-256, 1 ora), nuova password provvisoria dall'amministratore; pagina di accesso approvata.
 - **DoD:** entra solo chi ha credenziali giuste ed è attivo; messaggio uguale per ogni errore; con la password provvisoria non si apre nessuna pagina prima del cambio; link usato o scaduto rifiutato; risposta della password dimenticata uguale per email registrate e non; limite ai tentativi; eventi `auth/*` §15.2.1 scritti da `logEvent()` (F0-A5).
-- **Ore:** 3 h del preventivo (sessioni, guard, pagina) + **1 h da approvare** (superutente, password provvisoria e password dimenticata, D-39; le 2 h di Microsoft 365 e link di D-30 non servono più).
+- **Ore:** 3 h del preventivo (sessioni, guard, pagina) + **1 h da approvare** (superutente, password provvisoria e password dimenticata, D-39; le 2 h di Microsoft 365 e link di D-30 non servono più) + **1 h da approvare** (nuova pagina di accesso scura con logo e finestra, prototipo e app, D-42).
 
 #### F0-A4 · Shell layout comune + componenti standard — 5 h
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate

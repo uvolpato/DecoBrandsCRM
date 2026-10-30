@@ -219,20 +219,33 @@
   };
 
   /* =========================================================
-     Accesso (D-39, spec §7.0): pagina fuori dall'app, senza barra di navigazione.
-     A sinistra il marchio come nella barra; al centro un pannello con titolo, testo, modulo,
-     pulsante principale e collegamenti. Stessi campi di CRM.Form (anche 'password' e 'casella').
+     Accesso (D-39, D-42, spec §7.0): pagina fuori dall'app, tutta scura come la barra.
+     Con presentazione (Accedi, Password dimenticata, Controlla la posta): il logo compare al centro e, al primo tasto o
+     tocco, il modulo si apre in una finestra; il tasto premuto finisce nel primo campo. Fra le
+     pagine di accesso (Accedi ↔ Password dimenticata) la finestra è già aperta e cambia solo
+     il contenuto; Esc o un clic fuori tornano al logo. Dai link delle email niente logo. Stessi campi di CRM.Form (anche 'password', 'casella').
      opz: { titolo, testo, campi, conferma, link: [{ testo, href }], avviso (testo in evidenza),
-            onConferma(valori, form) → Promise | void (il pulsante resta in attesa fino alla fine) }
+            presentazione (bool), onConferma(valori, form) → Promise | void (pulsante in attesa) }
      ========================================================= */
+  let fermaAscolto = null;
   CRM.Accesso = function (opz) {
+    const giaAperta = !!$('.accesso-scena.aperta');
+    if (fermaAscolto) fermaAscolto();
     document.body.classList.add('in-accesso');
     document.body.classList.remove('sola-lettura');
     document.title = opz.titolo + ' · Decobrands';
-    $('#barra').innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Pratiche e provvigioni</span></div>' +
-      '<div class="barra-piede">Accesso riservato a chi lavora con Decobrands. Gli utenti li crea l’amministratore.</div>';
+    $('#barra').innerHTML = '';
     const p = $('#principale'); p.innerHTML = '';
-    const pan = CRM.Pannello(CRM.blocco(p, 'accesso'), {});
+    const scena = CRM.blocco(p, 'accesso-scena');
+    // D-43: il CRM è il primo pezzo del Sistema Informativo Aziendale; in basso licenza e copyright
+    scena.innerHTML = '<div class="accesso-logo"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Sistema Informativo Aziendale</span>' +
+      '<button type="button" class="accesso-invito">Premi un tasto o tocca per entrare</button></div>' +
+      '<div class="accesso-piede"><p>' + CRM.LICENZA.riga + '</p><p>' + CRM.LICENZA.copyright +
+      ' · <button type="button" class="accesso-licenza">Licenza d’uso</button></p></div>';
+    $('.accesso-licenza', scena).addEventListener('click', () => CRM.Modale({ titolo: 'Licenza d’uso', corpo: CRM.LICENZA.testo }));
+    const fin = CRM.blocco(scena, 'accesso');
+    fin.setAttribute('role', 'dialog'); fin.setAttribute('aria-label', opz.titolo);
+    const pan = CRM.Pannello(fin, {});
     pan.corpo.innerHTML = '<h1>' + esc(opz.titolo) + '</h1>' + (opz.testo ? '<p class="nota">' + opz.testo + '</p>' : '') +
       (opz.avviso ? '<p class="nota nota-attesa" role="status">' + opz.avviso + '</p>' : '');
     const form = CRM.Form(pan.corpo, { campi: opz.campi || [] });
@@ -245,7 +258,36 @@
       try { await opz.onConferma(form.valori(), form); } finally { btn.disabled = false; btn.textContent = t; }
       const err = $('.modulo-errore', form.el); if (!err.hidden) { const primo = form.el.querySelector('input'); if (primo) primo.focus(); }
     });
-    const primo = form.el.querySelector('input:not([type=checkbox])'); if (primo) primo.focus();
+    const primo = form.el.querySelector('input:not([type=checkbox])');
+    // tasti e tocchi della pagina; il piede (licenza) e le finestre sopra (la licenza aperta) non contano
+    const ascolta = (tasto, tocco) => {
+      if (fermaAscolto) fermaAscolto();
+      // click e non pointerdown: lo scorrimento col dito non chiude e il focus resta nel campo
+      document.addEventListener('keydown', tasto); scena.addEventListener('click', tocco);
+      fermaAscolto = () => { document.removeEventListener('keydown', tasto); scena.removeEventListener('click', tocco); fermaAscolto = null; };
+    };
+    const altrove = ev => $('.velo') || (ev.target.closest && ev.target.closest('.accesso-piede'));
+    // si torna al logo ridisegnando Accedi da chiuso (anche da Password dimenticata)
+    const chiudi = () => { p.innerHTML = ''; if (location.hash === '#/accesso') CRM.naviga(); else location.hash = '#/accesso'; };
+    const apri = (tasto) => {
+      scena.classList.add('aperta');
+      // con presentazione: Esc o un clic fuori dalla finestra tornano al logo (D-42)
+      if (opz.presentazione) ascolta(ev => { if (ev.key === 'Escape' && !altrove(ev)) chiudi(); }, ev => { if (!fin.contains(ev.target) && !altrove(ev)) chiudi(); });
+      else if (fermaAscolto) fermaAscolto();
+      if (!primo) return;
+      // il tasto va nel campo solo se è vuoto: se il browser l'ha già riempito non si sporca
+      if (tasto && !primo.value) { primo.value = tasto; primo.dispatchEvent(new Event('input', { bubbles: true })); }
+      primo.focus();
+    };
+    if (!opz.presentazione || giaAperta) { apri(); return form; }
+    // presentazione: il logo resta finché non si preme un tasto o si tocca; il modulo c'è già nella
+    // pagina (il browser può riempirlo), nascosto finché non si apre
+    ascolta(ev => {
+      if (altrove(ev) || ((ev.ctrlKey || ev.metaKey) && !ev.getModifierState('AltGraph'))) return; // scorciatoie sì, AltGr (@, #) no
+      const lettera = ev.key.length === 1 && ev.key !== ' ';
+      if (!lettera && !['Enter', ' ', 'Tab'].includes(ev.key)) return; // F5, F11, Esc… restano al browser
+      ev.preventDefault(); apri(lettera ? ev.key : '');
+    }, ev => { if (!altrove(ev)) apri(); });
     return form;
   };
 
@@ -1349,7 +1391,7 @@
     const io = M.utente();
     document.body.classList.toggle('sola-lettura', !M.puo('modifica'));
     const b = $('#barra');
-    b.innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Pratiche e provvigioni</span></div>' +
+    b.innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Sistema Informativo Aziendale</span></div>' +
       '<button type="button" class="carica-barra" id="carica-barra">' + CRM.icona('carica') + 'Carica documenti</button>' +
       '<div class="barra-menu">' + VOCI.filter(g => !g.ampliamento || CRM.AMPLIAMENTI[g.ampliamento]).map(g => Object.assign({}, g, { voci: g.voci.filter(v => !v.permesso || M.puo(v.permesso)) })).filter(g => g.voci.length).map(g => {
         // il gruppo Gestione si apre da solo quando si è in una delle sue pagine (il contatore dei problemi resta visibile sul titolo)
@@ -1408,6 +1450,7 @@
   // niente "Torna a…" verso le pagine di accesso (D-39): dopo l'accesso non si torna lì
   CRM.indietro = () => { const st = history.state; return st && st.prec && MEM[st.prec] && MEM[st.prec].hash.indexOf('/accesso') !== 0 ? { titolo: MEM[st.prec].titolo, vai: () => history.back() } : null; };
   CRM.naviga = function () {
+    if (fermaAscolto) fermaAscolto(); // le pagine di accesso smettono di ascoltare tasti e tocchi (D-42)
     if (voce && MEM[voce.n]) { MEM[voce.n].stato = cattura(); }
     const h = (location.hash || '#/').slice(1);
     // D-39: senza sessione si va alla pagina di accesso e, dopo, si torna alla pagina chiesta (D-38)

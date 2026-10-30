@@ -10,7 +10,7 @@ export default function LayoutAccesso({ children }: { children: ReactNode }) {
         <div className="marchio">
           {/* eslint-disable-next-line @next/next/no-img-element -- stesso logo del prototipo, già piccolo */}
           <img src="/logo-decobrands.png" alt="Decobrands" />
-          <span>Pratiche e provvigioni</span>
+          <span>Sistema Informativo Aziendale</span>
         </div>
         <div className="barra-piede">Accesso riservato a chi lavora con Decobrands. Gli utenti li crea l’amministratore.</div>
       </aside>

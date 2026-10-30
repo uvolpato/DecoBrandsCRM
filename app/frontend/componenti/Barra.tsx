@@ -41,7 +41,7 @@ export function Barra() {
       <div className="marchio">
         {/* eslint-disable-next-line @next/next/no-img-element -- stesso logo del prototipo */}
         <img src="/logo-decobrands.png" alt="Decobrands" />
-        <span>Pratiche e provvigioni</span>
+        <span>Sistema Informativo Aziendale</span>
       </div>
       {/* nascosto in sola lettura da stile.css (body.sola-lettura #carica-barra) */}
       <button type="button" className="carica-barra" id="carica-barra" onClick={() => router.push('/documenti')}><Icona nome="carica" />Carica documenti</button>

@@ -304,8 +304,8 @@
     /* ---------------- Gestione ---------------- */
     { id: 'accesso', titolo: 'Accesso', gruppo: 'Gestione', vai: '#/accesso/cambia',
       sintesi: 'Si entra con nome utente (o email) e password, come nella Gestione Ordini. La prima volta si usa la password provvisoria arrivata per email e se ne sceglie una propria.',
-      pulsanti: [['Entra', 'Nome utente o email e password; con “Resta collegato” la sessione dura 30 giorni, senza finisce alla chiusura del browser.'], ['Password dimenticata?', 'Scrivi l’email: arriva un link per sceglierne una nuova, valido un’ora e una volta sola.'], ['Esci', 'L’icona accanto al tuo nome, in fondo alla barra.'], ['Cambia la password', 'In fondo alla barra: password attuale e nuova (almeno 8 caratteri).']],
-      sapere: ['Il messaggio “Credenziali non valide” è lo stesso per nome sbagliato, password sbagliata o utente disattivato: così non si scopre chi è registrato.', 'Dopo troppi tentativi sbagliati su un utente bisogna aspettare 15 minuti.', 'Con la password provvisoria non si apre nessuna pagina prima di averla cambiata.', 'Cambiare la password chiude le sessioni aperte sugli altri computer.'] },
+      pulsanti: [['Premi un tasto o tocca', 'Sulla pagina col logo apre il modulo di accesso; il tasto premuto è già nel nome utente. Esc o un clic fuori tornano al logo.'], ['Licenza d’uso', 'In fondo alla pagina di accesso: chi può usare il sistema e cosa non si può fare.'], ['Entra', 'Nome utente o email e password; con “Resta collegato” la sessione dura 30 giorni, senza finisce alla chiusura del browser.'], ['Password dimenticata?', 'Scrivi l’email: arriva un link per sceglierne una nuova, valido un’ora e una volta sola.'], ['Esci', 'L’icona accanto al tuo nome, in fondo alla barra.'], ['Cambia la password', 'In fondo alla barra: password attuale e nuova (almeno 8 caratteri).']],
+      sapere: ['Il messaggio “Credenziali non valide” è lo stesso per nome sbagliato, password sbagliata o utente disattivato: così non si scopre chi è registrato.', 'Dopo troppi tentativi su un utente bisogna aspettare 15 minuti; i colleghi dello stesso ufficio entrano lo stesso.', 'Con la password provvisoria non si apre nessuna pagina prima di averla cambiata.', 'Cambiare la password chiude le sessioni aperte sugli altri computer.'] },
     { id: 'utenti', titolo: 'Utenti e ruoli', gruppo: 'Gestione', vai: '#/utenti',
       sintesi: 'Gli utenti del CRM. Si entra con nome utente (o email) e password; la password provvisoria arriva per email e va cambiata al primo accesso. Il ruolo decide cosa si può fare.',
       pulsanti: [['Nuovo utente', 'Nome, nome utente, email, ruolo; parte l’email con la password provvisoria.'], ['Modifica', 'Nome, nome utente, email, ruolo.'], ['Reimposta la password', 'Manda una nuova password provvisoria per email: quella di prima smette di funzionare.'], ['Cambia la tua password', 'Sulla tua scheda: porta al cambio della password.'], ['Disattiva · Riattiva', 'Chi è disattivato non entra; i suoi dati restano.'], ['Elimina', 'Solo per chi non serve più; chi ha già usato l’app conviene disattivarlo.']],
@@ -323,4 +323,24 @@
       sintesi: 'I documenti scartati restano per i giorni fissati nelle impostazioni, con motivo e autore.',
       pulsanti: [['Recupera', 'Rimette il documento fra quelli da controllare e lo apre.'], ['Elimina', 'Definitivo, solo amministratore, con conferma.']] }
   ];
+  /* Licenza d'uso (D-43): piede delle pagine di accesso e finestra "Licenza d'uso".
+     Bozza da far verificare al consulente (patent box). */
+  CRM.LICENZA = {
+    riga: 'Software proprietario sviluppato internamente da Decobrands. Uso riservato agli utenti autorizzati.',
+    copyright: '© 2026 Decobrands S.r.l. · Tutti i diritti riservati',
+    testo: '<div class="licenza">' +
+      '<p><b>Sistema Informativo Aziendale Decobrands</b><br>© 2026 Decobrands S.r.l. Tutti i diritti riservati.</p>' +
+      '<h3>1. Titolarità</h3><p>Il software è stato ideato e sviluppato internamente da Decobrands S.r.l. per i propri processi aziendali. ' +
+      'È un’opera dell’ingegno protetta dal diritto d’autore (legge 22 aprile 1941 n. 633, art. 2 n. 8 e art. 64-bis e seguenti); ' +
+      'codice sorgente, documentazione, interfaccia e banche dati appartengono a Decobrands S.r.l.</p>' +
+      '<h3>2. Uso concesso</h3><p>L’uso è concesso solo al personale e ai collaboratori autorizzati da Decobrands, con credenziali personali, ' +
+      'per le attività aziendali. Le credenziali non si cedono ad altri.</p>' +
+      '<h3>3. Divieti</h3><p>Senza autorizzazione scritta di Decobrands S.r.l. è vietato copiare, modificare, decompilare, distribuire, ' +
+      'cedere o mettere a disposizione di terzi il software, in tutto o in parte, salvo i casi permessi dalla legge (art. 64-ter e 64-quater).</p>' +
+      '<h3>4. Riservatezza</h3><p>Dati e documenti trattati nel sistema sono riservati e si usano solo per le attività aziendali.</p>' +
+      '<h3>5. Componenti di terzi</h3><p>Il sistema usa componenti open source, ognuno con la propria licenza, che resta valida:</p>' +
+      '<ul><li>Chart.js, ExcelJS, jsPDF e jsPDF-AutoTable: licenza MIT</li><li>carattere Public Sans: SIL Open Font License 1.1</li>' +
+      '<li>le librerie dell’applicazione elencate nei file delle dipendenze, con le rispettive licenze</li></ul>' +
+      '</div>'
+  };
 })();
