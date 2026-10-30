@@ -109,7 +109,7 @@
       sottotitolo: 'Qui entrano tutti i documenti dei fornitori: ordini, conferme, fatture, note di credito e bollettini. Caricali, controlla i dati letti e abbinali: la pratica avanza da sola.'
     });
     const col = CRM.blocco(corpo, 'colonne posta riempi');
-    const sx = CRM.Pannello(col, { titolo: 'Da controllare', nota: String(docs.length) + (M.puo('scartati') && M.S.scartati.length ? ' · <a href="#/scartati">' + M.S.scartati.length + ' scartati</a>' : ''), riempi: true });
+    const sx = CRM.Pannello(col, { titolo: 'Da controllare', nota: String(docs.length) + (M.puo('provvigioni.scartati') && M.S.scartati.length ? ' · <a href="#/scartati">' + M.S.scartati.length + ' scartati</a>' : ''), riempi: true });
     CRM.Caricamento(sx.corpo, { titolo: 'Trascina qui i documenti', testo: 'PDF di ordini, conferme, fatture e note di credito; bollettini in PDF o Excel', accetta: ACCETTA, onFile: f => carica(f) });
     if (!docs.length) {
       CRM.Nota(sx.corpo, 'Nessun documento da controllare.').style.marginTop = '12px';

@@ -218,7 +218,8 @@
       sottotitolo: 'Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre.',
       azioni: [
         { etichetta: 'Esporta in Excel', icona: 'scarica', variante: 'sec', consentito: true, disabilitato: !righe.length, titolo: righe.length ? '' : 'Nessun documento nel trimestre', onClick: () => esporta(a, t, righe) },
-        { etichetta: st.chiave === 'chiusa' ? 'Liquidazione chiusa' : 'Chiudi il trimestre', icona: 'spunta', disabilitato: !puoChiudere, titolo: perche, onClick: async () => {
+        // D-45: chiudere il trimestre è del responsabile delle provvigioni
+        { etichetta: st.chiave === 'chiusa' ? 'Liquidazione chiusa' : 'Chiudi il trimestre', icona: 'spunta', disabilitato: !puoChiudere || !M.puo('provvigioni.chiudi'), titolo: !M.puo('provvigioni.chiudi') ? 'Serve il livello responsabile nell’area Provvigioni' : perche, onClick: async () => {
           if (!(await CRM.Conferma('Chiudere la liquidazione del ' + t + '° trimestre?', 'Gli importi vengono fissati: ' + M.euro(totLiq) + ' a ' + new Set(liquidabili.map(r => r.subagente_id)).size + ' subagenti.', 'Chiudi il trimestre'))) return;
           M.chiudiTrimestre(a, t); M.salva(); CRM.Avviso('Liquidazione del ' + t + '° trimestre chiusa'); CRM.naviga();
         } }
@@ -283,7 +284,7 @@
           { key: 'numero', header: 'Documento', valore: r => r.doc.numero, cell: r => '<a href="#/pratiche/' + r.pratica.id + '">' + e(r.doc.numero) + '</a>' + (r.voce ? ' ' + CRM.stato(r.voce === 'storno' ? 'errore' : 'info', r.voce === 'storno' ? 'Storno' : 'Riaccredito') : '') + '<span class="sec-riga">' + e(r.fornitore.breve) + ' · ' + (r.doc.origine ? 'fattura del ' + M.data(r.doc.origine) : M.data(r.doc.data)) + '</span>' },
           { key: 'cliente', header: 'Cliente · subagente', grow: true, valore: r => M.nomeCliente(r.cliente), cell: r => e(M.nomeCliente(r.cliente)) + '<span class="sec-riga">' + e(M.subagente(r.subagente_id).nome) + ' · codice ' + e(r.codice_cliente) + '</span>' },
           { key: 'provvigione', header: 'Provvigione', tipo: 'euro', totale: 'somma', cell: r => '<b class="' + CRM.classeSegno(Math.min(0, r.provvigione)) + '">' + M.euro(r.provvigione) + '</b><span class="sec-riga">' + M.pct(r.pct) + ' di ' + M.euro(r.importo) + (r.nota ? ' · ' + e(r.nota) : '') + '</span>' +
-            (!r.voce && st.chiave !== 'chiusa' && M.puo('modifica') ? '<button type="button" class="btn testo piccolo" data-correggi="' + e(r.doc.numero) + '">' + (r.regola === 'correzione' ? 'Cambia la correzione' : 'Correggi') + '</button>' : '') },
+            (!r.voce && st.chiave !== 'chiusa' && M.puo('provvigioni.modifica') ? '<button type="button" class="btn testo piccolo" data-correggi="' + e(r.doc.numero) + '">' + (r.regola === 'correzione' ? 'Cambia la correzione' : 'Correggi') + '</button>' : '') },
           { key: 'stato', header: 'Stato', grow: true, sortValue: r => r.liquidabile ? 1 : 0,
             cell: r => r.voce ? CRM.stato(r.voce === 'storno' ? 'errore' : 'ok', r.voce === 'storno' ? 'Da stornare' : 'Da riaccreditare') + '<span class="sec-riga">' + e(r.motivo) + '</span>'
               : r.liquidabile ? CRM.stato('ok', st.chiave === 'chiusa' ? 'Liquidata' : 'Liquidabile')
@@ -421,7 +422,7 @@
         const sub = CRM.$('#esporta-sub', corpo).value;
         CRM.esportaLiquidazione(a, t, scelta, sub, formatoEsporta).then(nome => {
           if (!nome) return;
-          if (M.puo('modifica')) M.annota('Esportata la liquidazione del ' + t + '° trimestre ' + a + (scelta === 'uno' ? ' di ' + M.subagente(Number(sub)).nome : scelta === 'riepilogo' ? ' (riepilogo)' : ' (completa)') + ' in ' + formatoEsporta.toUpperCase()); if (M.puo('modifica')) M.salva();
+          if (M.puo('provvigioni.modifica')) M.annota('Esportata la liquidazione del ' + t + '° trimestre ' + a + (scelta === 'uno' ? ' di ' + M.subagente(Number(sub)).nome : scelta === 'riepilogo' ? ' (riepilogo)' : ' (completa)') + ' in ' + formatoEsporta.toUpperCase()); if (M.puo('provvigioni.modifica')) M.salva();
           CRM.Avviso('Scaricato ' + nome);
         });
       } }]

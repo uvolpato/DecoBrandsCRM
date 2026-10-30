@@ -140,10 +140,12 @@ Regole del codice del prototipo:
    - il catalogo `assets/viste-componenti.js`, se cambia un componente.
 
    Poi si lancia `python3 strumenti/genera-pagine-doc.py`.
-4. **Prove**: dopo ogni modifica al prototipo lancia `python strumenti/prove/flusso.py`
-   (servono `playwright` con Chromium e `openpyxl`). Deve chiudere con 0 KO. Aggiungi i
-   controlli per ciò che hai fatto. Nei selettori le schede vanno cercate con
-   `.schede-barra [role=tab]`, perché anche i segmenti hanno `role=tab`.
+4. **Prove**: il lavoro si concentra sull'**app vera** (`app/`): prove del backend (`npm test`,
+   database `decobrands_test`) e del browser (`strumenti/prove/app_*.py`, Playwright), da
+   chiudere con 0 KO. Il **prototipo serve a mostrare l'idea** (aspetto, flussi, testi): si
+   aggiorna quando cambia l'idea, ma non deve funzionare in ogni dettaglio e la sua prova
+   `flusso.py` non è più obbligatoria (Ugo, 30/10/2026). Nei selettori le schede vanno cercate
+   con `.schede-barra [role=tab]`, perché anche i segmenti hanno `role=tab`.
 5. **Controllo visivo**: per le modifiche all'interfaccia fai una schermata (Playwright, a
    1440 px e a 768 px, tablet in verticale) e guardala prima di consegnare. **Niente telefono**
    (D-44): sotto i 744 px l'app si ferma a monte, non va adattata.

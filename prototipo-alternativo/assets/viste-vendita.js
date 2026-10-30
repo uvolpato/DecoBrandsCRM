@@ -327,7 +327,7 @@
   function testataAliasKit(scheda) {
     const corpo = CRM.Pagina({ voce: 'alias-kit', titolo: 'Alias e kit', pieno: true,
       sottotitolo: 'Regole applicate all’esportazione degli ordini cliente: un codice vecchio passa al nuovo in base al disponibile; un articolo esaurito si sostituisce con i componenti del suo kit.',
-      azioni: M.puo('magazzino') ? [scheda === 'alias' ? { etichetta: 'Nuovo alias', icona: 'piu', onClick: () => modificaAlias(null) } : { etichetta: 'Nuovo kit', icona: 'piu', onClick: () => nuovoKit() }] : [] });
+      azioni: M.puo('vendite.magazzino') ? [scheda === 'alias' ? { etichetta: 'Nuovo alias', icona: 'piu', onClick: () => modificaAlias(null) } : { etichetta: 'Nuovo kit', icona: 'piu', onClick: () => nuovoKit() }] : [] });
     // due schede con indirizzo proprio (#/alias-kit/alias, #/alias-kit/kit): cambiare scheda cambia pagina
     const sk = CRM.Schede(corpo, { riempi: true, senzaMemoria: true, attiva: scheda, schede: [
       { id: 'alias', etichetta: 'Codici vecchio → nuovo', conta: M.S.alias.length, disegna: () => { if (scheda !== 'alias') location.hash = '#/alias-kit/alias'; } },
@@ -338,7 +338,7 @@
   rotta(/^\/alias-kit$/, () => { location.replace('#/alias-kit/alias'); });
   rotta(/^\/alias-kit\/alias$/, function () {
     const corpo = testataAliasKit('alias');
-    const puo = M.puo('magazzino');
+    const puo = M.puo('vendite.magazzino');
     const VA = { tutti: () => true, conferma: a => a.conferma, mancanti: a => !M.articoloAnag(a.nuovo) || !M.articoloAnag(a.vecchio) };
     const filtra = () => { const q = (filtroAlias.q || '').toLowerCase(); return M.S.alias.filter(VA[filtroAlias.vista]).filter(a => !q || [a.vecchio, a.nuovo, a.descrizione, a.ean].some(t => String(t || '').toLowerCase().indexOf(q) >= 0)); };
     CRM.FilterBar(corpo, { campi: [
@@ -393,7 +393,7 @@
   rotta(/^\/alias-kit\/kit\/(.+)$/, c => vistaKit(decodeURIComponent(c)));
   function vistaKit(codSel) {
     const corpo = testataAliasKit('kit');
-    const puo = M.puo('magazzino');
+    const puo = M.puo('vendite.magazzino');
     const k = M.S.kit.find(x => x.codice === codSel) || M.S.kit[0];
     const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(0,1fr) minmax(0,1.3fr)');
     const pl = CRM.Pannello(col, { titolo: 'Kit', riempi: true, senzaMargine: true });

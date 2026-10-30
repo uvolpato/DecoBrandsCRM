@@ -21,11 +21,14 @@
   const ULTIMA_EMAIL = { benvenuto: 'Benvenuto con la password provvisoria', password: 'Nuova password provvisoria', reset: 'Password dimenticata' };
   const ora = () => M.oggi() + 'T' + new Date().toTimeString().slice(0, 5);
   // chi può gestire chi (D-39): nessuno tocca il superutente né l'utente dei servizi; gli amministratori li gestisce il superutente
-  const gestibile = u => !u.sistema && u.ruolo !== 'superutente' && (u.ruolo !== 'amministratore' || M.puo('amministratori'));
+  const gestibile = u => !u.sistema && u.ruolo !== 'superutente' && (u.ruolo !== 'amministratore' || M.puo('sistema.amministratori'));
+  // aree visibili (Vendite solo con l'ampliamento acceso) e riassunto dei livelli: "Provvigioni: operatore · Anagrafiche: lettura"
+  const areeVisibili = () => M.AREE.filter(a => !a.ampliamento || CRM.AMPLIAMENTI[a.ampliamento]);
+  const livelliTesto = u => areeVisibili().filter(a => M.livello(u, a.id)).map(a => a.nome + ': ' + M.LIVELLI[M.livello(u, a.id)].nome.toLowerCase()).join(' · ');
   function vistaUtenti(idSel) {
-    if (!CRM.permesso('gestione', 'utenti', 'Utenti e ruoli')) return;
+    if (!CRM.permesso('sistema.utenti', 'utenti', 'Utenti e ruoli')) return;
     const corpo = CRM.Pagina({ voce: 'utenti', titolo: 'Utenti e ruoli', pieno: true,
-      sottotitolo: 'Si entra con nome utente (o email) e password. La password provvisoria arriva per email e va cambiata al primo accesso. Il ruolo decide cosa si può fare.',
+      sottotitolo: 'Si entra con nome utente (o email) e password. Il ruolo di Sistema decide chi gestisce il portale; il livello in ogni area (lettura, operatore, responsabile) decide cosa si può fare lì.',
       azioni: [{ etichetta: 'Nuovo utente', icona: 'piu', onClick: () => modificaUtente(null) }] });
     const utenti = M.S.utenti;
     const u = utenti.find(x => x.id === Number(idSel)) || utenti[0];
@@ -42,7 +45,8 @@
       righe: filtra(), ordinamentoIniziale: { key: 'nome', dir: 'asc' }, rowClass: x => x.id === u.id ? 'selezionata' : '',
       colonne: [
         { key: 'nome', header: 'Utente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === M.utente().id ? ' <span class="testo-tenue">(tu)</span>' : '') + '<span class="sec-riga">' + e(x.username) + ' · ' + e(x.email) + '</span>' },
-        { key: 'ruolo', header: 'Ruolo', valore: x => M.RUOLI[x.ruolo].nome, cell: x => x.sistema ? CRM.stato('neutro', 'Servizi automatici') : CRM.stato(x.ruolo === 'superutente' || x.ruolo === 'amministratore' ? 'primario' : x.ruolo === 'operatore' ? 'info' : 'neutro', M.RUOLI[x.ruolo].nome) },
+        { key: 'ruolo', header: 'Ruolo e aree', valore: x => M.RUOLI[x.ruolo].nome + livelliTesto(x), cell: x => x.sistema ? CRM.stato('neutro', 'Servizi automatici')
+          : (x.ruolo !== 'utente' ? CRM.stato('primario', M.RUOLI[x.ruolo].nome) : '') + '<span class="sec-riga">' + (e(livelliTesto(x)) || 'nessuna area') + '</span>' },
         { key: 'accesso', header: 'Ultimo accesso', valore: x => x.ultimo_accesso || '', cell: x => !x.attivo ? CRM.stato('neutro', 'Disattivato') : x.ultimo_accesso || x.sistema ? quando(x.ultimo_accesso) : CRM.stato('attesa', 'Mai entrato') }
       ],
       onRowClick: x => { location.hash = '#/utenti/' + x.id; },
@@ -54,18 +58,18 @@
       azioni: !modificabile ? [] : [{ etichetta: 'Modifica', onClick: () => modificaUtente(u) }].concat(sonoIo
         ? [{ etichetta: 'Cambia la tua password', icona: 'chiave', onClick: () => { location.hash = '#/accesso/cambia'; } }]
         : [{ etichetta: 'Reimposta la password', icona: 'chiave', onClick: () => reimposta(u) }]) });
-    const ruoli = Object.keys(M.RUOLI);
     // dati dell'utente e tabella dei permessi in due schede: niente scorrimento nella colonna
     CRM.Schede(p.corpo, { riempi: true, attiva: schedaUtente, onCambia: id => { schedaUtente = id; }, schede: [
       { id: 'utente', etichetta: 'Dati dell’utente', disegna: c => {
         CRM.Dettagli(c, [
           { etichetta: 'Nome utente', valore: e(u.username) },
           { etichetta: 'Email', valore: e(u.email) },
-          { etichetta: 'Ruolo', valore: e(M.RUOLI[u.ruolo].nome) },
+          { etichetta: 'Ruolo di Sistema', valore: e(M.RUOLI[u.ruolo].nome) }
+        ].concat(areeVisibili().map(a => ({ etichetta: a.nome, valore: M.livello(u, a.id) ? e(M.LIVELLI[M.livello(u, a.id)].nome) : '<span class="testo-tenue">—</span>' }))).concat([
           { etichetta: 'Stato', valore: u.attivo ? CRM.stato('ok', 'Attivo') + (u.deve_cambiare_password ? ' ' + CRM.stato('attesa', 'Password provvisoria') : '') : CRM.stato('neutro', 'Disattivato') },
           { etichetta: 'Ultimo accesso', valore: quando(u.ultimo_accesso) },
           { etichetta: 'Ultima email', valore: u.ultimo_invio ? e(ULTIMA_EMAIL[u.ultimo_invio.tipo] || u.ultimo_invio.tipo) + ' · ' + quando(u.ultimo_invio.quando) + (u.ultimo_invio.errore ? '<span class="sec-riga negativo">' + e(u.ultimo_invio.errore) + '</span>' : '') : '—' }
-        ], { inColonne: true });
+        ]), { inColonne: true });
         if (u.sistema) { CRM.Nota(c, 'Utente usato dai servizi automatici (lettura della casella, sincronizzazione da Integra): non si modifica e non accede all’app.'); return; }
         if (u.ruolo === 'superutente' && !sonoIo) { CRM.Nota(c, 'Il superutente si crea all’installazione e non si modifica da qui: crea e gestisce gli amministratori.'); return; }
         if (!modificabile) { CRM.Nota(c, 'Gli amministratori li gestisce il superutente.'); return; }
@@ -76,15 +80,20 @@
         b2.addEventListener('click', () => elimina(u)); az.appendChild(b2);
         if (sonoIo) { b1.disabled = b2.disabled = true; b1.title = b2.title = 'Non puoi disattivare o eliminare te stesso'; }
       } },
-      { id: 'ruoli', etichetta: 'Cosa può fare ogni ruolo', conta: M.PERMESSI.length, disegna: c => {
-        CRM.DataTable(CRM.blocco(c, 'riempi'), {
-          compatta: true, righe: M.PERMESSI,
-          colonne: [{ key: 'testo', header: 'Attività', grow: true, sortable: false }].concat(ruoli.map(r => ({
-            key: r, header: M.RUOLI[r].nome, align: 'center', sortable: false,
-            cell: x => x.ruoli.indexOf(r) >= 0 ? '<span class="si" aria-label="sì">' + CRM.icona('spunta') + '</span>' : '<span class="testo-tenue" aria-label="no">—</span>',
-            classe: x => r === u.ruolo ? 'col-evidenza' : '' })))
-        });
-        CRM.Nota(c, 'Evidenziata la colonna del ruolo di ' + e(u.nome) + '.');
+      { id: 'ruoli', etichetta: 'Cosa può fare ogni ruolo', disegna: c => {
+        // D-45: una tabella per Sistema (colonne = ruoli) e una per area (colonne = livelli); evidenziato quello di u
+        const spunta = si => si ? '<span class="si" aria-label="sì">' + CRM.icona('spunta') + '</span>' : '<span class="testo-tenue" aria-label="no">—</span>';
+        const tabella = (titolo, righe, colonne, evid, vale) => {
+          CRM.blocco(c, 'ruoli-titolo').textContent = titolo;
+          CRM.DataTable(c, { compatta: true, naturale: true, perPagina: false, righe: righe,
+            colonne: [{ key: 'testo', header: 'Attività', grow: true, sortable: false }].concat(colonne.map(k => ({
+              key: k.id, header: k.nome, align: 'center', sortable: false, cell: p => spunta(vale(p, k.id)), classe: () => k.id === evid ? 'col-evidenza' : '' }))) });
+        };
+        tabella('Sistema', M.PERMESSI.filter(p => p.area === 'sistema'), Object.keys(M.RUOLI).map(k => ({ id: k, nome: M.RUOLI[k].nome })), u.ruolo,
+          (p, k) => p.ruoli.indexOf(k) >= 0 || (p.ancheOperatore && k === 'utente'));
+        areeVisibili().forEach(a => tabella(a.nome, M.PERMESSI.filter(p => p.area === a.id), Object.keys(M.LIVELLI).map(k => ({ id: k, nome: M.LIVELLI[k].nome })), M.livello(u, a.id),
+          (p, k) => M.LIVELLI[k].n >= M.LIVELLI[p.minimo].n));
+        CRM.Nota(c, 'Evidenziati il ruolo e i livelli di ' + e(u.nome) + '. Un livello comprende quelli prima. Stato del sistema: anche per chi è operatore in un’area.');
       } }
     ] });
   }
@@ -94,8 +103,10 @@
   const amministratoriAttivi = escluso => M.S.utenti.filter(x => x.attivo && !x.sistema && x.ruolo === 'amministratore' && x !== escluso).length;
   function modificaUtente(u) {
     const nuovo = !u, io = M.utente();
-    // il superutente sceglie anche "Amministratore"; l'amministratore solo operatore e sola lettura (D-39)
-    const scelte = ['amministratore', 'operatore', 'lettura'].filter(r => r !== 'amministratore' || M.puo('amministratori') || (u && u.ruolo === r));
+    // D-39, D-45: "Amministratore" lo sceglie solo il superutente; nessuno cambia il proprio ruolo né i
+    // propri livelli, tranne il superutente (è uno solo e altrimenti non potrebbe darsene)
+    const scelte = ['utente', 'amministratore'].filter(r => r !== 'amministratore' || M.puo('sistema.amministratori') || (u && u.ruolo === r));
+    const bloccati = !!u && u.id === io.id && io.ruolo !== 'superutente';
     CRM.FormModal({
       titolo: nuovo ? 'Nuovo utente' : 'Modifica ' + u.nome, conferma: nuovo ? 'Crea e manda la password' : 'Salva', colonne: 2,
       testo: nuovo ? 'L’utente riceve per email il nome utente e una password provvisoria, da cambiare al primo accesso.' : null,
@@ -103,10 +114,14 @@
         { nome: 'nome', etichetta: 'Nome e cognome', valore: u ? u.nome : '', largo: true },
         { nome: 'username', etichetta: 'Nome utente', valore: u ? u.username : '', aiuto: 'Minuscole, numeri, punto, trattino; senza @.' },
         { nome: 'email', etichetta: 'Email', valore: u ? u.email : '' },
-        { nome: 'ruolo', etichetta: 'Ruolo', tipo: 'select', valore: u ? u.ruolo : 'operatore', largo: true, opzioni: (u && u.ruolo === 'superutente' ? ['superutente'] : scelte).map(r => ({ value: r, label: M.RUOLI[r].nome })),
-          aiuto: (M.puo('amministratori') ? 'Amministratore: tutto tranne gli amministratori. ' : '') + 'Operatore: lavoro quotidiano e anagrafiche del CRM. Sola lettura: consulta ed esporta.' }
-      ],
-      dopo: form => { if (u && u.id === io.id) { form.campo('ruolo').disabled = true; form.aiuto('ruolo', 'Non puoi cambiare il tuo ruolo.'); } },
+        { nome: 'ruolo', etichetta: 'Ruolo di Sistema', tipo: 'select', valore: u ? u.ruolo : 'utente', largo: true, opzioni: (u && u.ruolo === 'superutente' ? ['superutente'] : scelte).map(r => ({ value: r, label: M.RUOLI[r].nome })),
+          aiuto: 'Amministratore: gestisce utenti e impostazioni del portale. Non dà accesso alle aree: quelle si scelgono qui sotto.' }
+      ].concat(areeVisibili().map(a => ({ nome: 'area_' + a.id, etichetta: a.nome, tipo: 'select', valore: u ? M.livello(u, a.id) || '' : '',
+        opzioni: [{ value: '', label: 'Nessun accesso' }].concat(Object.keys(M.LIVELLI).map(k => ({ value: k, label: M.LIVELLI[k].nome }))) }))),
+      dopo: form => {
+        if (u && (u.id === io.id || u.ruolo === 'superutente')) form.campo('ruolo').disabled = true;
+        if (bloccati) { areeVisibili().forEach(a => { form.campo('area_' + a.id).disabled = true; }); form.aiuto('ruolo', 'Non puoi cambiare il tuo ruolo né i tuoi livelli.'); }
+      },
       onConferma: (v, form) => {
         const username = (v.username || '').toLowerCase();
         if (!v.nome || !username || !v.email) { form.errore('Compila nome, nome utente ed email.'); return false; }
@@ -115,27 +130,18 @@
         if (M.S.utenti.some(x => x !== u && x.username === username)) { form.errore('Il nome utente ' + username + ' è già di un altro utente.'); return false; }
         if (M.S.utenti.some(x => x !== u && x.email.toLowerCase() === v.email.toLowerCase())) { form.errore('L’email ' + v.email + ' è già di un altro utente.'); return false; }
         const ruolo = u && (u.id === io.id || u.ruolo === 'superutente') ? u.ruolo : v.ruolo;
+        const aree = bloccati ? Object.assign({}, u.aree) : Object.assign({}, u ? u.aree : {});
+        if (!bloccati) areeVisibili().forEach(a => { if (v['area_' + a.id]) aree[a.id] = v['area_' + a.id]; else delete aree[a.id]; });
         if (u && u.ruolo === 'amministratore' && ruolo !== 'amministratore' && u.attivo && !amministratoriAttivi(u)) { form.errore('Deve restare almeno un amministratore attivo.'); return false; }
         if (nuovo) {
-          const rec = { id: Math.max.apply(null, M.S.utenti.map(x => x.id)) + 1, username: username, nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo, attivo: true, deve_cambiare_password: true, ultimo_accesso: null, ultimo_invio: { quando: ora(), tipo: 'benvenuto', errore: null } };
-          M.S.utenti.push(rec); M.annota('Nuovo utente ' + rec.nome + ' (' + M.RUOLI[ruolo].nome.toLowerCase() + '), password provvisoria mandata');
+          const rec = { id: Math.max.apply(null, M.S.utenti.map(x => x.id)) + 1, username: username, nome: v.nome, email: v.email.toLowerCase(), ruolo: ruolo, aree: aree, attivo: true, deve_cambiare_password: true, ultimo_accesso: null, ultimo_invio: { quando: ora(), tipo: 'benvenuto', errore: null } };
+          M.S.utenti.push(rec); M.annota('Nuovo utente ' + rec.nome + ' (' + (livelliTesto(rec) || M.RUOLI[ruolo].nome.toLowerCase()) + '), password provvisoria mandata');
           M.salva(); CRM.Avviso('Utente creato: nome utente e password provvisoria mandati a ' + rec.email); location.hash = '#/utenti/' + rec.id; return;
         }
-        Object.assign(u, { nome: v.nome, username: username, email: v.email.toLowerCase(), ruolo: ruolo });
+        Object.assign(u, { nome: v.nome, username: username, email: v.email.toLowerCase(), ruolo: ruolo, aree: aree });
         M.annota('Utente ' + u.nome + ' aggiornato'); M.salva(); CRM.Avviso('Utente salvato'); CRM.naviga();
       }
     });
-  }
-  // D-39 §7.13: nuova password provvisoria per email; quella di prima smette di funzionare
-  async function reimposta(u) {
-    if (!(await CRM.Conferma('Mandare una nuova password provvisoria a ' + u.nome + '?',
-      'Riceve a ' + e(u.email) + ' una password provvisoria: quella attuale smette di funzionare e al primo accesso ne sceglie una nuova.', 'Manda la password'))) return;
-    const errore = /bianchi/.test(u.email) ? 'Casella inesistente (550 5.1.1)' : null;   // nel prototipo: l'indirizzo di Luca Bianchi non esiste più
-    u.ultimo_invio = { quando: ora(), tipo: 'password', errore: errore };
-    u.deve_cambiare_password = true;
-    M.annota('Nuova password provvisoria mandata a ' + u.nome + (errore ? ' (non recapitata)' : ''));
-    if (errore) M.S.sistema.problemi.unshift({ id: Date.now(), quando: u.ultimo_invio.quando, servizio: 'posta', livello: 'errore', testo: 'Invio non riuscito', dettaglio: 'Password provvisoria a ' + u.email + ': ' + errore + '.', visto: false });
-    M.salva(); CRM.Avviso(errore ? 'Invio non riuscito: ' + errore : 'Password provvisoria mandata a ' + u.email); CRM.naviga();
   }
   function attiva(u, si) {
     if (!si && u.ruolo === 'amministratore' && !amministratoriAttivi(u)) { CRM.Avviso('Deve restare almeno un amministratore attivo'); return; }
@@ -239,7 +245,7 @@
      ========================================================= */
   let servizioSel = null, vistaProblemi = 'nuovi';
   CRM.rotta(/^\/sistema$/, function () {
-    if (!CRM.permesso('sistema', 'sistema', 'Stato del sistema')) return;
+    if (!CRM.permesso('sistema.stato', 'sistema', 'Stato del sistema')) return;
     const S = M.S.sistema, nome = id => (S.servizi.find(x => x.id === id) || {}).nome || id;
     const nuovi = S.problemi.filter(x => !x.visto);
     const corpo = CRM.Pagina({ voce: 'sistema', titolo: 'Stato del sistema', pieno: true,
@@ -322,7 +328,7 @@
   ];
   CRM.rotta(/^\/impostazioni$/, () => { location.replace('#/impostazioni/azienda'); });
   CRM.rotta(/^\/impostazioni\/(\w+)$/, function (idSez) {
-    if (!CRM.permesso('gestione', 'impostazioni', 'Impostazioni')) return;
+    if (!CRM.permesso('sistema.impostazioni', 'impostazioni', 'Impostazioni')) return;
     const sez = SEZIONI.find(x => x.id === idSez) || SEZIONI[0];
     const corpo = CRM.Pagina({ voce: 'impostazioni', titolo: 'Impostazioni', pieno: true,
       sottotitolo: 'Valgono per tutti gli utenti. Le password non si rileggono: si sostituiscono. Ogni modifica resta nel registro eventi.' });
@@ -366,7 +372,7 @@
      ========================================================= */
   let filtroScartati = { motivo: 'tutti', q: '' };
   CRM.rotta(/^\/scartati$/, function () {
-    if (!CRM.permesso('scartati', 'scartati', 'Documenti scartati')) return;
+    if (!CRM.permesso('provvigioni.scartati', 'scartati', 'Documenti scartati')) return;
     const giorni = M.S.impostazioni.conservazione.scartati_giorni;
     const lista = M.S.scartati;
     const corpo = CRM.Pagina({ voce: 'scartati', titolo: 'Documenti scartati', pieno: true,
@@ -378,7 +384,7 @@
     ], onChange: v => { filtroScartati = v; tab.aggiorna(filtra()); } });
     const filtra = () => { const q = (filtroScartati.q || '').toLowerCase(); return lista.filter(x => filtroScartati.motivo === 'tutti' || x.motivo === filtroScartati.motivo)
       .filter(x => !q || [x.doc.numero, M.fornitore(x.doc.fornitore_id).nome, x.doc.file].some(t => String(t).toLowerCase().indexOf(q) >= 0)); };
-    const admin = M.puo('gestione');
+    const admin = M.puo('provvigioni.elimina');   // eliminazione definitiva: responsabile (D-45)
     const tab = CRM.DataTable(CRM.blocco(corpo, 'riempi'), {
       righe: filtra(), ordinamentoIniziale: { key: 'quando', dir: 'desc' },
       colonne: [
@@ -426,7 +432,7 @@
   };
   function vistaGuida(idSel) {
     const corpo = CRM.Pagina({ voce: 'guida', titolo: 'Guida', pieno: true, sottotitolo: 'Come si usa il CRM, pagina per pagina: cosa fa, come si lavora, a cosa servono i pulsanti e le finestre. Da ogni pagina il pulsante "Guida" in alto apre l’argomento giusto.' });
-    const visibili = CRM.GUIDA.filter(g => g.gruppo !== 'Vendita diretta' || CRM.AMPLIAMENTI.vendita).filter(g => g.gruppo !== 'Gestione' || M.puo(g.id === 'sistema' ? 'sistema' : g.id === 'scartati' ? 'scartati' : 'gestione'));
+    const visibili = CRM.GUIDA.filter(g => g.gruppo !== 'Vendita diretta' || CRM.AMPLIAMENTI.vendita).filter(g => g.gruppo !== 'Gestione' || M.puo(g.id === 'sistema' ? 'sistema.stato' : g.id === 'scartati' ? 'provvigioni.scartati' : g.id === 'impostazioni' ? 'sistema.impostazioni' : 'sistema.utenti'));
     const g = visibili.find(x => x.id === idSel) || visibili[0];
     const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(240px,0.55fr) minmax(0,2fr)');
     const sx = CRM.Pannello(col, { titolo: 'Argomenti', riempi: true });

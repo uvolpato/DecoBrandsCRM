@@ -613,6 +613,10 @@ body.sola-lettura .principale::before { content: 'Profilo in sola lettura: puoi 
 
 .dt tbody tr.decisa td { color: var(--testo-tenue); }
 
+/* titolo di ogni tabella nella scheda "Cosa può fare ogni ruolo" (D-45) */
+.ruoli-titolo { font-weight: 600; font-size: 13px; color: var(--testo-tenue); text-transform: uppercase; letter-spacing: .03em; margin: 14px 0 6px; }
+.ruoli-titolo:first-child { margin-top: 0; }
+
 /* gruppo Gestione richiudibile nella barra */
 details.gruppo.richiudibile > summary.gruppo-nome { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
 details.gruppo.richiudibile > summary.gruppo-nome::-webkit-details-marker { display: none; }

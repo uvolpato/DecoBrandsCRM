@@ -695,9 +695,16 @@
   CRM.permesso = function (azione, voce, titolo) {
     if (M.puo(azione)) return true;
     const corpo = CRM.Pagina({ voce: voce, titolo: titolo });
-    CRM.Pannello(corpo, {}).corpo.innerHTML = '<div class="vuoto"><b>Pagina riservata</b>Con il ruolo ' + esc(M.RUOLI[M.utente().ruolo].nome.toLowerCase()) + ' non puoi aprire questa pagina. Chiedi a un amministratore.</div>';
+    CRM.Pannello(corpo, {}).corpo.innerHTML = '<div class="vuoto"><b>Pagina riservata</b>' + esc(motivoRiservata(azione)) + ' Chiedi a un amministratore.</div>';
     return false;
   };
+  // perché la pagina è chiusa, detto con l'area e il livello che servono (D-45)
+  function motivoRiservata(azione) {
+    const p = M.PERMESSI.find(x => x.id === azione);
+    if (!p || p.area === 'sistema') return 'Questa pagina è per gli amministratori.';
+    const a = M.AREE.find(x => x.id === p.area);
+    return 'Serve il livello ' + M.LIVELLI[p.minimo].nome.toLowerCase() + ' nell’area ' + a.nome + '.';
+  }
 
   /* =========================================================
      Pannello
@@ -1362,29 +1369,32 @@
   CRM.AMPLIAMENTI = { vendita: /[?&]vendita=1\b/.test(location.search) };
   const VOCI = [
     { gruppo: 'Ogni giorno', voci: [
-      { id: 'oggi', href: '#/', t: 'Oggi', icona: 'oggi' },
-      { id: 'documenti', href: '#/documenti', t: 'Documenti', icona: 'arrivo' },
-      { id: 'pratiche', href: '#/pratiche', t: 'Pratiche', icona: 'pratiche' }] },
-    { gruppo: 'Ogni mese', voci: [{ id: 'bollettini', href: '#/bollettini', t: 'Bollettini', icona: 'bollettini' }] },
-    { gruppo: 'Ogni trimestre', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni' },
-      { id: 'analisi', href: '#/analisi', t: 'Analisi', icona: 'analisi' }] },
+      { id: 'oggi', href: '#/', t: 'Oggi', icona: 'oggi', area: 'provvigioni' },
+      { id: 'documenti', href: '#/documenti', t: 'Documenti', icona: 'arrivo', area: 'provvigioni' },
+      { id: 'pratiche', href: '#/pratiche', t: 'Pratiche', icona: 'pratiche', area: 'provvigioni' }] },
+    { gruppo: 'Ogni mese', voci: [{ id: 'bollettini', href: '#/bollettini', t: 'Bollettini', icona: 'bollettini', area: 'provvigioni' }] },
+    { gruppo: 'Ogni trimestre', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni', area: 'provvigioni' },
+      { id: 'analisi', href: '#/analisi', t: 'Analisi', icona: 'analisi', area: 'provvigioni' }] },
     { gruppo: 'Vendita diretta', ampliamento: 'vendita', voci: [
-      { id: 'ordini-cliente', href: '#/ordini-cliente', t: 'Ordini cliente', icona: 'carrello' },
-      { id: 'articoli', href: '#/articoli', t: 'Articoli', icona: 'scatola' },
-      { id: 'giacenze', href: '#/giacenze', t: 'Giacenze', icona: 'magazzino' },
-      { id: 'alias-kit', href: '#/alias-kit', t: 'Alias e kit', icona: 'catena' }] },
+      { id: 'ordini-cliente', href: '#/ordini-cliente', t: 'Ordini cliente', icona: 'carrello', area: 'vendite' },
+      { id: 'articoli', href: '#/articoli', t: 'Articoli', icona: 'scatola', area: 'vendite' },
+      { id: 'giacenze', href: '#/giacenze', t: 'Giacenze', icona: 'magazzino', area: 'vendite' },
+      { id: 'alias-kit', href: '#/alias-kit', t: 'Alias e kit', icona: 'catena', area: 'vendite' }] },
     { gruppo: 'Anagrafiche', voci: [
-      { id: 'fornitori', href: '#/fornitori', t: 'Fornitori', icona: 'fornitori' },
-      { id: 'subagenti', href: '#/subagenti', t: 'Subagenti', icona: 'subagenti' },
-      { id: 'clienti', href: '#/clienti', t: 'Clienti', icona: 'abbinamenti' }] },
+      { id: 'fornitori', href: '#/fornitori', t: 'Fornitori', icona: 'fornitori', area: 'anagrafiche' },
+      { id: 'subagenti', href: '#/subagenti', t: 'Subagenti', icona: 'subagenti', area: 'anagrafiche' },
+      { id: 'clienti', href: '#/clienti', t: 'Clienti', icona: 'abbinamenti', area: 'anagrafiche' }] },
     { gruppo: 'Gestione', voci: [
-      { id: 'utenti', href: '#/utenti', t: 'Utenti e ruoli', icona: 'subagenti', permesso: 'gestione' },
-      { id: 'sistema', href: '#/sistema', t: 'Stato del sistema', icona: 'sistema', permesso: 'sistema' },
-      { id: 'impostazioni', href: '#/impostazioni', t: 'Impostazioni', icona: 'impostazioni', permesso: 'gestione' },
-      { id: 'scartati', href: '#/scartati', t: 'Documenti scartati', icona: 'cestino', permesso: 'scartati' },
+      { id: 'utenti', href: '#/utenti', t: 'Utenti e ruoli', icona: 'subagenti', permesso: 'sistema.utenti' },
+      { id: 'sistema', href: '#/sistema', t: 'Stato del sistema', icona: 'sistema', permesso: 'sistema.stato' },
+      { id: 'impostazioni', href: '#/impostazioni', t: 'Impostazioni', icona: 'impostazioni', permesso: 'sistema.impostazioni' },
+      { id: 'scartati', href: '#/scartati', t: 'Documenti scartati', icona: 'cestino', permesso: 'provvigioni.scartati' },
       { id: 'guida', href: '#/guida', t: 'Guida', icona: 'guida' }], richiudibile: true }
   ];
   let gestioneAperta = false;
+  // voce della barra per id, e il permesso che la apre: quello dichiarato o, per le voci di un'area, *.consulta (D-45)
+  const voceDi = id => VOCI.reduce((t, g) => t.concat(g.voci), []).find(v => v.id === id);
+  const permessoDi = v => v.permesso || (v.area ? v.area + '.consulta' : null);
   CRM.Barra = function (attiva) {
     document.body.classList.remove('in-accesso');
     const fare = M.daFare();
@@ -1399,25 +1409,28 @@
       sistema: { n: M.S.sistema.problemi.filter(x => !x.visto).length, urgente: M.S.sistema.problemi.some(x => !x.visto && x.livello === 'errore') }
     };
     const io = M.utente();
-    document.body.classList.toggle('sola-lettura', !M.puo('modifica'));
+    // sola lettura per area (D-45): la pagina aperta è di un'area dove l'utente ha solo "lettura"
+    const areaAttiva = (voceDi(attiva) || {}).area;
+    M.solaLettura = !!areaAttiva && M.livello(io, areaAttiva) === 'lettura';
+    document.body.classList.toggle('sola-lettura', M.solaLettura);
     const b = $('#barra');
     b.innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Sistema Informativo Aziendale</span></div>' +
-      '<button type="button" class="carica-barra" id="carica-barra">' + CRM.icona('carica') + 'Carica documenti</button>' +
-      '<div class="barra-menu">' + VOCI.filter(g => !g.ampliamento || CRM.AMPLIAMENTI[g.ampliamento]).map(g => Object.assign({}, g, { voci: g.voci.filter(v => !v.permesso || M.puo(v.permesso)) })).filter(g => g.voci.length).map(g => {
+      (M.puo('provvigioni.modifica') ? '<button type="button" class="carica-barra" id="carica-barra">' + CRM.icona('carica') + 'Carica documenti</button>' : '') +
+      '<div class="barra-menu">' + VOCI.filter(g => !g.ampliamento || CRM.AMPLIAMENTI[g.ampliamento]).map(g => Object.assign({}, g, { voci: g.voci.filter(v => !permessoDi(v) || M.puo(permessoDi(v))) })).filter(g => g.voci.length).map(g => {
         // il gruppo Gestione si apre da solo quando si è in una delle sue pagine (il contatore dei problemi resta visibile sul titolo)
         const aperto = !g.richiudibile || gestioneAperta || window.innerWidth <= 860 || g.voci.some(v => v.id === attiva);
-        const titolo = g.richiudibile ? '<summary class="gruppo-nome">' + g.gruppo + (conta.sistema && conta.sistema.n && M.puo('sistema') ? ' <span class="conta' + (conta.sistema.urgente ? ' urgente' : '') + '">' + conta.sistema.n + '</span>' : '') + '</summary>' : '<div class="gruppo-nome">' + g.gruppo + '</div>';
+        const titolo = g.richiudibile ? '<summary class="gruppo-nome">' + g.gruppo + (conta.sistema && conta.sistema.n && M.puo('sistema.stato') ? ' <span class="conta' + (conta.sistema.urgente ? ' urgente' : '') + '">' + conta.sistema.n + '</span>' : '') + '</summary>' : '<div class="gruppo-nome">' + g.gruppo + '</div>';
         return (g.richiudibile ? '<details class="gruppo richiudibile"' + (aperto ? ' open' : '') + ' aria-label="' + g.gruppo + '">' : '<nav class="gruppo" aria-label="' + g.gruppo + '">') + titolo + g.voci.map(v => {
         const k = conta[v.id];
         return '<a class="voce' + (v.id === attiva ? ' attiva' : '') + '" href="' + v.href + '"' + (v.id === attiva ? ' aria-current="page"' : '') + '>' + CRM.icona(v.icona) + '<span>' + v.t + '</span>' +
           (k && k.n ? '<span class="conta' + (k.urgente ? ' urgente' : '') + '">' + k.n + '</span>' : '') + '</a>';
       }).join('') + (g.richiudibile ? '</details>' : '</nav>'); }).join('') + '</div>' +
-      '<div class="barra-piede"><div class="io"><span class="io-sigla" aria-hidden="true">' + esc(io.nome.split(' ').map(x => x[0]).join('').slice(0, 2)) + '</span><span><b>' + esc(io.nome) + '</b>' + esc(M.RUOLI[io.ruolo].nome) + '</span><a class="io-esci" href="#/accesso/esci" title="Esci" aria-label="Esci">' + CRM.icona('esci') + '</a></div>' +
-      '<label class="io-cambia">Prova come <select id="accedi-come" aria-label="Prova il prototipo come">' + M.S.utenti.filter(u => u.attivo && !u.sistema).map(u => '<option value="' + u.id + '"' + (u.id === io.id ? ' selected' : '') + '>' + esc(u.nome + ' · ' + M.RUOLI[u.ruolo].breve) + '</option>').join('') + '</select></label>' +
+      '<div class="barra-piede"><div class="io"><span class="io-sigla" aria-hidden="true">' + esc(io.nome.split(' ').map(x => x[0]).join('').slice(0, 2)) + '</span><span><b>' + esc(io.nome) + '</b>' + esc(M.ruoloBreve(io)) + '</span><a class="io-esci" href="#/accesso/esci" title="Esci" aria-label="Esci">' + CRM.icona('esci') + '</a></div>' +
+      '<label class="io-cambia">Prova come <select id="accedi-come" aria-label="Prova il prototipo come">' + M.S.utenti.filter(u => u.attivo && !u.sistema).map(u => '<option value="' + u.id + '"' + (u.id === io.id ? ' selected' : '') + '>' + esc(u.nome + ' · ' + (u.ruolo === 'utente' ? M.ruoloBreve(u) : M.RUOLI[u.ruolo].breve)) + '</option>').join('') + '</select></label>' +
       '<a href="#/accesso/cambia">Cambia la password</a><br>Data simulata: ' + M.dataLunga(M.oggi()) + '<br><button type="button" id="ripristina">Ripristina i dati di prova</button> · <a href="#/componenti"' + (attiva === 'componenti' ? ' aria-current="page"' : '') + '>Componenti</a></div>';
     const det = $('details.richiudibile', b); if (det) det.addEventListener('toggle', () => { gestioneAperta = det.open; });
-    $('#carica-barra').addEventListener('click', () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.alCaricamento && CRM.alCaricamento(f) }));
-    $('#accedi-come').addEventListener('change', ev => { M.S.utente_corrente = Number(ev.target.value); M.salvaSempre(); CRM.Avviso('Ora sei ' + M.utente().nome + ' · ' + M.RUOLI[M.utente().ruolo].nome); CRM.naviga(); });
+    if ($('#carica-barra')) $('#carica-barra').addEventListener('click', () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.alCaricamento && CRM.alCaricamento(f) }));
+    $('#accedi-come').addEventListener('change', ev => { M.S.utente_corrente = Number(ev.target.value); M.salvaSempre(); CRM.Avviso('Ora sei ' + M.utente().nome + ' · ' + M.ruoloBreve(M.utente())); CRM.naviga(); });
     $('#ripristina').addEventListener('click', async () => {
       if (!(await CRM.Conferma('Ripristinare i dati di prova?', 'Le modifiche fatte in questa demo andranno perse.', 'Ripristina', true))) return;
       M.ripristina(); CRM.Avviso('Dati di prova ripristinati'); CRM.naviga();
@@ -1474,6 +1487,9 @@
     CRM._mem.ripristino = ritorno; registro = []; differiti = [];
     const r = ROTTE.find(x => h.match(x.re));
     if (!r) { location.replace('#/'); return; }
+    // D-45: la voce della barra a cui appartiene l'indirizzo decide il permesso (le pagine di un'area con *.consulta)
+    const vb = VOCI.reduce((t, g) => t.concat(g.voci), []).find(v => v.href === '#/' + h.split('/')[1]);
+    if (vb && permessoDi(vb) && !CRM.permesso(permessoDi(vb), vb.id, vb.t)) { differiti = []; } else
     r.fn.apply(null, h.match(r.re).slice(1));
     differiti.forEach(fn => fn());
     if (ritorno) {

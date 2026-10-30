@@ -29,7 +29,7 @@
     const versioni = Array.from(new Set(M.S.scaglioni.filter(s => s.fornitore_id === f.id).map(s => s.valido_dal))).sort().reverse();
     const vigente = versioni.find(v => v <= M.oggi()) || versioni[versioni.length - 1];
     const sc = M.S.scaglioni.filter(s => s.fornitore_id === f.id && s.valido_dal === vigente).sort((x, y) => x.sconto - y.sconto);
-    const dx = CRM.Pannello(col, { titolo: f.nome, riempi: true, azioni: [{ etichetta: 'Modifica condizioni', onClick: () => modificaCondizioni(f) }] });
+    const dx = CRM.Pannello(col, { titolo: f.nome, riempi: true, azioni: M.puo('anagrafiche.condizioni') ? [{ etichetta: 'Modifica condizioni', onClick: () => modificaCondizioni(f) }] : [] });   // D-45: responsabile
     CRM.Nota(dx.corpo, 'Anagrafica da Integra (sola lettura). Qui si gestiscono solo condizioni e percentuali di provvigione.').style.marginBottom = '10px';
     CRM.Dettagli(dx.corpo, [
       { etichetta: 'Partita IVA', valore: e(f.piva) + ' <span class="testo-tenue">· ' + e(f.paese || '') + '</span>' },
@@ -45,7 +45,7 @@
         const t = CRM.blocco(c, 'strumenti-scheda');
         t.innerHTML = '<h3>In vigore dal ' + M.data(vigente) + '</h3><span class="spazio"></span>';
         const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.innerHTML = CRM.icona('piu') + 'Nuove percentuali da una data';
-        b.addEventListener('click', () => nuovePercentuali(f, sc)); t.appendChild(b);
+        b.addEventListener('click', () => nuovePercentuali(f, sc)); if (M.puo('anagrafiche.condizioni')) t.appendChild(b);
         CRM.DataTable(CRM.blocco(c, 'riempi'), {
           compatta: true, righe: sc, ordinamentoIniziale: { key: 'sconto', dir: 'asc' },
           colonne: [
@@ -161,11 +161,11 @@
     const te = CRM.blocco(dx.corpo, 'strumenti-scheda');
     te.innerHTML = '<h3>Eccezioni personali</h3><span class="spazio"></span>';
     const be = document.createElement('button'); be.type = 'button'; be.className = 'btn sec piccolo'; be.innerHTML = CRM.icona('piu') + 'Aggiungi eccezione';
-    be.addEventListener('click', () => modificaEccezione(s, null)); te.appendChild(be);
+    be.addEventListener('click', () => modificaEccezione(s, null)); if (M.puo('anagrafiche.condizioni')) te.appendChild(be);
     CRM.Elenco(dx.corpo, M.S.eccezioni.filter(x => x.subagente_id === s.id).map(x => {
       const sc = M.S.scaglioni.find(y => y.id === x.scaglione_id);
       return { testo: e(M.fornitore(sc.fornitore_id).breve) + ', sconto ' + M.pct(sc.sconto) + ' <span class="testo-tenue">· percentuali dal ' + M.data(sc.valido_dal) + '</span>',
-        destra: M.pct(x.pct_sub) + ' <span class="testo-tenue">invece di ' + M.pct(sc.pct_sub) + '</span>', onClick: () => modificaEccezione(s, x) };
+        destra: M.pct(x.pct_sub) + ' <span class="testo-tenue">invece di ' + M.pct(sc.pct_sub) + '</span>', onClick: M.puo('anagrafiche.condizioni') ? () => modificaEccezione(s, x) : null };
     }), 'Nessuna: valgono le percentuali standard dei fornitori.');
   }
   /* Eccezione personale: percentuale del subagente che vince su quella dello scaglione (spec §5.2). */

@@ -16,37 +16,61 @@
   M.S = carica();
   // dati salvati da una versione precedente della demo: completa le parti nuove
   Object.keys(window.DATI_DEMO).forEach(k => { if (M.S[k] === undefined) M.S[k] = clona(window.DATI_DEMO[k]); });
-  // D-39: utenti salvati prima del nome utente e del superutente → quelli nuovi della demo
-  if (M.S.utenti.some(u => !u.username)) { M.S.utenti = clona(window.DATI_DEMO.utenti); M.S.collegato = true; }
+  // D-39, D-45: utenti salvati prima del nome utente o dei ruoli per area → quelli nuovi della demo
+  if (M.S.utenti.some(u => !u.username || !u.aree)) { M.S.utenti = clona(window.DATI_DEMO.utenti); M.S.collegato = true; }
   M.salva = function () {
     // profilo in sola lettura: nessuna modifica viene salvata (rete di sicurezza oltre ai pulsanti disattivati)
-    if (!M.puo('modifica')) { M.S = carica(); Object.keys(window.DATI_DEMO).forEach(k => { if (M.S[k] === undefined) M.S[k] = clona(window.DATI_DEMO[k]); }); if (window.CRM && CRM.Avviso) CRM.Avviso('Profilo in sola lettura: la modifica non è stata salvata'); return; }
+    if (M.solaLettura) { M.S = carica(); Object.keys(window.DATI_DEMO).forEach(k => { if (M.S[k] === undefined) M.S[k] = clona(window.DATI_DEMO[k]); }); if (window.CRM && CRM.Avviso) CRM.Avviso('Profilo in sola lettura: la modifica non è stata salvata'); return; }
     try { localStorage.setItem(CHIAVE, JSON.stringify(M.S)); } catch (e) { /* ignora */ }
   };
   M.salvaSempre = function () { try { localStorage.setItem(CHIAVE, JSON.stringify(M.S)); } catch (e) { /* ignora */ } };
 
-  /* ---------- Ruoli (spec §8.3) ----------
-     amministratore: tutto · operatore: lavoro quotidiano e anagrafiche del CRM · lettura: consulta ed esporta */
+  /* ---------- Ruoli e aree (spec §8.3, D-45) ----------
+     Ruolo di Sistema (superutente · amministratore · utente) + un livello per area
+     (lettura < operatore < responsabile). Senza livello l'area non si vede: vale anche per
+     superutente e amministratori. Stessa tabella del server (app/backend/src/accesso.ts). */
   M.RUOLI = {
     superutente: { nome: 'Superutente', breve: 'Super' },   // D-39: uno solo, crea gli amministratori
     amministratore: { nome: 'Amministratore', breve: 'Admin' },
-    operatore: { nome: 'Operatore', breve: 'Operatore' },
-    lettura: { nome: 'Sola lettura', breve: 'Lettura' }
+    utente: { nome: 'Utente', breve: 'Utente' }
   };
+  M.LIVELLI = { lettura: { nome: 'Lettura', n: 1 }, operatore: { nome: 'Operatore', n: 2 }, responsabile: { nome: 'Responsabile', n: 3 } };
+  M.AREE = [
+    { id: 'anagrafiche', nome: 'Anagrafiche' },
+    { id: 'provvigioni', nome: 'Provvigioni' },
+    { id: 'vendite', nome: 'Vendite', ampliamento: 'vendita' }   // §17, spenta
+  ];
   M.PERMESSI = [
-    { id: 'consulta', testo: 'Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche', ruoli: ['superutente', 'amministratore', 'operatore', 'lettura'] },
-    { id: 'esporta', testo: 'Esportare le liquidazioni (Excel, PDF, CSV)', ruoli: ['superutente', 'amministratore', 'operatore', 'lettura'] },
-    { id: 'modifica', testo: 'Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti', ruoli: ['superutente', 'amministratore', 'operatore'] },
-    { id: 'anagrafiche', testo: 'Condizioni dei fornitori, agenzie dei clienti, subagenti', ruoli: ['superutente', 'amministratore', 'operatore'] },
-    { id: 'chiudi', testo: 'Chiudere la liquidazione del trimestre', ruoli: ['superutente', 'amministratore', 'operatore'] },
-    { id: 'scartati', testo: 'Vedere e recuperare i documenti scartati', ruoli: ['superutente', 'amministratore', 'operatore'] },
-    { id: 'sistema', testo: 'Vedere lo stato del sistema e segnare i problemi come visti', ruoli: ['superutente', 'amministratore', 'operatore'] },
-    { id: 'magazzino', testo: 'Alias e kit: creare, modificare, eliminare', ruoli: ['superutente', 'amministratore'] },
-    { id: 'gestione', testo: 'Utenti (operatori e sola lettura), impostazioni, eliminazione definitiva degli scartati', ruoli: ['superutente', 'amministratore'] },
-    { id: 'amministratori', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] }   // D-39
+    { id: 'sistema.utenti', area: 'sistema', testo: 'Utenti (non amministratori): creare, modificare, livelli nelle aree, disattivare', ruoli: ['superutente', 'amministratore'] },
+    { id: 'sistema.amministratori', area: 'sistema', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] },
+    { id: 'sistema.impostazioni', area: 'sistema', testo: 'Impostazioni del portale (casella, posta, sincronizzazione, conservazione)', ruoli: ['superutente', 'amministratore'] },
+    { id: 'sistema.stato', area: 'sistema', testo: 'Stato del sistema, segnare i problemi come visti', ruoli: ['superutente', 'amministratore'], ancheOperatore: true },
+    { id: 'anagrafiche.consulta', area: 'anagrafiche', testo: 'Consultare fornitori, clienti, subagenti', minimo: 'lettura' },
+    { id: 'anagrafiche.modifica', area: 'anagrafiche', testo: 'Subagenti, agenzie dei clienti (interscambio)', minimo: 'operatore' },
+    { id: 'anagrafiche.condizioni', area: 'anagrafiche', testo: 'Condizioni, scaglioni e percentuali dei fornitori; eccezioni personali', minimo: 'responsabile' },
+    { id: 'provvigioni.consulta', area: 'provvigioni', testo: 'Consultare pratiche, documenti, bollettini, liquidazioni, analisi', minimo: 'lettura' },
+    { id: 'provvigioni.esporta', area: 'provvigioni', testo: 'Esportare liquidazioni e analisi (Excel, PDF, CSV)', minimo: 'lettura' },
+    { id: 'provvigioni.modifica', area: 'provvigioni', testo: 'Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti', minimo: 'operatore' },
+    { id: 'provvigioni.scartati', area: 'provvigioni', testo: 'Vedere e recuperare i documenti scartati', minimo: 'operatore' },
+    { id: 'provvigioni.chiudi', area: 'provvigioni', testo: 'Chiudere la liquidazione del trimestre', minimo: 'responsabile' },
+    { id: 'provvigioni.elimina', area: 'provvigioni', testo: 'Eliminare definitivamente i documenti scartati', minimo: 'responsabile' },
+    { id: 'vendite.consulta', area: 'vendite', testo: 'Consultare ordini cliente, articoli, giacenze', minimo: 'lettura' },
+    { id: 'vendite.magazzino', area: 'vendite', testo: 'Alias e kit: creare, modificare, eliminare', minimo: 'responsabile' }
   ];
   M.utente = () => M.S.utenti.find(u => u.id === M.S.utente_corrente) || M.S.utenti[0];
-  M.puo = azione => { const u = M.utente(); const p = M.PERMESSI.find(x => x.id === azione); return !!(u && p && p.ruoli.indexOf(u.ruolo) >= 0); };
+  M.livello = (u, area) => (u.aree || {})[area] || null;
+  /** Il permesso vale per l'utente u? Sistema: ruolo; area: livello almeno quello richiesto. */
+  M.puoUtente = (u, id) => {
+    const p = M.PERMESSI.find(x => x.id === id);
+    if (!u || !p) return false;
+    if (p.area === 'sistema') return p.ruoli.indexOf(u.ruolo) >= 0 || (!!p.ancheOperatore && Object.keys(u.aree || {}).some(a => M.LIVELLI[u.aree[a]].n >= 2));
+    const l = M.livello(u, p.area);
+    return !!l && M.LIVELLI[l].n >= M.LIVELLI[p.minimo].n;
+  };
+  M.puo = id => M.puoUtente(M.utente(), id);
+  /** Ruolo in breve (barra, Prova come): quello di Sistema, o per un utente il livello in Provvigioni. */
+  M.ruoloBreve = u => u.ruolo !== 'utente' ? M.RUOLI[u.ruolo].nome : M.livello(u, 'provvigioni') ? M.LIVELLI[M.livello(u, 'provvigioni')].nome : 'Utente';
+  M.solaLettura = false;   // la pagina aperta è di un'area dove l'utente ha solo "lettura" (la imposta CRM.Barra)
   M.soglie = () => { const l = (M.S.impostazioni || {}).lettura || {}; M.SOGLIA_OK = Number(l.soglia_ok) || 0.9; M.SOGLIA_BASSA = Number(l.soglia_bassa) || 0.7; };
   M.ripristina = function () { try { localStorage.removeItem(CHIAVE); } catch (e) { /* ignora */ } M.S = Object.assign(clona(window.DATI_DEMO), { registro: [] }); if (M.soglie) M.soglie(); };
   M.annota = function (testo) { M.S.registro.unshift({ quando: new Date().toISOString(), testo: testo }); M.S.registro = M.S.registro.slice(0, 30); };
