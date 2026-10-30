@@ -1,6 +1,6 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
@@ -39,6 +39,7 @@ let schedaUtente = 'utente';
 const VISTE: Record<string, (u: Utente) => boolean> = { attivi: (u) => u.attivo, disattivati: (u) => !u.attivo, tutti: () => true };
 const ULTIMA_EMAIL: Record<string, string> = { benvenuto: 'Benvenuto con la password provvisoria', password: 'Nuova password provvisoria', reset: 'Password dimenticata' };
 const ORDINE = Object.keys(LIVELLI); // lettura < operatore < responsabile
+const VARIANTE: Record<string, 'primario' | 'info' | 'neutro'> = { responsabile: 'primario', operatore: 'info', lettura: 'neutro' };
 // "Provvigioni: operatore · Anagrafiche: lettura"
 const livelliTesto = (x: Utente) => Object.keys(AREE).filter((a) => x.aree[a]).map((a) => AREE[a] + ': ' + LIVELLI[x.aree[a]].toLowerCase()).join(' · ');
 
@@ -82,7 +83,9 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
   const u = utenti.find((x) => x.id === idSel) ?? utenti[0];
 
   // chi può gestire chi (D-39): nessuno tocca il superutente né l'utente dei servizi; gli amministratori li gestisce il superutente
-  const gestibile = (x: Utente) => !x.sistema && x.ruolo !== 'superutente' && (x.ruolo !== 'amministratore' || puo('sistema.amministratori'));
+  // D-45: e nemmeno chi ha in un'area un livello più alto del mio (tranne per il superutente)
+  const piuInAlto = (x: Utente) => io.ruolo !== 'superutente' && Object.keys(x.aree).some((a) => ORDINE.indexOf(x.aree[a]) > ORDINE.indexOf(io.aree[a] ?? ''));
+  const gestibile = (x: Utente) => !x.sistema && x.ruolo !== 'superutente' && (x.ruolo !== 'amministratore' || puo('sistema.amministratori')) && !piuInAlto(x);
   const chiudi = () => setFinestra(null);
   const chiedi = (titolo: string, testo: ReactNode, etichetta: string, pericolo = false) =>
     new Promise<boolean>((ok) => setFinestra(<Conferma titolo={titolo} testo={testo} etichetta={etichetta} pericolo={pericolo} onRisposta={(si) => { chiudi(); ok(si); }} />));
@@ -106,9 +109,14 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
             disabilitato: sonoIo || x?.ruolo === 'superutente',
             aiuto: bloccati ? 'Non puoi cambiare il tuo ruolo né i tuoi livelli.' : 'Amministratore: gestisce utenti e impostazioni del portale. Non dà accesso alle aree: quelle si scelgono qui sotto.',
           },
-          ...Object.keys(AREE).map((a) => ({
-            nome: 'area_' + a, etichetta: AREE[a], tipo: 'select' as const, valore: x?.aree[a] ?? '', disabilitato: bloccati,
-            opzioni: [{ value: '', label: 'Nessun accesso' }, ...ORDINE.map((l) => ({ value: l, label: LIVELLI[l] }))],
+          // D-45: un livello per area; nessuno dà più di quello che ha (sopra il proprio livello: spento)
+          ...Object.keys(AREE).map((a, i) => ({
+            nome: 'area_' + a, etichetta: AREE[a], tipo: 'livello' as const, valore: x?.aree[a] ?? '', disabilitato: bloccati, largo: true,
+            aiuto: i === Object.keys(AREE).length - 1 && io.ruolo !== 'superutente' ? 'Puoi dare al massimo il tuo livello in ogni area.' : undefined,
+            opzioni: [{ value: '', label: 'Nessuno' }, ...ORDINE.map((l) => {
+              const oltre = io.ruolo !== 'superutente' && ORDINE.indexOf(l) > ORDINE.indexOf(io.aree[a] ?? '');
+              return { value: l, label: LIVELLI[l], disabilitato: oltre, titolo: oltre ? 'Più del tuo livello in ' + AREE[a] : undefined };
+            })],
           })),
         ]}
         onChiudi={chiudi}
@@ -168,7 +176,7 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
   function datiUtente() {
     const nota = u.sistema ? 'Utente usato dai servizi automatici (lettura della casella, sincronizzazione da Integra): non si modifica e non accede all’app.'
       : u.ruolo === 'superutente' && !sonoIo ? 'Il superutente si crea all’installazione e non si modifica da qui: crea e gestisce gli amministratori.'
-        : !modificabile ? 'Gli amministratori li gestisce il superutente.' : '';
+        : !modificabile ? (piuInAlto(u) ? 'Ha in un’area un livello più alto del tuo: lo gestisce il superutente.' : 'Gli amministratori li gestisce il superutente.') : '';
     const noMe = sonoIo ? 'Non puoi disattivare o eliminare te stesso' : undefined;
     return (
       <>
@@ -176,11 +184,16 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
           { etichetta: 'Nome utente', valore: u.username },
           { etichetta: 'Email', valore: u.email },
           { etichetta: 'Ruolo di Sistema', valore: RUOLI[u.ruolo] },
-          ...Object.keys(AREE).map((a) => ({ etichetta: AREE[a], valore: u.aree[a] ? LIVELLI[u.aree[a]] : <span className="testo-tenue">—</span> })),
           { etichetta: 'Stato', valore: u.attivo ? <><Stato v="ok">Attivo</Stato>{u.deve_cambiare_password && <> <Stato v="attesa">Password provvisoria</Stato></>}</> : <Stato v="neutro">Disattivato</Stato> },
           { etichetta: 'Ultimo accesso', valore: quando(u.ultimo_accesso) },
           { etichetta: 'Ultima email', valore: u.ultimo_invio ? <>{ULTIMA_EMAIL[u.ultimo_invio.tipo] ?? u.ultimo_invio.tipo} · {quando(u.ultimo_invio.quando)}{u.ultimo_invio.errore && <span className="sec-riga negativo">{u.ultimo_invio.errore}</span>}</> : '—' },
         ]} />
+        <div className="ruoli-titolo">Accesso alle aree</div>
+        <dl className="aree-accesso">
+          {Object.keys(AREE).map((a) => (
+            <Fragment key={a}><dt>{AREE[a]}</dt><dd>{u.aree[a] ? <Stato v={VARIANTE[u.aree[a]]}>{LIVELLI[u.aree[a]]}</Stato> : <span className="testo-tenue">Nessun accesso</span>}</dd></Fragment>
+          ))}
+        </dl>
         {nota ? <Nota>{nota}</Nota> : (
           <div className="azioni-riga">
             <button type="button" className="btn sec piccolo" disabled={sonoIo} title={noMe} onClick={() => attiva(u, !u.attivo)}>{u.attivo ? 'Disattiva' : 'Riattiva'}</button>
@@ -191,25 +204,28 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
     );
   }
 
-  // D-45: una tabella per Sistema (colonne = ruoli) e una per area (colonne = livelli); evidenziato quello di u
+  // D-45: una sezione richiudibile per Sistema e per ogni area (colonne = ruoli o livelli), col livello di u nel
+  // titolo; aperte quelle dove u ha accesso, così con molte aree si legge prima quello che lo riguarda
   function cosaPuoFare() {
     const spunta = (si: boolean) => (si ? <span className="si" aria-label="sì"><Icona nome="spunta" /></span> : <span className="testo-tenue" aria-label="no">—</span>);
-    const tabella = (titolo: string, righe: Permesso[], colonne: Record<string, string>, evid: string | undefined, vale: (p: Permesso, k: string) => boolean) => (
-      <div key={titolo}>
-        <div className="ruoli-titolo">{titolo}</div>
+    const sezione = (id: string, titolo: string, mio: ReactNode, aperta: boolean, righe: Permesso[], colonne: Record<string, string>, evid: string | undefined, vale: (p: Permesso, k: string) => boolean) => (
+      <details key={id} className="permessi-area" open={aperta}>
+        <summary>{titolo}{mio}</summary>
         <DataTable compatta naturale righe={righe} chiave={(p) => p.id} colonne={[
           { key: 'testo', header: 'Attività', grow: true, sortable: false },
           ...Object.keys(colonne).map((k): Colonna<Permesso> => ({
             key: k, header: colonne[k], align: 'center', sortable: false, cell: (p) => spunta(vale(p, k)), classe: () => (k === evid ? 'col-evidenza' : ''),
           })),
         ]} />
-      </div>
+      </details>
     );
     return (
       <>
-        {tabella('Sistema', permessi.filter((p) => p.area === 'sistema'), RUOLI, u.ruolo, (p, k) => !!p.ruoli?.includes(k) || (!!p.ancheOperatore && k === 'utente'))}
-        {Object.keys(AREE).map((a) => tabella(AREE[a], permessi.filter((p) => p.area === a), LIVELLI, u.aree[a],
-          (p, k) => ORDINE.indexOf(k) >= ORDINE.indexOf(p.minimo!)))}
+        {sezione('sistema', 'Sistema', <Stato v={u.ruolo === 'utente' ? 'neutro' : 'primario'}>{RUOLI[u.ruolo]}</Stato>, u.ruolo !== 'utente',
+          permessi.filter((p) => p.area === 'sistema'), RUOLI, u.ruolo, (p, k) => !!p.ruoli?.includes(k) || (!!p.ancheOperatore && k === 'utente'))}
+        {Object.keys(AREE).map((a) => sezione(a, AREE[a],
+          u.aree[a] ? <Stato v={VARIANTE[u.aree[a]]}>{LIVELLI[u.aree[a]]}</Stato> : <span className="testo-tenue">Nessun accesso</span>, !!u.aree[a],
+          permessi.filter((p) => p.area === a), LIVELLI, u.aree[a], (p, k) => ORDINE.indexOf(k) >= ORDINE.indexOf(p.minimo!)))}
         <Nota>Evidenziati il ruolo e i livelli di {u.nome}. Un livello comprende quelli prima. Stato del sistema: anche per chi è operatore in un’area.</Nota>
       </>
     );
@@ -235,7 +251,7 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
       <Pannello titolo={u.nome} nota={u.sistema ? 'utente dei servizi automatici' : ''} riempi azioni={azioni}>
         <Schede riempi attiva={schedaUtente} onCambia={(id) => { schedaUtente = id; }} schede={[
           { id: 'utente', etichetta: 'Dati dell’utente', contenuto: datiUtente },
-          { id: 'ruoli', etichetta: 'Cosa può fare ogni ruolo', contenuto: cosaPuoFare },
+          { id: 'ruoli', etichetta: 'Permessi', contenuto: cosaPuoFare },
         ]} />
       </Pannello>
     </div>,

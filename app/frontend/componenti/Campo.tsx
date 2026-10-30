@@ -3,15 +3,15 @@ import { useState } from 'react';
 import { Icona } from './Icona';
 
 // Un campo di modulo come campoHtml del prototipo (componenti.js, CRM.Form): etichetta sopra, aiuto
-// sotto; tipi testo · password (con mostra/nascondi) · casella · select; `completa` è l'autocomplete
-// del browser. Un campo disabilitato non si manda (FormData lo salta).
+// sotto; tipi testo · password (con mostra/nascondi) · casella · select · livello (scelta a segmenti
+// con radio, D-45); `completa` è l'autocomplete del browser. Un campo disabilitato non si manda.
 export interface CampoProps {
   nome: string;
   etichetta: string;
-  tipo?: 'testo' | 'password' | 'casella' | 'select';
+  tipo?: 'testo' | 'password' | 'casella' | 'select' | 'livello';
   completa?: string;
   valore?: string | boolean;
-  opzioni?: { value: string; label: string }[]; // select
+  opzioni?: { value: string; label: string; disabilitato?: boolean; titolo?: string }[]; // select, livello
   aiuto?: string;
   largo?: boolean; // occupa tutta la riga nei moduli a due colonne
   disabilitato?: boolean;
@@ -29,6 +29,21 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
     );
   }
   const testo = typeof valore === 'string' ? valore : undefined;
+  if (tipo === 'livello') {
+    return (
+      <fieldset className={'campo-livello' + (largo ? ' largo' : '')} disabled={disabilitato}>
+        <legend>{etichetta}</legend>
+        <div className="livello-scelta">
+          {opzioni.map((o) => (
+            <label key={o.value} title={o.titolo}>
+              <input type="radio" name={nome} value={o.value} defaultChecked={o.value === testo} disabled={o.disabilitato} />{o.label}
+            </label>
+          ))}
+        </div>
+        {aiuto && <span className="aiuto">{aiuto}</span>}
+      </fieldset>
+    );
+  }
   return (
     <div className={'campo' + (largo ? ' largo' : '')}>
       <label htmlFor={id}>{etichetta}</label>

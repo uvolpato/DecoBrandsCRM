@@ -20,7 +20,9 @@ let spia: jest.SpyInstance;
 // D-45: nelle prove "operatore" e "lettura" sono utenti con quel livello in Anagrafiche e Provvigioni
 const comeRuolo = (ruolo: string) => ['operatore', 'lettura'].includes(ruolo)
   ? { ruolo: 'utente', aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: ruolo })) } }
-  : { ruolo };
+  : ruolo === 'amministratore' // come nella migrazione: chi amministrava prima è responsabile nelle aree
+    ? { ruolo, aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: 'responsabile' })) } }
+    : { ruolo };
 async function crea(username: string, ruolo: string, altro: object = {}) {
   const u = await db.utenti.create({
     data: { username, email: username + DOMINIO, nome: 'Prova ' + username, ...comeRuolo(ruolo), password_hash: await cifra(PW), deve_cambiare_password: false, ...altro },
@@ -224,6 +226,26 @@ describe('livelli per area (D-45)', () => {
     const s = await entra('super');
     const { ruolo: _s, ...suoiDati } = nuovo('super');
     expect((await s.put('/utenti/' + id.super, { ...suoiDati, aree: { provvigioni: 'responsabile' } }).expect(200)).body.aree).toEqual({ provvigioni: 'responsabile' });
+  });
+
+  it('nessuno dà più di quello che ha: livello ≤ al proprio, niente aree che non ha, niente utenti più in alto (D-45)', async () => {
+    await crea('capetto', 'amministratore');
+    await db.utenti_aree.update({ where: { utente_id_area: { utente_id: BigInt(id.capetto), area: 'provvigioni' } }, data: { livello: 'operatore' } });
+    await db.utenti_aree.delete({ where: { utente_id_area: { utente_id: BigInt(id.capetto), area: 'anagrafiche' } } });
+    const c = await entra('capetto');
+    await c.post('/utenti', { ...nuovo('copia'), aree: { provvigioni: 'operatore' } }).expect(201); // una copia di sé sì
+    await c.post('/utenti', { ...nuovo('troppo'), aree: { provvigioni: 'responsabile' } }).expect(403, /più del tuo livello/);
+    await c.post('/utenti', { ...nuovo('altrove'), aree: { anagrafiche: 'lettura' } }).expect(403, /anagrafiche/);
+    // stessa area: capo ha solo Provvigioni, un gradino sopra capetto
+    await crea('capo', 'operatore');
+    await db.utenti_aree.delete({ where: { utente_id_area: { utente_id: BigInt(id.capo), area: 'anagrafiche' } } });
+    await db.utenti_aree.update({ where: { utente_id_area: { utente_id: BigInt(id.capo), area: 'provvigioni' } }, data: { livello: 'responsabile' } });
+    await c.post('/utenti/' + id.capo + '/attivo', { attivo: false }).expect(403, /livello più alto/);
+    await c.post('/utenti/' + id.capo + '/password', {}).expect(403, /livello più alto/);
+    // alzare con la modifica un utente sotto di me oltre il mio livello: no
+    const copia = await db.utenti.findFirstOrThrow({ where: { username: 'copia' } });
+    await c.put('/utenti/' + copia.id, { ...nuovo('copia'), aree: { provvigioni: 'responsabile' } }).expect(403, /più del tuo livello/);
+    await (await entra('super')).post('/utenti', { ...nuovo('dalsuper'), aree: { provvigioni: 'responsabile', anagrafiche: 'responsabile' } }).expect(201); // il superutente sì
   });
 
   it('i permessi seguono il livello, riletti a ogni richiesta', async () => {

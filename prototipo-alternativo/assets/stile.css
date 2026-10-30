@@ -613,6 +613,33 @@ body.sola-lettura .principale::before { content: 'Profilo in sola lettura: puoi 
 
 .dt tbody tr.decisa td { color: var(--testo-tenue); }
 
+/* Livello in un'area a segmenti (Nessuno · Lettura · Operatore · Responsabile): radio veri, un clic e si vede tutto (D-45) */
+.campo-livello { display: grid; grid-template-columns: 9rem minmax(0, 1fr); align-items: center; gap: 4px 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.campo-livello > legend { float: left; padding: 0; font-weight: 600; font-size: 13px; }
+.campo-livello > .aiuto { font-size: 12.5px; color: var(--testo-tenue); grid-column: 2; }
+.livello-scelta { display: inline-flex; flex-wrap: wrap; background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-medio); padding: 3px; gap: 2px; justify-self: start; }
+.livello-scelta label { position: relative; padding: 5px 11px; border-radius: var(--r-piccolo); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--testo-intest); }
+.livello-scelta label:hover { background: var(--bordo-tenue); }
+.livello-scelta input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.livello-scelta label:has(input:checked) { background: var(--primario); color: #fff; }
+.livello-scelta label:has(input:focus-visible) { outline: 2px solid var(--primario); outline-offset: 1px; }
+.livello-scelta label:has(input:disabled) { opacity: .4; cursor: not-allowed; }
+.livello-scelta label:has(input:disabled) input { cursor: not-allowed; }
+.aree-titolo { grid-column: 1 / -1; margin: 6px 0 -2px; padding-top: 12px; border-top: 1px solid var(--bordo-tenue); font-weight: 600; }
+/* Accesso alle aree nella scheda dell'utente: area → livello, le aree chiuse in tenue */
+.aree-accesso { display: grid; grid-template-columns: max-content max-content; gap: 6px 18px; align-items: center; margin: 16px 0 0; }
+.aree-accesso dt { color: var(--testo-tenue); font-size: 13px; }
+.aree-accesso dd { margin: 0; }
+/* Permessi: una sezione richiudibile per Sistema e per ogni area, con il livello dell'utente nel titolo */
+.permessi-area { border: 1px solid var(--bordo); border-radius: var(--r-medio); background: var(--superficie); margin-bottom: 10px; }
+.permessi-area > summary { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; list-style: none; font-weight: 600; }
+.permessi-area > summary::-webkit-details-marker { display: none; }
+.permessi-area > summary::before { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; flex: none; }
+.permessi-area[open] > summary::before { transform: rotate(45deg); }
+.permessi-area > summary .stato { margin-left: auto; }
+.permessi-area > summary:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; border-radius: var(--r-medio); }
+.permessi-area > .dt { margin: 0 12px 12px; }
+
 /* titolo di ogni tabella nella scheda "Cosa può fare ogni ruolo" (D-45) */
 .ruoli-titolo { font-weight: 600; font-size: 13px; color: var(--testo-tenue); text-transform: uppercase; letter-spacing: .03em; margin: 14px 0 6px; }
 .ruoli-titolo:first-child { margin-top: 0; }

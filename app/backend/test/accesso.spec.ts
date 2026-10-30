@@ -30,7 +30,9 @@ const id: Record<string, bigint> = {};
 // D-45: nelle prove "operatore" e "lettura" sono utenti con quel livello in Anagrafiche e Provvigioni
 const comeRuolo = (ruolo: string) => ['operatore', 'lettura'].includes(ruolo)
   ? { ruolo: 'utente', aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: ruolo })) } }
-  : { ruolo };
+  : ruolo === 'amministratore' // come nella migrazione: chi amministrava prima è responsabile nelle aree
+    ? { ruolo, aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: 'responsabile' })) } }
+    : { ruolo };
 async function crea(username: string, ruolo: string, altro: object = {}) {
   const u = await db.utenti.create({
     data: { username, email: username + DOMINIO, nome: username, ...comeRuolo(ruolo), password_hash: await cifra(PW), deve_cambiare_password: false, ...altro },

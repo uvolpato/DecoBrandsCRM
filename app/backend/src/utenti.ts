@@ -72,6 +72,7 @@ export class UtentiController {
   async crea(@Req() req: Request, @Body() b: DatiUtente) {
     puoDareRuolo(req, b.ruolo);
     const aree = unisci({}, leggiAree(b.aree ?? {}));
+    nonPiuDiMe(req, aree);
     const password = provvisoria();
     const hash = await cifra(password);
     const u = await unico(() => this.db.$transaction(async (tx) => {
@@ -102,6 +103,7 @@ export class UtentiController {
       const aDopo = b.aree === undefined ? aPrima : unisci(aPrima, leggiAree(b.aree));
       const areeCambiate = JSON.stringify(ordina(aPrima)) !== JSON.stringify(ordina(aDopo));
       if (areeCambiate && prima.id === io.id && io.ruolo !== 'superutente') throw new ForbiddenException('Non puoi cambiare i tuoi livelli');
+      if (areeCambiate) nonPiuDiMe(req, aDopo);
       const diff = differenze(prima, nuovo, areeCambiate ? { prima: aPrima, dopo: aDopo } : null);
       if (!diff) return;
       await tx.utenti.update({ where: { id: prima.id }, data: nuovo });
@@ -200,8 +202,19 @@ export class UtentiController {
     if (u.ruolo === 'amministratore' && !permessiDi(io.ruolo, req.livelli ?? {}).includes('sistema.amministratori')) {
       throw new ForbiddenException('Gli amministratori li gestisce il superutente');
     }
+    // D-45: chi ha in un'area più di me non lo gestisco (né disattivo, né reimposto, né modifico)
+    nonPiuDiMe(req, livelliDi(await tx.utenti_aree.findMany({ where: { utente_id: u.id } })), 'Ha in un’area un livello più alto del tuo: lo gestisce il superutente');
     return u;
   }
+}
+
+/** D-45: nessuno dà più di quello che ha. In ogni area il livello non supera il mio (un'area che non ho non
+ *  la do); al massimo si crea una copia di sé. Il superutente no: è uno solo e altrimenti non potrebbe dare niente. */
+function nonPiuDiMe(req: Request, aree: Livelli, messaggio?: string) {
+  if (req.utente!.ruolo === 'superutente') return;
+  const mio = req.livelli ?? {};
+  const oltre = (Object.keys(aree) as (keyof Livelli)[]).find((a) => LIVELLI.indexOf(aree[a]!) > LIVELLI.indexOf(mio[a]!));
+  if (oltre) throw new ForbiddenException(messaggio ?? `Nell’area ${oltre} non puoi dare più del tuo livello`);
 }
 
 /** Solo il superutente dà il ruolo di amministratore (D-39). */
