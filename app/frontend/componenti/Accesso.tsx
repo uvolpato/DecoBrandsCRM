@@ -9,13 +9,14 @@ export interface AccessoProps {
   titolo: string;
   testo?: ReactNode;
   avviso?: ReactNode;
+  marchio?: boolean; // logo scuro in testa alla finestra (Accedi, Password dimenticata, D-42)
   conferma: string;
   link?: { testo: string; href: string }[];
   onConferma: (valori: Record<string, string | boolean>) => Promise<string | void>;
   children?: ReactNode;
 }
 
-export function Accesso({ titolo, testo, avviso, conferma, link = [], onConferma, children }: AccessoProps) {
+export function Accesso({ titolo, testo, avviso, marchio, conferma, link = [], onConferma, children }: AccessoProps) {
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
   const modulo = useRef<HTMLFormElement>(null);
@@ -48,6 +49,8 @@ export function Accesso({ titolo, testo, avviso, conferma, link = [], onConferma
     <div className="accesso" role="dialog" aria-label={titolo}>
       <section className="pannello">
         <div className="pannello-corpo">
+          {/* eslint-disable-next-line @next/next/no-img-element -- stesso logo del prototipo, già piccolo */}
+          {marchio && <img className="accesso-marchio" src="/logo-decobrands.png" alt="Decobrands" />}
           <h1>{titolo}</h1>
           {testo && <p className="nota">{testo}</p>}
           {avviso && <p className="nota nota-attesa" role="status">{avviso}</p>}

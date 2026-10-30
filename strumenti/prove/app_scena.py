@@ -27,6 +27,7 @@ with sync_playwright() as p:
         ok(not aperta(), f'{w}: F5 resta al browser')
         pg.keyboard.press('u'); pg.wait_for_timeout(300)
         ok(aperta() and pg.input_value('#c-utente') == 'u' and pg.evaluate('document.activeElement.id') == 'c-utente', f'{w}: un tasto apre, la lettera è nel primo campo')
+        ok(pg.locator('.accesso .accesso-marchio').count() == 1, f'{w}: logo scuro in testa alla finestra')
         pg.screenshot(path=str(USCITA / f'app-scena-{w}-accedi.png'))
         pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
         ok(not aperta(), f'{w}: Esc torna al logo')

@@ -16,6 +16,7 @@ function Accedi() {
   return (
     <Accesso
       titolo="Accedi"
+      marchio
       testo="Usa il nome utente (o l’email) e la password che ti ha mandato l’amministratore."
       avviso={q.get('fatto') === 'password' ? 'Password salvata: entra con la nuova password.' : undefined}
       conferma="Entra"

@@ -14,6 +14,7 @@ export default function Pagina() {
     return (
       <Accesso
         titolo="Controlla la posta"
+        marchio
         testo={<>Se <b>{email}</b> è l’email di un utente, tra poco arriva un link per scegliere una nuova password. Vale un’ora e una volta sola.</>}
         conferma="Torna all’accesso"
         onConferma={async () => { router.replace('/accesso'); }}
@@ -23,6 +24,7 @@ export default function Pagina() {
   return (
     <Accesso
       titolo="Password dimenticata"
+      marchio
       testo="Scrivi l’email del tuo utente: ti mandiamo un link per sceglierne una nuova, valido un’ora."
       conferma="Manda il link"
       link={[{ testo: 'Torna all’accesso', href: '/accesso' }]}

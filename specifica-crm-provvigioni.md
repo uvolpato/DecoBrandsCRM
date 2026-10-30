@@ -1411,7 +1411,8 @@ di menu.
   utenti autorizzati.") e "© 2026 Decobrands S.r.l. · Tutti i diritti riservati · *Licenza
   d'uso*"; il collegamento apre una finestra con la licenza (D-43). Al primo tasto o tocco
   il modulo si apre in una finestra (passaggio veloce, circa 0,15 s) con il **primo campo
-  attivo**; il tasto premuto non si perde e finisce nel primo campo. Il modulo c'è già nella
+  attivo** e il logo scuro in testa (anche su *Password dimenticata*); il tasto premuto non si
+  perde e finisce nel primo campo. Il modulo c'è già nella
   pagina, chiuso e non raggiungibile, così il gestore delle password del browser può
   riempirlo. *Perché* (D-42): ingresso col marchio, senza costare tempo a chi scrive subito.
 - Fra le pagine di accesso (*Accedi* ↔ *Password dimenticata*) la finestra resta aperta e

@@ -246,7 +246,9 @@
     const fin = CRM.blocco(scena, 'accesso');
     fin.setAttribute('role', 'dialog'); fin.setAttribute('aria-label', opz.titolo);
     const pan = CRM.Pannello(fin, {});
-    pan.corpo.innerHTML = '<h1>' + esc(opz.titolo) + '</h1>' + (opz.testo ? '<p class="nota">' + opz.testo + '</p>' : '') +
+    // con presentazione il logo scuro in testa alla finestra (D-42)
+    pan.corpo.innerHTML = (opz.presentazione ? '<img class="accesso-marchio" src="assets/logo-decobrands.png" alt="Decobrands">' : '') +
+      '<h1>' + esc(opz.titolo) + '</h1>' + (opz.testo ? '<p class="nota">' + opz.testo + '</p>' : '') +
       (opz.avviso ? '<p class="nota nota-attesa" role="status">' + opz.avviso + '</p>' : '');
     const form = CRM.Form(pan.corpo, { campi: opz.campi || [] });
     const btn = el('button', 'btn largo'); btn.type = 'submit'; btn.textContent = opz.conferma || 'Continua';

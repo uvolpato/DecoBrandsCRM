@@ -453,6 +453,7 @@ with sync_playwright() as p:
     ok('accesso: Esc torna al logo', pg.locator('.accesso-scena.aperta').count()==0)
     pg.keyboard.press('b'); pg.wait_for_timeout(200)
     ok('accesso: riaperto, il modulo riparte vuoto', pg.input_value('#c-utente')=='b')
+    ok('accesso: logo scuro in testa alla finestra', pg.locator('.accesso .accesso-marchio').count()==1)
     pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
     pg.mouse.click(700, 120); pg.wait_for_timeout(200)
     ok('accesso: un clic apre la finestra col focus nel primo campo', pg.locator('.accesso-scena.aperta').count()==1 and pg.evaluate("()=>document.activeElement.id")=='c-utente')
