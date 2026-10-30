@@ -18,7 +18,8 @@ type Db = Prisma.TransactionClient;
 /** Manda un'email e scrive l'esito in utenti.ultimo_invio (§4.2.18). Non lancia mai: un invio
  *  fallito non deve far fallire l'operazione che lo chiede, resta visibile nella scheda dell'utente. */
 export async function invia(db: Db, utente_id: bigint, tipo: 'benvenuto' | 'password' | 'reset', m: Messaggio) {
-  log.log(`a ${m.a} · ${m.oggetto}\n${m.testo}`);
+  // il testo (password provvisorie, link) va nel log solo in sviluppo: in produzione mai le credenziali
+  log.log(`a ${m.a} · ${m.oggetto}` + (process.env.NODE_ENV === 'production' ? '' : `\n${m.testo}`));
   // con SMTP: errore = risposta del server se l'invio fallisce (anomalia posta.respinta, §7.14)
   await db.utenti
     .update({ where: { id: utente_id }, data: { ultimo_invio: { quando: new Date().toISOString(), tipo, errore: null } } })

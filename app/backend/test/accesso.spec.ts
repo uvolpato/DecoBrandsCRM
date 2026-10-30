@@ -179,6 +179,20 @@ describe('password dimenticata (passo 1.8)', () => {
     const u = await db.utenti.findUniqueOrThrow({ where: { id: id.posta } });
     expect(u.ultimo_invio).toMatchObject({ tipo: 'reset', errore: null });
   });
+  it('cambiare la password annulla i link di reimpostazione già mandati', async () => {
+    await crea('cauto', 'operatore');
+    const codice = (await chiedi('cauto' + DOMINIO))!;
+    const a = await entra('cauto');
+    await a.post('/api/accesso/password').set('x-csrf-token', a.csrf).send({ attuale: PW, nuova: 'cauto-nuova' }).expect(204);
+    await reimposta(codice, 'altra-password').expect(400);
+  });
+
+  it('un utente disattivato non usa più il suo link', async () => {
+    await crea('fermo', 'operatore');
+    const codice = (await chiedi('fermo' + DOMINIO))!;
+    await db.utenti.update({ where: { id: id.fermo }, data: { attivo: false } });
+    await reimposta(codice, 'password-nuova').expect(400);
+  });
 });
 
 describe('esci', () => {

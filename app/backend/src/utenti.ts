@@ -17,7 +17,7 @@ import { logEvent } from './registro';
 class DatiUtente {
   @IsString() @Matches(/^[a-z0-9._-]{2,50}$/, { message: 'Il nome utente può avere minuscole, numeri, punto o trattino (2–50 caratteri, senza @)' })
   username!: string;
-  @IsString() @MaxLength(120) nome!: string;
+  @IsString() @Matches(/\S/, { message: 'Scrivi il nome' }) @MaxLength(120) nome!: string;
   @IsEmail({}, { message: 'L’email non è valida' }) @MaxLength(200) email!: string;
   @IsIn(['amministratore', 'operatore', 'lettura'], { message: 'Ruolo non valido' }) ruolo!: string; // mai superutente (§3.3)
 }
@@ -83,10 +83,11 @@ export class UtentiController {
       if (prima.id === io.id && b.ruolo && b.ruolo !== prima.ruolo) throw new ForbiddenException('Non puoi cambiare il tuo ruolo');
       const nuovo = { ...pulisci(b), ruolo: prima.ruolo === 'superutente' || !b.ruolo ? prima.ruolo : b.ruolo };
       if (nuovo.ruolo !== prima.ruolo) puoDareRuolo(req, nuovo.ruolo);
-      if (prima.ruolo === 'amministratore' && nuovo.ruolo !== 'amministratore') await restaUnAmministratore(tx, prima);
+      if (prima.ruolo === 'amministratore' && prima.attivo && nuovo.ruolo !== 'amministratore') await restaUnAmministratore(tx, prima);
       const diff = differenze(prima, nuovo);
       if (!diff) return;
       await tx.utenti.update({ where: { id: prima.id }, data: nuovo });
+      if ('email' in diff.dopo) await tx.accessi_link.deleteMany({ where: { utente_id: prima.id, usato_il: null } });
       await logEvent(tx, { tipo: 'crud', azione: 'update', entita: 'utente', entita_id: prima.id, esito: 'successo',
         dettaglio: { etichetta: nuovo.username, ...diff } }, contesto(req));
     }));
@@ -164,7 +165,9 @@ export class UtentiController {
    * il superutente; su sé stessi solo i propri dati (modifica), mai stato, eliminazione o reimpostazione.
    */
   private async gestibile(tx: Tx, req: Request, id: number, propriDati = false): Promise<utenti> {
-    await tx.$queryRaw`SELECT id FROM utenti WHERE id = ${BigInt(id)} FOR UPDATE`;
+    // ponytail: un lucchetto unico per tutte le scritture sugli utenti (poche, solo da chi amministra): niente
+    // stallo fra due operazioni su due amministratori; lucchetti per riga se mai servissero più scritture insieme
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('decobrands.utenti'))`;
     const u = await tx.utenti.findUnique({ where: { id: BigInt(id) } });
     if (!u) throw new NotFoundException('Utente non trovato');
     const io = req.utente!;
@@ -188,14 +191,15 @@ function puoDareRuolo(req: Request, ruolo: string) {
   }
 }
 
-/** Deve restare almeno un amministratore attivo (§7.13). Le righe si bloccano: due tolte insieme non passano entrambe. */
+/** Deve restare almeno un amministratore attivo (§7.13). Si chiama dopo gestibile(), che tiene il lucchetto: due tolte insieme non passano entrambe. */
 export async function restaUnAmministratore(tx: Tx, tolto: utenti) {
   const altri = await tx.$queryRaw<{ id: bigint }[]>`
-    SELECT id FROM utenti WHERE ruolo = 'amministratore' AND attivo AND NOT sistema AND id <> ${tolto.id} FOR UPDATE`;
+    SELECT id FROM utenti WHERE ruolo = 'amministratore' AND attivo AND NOT sistema AND id <> ${tolto.id}`;
   if (!altri.length) throw new ConflictException('Deve restare almeno un amministratore attivo');
 }
 
-const pulisci = (b: DatiUtente | ModificaUtente) => ({ username: b.username.trim().toLowerCase(), nome: b.nome.trim(), email: b.email.trim().toLowerCase(), ruolo: b.ruolo });
+// nome utente ed email sono già validati (minuscole, senza spazi); l'email si porta in minuscolo come nel database
+const pulisci = (b: DatiUtente | ModificaUtente) => ({ username: b.username, nome: b.nome.trim(), email: b.email.toLowerCase(), ruolo: b.ruolo });
 
 /** Solo i campi cambiati, per il registro (§15.4). */
 function differenze(prima: utenti, dopo: ReturnType<typeof pulisci>) {

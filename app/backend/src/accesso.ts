@@ -133,10 +133,11 @@ const impronta = (codice: string) => createHash('sha256').update(codice).digest(
 @Injectable()
 class TentativiGuard extends ThrottlerGuard {
   protected getTracker(req: Request) {
-    const b = req.body as { utente?: unknown; email?: unknown } | undefined;
-    const tentato = typeof b?.utente === 'string' ? b.utente : typeof b?.email === 'string' ? b.email : '';
-    const chi = tentato.trim().toLowerCase();
-    return Promise.resolve(`${req.ip}|${chi || req.session?.utente_id || ''}`);
+    const b = req.body as { utente?: unknown; codice?: unknown } | undefined;
+    // entra: IP e nome utente; reimposta: IP e link; cambio password: IP e sessione;
+    // password dimenticata: solo IP (chi prova tante email diverse si ferma lo stesso)
+    const chi = typeof b?.utente === 'string' ? b.utente.trim().toLowerCase() : typeof b?.codice === 'string' ? b.codice : req.session?.utente_id;
+    return Promise.resolve(`${req.ip}|${chi ?? ''}`);
   }
 }
 
@@ -221,6 +222,7 @@ export class AccessoController {
     await this.db.$transaction(async (tx) => {
       await tx.utenti.update({ where: { id: u.id }, data: { password_hash: hash, deve_cambiare_password: false } });
       await tx.sessioni.deleteMany({ where: { utente_id: u.id, NOT: { sid: req.sessionID } } });
+      await tx.accessi_link.deleteMany({ where: { utente_id: u.id, usato_il: null } }); // un link già mandato non vale più
       await logEvent(tx, { ...evento, esito: 'successo', dettaglio: { etichetta: u.username } }, contesto(req));
     });
   }
@@ -277,7 +279,9 @@ export class AccessoController {
       // usato una volta sola anche con due richieste insieme: vince chi lo segna per primo
       const { count } = await tx.accessi_link.updateMany({ where: { id: link!.id, usato_il: null }, data: { usato_il: new Date() } });
       if (count !== 1) throw new BadRequestException('Il link non è valido o è scaduto: chiedine uno nuovo');
-      await tx.utenti.update({ where: { id: link!.utente_id }, data: { password_hash: hash, deve_cambiare_password: false } });
+      // ricontrollo dentro la transazione: un utente disattivato nel frattempo non cambia password
+      const { count: attivi } = await tx.utenti.updateMany({ where: { id: link!.utente_id, attivo: true }, data: { password_hash: hash, deve_cambiare_password: false } });
+      if (attivi !== 1) throw new BadRequestException('Il link non è valido o è scaduto: chiedine uno nuovo');
       await tx.sessioni.deleteMany({ where: { utente_id: link!.utente_id } });
       await logEvent(tx, { ...evento, esito: 'successo', dettaglio: { etichetta: link!.utente.username } }, ctx);
     });

@@ -84,6 +84,7 @@ describe('nuovo utente', () => {
     const a = await entra('ammi');
     const r = await a.post('/utenti', nuovo('Nuovo1')).expect(400); // maiuscole: no
     expect(JSON.stringify(r.body)).toContain('minuscole');
+    await a.post('/utenti', { ...nuovo('vuoto'), nome: '   ' }).expect(400, /Scrivi il nome/);
     const u = (await a.post('/utenti', nuovo('nuovo1')).expect(201)).body;
     expect(u).toMatchObject({ username: 'nuovo1', ruolo: 'operatore', deve_cambiare_password: true });
     const [, , password, tipo] = spia.mock.calls.at(-1)!;
@@ -115,6 +116,13 @@ describe('modifica', () => {
     const ev = await db.registro.findFirstOrThrow({ where: { codice: 'crud.update', entita_id: BigInt(id.lett) }, orderBy: { id: 'desc' } });
     expect(ev.dettaglio).toMatchObject({ prima: { nome: 'Prova lett' }, dopo: { nome: 'Giulia Lettura' } });
     expect(Object.keys((ev.dettaglio as { dopo: object }).dopo)).toEqual(['nome']);
+  });
+
+  it("cambiare l'email annulla i link di reimpostazione mandati al vecchio indirizzo", async () => {
+    await crea('trasloco', 'operatore');
+    await db.accessi_link.create({ data: { utente_id: BigInt(id.trasloco), tipo: 'reset', impronta: 'a'.repeat(64), scade_il: new Date(Date.now() + 3600_000) } });
+    await (await entra('ammi')).put('/utenti/' + id.trasloco, { ...nuovo('trasloco'), email: 'nuova-casa' + DOMINIO }).expect(200);
+    expect(await db.accessi_link.count({ where: { utente_id: BigInt(id.trasloco) } })).toBe(0);
   });
 
   it('i propri dati sì, il proprio ruolo no', async () => {
