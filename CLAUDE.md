@@ -145,7 +145,8 @@ Regole del codice del prototipo:
    controlli per ciò che hai fatto. Nei selettori le schede vanno cercate con
    `.schede-barra [role=tab]`, perché anche i segmenti hanno `role=tab`.
 5. **Controllo visivo**: per le modifiche all'interfaccia fai una schermata (Playwright, a
-   1440 px e a 390 px) e guardala prima di consegnare.
+   1440 px e a 768 px, tablet in verticale) e guardala prima di consegnare. **Niente telefono**
+   (D-44): sotto i 744 px l'app si ferma a monte, non va adattata.
 6. **Git**:
    - si lavora su `main`, con commit piccoli e messaggi in italiano;
    - non committare `image.png`, né le cartelle di uscita degli strumenti;

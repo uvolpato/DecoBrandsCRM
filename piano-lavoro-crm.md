@@ -121,9 +121,10 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **DoD:** entra solo chi ha credenziali giuste ed è attivo; messaggio uguale per ogni errore; con la password provvisoria non si apre nessuna pagina prima del cambio; link usato o scaduto rifiutato; risposta della password dimenticata uguale per email registrate e non; limite ai tentativi; eventi `auth/*` §15.2.1 scritti da `logEvent()` (F0-A5).
 - **Ore:** 3 h del preventivo (sessioni, guard, pagina) + **1 h da approvare** (superutente, password provvisoria e password dimenticata, D-39; le 2 h di Microsoft 365 e link di D-30 non servono più) + **1 h da approvare** (nuova pagina di accesso scura con logo e finestra, prototipo e app, D-42).
 
-#### F0-A4 · Shell layout comune + componenti standard — 5 h
+#### F0-A4 · Shell layout comune + componenti standard — 5 h + 0,5 h **da approvare**
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate
 - **Riferimenti:** spec §7.10 (barra laterale e rotte), §7.12 (ritorno nello stesso punto), **§16.4, §16.4.1, §16.4.2 (componenti standard, filtri, conteggi)**
+- **Schermi (D-44, da approvare 0,5 h):** pagina "usa un computer o un tablet" sotto i 744 px, nel layout radice con il CSS, uguale nel prototipo; prove a 1440 e 768 px.
 - **Sorgente prototipo:** `prototipo-alternativo/assets/componenti.js` (intero: Pagina, Barra, Pannello, Schede, DataTable, FilterBar, RiepilogoFiltri, KpiRow, CampoRicerca/RicercaEntita, PeriodoMesi, Grafico, Modale, FormModal, Conferma, Avviso, Elenco, Binario, Matrice, Cerniera, Periodi, …, rotte e memoria `registra`), `prototipo-alternativo/assets/entita.js`, catalogo `prototipo-alternativo/assets/viste-componenti.js`; `stile.css`
 - **Output:** layout comune (barra laterale a gruppi con contatori + testata della pagina + avvisi) e **libreria componenti React** con gli stessi nomi e parametri di `componenti.js`; pagina catalogo `/componenti` (solo admin) equivalente a `#/componenti`.
 - **DoD:** ogni rotta eredita la shell senza duplicarla; ogni componente supera il confronto con il catalogo del prototipo (DataTable: riempie lo spazio, intestazione fissa, righe scorrevoli, ordinamento ▲▼, totali fissi, piede); nessuna tabella o modale scritta a mano fuori dalla libreria.

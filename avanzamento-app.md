@@ -5,7 +5,7 @@ sono quelle di `piano-lavoro-crm.md`; qui c'è l'ordine in cui si fanno e cosa �
 
 Regole per ogni passo: si replica il prototipo `prototipo-alternativo/` (struttura, testi,
 classi di `stile.css`, numeri); calcoli e controlli solo sul backend (V12, D-28); prove e
-schermate a 1440 e 390 px prima di chiudere; documenti allineati nello stesso commit.
+schermate a 1440 e 768 px prima di chiudere (niente telefono, D-44); documenti allineati nello stesso commit.
 
 Nomi: l'applicazione si chiama **Decobrands** (titolo, pacchetti, servizi); `decobrands_db` è solo il database, `decobrands` il suo utente.
 
