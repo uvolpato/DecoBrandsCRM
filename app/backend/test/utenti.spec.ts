@@ -17,9 +17,13 @@ const PW = 'password-di-prova';
 const id: Record<string, string> = {};
 let spia: jest.SpyInstance;
 
+// D-45: nelle prove "operatore" e "lettura" sono utenti con quel livello in Anagrafiche e Provvigioni
+const comeRuolo = (ruolo: string) => ['operatore', 'lettura'].includes(ruolo)
+  ? { ruolo: 'utente', aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: ruolo })) } }
+  : { ruolo };
 async function crea(username: string, ruolo: string, altro: object = {}) {
   const u = await db.utenti.create({
-    data: { username, email: username + DOMINIO, nome: 'Prova ' + username, ruolo, password_hash: await cifra(PW), deve_cambiare_password: false, ...altro },
+    data: { username, email: username + DOMINIO, nome: 'Prova ' + username, ...comeRuolo(ruolo), password_hash: await cifra(PW), deve_cambiare_password: false, ...altro },
   });
   id[username] = String(u.id);
 }
@@ -40,7 +44,9 @@ async function apri(utente: string) {
   };
 }
 
-const nuovo = (u: string, ruolo = 'operatore') => ({ username: u, nome: 'Prova ' + u, email: u + DOMINIO, ruolo });
+// nel corpo delle richieste: ruolo di Sistema + livelli (operatore/lettura → utente con quel livello)
+const nuovo = (u: string, ruolo = 'operatore') => ({ username: u, nome: 'Prova ' + u, email: u + DOMINIO,
+  ...(['operatore', 'lettura'].includes(ruolo) ? { ruolo: 'utente', aree: { provvigioni: ruolo } as object } : { ruolo, aree: undefined }) });
 
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -80,8 +86,9 @@ describe('elenco e scheda', () => {
 
   it('cosa può fare ogni ruolo: dalla tabella dei permessi del server', async () => {
     const r = await (await entra('ammi')).get('/utenti/ruoli').expect(200);
-    expect(r.body).toContainEqual({ id: 'amministratori', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] });
-    expect(r.body.every((p: { testo: string }) => p.testo)).toBe(true);
+    expect(r.body).toMatchObject({ ruoli: ['superutente', 'amministratore', 'utente'], livelli: ['lettura', 'operatore', 'responsabile'] });
+    expect(r.body.permessi).toContainEqual({ id: 'sistema.amministratori', area: 'sistema', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] });
+    expect(r.body.permessi).toContainEqual(expect.objectContaining({ id: 'provvigioni.chiudi', area: 'provvigioni', minimo: 'responsabile' }));
     await (await entra('lett')).get('/utenti/ruoli').expect(403);
   });
 });
@@ -93,7 +100,7 @@ describe('nuovo utente', () => {
     expect(JSON.stringify(r.body)).toContain('minuscole');
     await a.post('/utenti', { ...nuovo('vuoto'), nome: '   ' }).expect(400, /Scrivi il nome/);
     const u = (await a.post('/utenti', nuovo('nuovo1')).expect(201)).body;
-    expect(u).toMatchObject({ username: 'nuovo1', ruolo: 'operatore', deve_cambiare_password: true });
+    expect(u).toMatchObject({ username: 'nuovo1', ruolo: 'utente', aree: { provvigioni: 'operatore' }, deve_cambiare_password: true });
     const [, , password, tipo] = spia.mock.calls.at(-1)!;
     expect(tipo).toBe('benvenuto');
     const salvato = await db.utenti.findUniqueOrThrow({ where: { id: BigInt(u.id) } });
@@ -118,7 +125,8 @@ describe('nuovo utente', () => {
 describe('modifica', () => {
   it('cambia i dati e scrive nel registro solo i campi cambiati', async () => {
     const a = await entra('ammi');
-    const u = (await a.put('/utenti/' + id.lett, { ...nuovo('lett', 'lettura'), nome: 'Giulia Lettura' }).expect(200)).body;
+    const { aree: _a, ...datiLett } = nuovo('lett', 'lettura'); // senza aree: restano come sono
+    const u = (await a.put('/utenti/' + id.lett, { ...datiLett, nome: 'Giulia Lettura' }).expect(200)).body;
     expect(u.nome).toBe('Giulia Lettura');
     const ev = await db.registro.findFirstOrThrow({ where: { codice: 'crud.update', entita_id: BigInt(id.lett) }, orderBy: { id: 'desc' } });
     expect(ev.dettaglio).toMatchObject({ prima: { nome: 'Prova lett' }, dopo: { nome: 'Giulia Lettura' } });
@@ -136,13 +144,13 @@ describe('modifica', () => {
     const a = await entra('ammi');
     await a.put('/utenti/' + id.ammi, { ...nuovo('ammi', 'amministratore'), nome: 'Ammi Nuovo' }).expect(200);
     await a.put('/utenti/' + id.ammi, nuovo('ammi', 'operatore')).expect(403);
-    const { ruolo: _r, ...senzaRuolo } = nuovo('ammi');
+    const { ruolo: _r, aree: _a, ...senzaRuolo } = nuovo('ammi');
     expect((await a.put('/utenti/' + id.ammi, { ...senzaRuolo, nome: 'Ammi Senza Ruolo' }).expect(200)).body).toMatchObject({ ruolo: 'amministratore', nome: 'Ammi Senza Ruolo' });
   });
 
   it('il superutente modifica i propri dati senza mandare il ruolo', async () => {
     const s = await entra('super');
-    const { ruolo: _r, ...dati } = nuovo('super');
+    const { ruolo: _r, aree: _a, ...dati } = nuovo('super');
     expect((await s.put('/utenti/' + id.super, { ...dati, nome: 'Super Nuovo' }).expect(200)).body).toMatchObject({ ruolo: 'superutente', nome: 'Super Nuovo' });
   });
 
@@ -196,6 +204,36 @@ describe('disattiva, riattiva, reimposta, elimina', () => {
     const liq = await db.liquidazioni.create({ data: { anno: 1999, trimestre: 1, chiusa_da: BigInt(id.contabile), totali: {} } });
     expect((await a.del('/utenti/' + id.contabile).expect(409)).body.message).toContain('disattivalo');
     await db.liquidazioni.delete({ where: { id: liq.id } });
+  });
+});
+
+describe('livelli per area (D-45)', () => {
+  it('l’amministratore dà i livelli; aree o livelli sconosciuti rifiutati; i propri no, il superutente sì', async () => {
+    const a = await entra('ammi');
+    const u = (await a.post('/utenti', { ...nuovo('areato'), aree: { provvigioni: 'responsabile', anagrafiche: 'lettura' } }).expect(201)).body;
+    expect(u.aree).toEqual({ provvigioni: 'responsabile', anagrafiche: 'lettura' });
+    await a.post('/utenti', { ...nuovo('areato2'), aree: { cucina: 'lettura' } }).expect(400, /area cucina/);
+    await a.put('/utenti/' + u.id, { ...nuovo('areato'), aree: { provvigioni: 'capo' } }).expect(400);
+    // un'area non mandata resta, null la toglie
+    expect((await a.put('/utenti/' + u.id, { ...nuovo('areato'), aree: { provvigioni: 'operatore' } }).expect(200)).body.aree).toEqual({ provvigioni: 'operatore', anagrafiche: 'lettura' });
+    expect((await a.put('/utenti/' + u.id, { ...nuovo('areato'), aree: { anagrafiche: null } }).expect(200)).body.aree).toEqual({ provvigioni: 'operatore' });
+    const ev = await db.registro.findFirstOrThrow({ where: { codice: 'crud.update', entita_id: BigInt(u.id) }, orderBy: { id: 'desc' } });
+    expect(ev.dettaglio).toMatchObject({ prima: { aree: { anagrafiche: 'lettura', provvigioni: 'operatore' } }, dopo: { aree: { provvigioni: 'operatore' } } });
+    const { ruolo: _r, ...mieiDati } = nuovo('ammi');
+    await a.put('/utenti/' + id.ammi, { ...mieiDati, aree: { vendite: 'responsabile' } }).expect(403, /tuoi livelli/);
+    const s = await entra('super');
+    const { ruolo: _s, ...suoiDati } = nuovo('super');
+    expect((await s.put('/utenti/' + id.super, { ...suoiDati, aree: { provvigioni: 'responsabile' } }).expect(200)).body.aree).toEqual({ provvigioni: 'responsabile' });
+  });
+
+  it('i permessi seguono il livello, riletti a ogni richiesta', async () => {
+    const o = await entra('oper');
+    const io = async () => (await o.get('/accesso/io').expect(200)).body.permessi as string[];
+    expect(await io()).not.toContain('provvigioni.chiudi');
+    await db.utenti_aree.update({ where: { utente_id_area: { utente_id: BigInt(id.oper), area: 'provvigioni' } }, data: { livello: 'responsabile' } });
+    expect(await io()).toContain('provvigioni.chiudi');
+    await db.utenti_aree.deleteMany({ where: { utente_id: BigInt(id.oper) } });
+    expect(await io()).toEqual(['collegato']);
   });
 });
 

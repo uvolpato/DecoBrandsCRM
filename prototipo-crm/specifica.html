@@ -4408,6 +4408,18 @@ tutto quello che può <code>lettura</code>. I permessi si chiamano <code>area.at
   tutte le aree, anche <code>responsabile</code>; gli amministratori li crea e modifica il superutente;
   nessuno cambia il proprio ruolo né i propri livelli, tranne il superutente (è uno solo e
   altrimenti non potrebbe darsene).</li>
+<li><strong>Limite da sapere:</strong> la separazione fra gestire il portale e lavorare nelle aree è
+  organizzativa, non una barriera contro un amministratore: chi può creare utenti può crearne uno
+  per sé con i livelli che vuole. Ogni creazione e ogni cambio di livello va nel registro con chi
+  l'ha fatto (§15), così il superutente lo vede; se servirà una barriera vera, i livelli
+  <code>responsabile</code> li darà solo il superutente.</li>
+<li><code>PUT /api/utenti/:id</code> con <code>aree</code>: si mandano solo le aree da cambiare (<code>null</code> toglie l'area);
+  quelle non mandate restano, così una pagina che non mostra un'area (Vendite spenta) non la
+  cancella.</li>
+<li>Il superutente creato dal comando d'installazione non ha livelli: gestisce il portale. Chi
+  c'era prima della D-45 ha ricevuto con la migrazione livelli pari a quello che poteva fare
+  (amministratore e superutente: responsabile in Anagrafiche e Provvigioni). Dopo l'accesso, chi
+  non ha Provvigioni va alla prima pagina che può aprire.</li>
 </ul>
 <p><em>Perché (D-45):</em> il CRM è il primo pezzo di un portale (D-43): con un solo ruolo per tutto, chi
 lavora sulle provvigioni vedrebbe domani anche le aree che non lo riguardano (vendite,

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { Icona } from './Icona';
-import { RUOLI, usePuo, useUtente } from './Utente';
+import { AREE, usePuo, useUtente } from './Utente';
 
 // Pagina e Intestazione come CRM.Pagina / CRM.Intestazione del prototipo: testata con titolo,
 // sottotitolo e azioni, poi il corpo. La barra la mette il guscio (app/(app)/layout.tsx).
@@ -88,10 +88,15 @@ export function Riservata({ permesso, titolo, children }: { permesso: string; ti
   const io = useUtente();
   const puo = usePuo();
   if (puo(permesso)) return <>{children}</>;
+  // perché è chiusa (D-45): area mancante o livello troppo basso; Sistema per gli amministratori
+  const [area] = permesso.split('.');
+  const motivo = permesso === 'sistema.stato' ? 'Questa pagina è per gli amministratori e per chi è operatore in un’area.'
+    : area === 'sistema' ? 'Questa pagina è per gli amministratori.'
+      : io.aree[area] ? `Serve un livello più alto nell’area ${AREE[area] ?? area}.` : `Non hai accesso all’area ${AREE[area] ?? area}.`;
   return (
     <Pagina titolo={titolo}>
       <Pannello>
-        <div className="vuoto"><b>Pagina riservata</b>Con il ruolo {(RUOLI[io.ruolo] ?? io.ruolo).toLowerCase()} non puoi aprire questa pagina. Chiedi a un amministratore.</div>
+        <div className="vuoto"><b>Pagina riservata</b>{motivo} Chiedi a un amministratore.</div>
       </Pannello>
     </Pagina>
   );

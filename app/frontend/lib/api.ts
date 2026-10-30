@@ -8,7 +8,8 @@ export interface Io {
   username: string;
   nome: string;
   email: string;
-  ruolo: string;
+  ruolo: string; // di Sistema: superutente | amministratore | utente (D-45)
+  aree: Record<string, string>; // area → lettura | operatore | responsabile
   permessi: string[];
   cambia_password: boolean;
   csrf: string;

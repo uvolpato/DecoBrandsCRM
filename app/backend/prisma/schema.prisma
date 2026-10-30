@@ -368,7 +368,7 @@ model utenti {
   username               String    @unique @db.VarChar(50) // nome utente, sempre in minuscolo (D-39)
   email                  String    @unique @db.VarChar(200) // sempre in minuscolo
   nome                   String    @db.VarChar(120)
-  ruolo                  String    @db.VarChar(15) // superutente | amministratore | operatore | lettura (§8.3); un solo superutente
+  ruolo                  String    @db.VarChar(15) // ruolo di Sistema: superutente | amministratore | utente (§8.3, D-45); un solo superutente
   password_hash          String?   @db.VarChar(200) // scrypt$N$r$p$sale$hash; NULL solo per l'utente dei servizi
   deve_cambiare_password Boolean   @default(true) // password provvisoria: va cambiata al primo accesso
   attivo                 Boolean   @default(true)
@@ -378,6 +378,7 @@ model utenti {
   ultimo_invio           Json? // {quando, tipo: benvenuto | password | reset, errore}
 
   link               accessi_link[]
+  aree               utenti_aree[]
   eventi             registro[]               @relation("registro_utente")
   visti              registro[]               @relation("registro_visto")
   correzioni         provvigioni_correzioni[]
@@ -388,6 +389,17 @@ model utenti {
   campi_corretti     documenti_campi[]
   esecuzioni         servizi_esecuzioni[]
   impostazioni       impostazioni[]
+}
+
+/// Livello di un utente in un'area (D-45): lettura < operatore < responsabile; nessuna riga = area chiusa.
+model utenti_aree {
+  utente_id BigInt
+  area      String @db.VarChar(20) // anagrafiche | provvigioni | vendite (CHECK)
+  livello   String @db.VarChar(15) // lettura | operatore | responsabile (CHECK)
+
+  utente utenti @relation(fields: [utente_id], references: [id], onDelete: Cascade)
+
+  @@id([utente_id, area])
 }
 
 /// Inviti e link monouso: si salva solo l'impronta SHA-256 del codice (§4.2.18).

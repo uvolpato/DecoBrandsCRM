@@ -11,10 +11,11 @@ export const usePuo = () => {
   return (permesso: string) => io.permessi.includes(permesso);
 };
 
-// Nomi dei ruoli per l'interfaccia (M.RUOLI del prototipo, §8.3).
-export const RUOLI: Record<string, string> = {
-  superutente: 'Superutente',
-  amministratore: 'Amministratore',
-  operatore: 'Operatore',
-  lettura: 'Sola lettura',
-};
+// Nomi per l'interfaccia (M.RUOLI, M.LIVELLI, M.AREE del prototipo, §8.3, D-45). Le regole stanno sul server.
+export const RUOLI: Record<string, string> = { superutente: 'Superutente', amministratore: 'Amministratore', utente: 'Utente' };
+export const LIVELLI: Record<string, string> = { lettura: 'Lettura', operatore: 'Operatore', responsabile: 'Responsabile' };
+// ponytail: Vendite (§17) è spenta, si aggiunge qui quando si accende
+export const AREE: Record<string, string> = { anagrafiche: 'Anagrafiche', provvigioni: 'Provvigioni' };
+/** Ruolo in breve (barra): quello di Sistema o, per un utente, il livello in Provvigioni. */
+export const ruoloBreve = (u: { ruolo: string; aree: Record<string, string> }) =>
+  u.ruolo !== 'utente' ? RUOLI[u.ruolo] : u.aree.provvigioni ? LIVELLI[u.aree.provvigioni] : RUOLI.utente;

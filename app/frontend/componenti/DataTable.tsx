@@ -27,6 +27,7 @@ export interface DataTableProps<R> {
   rowClass?: (r: R) => string;
   onRowClick?: (r: R) => void;
   compatta?: boolean;
+  naturale?: boolean; // altezza del contenuto, senza pagine (tabelle brevi impilate)
   emptyText?: string;
   emptyHint?: string;
   perPagina?: number;
@@ -35,7 +36,8 @@ export interface DataTableProps<R> {
 
 const ordinale = (v: unknown) => (typeof v === 'number' ? v : String(v ?? '').toLowerCase());
 
-export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina = 25, filtro }: DataTableProps<R>) {
+export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp = 25, filtro, naturale }: DataTableProps<R>) {
+  const perPagina = naturale ? Number.MAX_SAFE_INTEGER : pp;
   const [ord, setOrd] = useState(ordinamentoIniziale ?? null);
   const [pag, setPag] = useState(0);
   useEffect(() => setPag(0), [filtro]);
@@ -56,7 +58,7 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
   const al = (c: Colonna<R>) => (c.align === 'right' ? 'dx' : c.align === 'center' ? 'cx' : '');
 
   return (
-    <div className={'dt' + (compatta ? ' compatta' : '')}>
+    <div className={'dt' + (compatta ? ' compatta' : '') + (naturale ? ' naturale' : '')}>
       <div className="dt-scorri">
         <table>
           <thead>

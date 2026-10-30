@@ -1,17 +1,17 @@
 import {
-  Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode,
+  BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode,
   NotFoundException, Param, ParseIntPipe, Post, Put, Req,
 } from '@nestjs/common';
 import { Prisma, type utenti } from '@prisma/client';
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsObject, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import type { Request } from 'express';
-import { contesto, PERMESSI, permessiDi, Richiede, TESTI_PERMESSI, type Permesso } from './accesso';
+import { AREE, contesto, LIVELLI, livelliDi, PERMESSI, permessiDi, Richiede, RUOLI, type Livelli } from './accesso';
 import { cifra, provvisoria } from './password';
 import { mandaPassword } from './posta';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
-// Utenti e ruoli (§7.13, §8.3, D-39). Tutte le regole stanno qui, sul server (V12): l'interfaccia
+// Utenti e ruoli (§7.13, §8.3, D-39, D-45). Tutte le regole stanno qui, sul server (V12): l'interfaccia
 // nasconde i pulsanti, ma è questo file che decide.
 
 class DatiUtente {
@@ -19,12 +19,15 @@ class DatiUtente {
   username!: string;
   @IsString() @Matches(/\S/, { message: 'Scrivi il nome' }) @MaxLength(120) nome!: string;
   @IsEmail({}, { message: 'L’email non è valida' }) @MaxLength(200) email!: string;
-  @IsIn(['amministratore', 'operatore', 'lettura'], { message: 'Ruolo non valido' }) ruolo!: string; // mai superutente (§3.3)
+  @IsIn(['amministratore', 'utente'], { message: 'Ruolo non valido' }) ruolo!: string; // ruolo di Sistema, mai superutente (§3.3)
+  /** Livelli per area (D-45): { provvigioni: 'operatore', anagrafiche: null, … }; null toglie l'area,
+   *  un'area non mandata resta com'è (così una pagina che non mostra un'area non la cancella). */
+  @IsOptional() @IsObject() aree?: Record<string, unknown>;
 }
 
-/** Nella modifica il ruolo si può non mandare: chi modifica i propri dati (anche il superutente) lo lascia com'è. */
+/** Nella modifica ruolo e aree si possono non mandare: chi modifica i propri dati li lascia com'è. */
 class ModificaUtente extends DatiUtente {
-  @IsOptional() @IsIn(['amministratore', 'operatore', 'lettura'], { message: 'Ruolo non valido' }) declare ruolo: string;
+  @IsOptional() @IsIn(['amministratore', 'utente'], { message: 'Ruolo non valido' }) declare ruolo: string;
 }
 
 class Attivo {
@@ -35,6 +38,7 @@ class Attivo {
 const VISIBILI = {
   id: true, username: true, email: true, nome: true, ruolo: true, attivo: true, sistema: true,
   deve_cambiare_password: true, creato_il: true, ultimo_accesso: true, ultimo_invio: true,
+  aree: { select: { area: true, livello: true } },
 } satisfies Prisma.utentiSelect;
 
 type Tx = Prisma.TransactionClient;
@@ -44,35 +48,37 @@ export class UtentiController {
   constructor(private readonly db: PrismaService) {}
 
   @Get()
-  @Richiede('gestione')
+  @Richiede('sistema.utenti')
   elenco() {
     return this.db.utenti.findMany({ select: VISIBILI, orderBy: { nome: 'asc' } }).then((r) => r.map(fuori));
   }
 
   /** Tabella "Cosa può fare ogni ruolo": dalla stessa tabella che usa il guard, così non si disallinea. */
   @Get('ruoli')
-  @Richiede('gestione')
+  @Richiede('sistema.utenti')
   ruoli() {
-    return (Object.keys(PERMESSI) as Permesso[]).map((id) => ({ id, testo: TESTI_PERMESSI[id], ruoli: PERMESSI[id] }));
+    return { ruoli: RUOLI, aree: AREE, livelli: LIVELLI, permessi: Object.entries(PERMESSI).map(([id, p]) => ({ id, ...p })) };
   }
 
   @Get(':id')
-  @Richiede('gestione')
+  @Richiede('sistema.utenti')
   async scheda(@Param('id', ParseIntPipe) id: number) {
     return fuori(await this.trova(this.db, id));
   }
 
   /** Nuovo utente: password provvisoria per email, da cambiare al primo accesso. */
   @Post()
-  @Richiede('gestione')
+  @Richiede('sistema.utenti')
   async crea(@Req() req: Request, @Body() b: DatiUtente) {
     puoDareRuolo(req, b.ruolo);
+    const aree = unisci({}, leggiAree(b.aree ?? {}));
     const password = provvisoria();
     const hash = await cifra(password);
     const u = await unico(() => this.db.$transaction(async (tx) => {
       const u = await tx.utenti.create({ data: { ...pulisci(b), password_hash: hash } });
+      await scriviAree(tx, u.id, aree);
       await logEvent(tx, { tipo: 'crud', azione: 'create', entita: 'utente', entita_id: u.id, esito: 'successo',
-        dettaglio: { etichetta: u.username, nome: u.nome, email: u.email, ruolo: u.ruolo } }, contesto(req));
+        dettaglio: { etichetta: u.username, nome: u.nome, email: u.email, ruolo: u.ruolo, aree } }, contesto(req));
       await logEvent(tx, { tipo: 'auth', azione: 'password_temp', entita: 'utente', entita_id: u.id, esito: 'successo',
         dettaglio: { etichetta: u.username, tipo: 'benvenuto' } }, contesto(req));
       return u;
@@ -82,7 +88,7 @@ export class UtentiController {
   }
 
   @Put(':id')
-  @Richiede('gestione')
+  @Richiede('sistema.utenti')
   async modifica(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: ModificaUtente) {
     await unico(() => this.db.$transaction(async (tx) => {
       const prima = await this.gestibile(tx, req, id, true);
@@ -91,9 +97,15 @@ export class UtentiController {
       const nuovo = { ...pulisci(b), ruolo: prima.ruolo === 'superutente' || !b.ruolo ? prima.ruolo : b.ruolo };
       if (nuovo.ruolo !== prima.ruolo) puoDareRuolo(req, nuovo.ruolo);
       if (prima.ruolo === 'amministratore' && prima.attivo && nuovo.ruolo !== 'amministratore') await restaUnAmministratore(tx, prima);
-      const diff = differenze(prima, nuovo);
+      // livelli: se arrivano si sostituiscono; i propri li cambia solo il superutente (è uno solo, D-45)
+      const aPrima = livelliDi(await tx.utenti_aree.findMany({ where: { utente_id: prima.id } }));
+      const aDopo = b.aree === undefined ? aPrima : unisci(aPrima, leggiAree(b.aree));
+      const areeCambiate = JSON.stringify(ordina(aPrima)) !== JSON.stringify(ordina(aDopo));
+      if (areeCambiate && prima.id === io.id && io.ruolo !== 'superutente') throw new ForbiddenException('Non puoi cambiare i tuoi livelli');
+      const diff = differenze(prima, nuovo, areeCambiate ? { prima: aPrima, dopo: aDopo } : null);
       if (!diff) return;
       await tx.utenti.update({ where: { id: prima.id }, data: nuovo });
+      if (areeCambiate) await scriviAree(tx, prima.id, aDopo);
       if ('email' in diff.dopo) await tx.accessi_link.deleteMany({ where: { utente_id: prima.id, usato_il: null } });
       await logEvent(tx, { tipo: 'crud', azione: 'update', entita: 'utente', entita_id: prima.id, esito: 'successo',
         dettaglio: { etichetta: nuovo.username, ...diff } }, contesto(req));
@@ -104,7 +116,7 @@ export class UtentiController {
   /** Disattiva (fuori subito: le sue sessioni si chiudono) o riattiva. */
   @Post(':id/attivo')
   @HttpCode(200)
-  @Richiede('gestione')
+  @Richiede('sistema.utenti')
   async attivo(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: Attivo) {
     await this.db.$transaction(async (tx) => {
       const u = await this.gestibile(tx, req, id);
@@ -121,7 +133,7 @@ export class UtentiController {
   /** Elimina. Chi ha toccato importi (correzioni, liquidazioni chiuse) non si elimina: si disattiva (§7.13). */
   @Delete(':id')
   @HttpCode(204)
-  @Richiede('gestione')
+  @Richiede('sistema.utenti')
   async elimina(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
     try {
       await this.db.$transaction(async (tx) => {
@@ -144,7 +156,7 @@ export class UtentiController {
   /** Reimposta la password: nuova provvisoria per email; quella di prima e le sessioni aperte non valgono più. */
   @Post(':id/password')
   @HttpCode(200)
-  @Richiede('gestione')
+  @Richiede('sistema.utenti')
   async reimposta(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
     const password = provvisoria();
     const hash = await cifra(password);
@@ -185,7 +197,7 @@ export class UtentiController {
     }
     if (u.sistema) throw new ForbiddenException('L’utente dei servizi automatici non si modifica');
     if (u.ruolo === 'superutente') throw new ForbiddenException('Il superutente non si modifica da qui');
-    if (u.ruolo === 'amministratore' && !permessiDi(io.ruolo).includes('amministratori')) {
+    if (u.ruolo === 'amministratore' && !permessiDi(io.ruolo, req.livelli ?? {}).includes('sistema.amministratori')) {
       throw new ForbiddenException('Gli amministratori li gestisce il superutente');
     }
     return u;
@@ -194,7 +206,7 @@ export class UtentiController {
 
 /** Solo il superutente dà il ruolo di amministratore (D-39). */
 function puoDareRuolo(req: Request, ruolo: string) {
-  if (ruolo === 'amministratore' && !permessiDi(req.utente!.ruolo).includes('amministratori')) {
+  if (ruolo === 'amministratore' && !permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('sistema.amministratori')) {
     throw new ForbiddenException('Solo il superutente crea gli amministratori');
   }
 }
@@ -209,10 +221,39 @@ export async function restaUnAmministratore(tx: Tx, tolto: utenti) {
 // nome utente ed email sono già validati (minuscole, senza spazi); l'email si porta in minuscolo come nel database
 const pulisci = (b: DatiUtente | ModificaUtente) => ({ username: b.username, nome: b.nome.trim(), email: b.email.toLowerCase(), ruolo: b.ruolo });
 
-/** Solo i campi cambiati, per il registro (§15.4). */
-function differenze(prima: utenti, dopo: ReturnType<typeof pulisci>) {
+/** Solo i campi cambiati, per il registro (§15.4); i livelli come un campo `aree`. */
+function differenze(prima: utenti, dopo: ReturnType<typeof pulisci>, aree: { prima: Livelli; dopo: Livelli } | null) {
   const k = (Object.keys(dopo) as (keyof typeof dopo)[]).filter((c) => prima[c] !== dopo[c]);
-  return k.length ? { prima: Object.fromEntries(k.map((c) => [c, prima[c]])), dopo: Object.fromEntries(k.map((c) => [c, dopo[c]])) } : null;
+  if (!k.length && !aree) return null;
+  const p: Record<string, unknown> = Object.fromEntries(k.map((c) => [c, prima[c]]));
+  const d: Record<string, unknown> = Object.fromEntries(k.map((c) => [c, dopo[c]]));
+  if (aree) { p.aree = aree.prima; d.aree = aree.dopo; }
+  return { prima: p, dopo: d };
+}
+
+/** Livelli mandati dal browser: solo aree e livelli conosciuti (o null = togli), il resto è un errore (V12).
+ *  Si costruisce un oggetto nuovo: dal browser non passa niente così com'è. */
+function leggiAree(v: Record<string, unknown>) {
+  const fuori: Partial<Record<(typeof AREE)[number], (typeof LIVELLI)[number] | null>> = {};
+  for (const [a, l] of Object.entries(v)) {
+    const area = AREE.find((x) => x === a), livello = LIVELLI.find((x) => x === l);
+    if (!area || (l !== null && !livello)) throw new BadRequestException('Livello non valido per l’area ' + a);
+    fuori[area] = livello ?? null;
+  }
+  return fuori;
+}
+/** I livelli di prima con le modifiche: null toglie l'area, le aree non mandate restano. */
+function unisci(prima: Livelli, modifiche: ReturnType<typeof leggiAree>): Livelli {
+  const dopo: Livelli = { ...prima };
+  for (const [a, l] of Object.entries(modifiche) as [keyof Livelli, Livelli[keyof Livelli] | null][]) {
+    if (l) dopo[a] = l; else delete dopo[a];
+  }
+  return dopo;
+}
+const ordina = (l: Livelli) => Object.fromEntries(Object.entries(l).sort(([a], [b]) => a.localeCompare(b)));
+async function scriviAree(tx: Tx, utente_id: bigint, aree: Livelli) {
+  await tx.utenti_aree.deleteMany({ where: { utente_id } });
+  await tx.utenti_aree.createMany({ data: Object.entries(aree).map(([area, livello]) => ({ utente_id, area, livello: livello! })) });
 }
 
 /** Nome utente o email già usati: messaggio chiaro invece dell'errore del database. */
@@ -229,5 +270,5 @@ async function unico<T>(fn: () => Promise<T>) {
   }
 }
 
-/** BigInt non va in JSON: gli id escono come testo. */
-const fuori = <T extends { id: bigint }>(u: T) => ({ ...u, id: String(u.id) });
+/** BigInt non va in JSON: gli id escono come testo; i livelli come mappa area → livello. */
+const fuori = <T extends { id: bigint; aree: { area: string; livello: string }[] }>(u: T) => ({ ...u, id: String(u.id), aree: livelliDi(u.aree) });

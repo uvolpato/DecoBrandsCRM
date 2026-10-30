@@ -24,40 +24,60 @@ declare module 'express-session' {
 declare module 'express' {
   interface Request {
     utente?: utenti;
+    livelli?: Partial<Record<'anagrafiche' | 'provvigioni' | 'vendite', 'lettura' | 'operatore' | 'responsabile'>>; // D-45
   }
 }
 
-/** Permessi per ruolo: la tabella di §8.3 (M.PERMESSI del prototipo, più il superutente di D-39). */
+/** Ruoli e aree (§8.3, D-45): ruolo di Sistema + un livello per area; stessa tabella di M.PERMESSI del prototipo. */
+export const RUOLI = ['superutente', 'amministratore', 'utente'] as const;
+export const AREE = ['anagrafiche', 'provvigioni', 'vendite'] as const;
+export const LIVELLI = ['lettura', 'operatore', 'responsabile'] as const; // in ordine: ognuno comprende i precedenti
+export type Area = (typeof AREE)[number];
+export type Livello = (typeof LIVELLI)[number];
+export type Livelli = Partial<Record<Area, Livello>>;
+
+interface DefPermesso {
+  area: 'sistema' | Area;
+  testo: string;
+  ruoli?: readonly string[]; // Sistema: i ruoli che lo hanno
+  ancheOperatore?: boolean; // Sistema: anche chi è almeno operatore in un'area
+  minimo?: Livello; // area: il livello che serve
+}
 export const PERMESSI = {
-  consulta: ['superutente', 'amministratore', 'operatore', 'lettura'],
-  esporta: ['superutente', 'amministratore', 'operatore', 'lettura'],
-  modifica: ['superutente', 'amministratore', 'operatore'],
-  anagrafiche: ['superutente', 'amministratore', 'operatore'],
-  chiudi: ['superutente', 'amministratore', 'operatore'],
-  scartati: ['superutente', 'amministratore', 'operatore'],
-  sistema: ['superutente', 'amministratore', 'operatore'],
-  magazzino: ['superutente', 'amministratore'],
-  gestione: ['superutente', 'amministratore'],
-  amministratori: ['superutente'],
-} as const;
-export type Permesso = keyof typeof PERMESSI;
+  'sistema.utenti': { area: 'sistema', testo: 'Utenti (non amministratori): creare, modificare, livelli nelle aree, disattivare', ruoli: ['superutente', 'amministratore'] },
+  'sistema.amministratori': { area: 'sistema', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] },
+  'sistema.impostazioni': { area: 'sistema', testo: 'Impostazioni del portale (casella, posta, sincronizzazione, conservazione)', ruoli: ['superutente', 'amministratore'] },
+  'sistema.stato': { area: 'sistema', testo: 'Stato del sistema, segnare i problemi come visti', ruoli: ['superutente', 'amministratore'], ancheOperatore: true },
+  'anagrafiche.consulta': { area: 'anagrafiche', testo: 'Consultare fornitori, clienti, subagenti', minimo: 'lettura' },
+  'anagrafiche.modifica': { area: 'anagrafiche', testo: 'Subagenti, agenzie dei clienti (interscambio)', minimo: 'operatore' },
+  'anagrafiche.condizioni': { area: 'anagrafiche', testo: 'Condizioni, scaglioni e percentuali dei fornitori; eccezioni personali', minimo: 'responsabile' },
+  'provvigioni.consulta': { area: 'provvigioni', testo: 'Consultare pratiche, documenti, bollettini, liquidazioni, analisi', minimo: 'lettura' },
+  'provvigioni.esporta': { area: 'provvigioni', testo: 'Esportare liquidazioni e analisi (Excel, PDF, CSV)', minimo: 'lettura' },
+  'provvigioni.modifica': { area: 'provvigioni', testo: 'Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti', minimo: 'operatore' },
+  'provvigioni.scartati': { area: 'provvigioni', testo: 'Vedere e recuperare i documenti scartati', minimo: 'operatore' },
+  'provvigioni.chiudi': { area: 'provvigioni', testo: 'Chiudere la liquidazione del trimestre', minimo: 'responsabile' },
+  'provvigioni.elimina': { area: 'provvigioni', testo: 'Eliminare definitivamente i documenti scartati', minimo: 'responsabile' },
+  'vendite.consulta': { area: 'vendite', testo: 'Consultare ordini cliente, articoli, giacenze', minimo: 'lettura' },
+  'vendite.magazzino': { area: 'vendite', testo: 'Alias e kit: creare, modificare, eliminare', minimo: 'responsabile' },
+} as const satisfies Record<string, DefPermesso>;
+/** 'collegato': chiunque sia entrato (io, esci, cambio password). */
+export type Permesso = keyof typeof PERMESSI | 'collegato';
 
-/** Cosa vuol dire ogni permesso, per la tabella "Cosa può fare ogni ruolo" (§7.13, testi di M.PERMESSI). */
-export const TESTI_PERMESSI: Record<Permesso, string> = {
-  consulta: 'Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche',
-  esporta: 'Esportare le liquidazioni (Excel, PDF, CSV)',
-  modifica: 'Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti',
-  anagrafiche: 'Condizioni dei fornitori, agenzie dei clienti, subagenti',
-  chiudi: 'Chiudere la liquidazione del trimestre',
-  scartati: 'Vedere e recuperare i documenti scartati',
-  sistema: 'Vedere lo stato del sistema e segnare i problemi come visti',
-  magazzino: 'Alias e kit: creare, modificare, eliminare',
-  gestione: 'Utenti (operatori e sola lettura), impostazioni, eliminazione definitiva degli scartati',
-  amministratori: 'Amministratori: creare, modificare, disattivare',
-};
-
-export const permessiDi = (ruolo: string) =>
-  (Object.keys(PERMESSI) as Permesso[]).filter((p) => (PERMESSI[p] as readonly string[]).includes(ruolo));
+const grado = (l?: string) => LIVELLI.indexOf(l as Livello); // -1 = nessun livello
+/** I permessi di un utente dal suo ruolo di Sistema e dai livelli nelle aree; il server li rilegge a ogni richiesta (D-38). */
+export function permessiDi(ruolo: string, livelli: Livelli): Permesso[] {
+  const operatore = Object.values(livelli).some((l) => grado(l) >= grado('operatore'));
+  const def = PERMESSI as Record<string, DefPermesso>;
+  return ['collegato', ...(Object.keys(def) as Permesso[]).filter((id) => {
+    const p = def[id];
+    return p.area === 'sistema'
+      ? p.ruoli!.includes(ruolo) || (!!p.ancheOperatore && operatore)
+      : grado(livelli[p.area]) >= grado(p.minimo);
+  })];
+}
+/** Le righe di utenti_aree come mappa area → livello. */
+export const livelliDi = (righe: { area: string; livello: string }[]): Livelli =>
+  Object.fromEntries(righe.map((r) => [r.area, r.livello]));
 
 // Ogni rotta dichiara cosa serve: un permesso, oppure che è pubblica. Senza dichiarazione: negata.
 export const Richiede = (permesso: Permesso) => SetMetadata('permesso', permesso);
@@ -99,20 +119,22 @@ export class AccessoGuard implements CanActivate {
 
     const req = ctx.switchToHttp().getRequest<Request>();
     const id = req.session?.utente_id;
-    const utente = id ? await this.db.utenti.findUnique({ where: { id: BigInt(id) } }) : null;
-    if (!utente?.attivo || utente.sistema) {
+    const trovato = id ? await this.db.utenti.findUnique({ where: { id: BigInt(id) }, include: { aree: true } }) : null;
+    const { aree, ...utente } = trovato ?? { aree: [] };
+    if (!trovato || !trovato.attivo || trovato.sistema) {
       if (id) await new Promise((ok) => req.session.destroy(ok)); // disattivato o sparito: fuori subito
       throw new UnauthorizedException();
     }
-    req.utente = utente;
-    if (utente.deve_cambiare_password && !this.reflector.getAllAndOverride<boolean>('provvisoria', dove)) {
+    req.utente = utente as utenti;
+    req.livelli = livelliDi(aree);
+    if (trovato.deve_cambiare_password && !this.reflector.getAllAndOverride<boolean>('provvisoria', dove)) {
       throw new ForbiddenException('cambia_password'); // prima il cambio della password provvisoria
     }
-    if (permessiDi(utente.ruolo).includes(permesso)) return true;
+    if (permessiDi(trovato.ruolo, req.livelli).includes(permesso)) return true;
 
     await logEventSicuro(this.db, {
-      tipo: 'auth', azione: 'access_denied', entita: 'utente', entita_id: utente.id, esito: 'negato',
-      dettaglio: { etichetta: utente.username, rotta: req.path, metodo: req.method },
+      tipo: 'auth', azione: 'access_denied', entita: 'utente', entita_id: trovato.id, esito: 'negato',
+      dettaglio: { etichetta: trovato.username, rotta: req.path, metodo: req.method },
     }, contesto(req));
     throw new ForbiddenException();
   }
@@ -166,13 +188,13 @@ export class AccessoController {
 
   /** Chi sono e cosa posso fare: il frontend costruisce barra e pagine da qui (D-38). */
   @Get('io')
-  @Richiede('consulta')
+  @Richiede('collegato')
   @AncheProvvisoria()
   io(@Req() req: Request) {
     const u = req.utente!;
     return {
-      id: String(u.id), username: u.username, nome: u.nome, email: u.email, ruolo: u.ruolo,
-      permessi: permessiDi(u.ruolo), cambia_password: u.deve_cambiare_password, csrf: req.session.csrf,
+      id: String(u.id), username: u.username, nome: u.nome, email: u.email, ruolo: u.ruolo, aree: req.livelli ?? {},
+      permessi: permessiDi(u.ruolo, req.livelli ?? {}), cambia_password: u.deve_cambiare_password, csrf: req.session.csrf,
     };
   }
 
@@ -204,7 +226,7 @@ export class AccessoController {
 
   @Post('esci')
   @HttpCode(204)
-  @Richiede('consulta')
+  @Richiede('collegato')
   @AncheProvvisoria()
   async esci(@Req() req: Request) {
     const u = req.utente!;
@@ -218,7 +240,7 @@ export class AccessoController {
   /** Cambio password: obbligatorio con la provvisoria; chiude le altre sessioni dell'utente (§3.3). */
   @Post('password')
   @HttpCode(204)
-  @Richiede('consulta')
+  @Richiede('collegato')
   @AncheProvvisoria()
   @UseGuards(TentativiGuard)
   async password(@Req() req: Request, @Body() b: CambiaPassword) {

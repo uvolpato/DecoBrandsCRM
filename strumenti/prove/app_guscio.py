@@ -51,10 +51,10 @@ with sync_playwright() as p:
     pg = entra(f'{S}-oper')
     ok('Utenti e ruoli' not in voci(pg) and 'Stato del sistema' in voci(pg) and 'Documenti scartati' in voci(pg), 'operatore: niente Utenti e Impostazioni, sì Stato del sistema e Scartati')
     pg.goto(BASE + '/utenti'); pg.wait_for_selector('.vuoto b')
-    ok(pg.locator('.vuoto b').inner_text() == 'Pagina riservata' and 'operatore' in pg.locator('.vuoto').inner_text(), 'operatore su /utenti: Pagina riservata')
+    ok(pg.locator('.vuoto b').inner_text() == 'Pagina riservata' and 'amministratori' in pg.locator('.vuoto').inner_text(), 'operatore su /utenti: Pagina riservata')
     pg.close()
 
-    pg = entra(f'{S}-lett', '/oggi-non-esiste')
+    pg = entra(f'{S}-lett', '/pratiche')  # D-45: la sola lettura vale nelle pagine di un'area dove si ha "lettura"
     ok(pg.evaluate("document.body.classList.contains('sola-lettura')"), 'sola lettura: classe sul body')
     fascia = pg.evaluate("getComputedStyle(document.querySelector('.principale'), '::before').content")
     ok('sola lettura' in fascia, 'sola lettura: fascia "Profilo in sola lettura"')

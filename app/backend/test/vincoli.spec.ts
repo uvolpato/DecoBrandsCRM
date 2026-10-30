@@ -132,12 +132,24 @@ describe('clienti da Integra', () => {
 describe('utenti, sessioni, registro (D-30, D-31, D-33)', () => {
   it('nome utente ed email in minuscolo, ruolo ammesso, password obbligatoria per chi accede', async () => {
     const ins = `INSERT INTO utenti (username, email, nome, ruolo, password_hash, sistema) VALUES ($1, $2, 'Anna', $3, $4, $5)`;
-    expect(await errore(ins, ['anna', 'Anna@X.it', 'operatore', 'x', false])).toMatch('utenti_email_minuscolo_check');
-    expect(await errore(ins, ['Anna', 'anna@x.it', 'operatore', 'x', false])).toMatch('utenti_username_check');
+    expect(await errore(ins, ['anna', 'Anna@X.it', 'utente', 'x', false])).toMatch('utenti_email_minuscolo_check');
+    expect(await errore(ins, ['Anna', 'anna@x.it', 'utente', 'x', false])).toMatch('utenti_username_check');
     expect(await errore(ins, ['anna', 'anna@x.it', 'capo', 'x', false])).toMatch('utenti_ruolo_check');
-    expect(await errore(ins, ['anna', 'anna@x.it', 'operatore', null, false])).toMatch('utenti_password_check');
-    expect(await errore(ins, ['servizi', 'servizi@x.it', 'operatore', null, true])).toBe('');
-    expect(await errore(ins, ['anna@x.it', 'anna2@x.it', 'operatore', 'x', false])).toMatch('utenti_username_senza_chiocciola_check');
+    expect(await errore(ins, ['anna', 'anna@x.it', 'utente', null, false])).toMatch('utenti_password_check');
+    expect(await errore(ins, ['servizi', 'servizi@x.it', 'utente', null, true])).toBe('');
+    expect(await errore(ins, ['anna@x.it', 'anna2@x.it', 'utente', 'x', false])).toMatch('utenti_username_senza_chiocciola_check');
+  });
+
+  it('livelli per area: solo aree e livelli previsti, uno per area, via con l’utente (D-45)', async () => {
+    const [u] = (await q(`INSERT INTO utenti (username, email, nome, ruolo, password_hash) VALUES ('liv', 'liv@x.it', 'Liv', 'utente', 'x') RETURNING id`)).rows;
+    const ins = `INSERT INTO utenti_aree (utente_id, area, livello) VALUES ($1, $2, $3)`;
+    expect(await errore(ins, [u.id, 'provvigioni', 'operatore'])).toBe('');
+    expect(await errore(ins, [u.id, 'provvigioni', 'lettura'])).toMatch('utenti_aree_pkey');
+    expect(await errore(ins, [u.id, 'cucina', 'lettura'])).toMatch('utenti_aree_area_check');
+    expect(await errore(ins, [u.id, 'anagrafiche', 'capo'])).toMatch('utenti_aree_livello_check');
+    expect(await errore(`INSERT INTO utenti (username, email, nome, ruolo, password_hash) VALUES ('vec', 'vec@x.it', 'V', 'operatore', 'x')`, [])).toMatch('utenti_ruolo_check');
+    await q('DELETE FROM utenti WHERE id = $1', [u.id]);
+    expect((await q('SELECT count(*)::int AS n FROM utenti_aree WHERE utente_id = $1', [u.id])).rows[0].n).toBe(0);
   });
 
   it('un solo superutente (D-39)', async () => {

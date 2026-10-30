@@ -13,8 +13,8 @@ import { PrismaService } from '../src/prisma.service';
 
 @Controller('prova')
 class ProvaController {
-  @Get('gestione') @Richiede('gestione') gestione() { return {}; }
-  @Post('modifica') @Richiede('modifica') modifica() { return {}; }
+  @Get('gestione') @Richiede('sistema.utenti') gestione() { return {}; }
+  @Post('modifica') @Richiede('provvigioni.modifica') modifica() { return {}; }
   @Get('senza') senza() { return {}; }
 }
 
@@ -27,9 +27,13 @@ const DOMINIO = '@prova-accesso.it';
 const PW = 'password-di-prova';
 const id: Record<string, bigint> = {};
 
+// D-45: nelle prove "operatore" e "lettura" sono utenti con quel livello in Anagrafiche e Provvigioni
+const comeRuolo = (ruolo: string) => ['operatore', 'lettura'].includes(ruolo)
+  ? { ruolo: 'utente', aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: ruolo })) } }
+  : { ruolo };
 async function crea(username: string, ruolo: string, altro: object = {}) {
   const u = await db.utenti.create({
-    data: { username, email: username + DOMINIO, nome: username, ruolo, password_hash: await cifra(PW), deve_cambiare_password: false, ...altro },
+    data: { username, email: username + DOMINIO, nome: username, ...comeRuolo(ruolo), password_hash: await cifra(PW), deve_cambiare_password: false, ...altro },
   });
   id[username] = u.id;
   return u;
@@ -66,9 +70,10 @@ describe('entra', () => {
   it("con il nome utente o con l'email: utente, permessi dal server e token CSRF", async () => {
     const a = await entra('oper');
     const io = (await a.get('/api/accesso/io').expect(200)).body;
-    expect(io).toMatchObject({ username: 'oper', ruolo: 'operatore', cambia_password: false });
-    expect(io.permessi).toContain('modifica');
-    expect(io.permessi).not.toContain('gestione');
+    expect(io).toMatchObject({ username: 'oper', ruolo: 'utente', aree: { anagrafiche: 'operatore', provvigioni: 'operatore' }, cambia_password: false });
+    expect(io.permessi).toEqual(expect.arrayContaining(['collegato', 'provvigioni.modifica', 'sistema.stato']));
+    expect(io.permessi).not.toContain('provvigioni.chiudi'); // serve responsabile (D-45)
+    expect(io.permessi).not.toContain('sistema.utenti');
     expect(io.csrf).toMatch(/^[0-9a-f]{64}$/);
     await entra('OPER' + DOMINIO.toUpperCase());
   });
@@ -85,7 +90,7 @@ describe('entra', () => {
   });
 
   it("l'utente dei servizi non entra", async () => {
-    await db.utenti.create({ data: { username: 'servizi', email: 'servizi' + DOMINIO, nome: 's', ruolo: 'operatore', sistema: true } });
+    await db.utenti.create({ data: { username: 'servizi', email: 'servizi' + DOMINIO, nome: 's', ruolo: 'utente', sistema: true } });
     await request(app.getHttpServer()).post('/api/accesso/entra').send({ utente: 'servizi', password: PW }).expect(401);
   });
 
@@ -223,7 +228,7 @@ describe('permessi', () => {
   it('il ruolo si rilegge a ogni richiesta: declassato vale subito', async () => {
     const a = await entra('ammi');
     await a.get('/api/prova/gestione').expect(200);
-    await db.utenti.update({ where: { id: id.ammi }, data: { ruolo: 'lettura' } });
+    await db.utenti.update({ where: { id: id.ammi }, data: { ruolo: 'utente' } });
     await a.get('/api/prova/gestione').expect(403);
     await db.utenti.update({ where: { id: id.ammi }, data: { ruolo: 'amministratore' } });
   });
