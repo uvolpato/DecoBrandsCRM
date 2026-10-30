@@ -16,9 +16,14 @@ app/
 ## Avvio in sviluppo
 
 1. `backend/.env` da `backend/.env.example` (password del database), poi in `backend/`:
-   `npm install`, `npx prisma migrate deploy`, `npm test`.
+   `npm install`, `npx prisma migrate deploy`.
+   Le prove (`npm test`) girano su un database a parte, `decobrands_test`, da creare una volta:
+   `CREATE DATABASE decobrands_test OWNER decobrands;` e poi, in Git Bash,
+   `DATABASE_URL=$(grep '^DATABASE_URL' .env | cut -d= -f2- | sed 's#/decobrands_db#/decobrands_test#') npx prisma migrate deploy`
+   (da rifare a ogni migrazione nuova).
 2. In `frontend/`: `npm install`.
-3. `avvia.bat` apre backend (8002) e frontend (8001): http://localhost:8001
+3. Il primo utente: `npm run build && npm run superutente -- <nome utente> <email> "<nome>"`.
+4. `avvia.bat` apre backend (8002) e frontend (8001): http://localhost:8001
 
 `stile.css` e `public-sans.css` in `frontend/app/stile/` sono **copie** del prototipo
 (D-24): si cambiano nel prototipo e si ricopiano, mai qui.

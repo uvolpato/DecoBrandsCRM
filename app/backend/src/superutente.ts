@@ -5,7 +5,7 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { cifra, provvisoria } from './password';
-import { indirizzo, invia } from './posta';
+import { mandaPassword } from './posta';
 import { logEvent } from './registro';
 
 async function crea(argv: string[]) {
@@ -26,12 +26,7 @@ async function crea(argv: string[]) {
       });
       return u;
     });
-    await invia(db, u.id, 'benvenuto', {
-      a: u.email,
-      oggetto: 'Decobrands: il tuo accesso',
-      testo: `Ciao ${u.nome},\n\nentra in ${indirizzo()}/accesso con\n  nome utente: ${u.username}\n  password provvisoria: ${password}\n\n` +
-        'Al primo accesso ti verrà chiesto di scegliere una nuova password.',
-    });
+    await mandaPassword(db, u, password, 'benvenuto');
     return u;
   } finally {
     await db.$disconnect();

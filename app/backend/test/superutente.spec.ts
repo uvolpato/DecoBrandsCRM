@@ -19,12 +19,12 @@ afterAll(async () => {
 });
 
 it('crea il superutente con password provvisoria per email; il secondo è rifiutato', async () => {
-  const spia = jest.spyOn(posta, 'invia').mockResolvedValue();
+  const spia = jest.spyOn(posta, 'mandaPassword').mockResolvedValue();
   const u = await crea(['Capo', 'Capo@Prova-Superutente.it', 'Ugo Volpato']);
   expect(u).toMatchObject({ username: 'capo', email: 'capo@prova-superutente.it', ruolo: 'superutente', deve_cambiare_password: true });
 
-  const email = spia.mock.calls[0][3];
-  const password = email.testo.match(/password provvisoria: (\S+)/)![1];
+  const [, , password, tipo] = spia.mock.calls[0];
+  expect(tipo).toBe('benvenuto');
   expect(password).toHaveLength(12);
   expect(await verifica(password, u.password_hash)).toBe(true);
   expect(await db.registro.count({ where: { codice: 'auth.password_temp', entita_id: u.id } })).toBe(1);

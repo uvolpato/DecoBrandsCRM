@@ -34,6 +34,11 @@ export const SCHEMI: Record<string, string[]> = {
   'auth.password_reset': [],
   'auth.password_temp': ['tipo'],
   'auth.access_denied': ['rotta', 'metodo'],
+  // utenti (§15.2.8)
+  'crud.create': [],
+  'crud.update': ['prima', 'dopo'],
+  'crud.delete': [],
+  'stato.change_state': ['prima', 'dopo'],
   'errore.error': ['rotta', 'metodo', 'http_status', 'errore'],
 };
 

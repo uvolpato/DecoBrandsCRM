@@ -61,6 +61,8 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": { "^.+\\.ts$": "ts-jest" },
     "testEnvironment": "node",
-    "testTimeout": 30000
+    "testTimeout": 30000,
+    "maxWorkers": 1,
+    "setupFiles": ["<rootDir>/test/ambiente.ts"]
   }
 }

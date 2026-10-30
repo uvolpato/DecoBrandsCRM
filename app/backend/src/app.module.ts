@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AccessoController, AccessoGuard, Pubblica } from './accesso';
 import { ErroriFilter } from './errori.filter';
 import { PrismaModule, PrismaService } from './prisma.service';
+import { UtentiController } from './utenti';
 
 @Controller('salute')
 class SaluteController {
@@ -20,7 +21,7 @@ class SaluteController {
 
 @Module({
   imports: [PrismaModule, ThrottlerModule.forRoot([{ ttl: 15 * 60_000, limit: 10 }])], // 10 tentativi in 15 minuti, solo dove c'è TentativiGuard
-  controllers: [SaluteController, AccessoController],
+  controllers: [SaluteController, AccessoController, UtentiController],
   providers: [
     { provide: APP_FILTER, useClass: ErroriFilter }, // con Prisma iniettato: scrive nel registro
     { provide: APP_GUARD, useClass: AccessoGuard }, // su tutte le rotte: permesso dichiarato o negata

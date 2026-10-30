@@ -27,3 +27,13 @@ export async function invia(db: Db, utente_id: bigint, tipo: 'benvenuto' | 'pass
 
 /** Indirizzo dell'app per i link nelle email (in produzione quello pubblico, dietro Caddy). */
 export const indirizzo = () => (process.env.APP_URL ?? 'http://localhost:8001').replace(/\/$/, '');
+
+/** Email con nome utente e password provvisoria: nuovo utente (benvenuto) o *Reimposta la password* (§7.13). */
+export const mandaPassword = (db: Db, u: { id: bigint; email: string; nome: string; username: string }, password: string, tipo: 'benvenuto' | 'password') =>
+  invia(db, u.id, tipo, {
+    a: u.email,
+    oggetto: tipo === 'benvenuto' ? 'Decobrands: il tuo accesso' : 'Decobrands: nuova password provvisoria',
+    testo: `Ciao ${u.nome},\n\nentra in ${indirizzo()}/accesso con\n  nome utente: ${u.username}\n  password provvisoria: ${password}\n\n` +
+      'Al primo accesso ti verrà chiesto di scegliere una nuova password.' +
+      (tipo === 'password' ? ' La password di prima non vale più.' : ''),
+  });

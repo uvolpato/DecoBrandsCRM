@@ -2,9 +2,8 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '@prisma/client';
-import { logEvent, logEventSicuro, SCHEMI } from '../src/registro';
+import { logEvent, logEventSicuro } from '../src/registro';
 
-SCHEMI['crud.create'] = []; // codice di prova, solo qui
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 const annulla = new Error('annulla');
