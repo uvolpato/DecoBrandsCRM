@@ -29,7 +29,7 @@
       azioni: [{ etichetta: 'Nuovo utente', icona: 'piu', onClick: () => modificaUtente(null) }] });
     const utenti = M.S.utenti;
     const u = utenti.find(x => x.id === Number(idSel)) || utenti[0];
-    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)');
+    const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(0,1.15fr) minmax(0,1fr)');
     const sx = CRM.blocco(col, 'pila riempi');
     const VISTE = { attivi: x => x.attivo, disattivati: x => !x.attivo, tutti: () => true };
     CRM.FilterBar(sx, { campi: [
@@ -255,7 +255,7 @@
         dettagli: [{ testo: s.nota, variante: s.stato === 'ok' ? '' : s.stato }, { testo: 'ultimo: ' + quando(s.ultimo) + ' · ' + s.ritmo }].concat(aperti ? [{ testo: aperti + (aperti === 1 ? ' problema da vedere' : ' problemi da vedere'), variante: 'errore' }] : []) };
     }), { selezionata: servizioSel, onSeleziona: id => { servizioSel = id; aggiorna(); } });
 
-    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)');
+    const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(0,1.5fr) minmax(0,1fr)');
     const pp = CRM.Pannello(col, { titolo: 'Problemi', riempi: true, senzaMargine: true, nota: nuovi.length ? nuovi.length + ' da vedere' : 'nessuno da vedere' });
     const fb = CRM.FilterBar(pp.corpo, { campi: [{ nome: 'vista', tipo: 'segmenti', valore: vistaProblemi, opzioni: [
       { value: 'nuovi', label: 'Da vedere', n: nuovi.length }, { value: 'tutti', label: 'Tutti', n: S.problemi.length }] }], onChange: v => { vistaProblemi = v.vista; aggiorna(); } });
@@ -326,7 +326,7 @@
     const sez = SEZIONI.find(x => x.id === idSez) || SEZIONI[0];
     const corpo = CRM.Pagina({ voce: 'impostazioni', titolo: 'Impostazioni', pieno: true,
       sottotitolo: 'Valgono per tutti gli utenti. Le password non si rileggono: si sostituiscono. Ogni modifica resta nel registro eventi.' });
-    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(240px,0.6fr) minmax(0,2fr)');
+    const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(240px,0.6fr) minmax(0,2fr)');
     const ps = CRM.Pannello(col, { titolo: 'Sezioni', riempi: true });
     CRM.ElencoSelezionabile(ps.corpo, SEZIONI.map(x => ({ id: x.id, href: '#/impostazioni/' + x.id, titolo: x.titolo, sotto: x.sotto })), sez.id);
     const dati = M.S.impostazioni[sez.id];
@@ -428,7 +428,7 @@
     const corpo = CRM.Pagina({ voce: 'guida', titolo: 'Guida', pieno: true, sottotitolo: 'Come si usa il CRM, pagina per pagina: cosa fa, come si lavora, a cosa servono i pulsanti e le finestre. Da ogni pagina il pulsante "Guida" in alto apre l’argomento giusto.' });
     const visibili = CRM.GUIDA.filter(g => g.gruppo !== 'Vendita diretta' || CRM.AMPLIAMENTI.vendita).filter(g => g.gruppo !== 'Gestione' || M.puo(g.id === 'sistema' ? 'sistema' : g.id === 'scartati' ? 'scartati' : 'gestione'));
     const g = visibili.find(x => x.id === idSel) || visibili[0];
-    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(240px,0.55fr) minmax(0,2fr)');
+    const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(240px,0.55fr) minmax(0,2fr)');
     const sx = CRM.Pannello(col, { titolo: 'Argomenti', riempi: true });
     CRM.FilterBar(sx.corpo, { campi: [{ nome: 'q', tipo: 'cerca', valore: cercaGuida, placeholder: 'Cerca un pulsante, una finestra…' }], onChange: v => { cercaGuida = v.q; disegna(); } });
     const elenco = CRM.blocco(sx.corpo, '');

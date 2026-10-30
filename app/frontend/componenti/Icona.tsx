@@ -20,6 +20,8 @@ const PERCORSI: Record<string, string> = {
   esci: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
   carica: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
   piu: '<path d="M12 5v14M5 12h14"/>',
+  cerca: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  spunta: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
 };
 
 export function Icona({ nome }: { nome: string }) {

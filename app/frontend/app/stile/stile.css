@@ -92,7 +92,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .testa-azioni { display: flex; gap: 8px; flex-wrap: wrap; }
 .corpo { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
 .corpo.pieno { overflow: hidden; }
-.colonne { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 16px; min-height: 0; }
+/* --colonne: larghezze scelte dalla pagina; sugli schermi stretti si impilano lo stesso (lo style in linea vincerebbe sulla @media) */
+.colonne { display: grid; grid-template-columns: var(--colonne, minmax(0, 1.7fr) minmax(300px, 1fr)); gap: 16px; min-height: 0; }
 .colonne.pari { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .colonne.posta { grid-template-columns: 330px minmax(0, 1fr); }
 .colonne > * { min-height: 0; }
@@ -104,9 +105,9 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 /* ---------- Pannello ---------- */
 .pannello { background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-medio); box-shadow: var(--ombra); display: flex; flex-direction: column; min-height: 0; flex: none; }
 .pannello.riempi { flex: 1 1 auto; overflow: hidden; }
-.pannello-testa { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 18px; border-bottom: 1px solid var(--bordo-tenue); flex: none; }
+.pannello-testa { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; padding: 13px 18px; border-bottom: 1px solid var(--bordo-tenue); flex: none; }
 .pannello-testa h2 { font-size: 15px; font-weight: 600; }
-.pannello-destra { display: flex; align-items: center; gap: 10px; }
+.pannello-destra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .pannello-nota { color: var(--testo-tenue); font-size: 13px; text-align: right; }
 .pannello-corpo { padding: 16px 18px; min-height: 0; }
 .pannello.riempi > .pannello-corpo { flex: 1 1 auto; overflow: auto; display: flex; flex-direction: column; }
@@ -175,6 +176,8 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 .segmenti button[aria-selected="true"] .n { color: rgba(255,255,255,.8); }
 .cerca { position: relative; flex: 0 1 280px; }
 .cerca input { width: 100%; padding: 7px 12px 7px 34px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: var(--superficie); }
+/* contorno dentro il bordo: fuori veniva tagliato dai contenitori che non scorrono */
+.cerca input:focus { outline: 0; border-color: var(--primario); box-shadow: inset 0 0 0 1px var(--primario); }
 .cerca .icona { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--testo-tenue); width: 16px; height: 16px; }
 .filtro-select { padding: 7px 10px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: var(--superficie); }
 
@@ -344,6 +347,7 @@ a.m-cella:hover { background: #f1f6ff; }
 .modale-piede { padding: 14px 22px 18px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--bordo-tenue); }
 .testo-email { width: 100%; min-height: 220px; padding: 12px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); font-size: 13.5px; line-height: 1.5; }
 .avviso { position: fixed; right: 22px; bottom: 22px; background: var(--ok); color: #fff; padding: 12px 16px; border-radius: var(--r-piccolo); z-index: 60; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+.avviso.errore { background: var(--errore); }
 @media (prefers-reduced-motion: no-preference) {
   .avviso { animation: entra .18s ease-out; }
   @keyframes entra { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -375,7 +379,7 @@ a.m-cella:hover { background: #f1f6ff; }
   body { display: block; overflow: auto; }
   .barra { flex-direction: row; overflow-x: auto; padding: 10px 12px; gap: 4px; position: sticky; top: 0; z-index: 10; }
   .marchio, .gruppo-nome, .barra-piede { display: none; }
-  .carica-barra { margin: 0 6px 0 0; white-space: nowrap; flex: none; }
+  .carica-barra { margin: 0 6px 0 0; white-space: nowrap; flex: none; align-self: center; } /* non si allunga quanto la barra */
   .gruppo { display: flex; margin: 0; gap: 2px; }
   .voce { white-space: nowrap; }
   .principale { height: auto; overflow: visible; padding: 18px 16px; }
@@ -615,6 +619,13 @@ details.gruppo.richiudibile > summary.gruppo-nome::-webkit-details-marker { disp
 details.gruppo.richiudibile > summary.gruppo-nome::after { content: ''; width: 6px; height: 6px; margin-left: auto; margin-right: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
 details.gruppo.richiudibile[open] > summary.gruppo-nome::after { transform: rotate(45deg); }
 details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
+/* sul telefono la barra è una riga: "Gestione" non si stringe (andava a capo lettera per lettera) */
+/* e le voci in riga: dentro <details> display:flex non vale, le voci si impilavano */
+@media (max-width: 860px) {
+  details.gruppo.richiudibile { white-space: nowrap; }
+  details.gruppo.richiudibile > summary.gruppo-nome { display: inline-flex; vertical-align: middle; margin-right: 4px; }
+  details.gruppo.richiudibile > .voce { display: inline-flex; vertical-align: middle; }
+}
 .barra-piede a { color: rgba(255,255,255,.75); }
 
 .gruppo-nome .conta { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 999px; background: rgba(255,255,255,.16); color: #fff; }
@@ -644,7 +655,7 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 /* ---------- Schede ---------- */
 .schede { display: flex; flex-direction: column; min-height: 0; }
 .schede.riempi { flex: 1 1 auto; min-height: 0; }
-.schede-barra { display: flex; gap: 2px; border-bottom: 1px solid var(--bordo); flex: none; overflow-x: auto; }
+.schede-barra { display: flex; gap: 2px; border-bottom: 1px solid var(--bordo); flex: none; overflow: auto hidden; } /* solo di lato: overflow-x da solo accendeva anche le frecce verticali */
 .schede-barra [role=tab] { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px 8px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; font: inherit; font-size: 14px; color: var(--testo-tenue); cursor: pointer; white-space: nowrap; border-radius: 6px 6px 0 0; }
 .schede-barra [role=tab]:hover { color: var(--testo); background: var(--sfondo); }
 .schede-barra [role=tab][aria-selected="true"] { color: var(--primario); border-bottom-color: var(--primario); font-weight: 600; }

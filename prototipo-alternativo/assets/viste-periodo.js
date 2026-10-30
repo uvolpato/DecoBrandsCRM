@@ -246,7 +246,7 @@
       });
       const conDoc = perSub.filter(x => x.documenti), senza = perSub.length - conDoc.length;
       if (subSel && !conDoc.some(x => String(x.id) === subSel)) subSel = null;
-      const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(300px,0.8fr) minmax(0,2.2fr)');
+      const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(300px,0.8fr) minmax(0,2.2fr)');
       const ps = CRM.Pannello(col, { titolo: 'Subagenti', riempi: true, senzaMargine: true,
         nota: conDoc.length + (conDoc.length === 1 ? ' con documenti' : ' con documenti') + (senza ? ' · ' + senza + ' senza' : '') });
       const tabSub = CRM.DataTable(ps.corpo, {

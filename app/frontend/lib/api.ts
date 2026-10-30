@@ -26,19 +26,27 @@ const MESSAGGI: Record<number, string> = {
   500: 'Qualcosa non ha funzionato. Riprova; se succede ancora, avvisa l’amministratore.',
 };
 
-export async function api<T = unknown>(percorso: string, corpo?: object): Promise<Risposta<T>> {
+/** GET senza corpo, POST con il corpo; PUT e DELETE si chiedono con `metodo`. */
+export async function api<T = unknown>(percorso: string, corpo?: object, metodo?: 'PUT' | 'DELETE'): Promise<Risposta<T>> {
+  const scrive = !!corpo || !!metodo;
   // pagina appena aperta con una sessione: il token si prende prima di modificare (senza sessione non serve)
-  if (corpo && !csrf && percorso !== 'accesso/io') await api('accesso/io');
-  const r = await fetch('/api/' + percorso, {
-    method: corpo ? 'POST' : 'GET',
-    headers: corpo ? { 'content-type': 'application/json', 'x-csrf-token': csrf } : undefined,
-    body: corpo ? JSON.stringify(corpo) : undefined,
-    credentials: 'same-origin',
-  });
+  if (scrive && !csrf && percorso !== 'accesso/io') await api('accesso/io');
+  let r: Response;
+  try {
+    r = await fetch('/api/' + percorso, {
+      method: metodo ?? (corpo ? 'POST' : 'GET'),
+      headers: scrive ? { 'content-type': 'application/json', 'x-csrf-token': csrf } : undefined,
+      body: corpo ? JSON.stringify(corpo) : undefined,
+      credentials: 'same-origin',
+    });
+  } catch { // server spento o rete caduta: chi chiama mostra il messaggio come per ogni altro errore
+    return { ok: false, stato: 0, dati: null as T, messaggio: 'Il server non risponde: controlla la connessione e riprova.' };
+  }
   const dati = r.status === 204 ? null : await r.json().catch(() => null);
   if (dati && typeof dati.csrf === 'string') csrf = dati.csrf;
-  // i messaggi del server sono già in italiano; le liste della validazione dei DTO no
-  const testo = typeof dati?.message === 'string' ? dati.message : '';
+  // i messaggi del server sono già in italiano; dalla validazione dei DTO arriva una lista: il primo
+  const m = dati?.message;
+  const testo = typeof m === 'string' ? m : Array.isArray(m) && typeof m[0] === 'string' ? m[0] : '';
   return { ok: r.ok, stato: r.status, dati: dati as T, messaggio: r.ok ? '' : MESSAGGI[r.status] ?? (testo || MESSAGGI[500]) };
 }
 

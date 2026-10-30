@@ -77,6 +77,13 @@ describe('elenco e scheda', () => {
     await (await a.get('/utenti/' + id.oper).expect(200));
     await (await entra('oper')).get('/utenti').expect(403);
   });
+
+  it('cosa può fare ogni ruolo: dalla tabella dei permessi del server', async () => {
+    const r = await (await entra('ammi')).get('/utenti/ruoli').expect(200);
+    expect(r.body).toContainEqual({ id: 'amministratori', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] });
+    expect(r.body.every((p: { testo: string }) => p.testo)).toBe(true);
+    await (await entra('lett')).get('/utenti/ruoli').expect(403);
+  });
 });
 
 describe('nuovo utente', () => {
@@ -170,7 +177,8 @@ describe('disattiva, riattiva, reimposta, elimina', () => {
   it('reimposta: nuova password provvisoria, la vecchia e le sessioni non valgono più', async () => {
     await crea('smemo', 'operatore');
     const lui = await apri('smemo');
-    await (await entra('ammi')).post(`/utenti/${id.smemo}/password`).expect(204);
+    const ris = await (await entra('ammi')).post(`/utenti/${id.smemo}/password`).expect(200);
+    expect(ris.body).toMatchObject({ deve_cambiare_password: true }); // con ultimo_invio: l'interfaccia dice se l'email è partita
     const [, , password, tipo] = spia.mock.calls.at(-1)!;
     expect(tipo).toBe('password');
     await lui.get('/accesso/io').expect(401);

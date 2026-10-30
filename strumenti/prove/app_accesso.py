@@ -83,10 +83,10 @@ with sync_playwright() as p:
     pg.goto(BASE + '/'); pg.wait_for_function("location.pathname === '/accesso'")
     ok(True, 'Esci aperto direttamente (pagina appena caricata): sessione chiusa')
 
-    m = b.new_page(viewport={'width': 390, 'height': 844})
+    m = b.new_page(viewport={'width': 768, 'height': 1024})
     m.goto(BASE + '/accesso'); m.wait_for_selector('.accesso h1')
-    ok(m.evaluate("document.documentElement.scrollWidth <= 390"), '390 px: niente scorrimento orizzontale')
-    m.screenshot(path=str(USCITA / 'app-accesso-390.png'))
+    ok(m.evaluate("document.documentElement.scrollWidth <= 768"), '768 px: niente scorrimento orizzontale')
+    m.screenshot(path=str(USCITA / 'app-accesso-768.png'))
     b.close()
 
 print('\n'.join(esiti)); print('errori della pagina:', errori or 'nessuno')

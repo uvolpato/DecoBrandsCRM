@@ -395,7 +395,7 @@
     const corpo = testataAliasKit('kit');
     const puo = M.puo('magazzino');
     const k = M.S.kit.find(x => x.codice === codSel) || M.S.kit[0];
-    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)');
+    const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(0,1fr) minmax(0,1.3fr)');
     const pl = CRM.Pannello(col, { titolo: 'Kit', riempi: true, senzaMargine: true });
     CRM.DataTable(pl.corpo, {
       compatta: true, righe: M.S.kit, ordinamentoIniziale: { key: 'codice', dir: 'asc' }, rowClass: x => k && x.codice === k.codice ? 'selezionata' : '',

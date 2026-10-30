@@ -5,7 +5,7 @@ import {
 import { Prisma, type utenti } from '@prisma/client';
 import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import type { Request } from 'express';
-import { contesto, permessiDi, Richiede } from './accesso';
+import { contesto, PERMESSI, permessiDi, Richiede, TESTI_PERMESSI, type Permesso } from './accesso';
 import { cifra, provvisoria } from './password';
 import { mandaPassword } from './posta';
 import { PrismaService } from './prisma.service';
@@ -47,6 +47,13 @@ export class UtentiController {
   @Richiede('gestione')
   elenco() {
     return this.db.utenti.findMany({ select: VISIBILI, orderBy: { nome: 'asc' } }).then((r) => r.map(fuori));
+  }
+
+  /** Tabella "Cosa può fare ogni ruolo": dalla stessa tabella che usa il guard, così non si disallinea. */
+  @Get('ruoli')
+  @Richiede('gestione')
+  ruoli() {
+    return (Object.keys(PERMESSI) as Permesso[]).map((id) => ({ id, testo: TESTI_PERMESSI[id], ruoli: PERMESSI[id] }));
   }
 
   @Get(':id')
@@ -136,7 +143,7 @@ export class UtentiController {
 
   /** Reimposta la password: nuova provvisoria per email; quella di prima e le sessioni aperte non valgono più. */
   @Post(':id/password')
-  @HttpCode(204)
+  @HttpCode(200)
   @Richiede('gestione')
   async reimposta(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
     const password = provvisoria();
@@ -151,6 +158,7 @@ export class UtentiController {
       return u;
     });
     await mandaPassword(this.db, u, password, 'password');
+    return fuori(await this.trova(this.db, id)); // con ultimo_invio: l'interfaccia dice se l'email è partita
   }
 
   private async trova(db: Tx, id: number) {

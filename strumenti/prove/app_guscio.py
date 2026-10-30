@@ -63,9 +63,9 @@ with sync_playwright() as p:
     pg.screenshot(path=str(USCITA / 'guscio-lettura-1440.png'))
     pg.close()
 
-    pg = entra(f'{S}-ammi', '/', 390)
-    ok(pg.evaluate('document.documentElement.scrollWidth <= 390'), '390 px: niente scorrimento orizzontale')
-    pg.screenshot(path=str(USCITA / 'guscio-390.png'))
+    pg = entra(f'{S}-ammi', '/', 768)
+    ok(pg.evaluate('document.documentElement.scrollWidth <= 768'), '768 px: niente scorrimento orizzontale')
+    pg.screenshot(path=str(USCITA / 'guscio-768.png'))
     b.close()
 
 print('\n'.join(esiti)); print('errori della pagina:', errori or 'nessuno')

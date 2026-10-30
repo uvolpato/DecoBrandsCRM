@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { Icona } from './Icona';
 import { RUOLI, usePuo, useUtente } from './Utente';
@@ -36,7 +37,9 @@ export interface PaginaProps {
 }
 
 export function Pagina({ titolo, sottotitolo, azioni = [], pieno, children }: PaginaProps) {
-  useEffect(() => { document.title = titolo + ' · Decobrands'; }, [titolo]);
+  // anche a ogni cambio d'indirizzo: navigando, Next rimette il titolo del layout ("Decobrands")
+  const percorso = usePathname();
+  useEffect(() => { document.title = titolo + ' · Decobrands'; }, [titolo, percorso]);
   return (
     <>
       <header className="testa">

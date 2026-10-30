@@ -6,7 +6,7 @@ import { Riservata } from '@/componenti/Pagina';
 
 // Pagine della barra non ancora fatte: dentro il guscio, con lo stesso controllo dei permessi
 // che avranno (Pagina riservata). Una pagina vera, quando arriva, prende il posto di questa.
-const PERMESSO: Record<string, string> = { utenti: 'gestione', impostazioni: 'gestione', sistema: 'sistema', scartati: 'scartati' };
+const PERMESSO: Record<string, string> = { impostazioni: 'gestione', sistema: 'sistema', scartati: 'scartati' };
 
 export default function Pagina() {
   const percorso = usePathname();

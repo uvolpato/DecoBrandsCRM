@@ -42,6 +42,20 @@ export const PERMESSI = {
 } as const;
 export type Permesso = keyof typeof PERMESSI;
 
+/** Cosa vuol dire ogni permesso, per la tabella "Cosa può fare ogni ruolo" (§7.13, testi di M.PERMESSI). */
+export const TESTI_PERMESSI: Record<Permesso, string> = {
+  consulta: 'Consultare pratiche, documenti, bollettini, liquidazioni e anagrafiche',
+  esporta: 'Esportare le liquidazioni (Excel, PDF, CSV)',
+  modifica: 'Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti',
+  anagrafiche: 'Condizioni dei fornitori, agenzie dei clienti, subagenti',
+  chiudi: 'Chiudere la liquidazione del trimestre',
+  scartati: 'Vedere e recuperare i documenti scartati',
+  sistema: 'Vedere lo stato del sistema e segnare i problemi come visti',
+  magazzino: 'Alias e kit: creare, modificare, eliminare',
+  gestione: 'Utenti (operatori e sola lettura), impostazioni, eliminazione definitiva degli scartati',
+  amministratori: 'Amministratori: creare, modificare, disattivare',
+};
+
 export const permessiDi = (ruolo: string) =>
   (Object.keys(PERMESSI) as Permesso[]).filter((p) => (PERMESSI[p] as readonly string[]).includes(ruolo));
 

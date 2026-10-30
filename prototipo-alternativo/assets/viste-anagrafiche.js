@@ -260,7 +260,7 @@
     const corpo = CRM.Pagina({ voce: 'clienti', titolo: 'Clienti', pieno: true,
       sottotitolo: 'Anagrafica da Integra. Per ogni cliente: le agenzie (fornitori per cui Decobrands fa da agente), chi lo segue e con quale sconto.' });
     const c = M.cliente(pivaSel) || M.S.clienti.slice().sort((x, y) => x.nome.localeCompare(y.nome))[0];
-    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)');
+    const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(0,1fr) minmax(0,1.3fr)');
     const sx = CRM.blocco(col, 'pila riempi');
     const VISTE = { tutti: () => true, agenzie: x => agenzie(x.piva).length > 0, senza: x => !agenzie(x.piva).length, diretta: x => x.vendita_diretta };
     CRM.FilterBar(sx, { campi: [

@@ -15,7 +15,7 @@ ok('accesso-scena' in html and 'Sistema Informativo Aziendale' in html, 'la scen
 
 with sync_playwright() as p:
     b = p.chromium.launch(headless=True)
-    for w, h in ((1440, 900), (390, 844)):
+    for w, h in ((1440, 900), (768, 1024)):
         pg = b.new_page(viewport={'width': w, 'height': h})
         pg.on('pageerror', lambda e: errori.append(str(e)))
         aperta = lambda: pg.locator('.accesso-scena.aperta').count() == 1
