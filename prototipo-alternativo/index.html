@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="assets/stile.css">
 </head>
 <body>
+  <!-- D-42: sulle pagine di accesso la pagina nasce già scura, senza lampo di barra e area chiara al ricaricamento -->
+  <script>if (/^#\/accesso/.test(location.hash)) document.body.classList.add('in-accesso');</script>
   <aside class="barra" id="barra"></aside>
   <main class="principale" id="principale"></main>
 
