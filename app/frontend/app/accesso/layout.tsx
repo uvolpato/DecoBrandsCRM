@@ -1,20 +1,15 @@
 import type { ReactNode } from 'react';
 import { ClasseBody } from '@/componenti/ClasseBody';
+import { ScenaAccesso } from '@/componenti/ScenaAccesso';
 
-// Pagine di accesso: barra scura con il solo marchio, come nel prototipo (CRM.Accesso, §7.0).
+// Pagine di accesso (§7.0, D-42): pagina scura con il logo, come nel prototipo (CRM.Accesso).
+// La scena arriva già nell'HTML del server e stile.css la riconosce con body:has(.accesso-scena):
+// la pagina nasce scura, senza lampo al ricaricamento; la classe in-accesso resta per i browser senza :has.
 export default function LayoutAccesso({ children }: { children: ReactNode }) {
   return (
-    <>
+    <main className="principale">
       <ClasseBody classe="in-accesso" />
-      <aside className="barra">
-        <div className="marchio">
-          {/* eslint-disable-next-line @next/next/no-img-element -- stesso logo del prototipo, già piccolo */}
-          <img src="/logo-decobrands.png" alt="Decobrands" />
-          <span>Sistema Informativo Aziendale</span>
-        </div>
-        <div className="barra-piede">Accesso riservato a chi lavora con Decobrands. Gli utenti li crea l’amministratore.</div>
-      </aside>
-      <main className="principale">{children}</main>
-    </>
+      <ScenaAccesso>{children}</ScenaAccesso>
+    </main>
   );
 }

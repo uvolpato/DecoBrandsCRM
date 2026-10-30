@@ -260,11 +260,11 @@
     });
     const primo = form.el.querySelector('input:not([type=checkbox])');
     // tasti e tocchi della pagina; il piede (licenza) e le finestre sopra (la licenza aperta) non contano
-    const ascolta = (tasto, tocco) => {
+    const ascolta = (tasto, tocco, fine) => {
       if (fermaAscolto) fermaAscolto();
       // click e non pointerdown: lo scorrimento col dito non chiude e il focus resta nel campo
       document.addEventListener('keydown', tasto); scena.addEventListener('click', tocco);
-      fermaAscolto = () => { document.removeEventListener('keydown', tasto); scena.removeEventListener('click', tocco); fermaAscolto = null; };
+      fermaAscolto = () => { document.removeEventListener('keydown', tasto); scena.removeEventListener('click', tocco); if (fine) fine(); fermaAscolto = null; };
     };
     const altrove = ev => $('.velo') || (ev.target.closest && ev.target.closest('.accesso-piede'));
     // si torna al logo ridisegnando Accedi da chiuso (anche da Password dimenticata)
@@ -272,7 +272,15 @@
     const apri = (tasto) => {
       scena.classList.add('aperta');
       // con presentazione: Esc o un clic fuori dalla finestra tornano al logo (D-42)
-      if (opz.presentazione) ascolta(ev => { if (ev.key === 'Escape' && !altrove(ev)) chiudi(); }, ev => { if (!fin.contains(ev.target) && !altrove(ev)) chiudi(); });
+      if (opz.presentazione) {
+        // 2 minuti senza tasti né clic: torna al logo e il modulo riparte vuoto (D-42)
+        let t = setTimeout(chiudi, 2 * 60000), giu = null;
+        const rinvia = () => { clearTimeout(t); t = setTimeout(chiudi, 2 * 60000); };
+        scena.addEventListener('pointerdown', ev => { giu = ev.target; rinvia(); });
+        // si chiude solo se il clic è partito e finito fuori: trascinare una selezione dal campo non chiude
+        ascolta(ev => { rinvia(); if (ev.key === 'Escape' && !altrove(ev)) chiudi(); },
+          ev => { if (!fin.contains(ev.target) && !(giu && fin.contains(giu)) && !altrove(ev)) chiudi(); }, () => clearTimeout(t));
+      }
       else if (fermaAscolto) fermaAscolto();
       if (!primo) return;
       // il tasto va nel campo solo se è vuoto: se il browser l'ha già riempito non si sporca

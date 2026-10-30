@@ -9,6 +9,12 @@ from playwright.sync_api import sync_playwright
 PROVVISORIA, LOG, USCITA, U = sys.argv[1], pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3]), sys.argv[4]
 BASE = 'http://localhost:8001'
 esiti, errori = [], []
+# D-42: su Accedi e Password dimenticata prima c'è il logo; un tasto apre la finestra
+def apri(pg):
+    pg.wait_for_selector('.accesso-scena')
+    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    pg.wait_for_selector('.accesso-scena.aperta')
+
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 
 def link_dal_log(dopo):
@@ -22,7 +28,7 @@ with sync_playwright() as p:
     b = p.chromium.launch(headless=True)
     pg = b.new_page(viewport={'width': 1440, 'height': 900})
     pg.on('pageerror', lambda e: errori.append(str(e)))
-    entra = lambda u, pw: (pg.fill('#c-utente', u), pg.fill('#c-password', pw), pg.click('button.btn.largo'))
+    entra = lambda u, pw: (apri(pg), pg.fill('#c-utente', u), pg.fill('#c-password', pw), pg.click('button.btn.largo'))
 
     pg.goto(BASE + '/'); pg.wait_for_function('f => (location.pathname + location.search).includes(f)', arg='/accesso?dopo=')
     ok(pg.locator('.accesso h1').inner_text() == 'Accedi', 'senza sessione: pagina di accesso con ritorno a /')
@@ -50,7 +56,7 @@ with sync_playwright() as p:
     # password dimenticata: il link arriva nel log del backend (posta in sviluppo)
     inizio = LOG.stat().st_size
     pg.click('text=Password dimenticata?'); pg.wait_for_function('f => (location.pathname + location.search).includes(f)', arg='/accesso/dimenticata')
-    pg.fill('#c-email', U + '@prova-e2e.it'); pg.click('button.btn.largo')
+    apri(pg); pg.fill('#c-email', U + '@prova-e2e.it'); pg.click('button.btn.largo')
     pg.wait_for_selector('text=Controlla la posta')
     ok(True, 'dimenticata: Controlla la posta')
     codice = link_dal_log(inizio)

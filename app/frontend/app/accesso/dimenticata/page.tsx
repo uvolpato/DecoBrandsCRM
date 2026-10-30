@@ -1,4 +1,5 @@
 'use client';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Accesso } from '@/componenti/Accesso';
 import { Campo } from '@/componenti/Campo';
@@ -7,6 +8,7 @@ import { api } from '@/lib/api';
 // Password dimenticata (§7.0): dopo l'invio sempre "Controlla la posta", anche se l'email non è
 // registrata (§3.3).
 export default function Pagina() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   if (email) {
     return (
@@ -14,7 +16,7 @@ export default function Pagina() {
         titolo="Controlla la posta"
         testo={<>Se <b>{email}</b> è l’email di un utente, tra poco arriva un link per scegliere una nuova password. Vale un’ora e una volta sola.</>}
         conferma="Torna all’accesso"
-        onConferma={async () => { window.location.assign('/accesso'); }}
+        onConferma={async () => { router.replace('/accesso'); }}
       />
     );
   }

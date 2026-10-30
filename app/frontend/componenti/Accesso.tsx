@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 
-// Pagine fuori dall'app (D-39, spec §7.0), come CRM.Accesso del prototipo: pannello al centro;
-// la barra scura con il marchio la mette app/accesso/layout.tsx. I campi arrivano come figli.
+// Pagine fuori dall'app (D-39, spec §7.0), come CRM.Accesso del prototipo: la finestra con il modulo;
+// pagina scura, logo e licenza li mette ScenaAccesso (app/accesso/layout.tsx). I campi arrivano come figli.
 // onConferma riceve i valori del modulo e restituisce il messaggio d'errore, se c'è.
 export interface AccessoProps {
   titolo: string;
@@ -45,7 +45,7 @@ export function Accesso({ titolo, testo, avviso, conferma, link = [], onConferma
   }
 
   return (
-    <div className="accesso">
+    <div className="accesso" role="dialog" aria-label={titolo}>
       <section className="pannello">
         <div className="pannello-corpo">
           <h1>{titolo}</h1>

@@ -12,6 +12,12 @@ esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 voci = lambda pg: [x.strip() for x in pg.locator('.barra .voce span').all_text_contents()]  # anche nel gruppo chiuso
 
+# D-42: su Accedi e Password dimenticata prima c'è il logo; un tasto apre la finestra
+def apri(pg):
+    pg.wait_for_selector('.accesso-scena')
+    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    pg.wait_for_selector('.accesso-scena.aperta')
+
 with sync_playwright() as p:
     b = p.chromium.launch(headless=True)
 
@@ -20,7 +26,7 @@ with sync_playwright() as p:
         pg.on('pageerror', lambda e: errori.append(str(e)))
         pg.goto(BASE + percorso)
         pg.wait_for_function("location.pathname === '/accesso'")
-        pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
+        apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
         pg.wait_for_function('p => location.pathname === p', arg=percorso)
         pg.wait_for_selector('.barra .voce')
         return pg
