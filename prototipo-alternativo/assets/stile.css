@@ -626,7 +626,8 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .barra-menu::-webkit-scrollbar { width: 6px; }
 .barra-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 3px; }
 .barra > .marchio, .barra > .carica-barra, .barra > .barra-piede { flex: none; }
-@media (max-width: 860px) { .barra { height: auto; overflow: visible; } .barra-menu { display: contents; } }
+/* sul telefono la barra è una riga che scorre da sola: senza overflow-x le voci allargavano tutta la pagina */
+@media (max-width: 860px) { .barra { height: auto; overflow: auto hidden; } .barra-menu { display: contents; } }
 
 /* ---------- Vendita diretta (ordini cliente, articoli, giacenze, alias e kit) ---------- */
 .testo-attesa { color: var(--attesa-testo); font-weight: 600; }
