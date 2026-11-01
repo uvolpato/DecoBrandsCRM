@@ -13,12 +13,11 @@ datasource db {
 
 // ---------- Anagrafiche (§4.2.1–§4.2.6) ----------
 
-/// Fornitori: dati anagrafici da Integra in sola lettura (D-01), condizioni gestite nel CRM.
+/// Identità del fornitore (D-46, §4.6): l'id non cambia mai. Qui stanno le regole del CRM e i campi
+/// tecnici; i dati descrittivi da Integra stanno in fornitori_versioni, il codice in codici_esterni.
 model fornitori {
   id                     BigInt    @id @default(autoincrement())
-  ragione_sociale        String    @db.VarChar(255)
-  piva                   String?   @unique @db.VarChar(20)
-  codice_integra         String    @unique @db.VarChar(20)
+  versione_corrente_id   BigInt? // versione in vigore; sempre una versione di questo fornitore (FK composta)
   giorni_attesa_conferma Int       @default(30)
   giorno_bollettino      Int       @default(10) @db.SmallInt // CHECK 1–28 (§5.6, D-03)
   tipo_provvigione       String    @default("fatturato") @db.VarChar(20) // maturato | fatturato (§5.5)
@@ -29,29 +28,85 @@ model fornitori {
   modificato_il          DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   sincronizzato_il       DateTime? @db.Timestamptz(6)
 
-  scaglioni  provvigioni_scaglioni[]
-  agenzie    interscambio[]
+  corrente  fornitori_versioni?     @relation("corrente", fields: [id, versione_corrente_id], references: [fornitore_id, id], onDelete: Restrict, map: "fornitori_versione_corrente_fkey")
+  versioni  fornitori_versioni[]    @relation("versioni")
+  scaglioni provvigioni_scaglioni[]
+  agenzie   interscambio[]
+}
+
+/// Dati descrittivi del fornitore da Integra: si aggiungono soltanto (trigger), mai UPDATE né DELETE (D-46).
+model fornitori_versioni {
+  id              BigInt   @id @default(autoincrement())
+  fornitore_id    BigInt
+  valido_dal      DateTime @default(now()) @db.Timestamptz(6)
+  fonte           String   @db.VarChar(10) // integra | crm (CHECK)
+  creato_da       BigInt?
+  piva            String?  @db.VarChar(20) // non univoca: ogni cambio è una versione nuova
+  ragione_sociale String   @db.VarChar(255)
+  paese           String?  @db.VarChar(100)
+
+  fornitore  fornitori                  @relation("versioni", fields: [fornitore_id], references: [id], onDelete: Restrict)
+  autore     utenti?                    @relation(fields: [creato_da], references: [id], onDelete: Restrict)
+  correnti   fornitori[]                @relation("corrente")
   pratiche   ordini_fornitore_testata[]
   bollettini bollettini_testata[]
   documenti  documenti_in_arrivo[]
+
+  @@unique([fornitore_id, id])
+  @@index([piva])
 }
 
-/// Copia locale di v_clienti, scritta solo dalla sincronizzazione (§4.2.20, D-33).
+/// Identità del cliente, scritta solo dalla sincronizzazione (§4.2.20, D-33, D-46). Dati descrittivi
+/// in clienti_versioni; P.IVA doppie ammesse (D-35).
 model clienti {
-  id               BigInt    @id @default(autoincrement())
-  codice_integra   String    @unique @db.VarChar(20)
-  piva             String?   @db.VarChar(20) // non univoca: Integra può avere P.IVA doppie (D-35)
-  ragione_sociale  String    @db.VarChar(255)
-  indirizzo        String?   @db.VarChar(255)
-  cap              String?   @db.VarChar(10)
-  citta            String?   @db.VarChar(100)
-  provincia        String?   @db.VarChar(5)
-  email            String?   @db.VarChar(200)
-  attivo           Boolean   @default(true)
-  modificato_il    DateTime? @db.Timestamptz(6)
-  sincronizzato_il DateTime? @db.Timestamptz(6)
+  id                   BigInt    @id @default(autoincrement())
+  versione_corrente_id BigInt? // versione in vigore; sempre una versione di questo cliente (FK composta)
+  attivo               Boolean   @default(true)
+  modificato_il        DateTime? @db.Timestamptz(6) // data di modifica in Integra
+  sincronizzato_il     DateTime? @db.Timestamptz(6)
 
+  corrente clienti_versioni?  @relation("corrente", fields: [id, versione_corrente_id], references: [cliente_id, id], onDelete: Restrict, map: "clienti_versione_corrente_fkey")
+  versioni clienti_versioni[] @relation("versioni")
+  agenzie  interscambio[]
+}
+
+/// Dati descrittivi del cliente da Integra: si aggiungono soltanto (trigger) (D-46).
+model clienti_versioni {
+  id              BigInt   @id @default(autoincrement())
+  cliente_id      BigInt
+  valido_dal      DateTime @default(now()) @db.Timestamptz(6)
+  fonte           String   @db.VarChar(10) // integra | crm (CHECK)
+  creato_da       BigInt?
+  piva            String?  @db.VarChar(20) // non univoca: Integra può avere P.IVA doppie (D-35)
+  ragione_sociale String   @db.VarChar(255)
+  indirizzo       String?  @db.VarChar(255)
+  cap             String?  @db.VarChar(10)
+  citta           String?  @db.VarChar(100)
+  provincia       String?  @db.VarChar(5)
+  email           String?  @db.VarChar(200)
+
+  cliente  clienti                    @relation("versioni", fields: [cliente_id], references: [id], onDelete: Restrict)
+  autore   utenti?                    @relation(fields: [creato_da], references: [id], onDelete: Restrict)
+  correnti clienti[]                  @relation("corrente")
+  pratiche ordini_fornitore_testata[]
+  righe    bollettini_righe[]
+
+  @@unique([cliente_id, id])
   @@index([piva])
+}
+
+/// Codice di un'entità in un sistema esterno (Integra, …). Due codici possono puntare alla stessa
+/// entità (fusione o cambio di codice). entita_id punta a clienti o fornitori secondo il tipo: niente FK.
+model codici_esterni {
+  id        BigInt   @id @default(autoincrement())
+  sistema   String   @db.VarChar(20) // integra (CHECK)
+  tipo      String   @db.VarChar(20) // cliente | fornitore (CHECK)
+  codice    String   @db.VarChar(50)
+  entita_id BigInt
+  creato_il DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([sistema, tipo, codice])
+  @@index([tipo, entita_id])
 }
 
 /// Percentuali per scaglione di sconto, in versioni datate (§5.11, D-25).
@@ -116,7 +171,7 @@ model subagenti {
 model interscambio {
   id                       BigInt    @id @default(autoincrement())
   subagente_id             BigInt
-  cliente_piva             String    @db.VarChar(20)
+  cliente_id               BigInt
   fornitore_id             BigInt
   codice_cliente_fornitore String?   @db.VarChar(50)
   sconto                   Decimal   @default(0) @db.Decimal(5, 2)
@@ -127,39 +182,44 @@ model interscambio {
   creato_il                DateTime  @default(now()) @db.Timestamptz(6)
 
   subagente subagenti @relation(fields: [subagente_id], references: [id], onDelete: Restrict)
+  cliente   clienti   @relation(fields: [cliente_id], references: [id], onDelete: Restrict)
   fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Restrict)
 
   // periodi senza sovrapposizioni per cliente e per codice: EXCLUDE nella migrazione iniziale (D-35 §19): vale anche per il codice, quindi niente UNIQUE semplice
   @@index([subagente_id])
+  @@index([cliente_id])
   @@index([fornitore_id, codice_cliente_fornitore])
 }
 
 // ---------- Pratiche (§4.2.7–§4.2.8) ----------
 
 model ordini_fornitore_testata {
-  id                BigInt    @id @default(autoincrement())
-  fornitore_id      BigInt
-  ordine_cliente_id BigInt? // senza FK fino alla vendita diretta (§17, D-33)
-  numero_ordine     String    @db.VarChar(50)
-  data_ordine       DateTime  @db.Date
-  cliente_piva      String    @db.VarChar(20)
-  agente_id         BigInt?
-  importo_merce     Decimal?  @db.Decimal(12, 2)
-  stato             String    @default("inviato") @db.VarChar(20) // inviato | confermato | fatturato
-  conferma_data     DateTime? @db.Date
-  conferma_numero   String?   @db.VarChar(50)
-  note              String?
-  creato_il         DateTime  @default(now()) @db.Timestamptz(6)
-  modificato_il     DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  id                    BigInt    @id @default(autoincrement())
+  fornitore_id          BigInt
+  fornitore_versione_id BigInt
+  ordine_cliente_id     BigInt? // senza FK fino alla vendita diretta (§17, D-33)
+  numero_ordine         String    @db.VarChar(50)
+  data_ordine           DateTime  @db.Date
+  cliente_id            BigInt
+  cliente_versione_id   BigInt
+  agente_id             BigInt?
+  importo_merce         Decimal?  @db.Decimal(12, 2)
+  stato                 String    @default("inviato") @db.VarChar(20) // inviato | confermato | fatturato
+  conferma_data         DateTime? @db.Date
+  conferma_numero       String?   @db.VarChar(50)
+  note                  String?
+  creato_il             DateTime  @default(now()) @db.Timestamptz(6)
+  modificato_il         DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
-  fornitore fornitori                    @relation(fields: [fornitore_id], references: [id])
+  fornitore fornitori_versioni           @relation(fields: [fornitore_id, fornitore_versione_id], references: [fornitore_id, id], onDelete: Restrict, map: "ordini_fornitore_testata_fornitore_versione_fkey")
+  cliente   clienti_versioni             @relation(fields: [cliente_id, cliente_versione_id], references: [cliente_id, id], onDelete: Restrict, map: "ordini_fornitore_testata_cliente_versione_fkey")
   agente    agenti?                      @relation(fields: [agente_id], references: [id])
   righe     ordini_fornitore_righe[]
   documenti ordini_fornitore_documenti[]
   arrivati  documenti_in_arrivo[]
 
   @@index([fornitore_id, stato])
-  @@index([cliente_piva])
+  @@index([cliente_id])
 }
 
 /// Fatture e note di credito della pratica: la base delle provvigioni (§4.2.7.1, §5.3).
@@ -233,19 +293,20 @@ model ordini_fornitore_righe {
 // ---------- Bollettini (§4.2.9–§4.2.10) ----------
 
 model bollettini_testata {
-  id            BigInt    @id @default(autoincrement())
-  fornitore_id  BigInt
-  mese          Int // CHECK 1–12
-  anno          Int
-  stato         String    @default("da_verificare") @db.VarChar(20) // da_verificare | verificato | contestato
-  chiuso_il     DateTime? @db.Timestamptz(6) // verificato o contestato: decide il trimestre di storni e riaccrediti (D-11)
-  chiuso_da     BigInt?
-  note          String?
-  creato_il     DateTime  @default(now()) @db.Timestamptz(6)
-  modificato_il DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  id                    BigInt    @id @default(autoincrement())
+  fornitore_id          BigInt
+  fornitore_versione_id BigInt
+  mese                  Int // CHECK 1–12
+  anno                  Int
+  stato                 String    @default("da_verificare") @db.VarChar(20) // da_verificare | verificato | contestato
+  chiuso_il             DateTime? @db.Timestamptz(6) // verificato o contestato: decide il trimestre di storni e riaccrediti (D-11)
+  chiuso_da             BigInt?
+  note                  String?
+  creato_il             DateTime  @default(now()) @db.Timestamptz(6)
+  modificato_il         DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
   chiusore  utenti?               @relation(fields: [chiuso_da], references: [id], onDelete: Restrict)
-  fornitore fornitori             @relation(fields: [fornitore_id], references: [id])
+  fornitore fornitori_versioni    @relation(fields: [fornitore_id, fornitore_versione_id], references: [fornitore_id, id], onDelete: Restrict, map: "bollettini_testata_fornitore_versione_fkey")
   righe     bollettini_righe[]
   arrivati  documenti_in_arrivo[]
 
@@ -258,7 +319,8 @@ model bollettini_righe {
   testata_id           BigInt
   fattura_numero       String    @db.VarChar(50)
   fattura_data         DateTime? @db.Date
-  cliente_piva         String?   @db.VarChar(20)
+  cliente_id           BigInt? // cliente e versione vanno insieme (CHECK)
+  cliente_versione_id  BigInt?
   importo_merce        Decimal?  @db.Decimal(12, 2)
   pct_riconosciuta     Decimal?  @db.Decimal(5, 2)
   importo_riconosciuto Decimal   @db.Decimal(12, 2)
@@ -274,8 +336,10 @@ model bollettini_righe {
   testata      bollettini_testata          @relation(fields: [testata_id], references: [id], onDelete: Cascade)
   documento    ordini_fornitore_documenti? @relation(fields: [documento_id], references: [id], onDelete: SetNull)
   liquidazione liquidazioni?               @relation(fields: [liquidazione_id], references: [id], onDelete: Restrict)
+  cliente      clienti_versioni?           @relation(fields: [cliente_id, cliente_versione_id], references: [cliente_id, id], onDelete: Restrict, map: "bollettini_righe_cliente_versione_fkey")
 
   @@index([fattura_numero])
+  @@index([cliente_id])
   @@index([testata_id])
   @@index([documento_id])
   @@index([liquidazione_id])
@@ -313,6 +377,7 @@ model documenti_in_arrivo {
   errore                 String?
   tipo                   String?   @db.VarChar(16)
   fornitore_id           BigInt?
+  fornitore_versione_id  BigInt? // fornitore e versione vanno insieme (CHECK)
   livello                String?   @db.VarChar(12) // dal campo meno affidabile in documenti_campi
   controlli              Json?
   modello                String?
@@ -327,7 +392,7 @@ model documenti_in_arrivo {
   motivo_scarto          String?   @db.VarChar(40)
   nota_scarto            String?
 
-  fornitore  fornitori?                   @relation(fields: [fornitore_id], references: [id])
+  fornitore  fornitori_versioni?          @relation(fields: [fornitore_id, fornitore_versione_id], references: [fornitore_id, id], onDelete: Restrict, map: "documenti_in_arrivo_fornitore_versione_fkey")
   pratica    ordini_fornitore_testata?    @relation(fields: [abbinato_pratica_id], references: [id])
   bollettino bollettini_testata?          @relation(fields: [abbinato_bollettino_id], references: [id])
   utente     utenti?                      @relation("documento_utente", fields: [utente_id], references: [id], onDelete: SetNull)
@@ -382,6 +447,8 @@ model utenti {
   eventi             registro[]               @relation("registro_utente")
   visti              registro[]               @relation("registro_visto")
   correzioni         provvigioni_correzioni[]
+  versioni_clienti   clienti_versioni[]
+  versioni_fornitori fornitori_versioni[]
   liquidazioni       liquidazioni[]
   bollettini_chiusi  bollettini_testata[]
   documenti          documenti_in_arrivo[]    @relation("documento_utente")
