@@ -25,6 +25,9 @@ export function ScenaAccesso({ children }: { children: ReactNode }) {
   const giu = useRef<Element | null>(null); // dove è partito il clic
   const scena = useRef<HTMLDivElement>(null);
 
+  // arrivando con un messaggio (password appena salvata) la finestra è già aperta: il messaggio si vede subito
+  useEffect(() => { if (/[?&]fatto=/.test(location.search)) setAperta(true); }, []);
+
   // cambiando pagina: Accedi ↔ Password dimenticata lasciano la finestra com'è, Esci torna al logo
   useEffect(() => {
     if (percorso === '/accesso/esci') setAperta(false);

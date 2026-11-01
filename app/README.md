@@ -24,6 +24,21 @@ app/
 2. In `frontend/`: `npm install`.
 3. Il primo utente: `npm run build && npm run superutente -- <nome utente> <email> "<nome>"`.
 4. `avvia.bat` apre backend (8002) e frontend (8001): http://localhost:8001
+   Un solo processo per porta: se `start:dev` dice `EADDRINUSE`, c'è un backend vecchio acceso.
+
+**Prove nel browser** (Playwright, fuori da `app/`, in `strumenti/prove/`), con i due processi
+accesi, da `backend/` dopo `npm run build`:
+
+```bash
+node ../../strumenti/prove/utenti_prova.js crea p1    # p1-ammi, p1-oper, p1-lett, p1-nuovo (password-di-prova)
+python ../../strumenti/prove/app_accesso.py password-di-prova <registro del backend> <cartella schermate> p1-nuovo
+python ../../strumenti/prove/app_guscio.py p1 <cartella schermate>
+python ../../strumenti/prove/app_utenti.py p1 <cartella schermate>
+python ../../strumenti/prove/app_scena.py <cartella schermate>
+node ../../strumenti/prove/utenti_prova.js togli      # toglie utenti, eventi e sessioni di prova
+```
+Il registro del backend serve ad `app_accesso.py` per leggere il link di *password dimenticata*
+(in sviluppo la posta va nel registro).
 
 `stile.css` e `public-sans.css` in `frontend/app/stile/` sono **copie** del prototipo
 (D-24): si cambiano nel prototipo e si ricopiano, mai qui.

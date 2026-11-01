@@ -1,8 +1,8 @@
 # Prova dell'accesso nell'app vera (passo 1.10), con Playwright.
-# Servono backend (8002, con la posta nel log) e frontend (8001) accesi. Uso:
-#   U=prova$RANDOM; cd app/backend && npm run superutente -- $U $U@prova-e2e.it "Prova E2E"   (password provvisoria nel risultato)
-#   python strumenti/prove/app_accesso.py <password provvisoria> <file di log del backend> <cartella schermate> $U
-# Poi si tolgono utente ed eventi di prova (email @prova-e2e.it).
+# Servono backend (8002, con la posta nel log) e frontend (8001) accesi. Uso (da app/backend):
+#   node ../../strumenti/prove/utenti_prova.js crea s1     (fra gli altri, s1-nuovo con password provvisoria)
+#   python ../../strumenti/prove/app_accesso.py password-di-prova <file di log del backend> <cartella schermate> s1-nuovo
+#   node ../../strumenti/prove/utenti_prova.js togli
 import re, sys, time, pathlib
 from playwright.sync_api import sync_playwright
 
@@ -31,8 +31,8 @@ with sync_playwright() as p:
     entra = lambda u, pw: (apri(pg), pg.fill('#c-utente', u), pg.fill('#c-password', pw), pg.click('button.btn.largo'))
 
     pg.goto(BASE + '/'); pg.wait_for_function('f => (location.pathname + location.search).includes(f)', arg='/accesso?dopo=')
-    ok(pg.locator('.accesso h1').inner_text() == 'Accedi', 'senza sessione: pagina di accesso con ritorno a /')
-    ok(pg.locator('aside.barra .marchio img').count() == 1 and pg.evaluate("document.body.classList.contains('in-accesso')"), 'barra con il marchio, stile del prototipo')
+    ok(pg.locator('.accesso h1').text_content() == 'Accedi', 'senza sessione: pagina di accesso con ritorno a /')
+    ok(pg.locator('.accesso-scena .accesso-logo img').count() == 1 and pg.evaluate("document.body.classList.contains('in-accesso')"), 'pagina scura con il logo (D-42)')
     pg.screenshot(path=str(USCITA / 'app-accesso-1440.png'))
     entra(U, 'sbagliata'); pg.wait_for_selector('.modulo-errore:not([hidden])')
     ok(pg.locator('.modulo-errore').inner_text() == 'Credenziali non valide.', 'password sbagliata: messaggio unico')
@@ -44,18 +44,18 @@ with sync_playwright() as p:
     pg.wait_for_selector('.modulo-errore:not([hidden])')
     ok('8 caratteri' in pg.locator('.modulo-errore').inner_text(), 'nuova password corta: messaggio del server')
     pg.fill('#c-nuova', 'nuova-password-1'); pg.fill('#c-ripeti', 'nuova-password-1'); pg.click('button.btn.largo')
-    pg.wait_for_function("location.pathname === '/'"); pg.wait_for_selector('.vuoto b')
-    ok('Ciao Prova E2E' in pg.locator('.vuoto').inner_text(), 'dopo il cambio si entra')
-    pg.click('text=Esci'); pg.wait_for_function("location.pathname === '/accesso'")
+    pg.wait_for_function("location.pathname === '/'"); pg.wait_for_selector('.barra-piede .io b')
+    ok(pg.locator('.barra-piede .io b').inner_text() == 'Prova Nuovo', 'dopo il cambio si entra')
+    pg.click('a.io-esci'); pg.wait_for_function("location.pathname === '/accesso'")
     pg.goto(BASE + '/'); pg.wait_for_function('f => (location.pathname + location.search).includes(f)', arg='/accesso?dopo=')
     ok(True, 'dopo Esci la sessione non vale più')
     entra(U + '@prova-e2e.it', 'nuova-password-1'); pg.wait_for_function("location.pathname === '/'")
     ok(True, 'si entra con l\'email e la nuova password')
-    pg.click('text=Esci'); pg.wait_for_function("location.pathname === '/accesso'")
+    pg.click('a.io-esci'); pg.wait_for_function("location.pathname === '/accesso'")
 
     # password dimenticata: il link arriva nel log del backend (posta in sviluppo)
     inizio = LOG.stat().st_size
-    pg.click('text=Password dimenticata?'); pg.wait_for_function('f => (location.pathname + location.search).includes(f)', arg='/accesso/dimenticata')
+    apri(pg); pg.click('text=Password dimenticata?'); pg.wait_for_function('f => (location.pathname + location.search).includes(f)', arg='/accesso/dimenticata')
     apri(pg); pg.fill('#c-email', U + '@prova-e2e.it'); pg.click('button.btn.largo')
     pg.wait_for_selector('text=Controlla la posta')
     ok(True, 'dimenticata: Controlla la posta')
@@ -74,7 +74,7 @@ with sync_playwright() as p:
     ok(True, 'si entra con la password reimpostata')
 
     # ritorno: solo percorsi interni
-    pg.click('text=Esci'); pg.wait_for_function("location.pathname === '/accesso'")
+    pg.click('a.io-esci'); pg.wait_for_function("location.pathname === '/accesso'")
     pg.goto(BASE + '/accesso?dopo=//esempio.com'); entra(U, 'nuova-password-2'); pg.wait_for_function("location.pathname === '/'")
     ok(pg.url == BASE + '/', 'ritorno verso un altro sito ignorato')
     pg.goto(BASE + '/accesso'); pg.wait_for_function("location.pathname === '/'")
@@ -84,7 +84,7 @@ with sync_playwright() as p:
     ok(True, 'Esci aperto direttamente (pagina appena caricata): sessione chiusa')
 
     m = b.new_page(viewport={'width': 768, 'height': 1024})
-    m.goto(BASE + '/accesso'); m.wait_for_selector('.accesso h1')
+    m.goto(BASE + '/accesso'); m.wait_for_selector('.accesso-scena')
     ok(m.evaluate("document.documentElement.scrollWidth <= 768"), '768 px: niente scorrimento orizzontale')
     m.screenshot(path=str(USCITA / 'app-accesso-768.png'))
     b.close()

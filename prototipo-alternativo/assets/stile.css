@@ -924,10 +924,11 @@ body.in-accesso .principale, body:has(.accesso-scena) .principale { padding: 0; 
 .accesso-licenza:hover { color: #fff; }
 .licenza h3 { font-size: 14px; margin: 14px 0 4px; }
 .licenza p, .licenza ul { margin: 0 0 8px; }
-.accesso-scena.aperta .accesso-logo { opacity: .07; transform: scale(1.06); animation: none; }
+.accesso-scena.aperta .accesso-logo { opacity: .07; transform: scale(1.06); animation: none; pointer-events: none; }
 .accesso-scena.aperta .accesso-invito { visibility: hidden; }
 /* chiusa: nascosta anche a Tab e ai lettori di schermo (visibility), che arrivano al pulsante dell'invito */
-.accesso { width: 100%; max-width: 400px; opacity: 0; transform: translateY(10px) scale(.97); visibility: hidden; }
+/* sopra il logo: col transform il logo sbiadito si disegnava sopra il modulo e un clic sul pulsante chiudeva la finestra */
+.accesso { position: relative; z-index: 1; width: 100%; max-width: 400px; opacity: 0; transform: translateY(10px) scale(.97); visibility: hidden; }
 .accesso-scena.aperta .accesso { opacity: 1; transform: none; visibility: visible; transition: opacity .16s ease-out, transform .16s ease-out; }
 .accesso .pannello { box-shadow: 0 20px 50px rgba(0,0,0,.45); }
 @keyframes accesso-entra { from { opacity: 0; transform: translateY(10px) scale(.96); } }

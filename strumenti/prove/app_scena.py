@@ -36,6 +36,7 @@ with sync_playwright() as p:
         pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
         pg.mouse.click(w // 2, 60); pg.wait_for_timeout(300)
         ok(aperta() and pg.evaluate('document.activeElement.id') == 'c-utente', f'{w}: un clic apre col focus nel primo campo')
+        ok(pg.evaluate("(() => { const b = document.querySelector('.accesso button.btn.largo').getBoundingClientRect(); return !!document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2).closest('.accesso'); })()"), f'{w}: il pulsante si clicca (il logo non lo copre)')
         pg.mouse.click(5, 5); pg.wait_for_timeout(300)
         ok(not aperta(), f'{w}: un clic fuori torna al logo')
         pg.keyboard.press('Enter'); pg.wait_for_timeout(300)
