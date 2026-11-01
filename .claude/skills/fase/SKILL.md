@@ -1,6 +1,6 @@
 ---
 name: fase
-description: Esegue una fase di avanzamento-app.md con un agente sul modello segnato per quella fase (Sonnet, Opus, Haiku), passandogli solo il contesto che serve. Usare quando Ugo dice "/fase", "/fase 2a", "fai la prossima fase con il modello giusto" o "manda la fase all'agente".
+description: Esegue una fase di avanzamento-app.md con un agente sul modello segnato per quella fase (Sonnet, Opus, Haiku), passandogli solo il contesto che serve. Usare SEMPRE, senza aspettare che Ugo lo chieda, quando si comincia o si riprende una fase o un'attività di avanzamento-app.md / piano-lavoro-crm.md ("andiamo avanti", "prossima fase", "fai la 2b", "/fase 2a").
 ---
 
 # Fase con il modello giusto

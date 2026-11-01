@@ -166,12 +166,11 @@ Regole del codice del prototipo:
      Si correggono i rilievi veri; nel messaggio finale a Ugo si dice quali controlli sono stati
      fatti, cosa hanno trovato e cosa resta aperto.
 6b. **Modello per fase** (Ugo, 01/11/2026): ogni fase di `avanzamento-app.md` ha il suo modello
-   (Sonnet, Opus, Haiku). **Prima di cominciare una fase controlla il modello in uso**: se non è
-   quello segnato, fermati e scrivi a Ugo: «⚠ Questa fase è segnata per **<modello>**, ora sto
-   usando **<modello attuale>**. Cambia con `/model <nome>` e poi scrivi *continua*.» Non
-   cominciare finché non è cambiato (o Ugo dice di proseguire così).
-   In alternativa `/fase <n>` (skill `.claude/skills/fase`) manda la fase a un agente sul modello
-   giusto con un brief mirato; la sessione principale controlla e fa il commit.
+   (Sonnet, Opus, Haiku). Per cominciare o riprendere una fase **chiama da solo la skill `fase`**
+   (`.claude/skills/fase`), senza chiedere: manda la fase a un agente sul modello segnato con un
+   brief mirato; la sessione principale controlla, fa le review e il commit. Si lavora nella
+   sessione principale senza agente solo se Ugo lo chiede; allora, se il modello in uso non è
+   quello segnato, fermati e chiedigli di cambiarlo con `/model <nome>`.
 7. **Domande**: se una richiesta è ambigua o va contro una decisione del §19, chiedi
    prima di procedere. I dubbi aperti con il cliente stanno nella spec, ad esempio §5.14:
    - chi manda il sollecito di pagamento;
