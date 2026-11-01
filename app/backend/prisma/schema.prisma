@@ -331,8 +331,13 @@ model bollettini_righe {
   fattura_mese         DateTime? @db.Date
   documento_id         BigInt? // documento abbinato dalla riconciliazione (§5.11)
   liquidazione_id      BigInt? // storno o riaccredito: trimestre in cui è andato al subagente (D-11)
+  decisione            String?   @db.VarChar(12) // riga che non quadra: accettato | contestato | attendere (§7.7, D-49); CHECK nella migrazione
+  decisione_motivo     String? // obbligatorio per contestato: va nel testo della contestazione
+  deciso_da            BigInt?
+  deciso_il            DateTime? @db.Timestamptz(6)
   creato_il            DateTime  @default(now()) @db.Timestamptz(6)
 
+  decisore     utenti?                     @relation(fields: [deciso_da], references: [id], onDelete: Restrict)
   testata      bollettini_testata          @relation(fields: [testata_id], references: [id], onDelete: Cascade)
   documento    ordini_fornitore_documenti? @relation(fields: [documento_id], references: [id], onDelete: SetNull)
   liquidazione liquidazioni?               @relation(fields: [liquidazione_id], references: [id], onDelete: Restrict)
@@ -451,6 +456,7 @@ model utenti {
   versioni_fornitori fornitori_versioni[]
   liquidazioni       liquidazioni[]
   bollettini_chiusi  bollettini_testata[]
+  righe_decise       bollettini_righe[]
   documenti          documenti_in_arrivo[]    @relation("documento_utente")
   documenti_scartati documenti_in_arrivo[]    @relation("documento_scartato")
   campi_corretti     documenti_campi[]

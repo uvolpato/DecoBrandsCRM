@@ -94,7 +94,8 @@
   M.meseMin = m => M.MESI[m - 1];
   M.mese = (m, a) => M.MESI[m - 1].replace(/^./, c => c.toUpperCase()) + (a ? ' ' + a : '');
   M.dataLunga = iso => { const [a, m, g] = iso.split('-'); return Number(g) + ' ' + M.MESI[Number(m) - 1] + ' ' + a; };
-  M.r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+  // regola contabile (D-49 §19): il mezzo si allontana dallo zero; toFixed sul numero già moltiplicato evita 1.005 → 1,00
+  M.r2 = n => { const x = Number(n) || 0; return Math.sign(x) * Math.round(Number((Math.abs(x) * 100).toFixed(6))) / 100; };
   M.giorni = (da, a) => Math.round((new Date(a) - new Date(da)) / 86400000);
   M.piuGiorni = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   M.oggi = () => M.S.oggi;

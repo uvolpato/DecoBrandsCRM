@@ -79,6 +79,7 @@ export async function caricaDati(db: Db, oggi = giornoRoma(new Date())) {
         numero: r.fattura_numero, data: r.fattura_data ? giorno(r.fattura_data) : null, imponibile: r.importo_merce, pct: r.pct_riconosciuta, importo: r.importo_riconosciuto,
         tipo: r.tipo_riga === 'provvigione' ? null : r.tipo_riga, // storno | riaccredito (§5.14)
         pct_calcolata: r.pct_calcolata, importo_calcolato: r.importo_calcolato, // congelati alla verifica (§5.11)
+        decisione: r.decisione ? { esito: r.decisione, motivo: r.decisione_motivo } : null, // riga che non quadra (D-49)
       })),
     })),
     liquidazioni_chiuse: liquidazioni.map((l) => ({ id: id(l.id), anno: l.anno, trimestre: l.trimestre, chiusa_il: giornoRoma(l.chiusa_il) })),

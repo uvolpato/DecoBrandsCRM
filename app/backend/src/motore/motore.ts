@@ -16,10 +16,9 @@ type Abbinamento = Dati['interscambio'][number];
 type RigaBollettino = Bollettino['righe'][number];
 
 /* ---------- Numeri e date ---------- */
-/** Centesimo come M.r2 (Math.round): il mezzo va verso +∞, quindi −0,005 → 0,00 e non −0,01.
- *  ROUND_HALF_CEIL su Decimal è uguale a Math.round tranne i mezzi che in binario non sono esatti
- *  (1.005 × 100 = 100.4999… → Math.round dà 1,00, qui 1,01): sul seed coincide al centesimo. */
-export const r2 = (n: Prisma.Decimal.Value) => new Dec(n).toDecimalPlaces(2, Dec.ROUND_HALF_CEIL);
+/** Centesimo con la regola contabile (D-49 §19): il mezzo si allontana dallo zero, quindi
+ *  0,005 → 0,01 e −0,005 → −0,01. Il prototipo (M.r2) fa lo stesso. */
+export const r2 = (n: Prisma.Decimal.Value) => new Dec(n).toDecimalPlaces(2, Dec.ROUND_HALF_UP);
 const somma = (xs: Dec[]) => xs.reduce((s, x) => s.plus(x), ZERO);
 /** importo × pct / 100, al centesimo: l'unico modo in cui si calcola una provvigione. */
 const quota = (importo: Dec, pct: Dec) => r2(importo.times(pct).div(100));
@@ -182,6 +181,7 @@ export function riconcilia(S: Dati, b: Bollettino) {
       numero: r.numero, data: r.data, pratica_id: n?.pratica.id ?? null, cliente_id: n?.pratica.cliente_id ?? null, tipo: n?.doc.tipo ?? null,
       loro: { imponibile: r.imponibile, pct: r.pct, importo: r.importo } as Lato | null, noi: null as Lato | null, differenza: null as Dec | null,
       categoria: 'sconosciuta', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
+      decisione: r.decisione as { esito: string; motivo: string | null } | null,
     };
     if (!n) return riga;
     const perc = percentuali(S, n.pratica, n.doc.data), pct = perc ? perc.dal_fornitore : ZERO;
@@ -209,6 +209,8 @@ export function riconcilia(S: Dati, b: Bollettino) {
       numero: x.doc.numero, data: x.doc.data, pratica_id: x.pratica.id, cliente_id: x.pratica.cliente_id, tipo: x.doc.tipo,
       loro: null as Lato | null, noi: { imponibile: x.doc.importo, pct, importo: atteso } as Lato | null, differenza: atteso.neg() as Dec | null,
       categoria: 'mancante', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
+      // ponytail: un documento che manca nel bollettino non ha una riga dove salvare "attendere": la crea F3 alla decisione
+      decisione: null as { esito: string; motivo: string | null } | null,
     };
     // maturato (§5.14): una fattura assente non è "mancante": il cliente non ha ancora pagato
     if (maturato && x.doc.tipo === 'fattura') {
@@ -218,8 +220,8 @@ export function riconcilia(S: Dati, b: Bollettino) {
     }
     righe.push(riga);
   }
-  // ponytail: la decisione sulla riga che non quadra (§5.13) non ha ancora una colonna: aperta = non quadra e non è d'incasso
-  const conAperta = righe.map((r) => ({ ...r, decisione: null, aperta: r.categoria !== 'quadra' && !r.incasso }));
+  // aperta = non quadra, non è d'incasso e nessuno ha ancora deciso (D-49)
+  const conAperta = righe.map((r) => ({ ...r, aperta: r.categoria !== 'quadra' && !r.incasso && !r.decisione }));
   // le fatture sul maturato non ancora pagate non entrano nei totali del bollettino
   const nei = conAperta.filter((r) => r.categoria !== 'attesa_incasso' && r.categoria !== 'pagata_dopo');
   const riconosciuto = r2(somma(nei.map((r) => r.loro?.importo ?? ZERO))), atteso = r2(somma(nei.map((r) => r.noi?.importo ?? ZERO)));
