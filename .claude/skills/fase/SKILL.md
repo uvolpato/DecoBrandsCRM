@@ -21,6 +21,14 @@ principale prepara il brief e poi controlla il risultato.
      prove;
    - `haiku`: rinomine, ricerche, piccole correzioni.
 
+   **Lavoro da `sonnet` (e da `haiku`) in Claude Code: va a OpenCode** (Ugo, 02/11/2026). Non
+   lanciare un agente: scrivi il prompt in `strumenti/opencode/<fase>.md` (compito, file, regole,
+   sottoagenti, prove, resoconto in `strumenti/opencode/resoconto-<fase>.md`) e dallo a Ugo.
+   Quando Ugo dice che ha finito, fai solo il **controllo finale** (passo 5). Se qualcosa non va,
+   non correggere tu: scrivi `strumenti/opencode/<fase>-correzioni-N.md` e ridallo a Ugo, finché
+   è tutto ok. Lavori tu (o un agente `sonnet`) solo se **Ugo lo decide**. Il lavoro da `opus`
+   resta qui.
+
    Se una fase mescola i due tipi, dividila in due agenti (prima il server, poi le pagine).
    Nel messaggio a Ugo scrivi quale modello hai scelto e perché, in mezza riga.
 
