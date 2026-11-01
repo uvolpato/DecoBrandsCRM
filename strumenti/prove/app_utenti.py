@@ -94,14 +94,14 @@ with sync_playwright() as p:
 
     pg = entra(S + '-oper')
     ok('Pagina riservata' in testo(pg, '.principale') and 'amministratori' in testo(pg, '.principale'), 'operatore: Pagina riservata')
-    ok(pg.locator('#carica-barra').count() == 1 and pg.locator('.barra .voce:has-text("Stato del sistema")').count() == 1, 'operatore: Carica documenti e Stato del sistema')
+    ok(pg.locator('.aree-barra .area.attiva').inner_text() == 'Gestione' and pg.locator('.barra .voce:has-text("Stato del sistema")').count() == 1, 'operatore: area Gestione con Stato del sistema')
     pg.close()
 
     pg = entra(S + '-ammi', 768)
     pg.wait_for_selector('.dt tbody tr.cliccabile')
     ok(not pg.evaluate('document.documentElement.scrollWidth > innerWidth'), '768 px: niente scorrimento orizzontale')
     ok(pg.evaluate("getComputedStyle(document.querySelector('.colonne')).gridTemplateColumns.split(' ').length") == 1, '768 px: elenco e scheda impilati')
-    ok(pg.evaluate("document.querySelector('.barra').getBoundingClientRect().height") < 80, '768 px: la barra è una riga sola')
+    ok(pg.evaluate("document.querySelector('.barra').getBoundingClientRect().height") < 120, '768 px: la barra sta in due righe (aree, voci)')
     pg.screenshot(path=str(USCITA / 'app-utenti-768.png'), full_page=True)
     pg.close()
     b.close()

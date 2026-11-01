@@ -21,7 +21,7 @@ const { cifra } = req('./dist/src/password');
     for (const [n, r, l, provvisoria] of [['ammi', 'amministratore', 'responsabile'], ['oper', 'utente', 'operatore'], ['lett', 'utente', 'lettura'], ['nuovo', 'utente', 'operatore', true]]) {
       const { rows: [u] } = await c.query('INSERT INTO utenti (username, email, nome, ruolo, password_hash, deve_cambiare_password) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
         [`${s}-${n}`, `${s}-${n}@prova-e2e.it`, 'Prova ' + n[0].toUpperCase() + n.slice(1), r, h, !!provvisoria]);
-      await c.query("INSERT INTO utenti_aree (utente_id, area, livello) VALUES ($1, 'anagrafiche', $2), ($1, 'provvigioni', $2)", [u.id, l]);
+      await c.query("INSERT INTO utenti_aree (utente_id, area, livello) VALUES ($1, 'dati', $2), ($1, 'provvigioni', $2)", [u.id, l]);
     }
     await c.query('COMMIT');
   } else if (process.argv[2] === 'togli') {

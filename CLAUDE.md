@@ -153,10 +153,15 @@ Regole del codice del prototipo:
    - si lavora su `main`, con commit piccoli e messaggi in italiano;
    - non committare `image.png`, né le cartelle di uscita degli strumenti;
    - pubblica (`git push`) solo se Ugo lo chiede;
-   - **prima di ogni commit di codice, tre controlli**, caricando davvero le skill (non a memoria):
-     1. sicurezza: `owasp-security` (o `vibesec`); per SQL e migrazioni anche `postgresql-code-review`;
-     2. correttezza: `/code-review`;
-     3. complessità: `/ponytail:ponytail-review`.
+   - **controlli prima del commit di codice**, in proporzione al rischio (per spendere meno token,
+     Ugo 01/11/2026):
+     - **codice sensibile** (accesso, permessi, sessioni, soldi e calcoli delle provvigioni, SQL e
+       migrazioni, dati di Integra): tre controlli caricando davvero le skill (non a memoria):
+       1. sicurezza: `owasp-security` (o `vibesec`); per SQL e migrazioni anche `postgresql-code-review`;
+       2. correttezza: `/code-review`;
+       3. complessità: `/ponytail:ponytail-review`;
+     - **altro codice** (pagine, stile, testi, prove): controllo leggero fatto da te, rileggendo il diff;
+     - **nel dubbio si fa la review completa.**
 
      Si correggono i rilievi veri; nel messaggio finale a Ugo si dice quali controlli sono stati
      fatti, cosa hanno trovato e cosa resta aperto.

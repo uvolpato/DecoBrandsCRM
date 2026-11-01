@@ -957,3 +957,18 @@ body.in-accesso .principale, body:has(.accesso-scena) .principale { padding: 0; 
   .accesso .campo input { font-size: 16px; }   /* niente zoom automatico su iPhone */
 }
 
+
+/* Menu per area (D-47, §7.1): aree a segmenti in cima alla barra, sotto le voci dell'area aperta */
+.aree-barra { flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; margin: 0 0 16px; padding: 3px; border-radius: var(--r-piccolo); background: rgba(255,255,255,.07); }
+.aree-barra .area { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px 6px; border-radius: calc(var(--r-piccolo) - 2px); color: rgba(255,255,255,.65); text-decoration: none; font-size: 12px; font-weight: 600; }
+.aree-barra .area:hover { color: #fff; background: rgba(255,255,255,.07); }
+.aree-barra .area.attiva { background: rgba(255,255,255,.16); color: #fff; }
+.aree-barra .area:focus-visible { outline: 2px solid var(--primario-chiaro); outline-offset: 1px; }
+.aree-barra .area svg { width: 18px; height: 18px; }
+@media (max-width: 860px) {
+  /* tablet: due righe, sopra aree e Carica documenti, sotto le voci dell'area (scorrono in orizzontale) */
+  .barra:has(.aree-barra) { flex-wrap: wrap; row-gap: 8px; }
+  .barra:has(.aree-barra) .barra-menu { display: flex; flex: 1 1 100%; gap: 4px; overflow: auto hidden; margin: 0; padding: 0; }
+  .aree-barra { margin: 0 6px 0 0; align-self: center; }
+  .aree-barra .area { flex-direction: row; padding: 6px 10px; white-space: nowrap; }
+}

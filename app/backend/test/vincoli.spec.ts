@@ -24,47 +24,53 @@ afterAll(() => db.end());
 beforeEach(async () => {
   await q('BEGIN');
   await q(`INSERT INTO utenti (id, username, email, nome, ruolo, password_hash) VALUES (1, 'ugo', 'ugo@decobrands.it', 'Ugo', 'amministratore', 'x')`);
-  await q(`INSERT INTO fornitori (id, ragione_sociale, codice_integra) VALUES (1, 'Gries', 'F1')`);
+  // identità + prima versione (D-46): la versione corrente si imposta dopo, perché la chiave è composta
+  await q(`INSERT INTO fornitori (id) VALUES (1)`);
+  await q(`INSERT INTO fornitori_versioni (id, fornitore_id, fonte, ragione_sociale) VALUES (1, 1, 'integra', 'Gries')`);
+  await q(`UPDATE fornitori SET versione_corrente_id = 1 WHERE id = 1`);
+  await q(`INSERT INTO clienti (id) VALUES (1), (2)`);
+  await q(`INSERT INTO clienti_versioni (id, cliente_id, fonte, piva, ragione_sociale) VALUES (1, 1, 'integra', 'IT1', 'Vivaio Rossi'), (2, 2, 'integra', 'IT2', 'Garden Bianchi')`);
+  await q(`UPDATE clienti SET versione_corrente_id = id`);
   await q(`INSERT INTO agenti (id, codice, nome, cognome) VALUES (1, 'DECO', 'Decobrands', 'SRL')`);
   await q(`INSERT INTO subagenti (id, agente_id, codice, nome, cognome) VALUES (1, 1, 'S1', 'Anna', 'R'), (2, 1, 'S2', 'Luca', 'B')`);
-  await q(`INSERT INTO ordini_fornitore_testata (id, fornitore_id, numero_ordine, data_ordine, cliente_piva) VALUES (1, 1, 'O1', '2026-03-01', 'IT1')`);
+  await q(`INSERT INTO ordini_fornitore_testata (id, fornitore_id, fornitore_versione_id, numero_ordine, data_ordine, cliente_id, cliente_versione_id) VALUES (1, 1, 1, 'O1', '2026-03-01', 1, 1)`);
   await q(`INSERT INTO ordini_fornitore_documenti (id, testata_id, tipo, numero, data, importo) VALUES (1, 1, 'fattura', 'FT1', '2026-03-10', 1000)`);
-  await q(`INSERT INTO bollettini_testata (id, fornitore_id, mese, anno) VALUES (1, 1, 3, 2026)`);
+  await q(`INSERT INTO bollettini_testata (id, fornitore_id, fornitore_versione_id, mese, anno) VALUES (1, 1, 1, 3, 2026)`);
   await q(`INSERT INTO liquidazioni (id, anno, trimestre, chiusa_da, totali) VALUES (1, 2026, 1, 1, '{}')`);
 });
 afterEach(() => q('ROLLBACK'));
 
 describe('interscambio datato (D-35)', () => {
-  const ins = `INSERT INTO interscambio (subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, valido_dal, valido_al) VALUES ($1, $2, 1, $3, $4, $5)`;
+  const ins = `INSERT INTO interscambio (subagente_id, cliente_id, fornitore_id, codice_cliente_fornitore, valido_dal, valido_al) VALUES ($1, $2, 1, $3, $4, $5)`;
 
   it('un solo subagente per cliente × fornitore in ogni giorno', async () => {
-    expect(await errore(ins, [1, 'IT1', 'C1', '2026-01-01', null])).toBe('');
-    expect(await errore(ins, [2, 'IT1', 'C1', '2026-06-01', null])).toMatch('interscambio_cliente_periodo_excl');
+    expect(await errore(ins, [1, 1, 'C1', '2026-01-01', null])).toBe('');
+    expect(await errore(ins, [2, 1, 'C9', '2026-06-01', null])).toMatch('interscambio_cliente_periodo_excl');
   });
 
   it('cambio di subagente: chiudo il periodo e apro il nuovo', async () => {
-    await q(ins, [1, 'IT1', 'C1', '2026-01-01', '2026-06-01']);
-    expect(await errore(ins, [2, 'IT1', 'C1', '2026-06-01', null])).toBe('');
+    await q(ins, [1, 1, 'C1', '2026-01-01', '2026-06-01']);
+    expect(await errore(ins, [2, 1, 'C1', '2026-06-01', null])).toBe('');
     const { rows } = await q(
-      `SELECT subagente_id FROM interscambio WHERE cliente_piva = 'IT1' AND daterange(valido_dal, valido_al) @> $1::date`,
+      `SELECT subagente_id FROM interscambio WHERE cliente_id = 1 AND daterange(valido_dal, valido_al) @> $1::date`,
       ['2026-03-10'],
     );
     expect(rows).toEqual([{ subagente_id: '1' }]); // la fattura di marzo resta al primo
   });
 
   it('lo stesso codice del fornitore non indica due clienti insieme', async () => {
-    await q(ins, [1, 'IT1', 'C1', '2026-01-01', null]);
-    expect(await errore(ins, [2, 'IT2', 'C1', '2026-01-01', null])).toMatch('interscambio_codice_periodo_excl');
+    await q(ins, [1, 1, 'C1', '2026-01-01', null]);
+    expect(await errore(ins, [2, 2, 'C1', '2026-01-01', null])).toMatch('interscambio_codice_periodo_excl');
   });
 
   it('periodo vuoto e sconto fuori scala rifiutati', async () => {
-    expect(await errore(ins, [1, 'IT1', 'C1', '2026-06-01', '2026-06-01'])).toMatch('interscambio_periodo_check');
-    expect(await errore(`INSERT INTO interscambio (subagente_id, cliente_piva, fornitore_id, valido_dal, sconto) VALUES (1, 'IT1', 1, '2026-01-01', 101)`))
+    expect(await errore(ins, [1, 1, 'C1', '2026-06-01', '2026-06-01'])).toMatch('interscambio_periodo_check');
+    expect(await errore(`INSERT INTO interscambio (subagente_id, cliente_id, fornitore_id, valido_dal, sconto) VALUES (1, 1, 1, '2026-01-01', 101)`))
       .toMatch('interscambio_sconto_check');
   });
 
   it('un subagente con storia non si elimina', async () => {
-    await q(ins, [1, 'IT1', 'C1', '2026-01-01', null]);
+    await q(ins, [1, 1, 'C1', '2026-01-01', null]);
     expect(await errore(`DELETE FROM subagenti WHERE id = 1`)).toMatch('interscambio_subagente_id_fkey');
   });
 });
@@ -120,12 +126,103 @@ describe('bollettini', () => {
   });
 });
 
-describe('clienti da Integra', () => {
-  it('P.IVA doppia ammessa, codice Integra no', async () => {
-    const ins = `INSERT INTO clienti (codice_integra, piva, ragione_sociale) VALUES ($1, 'IT9', 'Vivaio')`;
-    expect(await errore(ins, ['C1'])).toBe('');
-    expect(await errore(ins, ['C2'])).toBe('');
-    expect(await errore(ins, ['C2'])).toMatch('clienti_codice_integra_key');
+describe('valori ammessi (spec §4.2, fase 2a)', () => {
+  it('importo positivo per la fattura, negativo per la nota di credito', async () => {
+    const ins = `INSERT INTO ordini_fornitore_documenti (testata_id, tipo, numero, data, importo) VALUES (1, $1, 'X', '2026-04-01', $2)`;
+    expect(await errore(ins, ['fattura', -5])).toMatch('ordini_fornitore_documenti_importo_check');
+    expect(await errore(ins, ['nota_credito', 5])).toMatch('ordini_fornitore_documenti_importo_check');
+    expect(await errore(ins, ['nota_credito', -5])).toBe('');
+  });
+
+  it('correzione: percentuale 0–100, "nessuna" a zero', async () => {
+    const ins = `INSERT INTO provvigioni_correzioni (documento_id, tipo, valore, motivo) VALUES (1, $1, $2, 'm')`;
+    expect(await errore(ins, ['pct', 120])).toMatch('provvigioni_correzioni_valore_check');
+    expect(await errore(ins, ['nessuna', 3])).toMatch('provvigioni_correzioni_valore_check');
+    expect(await errore(ins, ['importo', 250])).toBe('');
+  });
+
+  it('bollettino chiuso: data e utente vanno insieme', async () => {
+    expect(await errore(`UPDATE bollettini_testata SET stato = 'verificato', chiuso_il = now() WHERE id = 1`)).toMatch('bollettini_testata_chiuso_da_check');
+  });
+
+  it('documento in arrivo: origine, stato, tipo e livello previsti', async () => {
+    const ins = `INSERT INTO documenti_in_arrivo (origine, file_nome, file_hash, stato, tipo, livello) VALUES ($1, 'a.pdf', repeat('a', 64), $2, $3, $4)`;
+    expect(await errore(ins, ['fax', 'in_coda', null, null])).toMatch('documenti_in_arrivo_origine_check');
+    expect(await errore(ins, ['email', 'perso', null, null])).toMatch('documenti_in_arrivo_stato_check');
+    expect(await errore(ins, ['email', 'in_coda', 'ricevuta', null])).toMatch('documenti_in_arrivo_tipo_check');
+    expect(await errore(ins, ['email', 'in_coda', 'fattura', 'alta'])).toMatch('documenti_in_arrivo_livello_check');
+    expect(await errore(ins, ['email', 'da_controllare', 'fattura', 'bassa'])).toBe('');
+  });
+
+  it('campo letto: affidabilità 0–1', async () => {
+    await q(`INSERT INTO documenti_in_arrivo (id, origine, file_nome, file_hash) VALUES (1, 'email', 'a.pdf', repeat('b', 64))`);
+    const ins = `INSERT INTO documenti_campi (documento_id, campo, affidabilita) VALUES (1, 'numero', $1)`;
+    expect(await errore(ins, [1.5])).toMatch('documenti_campi_affidabilita_check');
+    expect(await errore(ins, [0.93])).toBe('');
+  });
+
+  it('registro: solo le anomalie hanno uno stato, livello previsto', async () => {
+    const ins = `INSERT INTO registro (genere, codice, livello, stato) VALUES ($1, 'p', $2, $3)`;
+    expect(await errore(ins, ['evento', 'info', 'aperta'])).toMatch('registro_stato_check');
+    expect(await errore(ins, ['anomalia', 'info', null])).toMatch('registro_stato_check');
+    expect(await errore(ins, ['evento', 'grave', null])).toMatch('registro_livello_check');
+    expect(await errore(ins, ['anomalia', 'errore', 'chiusa'])).toBe('');
+  });
+
+  it('impostazioni e giri dei servizi: solo valori previsti', async () => {
+    expect(await errore(`INSERT INTO impostazioni (chiave, valore) VALUES ('altro', '{}')`)).toMatch('impostazioni_chiave_check');
+    expect(await errore(`INSERT INTO impostazioni (chiave, valore) VALUES ('casella', '{}')`)).toBe('');
+    const ins = `INSERT INTO servizi_esecuzioni (servizio, tipo, esito) VALUES ($1, $2, $3)`;
+    expect(await errore(ins, ['cucina', 'lavoro', null])).toMatch('servizi_esecuzioni_servizio_check');
+    expect(await errore(ins, ['lettura', 'giro', null])).toMatch('servizi_esecuzioni_tipo_check');
+    expect(await errore(ins, ['lettura', 'lavoro', 'boh'])).toMatch('servizi_esecuzioni_esito_check');
+    expect(await errore(ins, ['lettura', 'lavoro', 'ok'])).toBe('');
+  });
+});
+
+describe('anagrafiche con versioni (D-46)', () => {
+  const ver = `INSERT INTO clienti_versioni (id, cliente_id, fonte, piva, ragione_sociale) VALUES (nextval('clienti_versioni_id_seq') + 100, $1, $2, 'IT9', 'Vivaio')`;
+
+  it('P.IVA doppia ammessa, fonte solo integra o crm', async () => {
+    expect(await errore(ver, [1, 'integra'])).toBe('');
+    expect(await errore(ver, [2, 'integra'])).toBe(''); // stessa P.IVA su un altro cliente
+    expect(await errore(ver, [1, 'excel'])).toMatch('clienti_versioni_fonte_check');
+  });
+
+  it('la versione non si modifica né si cancella', async () => {
+    expect(await errore(`UPDATE clienti_versioni SET ragione_sociale = 'Altro' WHERE id = 1`)).toMatch('si aggiungono soltanto');
+    expect(await errore(`DELETE FROM fornitori_versioni WHERE id = 1`)).toMatch('si aggiungono soltanto');
+  });
+
+  it('la versione corrente è una versione della stessa identità', async () => {
+    expect(await errore(`UPDATE clienti SET versione_corrente_id = 2 WHERE id = 1`)).toMatch('clienti_versione_corrente_fkey');
+  });
+
+  it('un fatto non punta alla versione di un altro cliente', async () => {
+    const ins = `INSERT INTO ordini_fornitore_testata (id, fornitore_id, fornitore_versione_id, numero_ordine, data_ordine, cliente_id, cliente_versione_id) VALUES (2, 1, 1, 'O2', '2026-03-02', $1, $2)`;
+    expect(await errore(ins, [1, 2])).toMatch('ordini_fornitore_testata_cliente_versione_fkey');
+    expect(await errore(ins, [2, 2])).toBe('');
+    const riga = `INSERT INTO bollettini_righe (testata_id, fattura_numero, importo_riconosciuto, cliente_id, cliente_versione_id) VALUES (1, 'FT1', 1, $1, $2)`;
+    expect(await errore(riga, [1, 2])).toMatch('bollettini_righe_cliente_versione_fkey');
+    expect(await errore(riga, [1, null])).toMatch('bollettini_righe_cliente_check');
+    expect(await errore(riga, [null, null])).toBe('');
+  });
+
+  it('un fatto non punta alla versione di un altro fornitore', async () => {
+    await q(`INSERT INTO fornitori (id) VALUES (2)`);
+    await q(`INSERT INTO fornitori_versioni (id, fornitore_id, fonte, ragione_sociale) VALUES (2, 2, 'integra', 'Gasper')`);
+    expect(await errore(`INSERT INTO bollettini_testata (id, fornitore_id, fornitore_versione_id, mese, anno) VALUES (2, 1, 2, 4, 2026)`))
+      .toMatch('bollettini_testata_fornitore_versione_fkey');
+  });
+
+  it('codici esterni: niente doppioni, due codici sulla stessa identità', async () => {
+    const ins = `INSERT INTO codici_esterni (sistema, tipo, codice, entita_id) VALUES ($1, $2, $3, $4)`;
+    expect(await errore(ins, ['integra', 'cliente', 'C1', 1])).toBe('');
+    expect(await errore(ins, ['integra', 'cliente', 'C1', 2])).toMatch('codici_esterni_sistema_tipo_codice_key');
+    expect(await errore(ins, ['integra', 'cliente', 'C2', 1])).toBe(''); // fusione o cambio di codice
+    expect(await errore(ins, ['integra', 'fornitore', 'C1', 1])).toBe(''); // stesso codice, altro tipo
+    expect(await errore(ins, ['sap', 'cliente', 'C3', 1])).toMatch('codici_esterni_sistema_check');
+    expect(await errore(ins, ['integra', 'articolo', 'C3', 1])).toMatch('codici_esterni_tipo_check');
   });
 });
 
@@ -146,7 +243,7 @@ describe('utenti, sessioni, registro (D-30, D-31, D-33)', () => {
     expect(await errore(ins, [u.id, 'provvigioni', 'operatore'])).toBe('');
     expect(await errore(ins, [u.id, 'provvigioni', 'lettura'])).toMatch('utenti_aree_pkey');
     expect(await errore(ins, [u.id, 'cucina', 'lettura'])).toMatch('utenti_aree_area_check');
-    expect(await errore(ins, [u.id, 'anagrafiche', 'capo'])).toMatch('utenti_aree_livello_check');
+    expect(await errore(ins, [u.id, 'dati', 'capo'])).toMatch('utenti_aree_livello_check');
     expect(await errore(`INSERT INTO utenti (username, email, nome, ruolo, password_hash) VALUES ('vec', 'vec@x.it', 'V', 'operatore', 'x')`, [])).toMatch('utenti_ruolo_check');
     await q('DELETE FROM utenti WHERE id = $1', [u.id]);
     expect((await q('SELECT count(*)::int AS n FROM utenti_aree WHERE utente_id = $1', [u.id])).rows[0].n).toBe(0);

@@ -1,4 +1,4 @@
-# Prova del guscio dell'app (passo 1.11), con Playwright: barra per ruolo, sola lettura,
+# Prova del guscio dell'app (passo 1.11), con Playwright: barra per ruolo e per area (D-47), sola lettura,
 # Pagina riservata, ritorno alla pagina chiesta, Esci, telefono.
 # Servono backend (8002) e frontend (8001) accesi e tre utenti di prova con la password PW,
 # nomi utente <s>-ammi, <s>-oper, <s>-lett (vedi app_guscio.sql). Uso:
@@ -10,7 +10,8 @@ S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
 BASE, PW = 'http://localhost:8001', 'password-di-prova'
 esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
-voci = lambda pg: [x.strip() for x in pg.locator('.barra .voce span').all_text_contents()]  # anche nel gruppo chiuso
+voci = lambda pg: [x.strip() for x in pg.locator('.barra .voce span').all_text_contents()]  # le voci dell'area aperta
+aree = lambda pg: [x.strip() for x in pg.locator('.aree-barra .area').all_inner_texts()]
 
 # D-42: su Accedi e Password dimenticata prima c'è il logo; un tasto apre la finestra
 def apri(pg):
@@ -33,15 +34,19 @@ with sync_playwright() as p:
 
     pg = entra(f'{S}-ammi', '/pratiche')
     ok(True, 'senza sessione: accesso e ritorno alla pagina chiesta (/pratiche)')
-    ok('Utenti e ruoli' in voci(pg) and 'Stato del sistema' in voci(pg), 'amministratore: voci di Gestione')
+    ok(aree(pg) == ['Provvigioni', 'Dati', 'Gestione'] and pg.locator('.aree-barra .area.attiva').inner_text() == 'Provvigioni', 'amministratore: tre aree, aperta quella della pagina')
+    ok('Bollettini' in voci(pg) and 'Fornitori' not in voci(pg) and 'Utenti e ruoli' not in voci(pg) and 'Guida' in voci(pg), 'si vedono solo le voci dell’area aperta, più la Guida')
     ok(pg.locator('.voce.attiva').inner_text() == 'Pratiche', 'voce attiva = pagina corrente')
-    ok(not pg.locator('details.richiudibile').get_attribute('open') is not None, 'Gestione chiusa fuori dalle sue pagine')
     ok(pg.locator('.barra-piede .io b').inner_text() == 'Prova Ammi' and 'Amministratore' in pg.locator('.barra-piede .io').inner_text(), 'utente e ruolo in fondo alla barra')
     ok(not pg.evaluate("document.body.classList.contains('sola-lettura')"), 'amministratore: niente fascia di sola lettura')
-    pg.click('.voce:has-text("Fornitori")'); pg.wait_for_function("location.pathname === '/fornitori'")
+    pg.click('.aree-barra .area:has-text("Dati")'); pg.wait_for_function("location.pathname === '/fornitori'")
+    ok(voci(pg) == ['Fornitori', 'Subagenti', 'Clienti', 'Guida'] and not pg.locator('#carica-barra').count(), 'area Dati: le sue voci, niente Carica documenti')
     ok(pg.locator('.testa h1').inner_text() == 'Fornitori' and 'In costruzione' in pg.locator('.principale').inner_text(), 'pagina non ancora fatta: In costruzione dentro il guscio')
     pg.goto(BASE + '/utenti'); pg.wait_for_selector('.testa h1')
-    ok(pg.locator('details.richiudibile').get_attribute('open') is not None, 'Gestione aperta nelle sue pagine')
+    ok(pg.locator('.aree-barra .area.attiva').inner_text() == 'Gestione' and 'Impostazioni' in voci(pg), 'su /utenti è aperta Gestione')
+    pg.click('.voce:has-text("Guida")'); pg.wait_for_function("location.pathname === '/guida'")
+    ok(pg.locator('.aree-barra .area.attiva').inner_text() == 'Gestione', 'la Guida lascia aperta l’ultima area')
+    pg.go_back(); pg.wait_for_selector('.testa h1')
     pg.screenshot(path=str(USCITA / 'guscio-ammi-1440.png'))
     pg.click('.io-esci'); pg.wait_for_function("location.pathname === '/accesso'")
     pg.goto(BASE + '/pratiche'); pg.wait_for_function("location.pathname === '/accesso'")
@@ -49,7 +54,9 @@ with sync_playwright() as p:
     pg.close()
 
     pg = entra(f'{S}-oper')
-    ok('Utenti e ruoli' not in voci(pg) and 'Stato del sistema' in voci(pg) and 'Documenti scartati' in voci(pg), 'operatore: niente Utenti e Impostazioni, sì Stato del sistema e Scartati')
+    ok('Documenti scartati' in voci(pg) and aree(pg) == ['Provvigioni', 'Dati', 'Gestione'], 'operatore: Scartati in Provvigioni, tre aree')
+    pg.click('.aree-barra .area:has-text("Gestione")'); pg.wait_for_function("location.pathname === '/sistema'")
+    ok(voci(pg) == ['Stato del sistema', 'Guida'], 'operatore: in Gestione solo Stato del sistema')
     pg.goto(BASE + '/utenti'); pg.wait_for_selector('.vuoto b')
     ok(pg.locator('.vuoto b').inner_text() == 'Pagina riservata' and 'amministratori' in pg.locator('.vuoto').inner_text(), 'operatore su /utenti: Pagina riservata')
     pg.close()
@@ -59,12 +66,13 @@ with sync_playwright() as p:
     fascia = pg.evaluate("getComputedStyle(document.querySelector('.principale'), '::before').content")
     ok('sola lettura' in fascia, 'sola lettura: fascia "Profilo in sola lettura"')
     ok(not pg.locator('#carica-barra').is_visible(), 'sola lettura: Carica documenti nascosto')
-    ok(not any(x in voci(pg) for x in ('Utenti e ruoli', 'Stato del sistema', 'Documenti scartati', 'Impostazioni')) and 'Guida' in voci(pg), 'sola lettura: in Gestione solo la Guida')
+    ok(aree(pg) == ['Provvigioni', 'Dati'] and 'Documenti scartati' not in voci(pg), 'sola lettura: niente Gestione né Scartati')
     pg.screenshot(path=str(USCITA / 'guscio-lettura-1440.png'))
     pg.close()
 
     pg = entra(f'{S}-ammi', '/', 768)
     ok(pg.evaluate('document.documentElement.scrollWidth <= 768'), '768 px: niente scorrimento orizzontale')
+    ok(pg.evaluate("document.querySelector('.aree-barra').getBoundingClientRect().bottom <= document.querySelector('.barra-menu').getBoundingClientRect().top"), '768 px: aree sopra, voci sotto')
     pg.screenshot(path=str(USCITA / 'guscio-768.png'))
     b.close()
 

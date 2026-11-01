@@ -37,16 +37,58 @@ parte di F0-A4 e F0-A5, F5-A3, F5-A4.
 | 1.13b | Ruoli per area (D-45): ruolo di Sistema (superutente, amministratore, utente) + livello per area in `utenti_aree` (migrazione `20261030120000_ruoli_per_area`, chi c'era non perde niente); permessi `area.attività` nel guard e in `io`; barra, *Pagina riservata* e sola lettura decise dal guscio per area; finestra utente con un livello per area; *Cosa può fare ogni ruolo* per area; chi non ha Provvigioni dopo l'accesso va alla prima pagina che può aprire. Prove: server 69, `app_utenti.py` 28 | F5-A4b | [x] |
 | 1.14 | Prove: server (`npm test`, 70 su `decobrands_test`: accesso, permessi, livelli per area, vincoli, limite ai tentativi); browser (`strumenti/prove/`): `app_accesso.py` 18, `app_guscio.py` 16, `app_utenti.py` 28, `app_scena.py` 37, a 1440 e 768 px; utenti di prova con `utenti_prova.js`. Trovato e corretto: il logo sbiadito copriva il pulsante della finestra di accesso (un clic richiudeva) | F7 | [x] |
 | 1.15 | Documenti: spec 8.2 (D-41 → D-46), piano, `app/README.md` (prove nel browser), registro delle decisioni | — | [x] |
+| 1.16 | **Menu per area** (D-47, §7.10): in cima alla barra le aree dell'utente (Provvigioni, Dati, Gestione) a segmenti, sotto le voci dell'area della pagina, Guida comune, *Carica documenti* solo in Provvigioni; sul tablet due righe. L'area *Anagrafiche* diventa **Dati** (migrazione `20261101090000_area_dati`, permessi `dati.*`). Prove: server 70, `app_guscio.py` 20, `app_utenti.py` 28, `app_accesso.py`, `app_scena.py` 37 | F0-A4 | [x] |
 
 ## Blocchi successivi (dal piano)
 
-| Blocco | Contenuto | Fatto |
-|---|---|:-:|
-| 2 | Resto della Fase 0: schema completo e seed §12, motore sul server con i test numerici, tutti i componenti e il catalogo `/componenti` | [ ] |
-| 3 | F1 Anagrafiche (fornitori, subagenti, clienti; lettura dal database ponte di Integra) | [ ] |
-| 4 | F2 Pratiche | [ ] |
-| 5 | F3 Bollettini | [ ] |
-| 6 | F4 Liquidazioni e Analisi | [ ] |
-| 7 | F5 Oggi, Stato del sistema, Impostazioni, Scartati, Guida | [ ] |
-| 8 | F6 Ingresso documenti (casella, GLM-OCR) | [ ] |
-| 9 | F7 Collaudo e rilascio | [ ] |
+Il modello (Ugo, 01/11/2026): la sessione principale fa eseguire ogni fase dalla skill `fase` e
+sceglie il modello dell'agente guardando il lavoro; la colonna *Modello* è un'indicazione.
+
+| Blocco | Contenuto | Modello | Fatto |
+|---|---|---|:-:|
+| 2a | Schema completo (Prisma, migrazioni, vincoli). Fatto: migrazione `schema_completo` con i CHECK dei valori ammessi che mancavano (§4.2), identità e versioni delle anagrafiche (D-46, anticipato da F1-A7 con D-48: `_versioni` solo aggiunta, `codici_esterni`, chiavi composte sui fatti); spec allineata; prove 82 | Sonnet | [x] |
+| 2b | Dati di prova §12. Fatto: seed da `dati.js` (JSON estratto) in una transazione, si ferma se già caricato, bloccato in esercizio; 2 pratiche in più per i casi §12 (conferma 7/10, due tranche); prove 89 | Sonnet | [x] |
+| 2c | Motore delle provvigioni sul server, prove sui numeri uguali al prototipo | **Opus** | [ ] |
+| 2d | Componenti e catalogo `/componenti` (solo `app/frontend`: **insieme a 2b e 2c**) | Sonnet | [ ] |
+
+### Attività F1–F7, con modello e lavoro in parallelo
+
+Un blocco si fa per **gruppi in ordine** (1, 2, 3…): le attività dello **stesso gruppo vanno
+insieme**, un agente ciascuna nel suo worktree (`/fase <blocco> parallelo`); il gruppo dopo
+parte quando il precedente è unito. *Opus* per regole, soldi, stati, abbinamenti, segreti;
+*Sonnet* per pagine, elenchi, esportazioni, sincronizzazioni; *Haiku* per rinomine, ricerche e
+piccole correzioni, ovunque.
+
+| Blocco | Attività (piano) | Gruppo | Modello | Fatto |
+|---|---|:-:|---|:-:|
+| 3 · F1 Dati | F1-A1 Fornitori e scaglioni | 1 | Sonnet | [ ] |
+| | F1-A2 Agenti e subagenti | 1 | Sonnet | [ ] |
+| | F1-A3 Clienti e agenzie (interscambio) | 1 | Sonnet | [ ] |
+| | F1-A4 + F1-A7 Sincronizzazione da Integra con le versioni (serve il ponte, F0-A8) | 2 | Sonnet | [ ] |
+| | F1-A5 Percentuali datate ed eccezioni personali | 2 | **Opus** | [ ] |
+| | F1-A6 Regole del subagente (D-27): dopo F4-A2, si fa nel blocco 6 | — | **Opus** | [ ] |
+| 4 · F2 Pratiche | F2-A1 Elenco pratiche | 1 | Sonnet | [ ] |
+| | F2-A3 Documenti fiscali, netto, canale di caricamento | 1 | **Opus** | [ ] |
+| | F2-A2 Dettaglio pratica (fasi, righe a confronto) | 2 | Sonnet | [ ] |
+| 5 · F3 Bollettini | F3-A1 Matrice e caricamento | 1 | Sonnet | [ ] |
+| | F3-A3 Incassi dei clienti, storni e riaccrediti | 1 | **Opus** | [ ] |
+| | F3-A2 Dettaglio bollettino (cerniera) | 2 | **Opus** | [ ] |
+| 6 · F4 Liquidazioni e Analisi | F4-A1 Trimestri e subagenti con totali, chiusura | 1 | **Opus** | [ ] |
+| | F4-A5 Pagina Analisi | 1 | Sonnet | [ ] |
+| | F4-A2 Scheda Documenti (liquidabili, storni) | 2 | **Opus** | [ ] |
+| | F4-A4 Report subagenti | 2 | Sonnet | [ ] |
+| | F4-A6 Filtri standard e numeri aggiornati da soli | 2 | Sonnet | [ ] |
+| | F4-A3 Esportazione Excel, PDF, CSV | 3 | Sonnet | [ ] |
+| | F1-A6 Regole del subagente | 3 | **Opus** | [ ] |
+| 7 · F5 Gestione | F5-A1 Oggi | 1 | Sonnet | [ ] |
+| | F5-A2 Pagina del registro | 1 | Sonnet | [ ] |
+| | F5-A6 Impostazioni (password e segreti) | 1 | **Opus** | [ ] |
+| | F5-A8 Guida | 1 | Sonnet | [ ] |
+| | F5-A5 Stato del sistema (dopo F6-A1) e F5-A7 Scartati (dopo F6-A4) | blocco 8 | Sonnet | [ ] |
+| 8 · F6 Documenti | F6-A1 Ricezione e coda | 1 | Sonnet | [ ] |
+| | F6-A2 Lettura con GLM-OCR | 1 | **Opus** | [ ] |
+| | F6-A3 Controlli e proposta di abbinamento | 2 | **Opus** | [ ] |
+| | F6-A4 Pagina Documenti e finestra di correzione | 3 | Sonnet | [ ] |
+| | F5-A5, F5-A7 | 3 | Sonnet | [ ] |
+| | F6-A5 Installazione e taratura | 4 | Sonnet | [ ] |
+| 9 · F7 Collaudo | F7-A1 Verifica e prove complete, poi F7-A2 rilascio | 1 | Sonnet | [ ] |

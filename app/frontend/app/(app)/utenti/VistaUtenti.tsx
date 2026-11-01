@@ -40,7 +40,7 @@ const VISTE: Record<string, (u: Utente) => boolean> = { attivi: (u) => u.attivo,
 const ULTIMA_EMAIL: Record<string, string> = { benvenuto: 'Benvenuto con la password provvisoria', password: 'Nuova password provvisoria', reset: 'Password dimenticata' };
 const ORDINE = Object.keys(LIVELLI); // lettura < operatore < responsabile
 const VARIANTE: Record<string, 'primario' | 'info' | 'neutro'> = { responsabile: 'primario', operatore: 'info', lettura: 'neutro' };
-// "Provvigioni: operatore · Anagrafiche: lettura"
+// "Provvigioni: operatore · Dati: lettura"
 const livelliTesto = (x: Utente) => Object.keys(AREE).filter((a) => x.aree[a]).map((a) => AREE[a] + ': ' + LIVELLI[x.aree[a]].toLowerCase()).join(' · ');
 
 // il permesso (sistema.utenti) lo controlla il guscio, come per ogni pagina (D-45)

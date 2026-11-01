@@ -1,6 +1,6 @@
 # Specifica — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 8.2 — **nessuno dà più di quello che ha** (D-45): in ogni area si concede al massimo il proprio livello, niente aree che non si hanno, niente gestione di chi è più in alto (il superutente sì); finestra utente con i livelli a segmenti, scheda *Permessi* a sezioni richiudibili per area (§8.3, §7.13); versione 8.1 — **ruoli per area** (D-45, §8.3): ruolo di Sistema (superutente, amministratore, utente) e, per ogni area (Anagrafiche, Provvigioni, domani Vendite), un livello lettura · operatore · responsabile; permessi `area.attività`; versione 8.0 — **anagrafiche con identità e versioni** (D-46, §4.6): id nostro stabile, codici di Integra in una tabella di collegamento, versioni che si aggiungono soltanto; i fatti (documenti, righe, bollettini, liquidazioni) puntano a identità **e** versione con chiave composta, le configurazioni solo all'identità; versione 7.9 — pagina Utenti nell'app; `GET /api/utenti/ruoli` (tabella *Cosa può fare ogni ruolo* dal server); *Reimposta la password* restituisce l'utente con l'esito dell'invio; colonne con `--colonne` che si impilano sul tablet (§8.3, §16.4); versione 7.8 — **niente telefono**: l'app è per computer e tablet; sotto i 744 px di larghezza si ferma subito, anche prima dell'accesso, con una pagina che chiede un computer o un tablet (V6, §16.6, D-44); versione 7.7 — pagina di accesso nell'app come nel prototipo; chiudendo la finestra (Esc, clic fuori, 2 minuti senza toccare nulla) il modulo riparte vuoto (§7.0, D-42); versione 7.6 — il CRM è il primo pezzo del **Sistema Informativo Aziendale** Decobrands: sottotitolo nuovo, in fondo all'accesso licenza d'uso e copyright con la finestra *Licenza d'uso*; Esc o un clic fuori dalla finestra di accesso tornano al logo (§1, §7.0, D-42, D-43); versione 7.5 — nuova pagina di accesso: tutta scura come la barra, logo al centro, il modulo si apre in una finestra al primo tasto o tocco; *Password dimenticata* cambia il contenuto della stessa finestra (§7.0, §16.4, D-42); versione 7.4 — limite ai tentativi per persona e, più largo, per IP, con valori nel `.env` e finestra che si azzera da sola (§3.3, D-41); versione 7.3 — API degli utenti con le regole di §7.13 sul server ed eventi §15.2.1.1; prove su un database a parte `decobrands_test` (§16.5, D-40); versione 7.2 — guscio dell'app (barra per ruolo da `GET /api/accesso/io`, sola lettura, Pagina riservata); `stile.css`: sul telefono la barra scorre da sola, senza allargare la pagina; versione 7.1 — pagine di accesso (§7.0, componente `CRM.Accesso`, campi `password` e `casella` del Form), pagina Utenti con nome utente, superutente e *Reimposta la password*, niente Microsoft 365 in Impostazioni (D-39); versione 7.0 — accesso con nome utente (o email) e password come nella Gestione Ordini, superutente che crea gli amministratori, password provvisoria e password dimenticata; tolti Microsoft 365 e il link di accesso (§3.3, §4.2.18, §7.13, §8.3, §15.2.1, D-39 sostituisce D-30); versione 6.3 — guard unico con `@Richiede`/`@Pubblica` (rotta senza dichiarazione negata), CSRF dal token di `GET /api/accesso/io`, nessun CORS (stessa origine) (§3.3, §8.3); versione 6.2 — `logEvent(tx, …)` e `logEventSicuro()`, schemi per codice, codice dell'errore 500 = `operazione_id` dell'evento (§15.2.7, §15.3–§15.4); versione 6.1 — utente corrente `GET /api/accesso/io`, ruolo riletto dal database a ogni richiesta, sessione rigenerata all'accesso, ritorno alla pagina chiesta (§8.3, D-38); versione 6.0 — schema snellito: tolti `ordinamento`, `cliente_ragione_sociale`, `conferma_scadenza` (calcolata), `dati_letti` e l'affidabilità del documento; migrazioni unite in una sola `iniziale` (D-37); versione 5.9 — V13: ogni operazione che scrive su più tabelle sta in una sola transazione, con blocco della riga sulle chiusure (§2, D-36); versione 5.8 — interscambio con periodi di validità, scaglioni a soglia, P.IVA dei clienti non univoca, chiusura del bollettino e storni legati al trimestre liquidato, prova automatica dei vincoli (D-35); versione 5.7 — revisione dello schema: un solo subagente attivo per cliente × fornitore, righe del bollettino legate al documento, documenti legati al trimestre liquidato e la nota di credito alla fattura, niente copie nella pratica e nel bollettino, nomi in italiano, file su disco (D-34); versione 5.6 — schema completato: `liquidazioni`, `clienti` da Integra, `sessioni` per utente, FK verso `utenti` nei documenti (§4.2.18–§4.2.20, §4.3, D-33); versione 5.5 — database `decobrands_db` sull'istanza PostgreSQL locale (V2, §3.4, §16.3); versione 5.4 — CRM staccato dalla Gestione Ordini: database e utenti propri, la Gestione Ordini si ingloberà con la vendita diretta (§1, V2, §4.1, §17, D-29); accesso misto con Microsoft 365 o link via email, solo su invito, senza password (V3, §3.3, §4.2.18, §7.13, §7.15, §8.3, §15.2.1, D-30); **registro unico** di eventi e anomalie con campi comuni e dettaglio JSON controllato per codice, Stato del sistema come vista del registro (V10, §4.2.11, §4.2.15, §7.11, §7.14, §15, D-31); viste di Integra lette da un database PostgreSQL ponte (§4.5, D-32); versione 5.3 — confronto con la nota di credito: solo le righe stornate, differenza = importo stornato (§7.3); FinestraAffiancata a tutto schermo sui telefoni (§16.4); versione 5.2 — **regola V12: ogni calcolo e operazione sensibile solo sul backend, mai da dati del frontend** (§2, §16.5, D-28); versione 5.1 — regole del subagente per cliente e per documento: % dell'agenzia, una fattura al mese, correzione sul documento con motivo (§4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §8.1, §10, §15.2.3, D-27); versione 5.0 — fotografia delle righe registrata nel cambio di stato della pratica, senza l'azione `snapshot_righe` (§15.2.4); percentuali dei fornitori con data di validità e calcolo per documento alla sua data; eccezioni personali dei subagenti inserite nel CRM; rotte delle pagine come il prototipo ufficiale; tolti i filtri vecchi della liquidazione; formula §10 sul netto dei documenti (§4.2.2, §4.2.3, §5.2, §5.11, §7, §7.5, §7.8, §8.1, §10, §13, §15.2.2, D-25, D-26); versione 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
+**Versione:** 8.4 — schema completo (fase 2a): CHECK dei valori ammessi che mancavano (§4.2); **identità e versioni delle anagrafiche già nello schema**, la sincronizzazione delle versioni resta in F1 (§4.6, D-48); tabelle §4.2, §4.3 e §4.4 allineate (`cliente_id` + versione al posto di `cliente_piva`, `codici_esterni` al posto di `codice_integra`); versione 8.3 — **menu per area** (D-47, §7.10): in cima alla barra le aree che l'utente può aprire (Provvigioni, Dati, Gestione), sotto solo le voci dell'area della pagina; l'area *Anagrafiche* diventa **Dati** (permessi `dati.*`, migrazione `area_dati`); *Documenti scartati* passa in Provvigioni, la *Guida* è comune a tutte le aree; sul tablet la barra va su due righe; versione 8.2 — **nessuno dà più di quello che ha** (D-45): in ogni area si concede al massimo il proprio livello, niente aree che non si hanno, niente gestione di chi è più in alto (il superutente sì); finestra utente con i livelli a segmenti, scheda *Permessi* a sezioni richiudibili per area (§8.3, §7.13); versione 8.1 — **ruoli per area** (D-45, §8.3): ruolo di Sistema (superutente, amministratore, utente) e, per ogni area (Anagrafiche, Provvigioni, domani Vendite), un livello lettura · operatore · responsabile; permessi `area.attività`; versione 8.0 — **anagrafiche con identità e versioni** (D-46, §4.6): id nostro stabile, codici di Integra in una tabella di collegamento, versioni che si aggiungono soltanto; i fatti (documenti, righe, bollettini, liquidazioni) puntano a identità **e** versione con chiave composta, le configurazioni solo all'identità; versione 7.9 — pagina Utenti nell'app; `GET /api/utenti/ruoli` (tabella *Cosa può fare ogni ruolo* dal server); *Reimposta la password* restituisce l'utente con l'esito dell'invio; colonne con `--colonne` che si impilano sul tablet (§8.3, §16.4); versione 7.8 — **niente telefono**: l'app è per computer e tablet; sotto i 744 px di larghezza si ferma subito, anche prima dell'accesso, con una pagina che chiede un computer o un tablet (V6, §16.6, D-44); versione 7.7 — pagina di accesso nell'app come nel prototipo; chiudendo la finestra (Esc, clic fuori, 2 minuti senza toccare nulla) il modulo riparte vuoto (§7.0, D-42); versione 7.6 — il CRM è il primo pezzo del **Sistema Informativo Aziendale** Decobrands: sottotitolo nuovo, in fondo all'accesso licenza d'uso e copyright con la finestra *Licenza d'uso*; Esc o un clic fuori dalla finestra di accesso tornano al logo (§1, §7.0, D-42, D-43); versione 7.5 — nuova pagina di accesso: tutta scura come la barra, logo al centro, il modulo si apre in una finestra al primo tasto o tocco; *Password dimenticata* cambia il contenuto della stessa finestra (§7.0, §16.4, D-42); versione 7.4 — limite ai tentativi per persona e, più largo, per IP, con valori nel `.env` e finestra che si azzera da sola (§3.3, D-41); versione 7.3 — API degli utenti con le regole di §7.13 sul server ed eventi §15.2.1.1; prove su un database a parte `decobrands_test` (§16.5, D-40); versione 7.2 — guscio dell'app (barra per ruolo da `GET /api/accesso/io`, sola lettura, Pagina riservata); `stile.css`: sul telefono la barra scorre da sola, senza allargare la pagina; versione 7.1 — pagine di accesso (§7.0, componente `CRM.Accesso`, campi `password` e `casella` del Form), pagina Utenti con nome utente, superutente e *Reimposta la password*, niente Microsoft 365 in Impostazioni (D-39); versione 7.0 — accesso con nome utente (o email) e password come nella Gestione Ordini, superutente che crea gli amministratori, password provvisoria e password dimenticata; tolti Microsoft 365 e il link di accesso (§3.3, §4.2.18, §7.13, §8.3, §15.2.1, D-39 sostituisce D-30); versione 6.3 — guard unico con `@Richiede`/`@Pubblica` (rotta senza dichiarazione negata), CSRF dal token di `GET /api/accesso/io`, nessun CORS (stessa origine) (§3.3, §8.3); versione 6.2 — `logEvent(tx, …)` e `logEventSicuro()`, schemi per codice, codice dell'errore 500 = `operazione_id` dell'evento (§15.2.7, §15.3–§15.4); versione 6.1 — utente corrente `GET /api/accesso/io`, ruolo riletto dal database a ogni richiesta, sessione rigenerata all'accesso, ritorno alla pagina chiesta (§8.3, D-38); versione 6.0 — schema snellito: tolti `ordinamento`, `cliente_ragione_sociale`, `conferma_scadenza` (calcolata), `dati_letti` e l'affidabilità del documento; migrazioni unite in una sola `iniziale` (D-37); versione 5.9 — V13: ogni operazione che scrive su più tabelle sta in una sola transazione, con blocco della riga sulle chiusure (§2, D-36); versione 5.8 — interscambio con periodi di validità, scaglioni a soglia, P.IVA dei clienti non univoca, chiusura del bollettino e storni legati al trimestre liquidato, prova automatica dei vincoli (D-35); versione 5.7 — revisione dello schema: un solo subagente attivo per cliente × fornitore, righe del bollettino legate al documento, documenti legati al trimestre liquidato e la nota di credito alla fattura, niente copie nella pratica e nel bollettino, nomi in italiano, file su disco (D-34); versione 5.6 — schema completato: `liquidazioni`, `clienti` da Integra, `sessioni` per utente, FK verso `utenti` nei documenti (§4.2.18–§4.2.20, §4.3, D-33); versione 5.5 — database `decobrands_db` sull'istanza PostgreSQL locale (V2, §3.4, §16.3); versione 5.4 — CRM staccato dalla Gestione Ordini: database e utenti propri, la Gestione Ordini si ingloberà con la vendita diretta (§1, V2, §4.1, §17, D-29); accesso misto con Microsoft 365 o link via email, solo su invito, senza password (V3, §3.3, §4.2.18, §7.13, §7.15, §8.3, §15.2.1, D-30); **registro unico** di eventi e anomalie con campi comuni e dettaglio JSON controllato per codice, Stato del sistema come vista del registro (V10, §4.2.11, §4.2.15, §7.11, §7.14, §15, D-31); viste di Integra lette da un database PostgreSQL ponte (§4.5, D-32); versione 5.3 — confronto con la nota di credito: solo le righe stornate, differenza = importo stornato (§7.3); FinestraAffiancata a tutto schermo sui telefoni (§16.4); versione 5.2 — **regola V12: ogni calcolo e operazione sensibile solo sul backend, mai da dati del frontend** (§2, §16.5, D-28); versione 5.1 — regole del subagente per cliente e per documento: % dell'agenzia, una fattura al mese, correzione sul documento con motivo (§4.2.6, §4.2.7.2, §5.2, §7.6, §7.8, §8.1, §10, §15.2.3, D-27); versione 5.0 — fotografia delle righe registrata nel cambio di stato della pratica, senza l'azione `snapshot_righe` (§15.2.4); percentuali dei fornitori con data di validità e calcolo per documento alla sua data; eccezioni personali dei subagenti inserite nel CRM; rotte delle pagine come il prototipo ufficiale; tolti i filtri vecchi della liquidazione; formula §10 sul netto dei documenti (§4.2.2, §4.2.3, §5.2, §5.11, §7, §7.5, §7.8, §8.1, §10, §13, §15.2.2, D-25, D-26); versione 4.9 — il **prototipo ufficiale** è `prototipo-alternativo/` (struttura, stile senza Bootstrap, componenti, testi, numeri); `prototipo-crm/` resta come archivio (V4, §3.1, §7.10, §16.1, §16.3, §16.4, D-24); versione 4.8 — **filtri standard** in tutte le barre: entità sempre con ricerca a selezione multipla, riepilogo e azzeramento a icona (Pratiche, Bollettini, Cliente → Pratiche, Analisi); numeri dei segmenti aggiornati dal vivo con gli altri filtri; contatori aggiornati dal vivo ai cambiamenti dei dati, tabelle su richiesta (§16.4.1, §16.4.2, D-22, D-23); versione 4.7 — filtri dell'Analisi su una riga con il periodo; campo a selezione multipla che mostra il nome della sola voce scelta o *Filtro multiplo (n)* e apre il menu con in alto le voci scelte; icone *Riepilogo dei filtri* (riquadro con tutti i filtri) e *Togli tutti i filtri* (§7.22, §16.4, D-21); versione 4.6 — campi di ricerca con **selezione singola o multipla** (stesso componente della ricerca articoli: etichette nel campo, ✓ nel menu, caselle nella maschera); filtri fornitori, subagenti e clienti dell'Analisi a selezione multipla (§7.22, §16.4, D-20); versione 4.5 — liquidazioni: tornano le due colonne (subagenti | documenti); nel pannello di destra le schede *Documenti* e *Report subagenti*; nuova pagina **Analisi** con la BI completa: periodo di 3, 6 o 12 mesi, filtri fornitore / subagente / cliente, filtro incrociato con un clic su grafici e righe, confronto con il periodo precedente, tabella raggruppabile, esportazione Excel con grafici, PDF e CSV (§7.8, §7.22, §16.4, D-18, D-19); versione 4.4 — liquidazioni: scheda *Sintesi* con numeri e grafici (fatturato, provvigioni, margine, fornitori, subagenti) prima del dettaglio; componente Grafico con Chart.js (§7.8, §16.4, D-17); versione 4.3: bollettini: sempre 6 mesi con selettore a mesi (anno + griglia, scorciatoie) e completamento automatico (§7.7, componente PeriodoMesi §16.4, D-16); versione 4.2: documenti: dettaglio a schede con prima l'azione proposta e poi le righe lette (§7.9, D-15); versione 4.1: bollettini: periodo Da–A di al massimo 6 mesi, filtro fornitore e *Con qualcosa da fare* (§7.7, D-14); versione 4.0: pratica a schede *Riepilogo* · *Righe a confronto* con avviso delle variazioni, niente percorso nelle pagine di dettaglio (§7.3); **registro delle decisioni con il loro perché** (§19) e regola di consegna (§16.5); versione 3.9: incassi dei clienti descritti nelle pagine: riquadro Pagamenti in Oggi, Incasso del cliente nella pratica, giorni per l'incasso nel fornitore, filtro Non pagate nel cliente, finestra Solleciti di pagamento (§7.1, §7.3, §7.4, §7.6, §5.14); versione 3.8: storno alla liquidazione successiva: mese per Decobrands, trimestre per il subagente con voce negativa; incassi dei clienti nel prototipo (§5.14, §7.8); versione 3.7: Stato del sistema: da dove vengono i dati di ogni servizio, come si calcola lo stato, catalogo dei problemi, vita di un problema, interfacce del server (§7.14.1–§7.14.5, §4.2.15); versione 3.6: incassi dei clienti: insoluti, storni e riaccrediti sul fatturato, riconoscimento al pagamento sul maturato, solleciti di pagamento ai clienti (§5.5, §5.14, §6.2, §7.7); versione 3.5: guida in linea completa: panoramica con schema del ciclo, comandi comuni, per ogni pagina passi, pulsanti e finestre (§7.17); versione 3.4: paginazione delle tabelle con ordinamento e totali su tutto l'elenco (§16.4); versione 3.3: scheda cliente con le schede *Agenzie* e *Pratiche* filtrabili (§7.6); versione 3.2: la **vendita diretta** (ordini cliente, articoli, giacenze, alias e kit) è un **ampliamento futuro**: progettata e conservata nel prototipo ma spenta (§17); come distinguere fra documenti dell'agenzia e ordini della vendita diretta nell'ingresso unico dei documenti (§17.2); versione 3.1: componente **Schede** (§16.4) e suo uso dove una scheda impilava più tabelle: esportazione per Integra (§7.18), fornitore (§7.4), utente (§7.13), colonna destra di Oggi (§7.1), Alias e kit (§7.21); versione 3.0: vendita diretta dalla Gestione Ordini: ordini cliente con esportazione per Integra (Ordine cliente e Ordine fornitore), articoli, giacenze con impegni, alias e kit (§7.18–§7.21, §4.2.16–§4.2.17); dati di Integra letti da viste sul database con sincronizzazione ogni pochi secondi, al posto dell'import da file (§4.1, §4.5); versione 2.9: idee e strumenti per il supporto alle decisioni con modelli linguistici e decisioni tipizzate, fase successiva (§18); pagine di gestione: utenti e ruoli (con sola lettura), stato del sistema, impostazioni, documenti scartati, guida (§7.13–§7.17, §8.3); esportazione della liquidazione: completa, un subagente, solo riepilogo, in Excel, PDF o CSV (§11); liquidazione con elenco subagenti che regge qualsiasi numero di subagenti (§7.8); bollettino atteso entro un giorno fissato per fornitore, sollecito solo dopo (§4.2.1, §5.6); pagina Oggi per gruppi di lavoro con solleciti per fornitore (§7.1); **Stato:** validata con il cliente; anagrafiche clienti e fornitori da Integra in sola lettura, schermata Clienti con le agenzie (§4.1, §7.6); ritorno alla schermata precedente nello stesso punto (§7.12); documenti della pratica consultabili affiancati al confronto (§7.3); evidenziazione del valore nel documento **da verificare** con prova di fattibilità (§6.6); stack allineato al Portale B2B Luis (§16.3); componenti standard (§16.4); ingresso documenti interno senza n8n, lettura con GLM-OCR in locale (§6.5); sostituzione della Gestione Ordini pianificata in una fase successiva (§17)
 **Fonte:** `ANALISI_CRM_PROVVIGIONI.md` (analisi) + risposte di Matteo Caironi (Sales Assistant)
 
 ---
@@ -294,21 +294,21 @@ buttare dopo.
 > `fornitori` §4.2.1) e `rif_nro_ordine_fornitore` (numero ordine del fornitore indicato
 > dal cliente, spec Gestione Ordini). La pratica fornitore risale all'ordine cliente di
 > origine via `ordine_cliente_id` — FK opzionale su `ordini_fornitore_testata` §4.2.7 —
-> e collega le pratiche alla stessa `cliente_piva` usata negli ordini clienti.
+> e collega le pratiche allo stesso cliente (`cliente_id`, §4.6) usato negli ordini clienti.
 
 ### 4.2 Nuove tabelle CRM
 
 ### 4.2.1 `fornitori`
 
-Anagrafica dei fornitori, con i giorni di attesa conferma e la modalità di pagamento
-delle provvigioni.
+**Identità** del fornitore (D-46, §4.6) con le regole del CRM: giorni di attesa conferma e
+modalità di pagamento delle provvigioni. I dati descrittivi da Integra (`piva`,
+`ragione_sociale`, `paese`) stanno in `fornitori_versioni`, il codice di Integra in
+`codici_esterni`.
 
 | Colonna | Tipo | Note |
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
-| `ragione_sociale` | VARCHAR(255) NOT NULL | da Integra, sola lettura |
-| `piva` | VARCHAR(20) | univoco se valorizzato; da Integra, sola lettura |
-| `codice_integra` | VARCHAR(20) UNIQUE NOT NULL | codice del fornitore in Integra, chiave della sincronizzazione |
+| `versione_corrente_id` | BIGINT FK composta → `fornitori_versioni` (`fornitore_id`, `id`) | versione in vigore (§4.6); ragione sociale, P.IVA e paese da Integra, sola lettura, stanno lì |
 | `giorni_attesa_conferma` | INT DEFAULT 30 | usato per le scadenze |
 | `giorno_bollettino` | SMALLINT DEFAULT 10, CHECK 1–28 | giorno del **mese successivo** entro cui il fornitore manda il bollettino; prima è "atteso", dopo "non arrivato" con sollecito (§5.6) |
 | `tipo_provvigione` | VARCHAR(20) DEFAULT `'fatturato'` | `maturato` \| `fatturato` — maturazione provvigioni (**§5.5**) |
@@ -403,7 +403,7 @@ presso un fornitore e con quale sconto.
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
 | `subagente_id` | BIGINT FK → `subagenti` | ON DELETE RESTRICT |
-| `cliente_piva` | VARCHAR(20) NOT NULL | |
+| `cliente_id` | BIGINT FK → `clienti` | ON DELETE RESTRICT; solo identità (configurazione, §4.6) |
 | `fornitore_id` | BIGINT FK → `fornitori` | ON DELETE RESTRICT |
 | `codice_cliente_fornitore` | VARCHAR(50) | nullable — **codice con cui il fornitore identifica il cliente** (quello stampato su conferma e fattura): è la chiave per abbinare il documento ricevuto alla pratica (§4.4) |
 | `sconto` | NUMERIC(5,2) DEFAULT 0 | **sconto accordato al cliente su quel fornitore** — determina lo scaglione (**§4.4**) |
@@ -411,7 +411,7 @@ presso un fornitore e con quale sconto.
 | `regola_mensile` | VARCHAR(10) NULL | NULL = provvigione al subagente su ogni fattura; `prima` · `piu_alta` = **una fattura al mese** (la prima o la più alta del mese), le altre a zero (§5.2, D-27) |
 | `valido_dal` · `valido_al` | DATE NOT NULL · DATE | periodo in cui il subagente segue il cliente; `valido_al` escluso, NULL = lo segue oggi |
 | `creato_il` | TIMESTAMPTZ | |
-| Vincolo | `EXCLUDE (cliente_piva =, fornitore_id =, daterange(valido_dal, valido_al) &&)` | un solo subagente per cliente×fornitore **in ogni giorno** (**§5.10**) |
+| Vincolo | `EXCLUDE (cliente_id =, fornitore_id =, daterange(valido_dal, valido_al) &&)` | un solo subagente per cliente×fornitore **in ogni giorno** (**§5.10**) |
 | Vincolo | `EXCLUDE (fornitore_id =, codice_cliente_fornitore =, daterange &&)` | il codice del fornitore indica un solo cliente in ogni giorno (dove valorizzato) |
 
 Un documento va al subagente il cui periodo contiene la **data del documento**. Quando il cliente passa a un altro subagente si chiude il periodo (`valido_al`) e se ne apre uno nuovo dallo stesso giorno.
@@ -426,11 +426,11 @@ attraversa gli stati `inviato → confermato → fatturato`.
 | Colonna | Tipo | Note |
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
-| `fornitore_id` | BIGINT FK → `fornitori` | |
+| `fornitore_id` · `fornitore_versione_id` | BIGINT FK composta → `fornitori_versioni` | fornitore e la sua versione corrente alla nascita della pratica (§4.6) |
 | `ordine_cliente_id` | BIGINT FK → `ordini_cliente_testata` | nullable — ordine cliente che ha originato la pratica (ponte §4.1) |
 | `numero_ordine` | VARCHAR(50) NOT NULL | numero ordine del fornitore |
 | `data_ordine` | DATE NOT NULL | |
-| `cliente_piva` | VARCHAR(20) NOT NULL | cliente finale |
+| `cliente_id` · `cliente_versione_id` | BIGINT NOT NULL, FK composta → `clienti_versioni` | cliente finale e la sua versione corrente alla nascita della pratica (§4.6) |
 | `agente_id` | BIGINT FK → `agenti` | nullable |
 | `importo_merce` | NUMERIC(12,2) | importo merce (base del calcolo provvigioni) |
 | `stato` | VARCHAR(20) DEFAULT `'inviato'` | `inviato` \| `confermato` \| `fatturato` |
@@ -529,7 +529,7 @@ contestato`.
 | Colonna | Tipo | Note |
 |---------|------|------|
 | `id` | BIGSERIAL PK | |
-| `fornitore_id` | BIGINT FK → `fornitori` | |
+| `fornitore_id` · `fornitore_versione_id` | BIGINT FK composta → `fornitori_versioni` | fornitore e la sua versione corrente alla nascita del bollettino (§4.6) |
 | `mese` | INT CHECK 1–12 | |
 | `anno` | INT | |
 | `stato` | VARCHAR(20) DEFAULT `'da_verificare'` | `da_verificare` \| `verificato` \| `contestato` |
@@ -551,7 +551,7 @@ ha calcolato.
 | `testata_id` | BIGINT FK → `bollettini_testata` | ON DELETE CASCADE |
 | `fattura_numero` | VARCHAR(50) NOT NULL | |
 | `fattura_data` | DATE | |
-| `cliente_piva` | VARCHAR(20) | |
+| `cliente_id` · `cliente_versione_id` | BIGINT, FK composta → `clienti_versioni` | nullable, i due insieme (CHECK); cliente e versione corrente alla nascita della riga (§4.6) |
 | `importo_merce` | NUMERIC(12,2) | |
 | `pct_riconosciuta` | NUMERIC(5,2) | % applicata dal fornitore |
 | `importo_riconosciuto` | NUMERIC(12,2) NOT NULL | importo riconosciuto dal fornitore |
@@ -632,7 +632,7 @@ Coda e stato di ogni documento entrato nel CRM (§6.5), dalla ricezione all'abbi
 | `stato` | VARCHAR(16) | `in_coda` → `in_lettura` → `da_controllare` → `abbinato` · `scartato` · `errore` |
 | `tentativi` · `errore` | INT · TEXT | riletture automatiche (max 3) e ultimo errore |
 | `tipo` | VARCHAR(16) | `ordine` · `conferma` · `fattura` · `nota_credito` · `bollettino` (letto, correggibile) |
-| `fornitore_id` | FK → `fornitori` | riconosciuto dalla lettura, correggibile |
+| `fornitore_id` · `fornitore_versione_id` | FK composta → `fornitori_versioni` | riconosciuto dalla lettura, correggibile; nullable, i due insieme (CHECK, §4.6) |
 | `livello` | VARCHAR(12) | `affidabile` · `da_controllare` · `bassa` (§6.5), dal campo meno affidabile; i valori letti stanno **solo** in `documenti_campi` (*Perché D-37:* `dati_letti` in JSON li ripeteva) |
 | `controlli` | JSONB | esito dei controlli fissi (§6.5) |
 | `modello` | TEXT | versione del modello e del prompt usati |
@@ -779,19 +779,31 @@ cambiano percentuali o documenti.
 
 ### 4.2.20 `clienti` — copia locale da Integra (D-33)
 
-La sincronizzazione (§4.5) copia qui la vista `v_clienti`; la scrive **solo** il servizio
-`integra`, l'interfaccia la legge soltanto (D-01).
+**Identità** del cliente (D-46, §4.6). La sincronizzazione (§4.5) copia qui la vista
+`v_clienti`; la scrive **solo** il servizio `integra`, l'interfaccia la legge soltanto (D-01).
+I dati descrittivi stanno in `clienti_versioni` (si aggiungono soltanto), il codice di Integra
+in `codici_esterni`.
 
 | Colonna | Tipo | Note |
 |---|---|---|
 | `id` | BIGSERIAL PK | |
-| `codice_integra` | VARCHAR(20) UNIQUE NOT NULL | chiave della sincronizzazione |
-| `piva` | VARCHAR(20), indice non univoco | *Perché D-35:* Integra può avere P.IVA doppie (sedi, doppioni) e un vincolo univoco fermerebbe la sincronizzazione; i doppioni si segnalano come anomalia. Legame logico con `interscambio`, pratiche e bollettini (`cliente_piva`); un cliente senza P.IVA valida non si copia e apre l'anomalia `integra.piva_mancante` |
-| `ragione_sociale` | VARCHAR(255) NOT NULL | |
-| `indirizzo` · `cap` · `citta` · `provincia` | VARCHAR | |
-| `email` | VARCHAR(200) | da confermare (§5.14) |
+| `versione_corrente_id` | BIGINT FK composta → `clienti_versioni` (`cliente_id`, `id`) | versione in vigore (§4.6) |
 | `attivo` | BOOLEAN DEFAULT true | false se sparisce dalla vista: i dati storici restano |
 | `modificato_il` · `sincronizzato_il` | TIMESTAMPTZ | data di modifica in Integra (lettura incrementale) e ultima copia |
+
+**`clienti_versioni`** (§4.6, solo aggiunta): `id`, `cliente_id`, `valido_dal`, `fonte`, `creato_da`,
+`piva` (VARCHAR(20), indice non univoco), `ragione_sociale` (NOT NULL), `indirizzo` · `cap` · `citta` ·
+`provincia`, `email` (da confermare, §5.14); UNIQUE (`cliente_id`, `id`).
+*Perché D-35:* Integra può avere P.IVA doppie (sedi, doppioni) e un vincolo univoco fermerebbe la
+sincronizzazione; i doppioni si segnalano come anomalia. La P.IVA **non collega** più le tabelle
+(lo fa `cliente_id`); un cliente senza P.IVA valida non si copia e apre l'anomalia `integra.piva_mancante`.
+
+**`fornitori_versioni`** (§4.6, solo aggiunta): `id`, `fornitore_id`, `valido_dal`, `fonte`, `creato_da`,
+`piva`, `ragione_sociale` (NOT NULL), `paese`; UNIQUE (`fornitore_id`, `id`).
+
+**`codici_esterni`** (§4.6): `id`, `sistema` (`integra`), `tipo` (`cliente` · `fornitore`), `codice`,
+`entita_id`, `creato_il`; UNIQUE (`sistema`, `tipo`, `codice`). Sostituisce `codice_integra`: è la
+chiave della sincronizzazione.
 
 *Perché (D-33):* §4.5 sincronizza ogni 60 s, ma solo i fornitori avevano una tabella locale;
 leggere Integra a ogni pagina renderebbe il CRM lento e fermo quando il ponte non risponde.
@@ -812,10 +824,13 @@ ordini_fornitore_testata 1 ── n ordini_fornitore_documenti (fatture e note d
 ordini_fornitore_documenti (nota di credito) n ── 0..1 ordini_fornitore_documenti (fattura_id)
 ordini_fornitore_documenti n ── 0..1 liquidazioni (liquidazione_id) · documenti_in_arrivo (arrivo_id)
 bollettini_righe n ── 0..1 ordini_fornitore_documenti (documento_id, riconciliazione) · liquidazioni (liquidazione_id, storni)
-interscambio (cliente_piva, fornitore_id) → ordini_fornitore_testata (cliente_piva, fornitore_id)
-interscambio (fornitore_id, codice_cliente_fornitore) → ordini_fornitore_testata (cliente_piva, fornitore_id)
+interscambio (cliente_id, fornitore_id) → ordini_fornitore_testata (cliente_id, fornitore_id)
+interscambio (fornitore_id, codice_cliente_fornitore) → ordini_fornitore_testata (cliente_id, fornitore_id)
 ordini_cliente_testata 1 ── 0..n ordini_fornitore_testata (via ordine_cliente_id, ponte §4.1; senza FK fino a §17)
-clienti (piva) → interscambio, ordini_fornitore_testata, bollettini_righe (cliente_piva)
+clienti 1 ── n clienti_versioni · fornitori 1 ── n fornitori_versioni (versione_corrente_id, §4.6)
+clienti (id) → interscambio (cliente_id) · clienti_versioni (cliente_id, id) → ordini_fornitore_testata, bollettini_righe (cliente_id + cliente_versione_id)
+fornitori_versioni (fornitore_id, id) → ordini_fornitore_testata, bollettini_testata, documenti_in_arrivo (fornitore_id + fornitore_versione_id)
+codici_esterni (sistema, tipo, codice) → clienti · fornitori (entita_id, senza FK)
 utenti 1 ── n registro  (eventi e anomalie, §15: chi ha fatto ogni operazione)
 utenti 1 ── n sessioni · accessi_link · liquidazioni (chiusa_da) · provvigioni_correzioni (creato_da)
 ```
@@ -833,8 +848,8 @@ Diagramma grafico con colonne chiave e vincoli: https://claude.ai/artifact/SWCPp
   (§5.7) e determina lo scaglione (lo sconto di default del fornitore è stato tolto, D-34).
 - **Abbinamento dei documenti del fornitore**: la conferma e la fattura riportano il
   *codice cliente del fornitore*, non la P.IVA. `interscambio.codice_cliente_fornitore`
-  fa da traduzione verso `cliente_piva`: in arrivo documento il sistema risolve
-  `fornitore_id + codice_cliente_fornitore → cliente_piva` e propone la pratica
+  fa da traduzione verso `cliente_id`: in arrivo documento il sistema risolve
+  `fornitore_id + codice_cliente_fornitore → cliente_id` e propone la pratica
   corrispondente; se il codice non è valorizzato l'abbinamento resta manuale
   (confermato dall'operatore, §6.1).
 - La **scadenza della conferma** non si salva: si calcola come `data_ordine + giorni_attesa_conferma`
@@ -890,8 +905,10 @@ obbligherebbe a riagganciarle, ed è lì che nascerebbero gli errori sulle provv
 **Da non "semplificare":** niente aggiornamento in place dei campi delle versioni, niente FK alla
 sola identità sui fatti.
 
-Le tabelle `fornitori` (§4.2.1) e `clienti` (§4.2.20) si dividono così nella fase F1 (piano
-F1-A7); fino ad allora lo schema resta com'è, perché è vuoto.
+Le tabelle `fornitori` (§4.2.1) e `clienti` (§4.2.20) si dividono così già nello schema della
+fase 2a (piano F0-A2); la sincronizzazione che aggiunge le versioni resta in F1 (piano F1-A7).
+*Perché (D-48):* il seed e il motore delle provvigioni vengono prima di F1 e devono nascere sulle
+tabelle giuste, mentre sono ancora vuote.
 
 ### 4.5 Sincronizzazione da Integra
 
@@ -1023,7 +1040,7 @@ Le regole di dettaglio (stati della fattura, solleciti, effetto sui subagenti) s
 
 Ogni cliente ha un **fornitore di riferimento** con un **codice cliente** e uno
 **sconto**, se accordato. Questa relazione vive nella pagina **cliente** (riferimenti
-completi) e si riflette in `interscambio` (`cliente_piva`, `fornitore_id`, `sconto`).
+completi) e si riflette in `interscambio` (`cliente_id`, `fornitore_id`, `sconto`).
 Lo sconto di `interscambio` è **il campo canonico** che determina lo scaglione in
 liquidazione e nel confronto bollettini.
 
@@ -1833,38 +1850,54 @@ successiva (§17).
 ### 7.10 Schema dei flussi e navigazione tra le schermate
 
 Il prototipo ufficiale (`prototipo-alternativo/`, D-24) è una **pagina unica** con le
-rotte `#/percorso`. A sinistra c'è la **barra laterale**, con le voci raggruppate per
-frequenza di lavoro; il gruppo *Gestione* si può chiudere. Il dato che collega tutta
+rotte `#/percorso`. A sinistra c'è la **barra laterale** con il **menu per area** (D-47): in
+cima le aree che l'utente può aprire, sotto le voci dell'area della pagina, raggruppate per
+frequenza di lavoro. Il dato che collega tutta
 l'applicazione è l'**ordine a fornitore** (la pratica). Tutti i documenti entrano dal
 canale comune di ingresso documenti del CRM (§6.5).
 
 ```
 Barra laterale                         Rotte
-├── Carica documenti (sempre visibile) → apre la scelta dei file, poi Documenti
-├── Ogni giorno
-│   ├── Oggi                           #/                       cose da fare per gruppi, scadenze
-│   ├── Documenti                      #/documenti/:id          controlla, correggi, abbina, scarta
-│   └── Pratiche                       #/pratiche/:id           riepilogo · righe a confronto
-├── Ogni mese
-│   └── Bollettini                     #/bollettini/:id         matrice 6 mesi → riconciliazione
-├── Ogni trimestre
-│   ├── Liquidazioni                   #/liquidazioni/:anno/:t  documenti · report subagenti
-│   └── Analisi                        #/analisi                BI con filtri ed esportazione
-├── Vendita diretta (spenta, §17)
-├── Anagrafiche
-│   ├── Fornitori                      #/fornitori/:id          percentuali · clienti seguiti
-│   ├── Subagenti                      #/subagenti/:id
-│   └── Clienti                        #/clienti/:piva          agenzie · pratiche
-└── Gestione (richiudibile)
-    ├── Utenti e ruoli                 #/utenti/:id
-    ├── Stato del sistema              #/sistema
-    ├── Impostazioni                   #/impostazioni/:sezione
-    ├── Documenti scartati             #/scartati
-    └── Guida                          #/guida/:argomento
+[Provvigioni | Dati | Gestione]         aree a segmenti: solo quelle con almeno una voce permessa
+├── Provvigioni
+│   ├── Carica documenti               → apre la scelta dei file, poi Documenti (con provvigioni.modifica)
+│   ├── Ogni giorno
+│   │   ├── Oggi                       #/                       cose da fare per gruppi, scadenze
+│   │   ├── Documenti                  #/documenti/:id          controlla, correggi, abbina, scarta
+│   │   ├── Pratiche                   #/pratiche/:id           riepilogo · righe a confronto
+│   │   └── Documenti scartati         #/scartati
+│   ├── Ogni mese
+│   │   └── Bollettini                 #/bollettini/:id         matrice 6 mesi → riconciliazione
+│   └── Ogni trimestre
+│       ├── Liquidazioni               #/liquidazioni/:anno/:t  documenti · report subagenti
+│       └── Analisi                    #/analisi                BI con filtri ed esportazione
+├── Dati
+│   └── Anagrafiche
+│       ├── Fornitori                  #/fornitori/:id          percentuali · clienti seguiti
+│       ├── Subagenti                  #/subagenti/:id
+│       └── Clienti                    #/clienti/:piva          agenzie · pratiche
+├── Gestione (permessi di Sistema)
+│   ├── Utenti e ruoli                 #/utenti/:id
+│   ├── Stato del sistema              #/sistema
+│   └── Impostazioni                   #/impostazioni/:sezione
+├── Vendite (spenta, §17)
+└── Guida (in ogni area)               #/guida/:argomento
 ```
 
 Considerazioni:
 
+- **Menu per area** (D-47):
+  - l'area aperta è quella della pagina; le rotte non cambiano (niente prefisso d'area); sulle
+    pagine comuni (Guida) resta aperta l'ultima area;
+  - un clic su un'area apre la sua prima voce permessa;
+  - le aree sono a segmenti finché ci stanno (fino a quattro), poi diventano un elenco a tendina;
+  - sul tablet la barra va su due righe: sopra le aree e *Carica documenti*, sotto le voci.
+
+  *Perché:* il CRM è il primo modulo del portale (D-43): con tutte le voci in un'unica barra,
+  ogni area nuova (Vendite, Gestione Ordini, …) la allungherebbe per tutti. Per area si vede
+  solo quello che serve al lavoro che si sta facendo. L'area *Anagrafiche* diventa **Dati**
+  perché conterrà tutte le tabelle consultabili e modificabili, non solo fornitori, clienti e
+  subagenti (idea di Ugo, 01/11/2026).
 - **Navigazione**:
   - ogni pagina ha una testata con *‹ Torna a …*, il titolo, le azioni e *Guida*;
   - si torna sempre alla schermata precedente nello stesso punto (§7.12);
@@ -2461,7 +2494,7 @@ permessi fino all'uscita; senza rigenerare l'identificativo all'accesso la sessi
 si può fissare in anticipo (session fixation).
 
 **Ruoli e aree (D-45).** Il portale (D-43) è diviso in **Sistema**, che è di tutto il portale, e
-**aree** di lavoro: oggi **Anagrafiche** e **Provvigioni**, domani **Vendite** (spenta, §17) e
+**aree** di lavoro: oggi **Provvigioni** e **Dati** (prima *Anagrafiche*, D-47), domani **Vendite** (spenta, §17) e
 altre. Ogni utente ha:
 
 - un **ruolo di Sistema** (`utenti.ruolo`): `superutente` (uno solo) · `amministratore` ·
@@ -2480,9 +2513,9 @@ tutto quello che può `lettura`. I permessi si chiamano `area.attività`:
 | Sistema | `sistema.amministratori` | Amministratori: creare, modificare, disattivare | superutente |
 | Sistema | `sistema.impostazioni` | Impostazioni del portale (casella, posta, sincronizzazione, conservazione) | amministratore |
 | Sistema | `sistema.stato` | Stato del sistema, segnare i problemi come visti | amministratore, oppure operatore in un'area |
-| Anagrafiche | `anagrafiche.consulta` | Consultare fornitori, clienti, subagenti | lettura |
-| Anagrafiche | `anagrafiche.modifica` | Subagenti, agenzie dei clienti (interscambio) | operatore |
-| Anagrafiche | `anagrafiche.condizioni` | Condizioni, scaglioni e percentuali dei fornitori; eccezioni personali | responsabile |
+| Dati | `dati.consulta` | Consultare fornitori, clienti, subagenti | lettura |
+| Dati | `dati.modifica` | Subagenti, agenzie dei clienti (interscambio) | operatore |
+| Dati | `dati.condizioni` | Condizioni, scaglioni e percentuali dei fornitori; eccezioni personali | responsabile |
 | Provvigioni | `provvigioni.consulta` | Consultare pratiche, documenti, bollettini, liquidazioni, analisi | lettura |
 | Provvigioni | `provvigioni.esporta` | Esportare liquidazioni e analisi (Excel, PDF, CSV) | lettura |
 | Provvigioni | `provvigioni.modifica` | Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti | operatore |
@@ -2495,7 +2528,8 @@ tutto quello che può `lettura`. I permessi si chiamano `area.attività`:
   richiesta (D-38); `GET /api/accesso/io` dà `ruolo`, `aree` e `permessi`. Ogni rotta dichiara
   il suo permesso (`@Richiede('provvigioni.chiudi')`); le rotte di chi è solo collegato (io,
   esci, cambio password) dichiarano `@Collegato()`.
-- Barra: le voci di un'area compaiono solo con il suo `*.consulta`; *Carica documenti* con
+- Barra (D-47, §7.10): un'area compare se l'utente può aprirne almeno una voce; le voci di
+  un'area con il suo `*.consulta`; *Carica documenti* (nell'area Provvigioni) con
   `provvigioni.modifica`; Gestione con i permessi di Sistema.
 - Scheda *Permessi* (§7.13): una sezione per area (righe = attività, colonne = livelli),
   evidenziato il livello dell'utente scelto; per Sistema le colonne sono i ruoli di Sistema.
@@ -2521,7 +2555,7 @@ tutto quello che può `lettura`. I permessi si chiamano `area.attività`:
   cancella.
 - Il superutente creato dal comando d'installazione non ha livelli: gestisce il portale. Chi
   c'era prima della D-45 ha ricevuto con la migrazione livelli pari a quello che poteva fare
-  (amministratore e superutente: responsabile in Anagrafiche e Provvigioni). Dopo l'accesso, chi
+  (amministratore e superutente: responsabile in Dati e Provvigioni). Dopo l'accesso, chi
   non ha Provvigioni va alla prima pagina che può aprire.
 
 *Perché (D-45):* il CRM è il primo pezzo di un portale (D-43): con un solo ruolo per tutto, chi
@@ -2779,23 +2813,23 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 |------------------|--------|----------|----------|---------|-------------|
 | create/update/delete agente | `crud` | `create`/`update`/`delete` | `agente` | `successo` | create/delete: `{etichetta: cognome, nome}`; update: `{etichetta, prima, dopo}` |
 | create/update/delete subagente | `crud` | `create`/`update`/`delete` | `subagente` | `successo` | come agente (create include `agente_id`) |
-| POST `/api/interscambio` | `crud` | `create` | `interscambio` | `successo` | `{etichetta: cliente_piva · fornitore, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, sconto}` |
+| POST `/api/interscambio` | `crud` | `create` | `interscambio` | `successo` | `{etichetta: ragione sociale cliente · fornitore, subagente_id, cliente_id, fornitore_id, codice_cliente_fornitore, sconto}` |
 | PUT `/api/interscambio/:id` | `crud` | `update` | `interscambio` | `successo` | `{etichetta, prima, dopo}` (comprende `pct_subagente` e `regola_mensile`) |
 | PUT `/api/documenti-fiscali/:id/correzione` | `crud` | `create` · `update` | `correzione` | `successo` | `{etichetta: numero · subagente, documento_id, prima, dopo: {tipo, valore, motivo}}` |
 | DELETE `/api/documenti-fiscali/:id/correzione` | `crud` | `delete` | `correzione` | `successo` | `{etichetta, documento_id, tipo, valore, motivo}` |
-| DELETE `/api/interscambio/:id` | `crud` | `delete` | `interscambio` | `successo` | `{etichetta, interscambio_id, subagente_id, cliente_piva, fornitore_id, codice_cliente_fornitore, sconto}` |
+| DELETE `/api/interscambio/:id` | `crud` | `delete` | `interscambio` | `successo` | `{etichetta, interscambio_id, subagente_id, cliente_id, fornitore_id, codice_cliente_fornitore, sconto}` |
 
 #### 15.2.4 Pratiche ordine a fornitore (§8.1)
 
 | Operazione (API) | `tipo` | `azione` | `entita` | `esito` | `dettaglio` |
 |------------------|--------|----------|----------|---------|-------------|
-| POST `/api/ordini-fornitore` | `crud` | `create` | `pratica` | `successo` | `{etichetta: numero_ordine, fornitore_id, cliente_piva, ordine_cliente_id, agente_id, importo_merce, stato}` |
+| POST `/api/ordini-fornitore` | `crud` | `create` | `pratica` | `successo` | `{etichetta: numero_ordine, fornitore_id, cliente_id, ordine_cliente_id, agente_id, importo_merce, stato}` |
 | PUT `/api/ordini-fornitore/:id` **senza** cambio stato | `crud` | `update` | `pratica` | `successo` | `{etichetta, prima, dopo}` (lo `stato` è **escluso** dal diff) |
 | PUT `/api/ordini-fornitore/:id` **con** cambio stato | `stato` | `change_state` | `pratica` | `successo` | `{etichetta, prima: {stato}, dopo: {stato}, motivo: note}`; se il cambio salva le righe della nuova fase, anche `{da_fase, a_fase, n_righe, importo, scostamento_vs_fase_precedente}` |
 | PUT con **entrambi** (cambio stato + altri campi) | `crud`+`stato` | `update`+`change_state` | `pratica` | `successo` | **due eventi separati**, come da righe precedenti |
 | POST `/api/ordini-fornitore/:id/righe` | `crud` | `create` | `riga_pratica` | `successo` | `{etichetta: codice · descrizione, pratica_id, riga_numero, codice, descrizione, quantita, prezzo, importo}` |
 | DELETE `/api/ordini-fornitore/:id/righe/:rid` | `crud` | `delete` | `riga_pratica` | `successo` | `{etichetta, riga_pratica_id, pratica_id, codice, descrizione}` |
-| DELETE `/api/ordini-fornitore/:id` | `crud` | `delete` | `pratica` | `successo` | `{etichetta: numero_ordine, pratica_id, fornitore_id, cliente_piva, importo_merce, stato}` |
+| DELETE `/api/ordini-fornitore/:id` | `crud` | `delete` | `pratica` | `successo` | `{etichetta: numero_ordine, pratica_id, fornitore_id, cliente_id, importo_merce, stato}` |
 | POST `/api/ordini-fornitore/:id/upload` (ordine/conferma/fattura) | `documento` | `upload` | `pratica` | `successo` | `{etichetta, pratica_id, fase, file_nome, dimensione}` |
 | lettura con esito negativo (GLM-OCR non riuscita dopo 3 tentativi, §6.5) | `documento` | `upload` | `documento` | `errore` | `{etichetta, documento_id, file_nome, tentativi, errore}` |
 | correzione dati letti (§6.5) | `documento` | `update` | `documento` | `successo` | `{etichetta, documento_id, campi_corretti, livello_prima, livello_dopo}` |
@@ -2813,7 +2847,7 @@ sempre salvato nella chiave `etichetta` del dettaglio (§15.4).
 | PUT `/api/bollettini/:id` (dati/note, **senza** cambio stato) | `crud` | `update` | `bollettino` | `successo` | `{etichetta, prima, dopo}` |
 | PUT `/api/bollettini/:id` **con** cambio stato (`da_verificare → verificato`/`contestato`) | `stato` | `change_state` | `bollettino` | `successo` | `{etichetta, prima: {stato}, dopo: {stato}, motivo: note}` |
 | **Verifica** del bollettino (conferma importi, congelamento % e importi §5.11) | `calcolo` | `verify` | `bollettino` | `successo` | `{etichetta, bollettino_id, periodo: {mese, anno}, importo_riconosciuto, importo_calcolato, differenza_totale}` |
-| POST `/api/bollettini/:id/righe` | `crud` | `create` | `riga_bollettino` | `successo` | `{etichetta: fattura_numero · cliente_piva, bollettino_id, fattura_numero, fattura_data, cliente_piva, importo_merce, pct_riconosciuta, importo_riconosciuto, pct_calcolata, importo_calcolato, differenza}` |
+| POST `/api/bollettini/:id/righe` | `crud` | `create` | `riga_bollettino` | `successo` | `{etichetta: fattura_numero · ragione sociale cliente, bollettino_id, fattura_numero, fattura_data, cliente_id, importo_merce, pct_riconosciuta, importo_riconosciuto, pct_calcolata, importo_calcolato, differenza}` |
 | DELETE `/api/bollettini/:id/righe/:rid` | `crud` | `delete` | `riga_bollettino` | `successo` | `{etichetta, riga_bollettino_id, bollettino_id, fattura_numero, importo_riconosciuto, importo_calcolato}` |
 | **Correzione manuale** di un importo (§5.13) | `crud` | `update` | `riga_bollettino` | `successo` | `{etichetta, riga_bollettino_id, bollettino_id, prima, dopo}` |
 
@@ -3465,4 +3499,6 @@ rilegge per sapere da dove viene una regola. Le decisioni nuove si aggiungono in
 | D-43 | 30/10/2026 | Il CRM è il **primo pezzo del Sistema Informativo Aziendale** di Decobrands (portale aziendale generale): sottotitolo "Sistema Informativo Aziendale" al posto di "Pratiche e provvigioni"; software **proprietario**, sviluppato internamente, con licenza d'uso riservata (non open source) e copyright Decobrands S.r.l. in fondo all'accesso, finestra *Licenza d'uso* con titolarità, uso concesso, divieti, riservatezza e componenti di terzi | i moduli successivi (vendita diretta, Gestione Ordini, altro) entrano nello stesso portale: nomi, accessi, utenti e stile vanno pensati per il portale, non solo per le provvigioni; il software è sviluppato internamente in linea con le regole del **patent box** (software protetto da diritto d'autore, L. 633/1941): la titolarità va dichiarata. Il testo della licenza è una **bozza da far verificare al consulente** | Ugo | `prototipo-alternativo/assets/guida.js` (`CRM.LICENZA`), `componenti.js` (`CRM.Accesso`, `CRM.Barra`), §1, §7.0 |
 | D-44 | 30/10/2026 | L'app è per **computer e tablet**, niente telefono: sotto i 744 px di larghezza si ferma a monte (anche prima dell'accesso) con una pagina che chiede uno schermo più grande; controllo sulla larghezza con il CSS, non sul tipo di dispositivo; prove e schermate a 1440 e 768 px | strumento d'ufficio con tabelle larghe e colonne affiancate: sul telefono sarebbe poco usabile e adattarlo costerebbe molto; meglio fermare che mostrare schermate tagliate | Ugo | V6, §16.6, CLAUDE.md regola 5 |
 | D-45 | 30/10/2026 | **Ruoli per area**: ruolo di Sistema (`superutente`, `amministratore`, `utente`) più un livello per ogni area (`lettura`, `operatore`, `responsabile`, tabella `utenti_aree`); anche superutente e amministratori entrano in un'area solo con un livello; permessi `area.attività` (§8.3); **nessuno dà più di quello che ha** (livello ≤ al proprio in ogni area, niente gestione di chi è più in alto; solo il superutente senza limite); scheda *Permessi* a sezioni per area | il CRM è un'area di un portale più grande (D-43): servono confini fra le aree e fra lavoro quotidiano e azioni definitive; adesso tocca solo la gestione utenti | Ugo | §8.3, §4.2.18, §7.13, `app/backend/src/accesso.ts`, `utenti.ts`, prototipo `motore.js` |
-| D-46 | 30/10/2026 | **Anagrafiche con identità stabile e versioni**: id nostro che non cambia, codici di Integra in `codici_esterni`, dati descrittivi in tabelle di versioni che si aggiungono soltanto; i **fatti** puntano a identità **e** versione (chiave esterna composta), la versione è quella corrente quando la riga nasce; le **configurazioni** puntano solo all'identità | proposta di Ugo (versione agganciata, atomica, senza affidarsi alle date) unita a identità stabile e codici esterni: si conserva lo storico senza spezzare il cliente, e il modello regge quando il CRM diventerà la fonte di verità aziendale (D-43) | Ugo | §4.6, §4.5, piano F1-A7 |
+| D-46 | 30/10/2026 | **Anagrafiche con identità stabile e versioni**: id nostro che non cambia, codici di Integra in `codici_esterni`, dati descrittivi in tabelle di versioni che si aggiungono soltanto; i **fatti** puntano a identità **e** versione (chiave esterna composta), la versione è quella corrente quando la riga nasce; le **configurazioni** puntano solo all'identità | proposta di Ugo (versione agganciata, atomica, senza affidarsi alle date) unita a identità stabile e codici esterni: si conserva lo storico senza spezzare il cliente, e il modello regge quando il CRM diventerà la fonte di verità aziendale (D-43) | Ugo | §4.2, §4.3, §4.4, §4.6, §4.5, piano F1-A7 |
+| D-47 | 01/11/2026 | **Menu per area**: in cima alla barra le aree che l'utente può aprire (Provvigioni, Dati, Gestione), sotto solo le voci dell'area della pagina; rotte invariate; Guida comune; l'area *Anagrafiche* diventa **Dati** (permessi `dati.*`) | Il portale crescerà per aree (D-43): una barra unica si allungherebbe per tutti; per area si vede solo il lavoro che si sta facendo. *Dati* conterrà tutte le tabelle, non solo le anagrafiche | Ugo | §7.10, §8.3, piano F0-A4 |
+| D-48 | 01/11/2026 | **Identità e versioni nello schema subito** (fase 2a), non in F1: in F1-A7 resta solo la sincronizzazione che aggiunge le versioni | Le tabelle sono vuote ora; seed (2b) e motore (2c) vengono prima di F1 e nascono già sulle tabelle giuste, invece di essere rifatti e migrati dopo | Ugo | §4.2, §4.3, §4.6, piano F0-A2, F1-A7 |
