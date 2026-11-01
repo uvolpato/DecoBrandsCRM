@@ -23,6 +23,14 @@ principale prepara il brief e poi controlla il risultato.
 
    Se una fase mescola i due tipi, dividila in due agenti (prima il server, poi le pagine).
    Nel messaggio a Ugo scrivi quale modello hai scelto e perché, in mezza riga.
+
+   **Se giri in OpenCode** (non in Claude Code: niente strumento `Agent` con `model`, ma `task` e
+   gli agenti di `opencode.json`):
+   - lavoro da `sonnet` o `haiku`: usa il **modello caricato in OpenCode** (quello della sessione),
+     senza chiedere;
+   - lavoro da `opus`: **fermati e chiedi a Ugo** quale modello usare, con mezza riga sul perché è
+     un lavoro da Opus (regole, soldi, stati…). Non cominciare finché non risponde;
+   - niente modo *Parallelo* (OpenCode non ha i worktree automatici): una attività alla volta.
 2. **Contesto minimo.** Leggi solo quello che serve alla fase:
    - la riga della fase nel piano (`piano-lavoro-crm.md`, attività F…): *Riferimenti*, *Sorgente
      prototipo*, *Output*, *DoD*;
