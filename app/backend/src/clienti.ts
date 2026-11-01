@@ -4,7 +4,8 @@ import {
 import { type clienti, type clienti_versioni, type interscambio } from '@prisma/client';
 import { IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import type { Request } from 'express';
-import { Richiede, contesto } from './accesso';
+import { Richiede, contesto, permessiDi } from './accesso';
+import { ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -22,6 +23,15 @@ class DatiAgenzia {
   @IsOptional() @IsIn(['prima', 'piu_alta']) regola_mensile?: string | null;
   @Facoltativo() @IsISO8601({ strict: true }) valido_dal?: string;
   @IsOptional() @IsISO8601({ strict: true }) valido_al?: string | null;
+}
+
+// D-50 §19: percentuale e regola del subagente cambiano i soldi: solo chi ha dati.condizioni
+function soloResponsabile(req: Request, b: DatiAgenzia, attuale: { pct: number | null; regola: string | null }) {
+  const cambia = (b.pct_subagente !== undefined && b.pct_subagente !== attuale.pct)
+    || (b.regola_mensile !== undefined && b.regola_mensile !== attuale.regola);
+  if (cambia && !permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('dati.condizioni')) {
+    throw new ForbiddenException('Percentuale e regola del subagente le cambia un responsabile');
+  }
 }
 
 function iso(d: Date | null | undefined): string | null {
@@ -77,8 +87,16 @@ export class ClientiController {
     });
     const codici = await this.db.codici_esterni.findMany({ where: { sistema: 'integra', tipo: 'cliente' } });
     const codicePer = new Map(codici.map((c) => [String(c.entita_id), c.codice]));
-    const conteggi = await this.db.interscambio.groupBy({ by: ['cliente_id'], _count: { _all: true } });
-    const agenziePer = new Map(conteggi.map((c) => [String(c.cliente_id), c._count._all]));
+    const righe = await this.db.interscambio.findMany({ select: { cliente_id: true, fornitore_id: true, subagente_id: true } });
+    const agenziePer = new Map<string, number>();
+    const fornPer = new Map<string, Set<string>>();
+    const subPer = new Map<string, Set<string>>();
+    for (const r of righe) { // D-50: id per i filtri dell'elenco
+      const k = String(r.cliente_id);
+      agenziePer.set(k, (agenziePer.get(k) ?? 0) + 1);
+      (fornPer.get(k) ?? fornPer.set(k, new Set()).get(k)!).add(String(r.fornitore_id));
+      (subPer.get(k) ?? subPer.set(k, new Set()).get(k)!).add(String(r.subagente_id));
+    }
     const pratiche = await this.db.ordini_fornitore_testata.groupBy({ by: ['cliente_id'], _count: { _all: true }, where: { stato: { not: 'fatturato' } } });
     const pratichePer = new Map(pratiche.map((p) => [String(p.cliente_id), p._count._all]));
     return clienti.map((c) => ({
@@ -89,6 +107,8 @@ export class ClientiController {
       codice_integra: codicePer.get(String(c.id)) ?? null,
       attivo: c.attivo,
       agenzie: agenziePer.get(String(c.id)) ?? 0,
+      fornitori_ids: [...(fornPer.get(String(c.id)) ?? [])],
+      subagenti_ids: [...(subPer.get(String(c.id)) ?? [])],
       pratiche_aperte: pratichePer.get(String(c.id)) ?? 0,
     }));
   }
@@ -158,6 +178,7 @@ export class ClientiController {
   @Post(':id/agenzie')
   @Richiede('dati.modifica')
   async creaAgenzia(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: DatiAgenzia) {
+    soloResponsabile(req, b, { pct: null, regola: null });
     if (!b.subagente_id) throw new BadRequestException('Subagente obbligatorio');
     if (!b.fornitore_id) throw new BadRequestException('Fornitore obbligatorio');
     if (!b.valido_dal) throw new BadRequestException('Data di inizio obbligatoria');
@@ -215,6 +236,7 @@ export class ClientiController {
         },
       });
       if (!prima || prima.cliente_id !== BigInt(id)) throw new NotFoundException('Agenzia non trovata');
+      soloResponsabile(req, b, { pct: prima.pct_subagente === null ? null : Number(prima.pct_subagente), regola: prima.regola_mensile });
       if (b.subagente_id !== undefined) {
         const sub = await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id) } });
         if (!sub) throw new NotFoundException('Subagente non trovato');

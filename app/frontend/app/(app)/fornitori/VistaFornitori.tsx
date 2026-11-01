@@ -2,13 +2,15 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
-import { FilterBar } from '@/componenti/FilterBar';
+import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, quando } from '@/componenti/Piccoli';
 import { Schede } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
 import { api } from '@/lib/api';
+import { subagente } from '@/lib/entita';
+import { useMemoria } from '@/lib/memoria';
 
 interface Fornitore {
   id: string;
@@ -33,6 +35,7 @@ interface Scaglione {
 }
 interface ClienteSeguito {
   id: string;
+  subagente_id: string | null;
   cliente: string | null;
   piva: string | null;
   subagente: string | null;
@@ -48,7 +51,6 @@ type Dettaglio = Omit<Fornitore, 'scaglioni'> & {
   clienti_seguiti: ClienteSeguito[];
 };
 
-let filtro: Record<string, string> = { q: '' };
 let schedaFornitore = 'percentuali';
 
 export function VistaFornitori({ idSel }: { idSel?: string }) {
@@ -56,7 +58,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   const router = useRouter();
   const [fornitori, setFornitori] = useState<Fornitore[] | null>(null);
   const [dettaglio, setDettaglio] = useState<Dettaglio | null>(null);
-  const [valori, setValori] = useState(filtro);
+  const [valori, setValori] = useMemoria<Valori>('filtri', { q: '' });
+  const [valoriCl, setValoriCl] = useMemoria<Valori>('filtri-clienti', { subagenti: [] });
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [errore, setErrore] = useState('');
 
@@ -83,7 +86,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   }, [fornitori, idSel, router, caricaDettaglio]);
 
   const cercati = useMemo(() => {
-    const q = (valori.q ?? '').toLowerCase();
+    const q = String(valori.q ?? '').toLowerCase();
     return (fornitori ?? []).filter((x) => !q || [x.ragione_sociale, x.piva, x.codice_integra, x.paese].some((t) => (t ?? '').toLowerCase().includes(q)));
   }, [fornitori, valori.q]);
 
@@ -156,11 +159,11 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   return pagina(
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
-        <FilterBar valori={valori} onChange={(v) => { filtro = v; setValori(v); }} campi={[
+        <FilterBar valori={valori} onChange={setValori} campi={[
           { nome: 'q', tipo: 'cerca', placeholder: 'Ragione sociale, P.IVA o codice' },
         ]} />
         <div className="riempi">
-          <DataTable righe={cercati} filtro={valori.q} colonne={colonneFornitori} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
+          <DataTable righe={cercati} filtro={String(valori.q)} colonne={colonneFornitori} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/fornitori/' + x.id)}
             emptyText="Nessun fornitore" emptyHint="Cambia la ricerca." memoria="fornitori" />
         </div>
@@ -192,8 +195,13 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               },
               {
                 id: 'clienti', etichetta: 'Clienti seguiti', contenuto: () => (
-                  <div className="riempi">
-                    <DataTable righe={u.clienti_seguiti} colonne={colonneClienti} chiave={(c) => c.id} emptyText="Nessun cliente seguito" />
+                  <div className="pila riempi">
+                    <FilterBar valori={valoriCl} onChange={setValoriCl} campi={[
+                      { nome: 'subagenti', tipo: 'ricerca', entita: subagente, multipla: true, placeholder: 'Tutti i subagenti' },
+                    ]} />
+                    <div className="riempi">
+                    <DataTable righe={u.clienti_seguiti.filter((c) => !(valoriCl.subagenti as string[]).length || (valoriCl.subagenti as string[]).includes(c.subagente_id ?? ''))} filtro={JSON.stringify(valoriCl)} colonne={colonneClienti} chiave={(c) => c.id} emptyText="Nessun cliente seguito" />
+                    </div>
                   </div>
                 ),
               },

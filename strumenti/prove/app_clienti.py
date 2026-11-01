@@ -56,6 +56,18 @@ with sync_playwright() as p:
     ok(1 <= righe(pg) <= n_tutti, 'ricerca per nome: elenco filtrato')
     cerca(pg, 'zzzz-nessuno'); ok(righe(pg) == 0, 'ricerca senza risultati: elenco vuoto')
     cerca(pg, '')
+    # filtro multiplo per fornitore (D-22): restringe l'elenco, i segmenti contano con gli altri filtri (D-23)
+    fb = pg.locator('.filtri').first
+    campo = fb.locator('.ricerca.multipla .ricerca-testo').first
+    campo.click(); fb.locator('.ricerca-menu li[role=option]', has_text='Gries').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+    n_f = int(seg(pg, 'Tutti').locator('.n').inner_text())
+    ok('Gries' in (campo.get_attribute('placeholder') or '') and 1 <= n_f <= n_tutti and righe(pg) == n_f and int(seg(pg, 'Senza agenzie').locator('.n').inner_text()) == 0,
+       'filtro per fornitore Gries: %d clienti su %d, segmenti aggiornati' % (n_f, n_tutti))
+    pg.locator('.dt tbody tr.cliccabile:not(.selezionata)').first.click(); pg.wait_for_timeout(500); pg.go_back(); pg.wait_for_timeout(500)
+    ok('Gries' in (pg.locator('.filtri').first.locator('.ricerca.multipla .ricerca-testo').first.get_attribute('placeholder') or '') and righe(pg) == n_f, 'tornando indietro il filtro per fornitore resta')
+    pg.screenshot(path=str(USCITA / 'app-clienti-filtro-1440.png'))
+    pg.locator('.riepilogo-filtri .btn-icona').nth(1).click(); pg.wait_for_timeout(300)
+    ok(righe(pg) == n_tutti, 'riepilogo: togli tutti i filtri, tornano %d clienti' % n_tutti)
     seg(pg, 'Senza agenzie').click(); pg.wait_for_timeout(300)
     ok(righe(pg) == n_senza, 'segmento Senza agenzie: %d righe' % n_senza)
 
@@ -74,6 +86,8 @@ with sync_playwright() as p:
     ok('Gries' in f and fid.isdigit(), 'fornitore scelto dal menu: %s (id %s)' % (f, fid))
     s_, sid = scegli(pg, 'subagente_id', 'Nis')
     ok('Nista' in s_ and sid.isdigit(), 'subagente scelto dal menu: %s (id %s)' % (s_, sid))
+    ok('Scaglioni in vigore' in testo(pg, '.velo .campo:has(#c-sconto) .aiuto') and 'Gries' in testo(pg, '.velo .campo:has(#c-sconto) .aiuto'), 'sconto: aiuto con gli scaglioni dei fornitori')
+    ok(pg.locator('#c-pct_subagente:not([disabled])').count() == 1 and pg.locator('#c-regola_mensile:not([disabled])').count() == 1, 'responsabile: percentuale e regola del subagente attive')
     pg.fill('#c-codice_cliente_fornitore', 'T' + RUN); pg.fill('#c-sconto', '5'); pg.fill('#c-valido_dal', D1); pg.fill('#c-valido_al', A1)
     pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached')
     pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
@@ -91,12 +105,19 @@ with sync_playwright() as p:
     pg.fill('#c-valido_dal', '2031-07-01'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached')
     pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("Ravelli")')
     ok(pg.locator('.schede-corpo .dt tbody tr:has-text("Ravelli")').count() == 1, 'senza sovrapposizione (dal 01/07) la seconda agenzia viene creata')
+    # filtro multiplo nella scheda Agenzie: per subagente
+    fa = pg.locator('.schede-corpo .filtri').first
+    ca = fa.locator('.ricerca.multipla .ricerca-testo').nth(1)
+    ca.click(); fa.locator('.ricerca-menu li[role=option]', has_text='Rav').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+    ok(pg.locator('.schede-corpo .dt tbody tr').count() == 1 and pg.locator('.schede-corpo .dt tbody tr:has-text("Ravelli")').count() == 1, 'scheda Agenzie: filtro per subagente Ravelli, una riga')
+    pg.locator('.schede-corpo .riepilogo-filtri .btn-icona').nth(1).click(); pg.wait_for_timeout(300)
+    ok(pg.locator('.schede-corpo .dt tbody tr').count() == 2, 'scheda Agenzie: tolto il filtro, due righe')
     # modifica della prima
     pg.click('.schede-corpo .dt tbody tr:has-text("T%s") button:has-text("Modifica")' % RUN); finestra(pg).wait_for()
     ok(pg.input_value('#c-sconto') == '5' and pg.input_value('#c-valido_dal') == D1, 'modifica: il modulo parte dai valori attuali')
-    pg.fill('#c-sconto', '7'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached')
+    pg.fill('#c-sconto', '7'); pg.fill('#c-pct_subagente', '33'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached')
     pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s"):has-text("7 %%")' % RUN)
-    ok(True, 'agenzia modificata: sconto 7 %')
+    ok('33 %' in testo(pg, '.schede-corpo .dt tbody tr:has-text("T%s")' % RUN), 'agenzia modificata: sconto 7 %, al subagente 33 % (responsabile)')
     pg.screenshot(path=str(USCITA / 'app-clienti-agenzie-1440.png'))
 
     # Pratiche
@@ -137,6 +158,16 @@ with sync_playwright() as p:
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
     pg.screenshot(path=str(USCITA / 'app-clienti-768.png'), full_page=True)
+    pg.close()
+
+    # operatore: percentuale e regola spente, il resto si salva (D-50)
+    pg = entra(S + '-oper'); pg.wait_for_timeout(600)
+    seg(pg, 'Tutti').click(); pg.click('.dt tbody tr.cliccabile'); pg.wait_for_timeout(600)
+    pg.click('button:has-text("Aggiungi agenzia")'); finestra(pg).wait_for()
+    ok(pg.locator('#c-pct_subagente[disabled]').count() == 1 and pg.locator('#c-regola_mensile[disabled]').count() == 1 and 'responsabile' in testo(pg, '.velo .campo:has(#c-pct_subagente) .aiuto'),
+       'operatore: percentuale e regola spente, con la nota «li cambia un responsabile»')
+    pg.screenshot(path=str(USCITA / 'app-clienti-operatore-1440.png'))
+    pg.click('.modale-piede button:has-text("Annulla")')
     pg.close()
 
     pg = entra(S + '-lett'); pg.wait_for_timeout(600)

@@ -1,16 +1,18 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { Fragment, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
-import { FilterBar } from '@/componenti/FilterBar';
+import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, quando } from '@/componenti/Piccoli';
+import type { CampoProps } from '@/componenti/Campo';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
+import { useMemoria } from '@/lib/memoria';
 import { fornitore, subagente } from '@/lib/entita';
 
 interface Cliente {
@@ -21,6 +23,8 @@ interface Cliente {
   codice_integra: string | null;
   attivo: boolean;
   agenzie: number;
+  fornitori_ids: string[];
+  subagenti_ids: string[];
   pratiche_aperte: number;
 }
 
@@ -65,7 +69,15 @@ interface Dettaglio {
 interface Fornitore { id: string; ragione_sociale: string | null; }
 interface Subagente { id: string; codice: string; nome: string; cognome: string; }
 
-let filtro: Record<string, string> = { vista: 'tutti', q: '' };
+interface Scaglione { sconto_min: number; valido_dal: string; }
+
+// Sconti degli scaglioni in vigore (ultima data non futura), per l'aiuto della finestra (§7.6)
+function scontiInVigore(sc: Scaglione[], oggi: string) {
+  const dal = sc.map((x) => x.valido_dal).filter((d) => d <= oggi).sort().pop();
+  return [...new Set(sc.filter((x) => x.valido_dal === dal).map((x) => x.sconto_min))].sort((a, b) => a - b);
+}
+
+const NOTA_RESP = 'Li cambia un responsabile.'; // D-50 §19
 let schedaCliente = 'agenzie';
 
 export function VistaClienti({ idSel }: { idSel?: string }) {
@@ -77,7 +89,9 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   const [pratiche, setPratiche] = useState<Pratica[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [subagenti, setSubagenti] = useState<Subagente[]>([]);
-  const [valori, setValori] = useState(filtro);
+  const [valori, setValori] = useMemoria<Valori>('filtri', { vista: 'tutti', q: '', fornitori: [], subagenti: [] });
+  const [valoriAg, setValoriAg] = useMemoria<Valori>('filtri-agenzie', { fornitori: [], subagenti: [] });
+  const scaglioni = useRef<Record<string, Scaglione[]>>({});
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [errore, setErrore] = useState('');
 
@@ -107,18 +121,23 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   }, [clienti, idSel, router, caricaDettaglio]);
 
   const cercati = useMemo(() => {
-    const q = (valori.q ?? '').toLowerCase();
-    const vista = valori.vista ?? 'tutti';
+    const q = String(valori.q ?? '').toLowerCase();
+    const fs = valori.fornitori as string[], ss = valori.subagenti as string[];
     return (clienti ?? []).filter((x) => {
-      if (vista === 'con' && !(x.agenzie > 0)) return false;
-      if (vista === 'senza' && x.agenzie > 0) return false;
+      if (fs.length && !x.fornitori_ids.some((i) => fs.includes(i))) return false;
+      if (ss.length && !x.subagenti_ids.some((i) => ss.includes(i))) return false;
       if (!q) return true;
       return [x.ragione_sociale, x.piva, x.codice_integra, x.citta].some((t) => (t ?? '').toLowerCase().includes(q));
     });
-  }, [clienti, valori.q, valori.vista]);
-
-  const nCon = (clienti ?? []).filter((x) => x.agenzie > 0).length;
-  const nSenza = (clienti ?? []).filter((x) => x.agenzie === 0).length;
+  }, [clienti, valori.q, valori.fornitori, valori.subagenti]);
+  // D-23: i numeri dei segmenti contano con gli altri filtri
+  const nCon = cercati.filter((x) => x.agenzie > 0).length;
+  const nSenza = cercati.filter((x) => x.agenzie === 0).length;
+  const righe = cercati.filter((x) => (valori.vista === 'con' ? x.agenzie > 0 : valori.vista === 'senza' ? x.agenzie === 0 : true));
+  const agenzieFiltrate = useMemo(() => {
+    const fs = valoriAg.fornitori as string[], ss = valoriAg.subagenti as string[];
+    return (dettaglio?.agenzie ?? []).filter((a) => (!fs.length || fs.includes(a.fornitore_id)) && (!ss.length || ss.includes(a.subagente_id)));
+  }, [dettaglio, valoriAg.fornitori, valoriAg.subagenti]);
 
   const u = dettaglio;
   const chiudi = () => setFinestra(null);
@@ -129,19 +148,36 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
 
   const oggi = new Date().toISOString().slice(0, 10);
 
-  function nuovaAgenzia(x: Dettaglio) {
+  // D-50 §19: percentuale e regola solo al responsabile; per gli altri i campi sono spenti e non si inviano
+  const resp = puo('dati.condizioni');
+  const conResp = (c: CampoProps[]) => c.map((x) => ((x.nome === 'pct_subagente' || x.nome === 'regola_mensile') && !resp ? { ...x, disabilitato: true, aiuto: NOTA_RESP } : x));
+
+  // §7.6: sconti proposti dagli scaglioni in vigore dei fornitori (aiuto sotto il campo; il fornitore scelto va per primo)
+  async function aiutoSconto(primo?: string) {
+    await Promise.all(fornitori.filter((f) => !scaglioni.current[f.id]).map(async (f) => {
+      const d = await api<{ scaglioni: Scaglione[] }>('fornitori/' + f.id);
+      if (d.ok) scaglioni.current[f.id] = d.dati.scaglioni;
+    }));
+    const voci = [...fornitori].sort((a, b) => (a.id === primo ? -1 : b.id === primo ? 1 : 0))
+      .filter((f) => scaglioni.current[f.id]?.length)
+      .map((f) => (f.ragione_sociale ?? f.id) + ': ' + scontiInVigore(scaglioni.current[f.id], oggi).join(' · '));
+    return voci.length ? 'Scaglioni in vigore, sconti in %. ' + voci.join(' — ') : undefined;
+  }
+
+  async function nuovaAgenzia(x: Dettaglio) {
+    const aiuto = await aiutoSconto(fornitori[0]?.id);
     setFinestra(
       <FormModal titolo={'Nuova agenzia per ' + (x.ragione_sociale ?? '')} conferma="Crea" colonne={2}
-        campi={[
+        campi={conResp([
           { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: fornitore, valore: fornitori[0]?.id ?? '' },
           { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: subagenti[0]?.id ?? '' },
           { nome: 'codice_cliente_fornitore', etichetta: 'Codice cliente presso il fornitore', tipo: 'testo', valore: '' },
-          { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: '0' },
-          { nome: 'pct_subagente', etichetta: '% al subagente (vuoto = scaglione)', tipo: 'testo', valore: '' },
+          { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: '0', aiuto },
+          { nome: 'pct_subagente', etichetta: 'Al subagente per questo cliente % (vuoto = scaglione)', tipo: 'testo', valore: '' },
           { nome: 'regola_mensile', etichetta: 'Provvigione al subagente', tipo: 'select', valore: '', opzioni: [{ value: '', label: 'Su ogni fattura' }, { value: 'prima', label: 'Una fattura al mese: la prima' }, { value: 'piu_alta', label: 'Una fattura al mese: la più alta' }] },
           { nome: 'valido_dal', etichetta: 'Valido dal', tipo: 'testo', valore: oggi },
           { nome: 'valido_al', etichetta: 'Valido al (vuoto = oggi)', tipo: 'testo', valore: '' },
-        ]}
+        ])}
         onChiudi={chiudi}
         onConferma={async (v) => {
           const corpo: Record<string, unknown> = {
@@ -149,11 +185,11 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
             subagente_id: Number(v.subagente_id),
             codice_cliente_fornitore: v.codice_cliente_fornitore || null,
             sconto: Number(v.sconto ?? 0),
-            pct_subagente: v.pct_subagente ? Number(v.pct_subagente) : null,
-            regola_mensile: v.regola_mensile || null,
             valido_dal: v.valido_dal,
             valido_al: v.valido_al || null,
           };
+          if (v.pct_subagente !== undefined) corpo.pct_subagente = v.pct_subagente ? Number(v.pct_subagente) : null;
+          if (v.regola_mensile !== undefined) corpo.regola_mensile = v.regola_mensile || null;
           const r = await api<Agenzia>('clienti/' + x.id + '/agenzie', corpo);
           if (!r.ok) return r.messaggio;
           avviso('Agenzia creata');
@@ -165,19 +201,20 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
     );
   }
 
-  function modificaAgenzia(x: Dettaglio, a: Agenzia) {
+  async function modificaAgenzia(x: Dettaglio, a: Agenzia) {
+    const aiuto = await aiutoSconto(a.fornitore_id);
     setFinestra(
       <FormModal titolo="Modifica agenzia" conferma="Salva" colonne={2}
-        campi={[
+        campi={conResp([
           { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: fornitore, valore: a.fornitore_id },
           { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: a.subagente_id },
           { nome: 'codice_cliente_fornitore', etichetta: 'Codice cliente presso il fornitore', tipo: 'testo', valore: a.codice_cliente_fornitore ?? '' },
-          { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: String(a.sconto) },
-          { nome: 'pct_subagente', etichetta: '% al subagente (vuoto = scaglione)', tipo: 'testo', valore: a.pct_subagente === null ? '' : String(a.pct_subagente) },
+          { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: String(a.sconto), aiuto },
+          { nome: 'pct_subagente', etichetta: 'Al subagente per questo cliente % (vuoto = scaglione)', tipo: 'testo', valore: a.pct_subagente === null ? '' : String(a.pct_subagente) },
           { nome: 'regola_mensile', etichetta: 'Provvigione al subagente', tipo: 'select', valore: a.regola_mensile ?? '', opzioni: [{ value: '', label: 'Su ogni fattura' }, { value: 'prima', label: 'Una fattura al mese: la prima' }, { value: 'piu_alta', label: 'Una fattura al mese: la più alta' }] },
           { nome: 'valido_dal', etichetta: 'Valido dal', tipo: 'testo', valore: a.valido_dal },
           { nome: 'valido_al', etichetta: 'Valido al (vuoto = oggi)', tipo: 'testo', valore: a.valido_al ?? '' },
-        ]}
+        ])}
         onChiudi={chiudi}
         onConferma={async (v) => {
           const corpo: Record<string, unknown> = {
@@ -185,11 +222,11 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
             subagente_id: Number(v.subagente_id),
             codice_cliente_fornitore: v.codice_cliente_fornitore || null,
             sconto: Number(v.sconto ?? 0),
-            pct_subagente: v.pct_subagente ? Number(v.pct_subagente) : null,
-            regola_mensile: v.regola_mensile || null,
             valido_dal: v.valido_dal,
             valido_al: v.valido_al || null,
           };
+          if (v.pct_subagente !== undefined) corpo.pct_subagente = v.pct_subagente ? Number(v.pct_subagente) : null;
+          if (v.regola_mensile !== undefined) corpo.regola_mensile = v.regola_mensile || null;
           const r = await api<Agenzia>('clienti/' + x.id + '/agenzie/' + a.id, corpo, 'PUT');
           if (!r.ok) return r.messaggio;
           avviso('Agenzia salvata');
@@ -245,16 +282,18 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   return pagina(
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.1fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
-        <FilterBar valori={valori} onChange={(v) => { filtro = v; setValori(v); }} campi={[
+        <FilterBar valori={valori} onChange={setValori} campi={[
           { nome: 'vista', tipo: 'segmenti', opzioni: [
-            { value: 'tutti', label: 'Tutti', n: clienti.length },
+            { value: 'tutti', label: 'Tutti', n: cercati.length },
             { value: 'con', label: 'Con agenzie', n: nCon },
             { value: 'senza', label: 'Senza agenzie', n: nSenza },
           ] },
           { nome: 'q', tipo: 'cerca', placeholder: 'Ragione sociale, P.IVA, codice' },
-        ]} />
+          { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, placeholder: 'Tutti i fornitori' },
+          { nome: 'subagenti', tipo: 'ricerca', entita: subagente, multipla: true, placeholder: 'Tutti i subagenti' },
+        ]} riepilogo />
         <div className="riempi">
-          <DataTable righe={cercati} filtro={valori.q} colonne={colonneClienti} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
+          <DataTable righe={righe} filtro={JSON.stringify(valori)} colonne={colonneClienti} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/clienti/' + x.id)}
             emptyText="Nessun cliente" emptyHint="Cambia la ricerca." memoria="clienti" />
         </div>
@@ -274,13 +313,17 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
               {
                 id: 'agenzie', etichetta: 'Agenzie', contenuto: () => (
                   <div className="pila riempi">
-                    {puoModificare && <div className="azioni-riga"><button type="button" className="btn primario piccolo" onClick={() => nuovaAgenzia(u)}><Icona nome="piu" /> Aggiungi agenzia</button></div>}
+                    {puoModificare && <div className="azioni-riga"><button type="button" className="btn primario piccolo" onClick={() => void nuovaAgenzia(u)}><Icona nome="piu" /> Aggiungi agenzia</button></div>}
+                    <FilterBar valori={valoriAg} onChange={setValoriAg} riepilogo campi={[
+                      { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, placeholder: 'Tutti i fornitori' },
+                      { nome: 'subagenti', tipo: 'ricerca', entita: subagente, multipla: true, placeholder: 'Tutti i subagenti' },
+                    ]} />
                     <div className="riempi">
-                      <DataTable righe={u.agenzie} colonne={[...colonneAgenzie, ...(puoModificare ? [{
+                      <DataTable righe={agenzieFiltrate} filtro={JSON.stringify(valoriAg)} colonne={[...colonneAgenzie, ...(puoModificare ? [{
                         key: 'azioni', header: '', align: 'center' as const, sortable: false,
                         cell: (a: Agenzia) => (
                           <span className="azioni-riga">
-                            <button type="button" className="btn sec piccolo" onClick={(e) => { e.stopPropagation(); modificaAgenzia(u, a); }}>Modifica</button>
+                            <button type="button" className="btn sec piccolo" onClick={(e) => { e.stopPropagation(); void modificaAgenzia(u, a); }}>Modifica</button>
                             <button type="button" className="btn pericolo piccolo" onClick={(e) => { e.stopPropagation(); void eliminaAgenzia(u, a); }}>Elimina</button>
                           </span>
                         ),

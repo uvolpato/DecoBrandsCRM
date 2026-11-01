@@ -131,11 +131,46 @@ describe('permessi', () => {
   });
 });
 
+// D-50 §19: percentuale e regola del subagente solo al responsabile
+describe('percentuale e regola del subagente', () => {
+  const base = () => ({ subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreId), sconto: 2 });
+
+  it('operatore: senza i due campi crea e modifica, con i campi 403', async () => {
+    const a = await entra('oper-cli');
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', { ...base(), valido_dal: '2040-01-01', valido_al: '2040-12-31' }).expect(201);
+    creati.push(BigInt(r.body.id));
+    const url = '/clienti/' + clienteId + '/agenzie/' + r.body.id;
+    await a.put(url, { sconto: 3 }).expect(200);
+    await a.put(url, { pct_subagente: 100 }).expect(403);
+    const e = await a.put(url, { regola_mensile: 'piu_alta' }).expect(403);
+    expect(e.body.message).toContain('responsabile');
+    await a.post('/clienti/' + clienteId + '/agenzie', { ...base(), pct_subagente: 50, valido_dal: '2041-01-01' }).expect(403);
+    // stesso valore di prima (null): non e' un cambio
+    await a.put(url, { pct_subagente: null, sconto: 4 }).expect(200);
+  });
+
+  it('responsabile: cambia percentuale e regola', async () => {
+    const a = await entra('ammi-cli');
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', { ...base(), pct_subagente: 40, valido_dal: '2042-01-01', valido_al: '2042-12-31' }).expect(201);
+    creati.push(BigInt(r.body.id));
+    const m = await a.put('/clienti/' + clienteId + '/agenzie/' + r.body.id, { pct_subagente: 45, regola_mensile: 'piu_alta' }).expect(200);
+    expect(m.body.pct_subagente).toBe(45);
+  });
+
+  it('elenco clienti: id di fornitori e subagenti', async () => {
+    const a = await entra('ammi-cli');
+    const r = await a.get('/clienti').expect(200);
+    const c = r.body.find((x: { id: string }) => x.id === clienteId);
+    expect(c.fornitori_ids).toContain(fornitoreId);
+    expect(c.subagenti_ids).toContain(subagenteId);
+  });
+});
+
 describe('agenzie CRUD', () => {
   let agenziaId = '';
 
   it('crea agenzia e scrive nel registro', async () => {
-    const a = await entra('oper-cli');
+    const a = await entra('ammi-cli');
     const r = await a.post('/clienti/' + clienteId + '/agenzie', {
       subagente_id: Number(subagenteId),
       fornitore_id: Number(fornitoreId),
@@ -164,7 +199,7 @@ describe('agenzie CRUD', () => {
   });
 
   it('modifica agenzia', async () => {
-    const a = await entra('oper-cli');
+    const a = await entra('ammi-cli');
     const r = await a.put('/clienti/' + clienteId + '/agenzie/' + agenziaId, { sconto: 7, regola_mensile: 'piu_alta', valido_al: '2030-06-30' }).expect(200);
     expect(r.body.sconto).toBe(7);
     expect(r.body.regola_mensile).toBe('piu_alta');

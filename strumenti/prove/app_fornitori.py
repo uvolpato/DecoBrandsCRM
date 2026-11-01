@@ -56,6 +56,14 @@ with sync_playwright() as p:
     pg.screenshot(path=str(USCITA / 'app-fornitori-1440.png'))
     scheda(pg, 'Clienti seguiti'); pg.wait_for_timeout(200)
     ok(pg.locator('.schede-corpo .dt').count() == 1, 'scheda Clienti seguiti: tabella')
+    # filtro multiplo per subagente (D-22): restringe i clienti seguiti
+    n_seg0 = pg.locator('.schede-corpo .dt tbody tr.cliccabile, .schede-corpo .dt tbody tr').count()
+    fs = pg.locator('.schede-corpo .filtri').first; cs = fs.locator('.ricerca.multipla .ricerca-testo').first
+    cs.click(); fs.locator('.ricerca-menu li[role=option]').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+    n_seg1 = pg.locator('.schede-corpo .dt tbody tr').count()
+    ok(cs.get_attribute('placeholder') not in ('', 'Tutti i subagenti') and 0 <= n_seg1 <= n_seg0, 'Clienti seguiti: filtro per subagente (%d su %d righe)' % (n_seg1, n_seg0))
+    pg.screenshot(path=str(USCITA / 'app-fornitori-filtro-1440.png'))
+    cs.click(); fs.locator('.ricerca-menu .link-azzera').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
     # modifica delle regole
     gi = str(40 + int(RUN) % 50)
     pg.click('button:has-text("Modifica le regole")'); finestra(pg).wait_for()
