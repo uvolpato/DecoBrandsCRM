@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { Prisma } from '@prisma/client';
 import { cifra } from '../../src/password';
 import { logEvent } from '../../src/registro';
+import { caricaDati } from '../../src/motore/dati';
+import { fotografiaLiquidazione, righeLiquidazione } from '../../src/motore/motore';
 
 type Tx = Prisma.TransactionClient;
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -83,6 +85,7 @@ export async function base(tx: Tx) {
   // ---------- Pratiche, righe e documenti fiscali ----------
   const fatturaId: Record<string, bigint> = {};
   const praticaDi: Record<string, any> = {}; // numero documento fiscale → pratica (per i bollettini)
+  const documentoId: Record<string, bigint> = {}; // numero documento fiscale → id (righe dei bollettini chiusi)
   const note: [bigint, string][] = [];
   for (const p of D.pratiche) {
     const doc = (t: string) => p.documenti.find((d: any) => d.tipo === t);
@@ -107,12 +110,12 @@ export async function base(tx: Tx) {
         testata_id: t.id, tipo: d.tipo, numero: d.numero, data: data(d.data), importo: importoDoc(d), note: d.nota ?? null,
         ...(d.incasso ? { stato_incasso: 'pagata', fonte_incasso: 'manuale', note: d.incasso.nota, pagata_il: data(d.data.slice(0, 8) + '15') } : {}) } }); // data di pagamento: il prototipo ha solo un modello
       if (f) fatturaId[d.numero] = creato.id; else note.push([creato.id, d.riferimento]);
-      praticaDi[d.numero] = p;
+      praticaDi[d.numero] = p; documentoId[d.numero] = creato.id;
     }
   }
   for (const [id, rif] of note) await tx.ordini_fornitore_documenti.update({ where: { id }, data: { fattura_id: fatturaId[rif] } });
 
-  // ---------- Bollettini (§4.2.9–10): solo i dati del fornitore, l'abbinamento lo fa la riconciliazione ----------
+  // ---------- Bollettini (§4.2.9–10): i dati del fornitore; le righe dei bollettini chiusi sono già abbinate al documento (D-34) ----------
   for (const b of D.bollettini) {
     const chiuso = b.stato !== 'da_verificare';
     const t = await tx.bollettini_testata.create({ data: {
@@ -122,13 +125,25 @@ export async function base(tx: Tx) {
       const p = praticaDi[r.numero];
       await tx.bollettini_righe.create({ data: {
         testata_id: t.id, fattura_numero: r.numero, fattura_data: data(r.data), importo_merce: r.imponibile, pct_riconosciuta: r.pct,
-        importo_riconosciuto: r.importo, tipo_riga: r.tipo ?? 'provvigione',
+        importo_riconosciuto: r.importo, tipo_riga: r.tipo ?? 'provvigione', documento_id: chiuso ? documentoId[r.numero] ?? null : null,
         ...(p ? { cliente_id: ids.clienti[p.cliente_piva], cliente_versione_id: ids.versioniC[p.cliente_piva] } : {}) } });
     }
   }
   for (const l of D.liquidazioni_chiuse) {
-    // la fotografia del prospetto pagato nel prototipo non c'è (si calcola): totali vuoti
     await tx.liquidazioni.create({ data: { anno: l.anno, trimestre: l.trimestre, chiusa_il: ora(l.chiusa_il + 'T10:00'), chiusa_da: ugo, totali: {} } });
+  }
+  // Trimestri chiusi come li chiuderebbe l'app (D-33, D-34), uno dopo l'altro: al momento della chiusura
+  // erano chiusi solo i trimestri prima. Fotografia del prospetto pagato calcolata dal motore; documenti,
+  // storni e riaccrediti legati alla liquidazione (D-11). Il trimestre chiuso non si ricalcola più (§4.2.19).
+  const S = await caricaDati(tx, D.oggi);
+  for (const l of S.liquidazioni_chiuse) {
+    const prima = { ...S, liquidazioni_chiuse: S.liquidazioni_chiuse.filter((x) => x.anno * 10 + x.trimestre < l.anno * 10 + l.trimestre) };
+    const righe = righeLiquidazione(prima, l.anno, l.trimestre);
+    const liq = await tx.liquidazioni.update({ where: { id: BigInt(l.id) }, data: { totali: fotografiaLiquidazione(prima, righe) } });
+    const documenti = righe.filter((r) => r.liquidabile && !r.voce).map((r) => BigInt(r.documento_id));
+    const voci = righe.filter((r) => r.riga_bollettino_id).map((r) => BigInt(r.riga_bollettino_id!));
+    await tx.ordini_fornitore_documenti.updateMany({ where: { id: { in: documenti } }, data: { liquidazione_id: liq.id } });
+    await tx.bollettini_righe.updateMany({ where: { id: { in: voci } }, data: { liquidazione_id: liq.id } });
   }
 
   // ---------- Documenti in arrivo e scartati (§4.2.12–13) ----------

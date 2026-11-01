@@ -48,7 +48,7 @@ sceglie il modello dell'agente guardando il lavoro; la colonna *Modello* è un'i
 |---|---|---|:-:|
 | 2a | Schema completo (Prisma, migrazioni, vincoli). Fatto: migrazione `schema_completo` con i CHECK dei valori ammessi che mancavano (§4.2), identità e versioni delle anagrafiche (D-46, anticipato da F1-A7 con D-48: `_versioni` solo aggiunta, `codici_esterni`, chiavi composte sui fatti); spec allineata; prove 82 | Sonnet | [x] |
 | 2b | Dati di prova §12. Fatto: seed da `dati.js` (JSON estratto) in una transazione, si ferma se già caricato, bloccato in esercizio; 2 pratiche in più per i casi §12 (conferma 7/10, due tranche); prove 89 | Sonnet | [x] |
-| 2c | Motore delle provvigioni sul server, prove sui numeri uguali al prototipo | **Opus** | [ ] |
+| 2c | Motore delle provvigioni sul server (`src/motore`: funzioni pure + `caricaDati`), prove contro il prototipo vero eseguito in Node, al centesimo; documenti per id (D-34); stato d'incasso solo da bollettini verificati (§5.14); fotografia delle liquidazioni chiuse nel seed; prove 105. Da decidere: §10 contro §5.2, arrotondamento dei negativi, colonna `decisione` sulle righe dei bollettini (F3) | **Opus** | [x] |
 | 2d | Componenti e catalogo `/componenti` (solo superutente). Fatto: FilterBar con ricerca multipla e riepilogo, CampoRicerca/RicercaEntita, KpiRow, PeriodoMesi, Grafico, Flussi, memoria della schermata; `app_componenti.py` 54 OK. Da fare: parametri nuovi nella spec §16.4 | Sonnet | [x] |
 
 ### Attività F1–F7, con modello e lavoro in parallelo
