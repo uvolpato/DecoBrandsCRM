@@ -1,6 +1,6 @@
 ---
 name: fase
-description: Esegue una fase di avanzamento-app.md con un agente sul modello segnato per quella fase (Sonnet, Opus, Haiku), passandogli solo il contesto che serve. Usare SEMPRE, senza aspettare che Ugo lo chieda, quando si comincia o si riprende una fase o un'attività di avanzamento-app.md / piano-lavoro-crm.md ("andiamo avanti", "prossima fase", "fai la 2b", "/fase 2a").
+description: Esegue una fase di avanzamento-app.md con un agente sul modello che scegli tu in base al lavoro (Opus, Sonnet, Haiku), passandogli solo il contesto che serve. Usare SEMPRE, senza aspettare che Ugo lo chieda, quando si comincia o si riprende una fase o un'attività di avanzamento-app.md / piano-lavoro-crm.md ("andiamo avanti", "prossima fase", "fai la 2b", "/fase 2a").
 ---
 
 # Fase con il modello giusto
@@ -12,8 +12,16 @@ principale prepara il brief e poi controlla il risultato.
 ## Passi
 
 1. **Fase.** Usa quella indicata negli argomenti (es. `2a`). Se non ce n'è una, prendi la prima
-   con `[ ]` nella tabella dei blocchi di `avanzamento-app.md`. Leggi il suo *Modello*:
-   `Sonnet` → `sonnet`, `Opus` → `opus`, `Haiku` → `haiku`.
+   con `[ ]` nella tabella dei blocchi di `avanzamento-app.md`.
+   **Modello: lo scegli tu**, guardando il lavoro, non solo la colonna *Modello* (che è un'indicazione):
+   - `opus`: regole, soldi e calcoli delle provvigioni, stati, abbinamenti, accesso e permessi,
+     scelte di architettura;
+   - `sonnet`: schema e migrazioni seguendo la spec, pagine, elenchi, esportazioni, sincronizzazioni,
+     prove;
+   - `haiku`: rinomine, ricerche, piccole correzioni.
+
+   Se una fase mescola i due tipi, dividila in due agenti (prima il server, poi le pagine).
+   Nel messaggio a Ugo scrivi quale modello hai scelto e perché, in mezza riga.
 2. **Contesto minimo.** Leggi solo quello che serve alla fase:
    - la riga della fase nel piano (`piano-lavoro-crm.md`, attività F…): *Riferimenti*, *Sorgente
      prototipo*, *Output*, *DoD*;
@@ -54,5 +62,5 @@ principale prepara il brief e poi controlla il risultato.
 
 - L'agente parte senza la conversazione: se il brief manca di un vincolo, l'agente non lo conosce.
   Nel dubbio aggiungi una riga al brief, non un file intero.
-- Il modello della sessione principale non cambia: per le decisioni di architettura vale
-  ancora CLAUDE.md §4 punto 6b (chiedere a Ugo di cambiare modello con `/model`).
+- Il modello della sessione principale non cambia: le decisioni di architettura le prende la
+  sessione principale o un agente `opus`.

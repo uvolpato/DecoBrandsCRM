@@ -41,8 +41,8 @@ parte di F0-A4 e F0-A5, F5-A3, F5-A4.
 
 ## Blocchi successivi (dal piano)
 
-Il modello di ogni fase (Ugo, 01/11/2026): prima di cominciare una fase si controlla il modello in uso; se è
-diverso da quello segnato ci si ferma e si chiede a Ugo di cambiarlo con `/model`.
+Il modello (Ugo, 01/11/2026): la sessione principale fa eseguire ogni fase dalla skill `fase` e
+sceglie il modello dell'agente guardando il lavoro; la colonna *Modello* è un'indicazione.
 
 | Blocco | Contenuto | Modello | Fatto |
 |---|---|---|:-:|
