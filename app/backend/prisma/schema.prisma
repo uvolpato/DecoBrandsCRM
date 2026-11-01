@@ -1,7 +1,7 @@
 // Schema del database decobrands_db (spec §4.2, D-29, D-33).
 // Nomi di tabelle e colonne uguali alla spec: chi legge la spec trova lo stesso nome qui.
-// Vincoli che Prisma non esprime (CHECK, indice univoco parziale, colonna generata) stanno
-// nella migrazione iniziale, in fondo al file SQL.
+// Vincoli che Prisma non esprime (CHECK, EXCLUDE, indice univoco parziale, colonna generata)
+// stanno nelle migrazioni SQL: iniziale e schema_completo.
 
 generator client {
   provider = "prisma-client-js"
@@ -129,7 +129,7 @@ model interscambio {
   subagente subagenti @relation(fields: [subagente_id], references: [id], onDelete: Restrict)
   fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Restrict)
 
-  // periodi senza sovrapposizioni per cliente e per codice: EXCLUDE nella migrazione revisione_periodi
+  // periodi senza sovrapposizioni per cliente e per codice: EXCLUDE nella migrazione iniziale (D-35 §19): vale anche per il codice, quindi niente UNIQUE semplice
   @@index([subagente_id])
   @@index([fornitore_id, codice_cliente_fornitore])
 }
@@ -362,7 +362,7 @@ model documenti_campi {
 
 // ---------- Gestione (§4.2.11, §4.2.14, §4.2.15, §4.2.18) ----------
 
-/// Utenti propri del CRM: si entra solo su invito, senza password (D-29, D-30).
+/// Utenti propri del CRM: si entra con nome utente (o email) e password (D-29, D-39).
 model utenti {
   id                     BigInt    @id @default(autoincrement())
   username               String    @unique @db.VarChar(50) // nome utente, sempre in minuscolo (D-39)

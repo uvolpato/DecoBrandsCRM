@@ -46,7 +46,7 @@ diverso da quello segnato ci si ferma e si chiede a Ugo di cambiarlo con `/model
 
 | Blocco | Contenuto | Modello | Fatto |
 |---|---|---|:-:|
-| 2a | Schema completo (Prisma, migrazioni, vincoli) | Sonnet | [ ] |
+| 2a | Schema completo (Prisma, migrazioni, vincoli). Fatto: migrazione `schema_completo` con i CHECK dei valori ammessi che mancavano (§4.2), prove 77. Da fare: identità e versioni delle anagrafiche (D-46, anticipato da F1-A7) | Sonnet | [~] |
 | 2b | Dati di prova §12 | Sonnet | [ ] |
 | 2c | Motore delle provvigioni sul server, prove sui numeri uguali al prototipo | **Opus** | [ ] |
 | 2d | Componenti e catalogo `/componenti` | Sonnet | [ ] |

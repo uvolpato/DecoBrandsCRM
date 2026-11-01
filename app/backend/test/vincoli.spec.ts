@@ -120,6 +120,60 @@ describe('bollettini', () => {
   });
 });
 
+describe('valori ammessi (spec §4.2, fase 2a)', () => {
+  it('importo positivo per la fattura, negativo per la nota di credito', async () => {
+    const ins = `INSERT INTO ordini_fornitore_documenti (testata_id, tipo, numero, data, importo) VALUES (1, $1, 'X', '2026-04-01', $2)`;
+    expect(await errore(ins, ['fattura', -5])).toMatch('ordini_fornitore_documenti_importo_check');
+    expect(await errore(ins, ['nota_credito', 5])).toMatch('ordini_fornitore_documenti_importo_check');
+    expect(await errore(ins, ['nota_credito', -5])).toBe('');
+  });
+
+  it('correzione: percentuale 0–100, "nessuna" a zero', async () => {
+    const ins = `INSERT INTO provvigioni_correzioni (documento_id, tipo, valore, motivo) VALUES (1, $1, $2, 'm')`;
+    expect(await errore(ins, ['pct', 120])).toMatch('provvigioni_correzioni_valore_check');
+    expect(await errore(ins, ['nessuna', 3])).toMatch('provvigioni_correzioni_valore_check');
+    expect(await errore(ins, ['importo', 250])).toBe('');
+  });
+
+  it('bollettino chiuso: data e utente vanno insieme', async () => {
+    expect(await errore(`UPDATE bollettini_testata SET stato = 'verificato', chiuso_il = now() WHERE id = 1`)).toMatch('bollettini_testata_chiuso_da_check');
+  });
+
+  it('documento in arrivo: origine, stato, tipo e livello previsti', async () => {
+    const ins = `INSERT INTO documenti_in_arrivo (origine, file_nome, file_hash, stato, tipo, livello) VALUES ($1, 'a.pdf', repeat('a', 64), $2, $3, $4)`;
+    expect(await errore(ins, ['fax', 'in_coda', null, null])).toMatch('documenti_in_arrivo_origine_check');
+    expect(await errore(ins, ['email', 'perso', null, null])).toMatch('documenti_in_arrivo_stato_check');
+    expect(await errore(ins, ['email', 'in_coda', 'ricevuta', null])).toMatch('documenti_in_arrivo_tipo_check');
+    expect(await errore(ins, ['email', 'in_coda', 'fattura', 'alta'])).toMatch('documenti_in_arrivo_livello_check');
+    expect(await errore(ins, ['email', 'da_controllare', 'fattura', 'bassa'])).toBe('');
+  });
+
+  it('campo letto: affidabilità 0–1', async () => {
+    await q(`INSERT INTO documenti_in_arrivo (id, origine, file_nome, file_hash) VALUES (1, 'email', 'a.pdf', repeat('b', 64))`);
+    const ins = `INSERT INTO documenti_campi (documento_id, campo, affidabilita) VALUES (1, 'numero', $1)`;
+    expect(await errore(ins, [1.5])).toMatch('documenti_campi_affidabilita_check');
+    expect(await errore(ins, [0.93])).toBe('');
+  });
+
+  it('registro: solo le anomalie hanno uno stato, livello previsto', async () => {
+    const ins = `INSERT INTO registro (genere, codice, livello, stato) VALUES ($1, 'p', $2, $3)`;
+    expect(await errore(ins, ['evento', 'info', 'aperta'])).toMatch('registro_stato_check');
+    expect(await errore(ins, ['anomalia', 'info', null])).toMatch('registro_stato_check');
+    expect(await errore(ins, ['evento', 'grave', null])).toMatch('registro_livello_check');
+    expect(await errore(ins, ['anomalia', 'errore', 'chiusa'])).toBe('');
+  });
+
+  it('impostazioni e giri dei servizi: solo valori previsti', async () => {
+    expect(await errore(`INSERT INTO impostazioni (chiave, valore) VALUES ('altro', '{}')`)).toMatch('impostazioni_chiave_check');
+    expect(await errore(`INSERT INTO impostazioni (chiave, valore) VALUES ('casella', '{}')`)).toBe('');
+    const ins = `INSERT INTO servizi_esecuzioni (servizio, tipo, esito) VALUES ($1, $2, $3)`;
+    expect(await errore(ins, ['cucina', 'lavoro', null])).toMatch('servizi_esecuzioni_servizio_check');
+    expect(await errore(ins, ['lettura', 'giro', null])).toMatch('servizi_esecuzioni_tipo_check');
+    expect(await errore(ins, ['lettura', 'lavoro', 'boh'])).toMatch('servizi_esecuzioni_esito_check');
+    expect(await errore(ins, ['lettura', 'lavoro', 'ok'])).toBe('');
+  });
+});
+
 describe('clienti da Integra', () => {
   it('P.IVA doppia ammessa, codice Integra no', async () => {
     const ins = `INSERT INTO clienti (codice_integra, piva, ragione_sociale) VALUES ($1, 'IT9', 'Vivaio')`;
