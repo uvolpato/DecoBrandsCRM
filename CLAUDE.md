@@ -170,6 +170,8 @@ Regole del codice del prototipo:
    quello segnato, fermati e scrivi a Ugo: «⚠ Questa fase è segnata per **<modello>**, ora sto
    usando **<modello attuale>**. Cambia con `/model <nome>` e poi scrivi *continua*.» Non
    cominciare finché non è cambiato (o Ugo dice di proseguire così).
+   In alternativa `/fase <n>` (skill `.claude/skills/fase`) manda la fase a un agente sul modello
+   giusto con un brief mirato; la sessione principale controlla e fa il commit.
 7. **Domande**: se una richiesta è ambigua o va contro una decisione del §19, chiedi
    prima di procedere. I dubbi aperti con il cliente stanno nella spec, ad esempio §5.14:
    - chi manda il sollecito di pagamento;
