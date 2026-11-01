@@ -11,8 +11,9 @@ principale prepara il brief e poi controlla il risultato.
 
 ## Passi
 
-1. **Fase.** Usa quella indicata negli argomenti (es. `2a`). Se non ce n'è una, prendi la prima
-   con `[ ]` nella tabella dei blocchi di `avanzamento-app.md`.
+1. **Fase.** Usa quella indicata negli argomenti (es. `2a`, `F2-A1`). Se non ce n'è una, prendi la
+   prima con `[ ]` in `avanzamento-app.md`. Se il gruppo ha più attività non fatte, usa il modo
+   *Parallelo* qui sotto.
    **Modello: lo scegli tu**, guardando il lavoro, non solo la colonna *Modello* (che è un'indicazione):
    - `opus`: regole, soldi e calcoli delle provvigioni, stati, abbinamenti, accesso e permessi,
      scelte di architettura;
@@ -57,6 +58,29 @@ principale prepara il brief e poi controlla il risultato.
    - cosa è stato fatto;
    - esito delle prove e dei controlli;
    - cosa resta aperto.
+
+## Parallelo (`/fase <blocco> parallelo`)
+
+Per i blocchi divisi in attività (`avanzamento-app.md`, tabella *Attività F1–F7*): si lancia
+insieme il **primo gruppo non fatto**, un agente per attività, ognuno sul suo modello.
+
+1. Per ogni attività: brief come al passo 3, più i **file che può toccare** (dal piano) e l'elenco
+   di quelli che toccano gli altri agenti del gruppo, da non toccare. I file comuni (`app.module`,
+   barra, guida, spec, `avanzamento-app.md`) **non li tocca nessun agente**: l'agente scrive nel
+   resoconto cosa ci va e lo aggiunge la sessione principale.
+2. Database di prova separato per agente, perché le prove svuotano il database: prima del lancio
+   la sessione principale crea `decobrands_test_<attività>` (es. `decobrands_test_f2a1`, owner
+   `decobrands`) e ci applica le migrazioni. Nel brief scrivi di lanciare le prove con
+   `DATABASE_URL_TEST` che punta a quel database (`test/ambiente.ts` lo accetta perché il nome
+   contiene `decobrands_test`). Se non si può creare il database, avvisa Ugo e lancia gli agenti
+   uno alla volta.
+3. Lancio: `Agent` con `isolation: "worktree"`, `model` dell'attività, `description` =
+   "Fase <attività>". Tutti nello stesso messaggio. Il worktree non ha `.env`: nel brief scrivi
+   di copiarlo da `C:\Progetti\Decobrands_CRM\app\backend\.env` senza modificarlo.
+4. Unione **una alla volta**, nell'ordine in cui finiscono: diff, controlli (passo 5), merge in
+   `main`, `npm test` su `decobrands_test`, commit. Un conflitto lo risolve la sessione principale.
+5. Dopo l'ultimo: file comuni, `avanzamento-app.md`, cancellazione dei database
+   `decobrands_test_<attività>`, messaggio a Ugo (passo 6, un punto per attività).
 
 ## Limiti
 

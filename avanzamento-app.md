@@ -49,13 +49,46 @@ sceglie il modello dell'agente guardando il lavoro; la colonna *Modello* è un'i
 | 2a | Schema completo (Prisma, migrazioni, vincoli). Fatto: migrazione `schema_completo` con i CHECK dei valori ammessi che mancavano (§4.2), identità e versioni delle anagrafiche (D-46, anticipato da F1-A7 con D-48: `_versioni` solo aggiunta, `codici_esterni`, chiavi composte sui fatti); spec allineata; prove 82 | Sonnet | [x] |
 | 2b | Dati di prova §12 | Sonnet | [ ] |
 | 2c | Motore delle provvigioni sul server, prove sui numeri uguali al prototipo | **Opus** | [ ] |
-| 2d | Componenti e catalogo `/componenti` | Sonnet | [ ] |
-| 3 | F1 area Dati: anagrafiche (fornitori, subagenti, clienti; lettura dal database ponte di Integra) | Sonnet | [ ] |
-| 4 | F2 Pratiche (stato ricavato dai documenti) | Opus | [ ] |
-| 5 | F3 Bollettini (riconciliazione a cerniera) | Opus | [ ] |
-| 6 | F4 Liquidazioni e Analisi (storni, chiusura del trimestre) | Opus | [ ] |
-| 7 | F5 Oggi, Stato del sistema, Impostazioni, Scartati, Guida | Sonnet | [ ] |
-| 8 | F6 Ingresso documenti (casella, GLM-OCR, abbinamento) | Opus | [ ] |
-| 9 | F7 Collaudo e rilascio | Sonnet | [ ] |
+| 2d | Componenti e catalogo `/componenti` (solo `app/frontend`: **insieme a 2b e 2c**) | Sonnet | [ ] |
 
-Rinomine, piccole correzioni e ricerche: Haiku, in qualsiasi fase.
+### Attività F1–F7, con modello e lavoro in parallelo
+
+Un blocco si fa per **gruppi in ordine** (1, 2, 3…): le attività dello **stesso gruppo vanno
+insieme**, un agente ciascuna nel suo worktree (`/fase <blocco> parallelo`); il gruppo dopo
+parte quando il precedente è unito. *Opus* per regole, soldi, stati, abbinamenti, segreti;
+*Sonnet* per pagine, elenchi, esportazioni, sincronizzazioni; *Haiku* per rinomine, ricerche e
+piccole correzioni, ovunque.
+
+| Blocco | Attività (piano) | Gruppo | Modello | Fatto |
+|---|---|:-:|---|:-:|
+| 3 · F1 Dati | F1-A1 Fornitori e scaglioni | 1 | Sonnet | [ ] |
+| | F1-A2 Agenti e subagenti | 1 | Sonnet | [ ] |
+| | F1-A3 Clienti e agenzie (interscambio) | 1 | Sonnet | [ ] |
+| | F1-A4 + F1-A7 Sincronizzazione da Integra con le versioni (serve il ponte, F0-A8) | 2 | Sonnet | [ ] |
+| | F1-A5 Percentuali datate ed eccezioni personali | 2 | **Opus** | [ ] |
+| | F1-A6 Regole del subagente (D-27): dopo F4-A2, si fa nel blocco 6 | — | **Opus** | [ ] |
+| 4 · F2 Pratiche | F2-A1 Elenco pratiche | 1 | Sonnet | [ ] |
+| | F2-A3 Documenti fiscali, netto, canale di caricamento | 1 | **Opus** | [ ] |
+| | F2-A2 Dettaglio pratica (fasi, righe a confronto) | 2 | Sonnet | [ ] |
+| 5 · F3 Bollettini | F3-A1 Matrice e caricamento | 1 | Sonnet | [ ] |
+| | F3-A3 Incassi dei clienti, storni e riaccrediti | 1 | **Opus** | [ ] |
+| | F3-A2 Dettaglio bollettino (cerniera) | 2 | **Opus** | [ ] |
+| 6 · F4 Liquidazioni e Analisi | F4-A1 Trimestri e subagenti con totali, chiusura | 1 | **Opus** | [ ] |
+| | F4-A5 Pagina Analisi | 1 | Sonnet | [ ] |
+| | F4-A2 Scheda Documenti (liquidabili, storni) | 2 | **Opus** | [ ] |
+| | F4-A4 Report subagenti | 2 | Sonnet | [ ] |
+| | F4-A6 Filtri standard e numeri aggiornati da soli | 2 | Sonnet | [ ] |
+| | F4-A3 Esportazione Excel, PDF, CSV | 3 | Sonnet | [ ] |
+| | F1-A6 Regole del subagente | 3 | **Opus** | [ ] |
+| 7 · F5 Gestione | F5-A1 Oggi | 1 | Sonnet | [ ] |
+| | F5-A2 Pagina del registro | 1 | Sonnet | [ ] |
+| | F5-A6 Impostazioni (password e segreti) | 1 | **Opus** | [ ] |
+| | F5-A8 Guida | 1 | Sonnet | [ ] |
+| | F5-A5 Stato del sistema (dopo F6-A1) e F5-A7 Scartati (dopo F6-A4) | blocco 8 | Sonnet | [ ] |
+| 8 · F6 Documenti | F6-A1 Ricezione e coda | 1 | Sonnet | [ ] |
+| | F6-A2 Lettura con GLM-OCR | 1 | **Opus** | [ ] |
+| | F6-A3 Controlli e proposta di abbinamento | 2 | **Opus** | [ ] |
+| | F6-A4 Pagina Documenti e finestra di correzione | 3 | Sonnet | [ ] |
+| | F5-A5, F5-A7 | 3 | Sonnet | [ ] |
+| | F6-A5 Installazione e taratura | 4 | Sonnet | [ ] |
+| 9 · F7 Collaudo | F7-A1 Verifica e prove complete, poi F7-A2 rilascio | 1 | Sonnet | [ ] |
