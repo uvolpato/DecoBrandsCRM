@@ -146,7 +146,7 @@ describe('utenti, sessioni, registro (D-30, D-31, D-33)', () => {
     expect(await errore(ins, [u.id, 'provvigioni', 'operatore'])).toBe('');
     expect(await errore(ins, [u.id, 'provvigioni', 'lettura'])).toMatch('utenti_aree_pkey');
     expect(await errore(ins, [u.id, 'cucina', 'lettura'])).toMatch('utenti_aree_area_check');
-    expect(await errore(ins, [u.id, 'anagrafiche', 'capo'])).toMatch('utenti_aree_livello_check');
+    expect(await errore(ins, [u.id, 'dati', 'capo'])).toMatch('utenti_aree_livello_check');
     expect(await errore(`INSERT INTO utenti (username, email, nome, ruolo, password_hash) VALUES ('vec', 'vec@x.it', 'V', 'operatore', 'x')`, [])).toMatch('utenti_ruolo_check');
     await q('DELETE FROM utenti WHERE id = $1', [u.id]);
     expect((await q('SELECT count(*)::int AS n FROM utenti_aree WHERE utente_id = $1', [u.id])).rows[0].n).toBe(0);

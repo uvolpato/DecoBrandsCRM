@@ -124,6 +124,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 #### F0-A4 · Shell layout comune + componenti standard — 5 h + 0,5 h **da approvare**
 - **Dipende da:** F0-A1 · **Blocca:** tutte le schermate
 - **Riferimenti:** spec §7.10 (barra laterale e rotte), §7.12 (ritorno nello stesso punto), **§16.4, §16.4.1, §16.4.2 (componenti standard, filtri, conteggi)**
+- **Menu per area (D-47, nelle 5 h):** aree a segmenti in cima alla barra, voci dell'area della pagina, area *Anagrafiche* → *Dati* (fatto, passo 1.16).
 - **Schermi (D-44, da approvare 0,5 h):** pagina "usa un computer o un tablet" sotto i 744 px, nel layout radice con il CSS, uguale nel prototipo; prove a 1440 e 768 px.
 - **Sorgente prototipo:** `prototipo-alternativo/assets/componenti.js` (intero: Pagina, Barra, Pannello, Schede, DataTable, FilterBar, RiepilogoFiltri, KpiRow, CampoRicerca/RicercaEntita, PeriodoMesi, Grafico, Modale, FormModal, Conferma, Avviso, Elenco, Binario, Matrice, Cerniera, Periodi, …, rotte e memoria `registra`), `prototipo-alternativo/assets/entita.js`, catalogo `prototipo-alternativo/assets/viste-componenti.js`; `stile.css`
 - **Output:** layout comune (barra laterale a gruppi con contatori + testata della pagina + avvisi) e **libreria componenti React** con gli stessi nomi e parametri di `componenti.js`; pagina catalogo `/componenti` (solo admin) equivalente a `#/componenti`.

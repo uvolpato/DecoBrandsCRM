@@ -20,7 +20,7 @@ class DatiUtente {
   @IsString() @Matches(/\S/, { message: 'Scrivi il nome' }) @MaxLength(120) nome!: string;
   @IsEmail({}, { message: 'L’email non è valida' }) @MaxLength(200) email!: string;
   @IsIn(['amministratore', 'utente'], { message: 'Ruolo non valido' }) ruolo!: string; // ruolo di Sistema, mai superutente (§3.3)
-  /** Livelli per area (D-45): { provvigioni: 'operatore', anagrafiche: null, … }; null toglie l'area,
+  /** Livelli per area (D-45): { provvigioni: 'operatore', dati: null, … }; null toglie l'area,
    *  un'area non mandata resta com'è (così una pagina che non mostra un'area non la cancella). */
   @IsOptional() @IsObject() aree?: Record<string, unknown>;
 }

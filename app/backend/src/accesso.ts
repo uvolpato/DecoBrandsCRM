@@ -24,13 +24,13 @@ declare module 'express-session' {
 declare module 'express' {
   interface Request {
     utente?: utenti;
-    livelli?: Partial<Record<'anagrafiche' | 'provvigioni' | 'vendite', 'lettura' | 'operatore' | 'responsabile'>>; // D-45
+    livelli?: Partial<Record<'dati' | 'provvigioni' | 'vendite', 'lettura' | 'operatore' | 'responsabile'>>; // D-45
   }
 }
 
 /** Ruoli e aree (§8.3, D-45): ruolo di Sistema + un livello per area; stessa tabella di M.PERMESSI del prototipo. */
 export const RUOLI = ['superutente', 'amministratore', 'utente'] as const;
-export const AREE = ['anagrafiche', 'provvigioni', 'vendite'] as const;
+export const AREE = ['dati', 'provvigioni', 'vendite'] as const;
 export const LIVELLI = ['lettura', 'operatore', 'responsabile'] as const; // in ordine: ognuno comprende i precedenti
 export type Area = (typeof AREE)[number];
 export type Livello = (typeof LIVELLI)[number];
@@ -48,9 +48,9 @@ export const PERMESSI = {
   'sistema.amministratori': { area: 'sistema', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] },
   'sistema.impostazioni': { area: 'sistema', testo: 'Impostazioni del portale (casella, posta, sincronizzazione, conservazione)', ruoli: ['superutente', 'amministratore'] },
   'sistema.stato': { area: 'sistema', testo: 'Stato del sistema, segnare i problemi come visti', ruoli: ['superutente', 'amministratore'], ancheOperatore: true },
-  'anagrafiche.consulta': { area: 'anagrafiche', testo: 'Consultare fornitori, clienti, subagenti', minimo: 'lettura' },
-  'anagrafiche.modifica': { area: 'anagrafiche', testo: 'Subagenti, agenzie dei clienti (interscambio)', minimo: 'operatore' },
-  'anagrafiche.condizioni': { area: 'anagrafiche', testo: 'Condizioni, scaglioni e percentuali dei fornitori; eccezioni personali', minimo: 'responsabile' },
+  'dati.consulta': { area: 'dati', testo: 'Consultare fornitori, clienti, subagenti', minimo: 'lettura' },
+  'dati.modifica': { area: 'dati', testo: 'Subagenti, agenzie dei clienti (interscambio)', minimo: 'operatore' },
+  'dati.condizioni': { area: 'dati', testo: 'Condizioni, scaglioni e percentuali dei fornitori; eccezioni personali', minimo: 'responsabile' },
   'provvigioni.consulta': { area: 'provvigioni', testo: 'Consultare pratiche, documenti, bollettini, liquidazioni, analisi', minimo: 'lettura' },
   'provvigioni.esporta': { area: 'provvigioni', testo: 'Esportare liquidazioni e analisi (Excel, PDF, CSV)', minimo: 'lettura' },
   'provvigioni.modifica': { area: 'provvigioni', testo: 'Caricare, correggere e abbinare documenti; verificare bollettini; preparare solleciti', minimo: 'operatore' },

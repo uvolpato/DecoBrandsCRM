@@ -6,4 +6,4 @@ INSERT INTO utenti (username, email, nome, ruolo, password_hash, deve_cambiare_p
   (:'s' || '-lett', :'s' || '-lett@prova-e2e.it', 'Prova Lett', 'utente', :'h', false);
 INSERT INTO utenti_aree (utente_id, area, livello)
 SELECT u.id, a.area, CASE WHEN u.username LIKE '%-ammi' THEN 'responsabile' WHEN u.username LIKE '%-oper' THEN 'operatore' ELSE 'lettura' END
-FROM utenti u CROSS JOIN (VALUES ('anagrafiche'), ('provvigioni')) a(area) WHERE u.username LIKE :'s' || '-%';
+FROM utenti u CROSS JOIN (VALUES ('dati'), ('provvigioni')) a(area) WHERE u.username LIKE :'s' || '-%';

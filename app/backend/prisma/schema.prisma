@@ -394,7 +394,7 @@ model utenti {
 /// Livello di un utente in un'area (D-45): lettura < operatore < responsabile; nessuna riga = area chiusa.
 model utenti_aree {
   utente_id BigInt
-  area      String @db.VarChar(20) // anagrafiche | provvigioni | vendite (CHECK)
+  area      String @db.VarChar(20) // dati | provvigioni | vendite (CHECK, D-47)
   livello   String @db.VarChar(15) // lettura | operatore | responsabile (CHECK)
 
   utente utenti @relation(fields: [utente_id], references: [id], onDelete: Cascade)

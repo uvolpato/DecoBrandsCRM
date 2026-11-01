@@ -37,13 +37,14 @@ parte di F0-A4 e F0-A5, F5-A3, F5-A4.
 | 1.13b | Ruoli per area (D-45): ruolo di Sistema (superutente, amministratore, utente) + livello per area in `utenti_aree` (migrazione `20261030120000_ruoli_per_area`, chi c'era non perde niente); permessi `area.attività` nel guard e in `io`; barra, *Pagina riservata* e sola lettura decise dal guscio per area; finestra utente con un livello per area; *Cosa può fare ogni ruolo* per area; chi non ha Provvigioni dopo l'accesso va alla prima pagina che può aprire. Prove: server 69, `app_utenti.py` 28 | F5-A4b | [x] |
 | 1.14 | Prove: server (`npm test`, 70 su `decobrands_test`: accesso, permessi, livelli per area, vincoli, limite ai tentativi); browser (`strumenti/prove/`): `app_accesso.py` 18, `app_guscio.py` 16, `app_utenti.py` 28, `app_scena.py` 37, a 1440 e 768 px; utenti di prova con `utenti_prova.js`. Trovato e corretto: il logo sbiadito copriva il pulsante della finestra di accesso (un clic richiudeva) | F7 | [x] |
 | 1.15 | Documenti: spec 8.2 (D-41 → D-46), piano, `app/README.md` (prove nel browser), registro delle decisioni | — | [x] |
+| 1.16 | **Menu per area** (D-47, §7.10): in cima alla barra le aree dell'utente (Provvigioni, Dati, Gestione) a segmenti, sotto le voci dell'area della pagina, Guida comune, *Carica documenti* solo in Provvigioni; sul tablet due righe. L'area *Anagrafiche* diventa **Dati** (migrazione `20261101090000_area_dati`, permessi `dati.*`). Prove: server 70, `app_guscio.py` 20, `app_utenti.py` 28, `app_accesso.py`, `app_scena.py` 37 | F0-A4 | [x] |
 
 ## Blocchi successivi (dal piano)
 
 | Blocco | Contenuto | Fatto |
 |---|---|:-:|
 | 2 | Resto della Fase 0: schema completo e seed §12, motore sul server con i test numerici, tutti i componenti e il catalogo `/componenti` | [ ] |
-| 3 | F1 Anagrafiche (fornitori, subagenti, clienti; lettura dal database ponte di Integra) | [ ] |
+| 3 | F1 area Dati: anagrafiche (fornitori, subagenti, clienti; lettura dal database ponte di Integra) | [ ] |
 | 4 | F2 Pratiche | [ ] |
 | 5 | F3 Bollettini | [ ] |
 | 6 | F4 Liquidazioni e Analisi | [ ] |

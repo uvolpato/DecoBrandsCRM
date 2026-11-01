@@ -27,11 +27,11 @@ const DOMINIO = '@prova-accesso.it';
 const PW = 'password-di-prova';
 const id: Record<string, bigint> = {};
 
-// D-45: nelle prove "operatore" e "lettura" sono utenti con quel livello in Anagrafiche e Provvigioni
+// D-45: nelle prove "operatore" e "lettura" sono utenti con quel livello in Dati e Provvigioni
 const comeRuolo = (ruolo: string) => ['operatore', 'lettura'].includes(ruolo)
-  ? { ruolo: 'utente', aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: ruolo })) } }
+  ? { ruolo: 'utente', aree: { create: ['dati', 'provvigioni'].map((area) => ({ area, livello: ruolo })) } }
   : ruolo === 'amministratore' // come nella migrazione: chi amministrava prima è responsabile nelle aree
-    ? { ruolo, aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: 'responsabile' })) } }
+    ? { ruolo, aree: { create: ['dati', 'provvigioni'].map((area) => ({ area, livello: 'responsabile' })) } }
     : { ruolo };
 async function crea(username: string, ruolo: string, altro: object = {}) {
   const u = await db.utenti.create({
@@ -72,7 +72,7 @@ describe('entra', () => {
   it("con il nome utente o con l'email: utente, permessi dal server e token CSRF", async () => {
     const a = await entra('oper');
     const io = (await a.get('/api/accesso/io').expect(200)).body;
-    expect(io).toMatchObject({ username: 'oper', ruolo: 'utente', aree: { anagrafiche: 'operatore', provvigioni: 'operatore' }, cambia_password: false });
+    expect(io).toMatchObject({ username: 'oper', ruolo: 'utente', aree: { dati: 'operatore', provvigioni: 'operatore' }, cambia_password: false });
     expect(io.permessi).toEqual(expect.arrayContaining(['collegato', 'provvigioni.modifica', 'sistema.stato']));
     expect(io.permessi).not.toContain('provvigioni.chiudi'); // serve responsabile (D-45)
     expect(io.permessi).not.toContain('sistema.utenti');

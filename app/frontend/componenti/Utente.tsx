@@ -15,7 +15,7 @@ export const usePuo = () => {
 export const RUOLI: Record<string, string> = { superutente: 'Superutente', amministratore: 'Amministratore', utente: 'Utente' };
 export const LIVELLI: Record<string, string> = { lettura: 'Lettura', operatore: 'Operatore', responsabile: 'Responsabile' };
 // ponytail: Vendite (§17) è spenta, si aggiunge qui quando si accende
-export const AREE: Record<string, string> = { anagrafiche: 'Anagrafiche', provvigioni: 'Provvigioni' };
+export const AREE: Record<string, string> = { provvigioni: 'Provvigioni', dati: 'Dati' }; // D-47: Anagrafiche → Dati
 /** Ruolo in breve (barra): quello di Sistema o, per un utente, il livello in Provvigioni. */
 export const ruoloBreve = (u: { ruolo: string; aree: Record<string, string> }) =>
   u.ruolo !== 'utente' ? RUOLI[u.ruolo] : u.aree.provvigioni ? LIVELLI[u.aree.provvigioni] : RUOLI.utente;

@@ -17,11 +17,11 @@ const PW = 'password-di-prova';
 const id: Record<string, string> = {};
 let spia: jest.SpyInstance;
 
-// D-45: nelle prove "operatore" e "lettura" sono utenti con quel livello in Anagrafiche e Provvigioni
+// D-45: nelle prove "operatore" e "lettura" sono utenti con quel livello in Dati e Provvigioni
 const comeRuolo = (ruolo: string) => ['operatore', 'lettura'].includes(ruolo)
-  ? { ruolo: 'utente', aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: ruolo })) } }
+  ? { ruolo: 'utente', aree: { create: ['dati', 'provvigioni'].map((area) => ({ area, livello: ruolo })) } }
   : ruolo === 'amministratore' // come nella migrazione: chi amministrava prima è responsabile nelle aree
-    ? { ruolo, aree: { create: ['anagrafiche', 'provvigioni'].map((area) => ({ area, livello: 'responsabile' })) } }
+    ? { ruolo, aree: { create: ['dati', 'provvigioni'].map((area) => ({ area, livello: 'responsabile' })) } }
     : { ruolo };
 async function crea(username: string, ruolo: string, altro: object = {}) {
   const u = await db.utenti.create({
@@ -212,15 +212,15 @@ describe('disattiva, riattiva, reimposta, elimina', () => {
 describe('livelli per area (D-45)', () => {
   it('l’amministratore dà i livelli; aree o livelli sconosciuti rifiutati; i propri no, il superutente sì', async () => {
     const a = await entra('ammi');
-    const u = (await a.post('/utenti', { ...nuovo('areato'), aree: { provvigioni: 'responsabile', anagrafiche: 'lettura' } }).expect(201)).body;
-    expect(u.aree).toEqual({ provvigioni: 'responsabile', anagrafiche: 'lettura' });
+    const u = (await a.post('/utenti', { ...nuovo('areato'), aree: { provvigioni: 'responsabile', dati: 'lettura' } }).expect(201)).body;
+    expect(u.aree).toEqual({ provvigioni: 'responsabile', dati: 'lettura' });
     await a.post('/utenti', { ...nuovo('areato2'), aree: { cucina: 'lettura' } }).expect(400, /area cucina/);
     await a.put('/utenti/' + u.id, { ...nuovo('areato'), aree: { provvigioni: 'capo' } }).expect(400);
     // un'area non mandata resta, null la toglie
-    expect((await a.put('/utenti/' + u.id, { ...nuovo('areato'), aree: { provvigioni: 'operatore' } }).expect(200)).body.aree).toEqual({ provvigioni: 'operatore', anagrafiche: 'lettura' });
-    expect((await a.put('/utenti/' + u.id, { ...nuovo('areato'), aree: { anagrafiche: null } }).expect(200)).body.aree).toEqual({ provvigioni: 'operatore' });
+    expect((await a.put('/utenti/' + u.id, { ...nuovo('areato'), aree: { provvigioni: 'operatore' } }).expect(200)).body.aree).toEqual({ provvigioni: 'operatore', dati: 'lettura' });
+    expect((await a.put('/utenti/' + u.id, { ...nuovo('areato'), aree: { dati: null } }).expect(200)).body.aree).toEqual({ provvigioni: 'operatore' });
     const ev = await db.registro.findFirstOrThrow({ where: { codice: 'crud.update', entita_id: BigInt(u.id) }, orderBy: { id: 'desc' } });
-    expect(ev.dettaglio).toMatchObject({ prima: { aree: { anagrafiche: 'lettura', provvigioni: 'operatore' } }, dopo: { aree: { provvigioni: 'operatore' } } });
+    expect(ev.dettaglio).toMatchObject({ prima: { aree: { dati: 'lettura', provvigioni: 'operatore' } }, dopo: { aree: { provvigioni: 'operatore' } } });
     const { ruolo: _r, ...mieiDati } = nuovo('ammi');
     await a.put('/utenti/' + id.ammi, { ...mieiDati, aree: { vendite: 'responsabile' } }).expect(403, /tuoi livelli/);
     const s = await entra('super');
@@ -231,21 +231,21 @@ describe('livelli per area (D-45)', () => {
   it('nessuno dà più di quello che ha: livello ≤ al proprio, niente aree che non ha, niente utenti più in alto (D-45)', async () => {
     await crea('capetto', 'amministratore');
     await db.utenti_aree.update({ where: { utente_id_area: { utente_id: BigInt(id.capetto), area: 'provvigioni' } }, data: { livello: 'operatore' } });
-    await db.utenti_aree.delete({ where: { utente_id_area: { utente_id: BigInt(id.capetto), area: 'anagrafiche' } } });
+    await db.utenti_aree.delete({ where: { utente_id_area: { utente_id: BigInt(id.capetto), area: 'dati' } } });
     const c = await entra('capetto');
     await c.post('/utenti', { ...nuovo('copia'), aree: { provvigioni: 'operatore' } }).expect(201); // una copia di sé sì
     await c.post('/utenti', { ...nuovo('troppo'), aree: { provvigioni: 'responsabile' } }).expect(403, /più del tuo livello/);
-    await c.post('/utenti', { ...nuovo('altrove'), aree: { anagrafiche: 'lettura' } }).expect(403, /anagrafiche/);
+    await c.post('/utenti', { ...nuovo('altrove'), aree: { dati: 'lettura' } }).expect(403, /dati/);
     // stessa area: capo ha solo Provvigioni, un gradino sopra capetto
     await crea('capo', 'operatore');
-    await db.utenti_aree.delete({ where: { utente_id_area: { utente_id: BigInt(id.capo), area: 'anagrafiche' } } });
+    await db.utenti_aree.delete({ where: { utente_id_area: { utente_id: BigInt(id.capo), area: 'dati' } } });
     await db.utenti_aree.update({ where: { utente_id_area: { utente_id: BigInt(id.capo), area: 'provvigioni' } }, data: { livello: 'responsabile' } });
     await c.post('/utenti/' + id.capo + '/attivo', { attivo: false }).expect(403, /livello più alto/);
     await c.post('/utenti/' + id.capo + '/password', {}).expect(403, /livello più alto/);
     // alzare con la modifica un utente sotto di me oltre il mio livello: no
     const copia = await db.utenti.findFirstOrThrow({ where: { username: 'copia' } });
     await c.put('/utenti/' + copia.id, { ...nuovo('copia'), aree: { provvigioni: 'responsabile' } }).expect(403, /più del tuo livello/);
-    await (await entra('super')).post('/utenti', { ...nuovo('dalsuper'), aree: { provvigioni: 'responsabile', anagrafiche: 'responsabile' } }).expect(201); // il superutente sì
+    await (await entra('super')).post('/utenti', { ...nuovo('dalsuper'), aree: { provvigioni: 'responsabile', dati: 'responsabile' } }).expect(201); // il superutente sì
   });
 
   it('i permessi seguono il livello, riletti a ogni richiesta', async () => {
