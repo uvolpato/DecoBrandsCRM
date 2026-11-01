@@ -25,7 +25,7 @@ const AREE_MENU: { id: string; t: string; icona: string; gruppi: { gruppo: strin
       { href: '/utenti', t: 'Utenti e ruoli', icona: 'subagenti', permesso: 'sistema.utenti' },
       { href: '/sistema', t: 'Stato del sistema', icona: 'sistema', permesso: 'sistema.stato' },
       { href: '/impostazioni', t: 'Impostazioni', icona: 'impostazioni', permesso: 'sistema.impostazioni' },
-      { href: '/componenti', t: 'Componenti', icona: 'componenti', permesso: 'sistema.utenti' }] }, // catalogo: solo amministratori (permesso esistente)
+      { href: '/componenti', t: 'Componenti', icona: 'componenti', permesso: 'sistema.amministratori' }] }, // catalogo: solo il superutente (Ugo 01/11/2026)
   ] },
 ];
 const GUIDA: Voce = { href: '/guida', t: 'Guida', icona: 'guida' };

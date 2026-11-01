@@ -1,7 +1,8 @@
 # Prova del catalogo /componenti dell'app (fase 2d), con Playwright: ogni esempio si vede, filtri con
 # ricerca multipla, riepilogo e numeri dei segmenti (D-22, D-23), tabella (ordine, totali), campo di
 # ricerca e maschera, periodo, grafico, memoria della schermata (§7.12), pagina riservata.
-# Servono backend e frontend accesi e gli utenti di prova (utenti_prova.js crea <s>: <s>-ammi, <s>-oper).
+# Servono backend e frontend accesi, gli utenti di prova (utenti_prova.js crea <s>: <s>-ammi, <s>-oper) e un
+# superutente <s>-super con la stessa password (la pagina è solo sua). Un amministratore vede "Pagina riservata".
 # Uso: python strumenti/prove/app_componenti.py <suffisso> <cartella schermate> [base, predefinita http://localhost:8011]
 import sys, pathlib
 from playwright.sync_api import sync_playwright
@@ -49,7 +50,7 @@ with sync_playwright() as p:
         return pg
 
     # --- amministratore ---
-    pg = entra(S + '-ammi')
+    pg = entra(S + '-super')
     pg.wait_for_selector('.catalogo-voci h2')
     titoli = pg.locator('.catalogo-voci > div > .pannello > .pannello-testa h2').all_inner_texts()
     ok(len(titoli) >= 25, f'catalogo: {len(titoli)} componenti')
@@ -147,7 +148,7 @@ with sync_playwright() as p:
     pg.close()
 
     # --- 768 px ---
-    pg = entra(S + '-ammi', 768)
+    pg = entra(S + '-super', 768)
     pg.wait_for_selector('.catalogo-voci h2')
     ok(pg.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), '768 px: nessuno scorrimento orizzontale della pagina')
     pg.screenshot(path=str(USCITA / 'componenti-768.png'))
@@ -156,10 +157,10 @@ with sync_playwright() as p:
     pg.close()
 
     # --- non amministratore ---
-    pg = entra(S + '-oper')
-    ok(pg.locator('.vuoto b', has_text='Pagina riservata').count() == 1, 'operatore: Pagina riservata')
-    ok(pg.locator('.barra .voce', has_text='Componenti').count() == 0, 'operatore: la voce Componenti non c’è')
-    ok(pg.locator('.catalogo-voci').count() == 0, 'operatore: il catalogo non si vede')
+    pg = entra(S + '-ammi')
+    ok(pg.locator('.vuoto b', has_text='Pagina riservata').count() == 1, 'amministratore: Pagina riservata')
+    ok(pg.locator('.barra .voce', has_text='Componenti').count() == 0, 'amministratore: la voce Componenti non c’è')
+    ok(pg.locator('.catalogo-voci').count() == 0, 'amministratore: il catalogo non si vede')
     pg.close()
     b.close()
 
