@@ -46,7 +46,7 @@ sceglie il modello dell'agente guardando il lavoro; la colonna *Modello* è un'i
 
 | Blocco | Contenuto | Modello | Fatto |
 |---|---|---|:-:|
-| 2a | Schema completo (Prisma, migrazioni, vincoli). Fatto: migrazione `schema_completo` con i CHECK dei valori ammessi che mancavano (§4.2), prove 77. Da fare: identità e versioni delle anagrafiche (D-46, anticipato da F1-A7) | Sonnet | [~] |
+| 2a | Schema completo (Prisma, migrazioni, vincoli). Fatto: migrazione `schema_completo` con i CHECK dei valori ammessi che mancavano (§4.2), identità e versioni delle anagrafiche (D-46, anticipato da F1-A7 con D-48: `_versioni` solo aggiunta, `codici_esterni`, chiavi composte sui fatti); spec allineata; prove 82 | Sonnet | [x] |
 | 2b | Dati di prova §12 | Sonnet | [ ] |
 | 2c | Motore delle provvigioni sul server, prove sui numeri uguali al prototipo | **Opus** | [ ] |
 | 2d | Componenti e catalogo `/componenti` | Sonnet | [ ] |
