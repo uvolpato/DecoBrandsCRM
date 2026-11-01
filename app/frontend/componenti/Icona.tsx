@@ -22,6 +22,15 @@ const PERCORSI: Record<string, string> = {
   piu: '<path d="M12 5v14M5 12h14"/>',
   cerca: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   spunta: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  componenti: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  filtro: '<path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/>',
+  'filtro-via': '<path d="M3 5h12l-5 6.5V18l-3 2v-8.5z"/><path d="M16 12l5 5M21 12l-5 5"/>',
+  chiudi: '<path d="M6 6l12 12M18 6L6 18"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  scarica: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  posta: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  avviso: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.5"/>',
+  indietro: '<path d="M15 18l-6-6 6-6"/>',
 };
 
 export function Icona({ nome }: { nome: string }) {

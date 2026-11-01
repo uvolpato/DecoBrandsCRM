@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
+import { useScorrimento } from '@/lib/memoria';
 import { Icona } from './Icona';
 import { AREE, usePuo, useUtente } from './Utente';
 
@@ -18,11 +19,13 @@ export interface Azione {
   disabilitato?: boolean;
   titolo?: string;
   consentito?: boolean; // resta attivo in sola lettura (esporta, guida)
+  conta?: number; // contatore colorato sul pulsante (punti da controllare)
+  contaVariante?: 'attesa' | 'errore';
 }
 
 export function Pulsante({ a, piccolo }: { a: Azione; piccolo?: boolean }) {
   const classe = 'btn' + (piccolo ? ' piccolo' : '') + (a.variante && a.variante !== 'primario' ? ' ' + a.variante : '') + (a.consentito ? ' consentito' : '');
-  const dentro = <>{a.icona && <Icona nome={a.icona} />}{a.etichetta}</>;
+  const dentro = <>{a.icona && <Icona nome={a.icona} />}{a.etichetta}{!!a.conta && <span className={'btn-conta' + (a.contaVariante ? ' c-' + a.contaVariante : '')}>{a.conta}</span>}</>;
   return a.href
     ? <Link className={classe} href={a.href} title={a.titolo}>{dentro}</Link>
     : <button type="button" className={classe} onClick={a.onClick} disabled={a.disabilitato} title={a.titolo}>{dentro}</button>;
@@ -31,25 +34,29 @@ export function Pulsante({ a, piccolo }: { a: Azione; piccolo?: boolean }) {
 export interface PaginaProps {
   titolo: string;
   sottotitolo?: ReactNode;
+  briciole?: { etichetta: string; href?: string }[];
+  badge?: ReactNode;
   azioni?: Azione[];
   pieno?: boolean; // il corpo riempie lo spazio (pagine a due colonne con tabelle)
   children?: ReactNode;
 }
 
-export function Pagina({ titolo, sottotitolo, azioni = [], pieno, children }: PaginaProps) {
+export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], pieno, children }: PaginaProps) {
   // anche a ogni cambio d'indirizzo: navigando, Next rimette il titolo del layout ("Decobrands")
   const percorso = usePathname();
+  const corpo = useScorrimento<HTMLElement>('corpo'); // posizione di scorrimento ritrovata tornando (§7.12)
   useEffect(() => { document.title = titolo + ' · Decobrands'; }, [titolo, percorso]);
   return (
     <>
       <header className="testa">
         <div>
-          <h1>{titolo}</h1>
+          {briciole && <nav className="percorso" aria-label="Percorso">{briciole.map((b, i) => <span key={i}>{i > 0 && ' › '}{b.href ? <Link href={b.href}>{b.etichetta}</Link> : b.etichetta}</span>)}</nav>}
+          <h1>{titolo}{badge && <span className="testa-badge">{badge}</span>}</h1>
           {sottotitolo && <div className="sotto">{sottotitolo}</div>}
         </div>
         <div className="testa-azioni">{azioni.map((a) => <Pulsante key={a.etichetta} a={a} />)}</div>
       </header>
-      <section className={'corpo' + (pieno ? ' pieno' : '')}>{children}</section>
+      <section ref={corpo} className={'corpo' + (pieno ? ' pieno' : '')}>{children}</section>
     </>
   );
 }

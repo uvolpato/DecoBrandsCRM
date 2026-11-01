@@ -9,10 +9,12 @@ export interface ModaleProps {
   testo?: ReactNode;
   onChiudi: () => void;
   piede?: ReactNode; // i pulsanti; senza: solo Chiudi
+  larga?: boolean; // finestra grande (maschera di ricerca)
+  corpoClasse?: string;
   children?: ReactNode;
 }
 
-export function Modale({ titolo, testo, onChiudi, piede, children }: ModaleProps) {
+export function Modale({ titolo, testo, onChiudi, piede, larga, corpoClasse, children }: ModaleProps) {
   const id = useId();
   const finestra = useRef<HTMLDivElement>(null);
   const suChiudi = useRef(onChiudi);
@@ -31,9 +33,9 @@ export function Modale({ titolo, testo, onChiudi, piede, children }: ModaleProps
 
   return (
     <div className="velo" onClick={(e) => { if (e.target === e.currentTarget) onChiudi(); }}>
-      <div ref={finestra} className="modale" role="dialog" aria-modal="true" aria-labelledby={id}>
+      <div ref={finestra} className={'modale' + (larga ? ' larga' : '')} role="dialog" aria-modal="true" aria-labelledby={id}>
         <div className="modale-testa"><h2 id={id}>{titolo}</h2>{testo && <p>{testo}</p>}</div>
-        {children && <div className="modale-corpo">{children}</div>}
+        {children && <div className={'modale-corpo' + (corpoClasse ? ' ' + corpoClasse : '')}>{children}</div>}
         <div className="modale-piede">
           {piede ?? <button type="button" className="btn sec" onClick={onChiudi}>Chiudi</button>}
         </div>

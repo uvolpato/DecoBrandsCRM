@@ -20,6 +20,7 @@ const VOCI: { gruppo: string; richiudibile?: boolean; voci: Voce[] }[] = [
     { href: '/sistema', t: 'Stato del sistema', icona: 'sistema', permesso: 'sistema.stato' },
     { href: '/impostazioni', t: 'Impostazioni', icona: 'impostazioni', permesso: 'sistema.impostazioni' },
     { href: '/scartati', t: 'Documenti scartati', icona: 'cestino', permesso: 'provvigioni.scartati' },
+    { href: '/componenti', t: 'Componenti', icona: 'componenti', permesso: 'sistema.utenti' }, // catalogo: solo amministratori (permesso esistente)
     { href: '/guida', t: 'Guida', icona: 'guida' }] },
 ];
 const permessoDi = (v: Voce) => v.permesso ?? (v.area ? v.area + '.consulta' : undefined);

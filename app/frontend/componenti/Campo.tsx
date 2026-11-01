@@ -1,5 +1,7 @@
 'use client';
 import { useState } from 'react';
+import type { Contesto, Entita } from '@/lib/entita';
+import { CampoRicerca } from './CampoRicerca';
 import { Icona } from './Icona';
 
 // Un campo di modulo come campoHtml del prototipo (componenti.js, CRM.Form): etichetta sopra, aiuto
@@ -8,18 +10,34 @@ import { Icona } from './Icona';
 export interface CampoProps {
   nome: string;
   etichetta: string;
-  tipo?: 'testo' | 'password' | 'casella' | 'select' | 'livello';
+  tipo?: 'testo' | 'password' | 'casella' | 'select' | 'livello' | 'ricerca';
   completa?: string;
-  valore?: string | boolean;
+  valore?: string | string[] | boolean;
   opzioni?: { value: string; label: string; disabilitato?: boolean; titolo?: string }[]; // select, livello
   aiuto?: string;
   largo?: boolean; // occupa tutta la riga nei moduli a due colonne
   disabilitato?: boolean;
+  entita?: Entita; // ricerca: campo di ricerca su un'entità (D-22); con multipla il valore inviato è l'elenco JSON delle chiavi
+  multipla?: boolean;
+  contesto?: Contesto;
 }
 
-export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, disabilitato }: CampoProps) {
+export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, disabilitato, entita, multipla, contesto }: CampoProps) {
   const [vedi, setVedi] = useState(false);
   const id = 'c-' + nome;
+  const [ricerca, setRicerca] = useState<string | string[]>(multipla ? (Array.isArray(valore) ? valore : []) : typeof valore === 'string' ? valore : '');
+  if (tipo === 'ricerca' && entita) {
+    return (
+      <div className={'campo' + (largo ? ' largo' : '')}>
+        <label htmlFor={id}>{etichetta}</label>
+        <input type="hidden" name={nome} value={multipla ? JSON.stringify(ricerca) : (ricerca as string)} />
+        {multipla
+          ? <CampoRicerca entita={entita} contesto={contesto} id={id} multipla valori={ricerca as string[]} onChange={setRicerca} />
+          : <CampoRicerca entita={entita} contesto={contesto} id={id} valore={ricerca as string} onChange={setRicerca} />}
+        {aiuto && <span className="aiuto">{aiuto}</span>}
+      </div>
+    );
+  }
   if (tipo === 'casella') {
     return (
       <div className={'campo campo-casella' + (largo ? ' largo' : '')}>
