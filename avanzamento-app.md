@@ -41,13 +41,21 @@ parte di F0-A4 e F0-A5, F5-A3, F5-A4.
 
 ## Blocchi successivi (dal piano)
 
-| Blocco | Contenuto | Fatto |
-|---|---|:-:|
-| 2 | Resto della Fase 0: schema completo e seed §12, motore sul server con i test numerici, tutti i componenti e il catalogo `/componenti` | [ ] |
-| 3 | F1 area Dati: anagrafiche (fornitori, subagenti, clienti; lettura dal database ponte di Integra) | [ ] |
-| 4 | F2 Pratiche | [ ] |
-| 5 | F3 Bollettini | [ ] |
-| 6 | F4 Liquidazioni e Analisi | [ ] |
-| 7 | F5 Oggi, Stato del sistema, Impostazioni, Scartati, Guida | [ ] |
-| 8 | F6 Ingresso documenti (casella, GLM-OCR) | [ ] |
-| 9 | F7 Collaudo e rilascio | [ ] |
+Il modello di ogni fase (D-48): prima di cominciare una fase si controlla il modello in uso; se è
+diverso da quello segnato ci si ferma e si chiede a Ugo di cambiarlo con `/model`.
+
+| Blocco | Contenuto | Modello | Fatto |
+|---|---|---|:-:|
+| 2a | Schema completo (Prisma, migrazioni, vincoli) | Sonnet | [ ] |
+| 2b | Dati di prova §12 | Sonnet | [ ] |
+| 2c | Motore delle provvigioni sul server, prove sui numeri uguali al prototipo | **Opus** | [ ] |
+| 2d | Componenti e catalogo `/componenti` | Sonnet | [ ] |
+| 3 | F1 area Dati: anagrafiche (fornitori, subagenti, clienti; lettura dal database ponte di Integra) | Sonnet | [ ] |
+| 4 | F2 Pratiche (stato ricavato dai documenti) | Opus | [ ] |
+| 5 | F3 Bollettini (riconciliazione a cerniera) | Opus | [ ] |
+| 6 | F4 Liquidazioni e Analisi (storni, chiusura del trimestre) | Opus | [ ] |
+| 7 | F5 Oggi, Stato del sistema, Impostazioni, Scartati, Guida | Sonnet | [ ] |
+| 8 | F6 Ingresso documenti (casella, GLM-OCR, abbinamento) | Opus | [ ] |
+| 9 | F7 Collaudo e rilascio | Sonnet | [ ] |
+
+Rinomine, piccole correzioni e ricerche: Haiku, in qualsiasi fase.
