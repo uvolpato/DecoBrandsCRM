@@ -61,9 +61,9 @@ piccole correzioni, ovunque.
 
 | Blocco | Attività (piano) | Gruppo | Modello | Fatto |
 |---|---|:-:|---|:-:|
-| 3 · F1 Dati | F1-A1 Fornitori e scaglioni | 1 | Sonnet | [ ] |
-| | F1-A2 Agenti e subagenti | 1 | Sonnet | [ ] |
-| | F1-A3 Clienti e agenzie (interscambio) | 1 | Sonnet | [ ] |
+| 3 · F1 Dati | F1-A1 Fornitori e scaglioni (OpenCode + controllo Claude Code): regole del CRM modificabili, percentuali in sola lettura fino a F1-A5; `app_fornitori.py` 19 OK | 1 | Sonnet | [x] |
+| | F1-A2 Agenti e subagenti: crea, modifica, disattiva, eliminazione rifiutata se ha agenzie; `app_subagenti.py` 23 OK | 1 | Sonnet | [x] |
+| | F1-A3 Clienti e agenzie (interscambio): clienti in sola lettura, agenzie con campi di ricerca, periodo sovrapposto bloccato dal database; `app_clienti.py` 25 OK. Da fare: sconti proposti dagli scaglioni, filtri a ricerca multipla negli elenchi, testi della Guida | 1 | Sonnet | [x] |
 | | F1-A4 + F1-A7 Sincronizzazione da Integra con le versioni (serve il ponte, F0-A8) | 2 | Sonnet | [ ] |
 | | F1-A5 Percentuali datate ed eccezioni personali | 2 | **Opus** | [ ] |
 | | F1-A6 Regole del subagente (D-27): dopo F4-A2, si fa nel blocco 6 | — | **Opus** | [ ] |

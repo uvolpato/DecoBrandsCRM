@@ -5,6 +5,9 @@ import { AccessoController, AccessoGuard, Pubblica } from './accesso';
 import { ErroriFilter } from './errori.filter';
 import { PrismaModule, PrismaService } from './prisma.service';
 import { UtentiController } from './utenti';
+import { FornitoriController } from './fornitori';
+import { AgentiController, SubagentiController } from './subagenti';
+import { ClientiController } from './clienti';
 
 @Controller('salute')
 class SaluteController {
@@ -33,7 +36,7 @@ export function limiti(env = process.env) {
 
 @Module({
   imports: [PrismaModule, ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
-  controllers: [SaluteController, AccessoController, UtentiController],
+  controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, AgentiController, SubagentiController, ClientiController],
   providers: [
     { provide: APP_FILTER, useClass: ErroriFilter }, // con Prisma iniettato: scrive nel registro
     { provide: APP_GUARD, useClass: AccessoGuard }, // su tutte le rotte: permesso dichiarato o negata

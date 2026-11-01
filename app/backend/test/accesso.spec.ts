@@ -92,8 +92,8 @@ describe('entra', () => {
   });
 
   it("l'utente dei servizi non entra", async () => {
-    await db.utenti.create({ data: { username: 'servizi', email: 'servizi' + DOMINIO, nome: 's', ruolo: 'utente', sistema: true } });
-    await request(app.getHttpServer()).post('/api/accesso/entra').send({ utente: 'servizi', password: PW }).expect(401);
+    await db.utenti.create({ data: { username: 'servizi-prova', email: 'servizi-prova' + DOMINIO, nome: 's', ruolo: 'utente', sistema: true } });
+    await request(app.getHttpServer()).post('/api/accesso/entra').send({ utente: 'servizi-prova', password: PW }).expect(401);
   });
 
   it('la sessione sta nel database; senza "Resta collegato" il cookie finisce con il browser', async () => {

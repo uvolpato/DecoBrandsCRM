@@ -46,3 +46,55 @@ export function vociMenu<R>(ent: Entita<R>, ctx: Contesto, tutte: R[]) {
   const k = ctx.limita ? new Set(ctx.limita.map(String)) : null;
   return tutte.filter((r) => (ctx.tutti || !ent.attiva || ent.attiva(r)) && (!k || k.has(String(ent.chiave(r)))));
 }
+
+import { api } from '@/lib/api';
+
+export const fornitore: Entita<any> = {
+  titolo: 'Fornitore',
+  voci: async () => {
+    const r = await api<any[]>('fornitori');
+    if (!r.ok) return [];
+    return r.dati.map((f: any) => ({ id: f.id, nome: f.ragione_sociale ?? f.id, piva: f.piva }));
+  },
+  chiave: (r: any) => r.id,
+  testo: (r: any) => r.nome ?? '',
+  dettaglio: (r: any) => (r.piva ? 'P.IVA ' + r.piva : ''),
+  cerca: (r: any) => (r.nome ?? '') + ' ' + (r.piva ?? ''),
+  colonne: [
+    { key: 'nome', header: 'Fornitore', grow: true },
+    { key: 'piva', header: 'P.IVA' },
+  ] as any,
+};
+
+export const subagente: Entita<any> = {
+  titolo: 'Subagente',
+  voci: async () => {
+    const r = await api<any[]>('subagenti');
+    if (!r.ok) return [];
+    return r.dati.map((s: any) => ({ id: s.id, nome: (s.cognome + ' ' + s.nome).trim(), email: s.email, attivo: s.attivo }));
+  },
+  chiave: (r: any) => r.id,
+  testo: (r: any) => r.nome ?? '',
+  dettaglio: (r: any) => r.email ?? '',
+  attiva: (r: any) => r.attivo !== false,
+  colonne: [
+    { key: 'nome', header: 'Subagente', grow: true },
+    { key: 'email', header: 'Email' },
+  ] as any,
+};
+
+export const agente: Entita<any> = {
+  titolo: 'Agente',
+  voci: async () => {
+    const r = await api<any[]>('agenti');
+    if (!r.ok) return [];
+    return r.dati.map((a: any) => ({ id: a.id, nome: (a.cognome + ' ' + a.nome).trim(), codice: a.codice }));
+  },
+  chiave: (r: any) => r.id,
+  testo: (r: any) => r.nome ?? '',
+  dettaglio: (r: any) => r.codice ?? '',
+  colonne: [
+    { key: 'nome', header: 'Agente', grow: true },
+    { key: 'codice', header: 'Codice' },
+  ] as any,
+};
