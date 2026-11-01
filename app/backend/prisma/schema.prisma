@@ -378,7 +378,7 @@ model documenti_in_arrivo {
   tipo                   String?   @db.VarChar(16)
   fornitore_id           BigInt?
   fornitore_versione_id  BigInt? // fornitore e versione vanno insieme (CHECK)
-  livello                String?   @db.VarChar(12) // dal campo meno affidabile in documenti_campi
+  livello                String?   @db.VarChar(16) // dal campo meno affidabile in documenti_campi
   controlli              Json?
   modello                String?
   ricevuto_il            DateTime  @default(now()) @db.Timestamptz(6)
