@@ -134,6 +134,7 @@ describe('percentuali datate', () => {
     expect(scaglioneDi(r, '2025-01-01', 1).eccezioni)
       .toEqual([expect.objectContaining({ subagente_id: bastasin, pct_personale: 3, valido_dal: '2025-01-01', valido_al: null })]);
     expect(r.body.versioni[0].scaglioni[0]).toHaveProperty('dal_fornitore', 28);
+    expect(r.body.versioni[0].modificabile).toBe(false); // D-51: 2025 è prima dell'ultima chiusura (2026-08-31)
   });
 
   it('operatore e lettura: 403 sulla scrittura', async () => {
@@ -258,7 +259,7 @@ describe('percentuali datate', () => {
     const r = await lett.get('/fornitori').expect(200);
     expect(r.body.find((f: { id: string }) => f.id === gries).scaglioni).toBe(prima);
     const v = await lett.get(p()).expect(200);
-    expect(v.body.versioni[0]).toMatchObject({ valido_dal: '2099-01-01', in_vigore: false });
+    expect(v.body.versioni[0]).toMatchObject({ valido_dal: '2099-01-01', in_vigore: false, modificabile: true });
   });
 });
 

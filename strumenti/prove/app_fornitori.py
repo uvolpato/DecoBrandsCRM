@@ -52,8 +52,9 @@ with sync_playwright() as p:
     corpo = pg.locator('.schede-corpo')
     ok(corpo.locator('[data-versione]').count() >= 1 and 'In vigore dal' in corpo.inner_text(), 'Percentuali: versioni, quella in vigore in evidenza')
     ok(corpo.locator('.dt tbody tr').count() >= 1, 'Percentuali: scaglioni in tabella')
-    ok(corpo.locator('button:has-text("Nuove percentuali")').count() == 1 and corpo.locator('button:has-text("Correggi")').count() >= 1,
-       'responsabile: comandi per nuova versione, correzione ed eliminazione')
+    # D-51: la versione in vigore del seed è nel periodo chiuso, quindi niente Correggi/Elimina su di lei
+    ok(corpo.locator('button:has-text("Nuove percentuali")').count() == 1 and corpo.locator('button:has-text("Correggi")').count() == 0,
+       'responsabile: nuova versione sì, correzione no nel periodo chiuso')
     pg.screenshot(path=str(USCITA / 'app-fornitori-1440.png'))
     pg.click('button:has-text("Nuove percentuali")'); finestra(pg).wait_for()
     pg.fill('#c-valido_dal', '2020-01-01'); pg.click('.modale-piede button[type=submit]')

@@ -72,6 +72,7 @@ interface ScaglioneVersione extends Scaglione {
 interface Versione {
   valido_dal: string;
   in_vigore: boolean;
+  modificabile: boolean; // D-51: dopo l'ultima chiusura del fornitore
   scaglioni: ScaglioneVersione[];
 }
 interface Percentuali {
@@ -355,8 +356,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
                             <h3>{tipo === 'in vigore' ? 'In vigore dal ' + dataIt(v.valido_dal) : 'Dal ' + dataIt(v.valido_dal)}</h3>
                             {tipo !== 'in vigore' && <span className="testo-tenue">{tipo}</span>}
                             <span className="spazio" />
-                            {puoModificare && <button type="button" className="btn sec piccolo" onClick={() => correggi(v)}>Correggi</button>}
-                            {puoModificare && percentuali.versioni.length > 1 && <button type="button" className="btn sec piccolo" onClick={() => void eliminaVersione(v)}>Elimina</button>}
+                            {puoModificare && v.modificabile && <button type="button" className="btn sec piccolo" onClick={() => correggi(v)}>Correggi</button>}
+                            {puoModificare && v.modificabile && percentuali.versioni.length > 1 &&<button type="button" className="btn sec piccolo" onClick={() => void eliminaVersione(v)}>Elimina</button>}
                           </div>
                           <DataTable compatta naturale righe={v.scaglioni} colonne={colonneScaglioni} chiave={(s) => s.id}
                             ordinamentoIniziale={{ key: 'sconto_min', dir: 'asc' }} emptyText="Nessuno scaglione" />

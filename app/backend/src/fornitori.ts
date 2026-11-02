@@ -79,12 +79,13 @@ const nomeSub = (s: { nome: string; cognome: string }) => `${s.cognome} ${s.nome
  *  Per ogni scaglione le eccezioni personali che valgono in qualche giorno della versione (D-51). */
 async function percentualiFornitore(db: Db, fid: bigint) {
   const oggi = giornoRoma(new Date());
-  const [sc, agenzie, ecc] = await Promise.all([
+  const [sc, agenzie, ecc, chiusura] = await Promise.all([
     db.provvigioni_scaglioni.findMany({ where: { fornitore_id: fid }, orderBy: [{ valido_dal: 'desc' }, { sconto_min: 'asc' }] }),
     db.interscambio.findMany({ where: { fornitore_id: fid }, select: { sconto: true } }),
     db.provvigioni_eccezioni.findMany({
       where: { fornitore_id: fid }, include: { subagente: { select: { nome: true, cognome: true } } }, orderBy: [{ valido_dal: 'asc' }, { id: 'asc' }],
     }),
+    ultimaChiusura(db, fid),
   ]);
   const date = [...new Set(sc.map((s) => iso(s.valido_dal)))];
   const in_vigore = date.find((d) => d <= oggi) ?? null;
@@ -98,6 +99,7 @@ async function percentualiFornitore(db: Db, fid: bigint) {
       return {
         valido_dal: d,
         in_vigore: d === in_vigore,
+        modificabile: !chiusura || d > chiusura, // D-51: correggi/elimina solo fuori dal periodo chiuso (lo ricontrolla la scrittura)
         scaglioni: righe.map((s) => ({
           ...mappaScaglione(s),
           dal_fornitore: Number(s.pct_agente.plus(s.pct_subagente)),

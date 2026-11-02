@@ -2480,6 +2480,7 @@ pratiche).
 | GET | `/fornitori` · `/fornitori/:id` | elenco / dettaglio fornitori |
 | POST | `/api/fornitori` | crea fornitore |
 | PUT | `/api/fornitori/:id` | aggiorna fornitore |
+| GET | `/api/fornitori/:id/percentuali` | versioni dalla più recente, con `in_vigore` e `modificabile` (dopo l'ultima chiusura: *Correggi* ed *Elimina* compaiono solo lì, il server ricontrolla a ogni scrittura, D-51) |
 | POST | `/api/fornitori/:id/percentuali` | nuova versione delle percentuali da una data dopo l'ultima chiusura: `{valido_dal, scaglioni: [{sconto_min, pct_agente, pct_subagente}]}`; data già usata 400, nel periodo chiuso 409 (§5.11, D-25, D-51) |
 | PUT · DELETE | `/api/fornitori/:id/percentuali/:valido_dal` | corregge (`{scaglioni}`, la data sta nella rotta; sostituisce le righe) · elimina (non l'unica) una versione dopo l'ultima chiusura; altrimenti 409; 409 anche se un'eccezione valida resterebbe senza la sua soglia (D-51) |
 | GET | `/api/eccezioni?subagente_id=&fornitore_id=` | eccezioni con `{id, subagente_id, subagente, fornitore_id, fornitore, sconto_min, pct_personale, pct_standard, valido_dal, valido_al, modificabile}` (almeno un filtro) |

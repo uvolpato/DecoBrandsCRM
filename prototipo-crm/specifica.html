@@ -4058,6 +4058,11 @@ pratiche).</p>
 <td>aggiorna fornitore</td>
 </tr>
 <tr>
+<td>GET</td>
+<td><code>/api/fornitori/:id/percentuali</code></td>
+<td>versioni dalla più recente, con <code>in_vigore</code> e <code>modificabile</code> (dopo l'ultima chiusura: <em>Correggi</em> ed <em>Elimina</em> compaiono solo lì, il server ricontrolla a ogni scrittura, D-51)</td>
+</tr>
+<tr>
 <td>POST</td>
 <td><code>/api/fornitori/:id/percentuali</code></td>
 <td>nuova versione delle percentuali da una data dopo l'ultima chiusura: <code>{valido_dal, scaglioni: [{sconto_min, pct_agente, pct_subagente}]}</code>; data già usata 400, nel periodo chiuso 409 (§5.11, D-25, D-51)</td>
