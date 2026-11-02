@@ -162,3 +162,5 @@ GRANT SELECT ON crm_viste.v_clienti, crm_viste.v_fornitori TO crm_lettura;
 -- 5. `postgres_fdw` o funzione con parametro (`crm_viste.clienti_dal(dal)`)?
 --    Lo decide il sistemista: il CRM legge in tutti e due i casi con una sola
 --    SELECT ... WHERE modificato_il > $1.
+-- 6. `cli_cdclistr` è unico e non cambia mai per lo stesso soggetto? Il CRM usa
+--    solo quello come chiave: se cambia, il soggetto sembrerebbe nuovo.

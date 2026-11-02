@@ -45,6 +45,7 @@ export const SCHEMI: Record<string, string[]> = {
   'integra.vista': ['vista', 'errore'],
   'integra.piva_mancante': ['codice', 'piva'],
   'integra.piva_doppia': ['piva'],
+  'integra.riga': ['vista', 'id_integra', 'errore'],
   'integra.lenta': ['secondi'],
 };
 

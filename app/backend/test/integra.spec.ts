@@ -11,7 +11,7 @@ import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
-import { sincronizzaGiro } from '../src/integra';
+import { creaPonte, IntegraService, pulisci, sincronizzaGiro } from '../src/integra';
 import { svuota } from './svuota';
 
 let app: NestExpressApplication;
@@ -253,5 +253,77 @@ describe('un giro', () => {
     const oper = request.agent(app.getHttpServer());
     const r2 = await oper.post('/api/accesso/entra').send({ utente: 'oper-int', password: PW }).expect(200);
     await oper.post('/api/integra/prova').set('x-csrf-token', r2.body.csrf).expect(403);
+  });
+
+  it('un giro alla volta: la seconda sincronizzazione dà 409', async () => {
+    await mettiCliente({});
+    const svc = app.get(IntegraService);
+    const esiti = await Promise.allSettled([svc.sincronizza(), svc.sincronizza()]);
+    expect(esiti.filter((e) => e.status === 'fulfilled')).toHaveLength(1);
+    const ko = esiti.find((e) => e.status === 'rejected') as PromiseRejectedResult;
+    expect(ko.reason.message).toBe('Sincronizzazione già in corso');
+    expect(await db.clienti.count()).toBe(1);
+  });
+
+  it('una riga in errore resta in anomalia e si rilegge al giro dopo', async () => {
+    await mettiCliente({ id_integra: 5, codice: 'C00005', modificato_il: ora });
+    // identità che punta a un cliente inesistente: la copia della riga fallisce
+    await db.codici_esterni.create({ data: { sistema: 'integra', tipo: 'cliente', codice: 'C00005', entita_id: 999999n } });
+    await sincronizzaGiro(db, ponte, ora);
+    expect(await db.registro.count({ where: { codice: 'integra.riga', stato: 'aperta' } })).toBe(1);
+
+    await db.codici_esterni.deleteMany({ where: { codice: 'C00005' } });
+    await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 2 * 86_400_000));
+    expect(await db.clienti.count()).toBe(1);
+    expect(await db.registro.count({ where: { codice: 'integra.riga', stato: 'aperta' } })).toBe(0);
+  });
+
+  it('connessione: solo il ponte giù conta, non una vista mancante', async () => {
+    await ponte.query('ALTER TABLE crm_viste.v_clienti RENAME COLUMN email TO email_x');
+    await sincronizzaGiro(db, ponte, ora);
+    await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
+    await ponte.query('ALTER TABLE crm_viste.v_clienti RENAME COLUMN email_x TO email');
+    expect(await db.registro.count({ where: { codice: 'integra.connessione' } })).toBe(0);
+
+    const rotto = new Pool({ connectionString: 'postgresql://x:y@127.0.0.1:1/nope', connectionTimeoutMillis: 300, max: 1 });
+    await expect(sincronizzaGiro(db, rotto, new Date(ora.getTime() + 120_000))).rejects.toThrow();
+    expect(await db.registro.count({ where: { codice: 'integra.connessione' } })).toBe(0);
+    await expect(sincronizzaGiro(db, rotto, new Date(ora.getTime() + 180_000))).rejects.toThrow();
+    await expect(sincronizzaGiro(db, rotto, new Date(ora.getTime() + 240_000))).rejects.toThrow();
+    await rotto.end();
+    expect(await db.registro.count({ where: { codice: 'integra.connessione', stato: 'aperta' } })).toBe(1);
+  });
+
+  it('chiave solo dal codice: id_integra uguale non unisce due soggetti', async () => {
+    await mettiCliente({ id_integra: 1, codice: '500', ragione_sociale: 'Soggetto A' });
+    await sincronizzaGiro(db, ponte, ora);
+    const a = await db.clienti.findFirstOrThrow({ include: { corrente: true } });
+    await mettiCliente({ id_integra: 500, codice: 'C00500', ragione_sociale: 'Soggetto B' });
+    await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
+    expect(await db.clienti.count()).toBe(2);
+    expect((await db.clienti.findUniqueOrThrow({ where: { id: a.id }, include: { corrente: true } })).corrente?.ragione_sociale).toBe('Soggetto A');
+  });
+
+  it('ponte in sola lettura anche per il CRM', async () => {
+    const soloLettura = creaPonte(PONTE_URL);
+    try {
+      expect((await soloLettura.query('SHOW transaction_read_only')).rows[0].transaction_read_only).toBe('on');
+      await expect(soloLettura.query("INSERT INTO crm_viste.v_clienti (id_integra) VALUES (1)")).rejects.toMatchObject({ code: '25006' });
+    } finally {
+      await soloLettura.end();
+    }
+  });
+
+  it('pulisci toglie indirizzi, host e password', () => {
+    const esempi = [
+      'connect ECONNREFUSED 192.168.1.5:5432',
+      'getaddrinfo ENOTFOUND nome-host',
+      'postgresql://utente:segreta@host:5432/db password=abc',
+    ];
+    for (const e of esempi) {
+      const p = pulisci(new Error(e));
+      expect(p).not.toMatch(/192\.168\.1\.5|nome-host|segreta|password=abc/);
+    }
+    expect(pulisci(new Error('getaddrinfo ENOTFOUND nome-host'))).toBe('getaddrinfo ENOTFOUND [indirizzo rimosso]');
   });
 });

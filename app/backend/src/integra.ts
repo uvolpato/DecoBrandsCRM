@@ -1,4 +1,4 @@
-import { BadGatewayException, Controller, HttpCode, Injectable, Logger, OnModuleDestroy, OnModuleInit, Post, Req } from '@nestjs/common';
+import { BadGatewayException, ConflictException, Controller, HttpCode, Injectable, Logger, OnModuleDestroy, OnModuleInit, Post, Req } from '@nestjs/common';
 import { type Prisma, type PrismaClient } from '@prisma/client';
 import type { Request } from 'express';
 import { Pool } from 'pg';
@@ -65,6 +65,7 @@ const TESTO = {
   pivaMancante: (tipo: Tipo, codice: string) => `Il ${tipo} ${codice} non ha una P.IVA valida: correggerla in Integra, entra da sola al giro successivo.`,
   pivaDoppia: (tipo: Tipo, piva: string) => `La P.IVA ${piva} è su più di un ${tipo}: unire o correggere in Integra.`,
   lenta: (secondi: number) => `La sincronizzazione è durata ${secondi} secondi: segnalare a chi gestisce Integra il carico del database.`,
+  riga: (tipo: Tipo, codice: string, errore: string) => `Il ${tipo} ${codice} non è stato copiato: ${errore}`,
 };
 
 // ---------- Valori normalizzati (§4.5) ----------
@@ -121,10 +122,12 @@ function datiFornitore(r: Riga) {
 const codiceDi = (r: Riga) => testo(r.codice) || String(r.id_integra);
 
 /** Mai indirizzo o password nei testi, nei log, nelle risposte, nel registro. */
-function pulisci(errore: unknown): string {
+export function pulisci(errore: unknown): string {
   const messaggio = errore instanceof Error ? errore.message : String(errore);
   return messaggio
     .replace(/postgres(?:ql)?:\/\/\S+/gi, '[indirizzo rimosso]')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b/g, '[indirizzo rimosso]')
+    .replace(/\b(ENOTFOUND|EAI_AGAIN)\s+\S+/gi, '$1 [indirizzo rimosso]')
     .replace(/password\s*=\s*\S+/gi, 'password=[rimossa]')
     .replace(/\s+/g, ' ')
     .slice(0, 300);
@@ -134,13 +137,21 @@ const vuoto = (): ConteggioVista => ({ letti: 0, nuovi: 0, versioni: 0, disattiv
 
 // ---------- Un giro ----------
 
-/** Dal = inizio dell'ultimo giro riuscito − 1 giorno; al primo giro si legge tutto. */
+/**
+ * Dal = inizio dell'ultimo giro riuscito − 1 giorno; se ci sono righe in errore, si torna alla più
+ * vecchia anomalia aperta, così la riga si rilegge finché non passa. Al primo giro si legge tutto.
+ */
 async function daQuando(db: Db): Promise<Date> {
   const ultimo = await db.servizi_esecuzioni.findFirst({
     where: { servizio: 'integra', tipo: 'lavoro', esito: { in: ['ok', 'attenzione'] } },
     orderBy: [{ inizio: 'desc' }, { id: 'desc' }],
   });
-  return ultimo ? new Date(ultimo.inizio.getTime() - GIORNO_MS) : new Date(0);
+  const base = ultimo ? new Date(ultimo.inizio.getTime() - GIORNO_MS) : new Date(0);
+  const righe = await db.registro.findFirst({
+    where: { genere: 'anomalia', codice: 'integra.riga', stato: 'aperta' },
+    orderBy: { ts: 'asc' }, select: { ts: true },
+  });
+  return righe ? new Date(Math.min(base.getTime(), righe.ts.getTime() - GIORNO_MS)) : base;
 }
 
 async function leggi(ponte: Pool, vista: Vista, dal: Date): Promise<Riga[]> {
@@ -151,13 +162,9 @@ async function leggi(ponte: Pool, vista: Vista, dal: Date): Promise<Riga[]> {
 
 const erroreVista = (e: unknown) => ['42P01', '42703'].includes(String((e as { code?: string }).code));
 
-/** Identità in codici_esterni: prima il codice leggibile, poi `id_integra` (§4.5). */
+/** Identità in codici_esterni: solo il codice di Integra salvato alla creazione (§4.5). */
 async function identita(db: Db, tipo: Tipo, r: Riga) {
-  for (const codice of [...new Set([codiceDi(r), String(r.id_integra)])]) {
-    const trovato = await db.codici_esterni.findFirst({ where: { sistema: 'integra', tipo, codice } });
-    if (trovato) return trovato;
-  }
-  return null;
+  return db.codici_esterni.findFirst({ where: { sistema: 'integra', tipo, codice: codiceDi(r) } });
 }
 
 /** Una riga della vista diventa (o aggiorna) cliente o fornitore; la sua transazione (§4.6, V13). */
@@ -240,14 +247,9 @@ async function applicaFornitore(db: PrismaService, r: Riga, ora: Date, c: Conteg
 /** P.IVA doppia fra identità correnti (§4.2.20, D-35): si copia e si segnala. */
 async function pivaDoppie(db: PrismaService, tipo: Tipo, ora: Date) {
   const righe = tipo === 'cliente'
-    ? await db.$queryRaw<{ piva: string | null }[]>`SELECT v.piva FROM clienti c JOIN clienti_versioni v ON v.cliente_id = c.id AND v.id = c.versione_corrente_id WHERE v.piva IS NOT NULL`
-    : await db.$queryRaw<{ piva: string | null }[]>`SELECT v.piva FROM fornitori f JOIN fornitori_versioni v ON v.fornitore_id = f.id AND v.id = f.versione_corrente_id WHERE v.piva IS NOT NULL`;
-  const conteggio = new Map<string, number>();
-  for (const r of righe) {
-    const p = piva(r.piva);
-    if (p) conteggio.set(p, (conteggio.get(p) ?? 0) + 1);
-  }
-  const doppie = new Set([...conteggio].filter(([, n]) => n > 1).map(([p]) => p));
+    ? await db.$queryRaw<{ piva: string }[]>`SELECT v.piva FROM clienti c JOIN clienti_versioni v ON v.cliente_id = c.id AND v.id = c.versione_corrente_id WHERE v.piva IS NOT NULL GROUP BY v.piva HAVING count(*) > 1`
+    : await db.$queryRaw<{ piva: string }[]>`SELECT v.piva FROM fornitori f JOIN fornitori_versioni v ON v.fornitore_id = f.id AND v.id = f.versione_corrente_id WHERE v.piva IS NOT NULL GROUP BY v.piva HAVING count(*) > 1`;
+  const doppie = new Set(righe.map((r) => r.piva));
   for (const p of doppie) {
     await apriAnomalia(db, {
       servizio: 'integra', codice: 'integra.piva_doppia', chiave: `${tipo}:${p}`,
@@ -266,12 +268,12 @@ async function pivaDoppie(db: PrismaService, tipo: Tipo, ora: Date) {
 /** `integra.connessione` solo al terzo giro fallito di fila, si chiude al primo riuscito (§4.5). */
 async function controllaConnessione(db: Db, ora: Date) {
   const ultime = await db.servizi_esecuzioni.findMany({
-    where: { servizio: 'integra', tipo: 'lavoro', esito: { not: null } },
+    where: { servizio: 'integra', tipo: 'lavoro', esito: { not: null }, misure: { path: ['ponte'], equals: false } },
     orderBy: [{ inizio: 'desc' }, { id: 'desc' }],
     take: 3,
     select: { esito: true },
   });
-  if (ultime.length === 3 && ultime.every((e) => e.esito === 'errore')) {
+  if (ultime.length === 3) {
     await apriAnomalia(db, {
       servizio: 'integra', codice: 'integra.connessione', messaggio: TESTO.connessione, dettaglio: { errore: 'ponte non raggiungibile' },
     }, ora);
@@ -309,12 +311,20 @@ export async function sincronizzaGiro(db: PrismaService, ponte: Pool, ora = new 
       await chiudiAnomalia(db, 'integra', 'integra.vista', VISTE[vista].vista, ora);
       conteggi[vista].letti = righe.length;
       for (const r of righe) {
+        const chiave = `${vista}:${r.id_integra}`;
         try {
           if (vista === 'clienti') await applicaCliente(db, r, ora, conteggi.clienti);
           else await applicaFornitore(db, r, ora, conteggi.fornitori);
+          await chiudiAnomalia(db, 'integra', 'integra.riga', chiave, ora);
         } catch (e) {
           conteggi[vista].scartati++; // una riga sbagliata non ferma le altre
-          log.warn(`riga ${r.id_integra} di ${vista} non copiata: ${pulisci(e)}`);
+          const errore = pulisci(e);
+          await apriAnomalia(db, {
+            servizio: 'integra', codice: 'integra.riga', chiave,
+            messaggio: TESTO.riga(vista === 'clienti' ? 'cliente' : 'fornitore', codiceDi(r), errore),
+            dettaglio: { vista, id_integra: r.id_integra, errore },
+          }, ora);
+          log.warn(`riga ${r.id_integra} di ${vista} non copiata: ${errore}`);
         }
       }
       await pivaDoppie(db, vista === 'clienti' ? 'cliente' : 'fornitore', ora);
@@ -336,7 +346,7 @@ export async function sincronizzaGiro(db: PrismaService, ponte: Pool, ora = new 
     await chiudiAnomalia(db, 'integra', 'integra.lenta', '', ora);
   }
   const c = conteggi;
-  const misure = { clienti: c.clienti, fornitori: c.fornitori, secondi };
+  const misure = { clienti: c.clienti, fornitori: c.fornitori, secondi, ponte: !ponteKo };
   const testoGiro = `Clienti: ${c.clienti.letti} letti, ${c.clienti.nuovi} nuovi, ${c.clienti.versioni} versioni; fornitori: ${c.fornitori.letti} letti, ${c.fornitori.nuovi} nuovi, ${c.fornitori.versioni} versioni`
     + (nota ? `; errore: ${nota}` : '') + (esito === 'attenzione' ? `; lento: ${secondi} s` : '');
   await db.servizi_esecuzioni.update({
@@ -351,6 +361,11 @@ export async function sincronizzaGiro(db: PrismaService, ponte: Pool, ora = new 
   return conteggi;
 }
 
+/** Pool del ponte in sola lettura: anche per errore il CRM non scrive su Integra. */
+export function creaPonte(url: string): Pool {
+  return new Pool({ connectionString: url, max: 2, options: '-c default_transaction_read_only=on' });
+}
+
 /** Un pool solo, creato alla prima richiesta: le prove importano il file senza `PONTE_URL`. */
 @Injectable()
 export class IntegraService implements OnModuleInit, OnModuleDestroy {
@@ -361,7 +376,7 @@ export class IntegraService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly db: PrismaService) {}
 
   private ponte(): Pool | null {
-    if (!this.pool && process.env.PONTE_URL) this.pool = new Pool({ connectionString: process.env.PONTE_URL, max: 2 });
+    if (!this.pool && process.env.PONTE_URL) this.pool = creaPonte(process.env.PONTE_URL);
     return this.pool;
   }
 
@@ -383,12 +398,16 @@ export class IntegraService implements OnModuleInit, OnModuleDestroy {
 
   /** Giro a mano (rotta): se il ponte non risponde, messaggio pulito per il chiamante. */
   async sincronizza(avviatoDa?: bigint): Promise<Conteggi> {
+    if (this.inCorso) throw new ConflictException('Sincronizzazione già in corso');
     const ponte = this.ponte();
     if (!ponte) throw new BadGatewayException('Sincronizzazione non configurata');
+    this.inCorso = true; // vale sia per la rotta sia per il timer
     try {
       return await sincronizzaGiro(this.db, ponte, new Date(), avviatoDa);
     } catch (e) {
       throw new BadGatewayException(pulisci(e));
+    } finally {
+      this.inCorso = false;
     }
   }
 
@@ -399,14 +418,10 @@ export class IntegraService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async giro() {
-    if (this.inCorso) return;
-    this.inCorso = true;
     try {
       await this.sincronizza();
     } catch (e) {
-      log.warn(`giro non riuscito: ${pulisci(e)}`);
-    } finally {
-      this.inCorso = false;
+      if (!(e instanceof ConflictException)) log.warn(`giro non riuscito: ${pulisci(e)}`);
     }
   }
 
