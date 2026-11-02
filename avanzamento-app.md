@@ -51,6 +51,13 @@ sceglie il modello dell'agente guardando il lavoro; la colonna *Modello* è un'i
 | 2c | Motore delle provvigioni sul server (`src/motore`: funzioni pure + `caricaDati`), prove contro il prototipo vero eseguito in Node, al centesimo; documenti per id (D-34); stato d'incasso solo da bollettini verificati (§5.14); fotografia delle liquidazioni chiuse nel seed; prove 105. Da decidere: §10 contro §5.2, arrotondamento dei negativi, colonna `decisione` sulle righe dei bollettini (F3) | **Opus** | [x] |
 | 2d | Componenti e catalogo `/componenti` (solo superutente). Fatto: FilterBar con ricerca multipla e riepilogo, CampoRicerca/RicercaEntita, KpiRow, PeriodoMesi, Grafico, Flussi, memoria della schermata; `app_componenti.py` 54 OK. Da fare: parametri nuovi nella spec §16.4 | Sonnet | [x] |
 
+### In attesa di altri
+
+| Cosa manca | Da chi | Blocca |
+|---|---|---|
+| **Ponte vero verso Integra** (F0-A8): viste `crm_viste.v_clienti`/`v_fornitori` come in `strumenti/integra/viste-crm.sql`, utente `crm_lettura`, `PONTE_URL`. Oggi Integra (192.168.239.49:5432) rifiuta `172.26.191.9` in `pg_hba.conf`. Integra **solo in lettura**, mai scrivere | sistemista | sincronizzazione vera di F1-A4 (il codice è pronto e provato sul ponte finto) |
+| Domande in fondo a `viste-crm.sql`: codice azienda `001`, privati senza P.IVA, email o PEC, `cla_agecod`, postgres_fdw o funzione, `cli_cdclistr` unico e fisso | sistemista, Matteo | viste definitive |
+
 ### Attività F1–F7, con modello e lavoro in parallelo
 
 Un blocco si fa per **gruppi in ordine** (1, 2, 3…): le attività dello **stesso gruppo vanno
