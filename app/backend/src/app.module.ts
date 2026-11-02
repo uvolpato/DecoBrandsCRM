@@ -5,7 +5,7 @@ import { AccessoController, AccessoGuard, Pubblica } from './accesso';
 import { ErroriFilter } from './errori.filter';
 import { PrismaModule, PrismaService } from './prisma.service';
 import { UtentiController } from './utenti';
-import { FornitoriController } from './fornitori';
+import { EccezioniController, FornitoriController } from './fornitori';
 import { AgentiController, SubagentiController } from './subagenti';
 import { ClientiController } from './clienti';
 import { IntegraController, IntegraService } from './integra';
@@ -37,7 +37,7 @@ export function limiti(env = process.env) {
 
 @Module({
   imports: [PrismaModule, ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
-  controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, AgentiController, SubagentiController, ClientiController, IntegraController],
+  controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, IntegraController],
   providers: [
     IntegraService,
     { provide: APP_FILTER, useClass: ErroriFilter }, // con Prisma iniettato: scrive nel registro
