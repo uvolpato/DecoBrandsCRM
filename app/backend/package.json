@@ -16,6 +16,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "ponte:prova": "ts-node prisma/ponte-prova.ts",
     "superutente": "node dist/src/superutente.js"
   },
   "dependencies": {

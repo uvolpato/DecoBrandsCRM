@@ -14,5 +14,11 @@ export async function svuota(db: PrismaService) {
   } finally {
     await db.$executeRawUnsafe(`ALTER TABLE clienti_versioni ENABLE TRIGGER USER; ALTER TABLE fornitori_versioni ENABLE TRIGGER USER; ALTER TABLE registro ENABLE TRIGGER USER`);
   }
+  // utenti di prova rimasti da altre prove (es. superutente): si tolgono tutti, senza toccare i dati veri
+  const prova = (await db.utenti.findMany({ where: { email: { contains: '@prova-' } }, select: { id: true } })).map((u) => u.id);
+  if (prova.length) {
+    await db.sessioni.deleteMany({ where: { utente_id: { in: prova } } });
+    await db.utenti.deleteMany({ where: { id: { in: prova } } });
+  }
   await db.utenti.deleteMany({ where: { username: { in: USERNAME } } });
 }

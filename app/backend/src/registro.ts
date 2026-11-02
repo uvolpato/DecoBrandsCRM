@@ -1,10 +1,10 @@
 import { Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 // Registro unico (§4.2.11, §15, D-31). Un solo helper per gli eventi: lo chiama il server,
 // mai il client. Dentro un'operazione si passa `tx`, così l'evento sparisce con il rollback (V13).
 
-type Db = Prisma.TransactionClient;
+type Db = Prisma.TransactionClient | PrismaClient;
 
 /** Chi ha fatto l'operazione: dalla sessione e dalla richiesta, mai dal corpo (§15.3). */
 export interface Contesto {
@@ -40,7 +40,23 @@ export const SCHEMI: Record<string, string[]> = {
   'crud.delete': [],
   'stato.change_state': ['prima', 'dopo'],
   'errore.error': ['rotta', 'metodo', 'http_status', 'errore'],
+  // sincronizzazione da Integra (§7.14.3): anomalie, non eventi
+  'integra.connessione': ['errore'],
+  'integra.vista': ['vista', 'errore'],
+  'integra.piva_mancante': ['codice', 'piva'],
+  'integra.piva_doppia': ['piva'],
+  'integra.lenta': ['secondi'],
 };
+
+/** Anomalia del registro (§4.2.11, D-31): una per chiave finché resta aperta; si ripete e si chiude. */
+export interface Anomalia {
+  servizio: string;
+  codice: string;
+  chiave?: string;
+  messaggio: string;
+  livello?: 'errore' | 'attenzione';
+  dettaglio?: Record<string, unknown>;
+}
 
 const log = new Logger('Registro');
 
@@ -87,4 +103,34 @@ export async function logEventSicuro(db: Db, e: Evento, ctx: Contesto = {}) {
     if (process.env.NODE_ENV === 'test') throw err; // nelle prove un evento sbagliato si vede
     log.error(`evento ${e.tipo}.${e.azione} non scritto`, err instanceof Error ? err.stack : String(err));
   }
+}
+
+/** Apre (o ripete) un'anomalia. Resta una sola riga aperta per servizio/codice/chiave. */
+export async function apriAnomalia(db: Db, a: Anomalia, ora = new Date()) {
+  const chiave = a.chiave ?? '';
+  const aperta = await db.registro.findFirst({
+    where: { genere: 'anomalia', servizio: a.servizio, codice: a.codice, chiave, stato: 'aperta' },
+  });
+  const dettaglio = (a.dettaglio ?? {}) as Prisma.InputJsonValue;
+  if (aperta) {
+    await db.registro.update({
+      where: { id: aperta.id },
+      data: { volte: { increment: 1 }, ultimo: ora, messaggio: a.messaggio, dettaglio },
+    });
+    return;
+  }
+  await db.registro.create({
+    data: {
+      genere: 'anomalia', livello: a.livello ?? 'errore', codice: a.codice, servizio: a.servizio,
+      chiave, messaggio: a.messaggio, dettaglio, stato: 'aperta', ultimo: ora,
+    },
+  });
+}
+
+/** Chiude l'anomalia aperta (se c'è) quando il problema sparisce. */
+export async function chiudiAnomalia(db: Db, servizio: string, codice: string, chiave = '', ora = new Date()) {
+  await db.registro.updateMany({
+    where: { genere: 'anomalia', servizio, codice, chiave, stato: 'aperta' },
+    data: { stato: 'chiusa', chiusa_il: ora, ultimo: ora },
+  });
 }

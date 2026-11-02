@@ -40,6 +40,17 @@ node ../../strumenti/prove/utenti_prova.js togli      # toglie utenti, eventi e 
 Il registro del backend serve ad `app_accesso.py` per leggere il link di *password dimenticata*
 (in sviluppo la posta va nel registro).
 
+**Ponte finto per la sincronizzazione da Integra** (F1-A4, spec §4.5): in `backend/`,
+`npm run ponte:prova` crea il database `decobrands_ponte_prova` con lo schema `crm_viste` e le
+tabelle `v_clienti` e `v_fornitori` riempite con i dati di prova. Poi in `backend/.env`:
+
+```
+PONTE_URL=postgresql://crm_lettura:PASSWORD@localhost:5432/decobrands_ponte_prova
+```
+
+Senza `PONTE_URL` la sincronizzazione non parte. Il ponte vero (F0-A8) si prepara con
+`strumenti/integra/viste-crm.sql`; il CRM legge solo le viste, mai Integra.
+
 `stile.css` e `public-sans.css` in `frontend/app/stile/` sono **copie** del prototipo
 (D-24): si cambiano nel prototipo e si ricopiano, mai qui.
 
