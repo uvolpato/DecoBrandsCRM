@@ -1,0 +1,117 @@
+# Prova della pagina Pratiche dell'app (F2-A1), con Playwright: segmenti di stato con i numeri dal
+# server, ricerca, filtro multiplo con riepilogo, ordinamento e paginazione sul server, ritorno dal
+# dettaglio nello stesso punto, 768 px, operatore in sola consultazione.
+# Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi, <s>-oper
+# (password-di-prova, da utenti_prova.js crea <s>). Nel database di prova c'è il seed con 54 pratiche.
+# Uso: python strumenti/prove/app_pratiche.py <suffisso> <cartella schermate> [base]
+import sys, pathlib, re, time
+from playwright.sync_api import sync_playwright
+
+S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
+BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8011'
+PW = 'password-di-prova'
+USCITA.mkdir(parents=True, exist_ok=True)
+esiti, errori = [], []
+def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
+def numero(testo):
+    return float(re.sub(r'[^\d,-]', '', testo).replace('.', '').replace(',', '.'))
+
+def apri(pg):
+    pg.wait_for_selector('.accesso-scena')
+    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    pg.wait_for_selector('.accesso-scena.aperta')
+
+with sync_playwright() as p:
+    b = p.chromium.launch(headless=True)
+    def entra(utente, larghezza=1440):
+        pg = b.new_page(viewport={'width': larghezza, 'height': 900 if larghezza > 800 else 1024})
+        pg.on('pageerror', lambda e: errori.append(str(e)))
+        pg.goto(BASE + '/pratiche'); pg.wait_for_function("location.pathname === '/accesso'")
+        apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
+        pg.wait_for_function("location.pathname.startsWith('/pratiche')"); pg.wait_for_load_state('networkidle')
+        pg.wait_for_selector('.dt tbody tr.cliccabile')
+        return pg
+    testo = lambda pg, s: pg.locator(s).first.inner_text()
+    righe = lambda pg: pg.locator('.dt tbody tr.cliccabile').count()
+    seg = lambda pg, t: pg.locator('.segmenti [role=tab]:has-text("%s")' % t)
+    nseg = lambda pg, t: int(seg(pg, t).locator('.n').inner_text())
+    sovr = lambda pg: pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth')
+    def cerca(pg, t): pg.fill('.filtri input[type=search]', t); pg.wait_for_timeout(700)
+    def vai(pg, voce):
+        pg.click('.barra a.voce:has-text("%s")' % voce); pg.wait_for_function("location.pathname.startsWith('/%s')" % voce.lower()); pg.wait_for_load_state('networkidle')
+    def totali_piede(pg):
+        m = re.search(r'di (\d+) element', testo(pg, '.dt-piede > span:first-child'))
+        return int(m.group(1)) if m else righe(pg)
+    def importi(pg):
+        return [numero(pg.locator('.dt tbody tr.cliccabile').nth(i).locator('td').nth(4).inner_text()) for i in range(righe(pg))]
+
+    pg = entra(S + '-ammi')
+    ok('Pratiche' in testo(pg, '.testa h1'), 'titolo della pagina')
+    ok(pg.locator('.segmenti [role=tab]').count() == 6, 'sei segmenti di stato')
+    n = nseg(pg, 'Tutte')
+    stati = sum(nseg(pg, t) for t in ('Conferma in ritardo', 'Attesa conferma', 'Attesa fattura', 'Fatturate'))
+    ok(n >= 40 and stati == n and nseg(pg, 'Con variazioni') <= n and totali_piede(pg) == n,
+       'numeri dal server: %d pratiche = somma degli stati, %d con variazioni' % (n, nseg(pg, 'Con variazioni')))
+    ok(righe(pg) == min(25, n) and 'di %d elementi' % n in testo(pg, '.dt-piede'), 'prima pagina: %d righe di %d' % (righe(pg), n))
+    pg.screenshot(path=str(USCITA / 'app-pratiche-1440.png'))
+
+    # ricerca libera (numero, cliente, fornitore, documenti)
+    numero0 = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
+    cerca(pg, numero0)
+    ok(1 <= righe(pg) <= n and numero0 in testo(pg, '.dt tbody'), 'ricerca «%s»: la pratica si trova' % numero0)
+    cerca(pg, 'zzzz-nessuno'); ok(righe(pg) == 0 and totali_piede(pg) == 0, 'ricerca senza risultati: elenco vuoto')
+    cerca(pg, '')
+
+    # filtro multiplo per fornitore (D-22), riepilogo dei filtri e conteggi che seguono (D-23)
+    fb = pg.locator('.filtri').first
+    campo = fb.locator('.ricerca.multipla .ricerca-testo').first
+    campo.click(); fb.locator('.ricerca-menu li[role=option]', has_text='Gries').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(800)
+    n_g = nseg(pg, 'Tutte')
+    ok(1 <= n_g < n and righe(pg) == min(25, n_g) and totali_piede(pg) == n_g and 'Gries' in (campo.get_attribute('placeholder') or ''),
+       'filtro Gries: %d pratiche, numeri dei segmenti aggiornati' % n_g)
+    pg.locator('.riepilogo-filtri .btn-icona').first.click(); pg.wait_for_timeout(200)
+    ok('Gries' in testo(pg, '.riepilogo-pop'), 'riepilogo dei filtri: mostra Gries')
+    pg.screenshot(path=str(USCITA / 'app-pratiche-filtro-1440.png'))
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
+    pg.locator('.riepilogo-filtri .btn-icona').nth(1).click(); pg.wait_for_timeout(800)
+    ok(totali_piede(pg) == n, 'tolti i filtri dal riepilogo: tornano %d pratiche' % n)
+
+    # ordinamento sul server: clic su Importo = crescente, secondo clic = decrescente
+    pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(800)
+    ok(pg.locator('.dt th.attivo:has-text("Importo")').count() == 1 and importi(pg) == sorted(importi(pg)), 'ordinamento per importo crescente')
+    pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(800)
+    ok(importi(pg) == sorted(importi(pg), reverse=True), 'secondo clic: importo decrescente')
+    prima_dec = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
+
+    # pagina successiva, sempre sull'ordinamento scelto
+    pg.click('.dt-pagine button[title="Pagina successiva"]'); pg.wait_for_timeout(800)
+    inizio = testo(pg, '.dt-piede > span:first-child')
+    ok(inizio.startswith('26–') and 'di %d elementi' % n in inizio and pg.locator('.dt tbody tr.cliccabile b').first.inner_text() != prima_dec,
+       'pagina successiva: «%s»' % inizio)
+    ok(pg.locator('.dt th.attivo:has-text("Importo")').get_attribute('aria-sort') == 'descending', 'la pagina successiva tiene l’ordinamento per importo')
+    pg.screenshot(path=str(USCITA / 'app-pratiche-pagina-1440.png'))
+
+    # ritorno dal dettaglio nello stesso punto: stessa pagina e stesso ordinamento
+    url = pg.url
+    pg.locator('.dt tbody tr.cliccabile').first.click(); pg.wait_for_function("/^\\/pratiche\\/\\d+/.test(location.pathname)"); pg.wait_for_timeout(500)
+    ok('Pratica' in testo(pg, '.testa h1') and 'Dettaglio in arrivo' in testo(pg, '.vuoto'), 'clic sulla riga: pagina della pratica (F2-A2)')
+    pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(900)
+    ok(pg.url == url and testo(pg, '.dt-piede > span:first-child').startswith('26–'), 'indietro: stessa pagina dell’elenco')
+    ok(pg.locator('.dt th.attivo:has-text("Importo")').get_attribute('aria-sort') == 'descending', 'indietro: stesso ordinamento')
+
+    # 768 px
+    pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(500)
+    ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
+    pg.screenshot(path=str(USCITA / 'app-pratiche-768.png'), full_page=True)
+    pg.close()
+
+    # operatore: legge l'elenco (provvigioni.consulta), nessun comando di modifica
+    pg = entra(S + '-oper'); pg.wait_for_timeout(600)
+    ok(righe(pg) >= 1 and nseg(pg, 'Tutte') == n, 'operatore: consulta l’elenco')
+    pg.close()
+    b.close()
+
+ok(not errori, 'nessun errore JavaScript')
+print('\n'.join(esiti))
+print('errori della pagina:', errori or 'nessuno')
+print(f"{len(esiti)} controlli, {sum(e.startswith('KO') for e in esiti)} KO")

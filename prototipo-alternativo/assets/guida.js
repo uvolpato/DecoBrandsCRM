@@ -114,7 +114,7 @@
         ['Controlla le righe se serve', 'Scheda Righe a confronto: il numero rosso nel titolo dice quante righe cambiano.']
       ],
       pulsanti: [
-        ['Segmenti di stato', 'Tutte · Conferma in ritardo · Attesa conferma · Attesa fattura · Fatturate · Con variazioni. Con questo filtro la pratica si apre direttamente sulle righe.'],
+        ['Segmenti di stato', 'Tutte · Conferma in ritardo · Attesa conferma · Attesa fattura · Fatturate · Con variazioni. Con questo filtro la pratica si apre direttamente sulle righe. Nella lista una variazione mostra anche lo scostamento in euro.'],
         ['Tutti i fornitori · clienti · subagenti', 'Filtri standard a selezione multipla; i numeri dei segmenti si ricalcolano subito. Imbuto per il riepilogo, imbuto barrato per toglierli tutti.'],
         ['Cerca', 'Per pratica, cliente o numero di documento.'],
         ['Clic sulla riga', 'Apre la scheda della pratica.'],

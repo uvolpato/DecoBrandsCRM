@@ -74,7 +74,7 @@ piccole correzioni, ovunque.
 | | F1-A4 + F1-A7 Sincronizzazione da Integra con le versioni (serve il ponte, F0-A8). Fatto con OpenCode e controllato: `src/integra.ts` sul ponte finto `decobrands_ponte_prova` (pool in sola lettura), un giro alla volta, anomalie (connessione, vista, riga, P.IVA mancante/doppia, lenta), chiave solo dal codice di Integra; proposta di viste per il sistemista in `strumenti/integra/viste-crm.sql`; prove 159. **Manca il ponte vero** (F0-A8, sistemista) | 2 | Sonnet | [x] |
 | | F1-A5 Percentuali datate ed eccezioni personali. Fatto: server con Opus (D-51: un cambio vale da una data dopo l'ultima chiusura; eccezioni con fornitore, sconto e periodo), pagine con OpenCode (scheda Percentuali del fornitore, Eccezioni personali del subagente); prove 191, nel browser 25/30/33 | 2 | **Opus** | [x] |
 | | F1-A6 Regole del subagente (D-27): dopo F4-A2, si fa nel blocco 6 | — | **Opus** | [ ] |
-| 4 · F2 Pratiche | F2-A1 Elenco pratiche | 1 | Sonnet | [ ] |
+| 4 · F2 Pratiche | F2-A1 Elenco pratiche (OpenCode + controllo Claude Code): `GET /api/pratiche` con stato, importi e variazioni dal motore, filtri multipli, conteggi dei segmenti senza il filtro di stato (D-23), ordinamento e pagine sul server; prove 198, `app_pratiche.py` 19 OK | 1 | Sonnet | [x] |
 | | F2-A3 Documenti fiscali, netto, canale di caricamento | 1 | **Opus** | [ ] |
 | | F2-A2 Dettaglio pratica (fasi, righe a confronto) | 2 | Sonnet | [ ] |
 | 5 · F3 Bollettini | F3-A1 Matrice e caricamento | 1 | Sonnet | [ ] |

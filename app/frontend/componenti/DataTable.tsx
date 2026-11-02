@@ -40,6 +40,13 @@ export interface DataTableProps<R> {
   piede?: ReactNode;
   etichettaTotale?: string;
   memoria?: string;
+  // ordinamento e pagine decisi dal server (elenchi grandi): con onOrdine, `ordine` è quello del
+  // server e le intestazioni chiedono il nuovo ordine invece di ordinare la pagina mostrata; con
+  // paginaServer il piede usa totale e pagine del server.
+  ordine?: { key: string; dir: 'asc' | 'desc' } | null;
+  onOrdine?: (o: { key: string; dir: 'asc' | 'desc' }) => void;
+  paginaServer?: { pagina: number; pagine: number; totale: number };
+  onPagina?: (p: number) => void;
 }
 
 const FORMATI: Record<TipoColonna, (v: unknown) => string> = {
@@ -47,7 +54,7 @@ const FORMATI: Record<TipoColonna, (v: unknown) => string> = {
 };
 const ordinale = (v: unknown) => (typeof v === 'number' ? v : String(v ?? '').toLowerCase());
 
-export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp = 25, filtro, naturale, piede, etichettaTotale, memoria }: DataTableProps<R>) {
+export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp = 25, filtro, naturale, piede, etichettaTotale, memoria, ordine, onOrdine, paginaServer, onPagina }: DataTableProps<R>) {
   const perPagina = naturale || pp === false ? Number.MAX_SAFE_INTEGER : pp;
   const [ord, setOrd] = useMemoria(memoria && memoria + '|ord', ordinamentoIniziale ?? null);
   const [pag, setPag] = useMemoria(memoria && memoria + '|pagina', 0);
@@ -62,18 +69,19 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
     const v = c.sortValue ? c.sortValue(r) : val(c, r);
     return ordinale(tipo(c) === 'testo' || c.sortValue || v == null || Number.isNaN(Number(v)) ? v : Number(v));
   };
+  const o = onOrdine ? (ordine ?? null) : ord;
   let tutte = righe;
-  if (ord) {
-    const c = colonne.find((x) => x.key === ord.key);
+  if (!onOrdine && o) {
+    const c = colonne.find((x) => x.key === o.key);
     if (c) tutte = [...righe].sort((a, b) => {
       const x = chiaveOrd(c, a), y = chiaveOrd(c, b);
       const s = x < y ? -1 : x > y ? 1 : 0;
-      return ord.dir === 'desc' ? -s : s;
+      return o.dir === 'desc' ? -s : s;
     });
   }
-  const pagine = Math.max(1, Math.ceil(tutte.length / perPagina));
-  const p = Math.min(pag, pagine - 1);
-  const lista = tutte.slice(p * perPagina, (p + 1) * perPagina);
+  const pagine = paginaServer?.pagine ?? Math.max(1, Math.ceil(tutte.length / perPagina));
+  const p = paginaServer?.pagina ?? Math.min(pag, pagine - 1);
+  const lista = paginaServer ? righe : tutte.slice(p * perPagina, (p + 1) * perPagina);
   const al = (c: Colonna<R>) => (c.align === 'right' || (!c.align && ['euro', 'numero', 'pct'].includes(tipo(c))) ? 'dx' : c.align === 'center' ? 'cx' : '');
   const primoTotale = colonne.findIndex((c) => c.totale);
 
@@ -83,13 +91,17 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
         <thead>
           <tr>
             {colonne.map((c) => {
-              const ordinabile = c.sortable !== false, attivo = ord?.key === c.key;
+              const ordinabile = c.sortable !== false, attivo = o?.key === c.key;
               return (
                 <th key={c.key} className={[al(c), ordinabile ? 'ordinabile' : '', attivo ? 'attivo' : ''].join(' ')}
-                  aria-sort={ordinabile ? (attivo ? (ord!.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
-                  onClick={ordinabile ? () => { setOrd({ key: c.key, dir: attivo && ord!.dir === 'asc' ? 'desc' : 'asc' }); setPag(0); } : undefined}>
+                  aria-sort={ordinabile ? (attivo ? (o!.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+                  onClick={ordinabile ? () => {
+                    const nuovo = { key: c.key, dir: attivo && o!.dir === 'asc' ? 'desc' as const : 'asc' as const };
+                    if (onOrdine) onOrdine(nuovo);
+                    else { setOrd(nuovo); setPag(0); }
+                  } : undefined}>
                   {c.header}
-                  {ordinabile && <span className="freccia" aria-hidden="true">{attivo ? (ord!.dir === 'asc' ? '▲' : '▼') : '▲▼'}</span>}
+                  {ordinabile && <span className="freccia" aria-hidden="true">{attivo ? (o!.dir === 'asc' ? '▲' : '▼') : '▲▼'}</span>}
                 </th>
               );
             })}
@@ -114,8 +126,8 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
       </table>
     </div>
     <div className="dt-piede">
-      <span>{pagine > 1 ? `${p * perPagina + 1}–${p * perPagina + lista.length} di ` : ''}{tutte.length}{tutte.length === 1 ? ' elemento' : ' elementi'}</span>
-      {pagine > 1 && <NavPagine n={pagine} pag={p} vai={setPag} />}
+      <span>{pagine > 1 ? `${p * perPagina + 1}–${p * perPagina + lista.length} di ` : ''}{paginaServer?.totale ?? tutte.length}{(paginaServer?.totale ?? tutte.length) === 1 ? ' elemento' : ' elementi'}</span>
+      {pagine > 1 && <NavPagine n={pagine} pag={p} vai={onPagina ?? setPag} />}
       {piede && <span>{piede}</span>}
     </div>
   </div>;

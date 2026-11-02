@@ -66,6 +66,23 @@ export const fornitore: Entita<any> = {
   ] as any,
 };
 
+export const cliente: Entita<any> = {
+  titolo: 'Cliente',
+  voci: async () => {
+    const r = await api<any[]>('clienti');
+    if (!r.ok) return [];
+    return r.dati.map((c: any) => ({ id: c.id, nome: c.ragione_sociale ?? c.id, piva: c.piva }));
+  },
+  chiave: (r: any) => r.id,
+  testo: (r: any) => r.nome ?? '',
+  dettaglio: (r: any) => (r.piva ? 'P.IVA ' + r.piva : ''),
+  cerca: (r: any) => (r.nome ?? '') + ' ' + (r.piva ?? ''),
+  colonne: [
+    { key: 'nome', header: 'Cliente', grow: true },
+    { key: 'piva', header: 'P.IVA' },
+  ] as any,
+};
+
 export const subagente: Entita<any> = {
   titolo: 'Subagente',
   voci: async () => {
