@@ -45,7 +45,10 @@ export async function caricaDati(db: Db, oggi = giornoRoma(new Date())) {
     scaglioni: scaglioni.map((s) => ({
       id: id(s.id), fornitore_id: id(s.fornitore_id), sconto: s.sconto_min, pct_agente: s.pct_agente, pct_sub: s.pct_subagente, valido_dal: giorno(s.valido_dal),
     })),
-    eccezioni: eccezioni.map((e) => ({ scaglione_id: id(e.scaglione_id), subagente_id: id(e.subagente_id), pct: e.pct_personale })),
+    eccezioni: eccezioni.map((e) => ({ // D-51 §19: per fornitore × sconto, con periodo (valido_al escluso)
+      fornitore_id: id(e.fornitore_id), subagente_id: id(e.subagente_id), sconto: e.sconto_min, pct: e.pct_personale,
+      valido_dal: giorno(e.valido_dal), valido_al: e.valido_al ? giorno(e.valido_al) : null,
+    })),
     interscambio: interscambio.map((a) => ({
       id: id(a.id), subagente_id: id(a.subagente_id), cliente_id: id(a.cliente_id), fornitore_id: id(a.fornitore_id),
       codice: a.codice_cliente_fornitore, sconto: a.sconto, pct_subagente: a.pct_subagente, regola_mensile: a.regola_mensile,
@@ -84,6 +87,18 @@ export async function caricaDati(db: Db, oggi = giornoRoma(new Date())) {
     })),
     liquidazioni_chiuse: liquidazioni.map((l) => ({ id: id(l.id), anno: l.anno, trimestre: l.trimestre, chiusa_il: giornoRoma(l.chiusa_il) })),
   };
+}
+
+/** Ultima chiusura del fornitore (D-51 §19), 'aaaa-mm-gg' o null: la più recente fra la fine del mese
+ *  dell'ultimo bollettino chiuso (verificato o contestato) del fornitore e la fine dell'ultimo trimestre liquidato (le
+ *  liquidazioni valgono per tutti i fornitori). Fino a questa data i soldi sono chiusi e non cambiano. */
+export async function ultimaChiusura(db: Db, fornitore_id: bigint): Promise<string | null> {
+  const [r] = await db.$queryRaw<{ d: string | null }[]>`
+    SELECT to_char(greatest(
+      (SELECT max(make_date(anno, mese, 1)) FROM bollettini_testata WHERE fornitore_id = ${fornitore_id} AND chiuso_il IS NOT NULL),
+      (SELECT max(make_date(anno, trimestre * 3, 1)) FROM liquidazioni)
+    ) + interval '1 month' - interval '1 day', 'YYYY-MM-DD') AS d`;
+  return r.d;
 }
 
 export type Dati = Awaited<ReturnType<typeof caricaDati>>;

@@ -85,7 +85,9 @@ export function percentuali(S: Dati, p: Pratica, data = p.data) {
   if (!ab) return null;
   const sc = scaglione(S, p.fornitore_id, ab.sconto, data);
   if (!sc) return null;
-  const ecc = S.eccezioni.find((e) => e.scaglione_id === sc.id && e.subagente_id === ab.subagente_id);
+  // eccezione del subagente sulla soglia dello scaglione, valida alla data del documento (D-51 §19)
+  const ecc = S.eccezioni.find((e) => e.fornitore_id === p.fornitore_id && e.subagente_id === ab.subagente_id && e.sconto.equals(sc.sconto)
+    && e.valido_dal <= data && (!e.valido_al || data < e.valido_al)); // valido_al escluso, come interscambio
   return {
     ab, sconto: ab.sconto, scaglione: sc, subagente_id: ab.subagente_id,
     agente: sc.pct_agente, sub_standard: sc.pct_sub, sub: ecc ? ecc.pct : sc.pct_sub, eccezione: !!ecc,

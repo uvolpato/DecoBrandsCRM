@@ -73,7 +73,10 @@ export async function base(tx: Tx) {
     ids.subagenti[s.id] = (await tx.subagenti.create({ data: { agente_id: agente.id, codice: 'SUB' + String(s.id).padStart(2, '0'), nome, cognome, email: s.email, attivo: s.attivo } })).id;
   }
   for (const e of D.eccezioni) {
-    await tx.provvigioni_eccezioni.create({ data: { scaglione_id: ids.scaglioni[e.scaglione_id], subagente_id: ids.subagenti[e.subagente_id], pct_personale: e.pct_sub } });
+    // il prototipo lega l'eccezione allo scaglione: fornitore, sconto e data vengono da lì (D-51)
+    const sc = D.scaglioni.find((x: any) => x.id === e.scaglione_id);
+    await tx.provvigioni_eccezioni.create({ data: {
+      fornitore_id: ids.fornitori[sc.fornitore_id], subagente_id: ids.subagenti[e.subagente_id], sconto_min: sc.sconto, pct_personale: e.pct_sub, valido_dal: data(sc.valido_dal) } });
   }
   for (const a of D.abbinamenti) {
     // il prototipo non ha date: il subagente segue il cliente dall'inizio dei dati (D-35)
@@ -183,11 +186,11 @@ export async function base(tx: Tx) {
   }
   // Eventi: solo codici già nel catalogo di src/registro.ts; verifica, esportazione e caricamento non ci sono ancora
   const ctx = { utente_id: ugo, ip: '127.0.0.1' };
-  const gries = ids.fornitori[1], scaglione = ids.scaglioni[2];
+  const gries = ids.fornitori[1];
   await logEvent(tx, { tipo: 'auth', azione: 'login', entita: 'utente', entita_id: ugo, esito: 'successo', dettaglio: { etichetta: 'ugo', modo: 'password' } }, ctx);
   await logEvent(tx, { tipo: 'crud', azione: 'create', entita: 'fornitore', entita_id: gries, esito: 'successo', dettaglio: { etichetta: 'Gries GmbH & Co. KG', tipo_provvigione: 'maturato' } }, ctx);
-  await logEvent(tx, { tipo: 'crud', azione: 'create', entita: 'scaglione', entita_id: scaglione, esito: 'successo', dettaglio: { etichetta: 'Gries · dal 01/01/2025', sconto_min: 1 } }, ctx);
-  await logEvent(tx, { tipo: 'crud', azione: 'update', entita: 'scaglione', entita_id: scaglione, esito: 'successo', dettaglio: { etichetta: 'Gries · dal 01/01/2025', prima: { pct_subagente: 0 }, dopo: { pct_subagente: 3 } } }, ctx);
+  await logEvent(tx, { tipo: 'crud', azione: 'create', entita: 'scaglione', entita_id: gries, esito: 'successo', dettaglio: { etichetta: 'Gries · dal 01/01/2025', sconto_min: 1 } }, ctx);
+  await logEvent(tx, { tipo: 'crud', azione: 'update', entita: 'scaglione', entita_id: gries, esito: 'successo', dettaglio: { etichetta: 'Gries · dal 01/01/2025', prima: { pct_subagente: 0 }, dopo: { pct_subagente: 3 } } }, ctx);
   await logEvent(tx, { tipo: 'stato', azione: 'change_state', entita: 'pratica', esito: 'successo', dettaglio: { etichetta: 'OF/2026/045', prima: { stato: 'inviato' }, dopo: { stato: 'confermato' } } }, ctx);
   await logEvent(tx, { tipo: 'errore', azione: 'error', entita: 'sistema', esito: 'errore', dettaglio: { etichetta: 'POST /api/documenti', rotta: '/api/documenti', metodo: 'POST', http_status: 500, errore: { classe: 'Error', messaggio: 'lettura non riuscita (esempio)' } } }, ctx);
 }

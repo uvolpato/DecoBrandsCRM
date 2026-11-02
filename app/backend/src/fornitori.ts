@@ -8,7 +8,9 @@ import {
 } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
-import { giornoRoma } from './motore/dati';
+import { unico } from './clienti';
+import { giornoRoma, ultimaChiusura } from './motore/dati';
+import { piuGiorni } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -36,9 +38,14 @@ class ScaglioneNuovo {
   @Pct() pct_subagente!: number;
 }
 
-class NuovePercentuali {
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data nel formato aaaa-mm-gg' }) @IsISO8601({ strict: true }) valido_dal!: string;
+// Data 'aaaa-mm-gg' valida (2026-02-30 no)
+const Data = () => applyDecorators(Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data nel formato aaaa-mm-gg' }), IsISO8601({ strict: true }));
+
+class ScaglioniVersione {
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => ScaglioneNuovo) scaglioni!: ScaglioneNuovo[];
+}
+class NuovePercentuali extends ScaglioniVersione {
+  @Data() valido_dal!: string;
 }
 
 class NuovaEccezione {
@@ -46,32 +53,45 @@ class NuovaEccezione {
   @IsInt() fornitore_id!: number;
   @Pct() sconto_min!: number;
   @Pct() pct_personale!: number;
+  @Data() valido_dal!: string;
 }
-
 class ModificaEccezione {
   @Pct() pct_personale!: number;
+  @Facoltativo() @Data() valido_dal?: string;
+}
+class CambiaEccezione {
+  @Pct() pct_personale!: number;
+  @Data() dal!: string;
+}
+class TerminaEccezione {
+  @Data() al!: string;
+}
+class FiltroEccezioni {
+  @IsOptional() @Type(() => Number) @IsInt() subagente_id?: number;
+  @IsOptional() @Type(() => Number) @IsInt() fornitore_id?: number;
 }
 
 type Db = Prisma.TransactionClient | PrismaService;
 const iso = (d: Date) => d.toISOString().slice(0, 10); // colonne DATE: mezzanotte UTC
 const nomeSub = (s: { nome: string; cognome: string }) => `${s.cognome} ${s.nome}`;
 
-/** Versioni delle percentuali del fornitore, dalla più recente; in vigore = la più recente con valido_dal ≤ oggi (D-25). */
+/** Versioni delle percentuali del fornitore, dalla più recente; in vigore = la più recente con valido_dal ≤ oggi (D-25).
+ *  Per ogni scaglione le eccezioni personali che valgono in qualche giorno della versione (D-51). */
 async function percentualiFornitore(db: Db, fid: bigint) {
   const oggi = giornoRoma(new Date());
-  const [sc, agenzie] = await Promise.all([
-    db.provvigioni_scaglioni.findMany({
-      where: { fornitore_id: fid },
-      orderBy: [{ valido_dal: 'desc' }, { sconto_min: 'asc' }],
-      include: { eccezioni: { include: { subagente: { select: { nome: true, cognome: true } } }, orderBy: { id: 'asc' } } },
-    }),
+  const [sc, agenzie, ecc] = await Promise.all([
+    db.provvigioni_scaglioni.findMany({ where: { fornitore_id: fid }, orderBy: [{ valido_dal: 'desc' }, { sconto_min: 'asc' }] }),
     db.interscambio.findMany({ where: { fornitore_id: fid }, select: { sconto: true } }),
+    db.provvigioni_eccezioni.findMany({
+      where: { fornitore_id: fid }, include: { subagente: { select: { nome: true, cognome: true } } }, orderBy: [{ valido_dal: 'asc' }, { id: 'asc' }],
+    }),
   ]);
   const date = [...new Set(sc.map((s) => iso(s.valido_dal)))];
   const in_vigore = date.find((d) => d <= oggi) ?? null;
   return {
     in_vigore,
-    versioni: date.map((d) => {
+    versioni: date.map((d, i) => {
+      const fino = date[i - 1]; // la versione dopo (date in ordine decrescente)
       const righe = sc.filter((s) => iso(s.valido_dal) === d);
       // agenzia sullo scaglione con la soglia più alta ≤ suo sconto, come il motore (§5.1)
       const sogliaDi = (sconto: Prisma.Decimal) => righe.filter((r) => r.sconto_min.lte(sconto)).pop();
@@ -82,12 +102,85 @@ async function percentualiFornitore(db: Db, fid: bigint) {
           ...mappaScaglione(s),
           dal_fornitore: Number(s.pct_agente.plus(s.pct_subagente)),
           clienti: agenzie.filter((a) => sogliaDi(a.sconto) === s).length,
-          eccezioni: s.eccezioni.map((e) => ({ id: String(e.id), subagente_id: String(e.subagente_id), subagente: nomeSub(e.subagente), pct_personale: Number(e.pct_personale) })),
+          eccezioni: ecc
+            .filter((e) => e.sconto_min.equals(s.sconto_min) && (!fino || iso(e.valido_dal) < fino) && (!e.valido_al || iso(e.valido_al) > d))
+            .map((e) => ({
+              id: String(e.id), subagente_id: String(e.subagente_id), subagente: nomeSub(e.subagente), pct_personale: Number(e.pct_personale),
+              valido_dal: iso(e.valido_dal), valido_al: e.valido_al ? iso(e.valido_al) : null,
+            })),
         })),
       };
     }),
   };
 }
+
+/** Giorno 'aaaa-mm-gg' dalla rotta, 400 se non è una data vera. */
+function giornoDa(d: string) {
+  const t = Date.parse(d);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || isNaN(t) || iso(new Date(t)) !== d) throw new BadRequestException('Data nel formato aaaa-mm-gg');
+  return new Date(t);
+}
+
+/** D-51 §19: un cambio vale da una data in poi e la data non cade in un periodo chiuso; 409 altrimenti. */
+async function dopoChiusura(tx: Db, fid: bigint, data: string, testo: (chiusura: string) => string) {
+  const c = await ultimaChiusura(tx, fid);
+  if (c && data <= c) throw new ConflictException(testo(c));
+}
+const usate = (d: string) => (c: string) =>
+  `Le percentuali dal ${d} sono già usate in un periodo chiuso (fino al ${c}): crea una versione nuova da una data successiva`;
+
+/** Fornitore bloccato per la transazione (V13): una scrittura di percentuali o eccezioni alla volta. */
+async function fornitoreBloccato(tx: Db, id: number | bigint) {
+  await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${BigInt(id)} FOR UPDATE`;
+  const f = await tx.fornitori.findUnique({ where: { id: BigInt(id) }, include: { corrente: { select: { ragione_sociale: true, piva: true, paese: true } } } });
+  if (!f) throw new NotFoundException('Fornitore non trovato');
+  return f;
+}
+
+/** Soglie della versione che precede e di quella che segue la data (null se non c'è). */
+async function versioniVicine(tx: Db, fid: bigint, dal: Date) {
+  const soglie = async (v: { valido_dal: Date } | null) => v && {
+    data: iso(v.valido_dal),
+    soglie: (await tx.provvigioni_scaglioni.findMany({ where: { fornitore_id: fid, valido_dal: v.valido_dal } })).map((x) => Number(x.sconto_min)),
+  };
+  const [prima, dopo] = await Promise.all([
+    tx.provvigioni_scaglioni.findFirst({ where: { fornitore_id: fid, valido_dal: { lt: dal } }, orderBy: { valido_dal: 'desc' } }),
+    tx.provvigioni_scaglioni.findFirst({ where: { fornitore_id: fid, valido_dal: { gt: dal } }, orderBy: { valido_dal: 'asc' } }),
+  ]);
+  return { prima: await soglie(prima), dopo: await soglie(dopo) };
+}
+
+/** Ogni versione ha tutte le soglie di quella che la precede, anche quando se ne infila una fra due: il motore
+ *  sceglie la versione per soglia e una soglia omessa resterebbe in vigore con la versione vecchia (D-25, D-51). */
+async function controllaSoglie(tx: Db, fid: bigint, dal: Date, scaglioni: ScaglioneNuovo[]) {
+  const soglie = scaglioni.map((s) => s.sconto_min);
+  if (new Set(soglie).size !== soglie.length) throw new BadRequestException('Uno sconto è ripetuto');
+  const { prima, dopo } = await versioniVicine(tx, fid, dal);
+  const manca = prima?.soglie.find((x) => !soglie.includes(x));
+  if (manca !== undefined) throw new BadRequestException(`Manca lo sconto ${manca} %: la versione comprende tutti gli scaglioni di quella dal ${prima!.data}`);
+  const nuova = dopo && soglie.find((x) => !dopo.soglie.includes(x));
+  if (nuova != null) {
+    throw new BadRequestException(`La versione dal ${dopo!.data} non ha lo sconto ${nuova} %: aggiungilo prima a quella versione o toglilo da questa`);
+  }
+}
+
+/** Un'eccezione valida fra `dal` e la versione dopo deve trovare la sua soglia fra quelle che restano (D-51). */
+async function controllaOrfane(tx: Db, fid: bigint, dal: Date, restano: number[], fino: string | undefined) {
+  const orfana = await tx.provvigioni_eccezioni.findFirst({
+    where: {
+      fornitore_id: fid, sconto_min: { notIn: restano },
+      ...(fino ? { valido_dal: { lt: new Date(fino) } } : {}),
+      OR: [{ valido_al: null }, { valido_al: { gt: dal } }],
+    },
+  });
+  if (orfana) {
+    throw new ConflictException(`Ci sono eccezioni personali sullo sconto ${Number(orfana.sconto_min)} % in questo periodo: terminale o lascia lo sconto nella versione`);
+  }
+}
+const righeScaglioni = (fid: bigint, dal: Date, scaglioni: ScaglioneNuovo[]) =>
+  scaglioni.map((s) => ({ fornitore_id: fid, valido_dal: dal, sconto_min: s.sconto_min, pct_agente: s.pct_agente, pct_subagente: s.pct_subagente }));
+const perEvento = (scaglioni: { sconto_min: number | Prisma.Decimal; pct_agente: number | Prisma.Decimal; pct_subagente: number | Prisma.Decimal }[]) =>
+  scaglioni.map((s) => ({ sconto_min: Number(s.sconto_min), pct_agente: Number(s.pct_agente), pct_subagente: Number(s.pct_subagente) }));
 
 const CAMPI_REGOLE =['giorni_attesa_conferma', 'giorno_bollettino', 'tipo_provvigione', 'giorni_incasso', 'note'] as const;
 
@@ -181,9 +274,7 @@ export class FornitoriController {
   @Richiede('dati.condizioni')
   async modifica(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: ModificaFornitore) {
     return this.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
-      const prima = await tx.fornitori.findUnique({ where: { id: BigInt(id) }, include: { corrente: { select: { ragione_sociale: true, piva: true, paese: true } } } });
-      if (!prima) throw new NotFoundException('Fornitore non trovato');
+      const prima = await fornitoreBloccato(tx, id); // V13
       const aggiornamenti: Record<string, unknown> = {};
       for (const c of CAMPI_REGOLE) {
         const v = (b as Record<string, unknown>)[c];
@@ -218,143 +309,251 @@ export class FornitoriController {
     return percentualiFornitore(this.db, BigInt(id));
   }
 
-  /** Nuove percentuali da una data (§4.2.2, §5.11, D-25): una versione nuova di tutti gli scaglioni;
-   *  le versioni precedenti non si toccano e le eccezioni personali passano alla nuova (D-26). */
+  /** Nuove percentuali da una data (§4.2.2, §5.11, D-25, D-51): una versione di tutti gli scaglioni, anche
+   *  fra due esistenti, purché dopo l'ultima chiusura. Le eccezioni personali non si copiano (D-51). */
   @Post(':id/percentuali')
   @Richiede('dati.condizioni')
   async nuovePercentuali(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: NuovePercentuali) {
-    const soglie = b.scaglioni.map((s) => s.sconto_min);
-    if (new Set(soglie).size !== soglie.length) throw new BadRequestException('Uno sconto è ripetuto');
     return this.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${BigInt(id)} FOR UPDATE`; // V13: una versione alla volta
-      const f = await tx.fornitori.findUnique({ where: { id: BigInt(id) }, include: { corrente: { select: { ragione_sociale: true } } } });
-      if (!f) throw new NotFoundException('Fornitore non trovato');
+      const f = await fornitoreBloccato(tx, id);
+      await dopoChiusura(tx, f.id, b.valido_dal, (c) => `Il periodo fino al ${c} è chiuso: le nuove percentuali devono valere da una data successiva`);
       const dal = new Date(b.valido_dal);
-      const ultima = await tx.provvigioni_scaglioni.findFirst({ where: { fornitore_id: f.id }, orderBy: { valido_dal: 'desc' } });
-      // le versioni non si sovrascrivono e non si infilano fra due esistenti: la data viene dopo l'ultima
-      if (ultima && dal <= ultima.valido_dal) {
-        throw new BadRequestException(`Ci sono già percentuali dal ${iso(ultima.valido_dal)}: la nuova data deve essere successiva`);
+      if (await tx.provvigioni_scaglioni.findFirst({ where: { fornitore_id: f.id, valido_dal: dal } })) {
+        throw new BadRequestException(`Ci sono già percentuali dal ${b.valido_dal}: usa la correzione`);
       }
-      const vecchi = ultima
-        ? await tx.provvigioni_scaglioni.findMany({ where: { fornitore_id: f.id, valido_dal: ultima.valido_dal }, include: { eccezioni: true } })
-        : [];
-      // il motore sceglie la versione per soglia: una soglia omessa resterebbe in vigore con la versione vecchia
-      const manca = vecchi.find((v) => !soglie.includes(Number(v.sconto_min)));
-      if (manca) throw new BadRequestException(`Manca lo sconto ${Number(manca.sconto_min)} %: la nuova versione comprende tutti gli scaglioni`);
-      let eccezioni_copiate = 0;
-      for (const s of b.scaglioni) {
-        const nuovo = await tx.provvigioni_scaglioni.create({
-          data: { fornitore_id: f.id, valido_dal: dal, sconto_min: s.sconto_min, pct_agente: s.pct_agente, pct_subagente: s.pct_subagente },
-        });
-        const ecc = vecchi.find((v) => Number(v.sconto_min) === s.sconto_min)?.eccezioni ?? [];
-        if (ecc.length) {
-          await tx.provvigioni_eccezioni.createMany({
-            data: ecc.map((e) => ({ scaglione_id: nuovo.id, subagente_id: e.subagente_id, pct_personale: e.pct_personale })),
-          });
-          eccezioni_copiate += ecc.length;
-        }
-      }
+      await controllaSoglie(tx, f.id, dal, b.scaglioni);
+      await tx.provvigioni_scaglioni.createMany({ data: righeScaglioni(f.id, dal, b.scaglioni) });
       await logEvent(tx, {
         tipo: 'crud', azione: 'create', entita: 'scaglione', entita_id: f.id, esito: 'successo', // un evento per versione (§15.2.2)
+        dettaglio: { etichetta: `${f.corrente?.ragione_sociale ?? ''} · dal ${b.valido_dal}`, fornitore_id: String(f.id), valido_dal: b.valido_dal, scaglioni: perEvento(b.scaglioni) },
+      }, contesto(req));
+      return percentualiFornitore(tx, f.id);
+    });
+  }
+
+  /** Correzione di una versione (D-51): solo se vale dopo l'ultima chiusura; sostituisce le sue righe. */
+  @Put(':id/percentuali/:valido_dal')
+  @Richiede('dati.condizioni')
+  async correggiPercentuali(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Param('valido_dal') d: string, @Body() b: ScaglioniVersione) {
+    const dal = giornoDa(d);
+    return this.db.$transaction(async (tx) => {
+      const f = await fornitoreBloccato(tx, id);
+      const prima = await tx.provvigioni_scaglioni.findMany({ where: { fornitore_id: f.id, valido_dal: dal }, orderBy: { sconto_min: 'asc' } });
+      if (!prima.length) throw new NotFoundException('Versione non trovata');
+      await dopoChiusura(tx, f.id, d, usate(d));
+      await controllaSoglie(tx, f.id, dal, b.scaglioni);
+      await controllaOrfane(tx, f.id, dal, b.scaglioni.map((s) => s.sconto_min), (await versioniVicine(tx, f.id, dal)).dopo?.data);
+      await tx.provvigioni_scaglioni.deleteMany({ where: { fornitore_id: f.id, valido_dal: dal } });
+      await tx.provvigioni_scaglioni.createMany({ data: righeScaglioni(f.id, dal, b.scaglioni) });
+      await logEvent(tx, {
+        tipo: 'crud', azione: 'update', entita: 'scaglione', entita_id: f.id, esito: 'successo',
         dettaglio: {
-          etichetta: `${f.corrente?.ragione_sociale ?? ''} · dal ${b.valido_dal}`,
-          fornitore_id: String(f.id), valido_dal: b.valido_dal,
-          scaglioni: b.scaglioni.map((s) => ({ sconto_min: s.sconto_min, pct_agente: s.pct_agente, pct_subagente: s.pct_subagente })),
-          eccezioni_copiate,
+          etichetta: `${f.corrente?.ragione_sociale ?? ''} · dal ${d}`, fornitore_id: String(f.id), valido_dal: d,
+          prima: { scaglioni: perEvento(prima) }, dopo: { scaglioni: perEvento(b.scaglioni) },
         },
       }, contesto(req));
       return percentualiFornitore(tx, f.id);
     });
   }
+
+  /** Eliminazione di una versione (D-51): solo dopo l'ultima chiusura e se non è l'unica. */
+  @Delete(':id/percentuali/:valido_dal')
+  @HttpCode(204)
+  @Richiede('dati.condizioni')
+  async eliminaPercentuali(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Param('valido_dal') d: string) {
+    const dal = giornoDa(d);
+    await this.db.$transaction(async (tx) => {
+      const f = await fornitoreBloccato(tx, id);
+      const righe = await tx.provvigioni_scaglioni.findMany({ where: { fornitore_id: f.id, valido_dal: dal }, orderBy: { sconto_min: 'asc' } });
+      if (!righe.length) throw new NotFoundException('Versione non trovata');
+      await dopoChiusura(tx, f.id, d, usate(d));
+      if (!(await tx.provvigioni_scaglioni.count({ where: { fornitore_id: f.id, valido_dal: { not: dal } } }))) {
+        throw new ConflictException('È l\'unica versione delle percentuali: correggila invece di eliminarla');
+      }
+      const { prima, dopo } = await versioniVicine(tx, f.id, dal);
+      await controllaOrfane(tx, f.id, dal, prima?.soglie ?? [], dopo?.data); // dopo l'eliminazione vale la versione prima
+      await tx.provvigioni_scaglioni.deleteMany({ where: { fornitore_id: f.id, valido_dal: dal } });
+      await logEvent(tx, {
+        tipo: 'crud', azione: 'delete', entita: 'scaglione', entita_id: f.id, esito: 'successo',
+        dettaglio: { etichetta: `${f.corrente?.ragione_sociale ?? ''} · dal ${d}`, fornitore_id: String(f.id), valido_dal: d, scaglioni: perEvento(righe) },
+      }, contesto(req));
+    });
+  }
 }
 
-/** Ritorno dell'eccezione per le pagine: fornitore, sconto, data delle percentuali, sua % e quella standard. */
+/* ---------- Eccezioni personali (§4.2.3, §5.2, §7.5, D-26, D-51) ---------- */
 const conDettagli = {
   subagente: { select: { nome: true, cognome: true } },
-  scaglione: { include: { fornitore: { include: { corrente: { select: { ragione_sociale: true } } } } } },
+  fornitore: { include: { corrente: { select: { ragione_sociale: true } } } },
 } as const;
 type EccezioneCompleta = Prisma.provvigioni_eccezioniGetPayload<{ include: typeof conDettagli }>;
 
-function mappaEccezione(e: EccezioneCompleta) {
-  return {
-    id: String(e.id),
-    subagente_id: String(e.subagente_id),
-    subagente: nomeSub(e.subagente),
-    scaglione_id: String(e.scaglione_id),
-    fornitore_id: String(e.scaglione.fornitore_id),
-    fornitore: e.scaglione.fornitore.corrente?.ragione_sociale ?? null,
-    sconto_min: Number(e.scaglione.sconto_min),
-    valido_dal: iso(e.scaglione.valido_dal),
-    pct_personale: Number(e.pct_personale),
-    pct_standard: Number(e.scaglione.pct_subagente),
-  };
+/** Ritorno per le pagine: % standard dello scaglione alla data di oggi, tenuta dentro il periodo della riga
+ *  (valido_dal se futura, valido_al se finita); modificabile = tutto il periodo dopo l'ultima chiusura. */
+async function mappaEccezioni(db: Db, ee: EccezioneCompleta[]) {
+  const fids = [...new Set(ee.map((e) => e.fornitore_id))];
+  const [sc, chiusure] = await Promise.all([
+    db.provvigioni_scaglioni.findMany({ where: { fornitore_id: { in: fids } }, orderBy: { valido_dal: 'desc' } }),
+    Promise.all(fids.map((f) => ultimaChiusura(db, f))),
+  ]);
+  const chiusa = new Map(fids.map((f, i) => [f, chiusure[i]]));
+  const oggi = giornoRoma(new Date());
+  return ee.map((e) => {
+    const dal = iso(e.valido_dal), al = e.valido_al ? iso(e.valido_al) : null;
+    const data = oggi < dal ? dal : al && al <= oggi ? piuGiorni(al, -1) : oggi; // valido_al escluso
+    const std = sc.find((s) => s.fornitore_id === e.fornitore_id && s.sconto_min.equals(e.sconto_min) && iso(s.valido_dal) <= data);
+    const c = chiusa.get(e.fornitore_id) ?? null;
+    return {
+      id: String(e.id),
+      subagente_id: String(e.subagente_id),
+      subagente: nomeSub(e.subagente),
+      fornitore_id: String(e.fornitore_id),
+      fornitore: e.fornitore.corrente?.ragione_sociale ?? null,
+      sconto_min: Number(e.sconto_min),
+      pct_personale: Number(e.pct_personale),
+      pct_standard: std ? Number(std.pct_subagente) : null,
+      valido_dal: dal,
+      valido_al: al,
+      modificabile: !c || dal > c,
+    };
+  });
 }
-const etichettaEcc = (e: EccezioneCompleta) =>
-  `${nomeSub(e.subagente)} · ${e.scaglione.fornitore.corrente?.ragione_sociale ?? ''} ${Number(e.scaglione.sconto_min)} %`;
+const mappaEccezione = async (db: Db, e: EccezioneCompleta) => (await mappaEccezioni(db, [e]))[0];
+const etichettaEcc = (e: EccezioneCompleta) => `${nomeSub(e.subagente)} · ${e.fornitore.corrente?.ragione_sociale ?? ''} ${Number(e.sconto_min)} %`;
+const perEventoEcc = (e: EccezioneCompleta) => ({
+  etichetta: etichettaEcc(e), eccezione_id: String(e.id), fornitore_id: String(e.fornitore_id), subagente_id: String(e.subagente_id),
+  sconto_min: Number(e.sconto_min), pct_personale: Number(e.pct_personale), valido_dal: iso(e.valido_dal), valido_al: e.valido_al ? iso(e.valido_al) : null,
+});
+const SOVRAPPOSTO = 'Periodo sovrapposto: il subagente ha già un\'eccezione su questo sconto in quei giorni';
 
-/** Eccezioni personali dei subagenti (§4.2.3, §5.2, §7.5, D-26): si scrivono dalla scheda del subagente. */
+/** Lo sconto deve essere una soglia del fornitore in vigore alla data. */
+async function controllaSconto(tx: Db, fid: bigint, sconto: number, dal: string) {
+  const sc = await tx.provvigioni_scaglioni.findFirst({ where: { fornitore_id: fid, sconto_min: sconto, valido_dal: { lte: new Date(dal) } } });
+  if (!sc) throw new BadRequestException(`Il fornitore non ha lo sconto ${sconto} % nelle percentuali in vigore al ${dal}`);
+}
+
+/** V13: prima la riga del fornitore (come percentuali e nuove eccezioni), poi l'eccezione: una scrittura alla volta per fornitore. */
+async function eccezioneBloccata(tx: Db, id: number) {
+  const x = await tx.provvigioni_eccezioni.findUnique({ where: { id: BigInt(id) }, select: { fornitore_id: true } });
+  if (!x) throw new NotFoundException('Eccezione non trovata');
+  await fornitoreBloccato(tx, x.fornitore_id);
+  await tx.$queryRaw`SELECT id FROM provvigioni_eccezioni WHERE id = ${BigInt(id)} FOR UPDATE`;
+  const e = await tx.provvigioni_eccezioni.findUnique({ where: { id: BigInt(id) }, include: conDettagli });
+  if (!e) throw new NotFoundException('Eccezione non trovata');
+  return e;
+}
+
+/** Correzione o eliminazione libere solo se tutta la riga vale dopo l'ultima chiusura (D-51). */
+async function rigaAperta(tx: Db, e: EccezioneCompleta) {
+  await dopoChiusura(tx, e.fornitore_id, iso(e.valido_dal), (c) =>
+    `L'eccezione dal ${iso(e.valido_dal)} è già usata in un periodo chiuso (fino al ${c}): cambia la percentuale o termina l'eccezione da una data successiva`);
+}
+
+/** Eccezioni personali dei subagenti: per fornitore × sconto, con periodo (D-51). Si scrivono dalla scheda del subagente. */
 @Controller('eccezioni')
 export class EccezioniController {
   constructor(private readonly db: PrismaService) {}
 
   @Get()
   @Richiede('dati.consulta')
-  async elenco(@Query('subagente_id', ParseIntPipe) subagente_id: number) {
+  async elenco(@Query() q: FiltroEccezioni) {
+    if (q.subagente_id === undefined && q.fornitore_id === undefined) throw new BadRequestException('Indica subagente_id o fornitore_id');
     const ee = await this.db.provvigioni_eccezioni.findMany({
-      where: { subagente_id: BigInt(subagente_id) }, include: conDettagli,
-      orderBy: [{ scaglione: { fornitore_id: 'asc' } }, { scaglione: { valido_dal: 'desc' } }, { scaglione: { sconto_min: 'asc' } }],
+      where: {
+        ...(q.subagente_id !== undefined ? { subagente_id: BigInt(q.subagente_id) } : {}),
+        ...(q.fornitore_id !== undefined ? { fornitore_id: BigInt(q.fornitore_id) } : {}),
+      },
+      include: conDettagli,
+      orderBy: [{ fornitore_id: 'asc' }, { sconto_min: 'asc' }, { valido_dal: 'asc' }],
     });
-    return ee.map(mappaEccezione);
+    return mappaEccezioni(this.db, ee);
   }
 
-  /** Vale sulla versione delle percentuali in vigore oggi (§4.2.3): lo scaglione lo trova il server. */
   @Post()
   @Richiede('dati.condizioni')
   async crea(@Req() req: Request, @Body() b: NuovaEccezione) {
-    try {
-      return await this.db.$transaction(async (tx) => {
-        // V13: stesso blocco di Nuove percentuali, così la copia sulla nuova versione non perde l'eccezione
-        await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${BigInt(b.fornitore_id)} FOR UPDATE`;
-        if (!(await tx.fornitori.findUnique({ where: { id: BigInt(b.fornitore_id) } }))) throw new NotFoundException('Fornitore non trovato');
-        if (!(await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id) } }))) throw new NotFoundException('Subagente non trovato');
-        const sc = await tx.provvigioni_scaglioni.findFirst({
-          where: { fornitore_id: BigInt(b.fornitore_id), sconto_min: b.sconto_min, valido_dal: { lte: new Date(giornoRoma(new Date())) } },
-          orderBy: { valido_dal: 'desc' },
-        });
-        if (!sc) throw new BadRequestException(`Il fornitore non ha lo sconto ${b.sconto_min} % nelle percentuali in vigore`);
-        const e = await tx.provvigioni_eccezioni.create({
-          data: { scaglione_id: sc.id, subagente_id: BigInt(b.subagente_id), pct_personale: b.pct_personale },
-          include: conDettagli,
-        });
-        await logEvent(tx, {
-          tipo: 'crud', azione: 'create', entita: 'eccezione', entita_id: e.id, esito: 'successo',
-          dettaglio: { etichetta: etichettaEcc(e), subagente_id: String(e.subagente_id), scaglione_id: String(e.scaglione_id), pct_personale: b.pct_personale },
-        }, contesto(req));
-        return mappaEccezione(e);
+    return unico(() => this.db.$transaction(async (tx) => {
+      const f = await fornitoreBloccato(tx, b.fornitore_id);
+      if (!(await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id) } }))) throw new NotFoundException('Subagente non trovato');
+      await dopoChiusura(tx, f.id, b.valido_dal, (c) => `Il periodo fino al ${c} è chiuso: l'eccezione deve valere da una data successiva`);
+      await controllaSconto(tx, f.id, b.sconto_min, b.valido_dal);
+      const e = await tx.provvigioni_eccezioni.create({
+        data: { fornitore_id: f.id, subagente_id: BigInt(b.subagente_id), sconto_min: b.sconto_min, pct_personale: b.pct_personale, valido_dal: new Date(b.valido_dal) },
+        include: conDettagli,
       });
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        throw new ConflictException('Il subagente ha già un\'eccezione su questo scaglione: modificala');
-      }
-      throw e;
-    }
+      await logEvent(tx, { tipo: 'crud', azione: 'create', entita: 'eccezione', entita_id: e.id, esito: 'successo', dettaglio: perEventoEcc(e) }, contesto(req));
+      return mappaEccezione(tx, e);
+    }), SOVRAPPOSTO);
   }
 
+  /** Cambio di % da una data: chiude la riga il giorno prima e apre quella nuova (D-51). */
+  @Post(':id/cambia')
+  @Richiede('dati.condizioni')
+  async cambia(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: CambiaEccezione) {
+    return unico(() => this.db.$transaction(async (tx) => {
+      const e = await eccezioneBloccata(tx, id);
+      if (b.dal <= iso(e.valido_dal)) throw new BadRequestException(`Il cambio deve valere dopo il ${iso(e.valido_dal)}`);
+      if (e.valido_al && b.dal >= iso(e.valido_al)) throw new BadRequestException(`L'eccezione non vale più dal ${iso(e.valido_al)}: il cambio cade fuori dal suo periodo`);
+      if (Number(e.pct_personale) === b.pct_personale) throw new BadRequestException('La percentuale è già questa');
+      await dopoChiusura(tx, e.fornitore_id, b.dal, (c) => `Il periodo fino al ${c} è chiuso: il cambio deve valere da una data successiva`);
+      const chiusa = await tx.provvigioni_eccezioni.update({ where: { id: e.id }, data: { valido_al: new Date(b.dal) }, include: conDettagli }); // valido_al escluso
+      const nuova = await tx.provvigioni_eccezioni.create({
+        data: { fornitore_id: e.fornitore_id, subagente_id: e.subagente_id, sconto_min: e.sconto_min, pct_personale: b.pct_personale, valido_dal: new Date(b.dal), valido_al: e.valido_al },
+        include: conDettagli,
+      });
+      await logEvent(tx, {
+        tipo: 'crud', azione: 'update', entita: 'eccezione', entita_id: e.id, esito: 'successo',
+        dettaglio: { etichetta: etichettaEcc(e), prima: { valido_al: e.valido_al ? iso(e.valido_al) : null }, dopo: { valido_al: b.dal }, nuova_id: String(nuova.id) },
+      }, contesto(req));
+      await logEvent(tx, { tipo: 'crud', azione: 'create', entita: 'eccezione', entita_id: nuova.id, esito: 'successo', dettaglio: perEventoEcc(nuova) }, contesto(req));
+      const [c, n] = await mappaEccezioni(tx, [chiusa, nuova]);
+      return { chiusa: c, nuova: n };
+    }), SOVRAPPOSTO);
+  }
+
+  /** Fine dell'eccezione: `al` è il primo giorno in cui non vale più (escluso, come interscambio). I giorni fino
+   *  all'ultima chiusura non cambiano: né la vecchia né la nuova fine possono cadere entro la chiusura (D-51). */
+  @Post(':id/termina')
+  @Richiede('dati.condizioni')
+  async termina(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: TerminaEccezione) {
+    return unico(() => this.db.$transaction(async (tx) => {
+      const e = await eccezioneBloccata(tx, id);
+      const prima = e.valido_al ? iso(e.valido_al) : null;
+      if (b.al <= iso(e.valido_dal)) throw new BadRequestException(`L'eccezione comincia il ${iso(e.valido_dal)}: la fine viene dopo`);
+      const c = await ultimaChiusura(tx, e.fornitore_id);
+      if (c && (b.al <= c || (prima && prima <= c))) throw new ConflictException(`Il periodo fino al ${c} è chiuso: l'eccezione può smettere di valere solo dopo il ${c}`);
+      if (prima === b.al) return mappaEccezione(tx, e);
+      const dopo = await tx.provvigioni_eccezioni.update({ where: { id: e.id }, data: { valido_al: new Date(b.al) }, include: conDettagli });
+      await logEvent(tx, {
+        tipo: 'crud', azione: 'update', entita: 'eccezione', entita_id: e.id, esito: 'successo',
+        dettaglio: { etichetta: etichettaEcc(e), prima: { valido_al: prima }, dopo: { valido_al: b.al } },
+      }, contesto(req));
+      return mappaEccezione(tx, dopo);
+    }), SOVRAPPOSTO);
+  }
+
+  /** Correzione libera (% e inizio) solo se tutta la riga vale dopo l'ultima chiusura (D-51). */
   @Put(':id')
   @Richiede('dati.condizioni')
   async modifica(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: ModificaEccezione) {
-    return this.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM provvigioni_eccezioni WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
-      const prima = await tx.provvigioni_eccezioni.findUnique({ where: { id: BigInt(id) }, include: conDettagli });
-      if (!prima) throw new NotFoundException('Eccezione non trovata');
-      if (Number(prima.pct_personale) === b.pct_personale) return mappaEccezione(prima);
-      const dopo = await tx.provvigioni_eccezioni.update({ where: { id: prima.id }, data: { pct_personale: b.pct_personale }, include: conDettagli });
+    return unico(() => this.db.$transaction(async (tx) => {
+      const e = await eccezioneBloccata(tx, id);
+      await rigaAperta(tx, e);
+      const dal = b.valido_dal ?? iso(e.valido_dal);
+      if (b.valido_dal !== undefined) {
+        await dopoChiusura(tx, e.fornitore_id, dal, (c) => `Il periodo fino al ${c} è chiuso: l'eccezione deve valere da una data successiva`);
+        await controllaSconto(tx, e.fornitore_id, Number(e.sconto_min), dal);
+      }
+      const prima: Record<string, unknown> = {}, dopoDiff: Record<string, unknown> = {};
+      if (Number(e.pct_personale) !== b.pct_personale) { prima.pct_personale = Number(e.pct_personale); dopoDiff.pct_personale = b.pct_personale; }
+      if (dal !== iso(e.valido_dal)) { prima.valido_dal = iso(e.valido_dal); dopoDiff.valido_dal = dal; }
+      if (!Object.keys(dopoDiff).length) return mappaEccezione(tx, e);
+      const dopo = await tx.provvigioni_eccezioni.update({ where: { id: e.id }, data: { pct_personale: b.pct_personale, valido_dal: new Date(dal) }, include: conDettagli });
       await logEvent(tx, {
-        tipo: 'crud', azione: 'update', entita: 'eccezione', entita_id: prima.id, esito: 'successo',
-        dettaglio: { etichetta: etichettaEcc(prima), prima: { pct_personale: Number(prima.pct_personale) }, dopo: { pct_personale: b.pct_personale } },
+        tipo: 'crud', azione: 'update', entita: 'eccezione', entita_id: e.id, esito: 'successo', dettaglio: { etichetta: etichettaEcc(e), prima, dopo: dopoDiff },
       }, contesto(req));
-      return mappaEccezione(dopo);
-    });
+      return mappaEccezione(tx, dopo);
+    }), SOVRAPPOSTO);
   }
 
   @Delete(':id')
@@ -362,17 +561,10 @@ export class EccezioniController {
   @Richiede('dati.condizioni')
   async elimina(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
     await this.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM provvigioni_eccezioni WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
-      const e = await tx.provvigioni_eccezioni.findUnique({ where: { id: BigInt(id) }, include: conDettagli });
-      if (!e) throw new NotFoundException('Eccezione non trovata');
+      const e = await eccezioneBloccata(tx, id);
+      await rigaAperta(tx, e);
       await tx.provvigioni_eccezioni.delete({ where: { id: e.id } });
-      await logEvent(tx, {
-        tipo: 'crud', azione: 'delete', entita: 'eccezione', entita_id: e.id, esito: 'successo',
-        dettaglio: {
-          etichetta: etichettaEcc(e), eccezione_id: String(e.id), subagente_id: String(e.subagente_id),
-          scaglione_id: String(e.scaglione_id), pct_personale: Number(e.pct_personale),
-        },
-      }, contesto(req));
+      await logEvent(tx, { tipo: 'crud', azione: 'delete', entita: 'eccezione', entita_id: e.id, esito: 'successo', dettaglio: perEventoEcc(e) }, contesto(req));
     });
   }
 }

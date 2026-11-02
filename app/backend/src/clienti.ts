@@ -355,13 +355,14 @@ export class ClientiController {
   }
 }
 
-async function unico<T>(fn: () => Promise<T>) {
+/** Errori del database come risposte: periodo sovrapposto (EXCLUDE) 409, CHECK 400, riferimento 409. */
+export async function unico<T>(fn: () => Promise<T>, sovrapposto = 'Periodo sovrapposto per questo cliente/fornitore') {
   try {
     return await fn();
   } catch (e) {
     const anyErr = e as { code?: string; cause?: { originalCode?: string; originalMessage?: string } } & Error;
     const code = anyErr.code ?? anyErr.cause?.originalCode;
-    if (code === '23P01') throw new ConflictException('Periodo sovrapposto per questo cliente/fornitore');
+    if (code === '23P01') throw new ConflictException(sovrapposto);
     if (code === '23514') throw new BadRequestException('Valore non ammesso');
     if (code === 'P2003') throw new ConflictException('Riferimento non valido');
     throw e;

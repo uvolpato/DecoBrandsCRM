@@ -43,7 +43,35 @@ Replica dal prototipo `prototipo-alternativo/assets/viste-anagrafiche.js`:
    `Kpi`…) e le classi di `stile.css`. Niente componenti nuovi, salvo che servano davvero: in quel
    caso vanno nel catalogo `/componenti`.
 
-## Forma delle risposte del server
+## ⚠ Aggiornamento D-51 (vale sopra a tutto il resto)
+
+Le eccezioni non sono più legate a una versione: sono **subagente + fornitore + sconto + periodo**
+(`valido_dal` compreso, `valido_al` escluso, `null` = senza fine) e non si copiano. Regola unica:
+un cambio vale da una data in poi e la data deve venire **dopo l'ultima chiusura** del fornitore
+(bollettino verificato o contestato, trimestre liquidato). Leggi D-51 in §19 e §4.2.3 della spec,
+e le prove `app/backend/test/percentuali.spec.ts`: sono la fonte di verità delle rotte.
+
+Cosa cambia nelle pagine:
+- **Percentuali**: ogni versione dopo l'ultima chiusura ha *Correggi* (`PUT
+  /api/fornitori/:id/percentuali/:valido_dal`, corpo `{ scaglioni }`) ed *Elimina* (`DELETE`, con
+  conferma); quelle nel periodo chiuso sono in sola lettura. *Nuove percentuali* accetta qualsiasi
+  data dopo l'ultima chiusura, anche fra due versioni. Mostra i 400/409 del server nella finestra.
+- **Eccezioni** del subagente: elenco con periodo ("dal … al …" o "dal …"), "X % invece di Y %" e
+  il campo `modificabile`:
+  - *Aggiungi*: fornitore, sconto, % personale, **dal** (`POST /api/eccezioni` con `valido_dal`);
+  - *Cambia la %* da una data (`POST /api/eccezioni/:id/cambia { pct_personale, dal }`): chiude la
+    riga e ne apre una nuova;
+  - *Termina* (`POST /api/eccezioni/:id/termina { al }`, `al` = primo giorno in cui non vale più);
+  - *Modifica* (`PUT /api/eccezioni/:id { pct_personale, valido_dal? }`) ed *Elimina* (`DELETE`)
+    solo se `modificabile`;
+  - non serve più la scelta sullo "storico delle copie": mostra tutte le righe, la più recente in
+    alto, quelle finite in grigio.
+- Lo sconto proposto nella finestra viene dalle soglie della versione valida alla data scelta.
+
+Le forme qui sotto erano della prima versione: dove non coincidono con quelle nuove, valgono le
+prove del server.
+
+## Forma delle risposte del server (prima versione)
 
 Gli id sono stringhe, le percentuali numeri, le date `aaaa-mm-gg`.
 

@@ -82,6 +82,17 @@ describe('scaglioni ed eccezioni', () => {
     expect(await errore(ins, [5, 12])).toMatch('provvigioni_scaglioni_fornitore_id_sconto_min_valido_dal_key');
     expect(await errore(ins, [10, 120])).toMatch('provvigioni_scaglioni_pct_check');
   });
+
+  it('eccezioni: periodi senza sovrapposizioni per fornitore × subagente × sconto, valido_al escluso (D-51)', async () => {
+    const ins = `INSERT INTO provvigioni_eccezioni (fornitore_id, subagente_id, sconto_min, pct_personale, valido_dal, valido_al) VALUES (1, $1, $2, $3, $4, $5)`;
+    expect(await errore(ins, [1, 1, 3, '2026-01-01', '2026-07-01'])).toBe('');
+    expect(await errore(ins, [1, 1, 4, '2026-06-30', null])).toMatch('provvigioni_eccezioni_periodo_excl');
+    expect(await errore(ins, [1, 1, 4, '2026-07-01', null])).toBe('');
+    expect(await errore(ins, [2, 1, 4, '2026-03-01', null])).toBe(''); // altro subagente
+    expect(await errore(ins, [1, 5, 4, '2026-03-01', null])).toBe(''); // altro sconto
+    expect(await errore(ins, [1, 10, 4, '2026-03-01', '2026-03-01'])).toMatch('provvigioni_eccezioni_periodo_check');
+    expect(await errore(ins, [1, 10, 101, '2026-03-01', null])).toMatch('provvigioni_eccezioni_pct_check');
+  });
 });
 
 describe('documenti e liquidazione (D-34)', () => {

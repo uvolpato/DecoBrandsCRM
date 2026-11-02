@@ -31,6 +31,7 @@ model fornitori {
   corrente  fornitori_versioni?     @relation("corrente", fields: [id, versione_corrente_id], references: [fornitore_id, id], onDelete: Restrict, map: "fornitori_versione_corrente_fkey")
   versioni  fornitori_versioni[]    @relation("versioni")
   scaglioni provvigioni_scaglioni[]
+  eccezioni provvigioni_eccezioni[]
   agenzie   interscambio[]
 }
 
@@ -119,24 +120,27 @@ model provvigioni_scaglioni {
   valido_dal    DateTime @db.Date
   creato_il     DateTime @default(now()) @db.Timestamptz(6)
 
-  fornitore fornitori               @relation(fields: [fornitore_id], references: [id], onDelete: Cascade)
-  eccezioni provvigioni_eccezioni[]
+  fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Cascade)
 
   @@unique([fornitore_id, sconto_min, valido_dal])
 }
 
-/// Eccezioni personali del subagente su uno scaglione (§4.2.3, D-26).
+/// Eccezioni personali del subagente per fornitore × sconto, con un periodo (§4.2.3, D-51): non legate
+/// alle versioni delle percentuali. Periodi [dal, al) senza sovrapposizioni: EXCLUDE nella migrazione eccezioni_periodo.
 model provvigioni_eccezioni {
-  id            BigInt   @id @default(autoincrement())
-  scaglione_id  BigInt
+  id            BigInt    @id @default(autoincrement())
+  fornitore_id  BigInt
   subagente_id  BigInt
-  pct_personale Decimal  @db.Decimal(5, 2)
-  creato_il     DateTime @default(now()) @db.Timestamptz(6)
+  sconto_min    Decimal   @db.Decimal(5, 2) // la soglia dello scaglione a cui si applica
+  pct_personale Decimal   @db.Decimal(5, 2)
+  valido_dal    DateTime  @db.Date
+  valido_al     DateTime? @db.Date // escluso, come interscambio; NULL = senza fine
+  creato_il     DateTime  @default(now()) @db.Timestamptz(6)
 
-  scaglione provvigioni_scaglioni @relation(fields: [scaglione_id], references: [id], onDelete: Cascade)
-  subagente subagenti             @relation(fields: [subagente_id], references: [id])
+  fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Restrict)
+  subagente subagenti @relation(fields: [subagente_id], references: [id])
 
-  @@unique([scaglione_id, subagente_id])
+  @@index([subagente_id])
 }
 
 model agenti {

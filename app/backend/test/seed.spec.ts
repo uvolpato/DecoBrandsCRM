@@ -69,12 +69,13 @@ describe('seed §12', () => {
     expect(nc.fattura?.numero).toBe('F-2026-0815');
   });
 
-  it('eccezione Bastasin 3 sullo scaglione 1 %', async () => {
-    const e = await db.provvigioni_eccezioni.findMany({ include: { scaglione: { include: { fornitore: { include: { corrente: true } } } }, subagente: true } });
+  it('eccezione Bastasin 3 sullo sconto 1 % di Gries, dal 2025-01-01 senza fine (D-51)', async () => {
+    const e = await db.provvigioni_eccezioni.findMany({ include: { fornitore: { include: { corrente: true } }, subagente: true } });
     expect(e).toHaveLength(1);
     expect(e[0].subagente.cognome).toBe('Bastasin');
     expect(Number(e[0].pct_personale)).toBe(3);
-    expect(Number(e[0].scaglione.sconto_min)).toBe(1);
-    expect(e[0].scaglione.fornitore.corrente?.ragione_sociale).toMatch(/^Gries/);
+    expect(Number(e[0].sconto_min)).toBe(1);
+    expect([e[0].valido_dal.toISOString().slice(0, 10), e[0].valido_al]).toEqual(['2025-01-01', null]);
+    expect(e[0].fornitore.corrente?.ragione_sociale).toMatch(/^Gries/);
   });
 });
