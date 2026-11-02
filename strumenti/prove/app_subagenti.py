@@ -41,7 +41,7 @@ with sync_playwright() as p:
     def modulo(pg, **v):
         for k, x in v.items(): pg.fill('#c-' + k, x)
     def invia(pg): pg.click('.modale-piede button[type=submit]')
-    def avviso(pg): pg.wait_for_selector('.avviso'); return pg.locator('.avviso').inner_text()
+    def avviso(pg): pg.evaluate("document.querySelector('.avviso')?.remove()"); pg.wait_for_selector('.avviso'); return pg.locator('.avviso').inner_text()
 
     pg = entra(S + '-ammi')
     ok('Subagenti' in testo(pg, '.testa h1'), 'titolo della pagina')
@@ -55,6 +55,33 @@ with sync_playwright() as p:
     pg.click('.dt tbody tr.cliccabile:has-text("Bastasin")'); pg.wait_for_function("/^\\/subagenti\\/\\d+/.test(location.pathname)"); pg.wait_for_timeout(400)
     ok('Bastasin' in testo(pg, '.pannello-testa h2') and 'SUB01' in testo(pg, '.dettagli') and pg.locator('.dt tbody tr.selezionata').count() == 1, 'scheda Dati del subagente: codice, riga evidenziata')
     pg.screenshot(path=str(USCITA / 'app-subagenti-1440.png'))
+
+    # Eccezioni personali (D-51): elenco con periodo, aggiunta, periodo sovrapposto, modifica, eliminazione
+    pg.click('.schede-barra [role=tab]:has-text("Eccezioni personali")'); pg.wait_for_timeout(400)
+    ok(pg.locator('.elenco li:has-text("Gries")').count() >= 1 and 'invece di' in testo(pg, '.elenco') and 'dal 01/01/2025' in testo(pg, '.elenco'),
+       'eccezioni: fornitore, sconto, percentuale standard e periodo')
+    def nuova_eccezione(pct, dal):
+        pg.click('button:has-text("Aggiungi eccezione")'); finestra(pg).wait_for()
+        pg.fill('.velo .modale .campo-ricerca input.ricerca-testo', 'Gasper')
+        pg.locator('.velo .modale .ricerca-menu li[role=option]:has-text("Gasper")').first.click()
+        pg.wait_for_function("document.querySelectorAll('.velo .modale select[name=sconto] option').length > 1")
+        pg.select_option('#c-sconto', index=1); pg.fill('#c-pct_personale', pct); pg.fill('#c-valido_dal', dal)
+        pg.click('.modale-piede button[type=submit]')
+    nuova_eccezione('8', '2050-01-01'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(700)
+    riga = pg.locator('.elenco li:has-text("Gasper")')
+    ok(riga.count() == 1 and '2050' in riga.inner_text(), 'eccezione aggiunta: compare con il suo periodo')
+    nuova_eccezione('7', '2051-01-01'); pg.wait_for_selector('.modulo-errore:not([hidden])', timeout=5000)
+    ok('sovrapposto' in testo(pg, '.modulo-errore'), 'periodo sovrapposto: il 409 del server si vede nella finestra')
+    pg.click('.velo .modale-piede button:has-text("Annulla")'); finestra(pg).wait_for(state='detached')
+    pg.click('.elenco li:has-text("Gasper")'); pg.wait_for_selector('.velo .modale')
+    pg.click('.velo .modale button:has-text("Modifica")'); pg.wait_for_selector('.velo .modale #c-pct_personale')
+    pg.fill('#c-pct_personale', '6.5'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(700)
+    ok('6,5%' in pg.locator('.elenco li:has-text("Gasper")').inner_text(), 'eccezione modificata: nuova percentuale')
+    pg.click('.elenco li:has-text("Gasper")'); pg.wait_for_selector('.velo .modale')
+    pg.click('.velo .modale button.pericolo'); pg.wait_for_selector('.velo .modale h2:has-text("Eliminare l’eccezione")')
+    pg.click('.velo .modale button.pericolo'); pg.wait_for_timeout(800)
+    ok(pg.locator('.elenco li:has-text("Gasper")').count() == 0, 'eccezione eliminata')
+    pg.click('.schede-barra [role=tab]:has-text("Dati")'); pg.wait_for_timeout(300)
 
     # eliminare chi ha agenzie: rifiutato
     pg.click('.testa-azioni button:has-text("Elimina"), .pannello-testa button:has-text("Elimina")'); pg.wait_for_selector('.velo .modale')
@@ -111,6 +138,8 @@ with sync_playwright() as p:
         pg = entra(S + '-' + u); pg.wait_for_timeout(600)
         ok(pg.locator('.testa-azioni button:has-text("Nuovo subagente")').count() == atteso and pg.locator('.pannello-testa button:has-text("Elimina")').count() == atteso,
            '%s: comandi di modifica %s' % (u, 'presenti' if atteso else 'assenti'))
+        pg.click('.schede-barra [role=tab]:has-text("Eccezioni personali")'); pg.wait_for_timeout(400)
+        ok(pg.locator('button:has-text("Aggiungi eccezione")').count() == 0, '%s: Aggiungi eccezione assente (serve dati.condizioni)' % u)
         pg.close()
     b.close()
 

@@ -10,7 +10,7 @@ import { Icona } from './Icona';
 export interface CampoProps {
   nome: string;
   etichetta: string;
-  tipo?: 'testo' | 'password' | 'casella' | 'select' | 'livello' | 'ricerca';
+  tipo?: 'testo' | 'password' | 'casella' | 'select' | 'livello' | 'ricerca' | 'data';
   completa?: string;
   valore?: string | string[] | boolean;
   opzioni?: { value: string; label: string; disabilitato?: boolean; titolo?: string }[]; // select, livello
@@ -20,9 +20,10 @@ export interface CampoProps {
   entita?: Entita; // ricerca: campo di ricerca su un'entità (D-22); con multipla il valore inviato è l'elenco JSON delle chiavi
   multipla?: boolean;
   contesto?: Contesto;
+  onCambia?: (valore: string) => void; // per chi deve ricaricare altri campi della finestra (es. gli sconti del fornitore)
 }
 
-export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, disabilitato, entita, multipla, contesto }: CampoProps) {
+export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, disabilitato, entita, multipla, contesto, onCambia }: CampoProps) {
   const [vedi, setVedi] = useState(false);
   const id = 'c-' + nome;
   const [ricerca, setRicerca] = useState<string | string[]>(multipla ? (Array.isArray(valore) ? valore : []) : typeof valore === 'string' ? valore : '');
@@ -33,7 +34,7 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
         <input type="hidden" name={nome} value={multipla ? JSON.stringify(ricerca) : (ricerca as string)} />
         {multipla
           ? <CampoRicerca entita={entita} contesto={contesto} id={id} multipla valori={ricerca as string[]} onChange={setRicerca} />
-          : <CampoRicerca entita={entita} contesto={contesto} id={id} valore={ricerca as string} onChange={setRicerca} />}
+          : <CampoRicerca entita={entita} contesto={contesto} id={id} valore={ricerca as string} onChange={(v) => { setRicerca(v); onCambia?.(v); }} />}
         {aiuto && <span className="aiuto">{aiuto}</span>}
       </div>
     );
@@ -77,7 +78,7 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
           {opzioni.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       ) : (
-        <input id={id} name={nome} type="text" autoComplete={completa} defaultValue={testo} disabled={disabilitato} />
+        <input id={id} name={nome} type={tipo === 'data' ? 'date' : 'text'} autoComplete={completa} defaultValue={testo} disabled={disabilitato} />
       )}
       {aiuto && <span className="aiuto">{aiuto}</span>}
     </div>

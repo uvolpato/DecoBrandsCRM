@@ -47,13 +47,29 @@ with sync_playwright() as p:
     pg.click('.dt tbody tr.cliccabile'); pg.wait_for_function("/^\\/fornitori\\/\\d+/.test(location.pathname)"); pg.wait_for_timeout(500)
     ok('Gries' in testo(pg, '.pannello-testa h2') and pg.locator('.dt tbody tr.selezionata').count() == 1, 'scheda del fornitore aperta, riga evidenziata')
     ok(pg.locator('.schede-barra [role=tab]').count() == 2, 'due schede: Percentuali e Clienti seguiti')
-    # Percentuali: sola lettura
-    scheda(pg, 'Percentuali'); pg.wait_for_timeout(200)
+    # Percentuali datate (F1-A5): versioni, nuova versione, errore nel periodo chiuso, correzione, eliminazione
+    scheda(pg, 'Percentuali'); pg.wait_for_timeout(300)
     corpo = pg.locator('.schede-corpo')
-    ok(corpo.locator('.dt tbody tr').count() >= 1 and corpo.locator('button').count() == 0, 'Percentuali: scaglioni in tabella, nessun pulsante')
-    pagina = pg.locator('body').inner_text()
-    ok(not any(t in pagina for t in ['Nuovo scaglione', 'Aggiungi scaglione', 'Elimina']), 'nessun comando per creare, modificare o eliminare scaglioni')
+    ok(corpo.locator('[data-versione]').count() >= 1 and 'In vigore dal' in corpo.inner_text(), 'Percentuali: versioni, quella in vigore in evidenza')
+    ok(corpo.locator('.dt tbody tr').count() >= 1, 'Percentuali: scaglioni in tabella')
+    ok(corpo.locator('button:has-text("Nuove percentuali")').count() == 1 and corpo.locator('button:has-text("Correggi")').count() >= 1,
+       'responsabile: comandi per nuova versione, correzione ed eliminazione')
     pg.screenshot(path=str(USCITA / 'app-fornitori-1440.png'))
+    pg.click('button:has-text("Nuove percentuali")'); finestra(pg).wait_for()
+    pg.fill('#c-valido_dal', '2020-01-01'); pg.click('.modale-piede button[type=submit]')
+    pg.wait_for_selector('.modulo-errore:not([hidden])', timeout=5000)
+    ok('chiuso' in testo(pg, '.modulo-errore'), 'data nel periodo chiuso: il server rifiuta, messaggio nella finestra')
+    pg.fill('#c-valido_dal', '2050-01-01'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(500)
+    nuovo = pg.locator('[data-versione="2050-01-01"]')
+    ok(nuovo.count() == 1 and 'futura' in nuovo.inner_text(), 'nuova versione salvata e mostrata come futura')
+    nuovo.locator('button:has-text("Correggi")').click(); finestra(pg).wait_for()
+    pg.fill('#c-agente0', '21'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(500)
+    ok('21%' in pg.locator('[data-versione="2050-01-01"]').inner_text(), 'correzione salvata: la percentuale cambia')
+    pg.locator('[data-versione="2050-01-01"] button:has-text("Elimina")').click(); pg.wait_for_selector('.velo .modale')
+    pg.click('.velo .modale button.pericolo')
+    pg.wait_for_function("!document.querySelector('[data-versione=\"2050-01-01\"]')", timeout=8000)
+    ok(pg.locator('[data-versione="2050-01-01"]').count() == 0, 'eliminazione della versione di prova')
+    scheda(pg, 'Percentuali'); pg.wait_for_timeout(200)
     scheda(pg, 'Clienti seguiti'); pg.wait_for_timeout(200)
     ok(pg.locator('.schede-corpo .dt').count() == 1, 'scheda Clienti seguiti: tabella')
     # filtro multiplo per subagente (D-22): restringe i clienti seguiti
@@ -92,7 +108,9 @@ with sync_playwright() as p:
     # operatore e lettura: niente modifica
     for u in ('oper', 'lett'):
         pg = entra(S + '-' + u); pg.wait_for_timeout(600)
-        ok(pg.locator('button:has-text("Modifica le regole")').count() == 0, '%s: Modifica le regole assente' % u)
+        scheda(pg, 'Percentuali'); pg.wait_for_timeout(300)
+        ok(pg.locator('button:has-text("Modifica le regole"), button:has-text("Nuove percentuali"), button:has-text("Correggi")').count() == 0,
+           '%s: comandi delle percentuali assenti' % u)
         pg.close()
     b.close()
 

@@ -126,7 +126,12 @@ function Singola({ entita: ent, contesto = {}, placeholder, id, valore, onChange
   const [aperto, setAperto] = useState(false);
   const [attiva, setAttiva] = useState(0);
   const [maschera, setMaschera] = useState(false);
-  useEffect(() => { setTesto(nota ? ent.testo(nota) : valore); }, [valore, tutte]); // eslint-disable-line react-hooks/exhaustive-deps -- da fuori
+  const campo = useRef<HTMLInputElement>(null);
+  // non si sovrascrive quello che l'utente sta scrivendo: le voci arrivano dal server e possono
+  // atterrare dopo il primo tasto (prima si perdeva il testo digitato)
+  useEffect(() => {
+    if (document.activeElement !== campo.current) setTesto(nota ? ent.testo(nota) : valore);
+  }, [valore, tutte]); // eslint-disable-line react-hooks/exhaustive-deps -- da fuori
   const pos = usePosizione(aperto, box, testo);
 
   // punteggio: inizia con il testo 0 · lo contiene 1 · lo contiene nel resto o nella chiave 2
@@ -154,7 +159,7 @@ function Singola({ entita: ent, contesto = {}, placeholder, id, valore, onChange
     <div ref={box} className="ricerca"
       onBlur={(e) => { if (box.current?.contains(e.relatedTarget as Node) || maschera) return; setAperto(false); const t = testo.trim(); if (nota && ent.testo(nota) === t) return; const r = trova(t); imposta(r, t); }}>
       <span className={'pallino ' + stato} title={nota ? ent.titolo + ' trovato in anagrafica' : valore ? 'Valore non trovato in anagrafica' : ''} />
-      <input className="ricerca-testo" id={id} type="text" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={aperto}
+      <input ref={campo} className="ricerca-testo" id={id} type="text" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={aperto}
         value={testo} placeholder={placeholder ?? 'Scrivi per cercare'} onChange={(e) => { setTesto(e.target.value); setAperto(true); setAttiva(0); }} onKeyDown={tasto} />
       <button type="button" className="ricerca-lente" title={'Apri la ricerca di ' + ent.titolo.toLowerCase() + ' (F4)'} aria-label="Apri la ricerca" onClick={() => { setAperto(false); setMaschera(true); }}><Icona nome="cerca" /></button>
       <ul className="ricerca-menu" role="listbox" hidden={!aperto} style={pos}>

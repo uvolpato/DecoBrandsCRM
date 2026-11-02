@@ -258,23 +258,24 @@
       pulsanti: [
         ['Riga del fornitore', 'Apre la scheda a destra.'],
         ['Modifica condizioni', 'Giorni di attesa della conferma, giorno del bollettino, pagamento sul maturato o sul fatturato, giorni per l’incasso dal cliente.'],
-        ['Schede Percentuali · Clienti seguiti', 'Percentuali in vigore, in sola lettura finché non arriva <i>Nuove percentuali da una data</i>; clienti seguiti per quel fornitore (si modificano dal cliente), con filtro a scelta multipla per subagente.'],
-        ['Nuove percentuali da una data', 'Inserisce una nuova versione delle percentuali (in arrivo nell’app).']
+        ['Schede Percentuali · Clienti seguiti', 'Percentuali per versione: quella in vigore in alto, poi le future e le passate, con le eccezioni personali sotto la percentuale al subagente; clienti seguiti per quel fornitore (si modificano dal cliente), con filtro a scelta multipla per subagente.'],
+        ['Nuove percentuali', 'Inserisce una nuova versione delle percentuali da una data: le righe partono da quelle più recenti e si possono aggiungere sconti, non togliere.'],
+        ['Correggi · Elimina', 'Sulla singola versione. Valgono solo dopo l’ultima chiusura del fornitore (bollettino verificato o contestato, trimestre liquidato); altrimenti il server rifiuta e la finestra lo spiega.']
       ],
       finestre: [
         { nome: 'Condizioni del fornitore', da: 'Modifica condizioni', cosa: 'Regole che fanno scattare solleciti e liquidazioni.',
           campi: [['Giorni di attesa della conferma', 'Dopo, la pratica è in ritardo.'], ['Bollettino atteso entro il giorno', 'Del mese successivo (1–28); dopo, compare il sollecito.'], ['Pagamento provvigioni', 'Maturato o fatturato.'], ['Giorni per l’incasso dal cliente', 'Sul maturato: dopo questi giorni dalla fattura non ancora riconosciuta, l’incasso è da verificare (iniziale 60).']], azioni: [['Salva condizioni', 'Applica subito.']] },
-        { nome: 'Nuove percentuali', da: 'Nuove percentuali da una data', cosa: 'Per ogni sconto: % a Decobrands e % al subagente.', campi: [['Valide dal', 'I documenti precedenti restano calcolati con le percentuali di allora.']], azioni: [['Salva', 'Crea la nuova versione.']] }
+        { nome: 'Nuove percentuali', da: 'Nuove percentuali', cosa: 'Per ogni sconto: % a Decobrands e % al subagente.', campi: [['Valide dal', 'Deve venire dopo l’ultima chiusura del fornitore; può cadere fra due versioni. I documenti precedenti restano calcolati con le percentuali di allora.'], ['Aggiungi uno sconto', 'Facoltativo: le soglie esistenti non si tolgono.']], azioni: [['Salva le nuove percentuali', 'Crea la nuova versione.'], ['Salva la correzione', 'Con Correggi: sostituisce le percentuali di quella versione.']] }
       ] },
     { id: 'subagenti', titolo: 'Subagenti', gruppo: 'Anagrafiche', vai: '#/subagenti',
       sintesi: 'Chi segue i clienti per conto di Decobrands. Non sono in Integra: si gestiscono per intero nel CRM.',
       pulsanti: [['Nuovo subagente', 'Nome, email, codice fiscale o P.IVA, telefono.'], ['Modifica', 'Cambia i dati.'], ['Rendi non attivo', 'Un subagente con clienti o provvigioni non si elimina: si disattiva.'], ['Vedi la liquidazione', 'Apre la liquidazione filtrata sul subagente.'],
-        ['Aggiungi eccezione', 'Una percentuale personale che vale al posto di quella dello scaglione (la imposta un responsabile).'], ['Clic su un’eccezione', 'La modifica o la elimina.']],
+        ['Aggiungi eccezione', 'Una percentuale personale che vale al posto di quella dello scaglione, dal giorno indicato e fino a una fine (la imposta un responsabile).'], ['Clic su un’eccezione', 'Apre il periodo e le azioni: Cambia la %, Termina, e Modifica o Elimina quando tutto il periodo è dopo l’ultima chiusura.']],
       finestre: [{ nome: 'Subagente', da: 'Nuovo subagente · Modifica', cosa: 'Dati anagrafici.', azioni: [['Salva', 'Registra.'], ['Elimina', 'Solo se non ha clienti né provvigioni.']] },
         { nome: 'Eccezione', da: 'Aggiungi eccezione · clic su un’eccezione', cosa: 'Il subagente è fisso.',
-          campi: [['Fornitore', 'Campo con ricerca.'], ['Sconto al cliente', 'Gli sconti proposti seguono le percentuali del fornitore.'], ['Al subagente %', 'Da 0 a 100; 0 = nessuna provvigione su quello scaglione.']],
-          azioni: [['Aggiungi eccezione · Salva', 'Registra: vale per i documenti calcolati con le percentuali in vigore oggi.'], ['Elimina', 'Con conferma: torna a valere la percentuale standard.']] }],
-      sapere: ['Le eccezioni sono rare: di norma tutti i subagenti hanno la percentuale dello scaglione.', 'Un’eccezione per subagente e scaglione; con <b>Nuove percentuali da una data</b> del fornitore passa alla nuova versione con la stessa percentuale.'] },
+          campi: [['Fornitore', 'Campo con ricerca.'], ['Sconto al cliente', 'Gli sconti proposti sono quelli in vigore del fornitore.'], ['Al subagente %', 'Da 0 a 100; 0 = nessuna provvigione su quello sconto.'], ['Dal', 'La data deve venire dopo l’ultima chiusura del fornitore.']],
+          azioni: [['Aggiungi eccezione · Salva', 'Apre il periodo dell’eccezione.'], ['Cambia la %', 'Chiude il periodo alla data indicata e ne apre uno nuovo con la nuova percentuale.'], ['Termina', 'Dal giorno indicato non vale più (quel giorno è escluso).'], ['Modifica · Elimina', 'Solo se il periodo è tutto dopo l’ultima chiusura.'], ['Elimina', 'Con conferma: torna a valere la percentuale standard.']] }],
+      sapere: ['Le eccezioni sono rare: di norma tutti i subagenti hanno la percentuale dello scaglione.', 'L’eccezione non è legata a una versione delle percentuali: vale nei giorni del suo periodo e con <b>Nuove percentuali</b> del fornitore continua da sola, senza copie.'] },
     { id: 'clienti', titolo: 'Clienti', gruppo: 'Anagrafiche', vai: '#/clienti',
       sintesi: 'Anagrafica da Integra in sola lettura. Per ogni cliente le <b>agenzie</b>: i fornitori per cui Decobrands fa da agente, con codice cliente del fornitore, subagente e sconto.',
       pulsanti: [
