@@ -5,7 +5,8 @@ import { Prisma } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
-import { caricaDati, giornoRoma } from '../src/motore/dati';
+import { caricaDati, caricaDatiPratica, giornoRoma } from '../src/motore/dati';
+import { dettaglioPratica } from '../src/pratiche';
 import { confronto, haVariazioni, importoPratica, statoPratica } from '../src/motore/motore';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
@@ -218,6 +219,29 @@ describe('GET /api/pratiche/:id', () => {
     expect(b.provvigione.imponibile).toBe(Number(importoPratica(p).toFixed(2)));
     expect(b.provvigione.a_decobrands).toBeCloseTo(b.provvigione.imponibile * b.provvigione.da_fornitore / 100, 2);
     expect(b.provvigione.regole.length).toBeGreaterThan(0);
+  });
+
+  it('caricaDatiPratica dà per ogni pratica lo stesso dettaglio di caricaDati completo (D-52 §19)', async () => {
+    const uguali = async () => {
+      const tutto = await caricaDati(db), regole = new Set<string>();
+      for (const p of tutto.pratiche) {
+        const solo = await caricaDatiPratica(db, BigInt(p.id), tutto.oggi);
+        const atteso = dettaglioPratica(tutto, p.id);
+        expect({ id: p.id, r: dettaglioPratica(solo!, p.id) }).toEqual({ id: p.id, r: atteso });
+        atteso!.provvigione?.regole.forEach((r) => regole.add(r));
+      }
+      return regole;
+    };
+    await uguali();
+    // "una fattura al mese" (D-27) guarda le altre pratiche dell'abbinamento: il seed non la usa, si accende qui
+    const prima = await db.interscambio.findMany({ select: { id: true, regola_mensile: true } });
+    try {
+      await db.interscambio.updateMany({ data: { regola_mensile: 'piu_alta' } });
+      expect(await uguali()).toContain('mensile');
+    } finally {
+      for (const a of prima) await db.interscambio.update({ where: { id: a.id }, data: { regola_mensile: a.regola_mensile } });
+    }
+    expect(await caricaDatiPratica(db, 999999999n)).toBeNull();
   });
 
   it('404 se non esiste; la lettura consulta, chi non ha l\'area Provvigioni: 403', async () => {

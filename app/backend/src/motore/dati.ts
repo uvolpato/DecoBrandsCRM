@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client';
 // Lettore del motore (§10, F0-A5): carica dal database quello che serve ai calcoli e lo mette nella
 // forma dei dati del prototipo (M.S), così le funzioni di motore.ts restano quelle di motore.js.
 // Importi sempre Prisma.Decimal, date come 'aaaa-mm-gg', id come stringhe.
-// ponytail: carica tutto; filtrare per periodo o fornitore quando i dati cresceranno.
+// ponytail: caricaDati carica tutto (bollettini, liquidazioni, analisi); il dettaglio della pratica usa
+// caricaDatiPratica. Filtrare per periodo o fornitore anche gli altri quando i dati cresceranno.
 
 type Db = Prisma.TransactionClient;
 const Dec = Prisma.Decimal;
@@ -48,6 +49,19 @@ export const praticaDaDb = (t: Testata) => ({
   })),
 });
 
+const CON_RIGHE = { righe: { orderBy: { id: 'asc' } } } satisfies Prisma.bollettini_testataInclude;
+type Righe = {
+  fornitori: Prisma.fornitoriGetPayload<{ include: { corrente: true } }>[];
+  clienti: Prisma.clientiGetPayload<{ include: { corrente: true } }>[];
+  subagenti: Prisma.subagentiGetPayload<object>[];
+  scaglioni: Prisma.provvigioni_scaglioniGetPayload<object>[];
+  eccezioni: Prisma.provvigioni_eccezioniGetPayload<object>[];
+  interscambio: Prisma.interscambioGetPayload<object>[];
+  testate: Testata[];
+  bollettini: Prisma.bollettini_testataGetPayload<{ include: typeof CON_RIGHE }>[];
+  liquidazioni: Prisma.liquidazioniGetPayload<object>[];
+};
+
 /** `oggi` come nel prototipo (M.oggi): le prove lo fissano al 04/09/2026. */
 export async function caricaDati(db: Db, oggi = giornoRoma(new Date())) {
   const [fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini, liquidazioni] = await Promise.all([
@@ -58,10 +72,49 @@ export async function caricaDati(db: Db, oggi = giornoRoma(new Date())) {
     db.provvigioni_eccezioni.findMany(),
     db.interscambio.findMany({ orderBy: { id: 'asc' } }),
     db.ordini_fornitore_testata.findMany({ orderBy: { id: 'asc' }, include: CON_PRATICA }),
-    db.bollettini_testata.findMany({ orderBy: { id: 'asc' }, include: { righe: { orderBy: { id: 'asc' } } } }),
+    db.bollettini_testata.findMany({ orderBy: { id: 'asc' }, include: CON_RIGHE }),
     db.liquidazioni.findMany({ orderBy: [{ anno: 'asc' }, { trimestre: 'asc' }] }),
   ]);
+  return componi(oggi, { fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini, liquidazioni });
+}
 
+/** Solo i dati che il dettaglio di una pratica legge (D-52 §19, §7.3): la pratica, il suo cliente e
+ *  fornitore, scaglioni ed eccezioni del fornitore, le agenzie cliente × fornitore con i loro subagenti,
+ *  e per "una fattura al mese" (D-27) le pratiche dello stesso abbinamento con fatture negli stessi mesi
+ *  (più quelle delle fatture stornate dalle sue note). Bollettini e liquidazioni: il dettaglio non li usa.
+ *  Stessa forma di caricaDati; null se la pratica non c'è. */
+export async function caricaDatiPratica(db: Db, pratica: bigint, oggi = giornoRoma(new Date())) {
+  const t = await db.ordini_fornitore_testata.findUnique({ where: { id: pratica }, include: CON_PRATICA });
+  if (!t) return null;
+  const { cliente_id, fornitore_id } = t;
+  const rif = await db.ordini_fornitore_documenti.findMany({
+    where: { id: { in: t.documenti.flatMap((d) => d.fattura_id ?? []) } }, select: { testata_id: true, data: true },
+  });
+  const mesi = [...new Set([...t.documenti, ...rif].map((d) => iso(d.data).slice(0, 7)))].map((m) => {
+    const dal = new Date(`${m}-01`), al = new Date(dal);
+    al.setUTCMonth(al.getUTCMonth() + 1);
+    return { data: { gte: dal, lt: al } };
+  });
+  const [fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate] = await Promise.all([
+    db.fornitori.findMany({ where: { id: fornitore_id }, include: { corrente: true } }),
+    db.clienti.findMany({ where: { id: cliente_id }, include: { corrente: true } }),
+    db.subagenti.findMany({ where: { agenzie: { some: { cliente_id, fornitore_id } } } }),
+    db.provvigioni_scaglioni.findMany({ where: { fornitore_id }, orderBy: { id: 'asc' } }),
+    db.provvigioni_eccezioni.findMany({ where: { fornitore_id } }),
+    db.interscambio.findMany({ where: { cliente_id, fornitore_id }, orderBy: { id: 'asc' } }),
+    db.ordini_fornitore_testata.findMany({
+      where: { OR: [
+        { id: { in: [pratica, ...rif.map((r) => r.testata_id)] } },
+        ...(mesi.length ? [{ cliente_id, fornitore_id, documenti: { some: { tipo: 'fattura', OR: mesi } } }] : []),
+      ] },
+      orderBy: { id: 'asc' }, include: CON_PRATICA,
+    }),
+  ]);
+  return componi(oggi, { fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini: [], liquidazioni: [] });
+}
+
+/** Dalle righe del database alla forma del motore: una sola copia delle conversioni. */
+function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini, liquidazioni }: Righe) {
   return {
     oggi,
     fornitori: new Map(fornitori.map((f) => [id(f.id), {

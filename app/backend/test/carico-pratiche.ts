@@ -1,13 +1,13 @@
-// Misura dei tempi di GET /api/pratiche con ~10.000 pratiche (D-52 §19). Non è una prova jest.
-// Solo su decobrands_test (test/ambiente.ts): copia le pratiche del seed con righe e documenti,
-// misura la query nuova e la vecchia lettura in memoria (caricaDati + motore), poi ripulisce.
+// Misura dei tempi di GET /api/pratiche e /api/pratiche/:id con ~10.000 pratiche (D-52 §19). Non è una
+// prova jest. Solo su decobrands_test (test/ambiente.ts): copia le pratiche del seed con righe e documenti,
+// misura le letture nuove e le vecchie in memoria (caricaDati + motore), poi ripulisce.
 //   npx ts-node test/carico-pratiche.ts
 import './ambiente';
 import { Prisma } from '@prisma/client';
 import { seed } from '../prisma/seed';
 import { caricaDati } from '../src/motore/dati';
 import { abbinamento, haVariazioni, importoPratica, statoPratica } from '../src/motore/motore';
-import { PraticheController } from '../src/pratiche';
+import { PraticheController, dettaglioPratica } from '../src/pratiche';
 import { PrismaService } from '../src/prisma.service';
 import { svuota } from './svuota';
 
@@ -34,7 +34,20 @@ async function tempo(f: () => Promise<unknown>) {
 async function main() {
   const db = new PrismaService();
   const seminato = await seed(db); // se il database di prova è vuoto, alla fine si svuota di nuovo
+  const nuova = new PraticheController(db);
+  // dettaglio: una pratica senza fattura e una con fattura (questa legge anche le pratiche dello stesso mese, D-27)
+  const [senza, con] = await Promise.all([false, true].map(async (f) => Number((await db.ordini_fornitore_testata.findFirstOrThrow({
+    where: { documenti: f ? { some: { tipo: 'fattura' } } : { none: {} } }, orderBy: { id: 'asc' }, select: { id: true } })).id)));
+  const dettagli = async () => {
+    for (const [nome, id] of [['dettaglio senza fatt.', senza], ['dettaglio con fattura', con]] as const) {
+      const prima = await tempo(async () => dettaglioPratica(await caricaDati(db), String(id)));
+      const dopo = await tempo(() => nuova.dettaglio(id));
+      console.log(`${nome.padEnd(20)} vecchia ${String(prima).padStart(6)} ms   nuova ${String(dopo).padStart(5)} ms`);
+    }
+  };
   try {
+    console.log(`Pratiche: ${await db.ordini_fornitore_testata.count()}`);
+    await dettagli();
     await db.$transaction(async (tx) => {
       await tx.$executeRaw`CREATE TEMP TABLE copie ON COMMIT DROP AS
         SELECT t.id AS vecchio, n, nextval(pg_get_serial_sequence('ordini_fornitore_testata', 'id')) AS nuovo
@@ -55,7 +68,6 @@ async function main() {
     const n = await db.ordini_fornitore_testata.count();
     const gries = String((await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id);
 
-    const nuova = new PraticheController(db);
     const casi: [string, Record<string, string>][] = [
       ['prima pagina', {}],
       ['filtro fornitore', { fornitori: gries }],
@@ -67,6 +79,7 @@ async function main() {
       const dopo = await tempo(() => nuova.elenco(q as Parameters<PraticheController['elenco']>[0]));
       console.log(`${nome.padEnd(20)} vecchia ${String(prima).padStart(6)} ms   nuova ${String(dopo).padStart(5)} ms`);
     }
+    await dettagli();
   } finally {
     await db.ordini_fornitore_testata.deleteMany({ where: { numero_ordine: { contains: '#' } } }); // righe e documenti a cascata
     if (seminato) await svuota(db);
