@@ -177,6 +177,7 @@ export const righeBollettinoDi = (S: Dati, d: Documento, fornitore_id: string) =
     .sort((x, y) => x.b.anno * 100 + x.b.mese - (y.b.anno * 100 + y.b.mese));
 
 type Lato = { imponibile: Dec | null; pct: Dec | null; importo: Dec };
+type Decisione = NonNullable<RigaBollettino['decisione']>;
 /** Riconciliazione riga per riga: fornitore (loro) contro calcolo del CRM (noi). */
 export function riconcilia(S: Dati, b: Bollettino) {
   const f = S.fornitori.get(b.fornitore_id)!, maturato = f.maturazione === 'maturato', meseB = aaaamm(b.anno, b.mese);
@@ -184,10 +185,11 @@ export function riconcilia(S: Dati, b: Bollettino) {
   const righe = b.righe.map((r) => {
     const n = r.documento_id ? documentoPerId(S, r.documento_id) : (nostri.find((x) => x.doc.numero === r.numero) ?? trovaDocumento(S, r.numero, b.fornitore_id));
     const riga = {
+      id: r.id as string | null, documento_id: n?.doc.id ?? null,
       numero: r.numero, data: r.data, pratica_id: n?.pratica.id ?? null, cliente_id: n?.pratica.cliente_id ?? null, tipo: n?.doc.tipo ?? null,
       loro: { imponibile: r.imponibile, pct: r.pct, importo: r.importo } as Lato | null, noi: null as Lato | null, differenza: null as Dec | null,
       categoria: 'sconosciuta', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
-      decisione: r.decisione as { esito: string; motivo: string | null } | null,
+      decisione: r.decisione as Decisione | null,
     };
     if (!n) return riga;
     const perc = percentuali(S, n.pratica, n.doc.data), pct = perc ? perc.dal_fornitore : ZERO;
@@ -211,12 +213,14 @@ export function riconcilia(S: Dati, b: Bollettino) {
   for (const x of nostri.filter((x) => !b.righe.some((r) => suDocumento(r, x.doc)))) {
     const perc = percentuali(S, x.pratica, x.doc.data), pct = perc ? perc.dal_fornitore : ZERO;
     const atteso = perc ? quota(x.doc.importo, pct) : ZERO;
+    // la decisione su un documento assente sta in bollettini_attese (D-56 §19); vale solo qui, finché manca
+    const attesa = b.attese.find((a) => a.documento_id === x.doc.id) ?? null;
     const riga = {
+      id: null as string | null, documento_id: x.doc.id as string | null,
       numero: x.doc.numero, data: x.doc.data, pratica_id: x.pratica.id, cliente_id: x.pratica.cliente_id, tipo: x.doc.tipo,
       loro: null as Lato | null, noi: { imponibile: x.doc.importo, pct, importo: atteso } as Lato | null, differenza: atteso.neg() as Dec | null,
       categoria: 'mancante', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
-      // ponytail: un documento che manca nel bollettino non ha una riga dove salvare "attendere": la crea F3 alla decisione
-      decisione: null as { esito: string; motivo: string | null } | null,
+      decisione: attesa?.decisione ?? null,
     };
     // maturato (§5.14): una fattura assente non è "mancante": il cliente non ha ancora pagato
     if (maturato && x.doc.tipo === 'fattura') {

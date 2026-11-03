@@ -393,6 +393,8 @@ a.m-cella:hover { background: #f1f6ff; }
   .cerniera-riepilogo .lato, .cerniera-riepilogo .lato.destro { grid-column: auto; text-align: left; }
   .dettagli.in-colonne dt { white-space: normal; }
   .c-intest, .c-riga { min-width: 960px; }
+  /* la matrice è più larga dello schermo: scorre di lato invece di tagliare le ultime colonne */
+  .matrice { overflow-x: auto; }
   .testa { flex-direction: column; align-items: flex-start; }
 }
 

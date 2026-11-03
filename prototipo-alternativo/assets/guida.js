@@ -155,14 +155,14 @@
         ['Chiudi', 'Verificato o contestato. Per chi paga sul maturato si sbloccano le provvigioni dei subagenti.']
       ],
       pulsanti: [
-        ['Carica un bollettino', 'In testata: carica il file del bollettino.'],
+        ['Carica un bollettino', 'In testata: scegli fornitore, mese e anno e allega il PDF. Un solo bollettino per fornitore e mese: il secondo viene rifiutato.'],
         ['apr 2026 → set 2026', 'Il periodo: sempre 6 mesi. Clic: a sinistra le scorciatoie (Ultimi 6 mesi, semestri), a destra l’anno e i mesi; scegli il mese d’inizio e il periodo si completa da solo (passando col mouse vedi quali mesi prende).'],
         ['‹ · ›', 'Spostano tutto il periodo di un mese.'],
         ['Tutti i fornitori', 'Filtro standard: uno o più fornitori. I numeri di Tutti · Con qualcosa da fare contano solo i fornitori scelti.'],
         ['Imbuto · Imbuto barrato', 'Riepilogo dei filtri (con il periodo) · togli tutti i filtri.'],
-        ['Tutti · Con qualcosa da fare', 'Solo i fornitori con un bollettino da decidere, pronto, contestato o non arrivato nel periodo.'],
-        ['Cella della matrice', 'Fornitore × mese: verificato, da decidere, pronto, atteso, non arrivato. Clic apre il bollettino.'],
-        ['Sollecita', 'Cella non arrivato: prepara il testo di sollecito con i documenti del mese.'],
+        ['Tutti · Con qualcosa da fare', 'Solo i fornitori con un bollettino arrivato da verificare, contestato o non arrivato nel periodo.'],
+        ['Cella della matrice', 'Fornitore × mese: verificato, arrivato, contestato, atteso, non arrivato, mese in corso. Clic su una cella con il bollettino: si apre il dettaglio.'],
+        ['Sollecita', 'Cella non arrivato: prepara il testo di sollecito con i documenti del mese (dalla pagina Oggi, F5).'],
         ['Accetta il loro importo', 'Sulla riga: accetti quanto dice il fornitore, con motivo.'],
         ['Contesta', 'Sulla riga: contesti, con motivo obbligatorio.'],
         ['Attendi il prossimo', 'Documento assente dal bollettino: lo aspetti nel mese successivo.'],

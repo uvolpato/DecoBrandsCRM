@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 // forma dei dati del prototipo (M.S), così le funzioni di motore.ts restano quelle di motore.js.
 // Importi sempre Prisma.Decimal, date come 'aaaa-mm-gg', id come stringhe.
 // ponytail: caricaDati carica tutto (bollettini, liquidazioni, analisi); il dettaglio della pratica usa
-// caricaDatiPratica. Filtrare per periodo o fornitore anche gli altri quando i dati cresceranno.
+// caricaDatiPratica, quello del bollettino caricaDatiBollettino. Filtrare per periodo o fornitore anche gli altri quando i dati cresceranno.
 
 type Db = Prisma.TransactionClient;
 const Dec = Prisma.Decimal;
@@ -49,7 +49,7 @@ export const praticaDaDb = (t: Testata) => ({
   })),
 });
 
-const CON_RIGHE = { righe: { orderBy: { id: 'asc' } } } satisfies Prisma.bollettini_testataInclude;
+const CON_RIGHE = { righe: { orderBy: { id: 'asc' } }, attese: { orderBy: { id: 'asc' } } } satisfies Prisma.bollettini_testataInclude;
 type Righe = {
   fornitori: Prisma.fornitoriGetPayload<{ include: { corrente: true } }>[];
   clienti: Prisma.clientiGetPayload<{ include: { corrente: true } }>[];
@@ -113,6 +113,51 @@ export async function caricaDatiPratica(db: Db, pratica: bigint, oggi = giornoRo
   return componi(oggi, { fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini: [], liquidazioni: [] });
 }
 
+/** Solo i dati che la riconciliazione di un bollettino legge (§7.7, come caricaDatiPratica): il bollettino con
+ *  righe e attese, il fornitore con scaglioni ed eccezioni, le pratiche del fornitore con documenti del mese o
+ *  toccati dalle righe (per id o per numero), i loro clienti e agenzie; sul maturato anche gli altri bollettini
+ *  con righe sui documenti del mese ("pagata dopo", §5.14). Stessa forma di caricaDati; null se non c'è. */
+export async function caricaDatiBollettino(db: Db, bollettino: bigint, oggi = giornoRoma(new Date())) {
+  const b = await db.bollettini_testata.findUnique({ where: { id: bollettino }, include: CON_RIGHE });
+  if (!b) return null;
+  const { fornitore_id } = b;
+  const dal = new Date(Date.UTC(b.anno, b.mese - 1, 1)), al = new Date(Date.UTC(b.anno, b.mese, 1));
+  const [fornitori, testate, scaglioni, eccezioni] = await Promise.all([
+    db.fornitori.findMany({ where: { id: fornitore_id }, include: { corrente: true } }),
+    db.ordini_fornitore_testata.findMany({
+      where: { fornitore_id, documenti: { some: { OR: [
+        { data: { gte: dal, lt: al } },
+        { id: { in: b.righe.flatMap((r) => r.documento_id ?? []) } },
+        { numero: { in: b.righe.filter((r) => !r.documento_id).map((r) => r.fattura_numero) } },
+      ] } } },
+      orderBy: { id: 'asc' }, include: CON_PRATICA,
+    }),
+    db.provvigioni_scaglioni.findMany({ where: { fornitore_id }, orderBy: { id: 'asc' } }),
+    db.provvigioni_eccezioni.findMany({ where: { fornitore_id } }),
+  ]);
+  const clienti = [...new Set(testate.map((t) => t.cliente_id))];
+  const delMese = testate.flatMap((t) => t.documenti).filter((d) => d.data >= dal && d.data < al);
+  const [cl, interscambio, altri] = await Promise.all([
+    db.clienti.findMany({ where: { id: { in: clienti } }, include: { corrente: true } }),
+    db.interscambio.findMany({ where: { fornitore_id, cliente_id: { in: clienti } }, orderBy: { id: 'asc' } }),
+    fornitori[0]?.tipo_provvigione === 'maturato' && delMese.length
+      ? db.bollettini_testata.findMany({
+        where: { fornitore_id, id: { not: b.id }, righe: { some: { OR: [
+          { documento_id: { in: delMese.map((d) => d.id) } },
+          { documento_id: null, fattura_numero: { in: delMese.map((d) => d.numero) } },
+        ] } } },
+        include: CON_RIGHE,
+      })
+      : [],
+  ]);
+  const bollettini = [b, ...altri].sort((x, y) => (x.id < y.id ? -1 : 1));
+  return componi(oggi, { fornitori, clienti: cl, subagenti: [], scaglioni, eccezioni, interscambio, testate, bollettini, liquidazioni: [] });
+}
+
+/** Decisione di una riga o di un'attesa (D-49, D-56); il giorno come le altre date del motore (Roma). */
+const decisione = (r: { decisione: string | null; decisione_motivo: string | null; deciso_da: bigint | null; deciso_il: Date | null }) =>
+  r.decisione ? { esito: r.decisione, motivo: r.decisione_motivo, da: r.deciso_da ? id(r.deciso_da) : null, il: r.deciso_il ? giornoRoma(r.deciso_il) : null } : null;
+
 /** Dalle righe del database alla forma del motore: una sola copia delle conversioni. */
 function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini, liquidazioni }: Righe) {
   return {
@@ -144,8 +189,10 @@ function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccez
         numero: r.fattura_numero, data: r.fattura_data ? iso(r.fattura_data) : null, imponibile: r.importo_merce, pct: r.pct_riconosciuta, importo: r.importo_riconosciuto,
         tipo: r.tipo_riga === 'provvigione' ? null : r.tipo_riga, // storno | riaccredito (§5.14)
         pct_calcolata: r.pct_calcolata, importo_calcolato: r.importo_calcolato, // congelati alla verifica (§5.11)
-        decisione: r.decisione ? { esito: r.decisione, motivo: r.decisione_motivo } : null, // riga che non quadra (D-49)
+        decisione: decisione(r), // riga che non quadra (D-49)
       })),
+      // decisioni sui documenti che mancano nel bollettino (D-56): nostre, non righe del fornitore
+      attese: b.attese.map((a) => ({ documento_id: id(a.documento_id), decisione: decisione(a)! })),
     })),
     liquidazioni_chiuse: liquidazioni.map((l) => ({ id: id(l.id), anno: l.anno, trimestre: l.trimestre, chiusa_il: giornoRoma(l.chiusa_il) })),
   };

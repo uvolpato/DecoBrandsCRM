@@ -39,6 +39,8 @@ export const SCHEMI: Record<string, string[]> = {
   'crud.update': ['prima', 'dopo'],
   'crud.delete': [],
   'stato.change_state': ['prima', 'dopo'],
+  // bollettini (§15.2.5)
+  'calcolo.verify': ['bollettino_id', 'periodo', 'importo_riconosciuto', 'importo_calcolato', 'differenza_totale'],
   'errore.error': ['rotta', 'metodo', 'http_status', 'errore'],
   // documenti (§15.2.4, F2-A3)
   'documento.upload': ['documento_id', 'file_nome', 'dimensione', 'origine'],

@@ -77,9 +77,9 @@ piccole correzioni, ovunque.
 | 4 · F2 Pratiche | F2-A1 Elenco pratiche (OpenCode + controllo Claude Code): `GET /api/pratiche` con stato, importi e variazioni dal motore, filtri multipli, conteggi dei segmenti senza il filtro di stato (D-23), ordinamento e pagine sul server; prove 198, `app_pratiche.py` 19 OK | 1 | Sonnet | [x] |
 | | F2-A3 Documenti fiscali, netto, canale di caricamento (server e pagine, con F2-A2): `/api/pratiche/:id/documenti` e `/api/documenti/carica`, card *Documenti fiscali* con netto, finestre della fattura e della nota di credito, PDF del documento; prove 226 | 1 | **Opus** | [x] |
 | | F2-A2 Dettaglio pratica (OpenCode + controllo Claude Code): `GET /api/pratiche/:id` con binario, righe a confronto, provvigione e azione dal motore; `GET /api/documenti/:id/file`; pagina con binario, *Riepilogo* (provvigione, documenti fiscali) e *Righe a confronto*, avviso delle variazioni, apertura sul confronto dal filtro *Con variazioni*; prove 226, `app_pratica.py` 42 OK | 2 | Sonnet | [x] |
-| 5 · F3 Bollettini | F3-A1 Matrice e caricamento | 1 | Sonnet | [ ] |
+| 5 · F3 Bollettini | F3-A1 Matrice e caricamento (OpenCode + controllo Claude Code): `GET /api/bollettini` in SQL (6 mesi, stati, conteggi D-23), `POST /api/bollettini` con doppione 409 e PDF dal canale comune; `app_bollettini.py` 22 OK | 1 | Sonnet | [x] |
 | | F3-A3 Incassi dei clienti, storni e riaccrediti | 1 | **Opus** | [ ] |
-| | F3-A2 Dettaglio bollettino (cerniera) | 2 | **Opus** | [ ] |
+| | F3-A2 Dettaglio bollettino, parte server (Opus): `GET /api/bollettini/:id` a cerniera con caricamento parziale, decisioni sulle righe e sui mancanti (`bollettini_attese`, D-56), abbinamento, chiusura verificato/contestato che rende il mese periodo chiuso (D-51); prove 255. **Mancano le pagine** (OpenCode) | 2 | **Opus** | [~] |
 | 6 · F4 Liquidazioni e Analisi | F4-A1 Trimestri e subagenti con totali, chiusura | 1 | **Opus** | [ ] |
 | | F4-A5 Pagina Analisi | 1 | Sonnet | [ ] |
 | | F4-A2 Scheda Documenti (liquidabili, storni) | 2 | **Opus** | [ ] |

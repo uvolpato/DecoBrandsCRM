@@ -258,6 +258,7 @@ model ordini_fornitore_documenti {
   arrivo           documenti_in_arrivo?         @relation(fields: [arrivo_id], references: [id], onDelete: SetNull)
   liquidazione     liquidazioni?                @relation(fields: [liquidazione_id], references: [id], onDelete: Restrict)
   righe_bollettino bollettini_righe[]
+  attese_bollettino bollettini_attese[]
   testata          ordini_fornitore_testata     @relation(fields: [testata_id], references: [id], onDelete: Cascade)
   correzione       provvigioni_correzioni?
 
@@ -318,6 +319,7 @@ model bollettini_testata {
   chiusore  utenti?               @relation(fields: [chiuso_da], references: [id], onDelete: Restrict)
   fornitore fornitori_versioni    @relation(fields: [fornitore_id, fornitore_versione_id], references: [fornitore_id, id], onDelete: Restrict, map: "bollettini_testata_fornitore_versione_fkey")
   righe     bollettini_righe[]
+  attese    bollettini_attese[]
   arrivati  documenti_in_arrivo[]
 
   @@unique([fornitore_id, mese, anno])
@@ -358,6 +360,24 @@ model bollettini_righe {
   @@index([testata_id])
   @@index([documento_id])
   @@index([liquidazione_id])
+}
+
+/// Decisione su un documento del mese che manca nel bollettino (§7.7, D-56): nostra, non è una riga del fornitore.
+model bollettini_attese {
+  id               BigInt   @id @default(autoincrement())
+  testata_id       BigInt
+  documento_id     BigInt
+  decisione        String   @db.VarChar(12) // attendere | contestato (CHECK; motivo obbligatorio per contestato)
+  decisione_motivo String?
+  deciso_da        BigInt?
+  deciso_il        DateTime @default(now()) @db.Timestamptz(6)
+
+  testata   bollettini_testata         @relation(fields: [testata_id], references: [id], onDelete: Cascade)
+  documento ordini_fornitore_documenti @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+  decisore  utenti?                    @relation(fields: [deciso_da], references: [id], onDelete: Restrict)
+
+  @@unique([testata_id, documento_id])
+  @@index([documento_id])
 }
 
 // ---------- Liquidazioni (§4.2.19, D-33) ----------
@@ -468,6 +488,7 @@ model utenti {
   liquidazioni       liquidazioni[]
   bollettini_chiusi  bollettini_testata[]
   righe_decise       bollettini_righe[]
+  attese_decise      bollettini_attese[]
   documenti          documenti_in_arrivo[]    @relation("documento_utente")
   documenti_scartati documenti_in_arrivo[]    @relation("documento_scartato")
   campi_corretti     documenti_campi[]
