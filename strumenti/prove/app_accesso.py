@@ -17,6 +17,11 @@ def apri(pg):
 
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 
+def esci(pg):
+    """Esci dal menu dell'utente, in fondo alla barra (D-53)."""
+    pg.click('.io-btn'); pg.wait_for_selector('.menu-utente')
+    pg.click('.menu-utente-voce:has-text("Esci")'); pg.wait_for_function("location.pathname === '/accesso'")
+
 def link_dal_log(dopo):
     for _ in range(40):
         testo = LOG.read_bytes()[dopo:].decode('utf-8', errors='ignore')
@@ -46,12 +51,12 @@ with sync_playwright() as p:
     pg.fill('#c-nuova', 'nuova-password-1'); pg.fill('#c-ripeti', 'nuova-password-1'); pg.click('button.btn.largo')
     pg.wait_for_function("location.pathname === '/'"); pg.wait_for_selector('.barra-piede .io b')
     ok(pg.locator('.barra-piede .io b').inner_text() == 'Prova Nuovo', 'dopo il cambio si entra')
-    pg.click('a.io-esci'); pg.wait_for_function("location.pathname === '/accesso'")
+    esci(pg)
     pg.goto(BASE + '/'); pg.wait_for_function('f => (location.pathname + location.search).includes(f)', arg='/accesso?dopo=')
     ok(True, 'dopo Esci la sessione non vale più')
     entra(U + '@prova-e2e.it', 'nuova-password-1'); pg.wait_for_function("location.pathname === '/'")
     ok(True, 'si entra con l\'email e la nuova password')
-    pg.click('a.io-esci'); pg.wait_for_function("location.pathname === '/accesso'")
+    esci(pg)
 
     # password dimenticata: il link arriva nel log del backend (posta in sviluppo)
     inizio = LOG.stat().st_size
@@ -74,7 +79,7 @@ with sync_playwright() as p:
     ok(True, 'si entra con la password reimpostata')
 
     # ritorno: solo percorsi interni
-    pg.click('a.io-esci'); pg.wait_for_function("location.pathname === '/accesso'")
+    esci(pg)
     pg.goto(BASE + '/accesso?dopo=//esempio.com'); entra(U, 'nuova-password-2'); pg.wait_for_function("location.pathname === '/'")
     ok(pg.url == BASE + '/', 'ritorno verso un altro sito ignorato')
     pg.goto(BASE + '/accesso'); pg.wait_for_function("location.pathname === '/'")

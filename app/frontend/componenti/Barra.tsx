@@ -1,14 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icona } from './Icona';
 import { ruoloBreve, usePuo, useUtente } from './Utente';
 
-// Barra laterale con il menu per area (D-47, §7.1): in cima le aree che l'utente può aprire
-// (Provvigioni, Dati, Gestione), sotto le voci dell'area della pagina; la Guida vale per tutte.
-// In fondo l'utente con Esci e Cambia la password. `area` di una voce è l'area dei permessi
-// (D-45): le sue voci si aprono con *.consulta e seguono il livello (sola lettura).
+// Barra laterale con il menu per area (D-47, D-53, §7.1): in cima il nome dell'area aperta, sotto
+// le sue voci; in fondo l'utente, che apre il menu con le aree, la password, la Guida ed Esci.
+// `area` di una voce è l'area dei permessi (D-45): le sue voci si aprono con *.consulta e seguono
+// il livello (sola lettura).
 // ponytail: i contatori delle voci (Oggi, Documenti, Pratiche…) arrivano con le loro pagine.
 interface Voce { href: string; t: string; icona: string; area?: string; permesso?: string }
 const AREE_MENU: { id: string; t: string; icona: string; gruppi: { gruppo: string; voci: Voce[] }[] }[] = [
@@ -61,6 +61,34 @@ export function Barra() {
   if (dellaPagina && dellaPagina !== ultima) setUltima(dellaPagina);
   const qui = aree.find((a) => a.id === (dellaPagina ?? ultima)) ?? aree[0];
 
+  // menu dell'utente (D-53 §19): email, aree, password e guida, esci; si apre verso l'alto
+  const [menuUtente, setMenuUtente] = useState(false);
+  const contenitoreUtente = useRef<HTMLDivElement>(null);
+  const pulsanteUtente = useRef<HTMLButtonElement>(null);
+  const riquadroUtente = useRef<HTMLDivElement>(null);
+  useEffect(() => { setMenuUtente(false); }, [percorso]);
+  useEffect(() => {
+    if (!menuUtente) return;
+    riquadroUtente.current?.querySelector<HTMLElement>('[role=menuitem]')?.focus();
+    const fuori = (e: MouseEvent) => {
+      if (contenitoreUtente.current?.contains(e.target as Node)) return;
+      setMenuUtente(false); pulsanteUtente.current?.focus();
+    };
+    const tasto = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setMenuUtente(false); pulsanteUtente.current?.focus(); return; }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const voci = [...(riquadroUtente.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? [])];
+      if (!voci.length) return;
+      e.preventDefault();
+      const i = voci.indexOf(document.activeElement as HTMLElement);
+      const n = i < 0 ? (e.key === 'ArrowDown' ? 0 : voci.length - 1) : (i + (e.key === 'ArrowDown' ? 1 : -1) + voci.length) % voci.length;
+      voci[n]?.focus();
+    };
+    document.addEventListener('click', fuori);
+    document.addEventListener('keydown', tasto);
+    return () => { document.removeEventListener('click', fuori); document.removeEventListener('keydown', tasto); };
+  }, [menuUtente]);
+
   const voce = (v: Voce) => {
     const si = attiva(v.href, percorso);
     return (
@@ -77,30 +105,41 @@ export function Barra() {
         <img src="/logo-decobrands.png" alt="Decobrands" />
         <span>Sistema Informativo Aziendale</span>
       </div>
-      {/* ponytail: aree a segmenti finché ci stanno (fino a 4); con più aree un elenco a tendina */}
-      {aree.length > 1 && (
-        <nav className="aree-barra" aria-label="Aree">
-          {aree.map((a) => (
-            <Link key={a.id} href={a.gruppi[0].voci[0].href} className={'area' + (a === qui ? ' attiva' : '')} aria-current={a === qui ? 'true' : undefined}>
-              <Icona nome={a.icona} /><span>{a.t}</span>
-            </Link>
-          ))}
-        </nav>
-      )}
+      {qui && <div className="area-titolo"><Icona nome={qui.icona} /><span>{qui.t}</span></div>}
       {qui?.id === 'provvigioni' && puo('provvigioni.modifica') && <button type="button" className="carica-barra" id="carica-barra" onClick={() => router.push('/documenti')}><Icona nome="carica" />Carica documenti</button>}
       <div className="barra-menu">
         {qui?.gruppi.map((g) => (
           <nav key={g.gruppo} className="gruppo" aria-label={g.gruppo}><div className="gruppo-nome">{g.gruppo}</div>{g.voci.map(voce)}</nav>
         ))}
-        <nav className="gruppo" aria-label="Aiuto">{voce(GUIDA)}</nav>
       </div>
-      <div className="barra-piede">
-        <div className="io">
+      <div ref={contenitoreUtente} className={'barra-piede' + (menuUtente ? ' aperta' : '')}>
+        {menuUtente && (
+          <div ref={riquadroUtente} className="menu-utente" role="menu" aria-label="Utente">
+            <div className="menu-utente-mail">{io.email || io.nome}</div>
+            {aree.length > 1 && (
+              <>
+                {aree.map((a) => (
+                  <Link key={a.id} href={a.gruppi[0].voci[0].href} role="menuitem" aria-current={a === qui ? 'true' : undefined}
+                    className={'menu-utente-voce' + (a === qui ? ' attiva' : '')} onClick={() => setMenuUtente(false)}>
+                    <Icona nome={a.icona} /><span>{a.t}</span>
+                    {a === qui && <span className="menu-utente-spunta"><Icona nome="spunta" /></span>}
+                  </Link>
+                ))}
+                <div className="menu-sep" />
+              </>
+            )}
+            <Link href="/accesso/cambia" role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="chiave" /><span>Cambia la password</span></Link>
+            <Link href={GUIDA.href} role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="guida" /><span>Guida</span></Link>
+            <div className="menu-sep" />
+            <Link href="/accesso/esci" role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="esci" /><span>Esci</span></Link>
+          </div>
+        )}
+        <button ref={pulsanteUtente} type="button" className="io io-btn" aria-haspopup="menu" aria-expanded={menuUtente}
+          aria-label={'Menu di ' + io.nome} onClick={() => setMenuUtente(!menuUtente)}>
           <span className="io-sigla" aria-hidden="true">{sigla}</span>
           <span><b>{io.nome}</b>{ruoloBreve(io)}</span>
-          <Link className="io-esci" href="/accesso/esci" title="Esci" aria-label="Esci"><Icona nome="esci" /></Link>
-        </div>
-        <Link href="/accesso/cambia">Cambia la password</Link>
+          <Icona nome="giu" />
+        </button>
       </div>
     </aside>
   );

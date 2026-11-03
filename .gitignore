@@ -5,3 +5,4 @@ image.png
 Claude outputs/
 # grafo di graphify: locale, si ricostruisce con `graphify update .`
 graphify-out/
+__pycache__/

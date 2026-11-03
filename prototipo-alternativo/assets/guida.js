@@ -41,6 +41,7 @@
         ['Schede', 'Contenuti diversi nello stesso spazio (es. Agenzie · Pratiche); il numero dice quanti elementi ci sono. Frecce ← → per passare da una all’altra.'],
         ['Intestazione di colonna', 'Clic: ordina crescente ▲, di nuovo decrescente ▼. L’ordinamento vale su tutto l’elenco, non solo sulla pagina.'],
         ['‹ 1 2 … ›', 'In fondo alle tabelle lunghe: cambia pagina. Le righe per pagina si fissano nelle Impostazioni.'],
+        ['Menu dell’utente', 'In fondo alla barra, clic sul tuo nome: cambia area (Provvigioni, Dati, Gestione), Cambia la password, Guida, Esci.'],
         ['Campo con lente', 'Scrivi: compaiono le prime 5 corrispondenze (↑ ↓ Invio). La lente o F4 apre la ricerca completa. Pallino verde = trovato in anagrafica, rosso = non trovato.'],
         ['× / Esc', 'Chiudono la finestra in primo piano senza salvare.']
       ],
@@ -257,14 +258,14 @@
       sintesi: 'Anagrafica da Integra in sola lettura; nel CRM si gestiscono le condizioni e le percentuali di provvigione per sconto, con la data da cui valgono.',
       pulsanti: [
         ['Riga del fornitore', 'Apre la scheda a destra.'],
-        ['Modifica condizioni', 'Giorni di attesa della conferma, giorno del bollettino, pagamento sul maturato o sul fatturato, giorni per l’incasso dal cliente.'],
+        ['Modifica condizioni', 'Giorni attesa conferma, giorno del bollettino, pagamento sul maturato o sul fatturato, giorni per l’incasso dal cliente.'],
         ['Schede Percentuali · Clienti seguiti', 'Percentuali per versione: quella in vigore in alto, poi le future e le passate, con le eccezioni personali sotto la percentuale al subagente; clienti seguiti per quel fornitore (si modificano dal cliente), con filtro a scelta multipla per subagente.'],
         ['Nuove percentuali', 'Inserisce una nuova versione delle percentuali da una data: le righe partono da quelle più recenti e si possono aggiungere sconti, non togliere.'],
         ['Correggi · Elimina', 'Sulla singola versione. Valgono solo dopo l’ultima chiusura del fornitore (bollettino verificato o contestato, trimestre liquidato); altrimenti il server rifiuta e la finestra lo spiega.']
       ],
       finestre: [
         { nome: 'Condizioni del fornitore', da: 'Modifica condizioni', cosa: 'Regole che fanno scattare solleciti e liquidazioni.',
-          campi: [['Giorni di attesa della conferma', 'Dopo, la pratica è in ritardo.'], ['Bollettino atteso entro il giorno', 'Del mese successivo (1–28); dopo, compare il sollecito.'], ['Pagamento provvigioni', 'Maturato o fatturato.'], ['Giorni per l’incasso dal cliente', 'Sul maturato: dopo questi giorni dalla fattura non ancora riconosciuta, l’incasso è da verificare (iniziale 60).']], azioni: [['Salva condizioni', 'Applica subito.']] },
+          campi: [['Giorni attesa conferma', 'Dopo, la pratica è in ritardo.'], ['Bollettino atteso entro il giorno', 'Del mese successivo (1–28); dopo, compare il sollecito.'], ['Pagamento provvigioni', 'Maturato o fatturato.'], ['Giorni per l’incasso dal cliente', 'Sul maturato: dopo questi giorni dalla fattura non ancora riconosciuta, l’incasso è da verificare (iniziale 60).']], azioni: [['Salva condizioni', 'Applica subito.']] },
         { nome: 'Nuove percentuali', da: 'Nuove percentuali', cosa: 'Per ogni sconto: % a Decobrands e % al subagente.', campi: [['Valide dal', 'Deve venire dopo l’ultima chiusura del fornitore; può cadere fra due versioni. I documenti precedenti restano calcolati con le percentuali di allora.'], ['Aggiungi uno sconto', 'Facoltativo: le soglie esistenti non si tolgono.']], azioni: [['Salva le nuove percentuali', 'Crea la nuova versione.'], ['Salva la correzione', 'Con Correggi: sostituisce le percentuali di quella versione.']] }
       ] },
     { id: 'subagenti', titolo: 'Subagenti', gruppo: 'Anagrafiche', vai: '#/subagenti',
@@ -305,7 +306,7 @@
     /* ---------------- Gestione ---------------- */
     { id: 'accesso', titolo: 'Accesso', gruppo: 'Gestione', vai: '#/accesso/cambia',
       sintesi: 'Si entra con nome utente (o email) e password, come nella Gestione Ordini. La prima volta si usa la password provvisoria arrivata per email e se ne sceglie una propria.',
-      pulsanti: [['Premi un tasto o tocca', 'Sulla pagina col logo apre il modulo di accesso; il tasto premuto è già nel nome utente. Esc, un clic fuori o 2 minuti senza toccare nulla tornano al logo e il modulo riparte vuoto.'], ['Licenza d’uso', 'In fondo alla pagina di accesso: chi può usare il sistema e cosa non si può fare.'], ['Entra', 'Nome utente o email e password; con “Resta collegato” la sessione dura 30 giorni, senza finisce alla chiusura del browser.'], ['Password dimenticata?', 'Scrivi l’email: arriva un link per sceglierne una nuova, valido un’ora e una volta sola.'], ['Esci', 'L’icona accanto al tuo nome, in fondo alla barra.'], ['Cambia la password', 'In fondo alla barra: password attuale e nuova (almeno 8 caratteri).']],
+      pulsanti: [['Premi un tasto o tocca', 'Sulla pagina col logo apre il modulo di accesso; il tasto premuto è già nel nome utente. Esc, un clic fuori o 2 minuti senza toccare nulla tornano al logo e il modulo riparte vuoto.'], ['Licenza d’uso', 'In fondo alla pagina di accesso: chi può usare il sistema e cosa non si può fare.'], ['Entra', 'Nome utente o email e password; con “Resta collegato” la sessione dura 30 giorni, senza finisce alla chiusura del browser.'], ['Password dimenticata?', 'Scrivi l’email: arriva un link per sceglierne una nuova, valido un’ora e una volta sola.'], ['Esci', 'Nel menu dell’utente, in fondo alla barra: clic sul tuo nome.'], ['Cambia la password', 'Nel menu dell’utente, in fondo alla barra: password attuale e nuova (almeno 8 caratteri).']],
       sapere: ['Il messaggio “Credenziali non valide” è lo stesso per nome sbagliato, password sbagliata o utente disattivato: così non si scopre chi è registrato.', 'Dopo troppi tentativi su un utente bisogna aspettare 15 minuti; i colleghi dello stesso ufficio entrano lo stesso.', 'Con la password provvisoria non si apre nessuna pagina prima di averla cambiata.', 'Cambiare la password chiude le sessioni aperte sugli altri computer.'] },
     { id: 'utenti', titolo: 'Utenti e ruoli', gruppo: 'Gestione', vai: '#/utenti',
       sintesi: 'Gli utenti del CRM. Si entra con nome utente (o email) e password; la password provvisoria arriva per email e va cambiata al primo accesso. Il ruolo decide cosa si può fare.',

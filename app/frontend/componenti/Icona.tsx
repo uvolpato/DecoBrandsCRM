@@ -31,6 +31,7 @@ const PERCORSI: Record<string, string> = {
   posta: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   avviso: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.5"/>',
   indietro: '<path d="M15 18l-6-6 6-6"/>',
+  giu: '<path d="M6 9l6 6 6-6"/>',
 };
 
 export function Icona({ nome }: { nome: string }) {

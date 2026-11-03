@@ -7,11 +7,26 @@ import sys, pathlib
 from playwright.sync_api import sync_playwright
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
-BASE, PW = 'http://localhost:8001', 'password-di-prova'
+BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8001'
+PW = 'password-di-prova'
 esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 voci = lambda pg: [x.strip() for x in pg.locator('.barra .voce span').all_text_contents()]  # le voci dell'area aperta
-aree = lambda pg: [x.strip() for x in pg.locator('.aree-barra .area').all_inner_texts()]
+def apri_utente(pg):
+    pg.click('.io-btn'); pg.wait_for_selector('.menu-utente')
+def aree(pg):
+    """Le aree del menu dell'utente (D-53): apre il riquadro, legge le voci e lo chiude."""
+    apri_utente(pg)
+    v = [x.strip() for x in pg.locator('.menu-utente-voce').all_inner_texts() if x.strip() not in ('Cambia la password', 'Guida', 'Esci')]
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(150)
+    return v
+def attiva(pg):
+    apri_utente(pg)
+    t = pg.locator('.menu-utente-voce.attiva').inner_text().strip()
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(150)
+    return t
+def scegli(pg, area):
+    apri_utente(pg); pg.click('.menu-utente-voce:has-text("%s")' % area)
 
 # D-42: su Accedi e Password dimenticata prima c'è il logo; un tasto apre la finestra
 def apri(pg):
@@ -34,29 +49,30 @@ with sync_playwright() as p:
 
     pg = entra(f'{S}-ammi', '/pratiche')
     ok(True, 'senza sessione: accesso e ritorno alla pagina chiesta (/pratiche)')
-    ok(aree(pg) == ['Provvigioni', 'Dati', 'Gestione'] and pg.locator('.aree-barra .area.attiva').inner_text() == 'Provvigioni', 'amministratore: tre aree, aperta quella della pagina')
-    ok('Bollettini' in voci(pg) and 'Fornitori' not in voci(pg) and 'Utenti e ruoli' not in voci(pg) and 'Guida' in voci(pg), 'si vedono solo le voci dell’area aperta, più la Guida')
+    ok(aree(pg) == ['Provvigioni', 'Dati', 'Gestione'] and attiva(pg) == 'Provvigioni', 'amministratore: tre aree, aperta quella della pagina')
+    ok('Bollettini' in voci(pg) and 'Fornitori' not in voci(pg) and 'Utenti e ruoli' not in voci(pg) and 'Guida' not in voci(pg), 'si vedono solo le voci dell’area aperta')
     ok(pg.locator('.voce.attiva').inner_text() == 'Pratiche', 'voce attiva = pagina corrente')
     ok(pg.locator('.barra-piede .io b').inner_text() == 'Prova Ammi' and 'Amministratore' in pg.locator('.barra-piede .io').inner_text(), 'utente e ruolo in fondo alla barra')
     ok(not pg.evaluate("document.body.classList.contains('sola-lettura')"), 'amministratore: niente fascia di sola lettura')
-    pg.click('.aree-barra .area:has-text("Dati")'); pg.wait_for_function("location.pathname === '/fornitori'")
-    ok(voci(pg) == ['Fornitori', 'Subagenti', 'Clienti', 'Guida'] and not pg.locator('#carica-barra').count(), 'area Dati: le sue voci, niente Carica documenti')
-    ok(pg.locator('.testa h1').inner_text() == 'Fornitori' and 'In costruzione' in pg.locator('.principale').inner_text(), 'pagina non ancora fatta: In costruzione dentro il guscio')
+    scegli(pg, 'Dati'); pg.wait_for_function("location.pathname === '/fornitori'")
+    ok(voci(pg) == ['Fornitori', 'Subagenti', 'Clienti'] and not pg.locator('#carica-barra').count(), 'area Dati: le sue voci, niente Carica documenti')
+    pg.wait_for_selector('.dt tbody tr.cliccabile')
+    ok(pg.locator('.testa h1').inner_text() == 'Fornitori', 'pagina Fornitori dentro il guscio')
     pg.goto(BASE + '/utenti'); pg.wait_for_selector('.testa h1')
-    ok(pg.locator('.aree-barra .area.attiva').inner_text() == 'Gestione' and 'Impostazioni' in voci(pg), 'su /utenti è aperta Gestione')
-    pg.click('.voce:has-text("Guida")'); pg.wait_for_function("location.pathname === '/guida'")
-    ok(pg.locator('.aree-barra .area.attiva').inner_text() == 'Gestione', 'la Guida lascia aperta l’ultima area')
+    ok(attiva(pg) == 'Gestione' and 'Impostazioni' in voci(pg), 'su /utenti è aperta Gestione')
+    apri_utente(pg); pg.click('.menu-utente-voce:has-text("Guida")'); pg.wait_for_function("location.pathname === '/guida'")
+    ok(attiva(pg) == 'Gestione', 'la Guida lascia aperta l’ultima area')
     pg.go_back(); pg.wait_for_selector('.testa h1')
     pg.screenshot(path=str(USCITA / 'guscio-ammi-1440.png'))
-    pg.click('.io-esci'); pg.wait_for_function("location.pathname === '/accesso'")
+    apri_utente(pg); pg.click('.menu-utente-voce:has-text("Esci")'); pg.wait_for_function("location.pathname === '/accesso'")
     pg.goto(BASE + '/pratiche'); pg.wait_for_function("location.pathname === '/accesso'")
     ok(True, 'Esci dalla barra: sessione chiusa')
     pg.close()
 
     pg = entra(f'{S}-oper')
     ok('Documenti scartati' in voci(pg) and aree(pg) == ['Provvigioni', 'Dati', 'Gestione'], 'operatore: Scartati in Provvigioni, tre aree')
-    pg.click('.aree-barra .area:has-text("Gestione")'); pg.wait_for_function("location.pathname === '/sistema'")
-    ok(voci(pg) == ['Stato del sistema', 'Guida'], 'operatore: in Gestione solo Stato del sistema')
+    scegli(pg, 'Gestione'); pg.wait_for_function("location.pathname === '/sistema'")
+    ok(voci(pg) == ['Stato del sistema'], 'operatore: in Gestione solo Stato del sistema')
     pg.goto(BASE + '/utenti'); pg.wait_for_selector('.vuoto b')
     ok(pg.locator('.vuoto b').inner_text() == 'Pagina riservata' and 'amministratori' in pg.locator('.vuoto').inner_text(), 'operatore su /utenti: Pagina riservata')
     pg.close()
@@ -72,7 +88,7 @@ with sync_playwright() as p:
 
     pg = entra(f'{S}-ammi', '/', 768)
     ok(pg.evaluate('document.documentElement.scrollWidth <= 768'), '768 px: niente scorrimento orizzontale')
-    ok(pg.evaluate("document.querySelector('.aree-barra').getBoundingClientRect().bottom <= document.querySelector('.barra-menu').getBoundingClientRect().top"), '768 px: aree sopra, voci sotto')
+    ok(pg.locator('.area-titolo').is_visible() and pg.locator('.io-btn').is_visible(), '768 px: nome dell’area e pulsante utente visibili')
     pg.screenshot(path=str(USCITA / 'guscio-768.png'))
     b.close()
 

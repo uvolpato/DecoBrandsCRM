@@ -48,6 +48,7 @@
     esci: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
     lucchetto: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     indietro: '<path d="M15 18l-6-6 6-6"/>',
+    giu: '<path d="M6 9l6 6 6-6"/>',
     chiudi: '<path d="M6 6l12 12M18 6L6 18"/>',
     spunta: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
@@ -1368,34 +1369,43 @@
      Per provarli: CRM.AMPLIAMENTI.vendita = true nella console, poi ricarica la pagina con il menu. */
   CRM.AMPLIAMENTI = { vendita: /[?&]vendita=1\b/.test(location.search) };
   const VOCI = [
-    { gruppo: 'Ogni giorno', voci: [
+    { gruppo: 'Ogni giorno', area: 'provvigioni', voci: [
       { id: 'oggi', href: '#/', t: 'Oggi', icona: 'oggi', area: 'provvigioni' },
       { id: 'documenti', href: '#/documenti', t: 'Documenti', icona: 'arrivo', area: 'provvigioni' },
-      { id: 'pratiche', href: '#/pratiche', t: 'Pratiche', icona: 'pratiche', area: 'provvigioni' }] },
-    { gruppo: 'Ogni mese', voci: [{ id: 'bollettini', href: '#/bollettini', t: 'Bollettini', icona: 'bollettini', area: 'provvigioni' }] },
-    { gruppo: 'Ogni trimestre', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni', area: 'provvigioni' },
+      { id: 'pratiche', href: '#/pratiche', t: 'Pratiche', icona: 'pratiche', area: 'provvigioni' },
+      { id: 'scartati', href: '#/scartati', t: 'Documenti scartati', icona: 'cestino', permesso: 'provvigioni.scartati' }] },
+    { gruppo: 'Ogni mese', area: 'provvigioni', voci: [{ id: 'bollettini', href: '#/bollettini', t: 'Bollettini', icona: 'bollettini', area: 'provvigioni' }] },
+    { gruppo: 'Ogni trimestre', area: 'provvigioni', voci: [{ id: 'liquidazioni', href: '#/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni', area: 'provvigioni' },
       { id: 'analisi', href: '#/analisi', t: 'Analisi', icona: 'analisi', area: 'provvigioni' }] },
-    { gruppo: 'Vendita diretta', ampliamento: 'vendita', voci: [
+    { gruppo: 'Vendita diretta', area: 'vendite', ampliamento: 'vendita', voci: [
       { id: 'ordini-cliente', href: '#/ordini-cliente', t: 'Ordini cliente', icona: 'carrello', area: 'vendite' },
       { id: 'articoli', href: '#/articoli', t: 'Articoli', icona: 'scatola', area: 'vendite' },
       { id: 'giacenze', href: '#/giacenze', t: 'Giacenze', icona: 'magazzino', area: 'vendite' },
       { id: 'alias-kit', href: '#/alias-kit', t: 'Alias e kit', icona: 'catena', area: 'vendite' }] },
-    { gruppo: 'Anagrafiche', voci: [
+    { gruppo: 'Anagrafiche', area: 'anagrafiche', voci: [
       { id: 'fornitori', href: '#/fornitori', t: 'Fornitori', icona: 'fornitori', area: 'anagrafiche' },
       { id: 'subagenti', href: '#/subagenti', t: 'Subagenti', icona: 'subagenti', area: 'anagrafiche' },
       { id: 'clienti', href: '#/clienti', t: 'Clienti', icona: 'abbinamenti', area: 'anagrafiche' }] },
-    { gruppo: 'Gestione', voci: [
+    { gruppo: 'Gestione', area: 'gestione', voci: [
       { id: 'utenti', href: '#/utenti', t: 'Utenti e ruoli', icona: 'subagenti', permesso: 'sistema.utenti' },
       { id: 'sistema', href: '#/sistema', t: 'Stato del sistema', icona: 'sistema', permesso: 'sistema.stato' },
-      { id: 'impostazioni', href: '#/impostazioni', t: 'Impostazioni', icona: 'impostazioni', permesso: 'sistema.impostazioni' },
-      { id: 'scartati', href: '#/scartati', t: 'Documenti scartati', icona: 'cestino', permesso: 'provvigioni.scartati' },
-      { id: 'guida', href: '#/guida', t: 'Guida', icona: 'guida' }], richiudibile: true }
+      { id: 'impostazioni', href: '#/impostazioni', t: 'Impostazioni', icona: 'impostazioni', permesso: 'sistema.impostazioni' }], richiudibile: true }
+  ];
+  // D-53: le aree stanno nel menu dell'utente; qui l'ordine, l'icona e la prima pagina di ognuna
+  const AREE_MENU = [
+    { id: 'provvigioni', t: 'Provvigioni', icona: 'liquidazioni', href: '#/' },
+    { id: 'anagrafiche', t: 'Dati', icona: 'fornitori', href: '#/fornitori' },
+    { id: 'gestione', t: 'Gestione', icona: 'impostazioni', href: '#/utenti' },
+    { id: 'vendite', t: 'Vendite', icona: 'magazzino', href: '#/ordini-cliente', ampliamento: 'vendita' }
   ];
   let gestioneAperta = false;
+  let ultimaArea = null;
+  let pulisciBarra = () => {};
   // voce della barra per id, e il permesso che la apre: quello dichiarato o, per le voci di un'area, *.consulta (D-45)
   const voceDi = id => VOCI.reduce((t, g) => t.concat(g.voci), []).find(v => v.id === id);
   const permessoDi = v => v.permesso || (v.area ? v.area + '.consulta' : null);
   CRM.Barra = function (attiva) {
+    pulisciBarra();
     document.body.classList.remove('in-accesso');
     const fare = M.daFare();
     const conta = {
@@ -1409,14 +1419,29 @@
       sistema: { n: M.S.sistema.problemi.filter(x => !x.visto).length, urgente: M.S.sistema.problemi.some(x => !x.visto && x.livello === 'errore') }
     };
     const io = M.utente();
+    const primaGestione = M.puo('sistema.utenti') ? '#/utenti' : M.puo('sistema.stato') ? '#/sistema' : '#/impostazioni';
+    const hrefArea = a => a.id === 'gestione' ? primaGestione : a.href;
+    // D-53: aree visibili nel menu dell'utente; Gestione dipende dai permessi di Sistema
+    const areeVisibili = AREE_MENU.filter(a => (!a.ampliamento || CRM.AMPLIAMENTI[a.ampliamento]) &&
+      (a.id === 'gestione' ? (M.puo('sistema.utenti') || M.puo('sistema.stato') || M.puo('sistema.impostazioni')) : !!M.livello(io, a.id)));
+    const areaDallaPagina = (voceDi(attiva) || {}).area;
+    const areaPagina = areaDallaPagina === 'sistema' ? 'gestione' : areaDallaPagina;
+    const areaAttiva = areeVisibili.some(a => a.id === areaPagina) ? areaPagina
+      : areeVisibili.some(a => a.id === ultimaArea) ? ultimaArea : (areeVisibili[0] || {}).id;
+    if (areaAttiva) ultimaArea = areaAttiva;
+    const areaTitolo = areeVisibili.find(a => a.id === areaAttiva);
     // sola lettura per area (D-45): la pagina aperta è di un'area dove l'utente ha solo "lettura"
-    const areaAttiva = (voceDi(attiva) || {}).area;
-    M.solaLettura = !!areaAttiva && M.livello(io, areaAttiva) === 'lettura';
+    M.solaLettura = !!areaDallaPagina && areaDallaPagina !== 'sistema' && M.livello(io, areaDallaPagina) === 'lettura';
     document.body.classList.toggle('sola-lettura', M.solaLettura);
+    const vociArea = areeVisibili.length > 1 ? areeVisibili.map(a =>
+      '<a class="menu-utente-voce' + (a.id === areaAttiva ? ' attiva' : '') + '" role="menuitem" href="' + hrefArea(a) + '"' + (a.id === areaAttiva ? ' aria-current="true"' : '') + '>' +
+      CRM.icona(a.icona) + '<span>' + a.t + '</span>' + (a.id === areaAttiva ? '<span class="menu-utente-spunta">' + CRM.icona('spunta') + '</span>' : '') + '</a>').join('') +
+      '<div class="menu-sep"></div>' : '';
     const b = $('#barra');
     b.innerHTML = '<div class="marchio"><img src="assets/logo-decobrands.png" alt="Decobrands"><span>Sistema Informativo Aziendale</span></div>' +
+      '<div class="area-titolo">' + (areaTitolo ? CRM.icona(areaTitolo.icona) + '<span>' + areaTitolo.t + '</span>' : '') + '</div>' +
       (M.puo('provvigioni.modifica') ? '<button type="button" class="carica-barra" id="carica-barra">' + CRM.icona('carica') + 'Carica documenti</button>' : '') +
-      '<div class="barra-menu">' + VOCI.filter(g => !g.ampliamento || CRM.AMPLIAMENTI[g.ampliamento]).map(g => Object.assign({}, g, { voci: g.voci.filter(v => !permessoDi(v) || M.puo(permessoDi(v))) })).filter(g => g.voci.length).map(g => {
+      '<div class="barra-menu">' + VOCI.filter(g => g.area === areaAttiva && (!g.ampliamento || CRM.AMPLIAMENTI[g.ampliamento])).map(g => Object.assign({}, g, { voci: g.voci.filter(v => !permessoDi(v) || M.puo(permessoDi(v))) })).filter(g => g.voci.length).map(g => {
         // il gruppo Gestione si apre da solo quando si è in una delle sue pagine (il contatore dei problemi resta visibile sul titolo)
         const aperto = !g.richiudibile || gestioneAperta || window.innerWidth <= 860 || g.voci.some(v => v.id === attiva);
         const titolo = g.richiudibile ? '<summary class="gruppo-nome">' + g.gruppo + (conta.sistema && conta.sistema.n && M.puo('sistema.stato') ? ' <span class="conta' + (conta.sistema.urgente ? ' urgente' : '') + '">' + conta.sistema.n + '</span>' : '') + '</summary>' : '<div class="gruppo-nome">' + g.gruppo + '</div>';
@@ -1425,11 +1450,37 @@
         return '<a class="voce' + (v.id === attiva ? ' attiva' : '') + '" href="' + v.href + '"' + (v.id === attiva ? ' aria-current="page"' : '') + '>' + CRM.icona(v.icona) + '<span>' + v.t + '</span>' +
           (k && k.n ? '<span class="conta' + (k.urgente ? ' urgente' : '') + '">' + k.n + '</span>' : '') + '</a>';
       }).join('') + (g.richiudibile ? '</details>' : '</nav>'); }).join('') + '</div>' +
-      '<div class="barra-piede"><div class="io"><span class="io-sigla" aria-hidden="true">' + esc(io.nome.split(' ').map(x => x[0]).join('').slice(0, 2)) + '</span><span><b>' + esc(io.nome) + '</b>' + esc(M.ruoloBreve(io)) + '</span><a class="io-esci" href="#/accesso/esci" title="Esci" aria-label="Esci">' + CRM.icona('esci') + '</a></div>' +
+      '<div class="barra-piede" id="barra-piede"><div class="menu-utente" id="menu-utente" role="menu" aria-label="Utente" hidden>' +
+      '<div class="menu-utente-mail">' + esc(io.email || io.nome) + '</div>' + vociArea +
+      '<a class="menu-utente-voce" role="menuitem" href="#/accesso/cambia">' + CRM.icona('chiave') + '<span>Cambia la password</span></a>' +
+      '<a class="menu-utente-voce" role="menuitem" href="#/guida">' + CRM.icona('guida') + '<span>Guida</span></a>' +
+      '<div class="menu-sep"></div>' +
+      '<a class="menu-utente-voce" role="menuitem" href="#/accesso/esci">' + CRM.icona('esci') + '<span>Esci</span></a></div>' +
+      '<button type="button" class="io io-btn" id="io-btn" aria-haspopup="menu" aria-expanded="false"><span class="io-sigla" aria-hidden="true">' + esc(io.nome.split(' ').map(x => x[0]).join('').slice(0, 2)) + '</span><span><b>' + esc(io.nome) + '</b>' + esc(M.ruoloBreve(io)) + '</span>' + CRM.icona('giu') + '</button>' +
       '<label class="io-cambia">Prova come <select id="accedi-come" aria-label="Prova il prototipo come">' + M.S.utenti.filter(u => u.attivo && !u.sistema).map(u => '<option value="' + u.id + '"' + (u.id === io.id ? ' selected' : '') + '>' + esc(u.nome + ' · ' + (u.ruolo === 'utente' ? M.ruoloBreve(u) : M.RUOLI[u.ruolo].breve)) + '</option>').join('') + '</select></label>' +
-      '<a href="#/accesso/cambia">Cambia la password</a><br>Data simulata: ' + M.dataLunga(M.oggi()) + '<br><button type="button" id="ripristina">Ripristina i dati di prova</button> · <a href="#/componenti"' + (attiva === 'componenti' ? ' aria-current="page"' : '') + '>Componenti</a></div>';
+      'Data simulata: ' + M.dataLunga(M.oggi()) + '<br><button type="button" id="ripristina">Ripristina i dati di prova</button> · <a href="#/componenti"' + (attiva === 'componenti' ? ' aria-current="page"' : '') + '>Componenti</a></div>';
     const det = $('details.richiudibile', b); if (det) det.addEventListener('toggle', () => { gestioneAperta = det.open; });
     if ($('#carica-barra')) $('#carica-barra').addEventListener('click', () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.alCaricamento && CRM.alCaricamento(f) }));
+    // menu dell'utente (D-53): si apre verso l'alto; frecce, Esc, clic fuori; il fuoco torna al pulsante
+    const piede = $('#barra-piede'), btn = $('#io-btn'), menu = $('#menu-utente');
+    const chiudi = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); piede.classList.remove('aperta'); btn.focus(); };
+    const apri = () => { menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); piede.classList.add('aperta'); const primo = menu.querySelector('[role=menuitem]'); if (primo) primo.focus(); };
+    const fuori = ev => { if (!piede.contains(ev.target)) chiudi(); };
+    const tasto = ev => {
+      if (menu.hidden) return;
+      if (ev.key === 'Escape') { chiudi(); return; }
+      if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+      const voci = [...menu.querySelectorAll('[role=menuitem]')]; if (!voci.length) return;
+      ev.preventDefault();
+      const i = voci.indexOf(document.activeElement);
+      const n = i < 0 ? (ev.key === 'ArrowDown' ? 0 : voci.length - 1) : (i + (ev.key === 'ArrowDown' ? 1 : -1) + voci.length) % voci.length;
+      voci[n].focus();
+    };
+    btn.addEventListener('click', () => menu.hidden ? apri() : chiudi());
+    menu.querySelectorAll('[role=menuitem]').forEach(a => a.addEventListener('click', () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); piede.classList.remove('aperta'); }));
+    document.addEventListener('click', fuori);
+    document.addEventListener('keydown', tasto);
+    pulisciBarra = () => { document.removeEventListener('click', fuori); document.removeEventListener('keydown', tasto); };
     $('#accedi-come').addEventListener('change', ev => { M.S.utente_corrente = Number(ev.target.value); M.salvaSempre(); CRM.Avviso('Ora sei ' + M.utente().nome + ' · ' + M.ruoloBreve(M.utente())); CRM.naviga(); });
     $('#ripristina').addEventListener('click', async () => {
       if (!(await CRM.Conferma('Ripristinare i dati di prova?', 'Le modifiche fatte in questa demo andranno perse.', 'Ripristina', true))) return;

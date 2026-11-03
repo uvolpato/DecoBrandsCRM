@@ -7,7 +7,8 @@ import sys, pathlib
 from playwright.sync_api import sync_playwright
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
-BASE, PW = 'http://localhost:8001', 'password-di-prova'
+BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8001'
+PW = 'password-di-prova'
 esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 
@@ -33,8 +34,10 @@ with sync_playwright() as p:
     pg.wait_for_selector('.dt tbody tr.cliccabile')
     ok('Utenti e ruoli' in testo(pg, '.testa h1'), 'titolo della pagina')
     pg.fill('.filtri input[type=search]', S + '-'); pg.wait_for_timeout(200)
-    ok(righe(pg) == 4, 'ricerca: i quattro utenti di prova')
-    ok(pg.locator('.segmenti [role=tab]:has-text("Tutti") .n').inner_text() == '4', 'numeri dei segmenti contano con la ricerca (D-23)')
+    n_utenti = righe(pg)
+    ok(n_utenti >= 4 and all((S + '-' + u) in testo(pg, '.dt tbody') for u in ('ammi', 'oper', 'lett', 'nuovo')),
+       'ricerca: i quattro utenti di prova (più eventuali altri con lo stesso prefisso)')
+    ok(pg.locator('.segmenti [role=tab]:has-text("Tutti") .n').inner_text() == str(n_utenti), 'numeri dei segmenti contano con la ricerca (D-23)')
     ok('(tu)' in testo(pg, '.dt tbody'), 'l’utente corrente è segnato (tu)')
     ok(pg.title() == 'Utenti e ruoli · Decobrands', 'titolo della scheda del browser')
     pg.click('.dt th:has-text("Ruolo")'); pg.wait_for_timeout(200)
@@ -94,7 +97,9 @@ with sync_playwright() as p:
 
     pg = entra(S + '-oper')
     ok('Pagina riservata' in testo(pg, '.principale') and 'amministratori' in testo(pg, '.principale'), 'operatore: Pagina riservata')
-    ok(pg.locator('.aree-barra .area.attiva').inner_text() == 'Gestione' and pg.locator('.barra .voce:has-text("Stato del sistema")').count() == 1, 'operatore: area Gestione con Stato del sistema')
+    pg.click('.io-btn'); pg.wait_for_selector('.menu-utente')
+    ok(pg.locator('.menu-utente-voce.attiva').inner_text().strip() == 'Gestione' and pg.locator('.barra .voce:has-text("Stato del sistema")').count() == 1, 'operatore: area Gestione con Stato del sistema')
+    pg.keyboard.press('Escape')
     pg.close()
 
     pg = entra(S + '-ammi', 768)

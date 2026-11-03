@@ -36,7 +36,7 @@ with sync_playwright() as p:
     seg = lambda pg, t: pg.locator('.segmenti [role=tab]:has-text("%s")' % t)
     nseg = lambda pg, t: int(seg(pg, t).locator('.n').inner_text())
     sovr = lambda pg: pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth')
-    def cerca(pg, t): pg.fill('.filtri input[type=search]', t); pg.wait_for_timeout(700)
+    def cerca(pg, t): pg.fill('.filtri input[type=search]', t); pg.wait_for_timeout(1200)
     def vai(pg, voce):
         pg.click('.barra a.voce:has-text("%s")' % voce); pg.wait_for_function("location.pathname.startsWith('/%s')" % voce.lower()); pg.wait_for_load_state('networkidle')
     def totali_piede(pg):
@@ -65,7 +65,7 @@ with sync_playwright() as p:
     # filtro multiplo per fornitore (D-22), riepilogo dei filtri e conteggi che seguono (D-23)
     fb = pg.locator('.filtri').first
     campo = fb.locator('.ricerca.multipla .ricerca-testo').first
-    campo.click(); fb.locator('.ricerca-menu li[role=option]', has_text='Gries').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(800)
+    campo.click(); fb.locator('.ricerca-menu li[role=option]', has_text='Gries').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(1200)
     n_g = nseg(pg, 'Tutte')
     ok(1 <= n_g < n and righe(pg) == min(25, n_g) and totali_piede(pg) == n_g and 'Gries' in (campo.get_attribute('placeholder') or ''),
        'filtro Gries: %d pratiche, numeri dei segmenti aggiornati' % n_g)
@@ -73,18 +73,18 @@ with sync_playwright() as p:
     ok('Gries' in testo(pg, '.riepilogo-pop'), 'riepilogo dei filtri: mostra Gries')
     pg.screenshot(path=str(USCITA / 'app-pratiche-filtro-1440.png'))
     pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
-    pg.locator('.riepilogo-filtri .btn-icona').nth(1).click(); pg.wait_for_timeout(800)
+    pg.locator('.riepilogo-filtri .btn-icona').nth(1).click(); pg.wait_for_timeout(1200)
     ok(totali_piede(pg) == n, 'tolti i filtri dal riepilogo: tornano %d pratiche' % n)
 
     # ordinamento sul server: clic su Importo = crescente, secondo clic = decrescente
-    pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(800)
+    pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(1200)
     ok(pg.locator('.dt th.attivo:has-text("Importo")').count() == 1 and importi(pg) == sorted(importi(pg)), 'ordinamento per importo crescente')
-    pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(800)
+    pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(1200)
     ok(importi(pg) == sorted(importi(pg), reverse=True), 'secondo clic: importo decrescente')
     prima_dec = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
 
     # pagina successiva, sempre sull'ordinamento scelto
-    pg.click('.dt-pagine button[title="Pagina successiva"]'); pg.wait_for_timeout(800)
+    pg.click('.dt-pagine button[title="Pagina successiva"]'); pg.wait_for_timeout(1200)
     inizio = testo(pg, '.dt-piede > span:first-child')
     ok(inizio.startswith('26–') and 'di %d elementi' % n in inizio and pg.locator('.dt tbody tr.cliccabile b').first.inner_text() != prima_dec,
        'pagina successiva: «%s»' % inizio)
