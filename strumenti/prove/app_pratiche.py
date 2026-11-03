@@ -93,8 +93,8 @@ with sync_playwright() as p:
 
     # ritorno dal dettaglio nello stesso punto: stessa pagina e stesso ordinamento
     url = pg.url
-    pg.locator('.dt tbody tr.cliccabile').first.click(); pg.wait_for_function("/^\\/pratiche\\/\\d+/.test(location.pathname)"); pg.wait_for_timeout(500)
-    ok('Pratica' in testo(pg, '.testa h1') and 'Dettaglio in arrivo' in testo(pg, '.vuoto'), 'clic sulla riga: pagina della pratica (F2-A2)')
+    pg.locator('.dt tbody tr.cliccabile').first.click(); pg.wait_for_function("/^\\/pratiche\\/\\d+/.test(location.pathname)"); pg.wait_for_selector('.binario')
+    ok('/pratiche/' in pg.url and pg.locator('.binario .tappa').count() == 4, 'clic sulla riga: pagina della pratica (F2-A2)')
     pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(900)
     ok(pg.url == url and testo(pg, '.dt-piede > span:first-child').startswith('26–'), 'indietro: stessa pagina dell’elenco')
     ok(pg.locator('.dt th.attivo:has-text("Importo")').get_attribute('aria-sort') == 'descending', 'indietro: stesso ordinamento')

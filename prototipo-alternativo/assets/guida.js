@@ -122,6 +122,9 @@
         ['Riepilogo · Righe a confronto', 'Le due schede della pratica; tornando indietro si riapre quella lasciata.'],
         ['Vedi le righe', 'Nell’avviso delle variazioni: apre la scheda Righe a confronto.'],
         ['Solo righe che cambiano · Tutte le righe', 'Nella scheda Righe: filtra il confronto.'],
+        ['Registra fattura · Nota di credito', 'Nella card Documenti fiscali: registra il documento quando arriva dal fornitore, con il PDF facoltativo. La nota di credito sceglie la fattura da stornare.'],
+        ['Correggi · Annulla', 'Su una riga della card: correggi numero, data, importo o note, oppure annulla il documento (se ha un file, torna fra i documenti da controllare).'],
+        ['PDF', 'Apre il PDF originale accanto ai dati del documento.'],
         ['Carica un documento', 'Nella scheda: carica un documento già destinato a questa pratica.'],
         ['Consulta affiancati', 'Apre i documenti della pratica affiancati al confronto.'],
         ['Clic su documento o riga a confronto', 'Apre la stessa finestra su quel documento o su quella riga.'],
@@ -129,13 +132,19 @@
         ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Nel riquadro Incasso: sollecito al cliente, o segnalazione del fornitore ricevuta per email o telefono.']
       ],
       finestre: [
-        { nome: 'Documenti della pratica', da: 'Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato.',
+        { nome: 'Documenti della pratica', da: 'PDF · Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato. Nell’app, per ora, a destra ci sono i dati del documento.',
           campi: [['Confrontato con', 'Sceglie il documento di confronto.'], ['Solo righe che cambiano · Tutte', 'Filtra il confronto.']],
           azioni: [['Clic su una riga', 'La evidenzia nel documento a sinistra.'], ['Esc', 'Chiude.']] },
+        { nome: 'Registra la fattura', da: 'Registra fattura', cosa: 'Registra la fattura del fornitore sulla pratica; da lì la pratica passa a Fatturata e il netto si aggiorna.',
+          campi: [['Numero', 'Come sul documento; non può ripetersi per lo stesso fornitore.'], ['Data', 'La data della fattura.'], ['Importo', 'Il lordo della fattura.'], ['Note', 'Facoltative.'], ['PDF', 'Facoltativo: il file si carica prima e resta in coda se la registrazione non va.']],
+          azioni: [['Registra', 'Salva il documento; numero doppio o file non in coda: il messaggio del server compare nella finestra.']] },
+        { nome: 'Registra la nota di credito', da: 'Nota di credito', cosa: 'Storna tutto o in parte una fattura della pratica.',
+          campi: [['Fattura stornata', 'La fattura da stornare, con quello che ne resta.'], ['Importo', 'Positivo; non può superare quello che resta della fattura.'], ['Storna tutta la fattura', 'L’importo lo calcola il server su quello che resta.'], ['PDF', 'Facoltativo, come per la fattura.']],
+          azioni: [['Registra', 'Salva la nota con importo negativo; oltre il residuo il server rifiuta e la finestra resta aperta.']] },
         { nome: 'Fattura non pagata', da: 'Segna come non pagata', cosa: 'Registra la segnalazione del fornitore che il cliente non ha pagato.', campi: [['Nota', 'Facoltativa, es. “email di Gasper del 12/09”.']], azioni: [['Segna come non pagata', 'La fattura va fra i pagamenti da sollecitare in Oggi.']] },
         { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }
       ],
-      sapere: ['Le righe contano soprattutto quando qualcosa non torna: per questo stanno nella seconda scheda, ma il contatore rosso e l’avviso nel Riepilogo non le lasciano passare inosservate.', 'Stati d’incasso: <b>Pagata</b> · <b>Non pagata</b> (stornata o segnalata) · <b>Incasso da verificare</b> (maturato, oltre i giorni d’incasso) · <b>In attesa di incasso</b> · <b>Nessuna segnalazione</b>. Vedi <a href="#/guida/incassi">Incassi dei clienti</a>.'] },
+      sapere: ['Le righe contano soprattutto quando qualcosa non torna: per questo stanno nella seconda scheda, ma il contatore rosso e l’avviso nel Riepilogo non le lasciano passare inosservate.', 'La nota di credito non può superare quello che resta della fattura: il server rifiuta e la finestra resta aperta per correggere l’importo.', 'Un documento che è in un bollettino non si cambia (importo, numero, data): si corregge con una nota di credito.', 'Numero e data valgono per tutte le pratiche della stessa fattura (una fattura su più ordini): correggendoli si aggiornano tutte.', 'Stati d’incasso: <b>Pagata</b> · <b>Non pagata</b> (stornata o segnalata) · <b>Incasso da verificare</b> (maturato, oltre i giorni d’incasso) · <b>In attesa di incasso</b> · <b>Nessuna segnalazione</b>. Vedi <a href="#/guida/incassi">Incassi dei clienti</a>.'] },
 
     { id: 'bollettini', titolo: 'Bollettini', gruppo: 'Lavoro', vai: '#/bollettini',
       sintesi: 'Ogni mese ogni fornitore comunica le provvigioni che riconosce. Il CRM le confronta con il proprio calcolo e mostra cosa quadra e cosa no.',

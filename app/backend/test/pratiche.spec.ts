@@ -1,11 +1,12 @@
 import 'dotenv/config';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { Prisma } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { caricaDati, giornoRoma } from '../src/motore/dati';
-import { haVariazioni, importoPratica, statoPratica } from '../src/motore/motore';
+import { confronto, haVariazioni, importoPratica, statoPratica } from '../src/motore/motore';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
 import { seed } from '../prisma/seed';
@@ -175,5 +176,54 @@ describe('GET /api/pratiche', () => {
   it('la lettura dell\'area Provvigioni può consultare; chi non ce l\'ha: 403', async () => {
     await lett.get('/pratiche').expect(200);
     await senzaPermesso.get('/pratiche').expect(403);
+  });
+});
+
+describe('GET /api/pratiche/:id', () => {
+  it('testata, binario delle fasi e azione proposta dalla pratica', async () => {
+    const elenco = (await resp.get('/pratiche?perPagina=200').expect(200)).body as Elenco;
+    const el = elenco.righe.find((x) => x.stato === 'scaduta' || x.stato === 'attesa')!;
+    const r = (await resp.get(`/pratiche/${el.id}`).expect(200)).body;
+    expect(r).toMatchObject({
+      id: el.id, numero: el.numero, cliente_id: el.cliente_id, fornitore_id: el.fornitore_id,
+      data: el.data, stato: el.stato, importo: el.importo, nota: el.nota,
+    });
+    expect(r.fasi.map((f: any) => f.titolo)).toEqual(['Ordine', 'Conferma', 'Fattura', 'Nota di credito']);
+    expect(r.fasi[0]).toMatchObject({ fatta: true, numero: el.numero, importo: el.importo });
+    expect({ attesa: 'attesa', scaduta: 'sollecito', confermata: 'fattura', fatturata: 'nessuna' }[el.stato as string]).toBe(r.azione.tipo);
+    expect(r.confronto.righe.length).toBeGreaterThan(0);
+    expect(r.confronto.fasi[0]).toMatchObject({ tipo: 'ordine', numero: el.numero, data: el.data });
+  });
+
+  it('le righe a confronto sono quelle del motore, con le variazioni (D-12, §5.8)', async () => {
+    const S = await caricaDati(db);
+    const p = S.pratiche.find((x: any) => haVariazioni(x))!;
+    const b = (await resp.get(`/pratiche/${p.id}`).expect(200)).body;
+    const attese = confronto(p);
+    expect(b.confronto.righe).toHaveLength(attese.length);
+    expect(b.confronto.righe.map((x: any) => [x.codice, x.varia, x.delta]))
+      .toEqual(attese.map((x) => [x.codice, x.varia, Number(x.delta)]));
+    expect(b.confronto.righe.some((x: any) => x.varia)).toBe(true);
+    expect(b.confronto.variazioni.numero).toBe(attese.filter((r) => r.varia).length);
+    expect(b.confronto.variazioni.numero).toBeGreaterThan(0);
+    expect(b.confronto.variazioni.totale).toBe(Number(attese.filter((r) => r.varia).reduce((s, r) => s.plus(r.delta), new Prisma.Decimal(0)).toFixed(2)));
+  });
+
+  it('provvigione calcolata dal server, con la quota dei documenti (D-27)', async () => {
+    const S = await caricaDati(db);
+    const p = S.pratiche.find((x: any) => x.documenti.some((d: any) => d.tipo === 'fattura'))!;
+    const b = (await resp.get(`/pratiche/${p.id}`).expect(200)).body;
+    expect(b.stato).toBe('fatturata');
+    expect(b.provvigione).toMatchObject({ maturazione: S.fornitori.get(p.fornitore_id)!.maturazione });
+    expect(b.provvigione.imponibile).toBe(Number(importoPratica(p).toFixed(2)));
+    expect(b.provvigione.a_decobrands).toBeCloseTo(b.provvigione.imponibile * b.provvigione.da_fornitore / 100, 2);
+    expect(b.provvigione.regole.length).toBeGreaterThan(0);
+  });
+
+  it('404 se non esiste; la lettura consulta, chi non ha l\'area Provvigioni: 403', async () => {
+    const elenco = (await resp.get('/pratiche?perPagina=1').expect(200)).body as Elenco;
+    await resp.get('/pratiche/999999999').expect(404);
+    await lett.get(`/pratiche/${elenco.righe[0].id}`).expect(200);
+    await senzaPermesso.get(`/pratiche/${elenco.righe[0].id}`).expect(403);
   });
 });

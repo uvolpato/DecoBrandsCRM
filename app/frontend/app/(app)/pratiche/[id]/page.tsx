@@ -1,12 +1,9 @@
-import { Pagina, Pannello } from '@/componenti/Pagina';
+'use client';
+import { useParams } from 'next/navigation';
+import { VistaPratica } from './VistaPratica';
 
-// F2-A2 porta qui il dettaglio (binario delle fasi, riepilogo e righe a confronto).
-export default function PaginaPratica() {
-  return (
-    <Pagina titolo="Pratica">
-      <Pannello>
-        <div className="vuoto"><b>Dettaglio in arrivo</b>Il binario delle fasi e il confronto delle righe arrivano con F2-A2.</div>
-      </Pannello>
-    </Pagina>
-  );
+// Il dettaglio si disegna da sé: il layout delle pratiche monta l'elenco solo senza id.
+export default function Pagina() {
+  const { id } = useParams<{ id: string }>();
+  return <VistaPratica id={id} />;
 }

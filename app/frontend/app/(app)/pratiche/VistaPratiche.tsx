@@ -122,7 +122,8 @@ export function VistaPratiche() {
                 onPagina={setPagina}
                 filtro={JSON.stringify({ valori, ordine })}
                 piede={dati ? 'Totale importo ' + euro(dati.totali.importo) : ''}
-                onRowClick={(p) => router.push('/pratiche/' + p.id)}
+                // con il filtro Con variazioni si apre direttamente il confronto (D-12 §19)
+                onRowClick={(p) => router.push('/pratiche/' + p.id + (valori.stato === 'variazioni' ? '?righe=1' : ''))}
                 emptyText="Nessuna pratica" emptyHint="Prova a togliere il filtro o a cambiare la ricerca." />}
         </div>
       </div>

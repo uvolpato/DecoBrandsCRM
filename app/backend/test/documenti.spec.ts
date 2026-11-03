@@ -3,7 +3,8 @@ import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createHash } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { giornoRoma } from '../src/motore/dati';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
@@ -25,11 +26,11 @@ const CARTELLA = process.env.DOCUMENTI_DIR!;
 // D-55: cartelle per anno e giorno di caricamento (giorno di Roma)
 const suDisco = (hash: string) => { const g = giornoRoma(new Date()).replace(/-/g, ''); return join(CARTELLA, g.slice(0, 4), g, hash + '.pdf'); };
 
-async function creaUtente(username: string, livello: string) {
+async function creaUtente(username: string, livello: string, area = 'provvigioni') {
   await db.utenti.create({
     data: {
       username, email: username + DOMINIO, nome: 'Prova ' + username, ruolo: 'utente',
-      aree: { create: [{ area: 'provvigioni', livello }] }, password_hash: await cifra(PW), deve_cambiare_password: false,
+      aree: { create: [{ area, livello }] }, password_hash: await cifra(PW), deve_cambiare_password: false,
     },
   });
 }
@@ -46,6 +47,14 @@ async function entra(utente: string) {
 }
 let op: Awaited<ReturnType<typeof entra>>;
 let lett: Awaited<ReturnType<typeof entra>>;
+let senzaArea: Awaited<ReturnType<typeof entra>>;
+
+// supertest non ha un lettore per application/pdf: raccoglie i byte della risposta
+const raccogli = (res: any, cb: (e: Error | null, dati?: Buffer) => void) => {
+  const parti: Buffer[] = [];
+  res.on('data', (c: Buffer) => parti.push(c));
+  res.on('end', () => cb(null, Buffer.concat(parti)));
+};
 
 const pdf = (testo: string) => Buffer.from(`%PDF-1.4\n% ${testo}\n%%EOF\n`);
 const eventi = (codice: string, entita_id: bigint) => db.registro.count({ where: { codice, entita_id } });
@@ -64,7 +73,8 @@ beforeAll(async () => {
   await seed(db);
   await creaUtente('op-doc', 'operatore');
   await creaUtente('lett-doc', 'lettura');
-  [op, lett] = await Promise.all([entra('op-doc'), entra('lett-doc')]);
+  await creaUtente('dati-doc', 'responsabile', 'dati');
+  [op, lett, senzaArea] = await Promise.all([entra('op-doc'), entra('lett-doc'), entra('dati-doc')]);
   const conf = await db.ordini_fornitore_testata.findMany({ where: { stato: 'confermato', documenti: { none: {} } }, orderBy: { id: 'asc' } });
   pratica = conf[0];
   [altra, terza] = await db.ordini_fornitore_testata.findMany({ where: { fornitore_id: pratica.fornitore_id, id: { not: pratica.id } }, orderBy: { id: 'asc' }, take: 2 });
@@ -282,5 +292,36 @@ describe('POST /api/documenti/carica (canale comune)', () => {
     it('pratica inesistente: 404', async () => {
       await op.get('/pratiche/999999999/documenti').expect(404);
     });
+  });
+});
+
+describe('GET /api/documenti/:id/file', () => {
+  it('il PDF del documento arrivato: in linea, sandbox, percorso dal database (D-55)', async () => {
+    const doc = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { arrivo_id: { not: null } }, include: { arrivo: true } });
+    const arrivo = doc.arrivo!;
+    const dati = pdf('documento ' + arrivo.id);
+    await mkdir(dirname(join(CARTELLA, arrivo.file_percorso)), { recursive: true });
+    await writeFile(join(CARTELLA, arrivo.file_percorso), dati);
+
+    const r = await lett.get(`/documenti/${arrivo.id}/file`).buffer(true).parse(raccogli).expect(200);
+    expect(r.headers['content-type']).toBe('application/pdf');
+    expect(r.headers['content-disposition']).toMatch(/^inline; filename\*=UTF-8''[^"\r\n]+$/);
+    expect(r.headers['x-content-type-options']).toBe('nosniff');
+    expect(r.headers['content-security-policy']).toBe('sandbox');
+    expect(r.body).toEqual(dati);
+
+    // solo il database decide il percorso: uno uscito dalla radice non si serve
+    await db.documenti_in_arrivo.update({ where: { id: arrivo.id }, data: { file_percorso: '../fuori.pdf' } });
+    await lett.get(`/documenti/${arrivo.id}/file`).expect(404);
+    await db.documenti_in_arrivo.update({ where: { id: arrivo.id }, data: { file_percorso: arrivo.file_percorso } });
+
+    rmSync(join(CARTELLA, arrivo.file_percorso));
+    await lett.get(`/documenti/${arrivo.id}/file`).expect(404);
+  });
+
+  it('403 a chi non ha l\'area Provvigioni; 404 per un documento inesistente', async () => {
+    const arrivo = await db.documenti_in_arrivo.findFirstOrThrow({ where: { file_percorso: { not: '' } } });
+    await senzaArea.get(`/documenti/${arrivo.id}/file`).expect(403);
+    await lett.get('/documenti/999999999/file').expect(404);
   });
 });

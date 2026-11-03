@@ -75,8 +75,8 @@ piccole correzioni, ovunque.
 | | F1-A5 Percentuali datate ed eccezioni personali. Fatto: server con Opus (D-51: un cambio vale da una data dopo l'ultima chiusura; eccezioni con fornitore, sconto e periodo), pagine con OpenCode (scheda Percentuali del fornitore, Eccezioni personali del subagente); prove 191, nel browser 25/30/33 | 2 | **Opus** | [x] |
 | | F1-A6 Regole del subagente (D-27): dopo F4-A2, si fa nel blocco 6 | — | **Opus** | [ ] |
 | 4 · F2 Pratiche | F2-A1 Elenco pratiche (OpenCode + controllo Claude Code): `GET /api/pratiche` con stato, importi e variazioni dal motore, filtri multipli, conteggi dei segmenti senza il filtro di stato (D-23), ordinamento e pagine sul server; prove 198, `app_pratiche.py` 19 OK | 1 | Sonnet | [x] |
-| | F2-A3 Documenti fiscali, netto, canale di caricamento | 1 | **Opus** | [ ] |
-| | F2-A2 Dettaglio pratica (fasi, righe a confronto) | 2 | Sonnet | [ ] |
+| | F2-A3 Documenti fiscali, netto, canale di caricamento (server e pagine, con F2-A2): `/api/pratiche/:id/documenti` e `/api/documenti/carica`, card *Documenti fiscali* con netto, finestre della fattura e della nota di credito, PDF del documento; prove 226 | 1 | **Opus** | [x] |
+| | F2-A2 Dettaglio pratica (OpenCode + controllo Claude Code): `GET /api/pratiche/:id` con binario, righe a confronto, provvigione e azione dal motore; `GET /api/documenti/:id/file`; pagina con binario, *Riepilogo* (provvigione, documenti fiscali) e *Righe a confronto*, avviso delle variazioni, apertura sul confronto dal filtro *Con variazioni*; prove 226, `app_pratica.py` 42 OK | 2 | Sonnet | [x] |
 | 5 · F3 Bollettini | F3-A1 Matrice e caricamento | 1 | Sonnet | [ ] |
 | | F3-A3 Incassi dei clienti, storni e riaccrediti | 1 | **Opus** | [ ] |
 | | F3-A2 Dettaglio bollettino (cerniera) | 2 | **Opus** | [ ] |

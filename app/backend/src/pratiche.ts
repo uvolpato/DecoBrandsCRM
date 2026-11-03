@@ -1,10 +1,10 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Richiede } from './accesso';
-import { CON_PRATICA, giornoRoma, praticaDaDb } from './motore/dati';
-import { confronto, fasePratica, haVariazioni, importoPratica, r2 } from './motore/motore';
+import { CON_PRATICA, caricaDati, giornoRoma, praticaDaDb } from './motore/dati';
+import { abbinamento, confronto, fasePratica, haVariazioni, importoPratica, importoRighe, percentuali, quotaSub, r2, statoPratica } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { type Contesto, logEvent } from './registro';
 
@@ -38,6 +38,16 @@ const idElenco = (s: string | undefined) => (s ? s.split(',').map((x) => BigInt(
 
 // la colonna `stato` tiene la fase con i nomi di §4.2.7; l'elenco usa quelli del motore
 const STATO_DB = { attesa: 'inviato', confermata: 'confermato', fatturata: 'fatturato' } as const;
+
+const gg = (n: number) => `${n} ${n === 1 ? 'giorno' : 'giorni'}`;
+/** La nota dei giorni accanto allo stato, la stessa nell'elenco e nel dettaglio (§7.2, §7.3). */
+function notaStato(stato: string, giorni?: number) {
+  const n = giorni ?? 0;
+  return stato === 'confermata' ? 'in attesa di fattura'
+    : stato === 'scaduta' ? `da ${gg(-n)}`
+      : stato === 'attesa' ? (n === 0 ? 'scade oggi' : `entro ${gg(n)}`) : null;
+}
+const dataIt = (s: string) => s.split('-').reverse().join('/');
 
 /** Ricalcola con il motore quello che la pratica salva (D-52 §19): stato dai documenti, importo,
  *  variazioni. Va chiamata nella stessa transazione di ogni scrittura su documenti, righe o conferma
@@ -135,16 +145,12 @@ export class PraticheController {
       ORDER BY ${COLONNA[q.ordina ?? 'stato']} ${dir}, numero ${dir}, id
       LIMIT ${perPagina} OFFSET ${pagina * perPagina}`;
 
-    const gg = (n: number) => `${n} ${n === 1 ? 'giorno' : 'giorni'}`;
     return {
       righe: righe.map((r) => ({
         id: String(r.id), numero: r.numero, cliente_id: String(r.cliente_id), cliente: r.cliente,
         fornitore_id: String(r.fornitore_id), fornitore: r.fornitore,
         subagente_id: r.subagente_id == null ? null : String(r.subagente_id), subagente: r.subagente,
-        data: r.data, importo: Number(r.importo), stato: r.stato,
-        nota: r.stato === 'confermata' ? 'in attesa di fattura'
-          : r.stato === 'scaduta' ? `da ${gg(-r.giorni)}`
-          : r.stato === 'attesa' ? (r.giorni === 0 ? 'scade oggi' : `entro ${gg(r.giorni)}`) : null,
+        data: r.data, importo: Number(r.importo), stato: r.stato, nota: notaStato(r.stato, r.giorni),
         variazioni: r.variazioni, variazione: Number(r.variazione),
       })),
       totale: c.totale,
@@ -153,6 +159,99 @@ export class PraticheController {
       pagina,
       pagine,
       per_pagina: perPagina,
+    };
+  }
+
+  /** Dettaglio della pratica (§7.3, §8.1): testata, stato, binario delle fasi, righe a confronto,
+   *  provvigione e azione proposta. Tutto calcolato dal motore sul server (V12, D-28). */
+  @Get(':id')
+  @Richiede('provvigioni.consulta')
+  async dettaglio(@Param('id', ParseIntPipe) id: number) {
+    const S = await caricaDati(this.db);
+    const p = S.pratiche.find((x) => x.id === String(id));
+    if (!p) throw new NotFoundException('Pratica non trovata');
+
+    const s = statoPratica(S, p), nota = notaStato(s.chiave, s.giorni);
+    const ordine = p.righe.ordine, conferma = p.righe.conferma;
+    const impOrdine = importoRighe(ordine), impConferma = p.conferma ? importoRighe(conferma) : null;
+    const fatture = p.documenti.filter((d) => d.tipo === 'fattura');
+    const note = p.documenti.filter((d) => d.tipo === 'nota_credito');
+    const somma = (ds: typeof p.documenti) => r2(ds.reduce((x, d) => x.plus(d.importo), new Prisma.Decimal(0)));
+
+    const fasi = [
+      { titolo: 'Ordine', fatta: true, numero: p.numero, data: p.data, importo: Number(impOrdine) },
+      p.conferma && impConferma
+        ? { titolo: 'Conferma', fatta: true, numero: p.conferma.numero, data: p.conferma.data, importo: Number(impConferma), delta: Number(r2(impConferma.minus(impOrdine))) }
+        : {
+          titolo: 'Conferma', ritardo: s.chiave === 'scaduta',
+          testo: s.chiave === 'scaduta' ? `In ritardo ${nota} (attesa entro il ${dataIt(s.scadenza!)})`
+            : s.scadenza ? `Attesa entro il ${dataIt(s.scadenza)}` : 'Attesa',
+        },
+      fatture.length
+        ? {
+          titolo: fatture.length > 1 ? 'Fatture' : 'Fattura', fatta: true,
+          numero: fatture[0].numero + (fatture.length > 1 ? ` + ${fatture.length - 1}` : ''), data: fatture[0].data,
+          importo: Number(somma(fatture)), delta: Number(r2(somma(fatture).minus(impConferma ?? impOrdine))),
+        }
+        : { titolo: 'Fattura', testo: 'In attesa' },
+      note.length
+        ? { titolo: 'Nota di credito', fatta: true, numero: note[0].numero + (note.length > 1 ? ` + ${note.length - 1}` : ''), data: note[0].data, importo: Number(somma(note)) }
+        : { titolo: 'Nota di credito', assente: true, testo: 'Nessuna' },
+    ];
+
+    const faseRighe = (['ordine', 'conferma', 'fattura'] as const).filter((f) => p.righe[f].length);
+    const etichetta = { ordine: 'Ordine', conferma: 'Conferma', fattura: 'Fattura' } as const;
+    const numeroFase = (f: (typeof faseRighe)[number]) =>
+      f === 'ordine' ? { numero: p.numero, data: p.data }
+        : f === 'conferma' ? { numero: p.conferma?.numero ?? '', data: p.conferma?.data ?? p.data }
+          : { numero: fatture.map((d) => d.numero).join(' + '), data: fatture[0]?.data ?? p.data };
+    const righe = confronto(p);
+    const variate = righe.filter((r) => r.varia);
+    const deltaVariazioni = Number(r2(variate.reduce((s, r) => s.plus(r.delta), new Prisma.Decimal(0))));
+
+    // provvigione: le percentuali alla data del documento; al subagente la quota per documento (D-27)
+    const bicchiere = percentuali(S, p, fatture[0]?.data ?? p.data);
+    const fiscali = p.documenti.filter((d) => d.tipo === 'fattura' || d.tipo === 'nota_credito');
+    const quote = fiscali.map((d) => quotaSub(S, p, d)).filter((q): q is NonNullable<typeof q> => !!q);
+    const imponibile = importoPratica(p);
+    const sub = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
+    const provvigione = bicchiere ? {
+      imponibile: Number(imponibile),
+      sconto: Number(bicchiere.sconto), valido_dal: bicchiere.scaglione.valido_dal,
+      agente: Number(bicchiere.agente), sub_standard: Number(bicchiere.sub_standard),
+      sub: Number(bicchiere.sub), eccezione: bicchiere.eccezione, da_fornitore: Number(bicchiere.dal_fornitore),
+      a_decobrands: Number(r2(imponibile.times(bicchiere.dal_fornitore).div(100))),
+      a_subagente: Number(quote.length
+        ? r2(quote.reduce((x, q) => x.plus(q.provvigione), new Prisma.Decimal(0)))
+        : r2(imponibile.times(bicchiere.sub).div(100))),
+      maturazione: S.fornitori.get(p.fornitore_id)?.maturazione ?? null,
+      regole: [...new Set(quote.map((q) => q.regola))],
+    } : null;
+
+    const azione = s.chiave === 'fatturata'
+      ? { tipo: 'nessuna', testo: 'Pratica fatturata: non serve altro.' }
+      : s.chiave === 'confermata'
+        ? { tipo: 'fattura', testo: 'Attesa la fattura del fornitore: registrala quando arriva.' }
+        : s.chiave === 'scaduta'
+          ? { tipo: 'sollecito', testo: `Conferma in ritardo ${nota}: chiedila al fornitore.` }
+          : { tipo: 'attesa', testo: `Attesa la conferma entro il ${dataIt(s.scadenza!)}.` };
+
+    return {
+      id: p.id, numero: p.numero,
+      cliente_id: p.cliente_id, cliente: S.clienti.get(p.cliente_id)?.nome ?? '',
+      fornitore_id: p.fornitore_id, fornitore: S.fornitori.get(p.fornitore_id)?.nome ?? '',
+      subagente_id: sub?.subagente_id ?? null, subagente: sub ? (S.subagenti.get(sub.subagente_id)?.nome ?? null) : null,
+      data: p.data, importo: Number(imponibile), stato: s.chiave, nota, scadenza: s.scadenza ?? null,
+      fasi,
+      confronto: {
+        fasi: faseRighe.map((f) => ({ tipo: f, etichetta: etichetta[f], ...numeroFase(f) })),
+        righe: righe.map((r) => ({
+          codice: r.codice, descrizione: r.descrizione, varia: r.varia, delta: Number(r.delta),
+          per: r.per.map((x) => x ? { qta: Number(x.qta), prezzo: Number(x.prezzo), importo: Number(x.importo) } : null),
+        })),
+        variazioni: { numero: variate.length, totale: deltaVariazioni },
+      },
+      provvigione, azione,
     };
   }
 }

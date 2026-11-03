@@ -51,6 +51,24 @@ export async function api<T = unknown>(percorso: string, corpo?: object, metodo?
   return { ok: r.ok, stato: r.status, dati: dati as T, messaggio: r.ok ? '' : MESSAGGI[r.status] ?? (testo || MESSAGGI[500]) };
 }
 
+/** POST di un PDF in multipart/form-data (canale comune, §6.5): il file lo controlla il server. */
+export async function caricaPdf(file: File): Promise<Risposta<{ id: string; file_nome: string; stato: string; ricevuto_il: string }>> {
+  if (!csrf) await api('accesso/io');
+  const corpo = new FormData();
+  corpo.append('file', file);
+  let r: Response;
+  try {
+    r = await fetch('/api/documenti/carica', { method: 'POST', headers: { 'x-csrf-token': csrf }, body: corpo, credentials: 'same-origin' });
+  } catch {
+    return { ok: false, stato: 0, dati: null!, messaggio: 'Il server non risponde: controlla la connessione e riprova.' };
+  }
+  const dati = await r.json().catch(() => null);
+  if (dati && typeof dati.csrf === 'string') csrf = dati.csrf;
+  const m = dati?.message;
+  const testo = typeof m === 'string' ? m : Array.isArray(m) && typeof m[0] === 'string' ? m[0] : '';
+  return { ok: r.ok, stato: r.status, dati: dati as never, messaggio: r.ok ? '' : MESSAGGI[r.status] ?? (testo || MESSAGGI[500]) };
+}
+
 /** Pagina a cui tornare dopo l'accesso: solo percorsi interni (niente //sito o /\sito, D-38). */
 export function dopo(valore: string | null) {
   return valore && /^\/(?![/\\])/.test(valore) && !valore.startsWith('/accesso') ? valore : '/';

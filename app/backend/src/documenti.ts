@@ -1,15 +1,15 @@
 import {
   BadRequestException, Body, applyDecorators, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseIntPipe,
-  PayloadTooLargeException, Post, Put, Req, UnsupportedMediaTypeException, UploadedFile, UseInterceptors,
+  PayloadTooLargeException, Post, Put, Req, Res, StreamableFile, UnsupportedMediaTypeException, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Prisma } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min } from 'class-validator';
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
-import type { Request } from 'express';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, resolve, sep } from 'node:path';
+import type { Request, Response } from 'express';
 import { Richiede, contesto } from './accesso';
 import { Data, Facoltativo } from './fornitori';
 import { CON_PRATICA, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
@@ -102,6 +102,35 @@ export class DocumentiController {
   async carica(@Req() req: Request, @UploadedFile() file?: { originalname: string; buffer: Buffer }) {
     if (!file) throw new BadRequestException('Manca il file');
     return riceviDocumento(this.db, { nome: file.originalname, dati: file.buffer, origine: 'caricamento' }, contesto(req));
+  }
+
+  /** Il PDF originale di un documento arrivato (F2-A3, §8.1). Il percorso viene solo dal database
+   *  (D-55), mai dal browser; la risposta è in linea e chiusa in una sandbox. */
+  @Get(':id/file')
+  @Richiede('provvigioni.consulta')
+  async file(@Param('id', ParseIntPipe) id: number, @Res({ passthrough: true }) res: Response) {
+    const d = await this.db.documenti_in_arrivo.findUnique({ where: { id: BigInt(id) }, select: { file_percorso: true, file_nome: true } });
+    if (!d) throw new NotFoundException('Documento non trovato');
+    const radice = resolve(process.env.DOCUMENTI_DIR ?? '');
+    if (!process.env.DOCUMENTI_DIR) throw new Error('DOCUMENTI_DIR non definita in .env');
+    const percorso = resolve(radice, d.file_percorso);
+    if (!percorso.startsWith(radice + sep)) throw new NotFoundException('File non trovato');
+    let dati: Buffer;
+    try {
+      dati = await readFile(percorso);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw new NotFoundException('File non trovato');
+      throw e;
+    }
+    // RFC 5987: niente virgolette né a capo nell'intestazione (il nome arriva dal browser)
+    const nome = encodeURIComponent(d.file_nome).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename*=UTF-8''${nome}`,
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': 'sandbox',
+    });
+    return new StreamableFile(dati);
   }
 }
 
