@@ -285,6 +285,24 @@ export function statoIncasso(S: Dati, p: Pratica, d: Documento) {
   return { ...st, giorni: gg, limite, solleciti: d.solleciti, sollecitata_il: d.sollecitata_il };
 }
 
+/** Fatture da sollecitare al cliente (§5.14): non pagate (fatturato, stornate) e incassi da
+ *  verificare (maturato oltre i giorni d'incasso), dalla più vecchia. Solo fatture. */
+export function pagamentiDaSollecitare(S: Dati) {
+  const out = [];
+  for (const p of S.pratiche) for (const d of p.documenti) {
+    const st = statoIncasso(S, p, d);
+    if (st && (st.stato === 'insoluta' || st.stato === 'da_verificare')) {
+      out.push({
+        pratica_id: p.id, pratica: p.numero, documento_id: d.id, numero: d.numero, data: d.data,
+        cliente_id: p.cliente_id, cliente: S.clienti.get(p.cliente_id)?.nome ?? '',
+        fornitore_id: p.fornitore_id, fornitore: S.fornitori.get(p.fornitore_id)?.nome ?? '',
+        importo: d.importo, stato: st,
+      });
+    }
+  }
+  return out.sort((x, y) => x.data.localeCompare(y.data));
+}
+
 /* ---------- Liquidazioni ai subagenti (trimestri fissi, §5.6) ---------- */
 export const trimestre = (iso: string) => Math.floor((Number(iso.slice(5, 7)) - 1) / 3) + 1;
 export const limiti = (a: number, t: number) => ({ da: aaaamm(a, (t - 1) * 3 + 1) + '-01', a: fineMese(a, t * 3) });

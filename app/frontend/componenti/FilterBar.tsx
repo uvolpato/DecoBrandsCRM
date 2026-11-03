@@ -31,10 +31,11 @@ const predef = (c: CampoFiltro): string | string[] =>
   c.predefinito ?? (c.tipo === 'ricerca' && c.multipla ? [] : c.tipo === 'segmenti' || c.tipo === 'select' ? String(c.opzioni![0].value) : '');
 const uguali = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-export function FilterBar<V extends Valori>({ campi, valori, onChange, riepilogo, caricando }: {
+export function FilterBar<V extends Valori>({ campi, valori, onChange, riepilogo, caricando, classe }: {
   campi: CampoFiltro[]; valori: V; onChange: (v: V) => void;
   riepilogo?: boolean | { prima: VoceRiepilogo[] }; // icone Riepilogo dei filtri e Togli tutti i filtri in fondo
   caricando?: boolean; // i numeri dei segmenti non sono ancora arrivati: sagome (D-59)
+  classe?: string; // classi in più sul contenitore .filtri (es. filtri-entita dell'Analisi)
 }) {
   const metti = (nome: string, v: string | string[]) => onChange({ ...valori, [nome]: v });
   const str = (nome: string) => String(valori[nome] ?? '');
@@ -81,7 +82,7 @@ export function FilterBar<V extends Valori>({ campi, valori, onChange, riepilogo
   const azzera = () => onChange({ ...valori, ...Object.fromEntries(attivi.map((c) => [c.nome, predef(c)])) });
 
   return (
-    <div className={'filtri' + (riepilogo ? ' con-riepilogo' : '')}>
+    <div className={'filtri' + (riepilogo ? ' con-riepilogo' : '') + (classe ? ' ' + classe : '')}>
       {campi.map((c) => {
         if (c.tipo === 'ricerca') {
           const base = { entita: c.entita!, contesto: c.contesto, placeholder: c.placeholder, etichetta: c.etichetta };

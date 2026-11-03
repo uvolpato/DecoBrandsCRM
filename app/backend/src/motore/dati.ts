@@ -90,8 +90,8 @@ export async function caricaDati(db: Db, oggi = giornoRoma(new Date())) {
 /** Solo i dati che il dettaglio di una pratica legge (D-52 §19, §7.3): la pratica, il suo cliente e
  *  fornitore, scaglioni ed eccezioni del fornitore, le agenzie cliente × fornitore con i loro subagenti,
  *  e per "una fattura al mese" (D-27) le pratiche dello stesso abbinamento con fatture negli stessi mesi
- *  (più quelle delle fatture stornate dalle sue note). Bollettini e liquidazioni: il dettaglio non li usa.
- *  Stessa forma di caricaDati; null se la pratica non c'è. */
+ *  (più quelle delle fatture stornate dalle sue note). I bollettini del fornitore servono allo stato
+ *  d'incasso delle fatture (§5.14); le liquidazioni no. Stessa forma di caricaDati; null se la pratica non c'è. */
 export async function caricaDatiPratica(db: Db, pratica: bigint, oggi = giornoRoma(new Date())) {
   const t = await db.ordini_fornitore_testata.findUnique({ where: { id: pratica }, include: CON_PRATICA });
   if (!t) return null;
@@ -104,7 +104,7 @@ export async function caricaDatiPratica(db: Db, pratica: bigint, oggi = giornoRo
     al.setUTCMonth(al.getUTCMonth() + 1);
     return { data: { gte: dal, lt: al } };
   });
-  const [fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate] = await Promise.all([
+  const [fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini] = await Promise.all([
     db.fornitori.findMany({ where: { id: fornitore_id }, include: { corrente: true } }),
     db.clienti.findMany({ where: { id: cliente_id }, include: { corrente: true } }),
     db.subagenti.findMany({ where: { agenzie: { some: { cliente_id, fornitore_id } } } }),
@@ -118,8 +118,9 @@ export async function caricaDatiPratica(db: Db, pratica: bigint, oggi = giornoRo
       ] },
       orderBy: { id: 'asc' }, include: CON_PRATICA,
     }),
+    db.bollettini_testata.findMany({ where: { fornitore_id }, orderBy: { id: 'asc' }, include: CON_RIGHE }), // stato d'incasso (§5.14)
   ]);
-  return componi(oggi, { fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini: [], liquidazioni: [] });
+  return componi(oggi, { fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini, liquidazioni: [] });
 }
 
 /** Solo i dati che la riconciliazione di un bollettino legge (§7.7, come caricaDatiPratica): il bollettino con

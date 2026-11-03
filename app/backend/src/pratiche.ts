@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Richiede } from './accesso';
 import { CON_PRATICA, type Dati, caricaDatiPratica, giornoRoma, praticaDaDb } from './motore/dati';
-import { abbinamento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, statoPratica } from './motore/motore';
+import { abbinamento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, statoIncasso, statoPratica } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { type Contesto, logEvent } from './registro';
 
@@ -264,6 +264,8 @@ export function dettaglioPratica(S: Dati, id: string) {
     fasi,
     // il cliente ha pagato (D-60): solo un segno con i documenti a supporto, nessun effetto sui numeri
     pagato: pagato(p), pagamenti: p.pagamenti.map((d) => ({ id: d.id, numero: d.numero, data: d.data, importo: Number(d.importo) })),
+    // Incasso del cliente (§5.14): stato d'incasso di ogni fattura dal motore (bollettini o segnalazione a mano)
+    incassi: fatture.map((d) => ({ documento_id: d.id, numero: d.numero, data: d.data, importo: Number(d.importo), stato: statoIncasso(S, p, d) })),
     confronto: {
       fasi: faseRighe.map((f) => ({ tipo: f, etichetta: etichetta[f], ...numeroFase(f) })),
       righe: righe.map((r) => ({

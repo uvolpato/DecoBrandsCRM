@@ -49,6 +49,7 @@ export const SCHEMI: Record<string, string[]> = {
   'documento.delete': ['documento_id', 'pratica_id', 'tipo', 'numero', 'importo'],
   'documento.match': ['documento_id', 'arrivo_id', 'pratica_id', 'tipo'], // abbinamento a mano di un file in coda (D-60)
   'documento.move': ['documento_id', 'tipo', 'prima', 'dopo'], // documento spostato in un'altra pratica (D-60)
+  'documento.export': ['fatture', 'importo_totale', 'solleciti'], // sollecito di pagamento copiato al cliente (§5.14)
   // sincronizzazione da Integra (§7.14.3): anomalie, non eventi
   'integra.connessione': ['errore'],
   'integra.vista': ['vista', 'errore'],
