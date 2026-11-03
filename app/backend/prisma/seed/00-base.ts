@@ -151,11 +151,13 @@ export async function base(tx: Tx) {
 
   // ---------- Documenti in arrivo e scartati (§4.2.12–13) ----------
   const hashDi = (nome: string) => createHash('sha256').update(nome).digest('hex');
+  // D-55: AAAA/AAAAMMGG/<impronta>.pdf dal giorno di arrivo (i dati di prova non hanno il file vero)
+  const percorso = (nome: string, giorno: string) => `${giorno.slice(0, 4)}/${giorno.replace(/-/g, '')}/${hashDi(nome)}.pdf`;
   for (const d of D.in_arrivo) {
     const campi = Object.entries(d.lettura?.campi ?? {}) as [string, number][];
     const minimo = Math.min(1, ...campi.map(([, v]) => v));
     const arrivo = await tx.documenti_in_arrivo.create({ data: {
-      origine: 'caricamento', file_nome: d.file, file_hash: hashDi(d.file), stato: 'da_controllare', tipo: d.tipo,
+      origine: 'caricamento', file_nome: d.file, file_hash: hashDi(d.file), file_percorso: percorso(d.file, d.ricevuto), stato: 'da_controllare', tipo: d.tipo,
       fornitore_id: ids.fornitori[d.fornitore_id], fornitore_versione_id: ids.versioniF[d.fornitore_id],
       livello: minimo < 0.7 ? 'bassa' : minimo < 0.9 ? 'da_controllare' : 'affidabile', ricevuto_il: ora(d.ricevuto + 'T08:00'), letto_il: ora(d.ricevuto + 'T08:05') } });
     await tx.documenti_campi.createMany({ data: campi.map(([campo, affidabilita]) => ({
@@ -163,7 +165,7 @@ export async function base(tx: Tx) {
   }
   for (const s of D.scartati) {
     await tx.documenti_in_arrivo.create({ data: {
-      origine: 'caricamento', file_nome: s.doc.file, file_hash: hashDi(s.doc.file), stato: 'scartato', tipo: s.doc.tipo,
+      origine: 'caricamento', file_nome: s.doc.file, file_hash: hashDi(s.doc.file), file_percorso: percorso(s.doc.file, s.doc.ricevuto), stato: 'scartato', tipo: s.doc.tipo,
       fornitore_id: ids.fornitori[s.doc.fornitore_id], fornitore_versione_id: ids.versioniF[s.doc.fornitore_id], ricevuto_il: ora(s.doc.ricevuto + 'T08:00'),
       scartato_il: ora(s.quando), scartato_da: matteo, motivo_scarto: s.motivo, nota_scarto: s.nota } });
   }

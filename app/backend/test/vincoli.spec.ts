@@ -157,7 +157,7 @@ describe('valori ammessi (spec §4.2, fase 2a)', () => {
   });
 
   it('documento in arrivo: origine, stato, tipo e livello previsti', async () => {
-    const ins = `INSERT INTO documenti_in_arrivo (origine, file_nome, file_hash, stato, tipo, livello) VALUES ($1, 'a.pdf', repeat('a', 64), $2, $3, $4)`;
+    const ins = `INSERT INTO documenti_in_arrivo (origine, file_nome, file_hash, file_percorso, stato, tipo, livello) VALUES ($1, 'a.pdf', repeat('a', 64), 'a.pdf', $2, $3, $4)`;
     expect(await errore(ins, ['fax', 'in_coda', null, null])).toMatch('documenti_in_arrivo_origine_check');
     expect(await errore(ins, ['email', 'perso', null, null])).toMatch('documenti_in_arrivo_stato_check');
     expect(await errore(ins, ['email', 'in_coda', 'ricevuta', null])).toMatch('documenti_in_arrivo_tipo_check');
@@ -166,7 +166,7 @@ describe('valori ammessi (spec §4.2, fase 2a)', () => {
   });
 
   it('campo letto: affidabilità 0–1', async () => {
-    await q(`INSERT INTO documenti_in_arrivo (id, origine, file_nome, file_hash) VALUES (1, 'email', 'a.pdf', repeat('b', 64))`);
+    await q(`INSERT INTO documenti_in_arrivo (id, origine, file_nome, file_hash, file_percorso) VALUES (1, 'email', 'a.pdf', repeat('b', 64), 'b.pdf')`);
     const ins = `INSERT INTO documenti_campi (documento_id, campo, affidabilita) VALUES (1, 'numero', $1)`;
     expect(await errore(ins, [1.5])).toMatch('documenti_campi_affidabilita_check');
     expect(await errore(ins, [0.93])).toBe('');

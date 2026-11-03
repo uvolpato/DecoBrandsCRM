@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createHash } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { giornoRoma } from '../src/motore/dati';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
@@ -21,6 +22,8 @@ let db: PrismaService;
 const DOMINIO = '@prova-documenti.it';
 const PW = 'password-di-prova';
 const CARTELLA = process.env.DOCUMENTI_DIR!;
+// D-55: cartelle per anno e giorno di caricamento (giorno di Roma)
+const suDisco = (hash: string) => { const g = giornoRoma(new Date()).replace(/-/g, ''); return join(CARTELLA, g.slice(0, 4), g, hash + '.pdf'); };
 
 async function creaUtente(username: string, livello: string) {
   await db.utenti.create({
@@ -91,8 +94,10 @@ describe('POST /api/documenti/carica (canale comune)', () => {
     expect(r.body).toMatchObject({ file_nome: 'Fattura FT-T1.pdf', stato: 'in_coda' });
     arrivo = r.body.id;
     const hash = createHash('sha256').update(dati).digest('hex');
-    expect(existsSync(join(CARTELLA, hash + '.pdf'))).toBe(true);
-    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: BigInt(arrivo) } })).file_hash).toBe(hash);
+    expect(existsSync(suDisco(hash))).toBe(true);
+    const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: BigInt(arrivo) } });
+    expect(riga.file_hash).toBe(hash);
+    expect(join(CARTELLA, riga.file_percorso)).toBe(suDisco(hash)); // D-55: AAAA/AAAAMMGG/<impronta>.pdf
     expect(await eventi('documento.upload', BigInt(arrivo))).toBe(1);
   });
 
@@ -124,7 +129,7 @@ describe('POST /api/documenti/carica (canale comune)', () => {
     await op.carica(dati).expect(500);
     spia.mockRestore();
     expect(await db.documenti_in_arrivo.count({ where: { file_hash: hash } })).toBe(0);
-    expect(existsSync(join(CARTELLA, hash + '.pdf'))).toBe(true);
+    expect(existsSync(suDisco(hash))).toBe(true);
     await op.carica(dati).expect(201); // il nuovo invio passa
   });
 

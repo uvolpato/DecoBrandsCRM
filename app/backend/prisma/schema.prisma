@@ -387,6 +387,7 @@ model documenti_in_arrivo {
   email_oggetto          String?
   file_nome              String
   file_hash              String    @unique @db.Char(64) // il file sta su disco con questo nome (D-34)
+  file_percorso          String    @db.VarChar(100) // sotto DOCUMENTI_DIR: AAAA/AAAAMMGG/<impronta>.pdf (D-55)
   stato                  String    @default("in_coda") @db.VarChar(16)
   tentativi              Int       @default(0)
   errore                 String?

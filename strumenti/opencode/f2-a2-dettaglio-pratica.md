@@ -41,13 +41,18 @@ In `app/backend/src/pratiche.ts` o `documenti.ts`, riusando il motore:
    Lo stato, le fasi, il confronto e gli importi li calcola il server (V12). Il browser mostra e
    basta.
 2. **`GET /api/documenti/:id/file`** (permesso `provvigioni.consulta`). Restituisce il PDF dal
-   disco (`DOCUMENTI_DIR`, file `<impronta>.pdf`), con:
+   disco: `join(DOCUMENTI_DIR, documenti_in_arrivo.file_percorso)`. Il percorso è
+   `AAAA/AAAAMMGG/<impronta>.pdf` (D-55). Intestazioni:
    - `Content-Type: application/pdf`;
-   - `Content-Disposition: inline`, con il nome originale ripulito;
-   - `X-Content-Type-Options: nosniff`.
+   - `Content-Disposition: inline; filename*=UTF-8''<nome codificato>`, con
+     `encodeURIComponent(file_nome)`. Niente virgolette né a capo nell'intestazione, perché il
+     nome arriva dal browser;
+   - `X-Content-Type-Options: nosniff`;
+   - `Content-Security-Policy: sandbox`, così un PDF con script non gira con l'origine dell'app.
 
-   Il percorso si costruisce solo dall'impronta salvata nel database, **mai** da un valore che
-   arriva dal browser. Se il file manca, risponde 404.
+   Il percorso si prende solo da `file_percorso` salvato nel database, **mai** da un valore che
+   arriva dal browser. Controlla anche che il percorso risolto stia dentro `DOCUMENTI_DIR`. Se il
+   file manca, risponde 404.
 3. Per ogni rotta nuova aggiungi le prove in `test/pratiche.spec.ts` o `test/documenti.spec.ts`:
    - la forma della risposta;
    - 404;

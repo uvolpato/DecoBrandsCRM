@@ -8,11 +8,11 @@ import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min } from 'class-validator';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { Data, Facoltativo } from './fornitori';
-import { CON_PRATICA, iso, praticaDaDb, type Testata } from './motore/dati';
+import { CON_PRATICA, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
 import { netto, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
 import { PrismaService } from './prisma.service';
@@ -49,13 +49,16 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
   const hash = createHash('sha256').update(f.dati).digest('hex');
   const doppione = () => new ConflictException('Documento già caricato: è lo stesso file di uno già arrivato');
   // lo stesso file scartato si può ricaricare: torna in coda sulla stessa riga (D-54)
-  const gia = await db.documenti_in_arrivo.findUnique({ where: { file_hash: hash }, select: { id: true, stato: true } });
+  const gia = await db.documenti_in_arrivo.findUnique({ where: { file_hash: hash }, select: { id: true, stato: true, file_percorso: true } });
   if (gia && gia.stato !== 'scartato') throw doppione();
 
-  const cartella = process.env.DOCUMENTI_DIR;
-  if (!cartella) throw new Error('DOCUMENTI_DIR non definita in .env');
-  await mkdir(cartella, { recursive: true });
-  await writeFile(join(cartella, hash + '.pdf'), f.dati, { flag: 'wx' }).catch((e: NodeJS.ErrnoException) => {
+  const radice = process.env.DOCUMENTI_DIR;
+  if (!radice) throw new Error('DOCUMENTI_DIR non definita in .env');
+  // D-55: cartelle per anno e giorno di caricamento (giorno di Roma); un file scartato ricaricato resta dove era
+  const g = giornoRoma(new Date()).replace(/-/g, '');
+  const file_percorso = gia?.file_percorso ?? `${g.slice(0, 4)}/${g}/${hash}.pdf`;
+  await mkdir(dirname(join(radice, file_percorso)), { recursive: true });
+  await writeFile(join(radice, file_percorso), f.dati, { flag: 'wx' }).catch((e: NodeJS.ErrnoException) => {
     if (e.code !== 'EEXIST') throw e; // già scritto da un invio non andato a buon fine: stesso contenuto
   });
 
@@ -72,7 +75,7 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
           data: { ...dati, stato: 'in_coda', tentativi: 0, errore: null, ricevuto_il: new Date(), scartato_il: null, scartato_da: null, motivo_scarto: null, nota_scarto: null },
         });
       } else {
-        d = await tx.documenti_in_arrivo.create({ data: { ...dati, file_hash: hash } });
+        d = await tx.documenti_in_arrivo.create({ data: { ...dati, file_hash: hash, file_percorso } });
       }
       await logEvent(tx, {
         tipo: 'documento', azione: 'upload', entita: 'documento', entita_id: d.id, esito: 'successo',
@@ -101,7 +104,6 @@ export class DocumentiController {
     return riceviDocumento(this.db, { nome: file.originalname, dati: file.buffer, origine: 'caricamento' }, contesto(req));
   }
 }
-
 
 /* ---------- Documenti fiscali della pratica (§4.2.7.1, §5.3) ---------- */
 
@@ -356,10 +358,9 @@ export class DocumentiPraticaController {
         await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${d.arrivo_id} FOR UPDATE`;
         await tx.documenti_in_arrivo.update({ where: { id: d.arrivo_id }, data: { stato: 'in_coda', abbinato_pratica_id: null } });
       }
-      const e = perEvento(d);
       await logEvent(tx, {
         tipo: 'documento', azione: 'delete', entita: 'documento', entita_id: d.id, esito: 'successo',
-        dettaglio: { etichetta: e.etichetta, documento_id: e.documento_id, pratica_id: e.pratica_id, tipo: e.tipo, numero: e.numero, importo: e.importo, arrivo_id: d.arrivo_id ? String(d.arrivo_id) : null },
+        dettaglio: { ...perEvento(d), arrivo_id: d.arrivo_id ? String(d.arrivo_id) : null },
       }, ctx);
       await aggiornaPratica(tx, pid, ctx, `${quale} annullata`);
     });
