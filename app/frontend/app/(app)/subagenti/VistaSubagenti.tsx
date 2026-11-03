@@ -9,6 +9,7 @@ import { FormModal } from '@/componenti/FormModal';
 import { Conferma, Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, Stato } from '@/componenti/Piccoli';
+import { Sagoma, SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
@@ -79,6 +80,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [bozzaEccezione, setBozzaEccezione] = useState<FormEccezione | null>(null);
   const [errore, setErrore] = useState('');
+  const sagome = useSagome(!subagenti);
 
   const carica = useCallback(async () => {
     const r = await api<Subagente[]>('subagenti');
@@ -305,6 +307,10 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
 
   function tabEccezioni() {
     if (!u) return null;
+    if (eccezioni === null) return <div className="pila riempi" aria-busy="true">
+      <div className="strumenti-scheda"><h3>Eccezioni personali</h3></div>
+      <div className="pila">{Array.from({ length: 4 }, (_, i) => <Sagoma key={i} larghezza="100%" altezza={34} />)}</div>
+    </div>;
     const voci = [...(eccezioni ?? [])].sort((a, b) => b.valido_dal.localeCompare(a.valido_dal)).map((e) => {
       const finita = !!e.valido_al && e.valido_al <= oggi();
       return {
@@ -341,10 +347,23 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
     { etichetta: 'Elimina', variante: 'pericolo', onClick: () => elimina(u) },
   ];
 
+  const filtri = (
+    <FilterBar valori={valori} onChange={(v) => { filtro = v; setValori(v); }} caricando={sagome} campi={[
+      { nome: 'q', tipo: 'cerca', placeholder: 'Nome, cognome, codice o email' },
+      { nome: 'vista', tipo: 'segmenti', opzioni: [
+        { value: 'attivi', label: 'Attivi', n: subagenti ? cercati.filter(VISTE.attivi).length : undefined },
+        { value: 'disattivati', label: 'Disattivati', n: subagenti ? cercati.filter(VISTE.disattivati).length : undefined },
+        { value: 'tutti', label: 'Tutti', n: subagenti ? cercati.length : undefined },
+      ] },
+    ]} />
+  );
+
   if (!subagenti) {
     return (
       <Pagina titolo="Subagenti" pieno>
-        {errore && <Pannello><div className="vuoto"><b>Subagenti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>}
+        {errore
+          ? <Pannello><div className="vuoto"><b>Subagenti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
+          : sagome && <SagomaElenco filtri={filtri} />}
         {finestra}
       </Pagina>
     );
@@ -384,14 +403,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   return pagina(
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
-        <FilterBar valori={valori} onChange={(v) => { filtro = v; setValori(v); }} campi={[
-          { nome: 'q', tipo: 'cerca', placeholder: 'Nome, cognome, codice o email' },
-          { nome: 'vista', tipo: 'segmenti', opzioni: [
-            { value: 'attivi', label: 'Attivi', n: cercati.filter(VISTE.attivi).length },
-            { value: 'disattivati', label: 'Disattivati', n: cercati.filter(VISTE.disattivati).length },
-            { value: 'tutti', label: 'Tutti', n: cercati.length },
-          ] },
-        ]} />
+        {filtri}
         <div className="riempi">
           <DataTable righe={righe} filtro={valori.q + '|' + valori.vista} colonne={colonne} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'nome', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/subagenti/' + x.id)}
@@ -399,10 +411,10 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
         </div>
       </div>
       <Pannello titolo={u ? u.cognome + ' ' + u.nome : 'Subagente'} riempi azioni={azioni}>
-        <Schede riempi attiva={schedaSubagente} onCambia={(id) => { schedaSubagente = id; }} schede={[
+        {u ? <Schede riempi attiva={schedaSubagente} onCambia={(id) => { schedaSubagente = id; }} schede={[
           { id: 'dati', etichetta: 'Dati', contenuto: datiSubagente },
           { id: 'eccezioni', etichetta: 'Eccezioni personali', conta: eccezioni?.length, contenuto: tabEccezioni },
-        ]} />
+        ]} /> : <SagomaCorpo />}
       </Pannello>
     </div>,
   );

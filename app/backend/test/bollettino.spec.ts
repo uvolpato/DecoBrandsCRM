@@ -265,6 +265,36 @@ describe('documento mancante, abbinamento e chiusura (Gasper agosto, fatturato)'
   });
 });
 
+describe('contestazione pronta (F3-A2b)', () => {
+  let id: bigint;
+  beforeAll(async () => {
+    id = await bollettino('Gries', 7);
+  });
+
+  it('il testo ha fornitore e mese, i due lati, la differenza e il motivo; le righe accettate non ci sono', async () => {
+    const rid = riga((await op.get(`/bollettini/${id}`)).body, 'F-2026-0912').id;
+    await op.put(`/bollettini/${id}/righe/${rid}/decisione`, { decisione: 'contestato', motivo: 'Sconto diverso da quello concordato' }).expect(200);
+    const r = (await lett.get(`/bollettini/${id}/contestazione`).expect(200)).body;
+    expect(r.oggetto).toContain('Gries');
+    expect(r.oggetto).toContain('luglio 2026');
+    for (const pezzo of ['F-2026-0912', 'Vivaio Verde Azzurro s.r.l.', '28/07/2026', '1.144,50 €', '17,5 %',
+      '1.177,20 €', '18 %', '-32,70 €', 'Sconto diverso da quello concordato', 'Totale della differenza contestata: -32,70 €']) {
+      expect(r.testo).toContain(pezzo);
+    }
+    expect(r.testo).not.toContain('F-2026-0891'); // quadra, non contestata
+    expect(r.testo).toContain('Gentili colleghi di Gries');
+    expect(r.testo).toContain('Decobrands SRL');
+  });
+
+  it('nessuna riga contestata: 409', async () => {
+    await lett.get(`/bollettini/${await bollettino('Gries', 8)}/contestazione`).expect(409);
+  });
+
+  it('senza area Provvigioni: 403', async () => {
+    await dati.get(`/bollettini/${id}/contestazione`).expect(403);
+  });
+});
+
 describe('contestazione (Ing\'s agosto)', () => {
   it('riga sconosciuta contestata → bollettino contestato, chiuso', async () => {
     const id = await bollettino("Ing", 8);

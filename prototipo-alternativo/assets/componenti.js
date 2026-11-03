@@ -6,7 +6,7 @@
    Catalogo dal vivo: index.html#/componenti
 
    Struttura:   Pagina · Intestazione · Pannello · Nota
-   Dati:        DataTable · FilterBar · KpiRow · Cifre · Dettagli · Elenco · Matrice
+   Dati:        DataTable · FilterBar · KpiRow · Cifre · Dettagli · Elenco · Matrice · Sagoma
    Flussi:      ListaDaFare · ElencoSelezionabile · Scelte · Binario · Cerniera · Periodi
    Moduli:      Form · FormModal · Modale · Conferma · TestoDaInviare · Avviso
    Piccoli:     stato() · statoPratica() · icona() · euroSegno() · classeSegno()
@@ -910,6 +910,18 @@
   /* ---------- Nota (testo informativo) ---------- */
   CRM.Nota = function (host, html) { const n = el('p', 'nota', html); ospite(host).appendChild(n); return n; };
 
+  /* ---------- Sagoma (D-59): blocco grigio con la luce che scorre, al posto dei dati che stanno arrivando ---------- */
+  CRM.Sagoma = function (host, opz) {
+    const o = opz || {};
+    const s = el('span', 'sagoma');
+    s.setAttribute('aria-hidden', 'true');
+    s.style.width = typeof o.larghezza === 'number' ? o.larghezza + 'px' : (o.larghezza || '100%');
+    s.style.height = typeof o.altezza === 'number' ? o.altezza + 'px' : (o.altezza || '12px');
+    if (o.arrotondato != null) s.style.borderRadius = typeof o.arrotondato === 'number' ? o.arrotondato + 'px' : o.arrotondato;
+    ospite(host).appendChild(s);
+    return s;
+  };
+
   /* =========================================================
      DataTable — riempie lo spazio, intestazione fissa, righe scorrevoli, intestazioni ordinabili,
      totali fissi, piede con conteggio. Stessi parametri del primo prototipo.
@@ -1305,8 +1317,8 @@
     const lato = x => x ? '<span class="cifra">' + M.euro(x.importo) + '</span><span class="dett">' + esc(x.dett || '') + '</span>' : '<span class="dett">non presente</span>';
     const azioni = [];
     const riga = r => '<div class="c-riga' + (r.esito ? ' decisa' : '') + '"><div>' + r.titolo + (r.dettagli ? '<span class="sec-riga">' + r.dettagli + '</span>' : '') + '</div>' +
-      '<div class="c-sx">' + lato(r.sinistra) + '</div><div class="c-cucitura">' + (r.quadra ? CRM.stato('ok', 'Quadra') : '<span class="diff ' + CRM.classeSegno(r.differenza) + '">' + CRM.euroSegno(r.differenza) + '</span>') + '</div>' +
-      '<div class="c-dx">' + lato(r.destra) + '</div><div class="c-azioni">' + (r.esito || '') + (r.azioni || []).map(a => {
+      '<div class="c-sx" data-etichetta="' + esc(opz.sinistra) + '">' + lato(r.sinistra) + '</div><div class="c-cucitura">' + (r.quadra ? CRM.stato('ok', 'Quadra') : '<span class="diff ' + CRM.classeSegno(r.differenza) + '">' + CRM.euroSegno(r.differenza) + '</span>') + '</div>' +
+      '<div class="c-dx" data-etichetta="' + esc(opz.destra) + '">' + lato(r.destra) + '</div><div class="c-azioni">' + (r.esito || '') + (r.azioni || []).map(a => {
         azioni.push(a);
         return a.href ? '<a class="btn piccolo ' + (a.variante || '') + '" href="' + a.href + '">' + esc(a.etichetta) + '</a>' : '<button type="button" class="btn piccolo ' + (a.variante || '') + '" data-a="' + (azioni.length - 1) + '">' + esc(a.etichetta) + '</button>';
       }).join('') + '</div></div>';

@@ -153,9 +153,9 @@ export function Cerniera({ sinistra, destra, totali, gruppi }: { sinistra: strin
   const riga = (r: RigaCerniera, i: number) => (
     <div key={i} className={'c-riga' + (r.esito ? ' decisa' : '')}>
       <div>{r.titolo}{r.dettagli && <span className="sec-riga">{r.dettagli}</span>}</div>
-      <div className="c-sx">{lato(r.sinistra)}</div>
+      <div className="c-sx" data-etichetta={sinistra}>{lato(r.sinistra)}</div>
       <div className="c-cucitura">{r.quadra ? <Stato v="ok">Quadra</Stato> : <span className={'diff ' + classeSegno(r.differenza)}>{euroSegno(r.differenza)}</span>}</div>
-      <div className="c-dx">{lato(r.destra)}</div>
+      <div className="c-dx" data-etichetta={destra}>{lato(r.destra)}</div>
       <div className="c-azioni">{r.esito}{(r.azioni ?? []).map((a) => {
         const cl = 'btn piccolo ' + (a.variante ?? '');
         return a.href ? <Link key={a.etichetta} className={cl} href={a.href}>{a.etichetta}</Link> : <button key={a.etichetta} type="button" className={cl} onClick={a.onClick}>{a.etichetta}</button>;
@@ -173,8 +173,8 @@ export function Cerniera({ sinistra, destra, totali, gruppi }: { sinistra: strin
       {gruppi.filter((g) => g.righe.length).map((g) => {
         const testa = <span className="c-gruppo-testo"><Stato v={g.variante}>{String(g.righe.length)}</Stato> {g.titolo}</span>;
         return g.chiuso !== undefined
-          ? <details key={g.titolo} open={!g.chiuso}><summary className="c-gruppo">{testa}</summary>{g.righe.map(riga)}</details>
-          : <div key={g.titolo}><div className="c-gruppo">{testa}</div>{g.righe.map(riga)}</div>;
+          ? <details key={g.titolo} open={!g.chiuso} data-gruppo={g.titolo}><summary className="c-gruppo">{testa}</summary>{g.righe.map(riga)}</details>
+          : <div key={g.titolo} data-gruppo={g.titolo}><div className="c-gruppo">{testa}</div>{g.righe.map(riga)}</div>;
       })}
     </section>
   </>;

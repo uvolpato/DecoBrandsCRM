@@ -2,6 +2,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { data as formatoData, euro, num, pct } from '@/lib/formati';
 import { useMemoria, useScorrimento } from '@/lib/memoria';
+import { Sagoma } from './Sagoma';
 
 // Tabella come CRM.DataTable del prototipo (stesso markup .dt): riempie lo spazio, intestazione
 // fissa, intestazioni ordinabili, totali fissi, piede con conteggio, paginazione. L'ordinamento e i
@@ -47,6 +48,7 @@ export interface DataTableProps<R> {
   onOrdine?: (o: { key: string; dir: 'asc' | 'desc' }) => void;
   paginaServer?: { pagina: number; pagine: number; totale: number };
   onPagina?: (p: number) => void;
+  caricando?: boolean; // primo caricamento: sagome al posto delle righe; con righe già mostrate: tabella più tenue (D-59)
 }
 
 const FORMATI: Record<TipoColonna, (v: unknown) => string> = {
@@ -54,7 +56,7 @@ const FORMATI: Record<TipoColonna, (v: unknown) => string> = {
 };
 const ordinale = (v: unknown) => (typeof v === 'number' ? v : String(v ?? '').toLowerCase());
 
-export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp = 25, filtro, naturale, piede, etichettaTotale, memoria, ordine, onOrdine, paginaServer, onPagina }: DataTableProps<R>) {
+export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp = 25, filtro, naturale, piede, etichettaTotale, memoria, ordine, onOrdine, paginaServer, onPagina, caricando }: DataTableProps<R>) {
   const perPagina = naturale || pp === false ? Number.MAX_SAFE_INTEGER : pp;
   const [ord, setOrd] = useMemoria(memoria && memoria + '|ord', ordinamentoIniziale ?? null);
   const [pag, setPag] = useMemoria(memoria && memoria + '|pagina', 0);
@@ -84,8 +86,10 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
   const lista = paginaServer ? righe : tutte.slice(p * perPagina, (p + 1) * perPagina);
   const al = (c: Colonna<R>) => (c.align === 'right' || (!c.align && ['euro', 'numero', 'pct'].includes(tipo(c))) ? 'dx' : c.align === 'center' ? 'cx' : '');
   const primoTotale = colonne.findIndex((c) => c.totale);
+  // D-59: sagome solo al primo caricamento; con righe già a schermo la tabella resta, più tenue
+  const vuota = !!caricando && righe.length === 0;
 
-  return <div className={'dt' + (compatta ? ' compatta' : '') + (naturale ? ' naturale' : '')}>
+  return <div className={'dt' + (compatta ? ' compatta' : '') + (naturale ? ' naturale' : '') + (caricando && !vuota ? ' in-aggiornamento' : '')} aria-busy={caricando || undefined}>
     <div className="dt-scorri" ref={scorri}>
       <table>
         <thead>
@@ -108,7 +112,13 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
           </tr>
         </thead>
         <tbody>
-          {lista.length ? lista.map((r) => (
+          {vuota ? Array.from({ length: 8 }, (_, r) => (
+            <tr key={'sagoma' + r} aria-hidden="true">
+              {colonne.map((c, i) => <td key={c.key} className={al(c)}>
+                <Sagoma larghezza={c.grow ? '60%' : 40 + ((r + i) % 3) * 16} altezza={12} />
+              </td>)}
+            </tr>
+          )) : lista.length ? lista.map((r) => (
             <tr key={chiave(r)} className={[onRowClick ? 'cliccabile' : '', rowClass?.(r) ?? ''].join(' ')}
               onClick={onRowClick ? (e) => { if (!(e.target as Element).closest('a, button')) onRowClick(r); } : undefined}>
               {colonne.map((c) => <td key={c.key} className={[al(c), c.grow ? 'cresce' : '', c.classe?.(r) ?? ''].join(' ')}>
@@ -126,9 +136,9 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
       </table>
     </div>
     <div className="dt-piede">
-      <span>{pagine > 1 ? `${p * perPagina + 1}–${p * perPagina + lista.length} di ` : ''}{paginaServer?.totale ?? tutte.length}{(paginaServer?.totale ?? tutte.length) === 1 ? ' elemento' : ' elementi'}</span>
-      {pagine > 1 && <NavPagine n={pagine} pag={p} vai={onPagina ?? setPag} />}
-      {piede && <span>{piede}</span>}
+      <span>{vuota ? <Sagoma larghezza={80} altezza={10} /> : <>{pagine > 1 ? `${p * perPagina + 1}–${p * perPagina + lista.length} di ` : ''}{paginaServer?.totale ?? tutte.length}{(paginaServer?.totale ?? tutte.length) === 1 ? ' elemento' : ' elementi'}</>}</span>
+      {!vuota && pagine > 1 && <NavPagine n={pagine} pag={p} vai={onPagina ?? setPag} />}
+      {!vuota && piede && <span>{piede}</span>}
     </div>
   </div>;
 }

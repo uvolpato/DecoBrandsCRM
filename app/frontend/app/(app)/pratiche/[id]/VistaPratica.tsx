@@ -9,6 +9,7 @@ import { Cifre } from '@/componenti/Kpi';
 import { Conferma, Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso, Dettagli, Stato, type Variante } from '@/componenti/Piccoli';
+import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
@@ -73,6 +74,7 @@ export function VistaPratica({ id }: { id: string }) {
   const [errore, setErrore] = useState('');
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [vista, setVista] = useState<'variate' | 'tutte'>('variate');
+  const sagome = useSagome(!d || !fiscali);
 
   const carica = useCallback(async () => {
     const [r, f] = await Promise.all([api<Dettaglio>('pratiche/' + id), api<Fiscali>('pratiche/' + id + '/documenti')]);
@@ -123,11 +125,35 @@ export function VistaPratica({ id }: { id: string }) {
   if (!d || !fiscali) {
     return (
       <Pagina titolo="Pratica" pieno>
-        <Pannello>
-          <div className="vuoto"><b>{errore ? 'Pratica non caricata' : 'Caricamento…'}</b>{errore}
-            {errore && <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button>}
-          </div>
-        </Pannello>
+        {errore
+          ? <Pannello>
+            <div className="vuoto"><b>Pratica non caricata</b>{errore}
+              <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button>
+            </div>
+          </Pannello>
+          : sagome && (
+            <div className="pila riempi" aria-busy="true">
+              <Pannello senzaMargine><Sagoma larghezza="100%" altezza={96} /></Pannello>
+              <Sagoma larghezza={280} altezza={40} />
+              <div className="colonne riepilogo-pratica">
+                <Pannello titolo="Provvigione">
+                  <div className="pila">
+                    <Sagoma larghezza="55%" altezza={12} />
+                    <Sagoma larghezza="80%" altezza={22} />
+                    <Sagoma larghezza="70%" altezza={22} />
+                    <Sagoma larghezza="90%" altezza={22} />
+                  </div>
+                </Pannello>
+                <Pannello titolo="Documenti fiscali">
+                  <div className="pila">
+                    <Sagoma larghezza="100%" altezza={34} />
+                    <Sagoma larghezza="100%" altezza={34} />
+                    <Sagoma larghezza="100%" altezza={34} />
+                  </div>
+                </Pannello>
+              </div>
+            </div>
+          )}
       </Pagina>
     );
   }

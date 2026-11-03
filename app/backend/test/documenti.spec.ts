@@ -295,6 +295,55 @@ describe('POST /api/documenti/carica (canale comune)', () => {
   });
 });
 
+describe('GET /api/documenti/cerca (abbinamento a mano, F3-A2b)', () => {
+  let gasper: bigint;
+  beforeAll(async () => {
+    gasper = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gasper' } } })).fornitore_id;
+  });
+  const cerca = (parametri: string) => lett.get('/documenti/cerca?' + parametri);
+
+  it('solo i documenti del fornitore, con cliente, pratica e importo', async () => {
+    const r = (await cerca(`fornitore_id=${gasper}&limite=50`).expect(200)).body;
+    const numeri = r.map((x: any) => x.numero);
+    expect(numeri).toEqual(expect.arrayContaining(['F-2026-0933', 'F-2026-0921', 'NC-2026-007']));
+    expect(numeri).not.toContain('F-2026-0912'); // di Gries
+    expect(r.every((x: any) => x.cliente && x.pratica && typeof x.importo === 'number')).toBe(true);
+  });
+
+  it('con il mese del bollettino: prima i suoi documenti, poi gli altri dal più recente', async () => {
+    const r = (await cerca(`fornitore_id=${gasper}&mese=2026-07&limite=50`).expect(200)).body;
+    expect(r[0].numero).toBe('F-2026-0907');
+    const altri = r.slice(1).map((x: any) => x.data);
+    expect(altri).toEqual([...altri].sort().reverse());
+  });
+
+  it('cerca per numero e per cliente; % e _ sono lettere, non jolly', async () => {
+    expect((await cerca(`fornitore_id=${gasper}&q=0921`).expect(200)).body.map((x: any) => x.numero)).toEqual(['F-2026-0921']);
+    expect((await cerca(`fornitore_id=${gasper}&q=Orti`).expect(200)).body.map((x: any) => x.numero).sort())
+      .toEqual(['F-2026-0822', 'F-2026-0907']);
+    expect((await cerca(`fornitore_id=${gasper}&q=%25`).expect(200)).body).toEqual([]);
+    expect((await cerca(`fornitore_id=${gasper}&q=_`).expect(200)).body).toEqual([]);
+  });
+
+  it('su_riga: il documento già su una riga di un bollettino lo dice', async () => {
+    const r = (await cerca(`fornitore_id=${gasper}&q=0907`).expect(200)).body[0];
+    const b = await db.bollettini_testata.findFirstOrThrow({ where: { fornitore_id: gasper, mese: 7, anno: 2026 } });
+    expect(r.su_riga).toEqual({ bollettino_id: String(b.id), mese: 7, anno: 2026 });
+    expect((await cerca(`fornitore_id=${gasper}&q=0933`).expect(200)).body[0].su_riga).toBeNull();
+  });
+
+  it('su_riga vale anche per una riga non ancora abbinata con lo stesso numero', async () => {
+    const gries = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
+    const r = (await cerca(`fornitore_id=${gries}&q=0891`).expect(200)).body[0];
+    expect(r.numero).toBe('F-2026-0891');
+    expect(r.su_riga).toMatchObject({ mese: 7, anno: 2026 });
+  });
+
+  it('chi non ha l\'area Provvigioni: 403', async () => {
+    await senzaArea.get(`/documenti/cerca?fornitore_id=${gasper}`).expect(403);
+  });
+});
+
 describe('GET /api/documenti/:id/file', () => {
   it('il PDF del documento arrivato: in linea, sandbox, percorso dal database (D-55)', async () => {
     const doc = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { arrivo_id: { not: null } }, include: { arrivo: true } });

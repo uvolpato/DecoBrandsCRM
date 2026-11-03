@@ -8,6 +8,7 @@ import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, quando } from '@/componenti/Piccoli';
+import { SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import type { CampoProps } from '@/componenti/Campo';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
@@ -86,7 +87,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   const router = useRouter();
   const [clienti, setClienti] = useState<Cliente[] | null>(null);
   const [dettaglio, setDettaglio] = useState<Dettaglio | null>(null);
-  const [pratiche, setPratiche] = useState<Pratica[]>([]);
+  const [pratiche, setPratiche] = useState<Pratica[] | null>(null);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [subagenti, setSubagenti] = useState<Subagente[]>([]);
   const [valori, setValori] = useMemoria<Valori>('filtri', { vista: 'tutti', q: '', fornitori: [], subagenti: [] });
@@ -105,11 +106,12 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   }, [clienti]);
 
   const caricaDettaglio = useCallback(async (id: string) => {
+    setPratiche(null);
     const r = await api<Dettaglio>('clienti/' + id);
     if (r.ok) setDettaglio(r.dati);
     else avviso(r.messaggio, true);
     const p = await api<Pratica[]>('clienti/' + id + '/pratiche');
-    if (p.ok) setPratiche(p.dati);
+    setPratiche(p.ok ? p.dati : []);
   }, []);
 
   useEffect(() => { void carica(); }, []);
@@ -145,6 +147,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
     new Promise<boolean>((ok) => setFinestra(<Conferma titolo={titolo} testo={testo} etichetta={etichetta} pericolo={pericolo} onRisposta={(si) => { chiudi(); ok(si); }} />));
 
   const puoModificare = puo('dati.modifica');
+  const sagome = useSagome(!clienti);
 
   const oggi = new Date().toISOString().slice(0, 10);
 
@@ -275,23 +278,29 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
     </Pagina>
   );
 
-  if (!clienti) return pagina(errore && <Pannello><div className="vuoto"><b>Clienti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>);
+  const filtri = (
+    <FilterBar valori={valori} onChange={setValori} caricando={sagome} campi={[
+      { nome: 'vista', tipo: 'segmenti', opzioni: [
+        { value: 'tutti', label: 'Tutti', n: clienti ? cercati.length : undefined },
+        { value: 'con', label: 'Con agenzie', n: clienti ? nCon : undefined },
+        { value: 'senza', label: 'Senza agenzie', n: clienti ? nSenza : undefined },
+      ] },
+      { nome: 'q', tipo: 'cerca', placeholder: 'Ragione sociale, P.IVA, codice' },
+      { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, placeholder: 'Tutti i fornitori' },
+      { nome: 'subagenti', tipo: 'ricerca', entita: subagente, multipla: true, placeholder: 'Tutti i subagenti' },
+    ]} riepilogo />
+  );
+
+  if (!clienti) return pagina(errore
+    ? <Pannello><div className="vuoto"><b>Clienti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
+    : sagome && <SagomaElenco filtri={filtri} larghezze="minmax(0,1.1fr) minmax(0,1fr)" />);
 
   const azioni: Azione[] = [];
 
   return pagina(
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.1fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
-        <FilterBar valori={valori} onChange={setValori} campi={[
-          { nome: 'vista', tipo: 'segmenti', opzioni: [
-            { value: 'tutti', label: 'Tutti', n: cercati.length },
-            { value: 'con', label: 'Con agenzie', n: nCon },
-            { value: 'senza', label: 'Senza agenzie', n: nSenza },
-          ] },
-          { nome: 'q', tipo: 'cerca', placeholder: 'Ragione sociale, P.IVA, codice' },
-          { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, placeholder: 'Tutti i fornitori' },
-          { nome: 'subagenti', tipo: 'ricerca', entita: subagente, multipla: true, placeholder: 'Tutti i subagenti' },
-        ]} riepilogo />
+        {filtri}
         <div className="riempi">
           <DataTable righe={righe} filtro={JSON.stringify(valori)} colonne={colonneClienti} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/clienti/' + x.id)}
@@ -299,7 +308,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
         </div>
       </div>
       <Pannello titolo={u?.ragione_sociale ?? 'Cliente'} riempi azioni={azioni}>
-        {u && (
+        {u ? (
           <>
             <Dettagli inColonne voci={[
               { etichetta: 'Ragione sociale', valore: u.ragione_sociale ?? '—' },
@@ -335,13 +344,13 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
               {
                 id: 'pratiche', etichetta: 'Pratiche', contenuto: () => (
                   <div className="riempi">
-                    <DataTable righe={pratiche} colonne={colonnePratiche} chiave={(p) => p.id} emptyText="Nessuna pratica" memoria="clienti-pratiche" />
+                    <DataTable righe={pratiche ?? []} colonne={colonnePratiche} chiave={(p) => p.id} caricando={!pratiche} emptyText="Nessuna pratica" memoria="clienti-pratiche" />
                   </div>
                 ),
               },
             ]} />
           </>
-        )}
+        ) : <SagomaCorpo />}
       </Pannello>
     </div>,
   );

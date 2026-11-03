@@ -117,18 +117,28 @@ export const agente: Entita<any> = {
   ] as any,
 };
 
-/** Documenti fiscali del mese di un bollettino: le voci arrivano dal suo dettaglio (contesto.documenti),
- *  così l'abbinamento a mano non ha bisogno di una rotta in più (§7.7). */
-export const documentoMese: Entita<any> = {
+/** Documenti fiscali di un fornitore per l'abbinamento a mano (§7.7, F3-A2b): fatture e note di
+ *  credito di ogni periodo, cercate dal server per numero o cliente; quelle già su una riga di un
+ *  bollettino lo dicono, ma si possono scegliere lo stesso (il 409 del server lo spiega). */
+export const documentoFornitore: Entita<any> = {
   titolo: 'Documento',
-  voci: (ctx) => (ctx.documenti as any[] | undefined) ?? [],
-  chiave: (r: any) => r.documento_id,
+  voci: async (ctx) => {
+    // il limite tiene i documenti più utili per la ricerca nel campo (che filtra fra le voci ricevute)
+    const p = new URLSearchParams({ fornitore_id: String(ctx.fornitore_id ?? ''), limite: '50' });
+    if (ctx.mese) p.set('mese', String(ctx.mese));
+    const r = await api<any[]>('documenti/cerca?' + p.toString());
+    return r.ok ? r.dati : [];
+  },
+  chiave: (r: any) => r.id,
   testo: (r: any) => r.numero ?? '',
-  dettaglio: (r: any) => [data(r.data), r.cliente, r.tipo === 'nota_credito' ? 'nota di credito' : r.tipo === 'fattura' ? 'fattura' : ''].filter(Boolean).join(' · '),
-  cerca: (r: any) => [r.numero, r.cliente].filter(Boolean).join(' '),
+  dettaglio: (r: any) => [data(r.data), r.cliente, r.tipo === 'nota_credito' ? 'nota di credito' : 'fattura',
+    r.su_riga ? `già sul bollettino ${r.su_riga.mese}/${r.su_riga.anno}` : ''].filter(Boolean).join(' · '),
+  cerca: (r: any) => [r.numero, r.cliente, r.pratica].filter(Boolean).join(' '),
   colonne: [
     { key: 'numero', header: 'Documento', grow: true },
     { key: 'data', header: 'Data', tipo: 'data' },
     { key: 'cliente', header: 'Cliente' },
+    { key: 'bollettino', header: 'Bollettino', cell: (r: any) => (r.su_riga ? `${r.su_riga.mese}/${r.su_riga.anno}` : '—') },
   ] as any,
 };
+

@@ -4,6 +4,7 @@ import { caricaVoci, type Contesto, type Entita } from '@/lib/entita';
 import { CampoRicerca } from './CampoRicerca';
 import { Icona } from './Icona';
 import { RiepilogoFiltri, type VoceRiepilogo } from './RiepilogoFiltri';
+import { Sagoma } from './Sagoma';
 
 // Barra dei filtri come CRM.FilterBar del prototipo (D-22 §19), stesso markup .filtri.
 // Tipi: 'cerca' (testo) · 'segmenti' · 'select' (tendina, solo per scelte fisse: periodo, mese) ·
@@ -30,9 +31,10 @@ const predef = (c: CampoFiltro): string | string[] =>
   c.predefinito ?? (c.tipo === 'ricerca' && c.multipla ? [] : c.tipo === 'segmenti' || c.tipo === 'select' ? String(c.opzioni![0].value) : '');
 const uguali = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-export function FilterBar<V extends Valori>({ campi, valori, onChange, riepilogo }: {
+export function FilterBar<V extends Valori>({ campi, valori, onChange, riepilogo, caricando }: {
   campi: CampoFiltro[]; valori: V; onChange: (v: V) => void;
   riepilogo?: boolean | { prima: VoceRiepilogo[] }; // icone Riepilogo dei filtri e Togli tutti i filtri in fondo
+  caricando?: boolean; // i numeri dei segmenti non sono ancora arrivati: sagome (D-59)
 }) {
   const metti = (nome: string, v: string | string[]) => onChange({ ...valori, [nome]: v });
   const str = (nome: string) => String(valori[nome] ?? '');
@@ -103,7 +105,7 @@ export function FilterBar<V extends Valori>({ campi, valori, onChange, riepilogo
               <div className="segmenti" role="tablist">
                 {c.opzioni!.map((o) => (
                   <button key={o.value} type="button" role="tab" aria-selected={str(c.nome) === String(o.value)} onClick={() => metti(c.nome, String(o.value))}>
-                    {o.label}{o.n != null && <span className="n">{o.n}</span>}
+                    {o.label}{(o.n != null || caricando) && <span className="n">{caricando ? <Sagoma larghezza={14} altezza={9} /> : o.n}</span>}
                   </button>
                 ))}
               </div>

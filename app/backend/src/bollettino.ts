@@ -18,6 +18,18 @@ const DECISIONI = ['accettato', 'contestato', 'attendere'] as const;
 // decisioni ammesse per categoria, come i pulsanti del prototipo (viste-periodo.js, §7.7)
 const SCELTE: Record<string, readonly string[]> = { differenza: ['accettato', 'contestato'], sconosciuta: ['accettato', 'contestato'], mancante: ['attendere', 'contestato'] };
 const num = (x: Prisma.Decimal | null | undefined) => (x == null ? null : Number(x));
+const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+
+// importi e percentuali come il prototipo (M.euro, M.pct): punto per le migliaia, virgola per i decimali
+function numeroIt(n: number, dec: number, min = 0) {
+  const [i, d0] = Math.abs(n).toFixed(dec).split('.');
+  let d = d0;
+  if (d && min < dec) { d = d.replace(/0+$/, ''); while (d.length < min) d += '0'; }
+  return (n < 0 && Number(Math.abs(n).toFixed(dec)) !== 0 ? '-' : '') + i.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (d ? ',' + d : '');
+}
+const euroIt = (n: number) => numeroIt(n, 2, 2) + ' €';
+const pctIt = (n: number) => numeroIt(n, 2) + ' %';
+const dataIt = (s: string) => s.split('-').reverse().join('/');
 
 class Decisione {
   @ValidateIf((_o, v) => v !== null) @IsIn(DECISIONI) decisione!: (typeof DECISIONI)[number] | null; // null = annulla
@@ -108,6 +120,44 @@ export class BollettinoController {
       ...r, note: t.note, chiuso_da: t.chiusore?.nome ?? null,
       file: t.arrivati[0] ? { arrivo_id: String(t.arrivati[0].id), nome: t.arrivati[0].file_nome } : null,
       righe: r.righe.map((x) => ({ ...x, decisione: x.decisione && { ...x.decisione, da_nome: x.decisione.da ? (nome.get(x.decisione.da) ?? null) : null } })),
+    };
+  }
+
+  /** Testo della contestazione da mandare al fornitore (F3-A2b, §7.7): righe contestate con i due lati,
+   *  la differenza e il motivo, calcolato dal server (V12). 409 se nessuna riga è contestata. */
+  @Get(':id/contestazione')
+  @Richiede('provvigioni.consulta')
+  async contestazione(@Param('id', ParseIntPipe) id: number) {
+    const S = await caricaDatiBollettino(this.db, BigInt(id));
+    const r = S && riconciliazione(S, String(id));
+    if (!r) throw new NotFoundException('Bollettino non trovato');
+    const righe = r.righe.filter((x) => x.decisione?.esito === 'contestato');
+    if (!righe.length) throw new ConflictException('Nessuna riga contestata');
+    const mese = MESI[r.mese - 1] + ' ' + r.anno;
+    const conDifferenza = righe.filter((x) => x.differenza != null);
+    const totale = conDifferenza.reduce((s, x) => s + (x.differenza ?? 0), 0);
+    const riga = (x: (typeof righe)[number]) => {
+      const chi = x.cliente ? ` (${x.cliente})` : '';
+      const quando = x.data ? ` del ${dataIt(x.data)}` : '';
+      const testo = x.categoria === 'mancante'
+        ? `non compare nel bollettino, la provvigione attesa è ${euroIt(x.noi!.importo)} (${pctIt(x.noi!.pct ?? 0)})`
+        : x.categoria === 'sconosciuta'
+          ? `non ci risulta fra le nostre pratiche; voi riconoscete ${euroIt(x.loro!.importo)} (${pctIt(x.loro!.pct ?? 0)})`
+          : `voi riconoscete ${euroIt(x.loro!.importo)} (${pctIt(x.loro!.pct ?? 0)}), noi calcoliamo ${euroIt(x.noi!.importo)} (${pctIt(x.noi!.pct ?? 0)})`;
+      const differenza = x.differenza != null && x.categoria !== 'sconosciuta' ? ` Differenza ${euroIt(x.differenza)}.` : '';
+      const motivo = x.decisione?.motivo ? ` Motivo: ${x.decisione.motivo}.` : '';
+      return `- ${x.numero}${chi}${quando}: ${testo}.${differenza}${motivo}`;
+    };
+    return {
+      oggetto: `Contestazione bollettino provvigioni ${mese} · ${r.fornitore}`,
+      testo: [
+        `Gentili colleghi di ${r.fornitore},`,
+        `abbiamo verificato il bollettino provvigioni di ${mese} e vi segnaliamo:`,
+        righe.map(riga).join('\n'),
+        ...(conDifferenza.length ? [`Totale della differenza contestata: ${euroIt(totale)}.`] : []),
+        'Vi chiediamo di inviarci il bollettino rettificato.',
+        'Grazie,\nDecobrands SRL',
+      ].join('\n\n'),
     };
   }
 

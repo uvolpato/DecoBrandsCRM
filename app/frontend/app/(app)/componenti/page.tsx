@@ -14,6 +14,7 @@ import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { PeriodoMesi } from '@/componenti/PeriodoMesi';
 import { avviso, Dettagli, Stato } from '@/componenti/Piccoli';
 import { RiepilogoFiltri } from '@/componenti/RiepilogoFiltri';
+import { Sagoma, SagomaRiquadri, SagomaSegmenti, SagomaTabella } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import type { Entita } from '@/lib/entita';
 import { euro } from '@/lib/formati';
@@ -118,13 +119,21 @@ function DemoKpi() {
   ]} />;
 }
 
-function DemoRiepilogo() {
-  const [forn, setForn] = useState(['Gries', 'Gasper']);
+function DemoRiepilogo() {  const [forn, setForn] = useState(['Gries', 'Gasper']);
   return <RiepilogoFiltri attivi={1 + forn.length} onAzzera={() => { setForn([]); avviso('Filtri tolti'); }} voci={[
     { etichetta: 'Periodo', testo: 'aprile – settembre 2026' },
     { etichetta: 'Fornitore', valori: forn.map((t) => ({ testo: t, togli: () => setForn(forn.filter((x) => x !== t)) })) },
     { etichetta: 'Cliente', valori: [] },
   ]} />;
+}
+
+function DemoSagome() {
+  return <div className="pila">
+    <Sagoma larghezza={200} altezza={16} />
+    <SagomaSegmenti />
+    <SagomaRiquadri n={3} />
+    <SagomaTabella righe={3} colonne={['Pratica', 'Cliente', 'Importo']} naturale />
+  </div>;
 }
 
 interface Voce { nome: string; gruppo: string; testo: string; firma: string; alto?: boolean; demo: ReactNode }
@@ -162,6 +171,8 @@ const VOCI: Voce[] = [
       { nome: 'Margine', valori: [1400, 2150, 5390], colore: COLORI_GRAFICI.ok, tipo: 'line' }]} /> },
   { nome: 'KpiRow', gruppo: 'Dati', testo: 'Riquadri numerici con bordo colorato a sinistra. Con onSeleziona diventano un filtro (clic di nuovo per togliere).',
     firma: '<KpiRow voci={[{ id, etichetta, valore, variante: primario|ok|attesa|errore|info, dettagli: [{ testo, variante }] }]} selezionata onSeleziona={(id) => …} />', demo: <DemoKpi /> },
+  { nome: 'Sagoma', gruppo: 'Dati', testo: 'Blocco grigio con la luce che scorre, al posto dei dati che stanno arrivando (D-59): la pagina mostra subito il titolo e, finché i dati non ci sono, sagome con la forma del contenuto (segmenti, filtri, righe, riquadri) invece di zeri, «Nessun elemento» o testi vuoti. Sotto i ~150 ms non compaiono; con prefers-reduced-motion la luce non scorre. Nei filtri i numeri dei segmenti diventano sagome; cambiando filtro la tabella resta, più tenue (`in-aggiornamento`).',
+    firma: '<Sagoma larghezza altezza arrotondato />   <SagomaTabella righe colonne={numero | [intestazioni]} naturale />   <SagomaSegmenti n />   <SagomaRiquadri n />   <SagomaMatrice righe colonne />   <SagomaElenco segmenti />\nuseSagome(caricando) → sagome solo se il caricamento supera 150 ms\nEsempio in una pagina nuova: const sagome = useSagome(!dati); … <DataTable righe={dati ?? []} caricando={sagome} … />', demo: <DemoSagome /> },
   { nome: 'Cifre', gruppo: 'Dati', testo: 'Elenco etichetta → importo, per riepiloghi brevi.', firma: '<Cifre voci={[{ etichetta, valore (numero = euro), nota, variante, forte }]} />',
     demo: <Cifre voci={[{ etichetta: 'Atteso dai fornitori', valore: 3120.4 }, { etichetta: 'Già riconosciuto', valore: 2210 }, { etichetta: 'Bloccato', valore: 505.8, variante: 'attesa' }, { etichetta: 'Rettifica', valore: -42.5, nota: 'nota di credito' }]} /> },
   { nome: 'Dettagli', gruppo: 'Dati', testo: 'Coppie etichetta / valore per le schede.', firma: '<Dettagli voci={[{ etichetta, valore }]} inColonne />',

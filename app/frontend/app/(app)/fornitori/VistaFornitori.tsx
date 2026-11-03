@@ -8,6 +8,7 @@ import { FormModal } from '@/componenti/FormModal';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli } from '@/componenti/Piccoli';
+import { SagomaCorpo, SagomaElenco, SagomaTabella, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
 import { api } from '@/lib/api';
@@ -108,6 +109,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [bozza, setBozza] = useState<Bozza | null>(null);
   const [errore, setErrore] = useState('');
+  const [errorePercentuali, setErrorePercentuali] = useState(false);
+  const sagome = useSagome(!fornitori);
 
   const carica = useCallback(async () => {
     const r = await api<Fornitore[]>('fornitori');
@@ -135,11 +138,12 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   useEffect(() => {
     const id = dettaglio?.id;
     setPercentuali(null);
+    setErrorePercentuali(false);
     if (!id) return;
     let vivo = true;
     void api<Percentuali>('fornitori/' + id + '/percentuali').then((r) => {
       if (!vivo) return;
-      if (r.ok) setPercentuali(r.dati); else avviso(r.messaggio, true);
+      if (r.ok) setPercentuali(r.dati); else { setErrorePercentuali(true); avviso(r.messaggio, true); }
     });
     return () => { vivo = false; };
   }, [dettaglio?.id]);
@@ -310,16 +314,22 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
     </Pagina>
   );
 
-  if (!fornitori) return pagina(errore && <Pannello><div className="vuoto"><b>Fornitori non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>);
+  const filtri = (
+    <FilterBar valori={valori} onChange={setValori} campi={[
+      { nome: 'q', tipo: 'cerca', placeholder: 'Ragione sociale, P.IVA o codice' },
+    ]} />
+  );
+
+  if (!fornitori) return pagina(errore
+    ? <Pannello><div className="vuoto"><b>Fornitori non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
+    : sagome && <SagomaElenco filtri={filtri} />);
 
   const azioni: Azione[] = puoModificare && u ? [{ etichetta: 'Modifica le regole', icona: 'impostazioni', onClick: () => modificaRegole(u) }] : [];
 
   return pagina(
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
-        <FilterBar valori={valori} onChange={setValori} campi={[
-          { nome: 'q', tipo: 'cerca', placeholder: 'Ragione sociale, P.IVA o codice' },
-        ]} />
+        {filtri}
         <div className="riempi">
           <DataTable righe={cercati} filtro={String(valori.q)} colonne={colonneFornitori} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/fornitori/' + x.id)}
@@ -327,7 +337,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
         </div>
       </div>
       <Pannello titolo={u?.ragione_sociale ?? 'Fornitore'} riempi azioni={azioni}>
-        {u && (
+        {u ? (
           <>
             <Dettagli inColonne voci={[
               { etichetta: 'Ragione sociale', valore: u.ragione_sociale ?? '—' },
@@ -349,7 +359,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
                       {puoModificare && percentuali && <button type="button" className="btn sec piccolo" onClick={nuovePercentuali}>Nuove percentuali</button>}
                     </div>
                     {!percentuali
-                      ? <div className="vuoto">Percentuali non caricate.</div>
+                      ? errorePercentuali ? <div className="vuoto">Percentuali non caricate.</div> : <SagomaTabella righe={4} colonne={5} />
                       : ordinate(percentuali.versioni).map(({ v, tipo }) => (
                         <div key={v.valido_dal} data-versione={v.valido_dal} style={{ flex: 'none' }}>
                           <div className="strumenti-scheda">
@@ -381,7 +391,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               },
             ]} />
           </>
-        )}
+        ) : <SagomaCorpo />}
       </Pannello>
     </div>,
   );

@@ -1,11 +1,11 @@
 import {
   BadRequestException, Body, applyDecorators, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseIntPipe,
-  PayloadTooLargeException, Post, Put, Req, Res, StreamableFile, UnsupportedMediaTypeException, UploadedFile, UseInterceptors,
+  PayloadTooLargeException, Post, Put, Query, Req, Res, StreamableFile, UnsupportedMediaTypeException, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Prisma } from '@prisma/client';
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve, sep } from 'node:path';
@@ -91,9 +91,62 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
   }
 }
 
+/** Parametri della ricerca dei documenti per l'abbinamento a mano (§7.7, §8.1). */
+class CercaDocumenti {
+  @Type(() => Number) @IsInt() @Min(1) fornitore_id!: number;
+  @IsOptional() @IsString() @MaxLength(100) q?: string;
+  @IsOptional() @Matches(/^\d{4}-\d{2}$/) mese?: string; // AAAA-MM del bollettino: i suoi documenti vengono prima
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limite?: number;
+}
+
 @Controller('documenti')
 export class DocumentiController {
   constructor(private readonly db: PrismaService) {}
+
+  /** Documenti di un fornitore per l'abbinamento a mano (F3-A2b, §7.7, §8.1): fatture e note di
+   *  credito di ogni periodo, cercate per numero o per cliente. Prima quelli del mese del
+   *  bollettino, poi gli altri dal più recente; `su_riga` dice se sono già su una riga di un bollettino. */
+  @Get('cerca')
+  @Richiede('provvigioni.consulta')
+  async cerca(@Query() q: CercaDocumenti) {
+    const testo = (q.q ?? '').trim();
+    const simile = '%' + testo.replace(/[\\%_]/g, '\\$&') + '%'; // % e _ sono lettere, non jolly (come pratiche.ts)
+    const mese = q.mese ?? '';
+    const righe = await this.db.$queryRaw<{
+      id: bigint; numero: string; data: string; tipo: string; cliente: string;
+      pratica_id: bigint; pratica: string; importo: Prisma.Decimal;
+      bollettino_id: bigint | null; mese: number | null; anno: number | null;
+    }[]>`
+      WITH bollettino_riga AS (
+        SELECT DISTINCT ON (d.id) d.id AS documento_id, bt.id AS testata_id, bt.mese, bt.anno
+        FROM ordini_fornitore_documenti d
+        JOIN ordini_fornitore_testata t ON t.id = d.testata_id
+        -- anche una riga non ancora abbinata con lo stesso numero (il server la tratta come già usata)
+        JOIN bollettini_righe br ON br.documento_id = d.id
+          OR (br.documento_id IS NULL AND br.fattura_numero = d.numero
+            AND ((d.tipo = 'fattura' AND br.tipo_riga = 'provvigione') OR (d.tipo <> 'fattura' AND br.tipo_riga <> 'provvigione')))
+        JOIN bollettini_testata bt ON bt.id = br.testata_id AND bt.fornitore_id = t.fornitore_id
+        ORDER BY d.id, bt.anno DESC, bt.mese DESC
+      )
+      SELECT d.id, d.numero, to_char(d.data, 'YYYY-MM-DD') AS data, d.tipo,
+             coalesce(cv.ragione_sociale, '') AS cliente, t.id AS pratica_id, t.numero_ordine AS pratica, d.importo,
+             rb.testata_id AS bollettino_id, rb.mese, rb.anno
+      FROM ordini_fornitore_documenti d
+      JOIN ordini_fornitore_testata t ON t.id = d.testata_id
+      JOIN clienti c ON c.id = t.cliente_id
+      LEFT JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
+      LEFT JOIN bollettino_riga rb ON rb.documento_id = d.id
+      WHERE t.fornitore_id = ${BigInt(q.fornitore_id)}
+        AND (${testo} = '' OR d.numero ILIKE ${simile} OR coalesce(cv.ragione_sociale, '') ILIKE ${simile})
+      ORDER BY CASE WHEN ${mese} <> '' AND to_char(d.data, 'YYYY-MM') = ${mese} THEN 0 ELSE 1 END,
+               d.data DESC, d.numero
+      LIMIT ${q.limite ?? 20}`;
+    return righe.map((r) => ({
+      id: String(r.id), numero: r.numero, data: r.data, tipo: r.tipo, cliente: r.cliente,
+      pratica_id: String(r.pratica_id), pratica: r.pratica, importo: Number(r.importo),
+      su_riga: r.bollettino_id ? { bollettino_id: String(r.bollettino_id), mese: r.mese, anno: r.anno } : null,
+    }));
+  }
 
   /** Caricamento manuale (§8.1): multipart, campo `file`, un PDF. Va in coda "da leggere". */
   @Post('carica')

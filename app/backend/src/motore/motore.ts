@@ -285,13 +285,20 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
       liquidabile: true, incasso: false, motivo: null as string | null, voce: null as string | null, bollettino_id: null as string | null, riga_bollettino_id: null as string | null,
     };
   };
+  // Dove va una provvigione liquidabile (D-57): nella liquidazione che l'ha già pagata (liquidazione_id); altrimenti nel
+  // trimestre della data o, se è già chiuso, nel primo aperto dopo (come gli storni, D-11): niente provvigioni perse.
+  const qui = (liquidazione_id: string | null, iso: string) => {
+    const l = liquidazione_id ? S.liquidazioni_chiuse.find((x) => x.id === liquidazione_id) : null;
+    const q = l ? { a: l.anno, t: l.trimestre } : trimestreLiquidazione(S, iso);
+    return q.a === a && q.t === t;
+  };
   for (const p of S.pratiche) for (const d of p.documenti) {
     if (!percentuali(S, p, d.data)) continue;
     const r = riga(p, d, 1);
     if (S.fornitori.get(p.fornitore_id)!.maturazione === 'maturato') {
       // maturato→maturato (§5.14): entra nel trimestre del bollettino che la riconosce (il mese in cui il cliente paga)
       const b = riconosciutoIn(S, d, p.fornitore_id);
-      if (b) { if (!nelTrimestre(aaaamm(b.anno, b.mese) + '-01')) continue; }
+      if (b) { if (!qui(d.liquidazione_id, aaaamm(b.anno, b.mese) + '-01')) continue; }
       else {
         if (!nelTrimestre(d.data)) continue;
         r.liquidabile = false;
@@ -300,7 +307,7 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
         if (bm && bm.stato === 'verificato' && !ric) { r.incasso = true; r.motivo = 'attesa_incasso'; r.bollettino_id = bm.id; }
         else { r.motivo = ric || bm ? 'bollettino_da_verificare' : 'non_riconosciuta'; r.bollettino_id = (ric?.b ?? bm)?.id ?? null; }
       }
-    } else if (!nelTrimestre(d.data)) continue;
+    } else if (!qui(d.liquidazione_id, d.data)) continue;
     out.push(r);
   }
   // storni e riaccrediti (fatturato, §5.14, D-11): al subagente nella prima liquidazione ancora aperta
@@ -309,8 +316,9 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
     if (b.stato === 'da_verificare') continue;
     for (const rb of b.righe) {
       if (!rb.tipo) continue;
-      const quando = b.chiuso_il ?? b.ricevuto, dest = trimestreLiquidazione(S, quando);
-      if (dest.a !== a || dest.t !== t) continue;
+      // voce già liquidata (liquidazione_id, D-35): resta nel suo trimestre, non scivola nel successivo
+      const quando = b.chiuso_il ?? b.ricevuto;
+      if (!qui(rb.liquidazione_id, quando)) continue;
       const n = documentoDiRiga(S, b, rb);
       if (!n || !percentuali(S, n.pratica, n.doc.data)) continue;
       out.push({ ...riga(n.pratica, n.doc, rb.tipo === 'storno' ? -1 : 1), data: quando, origine: n.doc.data, voce: rb.tipo, motivo: rb.tipo, bollettino_id: b.id, riga_bollettino_id: rb.id });

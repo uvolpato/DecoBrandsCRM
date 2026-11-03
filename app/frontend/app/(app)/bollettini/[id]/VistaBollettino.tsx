@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Campo } from '@/componenti/Campo';
 import { Cerniera, type GruppoCerniera, type RigaCerniera } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
-import { Conferma } from '@/componenti/Modale';
+import { Conferma, Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
+import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api } from '@/lib/api';
-import { documentoMese } from '@/lib/entita';
+import { documentoFornitore } from '@/lib/entita';
 import { data, euro, euroSegno, pct } from '@/lib/formati';
 
 // Dettaglio del bollettino a cerniera (F3-A2, §7.7): righe del fornitore contro il nostro calcolo,
@@ -49,7 +50,9 @@ export function VistaBollettino({ id }: { id: string }) {
   const [d, setD] = useState<Dettaglio | null>(null);
   const [errore, setErrore] = useState('');
   const [finestra, setFinestra] = useState<ReactNode>(null);
+  const [bozza, setBozza] = useState<{ oggetto: string; testo: string } | null>(null);
   const puoModifica = puo('provvigioni.modifica');
+  const sagome = useSagome(!d);
 
   const carica = useCallback(async () => {
     const r = await api<Dettaglio>('bollettini/' + id);
@@ -63,21 +66,33 @@ export function VistaBollettino({ id }: { id: string }) {
   if (!d) {
     return (
       <Pagina titolo="Bollettino" pieno>
-        <Pannello>
-          <div className="vuoto"><b>{errore ? 'Bollettino non caricato' : 'Caricamento…'}</b>{errore}
-            {errore && <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button>}
-          </div>
-        </Pannello>
+        {errore
+          ? <Pannello>
+            <div className="vuoto"><b>Bollettino non caricato</b>{errore}
+              <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button>
+            </div>
+          </Pannello>
+          : sagome && (
+            <div className="pila" aria-busy="true" style={{ flex: '1 1 auto', minHeight: 0 }}>
+              <Sagoma larghezza="100%" altezza={44} />
+              <div className="colonne riempi" style={{ '--colonne': 'minmax(300px, 0.8fr) minmax(0, 1.9fr)' } as React.CSSProperties}>
+                <Pannello riempi><Sagoma larghezza="100%" altezza={420} /></Pannello>
+                <div className="pila">
+                  <Sagoma larghezza="100%" altezza={72} />
+                  {Array.from({ length: 4 }, (_, i) => <Sagoma key={i} larghezza="100%" altezza={64} />)}
+                </div>
+              </div>
+            </div>
+          )}
       </Pagina>
     );
   }
 
   const modificabile = d.modificabile && puoModifica;
   const bollettinoId = d.id;
-  const candidati = [...new Map(d.righe.filter((x) => x.documento_id).map((x) => [x.documento_id!, {
-    documento_id: x.documento_id!, numero: x.numero, data: x.data, tipo: x.tipo, cliente: x.cliente,
-  }])).values()];
+  const fornitoreId = d.fornitore_id;
   const conMancanti = d.righe.some((x) => x.categoria === 'mancante' || x.categoria === 'sconosciuta');
+  const meseBollettino = `${d.anno}-${String(d.mese).padStart(2, '0')}`;
 
   const percorso = (x: Riga) => x.categoria === 'mancante'
     ? `bollettini/${d.id}/documenti/${x.documento_id}/decisione`
@@ -117,8 +132,8 @@ export function VistaBollettino({ id }: { id: string }) {
   function abbina(x: Riga) {
     setFinestra(
       <FormModal titolo={`Abbina la riga ${x.numero}`} conferma="Abbina"
-        testo="Scegli il documento del mese che corrisponde davvero a questa riga. Il documento sta su una sola riga."
-        campi={[{ nome: 'documento_id', etichetta: 'Documento', tipo: 'ricerca', entita: documentoMese, contesto: { documenti: candidati } }]}
+        testo="Scegli il documento del fornitore che corrisponde davvero a questa riga. Il documento sta su una sola riga."
+        campi={[{ nome: 'documento_id', etichetta: 'Documento', tipo: 'ricerca', entita: documentoFornitore, contesto: { fornitore_id: fornitoreId, mese: meseBollettino } }]}
         onChiudi={chiudi}
         onConferma={async (v) => {
           if (!v.documento_id) return 'Scegli il documento.';
@@ -126,6 +141,43 @@ export function VistaBollettino({ id }: { id: string }) {
           if (!r.ok) return r.messaggio;
           salvato(r.dati, 'Riga abbinata al documento');
         }} />);
+  }
+
+  /** Scorre alla prima riga del gruppo Da decidere e la evidenzia un attimo (D-49, §7.7). */
+  function vaiAllaPrima() {
+    const x = document.querySelector<HTMLElement>('.cerniera [data-gruppo="Da decidere"] .c-riga');
+    if (!x) return;
+    x.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    x.classList.add('evidenzia');
+    setTimeout(() => x.classList.remove('evidenzia'), 1600);
+  }
+
+  // Testo della contestazione calcolato dal server (V12): qui si copia o si scarica, non si salva.
+  async function preparaContestazione() {
+    const r = await api<{ oggetto: string; testo: string }>(`bollettini/${bollettinoId}/contestazione`);
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    setBozza(r.dati);
+  }
+
+  function copiaContestazione() {
+    if (!bozza) return;
+    const t = document.getElementById('contestazione-testo') as HTMLTextAreaElement | null;
+    const ripiego = () => { t?.select(); document.execCommand('copy'); };
+    try {
+      void navigator.clipboard.writeText(bozza.testo).catch(ripiego);
+    } catch {
+      ripiego(); // browser senza appunti: si seleziona il testo e si copia
+    }
+    avviso('Testo copiato');
+  }
+
+  function scaricaContestazione() {
+    if (!bozza) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bozza.oggetto + '\n\n' + bozza.testo], { type: 'text/plain;charset=utf-8' }));
+    a.download = `contestazione-${meseBollettino}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   function chiudiBollettino(stato: 'verificato' | 'contestato') {
@@ -161,7 +213,7 @@ export function VistaBollettino({ id }: { id: string }) {
         if (x.categoria === 'mancante') azioni.push({ etichetta: 'Attendi il prossimo', variante: 'sec', onClick: () => decidi(x) });
         else if (x.categoria !== 'quadra' && !x.incasso) azioni.push({ etichetta: 'Accetta il loro importo', variante: 'sec', onClick: () => decidi(x) });
         if (x.categoria !== 'quadra' && !x.incasso) azioni.push({ etichetta: 'Contesta', variante: 'pericolo', onClick: () => apriDecisione(x, 'contestato') });
-        if (x.id && !x.incasso && candidati.length && (x.categoria !== 'quadra' || conMancanti)) {
+        if (x.id && !x.incasso && (x.categoria !== 'quadra' || conMancanti)) {
           azioni.push({ etichetta: 'Abbina il documento', variante: 'testo', onClick: () => abbina(x) });
         }
       }
@@ -203,9 +255,16 @@ export function VistaBollettino({ id }: { id: string }) {
   const barra = (
     <div className="barra-decisione">
       <span>{d.azione.testo}{d.chiuso_il ? ` Chiuso il ${data(d.chiuso_il)}${d.chiuso_da ? ' da ' + d.chiuso_da : ''}.` : ''}</span>
-      {modificabile && d.azione.tipo === 'verifica' && <button type="button" className="btn" onClick={() => chiudiBollettino('verificato')}>Segna come verificato</button>}
-      {modificabile && d.azione.tipo === 'contesta' && <button type="button" className="btn" onClick={() => chiudiBollettino('contestato')}>Segna come contestato</button>}
-      {modificabile && d.azione.tipo === 'decidi' && <button type="button" className="btn" disabled>Segna come verificato</button>}
+      <span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        {d.totali.aperte > 0 && <>
+          <span className="testo-tenue">{d.totali.aperte === 1 ? 'Manca 1 riga da decidere' : `Mancano ${d.totali.aperte} righe da decidere`}</span>
+          <button type="button" className="link-azzera" onClick={vaiAllaPrima}>Vai alla prima</button>
+        </>}
+        {d.totali.contestate > 0 && <button type="button" className="btn sec" onClick={() => void preparaContestazione()}>Prepara la contestazione</button>}
+        {modificabile && d.azione.tipo === 'verifica' && <button type="button" className="btn" onClick={() => chiudiBollettino('verificato')}>Segna come verificato</button>}
+        {modificabile && d.azione.tipo === 'contesta' && <button type="button" className="btn" onClick={() => chiudiBollettino('contestato')}>Segna come contestato</button>}
+        {modificabile && d.azione.tipo === 'decidi' && <button type="button" className="btn" disabled>Segna come verificato</button>}
+      </span>
     </div>
   );
 
@@ -239,6 +298,26 @@ export function VistaBollettino({ id }: { id: string }) {
           </div>
         ) : cerniera}
       </div>
+      {bozza && (
+        <Modale titolo="Prepara la contestazione" testo="Copia il testo nella tua email al fornitore. Le modifiche non si salvano."
+          onChiudi={() => setBozza(null)}
+          piede={<>
+            <button type="button" className="btn sec" onClick={() => setBozza(null)}>Chiudi</button>
+            <button type="button" className="btn sec" onClick={scaricaContestazione}>Scarica .txt</button>
+            <button type="button" className="btn" onClick={copiaContestazione}>Copia</button>
+          </>}>
+          <div className="modulo">
+            <div className="campo">
+              <label htmlFor="contestazione-oggetto">Oggetto</label>
+              <input id="contestazione-oggetto" value={bozza.oggetto} onChange={(e) => setBozza({ ...bozza, oggetto: e.target.value })} />
+            </div>
+            <div className="campo">
+              <label htmlFor="contestazione-testo">Testo</label>
+              <textarea id="contestazione-testo" className="testo-email" value={bozza.testo} onChange={(e) => setBozza({ ...bozza, testo: e.target.value })} />
+            </div>
+          </div>
+        </Modale>
+      )}
       {finestra}
     </Pagina>
   );

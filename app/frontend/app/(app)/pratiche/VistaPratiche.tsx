@@ -1,10 +1,11 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
+import { useSagome } from '@/componenti/Sagoma';
 import { api } from '@/lib/api';
 import { cliente, fornitore, subagente } from '@/lib/entita';
 import { euro, euroSegno } from '@/lib/formati';
@@ -60,9 +61,13 @@ export function VistaPratiche() {
   const [pagina, setPagina] = useMemoria<number>('pagina', 0);
   const [dati, setDati] = useState<Risposta | null>(null);
   const [errore, setErrore] = useState('');
+  const [caricando, setCaricando] = useState(true);
+  const sagome = useSagome(caricando);
+  const primaVolta = useRef(true);
 
   useEffect(() => {
     let vivo = true;
+    setCaricando(true);
     const t = setTimeout(() => {
       const p = new URLSearchParams();
       p.set('stato', String(valori.stato ?? 'tutte'));
@@ -76,9 +81,11 @@ export function VistaPratiche() {
       p.set('pagina', String(pagina));
       void api<Risposta>('pratiche?' + p.toString()).then((r) => {
         if (!vivo) return;
+        setCaricando(false);
         if (r.ok) { setDati(r.dati); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
       });
-    }, 250);
+    }, primaVolta.current ? 0 : 250);
+    primaVolta.current = false;
     return () => { vivo = false; clearTimeout(t); };
   }, [valori, ordine, pagina]);
 
@@ -105,8 +112,8 @@ export function VistaPratiche() {
   return (
     <Pagina titolo="Pratiche" pieno sottotitolo="Ogni ordine a fornitore con i suoi documenti. Lo stato avanza quando arrivano conferma e fattura.">
       <div className="pila riempi">
-        <FilterBar valori={valori} onChange={(v) => { setValori(v); setPagina(0); }} riepilogo campi={[
-          { nome: 'stato', tipo: 'segmenti', etichetta: 'Stato', opzioni: STATI.map((s) => ({ ...s, n: dati?.conteggi[s.value] ?? 0 })) },
+        <FilterBar valori={valori} onChange={(v) => { setValori(v); setPagina(0); }} riepilogo caricando={sagome && !dati} campi={[
+          { nome: 'stato', tipo: 'segmenti', etichetta: 'Stato', opzioni: STATI.map((s) => ({ ...s, n: dati?.conteggi[s.value] })) },
           { nome: 'q', tipo: 'cerca', etichetta: 'Ricerca', placeholder: 'Cerca pratica, cliente, documento' },
           { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, etichetta: 'Fornitore', placeholder: 'Tutti i fornitori' },
           { nome: 'clienti', tipo: 'ricerca', entita: cliente, multipla: true, etichetta: 'Cliente', placeholder: 'Tutti i clienti' },
@@ -116,6 +123,7 @@ export function VistaPratiche() {
           {errore && !dati
             ? <Pannello><div className="vuoto"><b>Pratiche non caricate</b>{errore}</div></Pannello>
             : <DataTable righe={dati?.righe ?? []} colonne={colonne} chiave={(p) => p.id}
+                caricando={sagome}
                 perPagina={dati?.per_pagina ?? 25}
                 ordine={ordine} onOrdine={(o) => { setOrdine(o); setPagina(0); }}
                 paginaServer={dati ? { pagina: dati.pagina, pagine: dati.pagine, totale: dati.totale } : { pagina: 0, pagine: 1, totale: 0 }}

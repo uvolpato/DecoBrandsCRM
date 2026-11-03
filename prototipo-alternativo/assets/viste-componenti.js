@@ -67,6 +67,22 @@
         { id: 'b', etichetta: 'Laura Neri', valore: 512.1, variante: 'attesa', dettagli: [{ testo: 'da liquidare · 3 documenti' }, { testo: '210,00 € in attesa', variante: 'attesa' }] },
         { id: 'c', etichetta: 'Paolo Riva', valore: 0, variante: 'info', dettagli: [{ testo: 'nessun documento' }] }
       ], { onSeleziona: id => CRM.Avviso(id ? 'Filtro: ' + id : 'Filtro tolto') }) },
+    { nome: 'Sagoma', gruppo: 'Dati', testo: 'Blocco grigio con la luce che scorre, al posto dei dati che stanno arrivando (D-59): la pagina mostra subito il titolo e, finché i dati non ci sono, sagome con la forma del contenuto (segmenti, filtri, righe, riquadri) invece di zeri, «Nessun elemento» o testi vuoti. Sotto i ~150 ms non compaiono; con prefers-reduced-motion la luce non scorre.',
+      firma: "CRM.Sagoma(host, { larghezza, altezza, arrotondato })\nNell'app: <Sagoma larghezza altezza arrotondato /> · <SagomaTabella righe colonne /> · <SagomaSegmenti n /> · <SagomaRiquadri n /> · <SagomaMatrice righe colonne /> · <SagomaElenco />\nuseSagome(caricando) → sagome solo se il caricamento supera 150 ms",
+      demo: h => {
+        const d = CRM.el('div', 'pila');
+        CRM.Sagoma(d, { larghezza: 200, altezza: 16 });
+        const seg = CRM.el('div', 'segmenti');
+        [54, 68, 82].forEach(w => CRM.Sagoma(seg, { larghezza: w, altezza: 20 }));
+        d.appendChild(seg);
+        [0, 1, 2].forEach(() => {
+          const r = CRM.el('div');
+          r.style.cssText = 'display:flex;gap:12px;padding:10px 14px;border-bottom:1px solid var(--bordo-tenue)';
+          [90, 160, 60].forEach(w => CRM.Sagoma(r, { larghezza: w, altezza: 12 }));
+          d.appendChild(r);
+        });
+        h.appendChild(d);
+      } },
     { nome: 'Cifre', gruppo: 'Dati', testo: 'Elenco etichetta → importo, per riepiloghi brevi (trimestre, provvigione).',
       firma: 'CRM.Cifre(host, [{ etichetta, valore (numero = euro), nota, variante, forte }])',
       demo: h => CRM.Cifre(h, [{ etichetta: 'Atteso dai fornitori', valore: 3120.4 }, { etichetta: 'Già riconosciuto', valore: 2210 }, { etichetta: 'Bloccato', valore: 505.8, variante: 'attesa' }, { etichetta: 'Rettifica', valore: -42.5, nota: 'nota di credito' }]) },
@@ -117,7 +133,7 @@
       demo: h => CRM.Matrice(h, { angolo: 'Fornitore', colonne: ['Luglio 2026', 'Agosto 2026', 'Settembre 2026'], righe: [
         { titolo: 'Gries Deco Company', sotto: 'paga sul maturato', celle: [{ href: '#/componenti', stato: CRM.stato('attesa', '1 riga da decidere'), valore: M.euro(1144.5) }, { stato: CRM.stato('errore', 'Non arrivato'), azione: { etichetta: 'Sollecita', onClick: prova } }, { vuota: 'Mese in corso' }] },
         { titolo: 'Ing’s', sotto: 'paga sul fatturato', celle: [{ href: '#/componenti', stato: CRM.stato('ok', 'Verificato'), valore: M.euro(420) }, { href: '#/componenti', stato: CRM.stato('primario', 'Pronto da chiudere'), valore: M.euro(472.5) }, { vuota: 'Mese in corso' }] }] }) },
-    { nome: 'Cerniera', gruppo: 'Flussi', testo: 'Riconciliazione riga per riga: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura. Gruppi richiudibili.',
+    { nome: 'Cerniera', gruppo: 'Flussi', testo: 'Riconciliazione riga per riga: a sinistra il fornitore, a destra il nostro calcolo, la differenza sulla cucitura. Gruppi richiudibili; sul tablet ogni riga si impila con la sua etichetta.',
       firma: 'CRM.Cerniera(host, { sinistra, destra, totali: { sinistra, destra, differenza },\n  gruppi: [{ titolo, variante, chiuso, righe: [{ titolo, dettagli, sinistra: { importo, dett }, destra, differenza, quadra, azioni: [{ etichetta, variante, onClick, href }], esito }] }] })',
       demo: h => CRM.Cerniera(h, { sinistra: 'Gries riconosce', destra: 'Noi calcoliamo', totali: { sinistra: 1144.5, destra: 1180, differenza: -35.5 }, gruppi: [
         { titolo: 'Da decidere', variante: 'attesa', righe: [{ titolo: '<b>F-0912</b>', dettagli: 'Arredo Bagno Rossi · 12/07/2026 · importo diverso', sinistra: { importo: 1144.5, dett: '17,50 % di 6.540,00 €' }, destra: { importo: 1180, dett: '18,04 % di 6.540,00 €' }, differenza: -35.5,

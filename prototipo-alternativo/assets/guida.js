@@ -166,15 +166,16 @@
         ['Accetta il loro importo', 'Sulla riga: accetti quanto dice il fornitore, con motivo.'],
         ['Contesta', 'Sulla riga: contesti, con motivo obbligatorio.'],
         ['Attendi il prossimo', 'Documento assente dal bollettino: lo aspetti nel mese successivo.'],
-        ['Abbina il documento', 'Riga del fornitore che non corrisponde: scegli il documento del mese giusto fra quelli del bollettino. Un documento sta su una sola riga.'],
-        ['Segna come verificato · Segna come contestato', 'Chiude il bollettino: chiede conferma, il mese diventa chiuso e la pagina resta in sola lettura.'],
-        ['Prepara la contestazione', 'Testo per il fornitore con le righe contestate e gli importi attesi.'],
+        ['Abbina il documento', 'Riga del fornitore che non corrisponde: scegli il documento del fornitore, anche di un altro mese, cercandolo per numero o cliente. Quelli già su un bollettino lo dicono ma si possono scegliere; il server rifiuta se il documento è già su un\'altra riga dello stesso tipo.'],
+        ['Vai alla prima', 'Con righe da decidere: porta alla prima riga di Da decidere e la evidenzia un attimo.'],
+        ['Segna come verificato · Segna come contestato', 'Chiude il bollettino: chiede conferma, il mese diventa chiuso e la pagina resta in sola lettura. Con righe aperte resta spento e la barra dice quante ne mancano.'],
+        ['Prepara la contestazione', 'Con almeno una riga contestata: oggetto e testo composti dal server, modificabili, da copiare o scaricare in .txt. Nessuna email parte dal CRM.'],
         ['Prepara il sollecito al cliente', 'Su una riga di storno: testo per il cliente con le fatture non pagate.'],
         ['PDF del bollettino', 'Se il fornitore l’ha mandato, sta a sinistra della cerniera; sul tablet va sopra.']
       ],
       finestre: [
         { nome: 'Accetta · Contesta · Attendi', da: 'pulsanti sulla riga', cosa: 'Registra la decisione sulla riga.', campi: [['Motivo', 'Obbligatorio per contestare.']], azioni: [['Conferma · Contesta', 'Salva la decisione; la riga passa fra le decise.']] },
-        { nome: 'Sollecito · Contestazione', da: 'Sollecita · Prepara la contestazione', cosa: 'Testo pronto da inviare al fornitore.', azioni: [['Copia il testo', 'Copia negli appunti e lo annota nel registro.']] },
+        { nome: 'Sollecito · Contestazione', da: 'Sollecita · Prepara la contestazione', cosa: 'Testo pronto da inviare al fornitore: oggetto e testo modificabili (le modifiche non si salvano).', azioni: [['Copia', 'Copia il testo negli appunti.'], ['Scarica .txt', 'Scarica il testo come file di testo.']] },
         { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }
       ],
       sapere: [

@@ -96,7 +96,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .colonne { display: grid; grid-template-columns: var(--colonne, minmax(0, 1.7fr) minmax(300px, 1fr)); gap: 16px; min-height: 0; }
 .colonne.pari { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .colonne.posta { grid-template-columns: 330px minmax(0, 1fr); }
-.colonne > * { min-height: 0; }
+.colonne > * { min-height: 0; min-width: 0; }
 .colonne.riempi, .riempi { flex: 1 1 auto; min-height: 16rem; }
 div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 .colonne.riempi { grid-template-rows: minmax(16rem, 1fr); }
@@ -294,7 +294,7 @@ a.m-cella:hover { background: #f1f6ff; }
 
 /* ---------- Cerniera ---------- */
 /* riepilogo e righe usano le stesse colonne (--cols): la cucitura resta in asse dall'alto in basso */
-.cerniera, .cerniera-riepilogo { --cols: minmax(200px, 1.3fr) minmax(150px, 1fr) 140px minmax(150px, 1fr) 260px; scrollbar-gutter: stable; }
+.cerniera, .cerniera-riepilogo { --cols: minmax(200px, 1.3fr) minmax(150px, 1fr) minmax(230px, 1fr) minmax(150px, 1fr) 260px; scrollbar-gutter: stable; }
 .cerniera-riepilogo { display: grid; grid-template-columns: var(--cols); flex: none; background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-medio); box-shadow: var(--ombra); overflow: hidden; }
 .cerniera-riepilogo .lato { padding: 14px; grid-column: 1 / 3; text-align: right; }
 .cerniera-riepilogo .lato.destro { grid-column: 4 / 6; text-align: left; }
@@ -302,7 +302,7 @@ a.m-cella:hover { background: #f1f6ff; }
 .cerniera-riepilogo .lato b { font-size: 22px; }
 .cerniera-riepilogo .cucitura { border-left: 2px solid var(--primario); border-right: 2px solid var(--primario); background: var(--primario-tenue); padding: 14px 8px; text-align: center; }
 .cerniera-riepilogo .cucitura span { color: var(--primario-testo); }
-.cerniera-riepilogo .cucitura b { font-size: 20px; }
+.cerniera-riepilogo .cucitura b { font-size: 20px; white-space: nowrap; }
 .cerniera {
   background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-medio); box-shadow: var(--ombra); overflow: auto; flex: 0 1 auto; min-height: 0; }
 .c-intest, .c-riga { display: grid; grid-template-columns: var(--cols); align-items: center; }
@@ -312,9 +312,12 @@ a.m-cella:hover { background: #f1f6ff; }
 .c-intest .c-cucitura { background: var(--primario-chiaro); color: var(--primario-testo); }
 .c-sx { text-align: right; }
 .c-riga .cifra { font-weight: 600; font-size: 15px; display: block; }
+.c-riga .c-cucitura .diff { white-space: nowrap; }
 .c-riga .dett { color: var(--testo-tenue); font-size: 12.5px; }
 .c-riga { border-bottom: 1px solid var(--bordo-tenue); }
 .c-riga.decisa { background: #fbfbfc; }
+@keyframes evidenzia-riga { from { background: var(--attesa-tenue); } }
+.c-riga.evidenzia { animation: evidenzia-riga 1.6s ease-out; }
 .c-azioni { display: flex; gap: 6px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
 .c-gruppo { padding: 10px 14px; font-weight: 600; border-bottom: 1px solid var(--bordo-tenue); display: flex; align-items: center; cursor: default; }
 .cerniera summary.c-gruppo { cursor: pointer; list-style: none; }
@@ -392,7 +395,20 @@ a.m-cella:hover { background: #f1f6ff; }
   .cerniera-riepilogo { grid-template-columns: 1fr; }
   .cerniera-riepilogo .lato, .cerniera-riepilogo .lato.destro { grid-column: auto; text-align: left; }
   .dettagli.in-colonne dt { white-space: normal; }
-  .c-intest, .c-riga { min-width: 960px; }
+  /* cerniera impilata (F3-A2b): niente scorrimento di lato, ogni valore con la sua etichetta */
+  .c-intest { display: none; }
+  .c-riga { grid-template-columns: minmax(0, 1fr); }
+  .c-riga > div { padding: 6px 14px; }
+  .c-riga > div:first-child { padding-top: 12px; }
+  .c-riga .c-sx, .c-riga .c-dx { text-align: left; }
+  .c-riga .c-sx::before, .c-riga .c-dx::before {
+    display: block; font-size: 11.5px; font-weight: 600; color: var(--testo-tenue); }
+  .c-riga .c-sx::before { content: attr(data-etichetta); }
+  .c-riga .c-dx::before { content: attr(data-etichetta); }
+  .c-riga .c-cucitura { border: 0; border-top: 2px solid var(--primario); border-bottom: 2px solid var(--primario); padding: 8px 14px; justify-content: flex-start; }
+  .c-riga .c-cucitura::before { content: 'Differenza'; display: block; margin-right: 10px; font-size: 11.5px; font-weight: 600; color: var(--primario-testo); }
+  .c-riga .c-azioni { justify-content: flex-start; padding: 10px 14px 12px; }
+  .c-riga .c-azioni .btn { flex: 1 1 100%; }
   /* la matrice è più larga dello schermo: scorre di lato invece di tagliare le ultime colonne */
   .matrice { overflow-x: auto; }
   .testa { flex-direction: column; align-items: flex-start; }
@@ -987,3 +1003,11 @@ body.in-accesso .principale, body:has(.accesso-scena) .principale { padding: 0; 
   .menu-utente { left: auto; right: 0; top: calc(100% + 8px); bottom: auto; min-width: 260px; }
   .barra:has(.barra-piede.aperta) { overflow: visible; } /* il riquadro non viene tagliato dalla barra */
 }
+
+/* ---------- Sagome di caricamento (D-59) ---------- */
+.sagoma { display: inline-block; background: var(--bordo-tenue); border-radius: var(--r-piccolo); vertical-align: middle; }
+@media (prefers-reduced-motion: no-preference) {
+  .sagoma { background-image: linear-gradient(90deg, var(--bordo-tenue) 0%, #f8f9fa 50%, var(--bordo-tenue) 100%); background-size: 200% 100%; animation: sagoma-luce 1.4s ease-in-out infinite; }
+  @keyframes sagoma-luce { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+}
+.in-aggiornamento { opacity: .6; }

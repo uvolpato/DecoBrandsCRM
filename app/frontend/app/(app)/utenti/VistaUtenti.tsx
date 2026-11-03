@@ -8,6 +8,7 @@ import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, quando, Stato } from '@/componenti/Piccoli';
+import { SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { AREE, LIVELLI, RUOLI, usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
@@ -49,10 +50,11 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
   const puo = usePuo();
   const router = useRouter();
   const [utenti, setUtenti] = useState<Utente[] | null>(null);
-  const [permessi, setPermessi] = useState<Permesso[]>([]);
+  const [permessi, setPermessi] = useState<Permesso[] | null>(null);
   const [valori, setValori] = useState(filtro);
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [errore, setErrore] = useState('');
+  const sagome = useSagome(!utenti);
 
   const carica = useCallback(async () => {
     const r = await api<Utente[]>('utenti');
@@ -79,7 +81,20 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
       {finestra}
     </Pagina>
   );
-  if (!utenti) return pagina(errore && <Pannello><div className="vuoto"><b>Utenti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>);
+  const filtri = (
+    <FilterBar valori={valori} onChange={(v) => { filtro = v; setValori(v); }} caricando={sagome} campi={[
+      { nome: 'q', tipo: 'cerca', placeholder: 'Nome, nome utente o email' },
+      { nome: 'vista', tipo: 'segmenti', opzioni: [
+        { value: 'attivi', label: 'Attivi', n: utenti ? cercati.filter(VISTE.attivi).length : undefined },
+        { value: 'disattivati', label: 'Disattivati', n: utenti ? cercati.filter(VISTE.disattivati).length : undefined },
+        { value: 'tutti', label: 'Tutti', n: utenti ? cercati.length : undefined },
+      ] },
+    ]} />
+  );
+
+  if (!utenti) return pagina(errore
+    ? <Pannello><div className="vuoto"><b>Utenti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
+    : sagome && <SagomaElenco filtri={filtri} />);
   const u = utenti.find((x) => x.id === idSel) ?? utenti[0];
 
   // chi può gestire chi (D-39): nessuno tocca il superutente né l'utente dei servizi; gli amministratori li gestisce il superutente
@@ -207,11 +222,12 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
   // D-45: una sezione richiudibile per Sistema e per ogni area (colonne = ruoli o livelli), col livello di u nel
   // titolo; aperte quelle dove u ha accesso, così con molte aree si legge prima quello che lo riguarda
   function cosaPuoFare() {
+    const elenco = permessi ?? [];
     const spunta = (si: boolean) => (si ? <span className="si" aria-label="sì"><Icona nome="spunta" /></span> : <span className="testo-tenue" aria-label="no">—</span>);
     const sezione = (id: string, titolo: string, mio: ReactNode, aperta: boolean, righe: Permesso[], colonne: Record<string, string>, evid: string | undefined, vale: (p: Permesso, k: string) => boolean) => (
       <details key={id} className="permessi-area" open={aperta}>
         <summary>{titolo}{mio}</summary>
-        <DataTable compatta naturale righe={righe} chiave={(p) => p.id} colonne={[
+        <DataTable compatta naturale caricando={permessi === null} righe={righe} chiave={(p) => p.id} colonne={[
           { key: 'testo', header: 'Attività', grow: true, sortable: false },
           ...Object.keys(colonne).map((k): Colonna<Permesso> => ({
             key: k, header: colonne[k], align: 'center', sortable: false, cell: (p) => spunta(vale(p, k)), classe: () => (k === evid ? 'col-evidenza' : ''),
@@ -222,10 +238,10 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
     return (
       <>
         {sezione('sistema', 'Sistema', <Stato v={u.ruolo === 'utente' ? 'neutro' : 'primario'}>{RUOLI[u.ruolo]}</Stato>, u.ruolo !== 'utente',
-          permessi.filter((p) => p.area === 'sistema'), RUOLI, u.ruolo, (p, k) => !!p.ruoli?.includes(k) || (!!p.ancheOperatore && k === 'utente'))}
+          elenco.filter((p) => p.area === 'sistema'), RUOLI, u.ruolo, (p, k) => !!p.ruoli?.includes(k) || (!!p.ancheOperatore && k === 'utente'))}
         {Object.keys(AREE).map((a) => sezione(a, AREE[a],
           u.aree[a] ? <Stato v={VARIANTE[u.aree[a]]}>{LIVELLI[u.aree[a]]}</Stato> : <span className="testo-tenue">Nessun accesso</span>, !!u.aree[a],
-          permessi.filter((p) => p.area === a), LIVELLI, u.aree[a], (p, k) => ORDINE.indexOf(k) >= ORDINE.indexOf(p.minimo!)))}
+          elenco.filter((p) => p.area === a), LIVELLI, u.aree[a], (p, k) => ORDINE.indexOf(k) >= ORDINE.indexOf(p.minimo!)))}
         <Nota>Evidenziati il ruolo e i livelli di {u.nome}. Un livello comprende quelli prima. Stato del sistema: anche per chi è operatore in un’area.</Nota>
       </>
     );
@@ -234,14 +250,7 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
   return pagina(
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
-        <FilterBar valori={valori} onChange={(v) => { filtro = v; setValori(v); }} campi={[
-          { nome: 'q', tipo: 'cerca', placeholder: 'Nome, nome utente o email' },
-          { nome: 'vista', tipo: 'segmenti', opzioni: [
-            { value: 'attivi', label: 'Attivi', n: cercati.filter(VISTE.attivi).length },
-            { value: 'disattivati', label: 'Disattivati', n: cercati.filter(VISTE.disattivati).length },
-            { value: 'tutti', label: 'Tutti', n: cercati.length },
-          ] },
-        ]} />
+        {filtri}
         <div className="riempi">
           <DataTable righe={righe} filtro={valori.q + '|' + valori.vista} colonne={colonne} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'nome', dir: 'asc' }}
             rowClass={(x) => (x.id === u.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/utenti/' + x.id)}

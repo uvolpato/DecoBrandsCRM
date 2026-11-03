@@ -47,19 +47,36 @@ with sync_playwright() as p:
                 return c and c['bollettino_id']
         return None
 
-    def decidi(pg, riga, azione, conferma):
+    def decidi(pg, riga, azione, conferma, motivo=None):
         riga.locator('button', has_text=azione).first.click()
         pg.wait_for_selector('.velo .modale-piede button:has-text("%s")' % conferma)
+        if motivo is not None:
+            pg.fill('.velo #c-motivo', motivo)
         pg.click('.velo .modale-piede button:has-text("%s")' % conferma)
         pg.wait_for_function("!document.querySelector('.velo')")
         pg.wait_for_timeout(400)
 
-    def abbina(pg, riga, documento, conferma=True):
+    def apri_abbina(pg, riga):
         riga.locator('button', has_text='Abbina il documento').first.click()
         pg.wait_for_selector('.velo form')
+        pg.wait_for_timeout(900)  # le voci dei documenti arrivano dal server
         campo = pg.locator('.velo .ricerca .ricerca-testo').first
-        campo.fill(documento); pg.wait_for_timeout(300); campo.press('Enter'); pg.wait_for_timeout(200)
-        if conferma: pg.click('.velo .modale-piede button:has-text("Abbina")')
+        campo.click()
+        pg.wait_for_selector('.velo .ricerca-menu li[role=option]', state='attached', timeout=10000)
+        return campo
+
+    def scegli(pg, documento):
+        pg.wait_for_timeout(300)
+        pg.locator('.velo .ricerca-menu li[role=option]', has_text=documento).first.click()
+        pg.wait_for_timeout(200)
+
+    def abbina(pg, riga, documento, conferma=True):
+        campo = apri_abbina(pg, riga)
+        campo.fill(documento); scegli(pg, documento)
+        if conferma:
+            pg.click('.velo .modale-piede button:has-text("Abbina")')
+            pg.wait_for_function("!document.querySelector('.velo')", timeout=15000)
+            pg.wait_for_timeout(600)
     def apri_gruppo(pg, titolo):
         det = gruppo(pg, titolo).locator('xpath=ancestor::details[1]')
         if det.count() and not det.get_attribute('open'):
@@ -87,17 +104,61 @@ with sync_playwright() as p:
     ok(tot(pg, '.cerniera-riepilogo .lato b') == 2228.10 and tot(pg, '.cerniera-riepilogo .lato.destro b') == 2260.80
        and tot(pg, '.cerniera-riepilogo .cucitura b') == -32.70, 'Gries luglio: totali 2.228,10 / 2.260,80 / -32,70')
     ok(n_gruppo(pg, 'Da decidere') == 1 and n_gruppo(pg, 'Quadrano') == 1, 'Gries luglio: 1 da decidere, 1 che quadra')
-    ok('1 riga da decidere' in testo(pg, '.barra-decisione') and pg.locator('.barra-decisione button').first.is_disabled(),
-       'azione proposta: riga da decidere e chiusura spenta')
+    ok('Manca 1 riga da decidere' in testo(pg, '.barra-decisione')
+       and pg.locator('.barra-decisione button:has-text("Segna come verificato")').first.is_disabled(),
+       'azione proposta: riga da decidere, chiusura spenta e righe mancanti indicate')
+    # Vai alla prima: porta alla riga del gruppo Da decidere e la evidenzia un attimo
+    pg.click('.barra-decisione button:has-text("Vai alla prima")')
+    pg.wait_for_selector('.cerniera [data-gruppo="Da decidere"] .c-riga.evidenzia')
+    pg.wait_for_timeout(700)
+    a_schermo = pg.evaluate("""() => { const r = document.querySelector('.cerniera [data-gruppo="Da decidere"] .c-riga');
+      const b = r.getBoundingClientRect(); return b.top >= 0 && b.bottom <= window.innerHeight; }""")
+    ok(a_schermo, 'Vai alla prima: la riga da decidere è a schermo e in evidenza')
+
     diff = riga_testo(pg, 'importo diverso')
-    abbina(pg, diff, 'F-2026-0891')
+    campo = apri_abbina(pg, diff)
+    ok(pg.locator('.velo .ricerca-menu li[role=option]').count() >= 3,
+       'abbinamento: l\'elenco arriva dal server con i documenti del fornitore di ogni mese')
+    campo.fill('F-2026-0891'); pg.wait_for_timeout(300)
+    ok('già sul bollettino 7/2026' in testo(pg, '.velo .ricerca-menu'), 'il documento già usato lo dice nell\'elenco')
+    scegli(pg, 'F-2026-0891')
+    pg.click('.velo .modale-piede button:has-text("Abbina")')
     pg.wait_for_selector('.modulo-errore:not([hidden])')
-    ok('già sulla riga' in testo(pg, '.modulo-errore'), 'abbinamento a un documento già usato: errore visibile')
+    ok('già sulla riga' in testo(pg, '.modulo-errore'), 'abbinamento a un documento già usato: il 409 del server si vede')
     pg.click('.velo .modale-piede button:has-text("Annulla")'); pg.wait_for_timeout(300)
+
+    # contesta con motivo, poi prepara la contestazione (testo dal server, copia e .txt)
+    decidi(pg, diff, 'Contesta', 'Contesta', 'Sconto diverso da quello concordato')
+    ok(n_gruppo(pg, 'Decise') == 1 and n_gruppo(pg, 'Da decidere') == 0, 'contestata: la riga passa fra le decise')
+    ok(pg.locator('.barra-decisione button:has-text("Prepara la contestazione")').count() == 1,
+       'con una riga contestata compare Prepara la contestazione')
+    pg.click('.barra-decisione button:has-text("Prepara la contestazione")')
+    pg.wait_for_selector('.velo #contestazione-testo')
+    testo_contestazione = pg.input_value('.velo #contestazione-testo')
+    ok('F-2026-0912' in testo_contestazione and 'Sconto diverso da quello concordato' in testo_contestazione
+       and '1.144,50 €' in testo_contestazione and 'F-2026-0891' not in testo_contestazione,
+       'la contestazione ha le righe contestate con i numeri, la differenza e il motivo')
+    ok(pg.input_value('.velo #contestazione-oggetto').startswith('Contestazione bollettino provvigioni luglio 2026'),
+       'l\'oggetto dice fornitore e mese')
+    pg.click('.velo .modale-piede button:has-text("Copia")')
+    pg.wait_for_selector('.avviso')
+    ok('Testo copiato' in testo(pg, '.avviso'), 'Copia: il testo va negli appunti')
+    with pg.expect_download() as scaricato:
+        pg.click('.velo .modale-piede button:has-text("Scarica .txt")')
+    download = scaricato.value
+    contenuto = pathlib.Path(download.path()).read_text(encoding='utf-8')
+    ok(download.suggested_filename == 'contestazione-2026-07.txt' and 'F-2026-0912' in contenuto,
+       'Scarica .txt: il file ha il nome del mese e le righe contestate')
+    pg.click('.velo .modale-piede button:has-text("Chiudi")'); pg.wait_for_timeout(300)
+
+    # annulla la contestazione e accetta, come prima
+    riga_testo(pg, 'F-2026-0912').locator('button', has_text='Annulla').first.click(); attesa(pg)
     decidi(pg, diff, 'Accetta il loro importo', 'Conferma')
     ok(n_gruppo(pg, 'Decise') == 1 and n_gruppo(pg, 'Da decidere') == 0, 'accettato: la riga passa fra le decise')
     ok('Tutte le righe sono quadrate o decise' in testo(pg, '.barra-decisione')
-       and not pg.locator('.barra-decisione button').first.is_disabled(), 'dopo la decisione la verifica è attiva')
+       and not pg.locator('.barra-decisione button:has-text("Segna come verificato")').first.is_disabled()
+       and pg.locator('.barra-decisione button:has-text("Prepara la contestazione")').count() == 0,
+       'dopo la decisione la verifica è attiva e non c\'è nulla da contestare')
     pg.close()
 
     # --- Gasper agosto: mancante, abbinamento D→E, chiusura verificato ---
@@ -114,6 +175,17 @@ with sync_playwright() as p:
        'senza PDF: la pagina lo dice e non mostra il riquadro')
     pg.screenshot(path=str(USCITA / 'app-bollettino-1440.png'))
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(500)
+    ok(pg.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'),
+       '768 px: la pagina non scorre di lato')
+    ok(pg.evaluate("""() => { const c = document.querySelector('.cerniera'); return c.scrollWidth <= c.clientWidth + 1; }"""),
+       '768 px: la cerniera impilata non scorre di lato')
+    ok(not pg.locator('.c-intest').first.is_visible(), '768 px: le intestazioni delle colonne spariscono')
+    etichetta = pg.eval_on_selector('.c-riga .c-sx', "e => getComputedStyle(e, '::before').content")
+    ok('riconosce' in etichetta, '768 px: ogni valore porta la sua etichetta')
+    dentro = pg.evaluate("""() => { const c = document.querySelector('.cerniera'), a = document.querySelector('.c-riga .c-azioni');
+      const b = a.getBoundingClientRect(), d = c.getBoundingClientRect();
+      return b.top >= d.top && b.bottom <= d.bottom && b.left >= d.left && b.right <= d.right; }""")
+    ok(dentro, '768 px: i pulsanti della riga stanno dentro la cerniera, a tutta larghezza')
     pg.screenshot(path=str(USCITA / 'app-bollettino-cerniera-768.png'), full_page=True)
     pg.set_viewport_size({'width': 1440, 'height': 900}); pg.wait_for_timeout(300)
 
@@ -122,7 +194,21 @@ with sync_playwright() as p:
     decidi(pg, mancante, 'Attendi il prossimo', 'Conferma')
     ok(n_gruppo(pg, 'Da decidere') == 0 and n_gruppo(pg, 'Decise') == 1, 'attesa sul mancante: passa fra le decise')
     riga_testo(pg, 'F-2026-0933').locator('button', has_text='Annulla').first.click(); attesa(pg)
-    ok(n_gruppo(pg, 'Da decidere') == 1 and n_gruppo(pg, 'Decise') == 0, 'annullata la decisione: torna da decidere')
+    dopo_annulla = (n_gruppo(pg, 'Da decidere'), n_gruppo(pg, 'Decise'))
+    ok(dopo_annulla == (1, 0), 'annullata la decisione: torna da decidere (%d da decidere, %d decise)' % dopo_annulla)
+
+    # abbinamento a un documento di un altro mese (settembre), poi ritorno: il vecchio torna mancante
+    apri_gruppo(pg, 'Quadrano')
+    abbina(pg, riga_testo(pg, 'F-2026-0921'), 'NC-2026-007')
+    attesa(pg)
+    ok(pg.locator('.c-riga', has_text='F-2026-0921').filter(has_text='manca nel bollettino').count() == 1,
+       'abbinamento a un documento di un altro mese: funziona e il vecchio torna mancante')
+    con_abbina = pg.locator('.c-riga', has_text='F-2026-0921').filter(
+        has=pg.locator('button', has_text='Abbina il documento')).first
+    abbina(pg, con_abbina, 'F-2026-0921')
+    attesa(pg)
+    ok(n_gruppo(pg, 'Da decidere') == 1 and n_gruppo(pg, 'Quadrano') == 1,
+       'tornando al documento giusto la riga quadra di nuovo')
 
     # abbinamento a mano: la riga F-2026-0921 va sul documento F-2026-0933 che mancava (D-56)
     apri_gruppo(pg, 'Quadrano')
@@ -132,13 +218,15 @@ with sync_playwright() as p:
        and riga_testo(pg, 'manca nel bollettino').count() == 1, 'abbinata: la vecchia riga torna mancante, la nuova è a confronto')
 
     # chiudere con righe aperte: la chiusura è spenta (il server rifiuterebbe)
-    ok('2 righe da decidere' in testo(pg, '.barra-decisione') and pg.locator('.barra-decisione button').first.is_disabled(),
+    ok('2 righe da decidere' in testo(pg, '.barra-decisione')
+       and pg.locator('.barra-decisione button:has-text("Segna come verificato")').first.is_disabled(),
        'con righe aperte la chiusura è spenta')
 
     # decide entrambe, poi verifica
     decidi(pg, riga_testo(pg, 'importo diverso'), 'Accetta il loro importo', 'Conferma')
     decidi(pg, riga_testo(pg, 'manca nel bollettino'), 'Attendi il prossimo', 'Conferma')
-    ok(n_gruppo(pg, 'Da decidere') == 0 and not pg.locator('.barra-decisione button').first.is_disabled(),
+    ok(n_gruppo(pg, 'Da decidere') == 0
+       and not pg.locator('.barra-decisione button:has-text("Segna come verificato")').first.is_disabled(),
        'tutte decise: la verifica torna attiva')
     pg.click('.barra-decisione button:has-text("Segna come verificato")')
     pg.wait_for_selector('.velo .modale-piede button:has-text("Segna come verificato")')
@@ -184,8 +272,8 @@ with sync_playwright() as p:
     pg.wait_for_function("location.pathname === '/bollettini'")
     ing = id_bollettino(pg, "Ing's", '2026-08')
     pg.goto(BASE + '/bollettini/' + str(ing)); pg.wait_for_selector('.cerniera')
-    ok(pg.locator('.barra-decisione button').count() == 0 and pg.locator('.c-azioni button').count() == 0,
-       'sola lettura: cerniera senza pulsanti')
+    ok(pg.locator('.barra-decisione button:has-text("Segna come")').count() == 0 and pg.locator('.c-azioni button').count() == 0,
+       'sola lettura: nessun pulsante di scrittura')
     pg.close()
     b.close()
 

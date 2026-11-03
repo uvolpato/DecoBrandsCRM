@@ -7,6 +7,7 @@ import { Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { PeriodoMesi } from '@/componenti/PeriodoMesi';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
+import { Sagoma, SagomaMatrice, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
 import { fornitore } from '@/lib/entita';
@@ -43,9 +44,12 @@ export function VistaBollettini() {
   const [errore, setErrore] = useState('');
   const [carica, setCarica] = useState(false);
   const [versione, setVersione] = useState(0);
+  const [caricando, setCaricando] = useState(true);
+  const sagome = useSagome(caricando);
 
   useEffect(() => {
     let vivo = true;
+    setCaricando(true);
     const p = new URLSearchParams();
     if (periodo.a) p.set('al', periodo.a);
     const scelte = (valori.fornitori as string[] | undefined) ?? [];
@@ -53,14 +57,14 @@ export function VistaBollettini() {
     p.set('vista', String(valori.vista ?? 'tutti'));
     void api<Risposta>('bollettini?' + p.toString()).then((r) => {
       if (!vivo) return;
+      setCaricando(false);
       if (r.ok) {
         setDati(r.dati);
         setErrore('');
-        if (!periodo.a) setPeriodo({ da: r.dati.da, a: r.dati.al });
       } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
     });
     return () => { vivo = false; };
-  }, [valori, periodo, versione, setPeriodo]);
+  }, [valori, periodo, versione]);
 
   const da = periodo.da || dati?.da || '';
   const a = periodo.a || dati?.al || '';
@@ -81,26 +85,27 @@ export function VistaBollettini() {
   return (
     <Pagina titolo="Bollettini" sottotitolo="Ogni mese ogni fornitore ci comunica le provvigioni che ci riconosce. Qui vedi quali sono arrivati e quali vanno ancora verificati."
       azioni={puo('provvigioni.modifica') ? [{ etichetta: 'Carica un bollettino', icona: 'carica', onClick: () => setCarica(true) }] : []}>
-      <div className="pila">
+      <div className="pila" aria-busy={(!dati && sagome) || undefined}>
         <div className="barra-periodo">
           {dati && <PeriodoMesi da={da} mesi={6} primo={primo} ultimo={ultimo} onChange={(d, a2) => setPeriodo({ da: d, a: a2 })} />}
+          {!dati && sagome && <Sagoma larghezza={180} altezza={34} arrotondato={8} />}
           <div className="sposta-periodo">
             <button type="button" className="btn sec piccolo" title="Sposta il periodo di un mese indietro" disabled={!dati || da <= primo} onClick={() => sposta(-1)}>‹</button>
             <button type="button" className="btn sec piccolo" title="Sposta il periodo di un mese avanti" disabled={!dati || a >= ultimo} onClick={() => sposta(1)}>›</button>
           </div>
-          <FilterBar valori={valori} onChange={setValori} riepilogo={{ prima: [{ etichetta: 'Periodo', testo: da && a ? etichetta(da) + ' – ' + etichetta(a) : '' }] }} campi={[
+          <FilterBar valori={valori} onChange={setValori} caricando={sagome && !dati} riepilogo={{ prima: [{ etichetta: 'Periodo', testo: da && a ? etichetta(da) + ' – ' + etichetta(a) : '' }] }} campi={[
             { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, etichetta: 'Fornitore', placeholder: 'Tutti i fornitori' },
             {
               nome: 'vista', tipo: 'segmenti', etichetta: 'Vista', opzioni: [
-                { value: 'tutti', label: 'Tutti', n: dati?.conteggi.tutti ?? 0 },
-                { value: 'dafare', label: 'Con qualcosa da fare', n: dati?.conteggi.dafare ?? 0 },
+                { value: 'tutti', label: 'Tutti', n: dati?.conteggi.tutti },
+                { value: 'dafare', label: 'Con qualcosa da fare', n: dati?.conteggi.dafare },
               ],
             },
           ]} />
         </div>
 
         {errore && !dati ? <Pannello><div className="vuoto"><b>Bollettini non caricati</b>{errore}</div></Pannello>
-          : !dati ? null
+          : !dati ? (sagome ? <SagomaMatrice righe={6} colonne={6} /> : null)
             : !dati.fornitori.length
               ? <Pannello><div className="vuoto"><b>Nessun fornitore con qualcosa da fare in questo periodo</b>Scegli “Tutti” o cambia i mesi.</div></Pannello>
               : <Matrice angolo="Fornitore" colonne={dati.colonne.map(etichetta)}
