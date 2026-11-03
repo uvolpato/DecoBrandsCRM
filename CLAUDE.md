@@ -112,6 +112,11 @@ Regole del codice del prototipo:
   - hanno la paginazione.
 - Si torna sempre alla schermata precedente nello stesso punto: filtri, scheda,
   ordinamento, pagina, scorrimento (`CRM.registra`, spec §7.12).
+- **Caricamento standard: sagome** (D-59, spec §16.4). Il titolo della pagina si vede subito;
+  il resto, finché i dati non arrivano, si mostra con il componente `Sagoma` (e le sue varianti
+  per tabelle, segmenti, riquadri), mai con zeri, «Nessun elemento» o testi vuoti finti. Niente
+  sagome sotto i 150 ms; al cambio di filtro la tabella resta, solo più tenue. Ogni pagina nuova
+  lo usa.
 - Nei punti non ovvi, un commento breve rimanda alla decisione (`// D-11 §19`).
 - Nomi delle classi CSS: controlla che non esistano già (`grep` su `stile.css`) prima di
   crearne una nuova. Un doppione ha già rotto un riquadro (`.scelta`).
