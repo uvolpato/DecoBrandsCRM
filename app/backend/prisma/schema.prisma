@@ -209,8 +209,7 @@ model ordini_fornitore_testata {
   agente_id             BigInt?
   importo_merce         Decimal?  @db.Decimal(12, 2)
   stato                 String    @default("inviato") @db.VarChar(20) // inviato | confermato | fatturato: dal motore (D-52)
-  conferma_data         DateTime? @db.Date
-  conferma_numero       String?   @db.VarChar(50)
+  // numero_ordine = numero della pratica, data_ordine = data del primo ordine (D-60); ordini e conferme sono documenti
   note                  String?
   // risultato del motore, scritto da aggiornaPratica nella stessa transazione di ogni modifica (D-52 §19)
   importo               Decimal   @default(0) @db.Decimal(14, 2) // importoPratica
@@ -232,14 +231,15 @@ model ordini_fornitore_testata {
   @@index([importo])
 }
 
-/// Fatture e note di credito della pratica: la base delle provvigioni (§4.2.7.1, §5.3).
+/// Documenti della pratica (§4.2.7.1, D-60): ordine | conferma | proforma | fattura | nota_credito | pagamento | altro.
+/// Solo fattura e nota di credito sono la base delle provvigioni (§5.3).
 model ordini_fornitore_documenti {
   id              BigInt    @id @default(autoincrement())
   testata_id      BigInt
-  tipo            String    @db.VarChar(20) // fattura | nota_credito
-  numero          String    @db.VarChar(50)
+  tipo            String    @db.VarChar(20) // CHECK nella migrazione (D-60)
+  numero          String    @db.VarChar(50) // vuoto per un pagamento senza numero
   data            DateTime  @db.Date
-  importo         Decimal   @db.Decimal(12, 2) // negativo per la nota di credito
+  importo         Decimal   @default(0) @db.Decimal(12, 2) // negativo per la nota di credito
   storno_totale   Boolean   @default(false)
   fattura_id      BigInt? // la fattura stornata dalla nota di credito
   stato_incasso   String    @default("da_incassare") @db.VarChar(15) // §5.14
@@ -261,6 +261,7 @@ model ordini_fornitore_documenti {
   attese_bollettino bollettini_attese[]
   testata          ordini_fornitore_testata     @relation(fields: [testata_id], references: [id], onDelete: Cascade)
   correzione       provvigioni_correzioni?
+  righe            ordini_fornitore_righe[]
 
   @@index([numero, tipo])
   @@index([testata_id])
@@ -283,10 +284,11 @@ model provvigioni_correzioni {
   autore    utenti?                    @relation(fields: [creato_da], references: [id], onDelete: Restrict)
 }
 
-/// Righe per fase: tre fotografie che non si sovrascrivono (§4.2.8, §5.8).
+/// Righe per fase: tre fotografie che non si sovrascrivono (§4.2.8, §5.8); ogni riga sta sul suo documento (D-60).
 model ordini_fornitore_righe {
   id              BigInt   @id @default(autoincrement())
   testata_id      BigInt
+  documento_id    BigInt? // null solo per le righe di fattura di prima di D-60 con più fatture nella pratica
   fase            String   @default("ordine") @db.VarChar(20) // ordine | conferma | fattura
   numero_riga     Int
   codice          String?  @db.VarChar(100)
@@ -296,9 +298,11 @@ model ordini_fornitore_righe {
   prezzo_unitario Decimal? @db.Decimal(12, 4)
   importo         Decimal? @db.Decimal(12, 2)
 
-  testata ordini_fornitore_testata @relation(fields: [testata_id], references: [id], onDelete: Cascade)
+  testata   ordini_fornitore_testata    @relation(fields: [testata_id], references: [id], onDelete: Cascade)
+  documento ordini_fornitore_documenti? @relation(fields: [documento_id], references: [id], onDelete: Cascade)
 
-  @@unique([testata_id, fase, numero_riga])
+  @@unique([documento_id, numero_riga])
+  @@index([testata_id])
 }
 
 // ---------- Bollettini (§4.2.9–§4.2.10) ----------
@@ -407,7 +411,7 @@ model documenti_in_arrivo {
   email_oggetto          String?
   file_nome              String
   file_hash              String    @unique @db.Char(64) // il file sta su disco con questo nome (D-34)
-  file_percorso          String    @db.VarChar(100) // sotto DOCUMENTI_DIR: AAAA/AAAAMMGG/<impronta>.pdf (D-55)
+  file_percorso          String    @db.VarChar(255) // sotto DOCUMENTI_DIR: in coda in_arrivo/AAAA/AAAAMMGG/<impronta>.<est>, abbinato pratiche/… (D-60)
   stato                  String    @default("in_coda") @db.VarChar(16)
   tentativi              Int       @default(0)
   errore                 String?

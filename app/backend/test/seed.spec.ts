@@ -33,7 +33,10 @@ describe('seed §12', () => {
     expect(await db.interscambio.count()).toBe(18);
     expect(await db.provvigioni_scaglioni.count()).toBe(33);
     expect(await db.ordini_fornitore_testata.count()).toBe(54); // 52 del prototipo + 2 di §12 (OF/2026/S12-…)
-    expect(await db.ordini_fornitore_documenti.count()).toBe(36 + 2 + 2);
+    // D-60: anche ordini e conferme sono documenti; fatture e note di credito restano 36 + 2 + 2
+    expect(await db.ordini_fornitore_documenti.count({ where: { tipo: { in: ['fattura', 'nota_credito'] } } })).toBe(36 + 2 + 2);
+    expect(await db.ordini_fornitore_documenti.count({ where: { tipo: 'ordine' } })).toBe(54);
+    expect(await db.ordini_fornitore_righe.count({ where: { documento_id: null } })).toBe(0);
     expect(await db.bollettini_testata.count()).toBe(7);
     expect(await db.bollettini_righe.count()).toBe(10);
     expect(await db.liquidazioni.count()).toBe(2);

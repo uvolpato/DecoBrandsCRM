@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Richiede } from './accesso';
 import { CON_PRATICA, type Dati, caricaDatiPratica, giornoRoma, praticaDaDb } from './motore/dati';
-import { abbinamento, confronto, fasePratica, haVariazioni, importoPratica, importoRighe, percentuali, quotaSub, r2, statoPratica } from './motore/motore';
+import { abbinamento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, statoPratica } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { type Contesto, logEvent } from './registro';
 
@@ -28,6 +28,7 @@ class FiltroPratiche {
   @IsOptional() @Matches(ELENCO_ID) subagenti?: string;
   @IsOptional() @Matches(DATA) dal?: string;
   @IsOptional() @Matches(DATA) al?: string;
+  @IsOptional() @IsIn(['si', 'no']) pagato?: 'si' | 'no'; // D-60: il cliente ha pagato (c'è un documento di pagamento)
   @IsOptional() @IsIn(ORDINI) ordina?: (typeof ORDINI)[number];
   @IsOptional() @IsIn(['asc', 'desc']) dir?: 'asc' | 'desc';
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) pagina?: number;
@@ -41,11 +42,11 @@ const STATO_DB = { attesa: 'inviato', confermata: 'confermato', fatturata: 'fatt
 
 const gg = (n: number) => `${n} ${n === 1 ? 'giorno' : 'giorni'}`;
 /** La nota dei giorni accanto allo stato, la stessa nell'elenco e nel dettaglio (§7.2, §7.3). */
-function notaStato(stato: string, giorni?: number) {
+function notaStato(stato: string, giorni?: number | null) {
   const n = giorni ?? 0;
   return stato === 'confermata' ? 'in attesa di fattura'
     : stato === 'scaduta' ? `da ${gg(-n)}`
-      : stato === 'attesa' ? (n === 0 ? 'scade oggi' : `entro ${gg(n)}`) : null;
+      : stato === 'attesa' ? (giorni === null ? 'il fornitore non manda la conferma' : n === 0 ? 'scade oggi' : `entro ${gg(n)}`) : null;
 }
 const dataIt = (s: string) => s.split('-').reverse().join('/');
 
@@ -59,7 +60,9 @@ export async function aggiornaPratica(tx: Prisma.TransactionClient, id: bigint, 
   const t = await tx.ordini_fornitore_testata.findUniqueOrThrow({ where: { id }, include: CON_PRATICA });
   const p = praticaDaDb(t);
   const variazione = r2(confronto(p).filter((r) => r.varia).reduce((s, r) => s.plus(r.delta), new Prisma.Decimal(0)));
-  const nuovi = { stato: STATO_DB[fasePratica(p)], importo: importoPratica(p), variazioni: haVariazioni(p), variazione };
+  // la data della pratica è quella del primo ordine rimasto (annullamenti, spostamenti, correzioni: D-60)
+  const primo = t.documenti.filter((d) => d.tipo === 'ordine').reduce<Date | null>((m, d) => (!m || d.data < m ? d.data : m), null);
+  const nuovi = { stato: STATO_DB[fasePratica(p)], importo: importoPratica(p), variazioni: haVariazioni(p), variazione, ...(primo ? { data_ordine: primo } : {}) };
   await tx.ordini_fornitore_testata.update({ where: { id }, data: nuovi });
   if (motivo && t.stato !== nuovi.stato) {
     await logEvent(tx, {
@@ -73,7 +76,7 @@ export async function aggiornaPratica(tx: Prisma.TransactionClient, id: bigint, 
 type Riga = {
   id: bigint; numero: string; cliente_id: bigint; cliente: string; fornitore_id: bigint; fornitore: string;
   subagente_id: bigint | null; subagente: string | null; data: string; importo: Prisma.Decimal; stato: string; giorni: number;
-  variazioni: boolean; variazione: Prisma.Decimal;
+  variazioni: boolean; variazione: Prisma.Decimal; pagato: boolean;
 };
 
 @Controller('pratiche')
@@ -95,6 +98,8 @@ export class PraticheController {
     if (subagenti.length) filtri.push(Prisma.sql`a.subagente_id IN (${Prisma.join(subagenti)})`);
     if (q.dal) filtri.push(Prisma.sql`t.data_ordine >= ${q.dal}::date`);
     if (q.al) filtri.push(Prisma.sql`t.data_ordine <= ${q.al}::date`);
+    const pagato = Prisma.sql`EXISTS (SELECT 1 FROM ordini_fornitore_documenti d WHERE d.testata_id = t.id AND d.tipo = 'pagamento')`;
+    if (q.pagato) filtri.push(q.pagato === 'si' ? pagato : Prisma.sql`NOT ${pagato}`);
     if (testo) filtri.push(Prisma.sql`(t.numero_ordine ILIKE ${simile} OR cv.ragione_sociale ILIKE ${simile} OR fv.ragione_sociale ILIKE ${simile}
       OR EXISTS (SELECT 1 FROM ordini_fornitore_documenti d WHERE d.testata_id = t.id AND d.numero ILIKE ${simile}))`);
 
@@ -105,10 +110,10 @@ export class PraticheController {
         SELECT t.id, t.numero_ordine AS numero, t.cliente_id, coalesce(cv.ragione_sociale, '') AS cliente,
                t.fornitore_id, coalesce(fv.ragione_sociale, '') AS fornitore,
                a.subagente_id, s.nome || ' ' || s.cognome AS subagente, to_char(t.data_ordine, 'YYYY-MM-DD') AS data,
-               t.importo, t.variazioni, t.variazione,
+               t.importo, t.variazioni, t.variazione, ${pagato} AS pagato,
                CASE t.stato WHEN 'fatturato' THEN 'fatturata' WHEN 'confermato' THEN 'confermata'
-                 ELSE CASE WHEN t.data_ordine + f.giorni_attesa_conferma < ${oggi}::date THEN 'scaduta' ELSE 'attesa' END END AS stato,
-               (t.data_ordine + f.giorni_attesa_conferma) - ${oggi}::date AS giorni
+                 ELSE CASE WHEN f.giorni_attesa_conferma > 0 AND t.data_ordine + f.giorni_attesa_conferma < ${oggi}::date THEN 'scaduta' ELSE 'attesa' END END AS stato,
+               CASE WHEN f.giorni_attesa_conferma > 0 THEN (t.data_ordine + f.giorni_attesa_conferma) - ${oggi}::date END AS giorni -- 0 = nessuna scadenza (D-60)
         FROM ordini_fornitore_testata t
         JOIN fornitori f ON f.id = t.fornitore_id
         LEFT JOIN fornitori_versioni fv ON fv.id = f.versione_corrente_id
@@ -151,7 +156,7 @@ export class PraticheController {
         fornitore_id: String(r.fornitore_id), fornitore: r.fornitore,
         subagente_id: r.subagente_id == null ? null : String(r.subagente_id), subagente: r.subagente,
         data: r.data, importo: Number(r.importo), stato: r.stato, nota: notaStato(r.stato, r.giorni),
-        variazioni: r.variazioni, variazione: Number(r.variazione),
+        variazioni: r.variazioni, variazione: Number(r.variazione), pagato: r.pagato,
       })),
       totale: c.totale,
       conteggi: Object.fromEntries(STATI.map((s) => [s, c[s]])) as Record<Stato, number>,
@@ -180,38 +185,44 @@ export function dettaglioPratica(S: Dati, id: string) {
   if (!p) return null;
 
   const s = statoPratica(S, p), nota = notaStato(s.chiave, s.giorni);
-  const ordine = p.righe.ordine, conferma = p.righe.conferma;
-  const impOrdine = importoRighe(ordine), impConferma = p.conferma ? importoRighe(conferma) : null;
   const fatture = p.documenti.filter((d) => d.tipo === 'fattura');
   const note = p.documenti.filter((d) => d.tipo === 'nota_credito');
-  const somma = (ds: typeof p.documenti) => r2(ds.reduce((x, d) => x.plus(d.importo), new Prisma.Decimal(0)));
+  const somma = (ds: { importo: Prisma.Decimal }[]) => r2(ds.reduce((x, d) => x.plus(d.importo), new Prisma.Decimal(0)));
+  // più documenti dello stesso tipo: il primo numero + quanti altri (D-60)
+  const numeri = (ds: { numero: string }[]) => ds[0].numero + (ds.length > 1 ? ` + ${ds.length - 1}` : '');
+  // una conferma registrata senza importo è arrivata, ma non dà un importo né una differenza (D-60)
+  const impOrdine = somma(p.ordini), impConferma = somma(p.conferme), confermaConImporto = !impConferma.isZero();
 
   const fasi = [
-    { titolo: 'Ordine', fatta: true, numero: p.numero, data: p.data, importo: Number(impOrdine) },
-    p.conferma && impConferma
-      ? { titolo: 'Conferma', fatta: true, numero: p.conferma.numero, data: p.conferma.data, importo: Number(impConferma), delta: Number(r2(impConferma.minus(impOrdine))) }
-      : {
-        titolo: 'Conferma', ritardo: s.chiave === 'scaduta',
-        testo: s.chiave === 'scaduta' ? `In ritardo ${nota} (attesa entro il ${dataIt(s.scadenza!)})`
-          : s.scadenza ? `Attesa entro il ${dataIt(s.scadenza)}` : 'Attesa',
-      },
+    { titolo: p.ordini.length > 1 ? 'Ordini' : 'Ordine', fatta: true, numero: p.ordini.length ? numeri(p.ordini) : p.numero, data: p.data, importo: Number(impOrdine) },
+    p.conferme.length
+      ? { titolo: p.conferme.length > 1 ? 'Conferme' : 'Conferma', fatta: true, numero: numeri(p.conferme), data: p.conferme[0].data,
+          ...(confermaConImporto ? { importo: Number(impConferma), delta: Number(r2(impConferma.minus(impOrdine))) } : {}) }
+      // conferma e proforma facoltative (D-60 §19): la proforma o la fattura fanno avanzare la pratica
+      : p.proforma.length ? { titolo: 'Proforma', fatta: true, numero: numeri(p.proforma), data: p.proforma[0].data, importo: Number(somma(p.proforma)) }
+        : s.chiave === 'fatturata' ? { titolo: 'Conferma', assente: true, testo: 'Non arrivata' }
+          : {
+            titolo: 'Conferma', ritardo: s.chiave === 'scaduta',
+            testo: s.chiave === 'scaduta' ? `In ritardo ${nota} (attesa entro il ${dataIt(s.scadenza!)})`
+              : s.scadenza ? `Attesa entro il ${dataIt(s.scadenza)}` : 'Attesa',
+          },
     fatture.length
       ? {
         titolo: fatture.length > 1 ? 'Fatture' : 'Fattura', fatta: true,
-        numero: fatture[0].numero + (fatture.length > 1 ? ` + ${fatture.length - 1}` : ''), data: fatture[0].data,
-        importo: Number(somma(fatture)), delta: Number(r2(somma(fatture).minus(impConferma ?? impOrdine))),
+        numero: numeri(fatture), data: fatture[0].data,
+        importo: Number(somma(fatture)), delta: Number(r2(somma(fatture).minus(confermaConImporto ? impConferma : impOrdine))),
       }
       : { titolo: 'Fattura', testo: 'In attesa' },
     note.length
-      ? { titolo: 'Nota di credito', fatta: true, numero: note[0].numero + (note.length > 1 ? ` + ${note.length - 1}` : ''), data: note[0].data, importo: Number(somma(note)) }
+      ? { titolo: 'Nota di credito', fatta: true, numero: numeri(note), data: note[0].data, importo: Number(somma(note)) }
       : { titolo: 'Nota di credito', assente: true, testo: 'Nessuna' },
   ];
 
   const faseRighe = (['ordine', 'conferma', 'fattura'] as const).filter((f) => p.righe[f].length);
   const etichetta = { ordine: 'Ordine', conferma: 'Conferma', fattura: 'Fattura' } as const;
   const numeroFase = (f: (typeof faseRighe)[number]) =>
-    f === 'ordine' ? { numero: p.numero, data: p.data }
-      : f === 'conferma' ? { numero: p.conferma?.numero ?? '', data: p.conferma?.data ?? p.data }
+    f === 'ordine' ? { numero: p.ordini.map((d) => d.numero).join(' + ') || p.numero, data: p.data }
+      : f === 'conferma' ? { numero: p.conferme.map((d) => d.numero).join(' + '), data: p.conferme[0]?.data ?? p.data }
         : { numero: fatture.map((d) => d.numero).join(' + '), data: fatture[0]?.data ?? p.data };
   const righe = confronto(p);
   const variate = righe.filter((r) => r.varia);
@@ -242,7 +253,7 @@ export function dettaglioPratica(S: Dati, id: string) {
       ? { tipo: 'fattura', testo: 'Attesa la fattura del fornitore: registrala quando arriva.' }
       : s.chiave === 'scaduta'
         ? { tipo: 'sollecito', testo: `Conferma in ritardo ${nota}: chiedila al fornitore.` }
-        : { tipo: 'attesa', testo: `Attesa la conferma entro il ${dataIt(s.scadenza!)}.` };
+        : { tipo: 'attesa', testo: s.scadenza ? `Attesa la conferma entro il ${dataIt(s.scadenza)}.` : 'Il fornitore non manda la conferma: si attende la fattura.' };
 
   return {
     id: p.id, numero: p.numero,
@@ -251,6 +262,8 @@ export function dettaglioPratica(S: Dati, id: string) {
     subagente_id: sub?.subagente_id ?? null, subagente: sub ? (S.subagenti.get(sub.subagente_id)?.nome ?? null) : null,
     data: p.data, importo: Number(imponibile), stato: s.chiave, nota, scadenza: s.scadenza ?? null,
     fasi,
+    // il cliente ha pagato (D-60): solo un segno con i documenti a supporto, nessun effetto sui numeri
+    pagato: pagato(p), pagamenti: p.pagamenti.map((d) => ({ id: d.id, numero: d.numero, data: d.data, importo: Number(d.importo) })),
     confronto: {
       fasi: faseRighe.map((f) => ({ tipo: f, etichetta: etichetta[f], ...numeroFase(f) })),
       righe: righe.map((r) => ({

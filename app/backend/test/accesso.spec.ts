@@ -46,6 +46,11 @@ beforeAll(async () => {
   app = configura(mod.createNestApplication<NestExpressApplication>({ logger: false }));
   await app.init();
   db = app.get(PrismaService);
+  // utenti rimasti da un giro interrotto (crash di node): si tolgono prima di ricrearli
+  const vecchi = (await db.utenti.findMany({ where: { email: { endsWith: DOMINIO } }, select: { id: true } })).map((u) => u.id);
+  await db.sessioni.deleteMany({ where: { utente_id: { in: vecchi } } });
+  await db.registro.deleteMany({ where: { utente_id: { in: vecchi } } });
+  await db.utenti.deleteMany({ where: { id: { in: vecchi } } });
   await crea('ammi', 'amministratore');
   await crea('oper', 'operatore');
 });

@@ -47,6 +47,8 @@ export const SCHEMI: Record<string, string[]> = {
   'documento.create': ['pratica_id', 'documento_id', 'tipo', 'numero', 'data', 'importo', 'storno_totale', 'fattura_id'],
   'documento.update': ['documento_id', 'pratica_id', 'prima', 'dopo'],
   'documento.delete': ['documento_id', 'pratica_id', 'tipo', 'numero', 'importo'],
+  'documento.match': ['documento_id', 'arrivo_id', 'pratica_id', 'tipo'], // abbinamento a mano di un file in coda (D-60)
+  'documento.move': ['documento_id', 'tipo', 'prima', 'dopo'], // documento spostato in un'altra pratica (D-60)
   // sincronizzazione da Integra (§7.14.3): anomalie, non eventi
   'integra.connessione': ['errore'],
   'integra.vista': ['vista', 'errore'],

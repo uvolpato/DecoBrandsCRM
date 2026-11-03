@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
-import { type Dati, caricaDatiBollettino } from './motore/dati';
+import { type Dati, caricaDatiBollettino, fiscale } from './motore/dati';
 import { riconcilia } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { type Contesto, logEvent } from './registro';
@@ -220,6 +220,7 @@ export class BollettinoController {
       if (!riga || riga.testata_id !== BigInt(id)) throw new NotFoundException('Riga non trovata');
       const doc = await tx.ordini_fornitore_documenti.findUnique({ where: { id: BigInt(a.documento_id) }, include: { testata: { select: { fornitore_id: true } } } });
       if (!doc) throw new NotFoundException('Documento non trovato');
+      if (!fiscale(doc.tipo)) throw new BadRequestException('Una riga del bollettino va su una fattura o una nota di credito'); // D-60
       if (String(doc.testata.fornitore_id) !== b.fornitore_id) throw new BadRequestException('Il documento è di un altro fornitore');
       // lo stesso documento sta su una sola riga dello stesso tipo (storno e riaccredito sono righe a parte, §5.14):
       // per id, o per numero se l'altra riga non è ancora abbinata (come suDocumento del motore)

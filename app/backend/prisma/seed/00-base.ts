@@ -92,27 +92,23 @@ export async function base(tx: Tx) {
   const documentoId: Record<string, bigint> = {}; // numero documento fiscale → id (righe dei bollettini chiusi)
   const note: [bigint, string][] = [];
   for (const p of D.pratiche) {
-    const doc = (t: string) => p.documenti.find((d: any) => d.tipo === t);
-    const ordine = doc('ordine'), conferma = doc('conferma');
-    const fiscali = p.documenti.filter((d: any) => d.tipo === 'fattura' || d.tipo === 'nota_credito');
+    const ordine = p.documenti.find((d: any) => d.tipo === 'ordine');
     const t = await tx.ordini_fornitore_testata.create({ data: {
       fornitore_id: ids.fornitori[p.fornitore_id], fornitore_versione_id: ids.versioniF[p.fornitore_id],
       cliente_id: ids.clienti[p.cliente_piva], cliente_versione_id: ids.versioniC[p.cliente_piva], agente_id: agente.id,
-      numero_ordine: p.numero, data_ordine: data(p.data), importo_merce: importoDoc(ordine),
-      conferma_data: conferma ? data(conferma.data) : null, conferma_numero: conferma?.numero ?? null } });
-    for (const fase of ['ordine', 'conferma', 'fattura']) {
-      let n = 0; // più fatture (tranche): le righe di una fase si numerano di seguito
-      const righe = p.documenti.filter((d: any) => d.tipo === fase).flatMap((d: any) => d.righe);
-      await tx.ordini_fornitore_righe.createMany({ data: righe.map((r: any[]) => ({
-        testata_id: t.id, fase, numero_riga: ++n, codice: r[0], descrizione: r[1], quantita: r[2], prezzo_unitario: r[3], importo: importoRiga(r) })) });
-    }
-    for (const d of fiscali) {
-      const f = d.tipo === 'fattura';
+      numero_ordine: p.numero, data_ordine: data(p.data), importo_merce: importoDoc(ordine) } });
+    // D-60: ogni documento (ordine, conferma, fattura, nota) è una riga con le sue righe; importo = somma delle righe
+    for (const d of p.documenti) {
       const creato = await tx.ordini_fornitore_documenti.create({ data: {
         testata_id: t.id, tipo: d.tipo, numero: d.numero, data: data(d.data), importo: importoDoc(d), note: d.nota ?? null,
         ...(d.incasso ? { stato_incasso: 'pagata', fonte_incasso: 'manuale', note: d.incasso.nota, pagata_il: data(d.data.slice(0, 8) + '15') } : {}) } }); // data di pagamento: il prototipo ha solo un modello
-      if (f) fatturaId[d.numero] = creato.id; else note.push([creato.id, d.riferimento]);
-      praticaDi[d.numero] = p; documentoId[d.numero] = creato.id;
+      if (d.tipo !== 'nota_credito') {
+        await tx.ordini_fornitore_righe.createMany({ data: d.righe.map((r: any[], i: number) => ({
+          testata_id: t.id, documento_id: creato.id, fase: d.tipo, numero_riga: i + 1, codice: r[0], descrizione: r[1], quantita: r[2], prezzo_unitario: r[3], importo: importoRiga(r) })) });
+      }
+      if (d.tipo === 'fattura') fatturaId[d.numero] = creato.id;
+      if (d.tipo === 'nota_credito') note.push([creato.id, d.riferimento]);
+      if (d.tipo === 'fattura' || d.tipo === 'nota_credito') { praticaDi[d.numero] = p; documentoId[d.numero] = creato.id; }
     }
     await aggiornaPratica(tx, t.id); // stato, importo e variazioni dal motore (D-52 §19)
   }
@@ -151,8 +147,8 @@ export async function base(tx: Tx) {
 
   // ---------- Documenti in arrivo e scartati (§4.2.12–13) ----------
   const hashDi = (nome: string) => createHash('sha256').update(nome).digest('hex');
-  // D-55: AAAA/AAAAMMGG/<impronta>.pdf dal giorno di arrivo (i dati di prova non hanno il file vero)
-  const percorso = (nome: string, giorno: string) => `${giorno.slice(0, 4)}/${giorno.replace(/-/g, '')}/${hashDi(nome)}.pdf`;
+  // D-60: in coda in_arrivo/AAAA/AAAAMMGG/<impronta>.pdf dal giorno di arrivo (i dati di prova non hanno il file vero)
+  const percorso = (nome: string, giorno: string) => `in_arrivo/${giorno.slice(0, 4)}/${giorno.replace(/-/g, '')}/${hashDi(nome)}.pdf`;
   for (const d of D.in_arrivo) {
     const campi = Object.entries(d.lettura?.campi ?? {}) as [string, number][];
     const minimo = Math.min(1, ...campi.map(([, v]) => v));

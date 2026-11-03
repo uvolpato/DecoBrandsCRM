@@ -27,27 +27,36 @@ const riga = (r: Testata['righe'][number]) => {
   return { codice: r.codice, descrizione: r.descrizione, qta, prezzo, importo: r.importo ?? qta.times(prezzo).toDecimalPlaces(2, Dec.ROUND_HALF_CEIL) };
 };
 
+/** Tipi di documento della pratica (D-60 §19); solo i fiscali toccano le provvigioni. */
+export const TIPI_DOCUMENTO = ['ordine', 'conferma', 'proforma', 'fattura', 'nota_credito', 'pagamento', 'altro'] as const;
+export type TipoDocumento = (typeof TIPI_DOCUMENTO)[number];
+export const fiscale = (tipo: string) => tipo === 'fattura' || tipo === 'nota_credito';
+
 /** Una pratica nella forma del motore (M.S.pratiche). */
-export const praticaDaDb = (t: Testata) => ({
-  id: id(t.id), numero: t.numero_ordine, fornitore_id: id(t.fornitore_id), cliente_id: id(t.cliente_id), data: iso(t.data_ordine),
-  conferma: t.conferma_data ? { numero: t.conferma_numero, data: iso(t.conferma_data) } : null,
-  // tre fotografie delle righe (§4.2.8): le tranche di fattura stanno tutte nella fase 'fattura'
-  righe: {
-    ordine: t.righe.filter((r) => r.fase === 'ordine').map(riga),
-    conferma: t.righe.filter((r) => r.fase === 'conferma').map(riga),
-    fattura: t.righe.filter((r) => r.fase === 'fattura').map(riga),
-  },
-  // documenti fiscali: fatture e note di credito (§4.2.7.1), importo negativo per le note
-  documenti: t.documenti.map((d) => ({
-    id: id(d.id), tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: d.importo,
-    fattura_id: d.fattura_id ? id(d.fattura_id) : null, // nota di credito → fattura stornata, per id (D-34)
-    liquidazione_id: d.liquidazione_id ? id(d.liquidazione_id) : null,
-    // segnalazione a mano del fornitore (§5.14): vince sui bollettini se non è più vecchia
-    incasso: d.fonte_incasso === 'manuale' ? { stato: d.stato_incasso, dal: iso((d.stato_incasso === 'insoluta' ? d.insoluta_dal : d.pagata_il) ?? d.data) } : null,
-    solleciti: d.solleciti, sollecitata_il: d.sollecitata_il ? iso(d.sollecitata_il) : null,
-    correzione: d.correzione ? { tipo: d.correzione.tipo, valore: d.correzione.valore, motivo: d.correzione.motivo } : null,
-  })),
-});
+export const praticaDaDb = (t: Testata) => {
+  // documenti solo tracciati (D-60): ordini, conferme, proforma, pagamenti, altri; nessun effetto sulle provvigioni
+  const tracciati = (tipo: TipoDocumento) => t.documenti.filter((d) => d.tipo === tipo).map((d) => ({ id: id(d.id), numero: d.numero, data: iso(d.data), importo: d.importo }));
+  return {
+    id: id(t.id), numero: t.numero_ordine, fornitore_id: id(t.fornitore_id), cliente_id: id(t.cliente_id), data: iso(t.data_ordine),
+    ordini: tracciati('ordine'), conferme: tracciati('conferma'), proforma: tracciati('proforma'), pagamenti: tracciati('pagamento'),
+    // tre fotografie delle righe (§4.2.8): più ordini e più fatture della stessa fase si sommano (confronto)
+    righe: {
+      ordine: t.righe.filter((r) => r.fase === 'ordine').map(riga),
+      conferma: t.righe.filter((r) => r.fase === 'conferma').map(riga),
+      fattura: t.righe.filter((r) => r.fase === 'fattura').map(riga),
+    },
+    // documenti fiscali: fatture e note di credito (§4.2.7.1), importo negativo per le note
+    documenti: t.documenti.filter((d) => fiscale(d.tipo)).map((d) => ({
+      id: id(d.id), tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: d.importo,
+      fattura_id: d.fattura_id ? id(d.fattura_id) : null, // nota di credito → fattura stornata, per id (D-34)
+      liquidazione_id: d.liquidazione_id ? id(d.liquidazione_id) : null,
+      // segnalazione a mano del fornitore (§5.14): vince sui bollettini se non è più vecchia
+      incasso: d.fonte_incasso === 'manuale' ? { stato: d.stato_incasso, dal: iso((d.stato_incasso === 'insoluta' ? d.insoluta_dal : d.pagata_il) ?? d.data) } : null,
+      solleciti: d.solleciti, sollecitata_il: d.sollecitata_il ? iso(d.sollecitata_il) : null,
+      correzione: d.correzione ? { tipo: d.correzione.tipo, valore: d.correzione.valore, motivo: d.correzione.motivo } : null,
+    })),
+  };
+};
 
 const CON_RIGHE = { righe: { orderBy: { id: 'asc' } }, attese: { orderBy: { id: 'asc' } } } satisfies Prisma.bollettini_testataInclude;
 type Righe = {
@@ -90,7 +99,7 @@ export async function caricaDatiPratica(db: Db, pratica: bigint, oggi = giornoRo
   const rif = await db.ordini_fornitore_documenti.findMany({
     where: { id: { in: t.documenti.flatMap((d) => d.fattura_id ?? []) } }, select: { testata_id: true, data: true },
   });
-  const mesi = [...new Set([...t.documenti, ...rif].map((d) => iso(d.data).slice(0, 7)))].map((m) => {
+  const mesi = [...new Set([...t.documenti.filter((d) => fiscale(d.tipo)), ...rif].map((d) => iso(d.data).slice(0, 7)))].map((m) => {
     const dal = new Date(`${m}-01`), al = new Date(dal);
     al.setUTCMonth(al.getUTCMonth() + 1);
     return { data: { gte: dal, lt: al } };
@@ -125,7 +134,7 @@ export async function caricaDatiBollettino(db: Db, bollettino: bigint, oggi = gi
   const [fornitori, testate, scaglioni, eccezioni] = await Promise.all([
     db.fornitori.findMany({ where: { id: fornitore_id }, include: { corrente: true } }),
     db.ordini_fornitore_testata.findMany({
-      where: { fornitore_id, documenti: { some: { OR: [
+      where: { fornitore_id, documenti: { some: { tipo: { in: ['fattura', 'nota_credito'] }, OR: [
         { data: { gte: dal, lt: al } },
         { id: { in: b.righe.flatMap((r) => r.documento_id ?? []) } },
         { numero: { in: b.righe.filter((r) => !r.documento_id).map((r) => r.fattura_numero) } },
@@ -136,7 +145,7 @@ export async function caricaDatiBollettino(db: Db, bollettino: bigint, oggi = gi
     db.provvigioni_eccezioni.findMany({ where: { fornitore_id } }),
   ]);
   const clienti = [...new Set(testate.map((t) => t.cliente_id))];
-  const delMese = testate.flatMap((t) => t.documenti).filter((d) => d.data >= dal && d.data < al);
+  const delMese = testate.flatMap((t) => t.documenti).filter((d) => fiscale(d.tipo) && d.data >= dal && d.data < al);
   const [cl, interscambio, altri] = await Promise.all([
     db.clienti.findMany({ where: { id: { in: clienti } }, include: { corrente: true } }),
     db.interscambio.findMany({ where: { fornitore_id, cliente_id: { in: clienti } }, orderBy: { id: 'asc' } }),

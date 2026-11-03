@@ -62,10 +62,7 @@ const REGOLE: Record<string, (p: any) => boolean> = {
 };
 const attesi = () => {
   const c = Object.fromEntries(Object.keys(REGOLE).map((k) => [k, M.S.pratiche.filter(REGOLE[k]).length])) as Record<string, number>;
-  // §5.9: il prototipo confronta solo la prima tranche di fattura di OF/2026/S12-2 e vede due
-  // articoli spariti; il database ha tutte le tranche e non vede variazioni (motore.spec.ts).
-  c.variazioni -= M.S.pratiche.filter((p: any) => p.numero === 'OF/2026/S12-2' && M.haVariazioni(p)).length;
-  return c;
+  return c; // D-60: le tranche di fattura si sommano anche nel prototipo (S12-2 senza variazioni in tutti e due)
 };
 
 beforeAll(async () => {

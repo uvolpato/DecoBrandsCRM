@@ -23,8 +23,8 @@ let db: PrismaService;
 const DOMINIO = '@prova-documenti.it';
 const PW = 'password-di-prova';
 const CARTELLA = process.env.DOCUMENTI_DIR!;
-// D-55: cartelle per anno e giorno di caricamento (giorno di Roma)
-const suDisco = (hash: string) => { const g = giornoRoma(new Date()).replace(/-/g, ''); return join(CARTELLA, g.slice(0, 4), g, hash + '.pdf'); };
+// D-60: in coda in_arrivo/AAAA/AAAAMMGG/<impronta>.<est> (giorno di Roma)
+const suDisco = (hash: string, est = 'pdf') => { const g = giornoRoma(new Date()).replace(/-/g, ''); return join(CARTELLA, 'in_arrivo', g.slice(0, 4), g, `${hash}.${est}`); };
 
 async function creaUtente(username: string, livello: string, area = 'provvigioni') {
   await db.utenti.create({
@@ -75,7 +75,7 @@ beforeAll(async () => {
   await creaUtente('lett-doc', 'lettura');
   await creaUtente('dati-doc', 'responsabile', 'dati');
   [op, lett, senzaArea] = await Promise.all([entra('op-doc'), entra('lett-doc'), entra('dati-doc')]);
-  const conf = await db.ordini_fornitore_testata.findMany({ where: { stato: 'confermato', documenti: { none: {} } }, orderBy: { id: 'asc' } });
+  const conf = await db.ordini_fornitore_testata.findMany({ where: { stato: 'confermato', documenti: { none: { tipo: { in: ['fattura', 'nota_credito'] } } } }, orderBy: { id: 'asc' } });
   pratica = conf[0];
   [altra, terza] = await db.ordini_fornitore_testata.findMany({ where: { fornitore_id: pratica.fornitore_id, id: { not: pratica.id } }, orderBy: { id: 'asc' }, take: 2 });
   expect(terza).toBeDefined();
@@ -107,7 +107,7 @@ describe('POST /api/documenti/carica (canale comune)', () => {
     expect(existsSync(suDisco(hash))).toBe(true);
     const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: BigInt(arrivo) } });
     expect(riga.file_hash).toBe(hash);
-    expect(join(CARTELLA, riga.file_percorso)).toBe(suDisco(hash)); // D-55: AAAA/AAAAMMGG/<impronta>.pdf
+    expect(join(CARTELLA, riga.file_percorso)).toBe(suDisco(hash)); // D-60: in_arrivo/AAAA/AAAAMMGG/<impronta>.pdf
     expect(await eventi('documento.upload', BigInt(arrivo))).toBe(1);
   });
 

@@ -37,7 +37,7 @@ async function main() {
   const nuova = new PraticheController(db);
   // dettaglio: una pratica senza fattura e una con fattura (questa legge anche le pratiche dello stesso mese, D-27)
   const [senza, con] = await Promise.all([false, true].map(async (f) => Number((await db.ordini_fornitore_testata.findFirstOrThrow({
-    where: { documenti: f ? { some: { tipo: 'fattura' } } : { none: {} } }, orderBy: { id: 'asc' }, select: { id: true } })).id)));
+    where: { documenti: f ? { some: { tipo: 'fattura' } } : { none: { tipo: { in: ['fattura', 'nota_credito'] } } } }, orderBy: { id: 'asc' }, select: { id: true } })).id)));
   const dettagli = async () => {
     for (const [nome, id] of [['dettaglio senza fatt.', senza], ['dettaglio con fattura', con]] as const) {
       const prima = await tempo(async () => dettaglioPratica(await caricaDati(db), String(id)));
@@ -53,9 +53,9 @@ async function main() {
         SELECT t.id AS vecchio, n, nextval(pg_get_serial_sequence('ordini_fornitore_testata', 'id')) AS nuovo
         FROM ordini_fornitore_testata t, generate_series(1, ${COPIE}) n`;
       await tx.$executeRaw`INSERT INTO ordini_fornitore_testata (id, fornitore_id, fornitore_versione_id, numero_ordine, data_ordine, cliente_id,
-          cliente_versione_id, agente_id, importo_merce, stato, conferma_data, conferma_numero, importo, variazioni, variazione)
+          cliente_versione_id, agente_id, importo_merce, stato, importo, variazioni, variazione)
         SELECT c.nuovo, t.fornitore_id, t.fornitore_versione_id, t.numero_ordine || '#' || c.n, t.data_ordine, t.cliente_id,
-          t.cliente_versione_id, t.agente_id, t.importo_merce, t.stato, t.conferma_data, t.conferma_numero, t.importo, t.variazioni, t.variazione
+          t.cliente_versione_id, t.agente_id, t.importo_merce, t.stato, t.importo, t.variazioni, t.variazione
         FROM copie c JOIN ordini_fornitore_testata t ON t.id = c.vecchio`;
       await tx.$executeRaw`INSERT INTO ordini_fornitore_righe (testata_id, fase, numero_riga, codice, descrizione, um, quantita, prezzo_unitario, importo)
         SELECT c.nuovo, r.fase, r.numero_riga, r.codice, r.descrizione, r.um, r.quantita, r.prezzo_unitario, r.importo

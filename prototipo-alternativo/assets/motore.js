@@ -111,17 +111,20 @@
   M.praticaPerDocumento = numero => M.S.pratiche.find(p => p.documenti.some(d => d.numero === numero && (d.tipo === 'fattura' || d.tipo === 'nota_credito')));
 
   /* ---------- Documenti e stato pratica (lo stato si ricava dai documenti) ---------- */
-  M.importoRiga = r => M.r2(r.qta * r.prezzo);
+  M.importoRiga = r => r.importo != null ? r.importo : M.r2(r.qta * r.prezzo); // importo dato: righe sommate (D-60)
   M.importoDoc = d => M.r2(d.righe.reduce((s, r) => s + M.importoRiga(r), 0));
   M.doc = (p, tipo) => p.documenti.find(d => d.tipo === tipo);
   M.fiscali = p => p.documenti.filter(d => d.tipo === 'fattura' || d.tipo === 'nota_credito');
   M.netto = p => M.r2(M.fiscali(p).reduce((s, d) => s + M.importoDoc(d), 0));
-  M.importoPratica = p => { const f = M.fiscali(p); if (f.length) return M.netto(p); const c = M.doc(p, 'conferma'); return M.importoDoc(c || M.doc(p, 'ordine')); };
+  M.docs = (p, tipo) => p.documenti.filter(d => d.tipo === tipo);
+  // D-60 §19: più ordini (o conferme) si sommano
+  M.importoPratica = p => { const f = M.fiscali(p); if (f.length) return M.netto(p); const c = M.docs(p, 'conferma'); return M.r2((c.length ? c : M.docs(p, 'ordine')).reduce((s, d) => s + M.importoDoc(d), 0)); };
   M.scadenzaConferma = p => M.piuGiorni(p.data, M.fornitore(p.fornitore_id).giorni_conferma);
 
   M.statoPratica = function (p) {
     if (M.fiscali(p).some(d => d.tipo === 'fattura')) return { chiave: 'fatturata', etichetta: 'Fatturata' };
-    if (M.doc(p, 'conferma')) return { chiave: 'confermata', etichetta: 'Confermata', nota: 'in attesa di fattura' };
+    // D-60 §19: conferma e proforma facoltative, l'una o l'altra fa avanzare
+    if (M.doc(p, 'conferma') || M.doc(p, 'proforma')) return { chiave: 'confermata', etichetta: 'Confermata', nota: 'in attesa di fattura' };
     const scad = M.scadenzaConferma(p);
     const g = M.giorni(M.oggi(), scad);
     return g < 0
@@ -129,8 +132,19 @@
       : { chiave: 'attesa', etichetta: 'Attesa conferma', scadenza: scad, nota: g === 0 ? 'scade oggi' : 'entro ' + g + (g === 1 ? ' giorno' : ' giorni') };
   };
 
-  /* Confronto righe fra le fasi (ordine → conferma → fattura) */
-  M.fasi = p => ['ordine', 'conferma', 'fattura'].map(t => M.doc(p, t)).filter(Boolean);
+  /* Confronto righe fra le fasi (ordine → conferma → fattura). D-60 §19: i documenti dello stesso tipo (più ordini,
+     più fatture) si sommano per codice: quantità e importo; prezzo uguale o medio (importo / quantità). */
+  M.unisci = ds => {
+    const m = new Map();
+    ds.forEach(d => d.righe.forEach(r => {
+      const x = m.get(r.codice);
+      if (!x) { m.set(r.codice, r); return; }
+      const qta = x.qta + r.qta, importo = M.r2(M.importoRiga(x) + M.importoRiga(r));
+      m.set(r.codice, Object.assign({}, x, { qta: qta, importo: importo, prezzo: x.prezzo === r.prezzo || !qta ? x.prezzo : Math.round(importo / qta * 10000) / 10000 }));
+    }));
+    return { righe: Array.from(m.values()) };
+  };
+  M.fasi = p => ['ordine', 'conferma', 'fattura'].map(t => M.docs(p, t)).filter(ds => ds.length).map(M.unisci);
   M.confronto = function (p) {
     const fasi = M.fasi(p);
     const codici = [];

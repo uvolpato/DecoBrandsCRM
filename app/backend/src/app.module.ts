@@ -10,7 +10,7 @@ import { AgentiController, SubagentiController } from './subagenti';
 import { ClientiController } from './clienti';
 import { IntegraController, IntegraService } from './integra';
 import { PraticheController } from './pratiche';
-import { DocumentiController, DocumentiPraticaController } from './documenti';
+import { DocumentiAbbinaController, DocumentiController, DocumentiPraticaController } from './documenti';
 import { BollettiniController } from './bollettini';
 import { BollettinoController } from './bollettino';
 import { LiquidazioniController } from './liquidazioni';
@@ -42,7 +42,7 @@ export function limiti(env = process.env) {
 
 @Module({
   imports: [PrismaModule, ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
-  controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, PraticheController, DocumentiController, DocumentiPraticaController, IntegraController,
+  controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, PraticheController, DocumentiController, DocumentiAbbinaController, DocumentiPraticaController, IntegraController,
     BollettiniController, // F3-A1: matrice e caricamento (rotte fisse) prima di GET /bollettini/:id
     BollettinoController, LiquidazioniController],
   providers: [

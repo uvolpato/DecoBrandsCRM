@@ -81,9 +81,8 @@ describe('motore §10 = prototipo', () => {
   });
 
   it('pratiche: stato ricavato dai documenti, importo, netto, variazioni fra le fasi', () => {
-    // S12-2 escluso dalle variazioni: vedi la prova delle tranche
-    const nostri = S.pratiche.map((p) => { const st = m.statoPratica(S, p); return [p.numero, st.chiave, 'scadenza' in st ? st.scadenza : null, n(m.importoPratica(p)), n(m.netto(p)), p.numero === 'OF/2026/S12-2' || m.haVariazioni(p)]; });
-    const loro = M.S.pratiche.map((p: any) => { const st = M.statoPratica(p); return [p.numero, st.chiave, st.scadenza ?? null, M.importoPratica(p), M.netto(p), p.numero === 'OF/2026/S12-2' || M.haVariazioni(p)]; });
+    const nostri = S.pratiche.map((p) => { const st = m.statoPratica(S, p); return [p.numero, st.chiave, 'scadenza' in st ? st.scadenza : null, n(m.importoPratica(p)), n(m.netto(p)), m.haVariazioni(p)]; });
+    const loro = M.S.pratiche.map((p: any) => { const st = M.statoPratica(p); return [p.numero, st.chiave, st.scadenza ?? null, M.importoPratica(p), M.netto(p), M.haVariazioni(p)]; });
     expect(nostri).toHaveLength(54);
     expect(nostri).toEqual(j(loro));
   });
@@ -105,9 +104,8 @@ describe('motore §10 = prototipo', () => {
     expect(n(m.netto(p))).toBe(M.netto(pm));
     expect(n(m.netto(p))).toBe(1245.6);
     expect(m.statoPratica(S, p).chiave).toBe('fatturata');
-    // differenza voluta: il prototipo confronta solo la prima tranche (M.doc trova una fattura) e vede
-    // due articoli spariti; nel database le righe di fattura sono tutte le tranche e non c'è variazione
-    expect(M.haVariazioni(pm)).toBe(true);
+    // D-60: le tranche si sommano per codice, nel prototipo come nel database: nessuna variazione
+    expect(M.haVariazioni(pm)).toBe(false);
     expect(m.haVariazioni(p)).toBe(false);
   });
 

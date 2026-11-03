@@ -31,29 +31,55 @@ export const fineMese = (a: number, m: number) => new Date(Date.UTC(a, m, 0)).to
 export const importoRighe = (righe: Riga[]) => r2(somma(righe.map((r) => r.importo)));
 /** Netto della pratica: fatture − note di credito (§5.3). */
 export const netto = (p: Pratica) => r2(somma(p.documenti.map((d) => d.importo)));
-/** Netto se ci sono documenti fiscali, altrimenti conferma o ordine (solo stima). */
-export const importoPratica = (p: Pratica) => (p.documenti.length ? netto(p) : importoRighe(p.conferma ? p.righe.conferma : p.righe.ordine));
+/** Netto se ci sono documenti fiscali, altrimenti le conferme o gli ordini sommati (solo stima, D-60).
+ *  Le conferme contano solo con un importo: una conferma registrata senza non azzera la stima. */
+export const importoPratica = (p: Pratica) => {
+  if (p.documenti.length) return netto(p);
+  const conImporto = p.conferme.filter((d) => !d.importo.isZero());
+  return r2(somma((conImporto.length ? conImporto : p.ordini).map((d) => d.importo)));
+};
 
-/** Parte dello stato che dipende solo dai documenti: si salva sulla pratica (D-52 §19). */
+/** Parte dello stato che dipende solo dai documenti: si salva sulla pratica (D-52 §19). Conferma e proforma sono
+ *  facoltative (D-60 §19): l'una o l'altra fa avanzare a "confermata", la fattura a "fatturata" anche senza. */
 export const fasePratica = (p: Pratica) =>
-  p.documenti.some((d) => d.tipo === 'fattura') ? ('fatturata' as const) : p.conferma ? ('confermata' as const) : ('attesa' as const);
+  p.documenti.some((d) => d.tipo === 'fattura') ? ('fatturata' as const) : p.conferme.length || p.proforma.length ? ('confermata' as const) : ('attesa' as const);
+/** Il cliente ha pagato (D-60): basta un documento di pagamento. Solo un segno, nessun effetto sui calcoli. */
+export const pagato = (p: Pratica) => p.pagamenti.length > 0;
 
 /** Lo stato si ricava dai documenti arrivati, non si scrive a mano (§5.1). */
 export function statoPratica(S: Dati, p: Pratica) {
   const fase = fasePratica(p);
   if (fase !== 'attesa') return { chiave: fase };
-  const scadenza = piuGiorni(p.data, S.fornitori.get(p.fornitore_id)!.giorni_conferma);
+  const gg = S.fornitori.get(p.fornitore_id)!.giorni_conferma;
+  if (!gg) return { chiave: 'attesa' as const, scadenza: null, giorni: null }; // 0 = il fornitore non manda conferme: nessuna scadenza (D-60)
+  const scadenza = piuGiorni(p.data, gg);
   const g = giorni(S.oggi, scadenza);
   return { chiave: g < 0 ? ('scaduta' as const) : ('attesa' as const), scadenza, giorni: g };
 }
 
+/** Righe di una fase con lo stesso codice sommate (D-60 §19: più ordini, più fatture): quantità e importo si
+ *  sommano; il prezzo resta se è lo stesso, altrimenti è il medio (importo / quantità). */
+// le righe senza codice (trasporto, imballo…) non si fondono fra loro: le tiene distinte la descrizione
+const chiaveRiga = (r: Riga) => r.codice ?? `~${r.descrizione}`;
+function perCodice(rr: Riga[]) {
+  const m = new Map<string, Riga>();
+  for (const r of rr) {
+    const k = chiaveRiga(r), x = m.get(k);
+    if (!x) { m.set(k, r); continue; }
+    const qta = x.qta.plus(r.qta), importo = x.importo.plus(r.importo);
+    const prezzo = x.prezzo.equals(r.prezzo) || qta.isZero() ? x.prezzo : importo.div(qta).toDecimalPlaces(4, Dec.ROUND_HALF_UP);
+    m.set(k, { ...x, qta, prezzo, importo });
+  }
+  return [...m.values()];
+}
+
 /** Confronto delle righe fra le fasi, allineate per codice (§5.8). */
 export function confronto(p: Pratica) {
-  const fasi = (['ordine', 'conferma', 'fattura'] as const).filter((f) => p.righe[f].length).map((f) => p.righe[f]);
-  const codici = [...new Set(fasi.flat().map((r) => r.codice))];
-  return codici.map((codice) => {
-    // ponytail: un codice ripetuto in due tranche conta la prima riga, come il prototipo
-    const per = fasi.map((rr) => rr.find((r) => r.codice === codice) ?? null);
+  const fasi = (['ordine', 'conferma', 'fattura'] as const).filter((f) => p.righe[f].length).map((f) => perCodice(p.righe[f]));
+  const chiavi = [...new Set(fasi.flat().map(chiaveRiga))];
+  return chiavi.map((k) => {
+    const per = fasi.map((rr) => rr.find((r) => chiaveRiga(r) === k) ?? null);
+    const codice = per.find((r) => r)!.codice;
     let varia = false;
     for (let i = 1; i < per.length; i++) {
       const a = per[i - 1], b = per[i];

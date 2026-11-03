@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, applyDecorators, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseIntPipe,
+  BadRequestException, Body, applyDecorators, ConflictException, Controller, Delete, Get, HttpCode, Logger, NotFoundException, Param, ParseIntPipe,
   PayloadTooLargeException, Post, Put, Query, Req, Res, StreamableFile, UnsupportedMediaTypeException, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -7,12 +7,13 @@ import { Prisma } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { constants } from 'node:fs';
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import type { Request, Response } from 'express';
 import { Richiede, contesto } from './accesso';
 import { Data, Facoltativo } from './fornitori';
-import { CON_PRATICA, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
+import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
 import { netto, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
 import { PrismaService } from './prisma.service';
@@ -23,7 +24,9 @@ import { type Contesto, logEvent } from './registro';
 
 type Tx = Prisma.TransactionClient;
 const Dec = Prisma.Decimal;
-const NOME = { fattura: 'Fattura', nota_credito: 'Nota di credito' } as const;
+const NOME: Record<TipoDocumento, string> = {
+  ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura', nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento',
+};
 
 /* ---------- Canale comune: file → disco → coda (§6.5 punti 1–2, D-34, D-36) ---------- */
 
@@ -38,14 +41,32 @@ export interface FileRicevuto {
   email_oggetto?: string;
 }
 
+/** Formati ammessi, riconosciuti dai primi byte (non dall'estensione né dal Content-Type del browser). D-60: anche le foto. */
+const FORMATI = [
+  { est: 'pdf', mime: 'application/pdf', firma: Buffer.from('%PDF-') },
+  { est: 'jpg', mime: 'image/jpeg', firma: Buffer.from([0xff, 0xd8, 0xff]) },
+  { est: 'png', mime: 'image/png', firma: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) },
+];
+const ZIP_OLE = [Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.from([0xd0, 0xcf, 0x11, 0xe0])]; // xlsx/xlsm; xls e msg
+
+/** Estensione del file dai byte; 415 con un messaggio chiaro per Excel (D-60: non si accettano) e per il resto. */
+function formato(dati: Buffer, nome: string) {
+  const f = FORMATI.find((x) => dati.subarray(0, x.firma.length).equals(x.firma));
+  if (f) return f.est;
+  if (/\.msg$/i.test(nome)) throw new UnsupportedMediaTypeException("I messaggi di Outlook (.msg) non si caricano: salva l'allegato e carica quello");
+  if (/\.xls[xmb]?$/i.test(nome) || ZIP_OLE.some((z) => dati.subarray(0, z.length).equals(z))) {
+    throw new UnsupportedMediaTypeException('I file Excel non si accettano: carica il PDF o la foto del documento');
+  }
+  throw new UnsupportedMediaTypeException('Il file non è un PDF né una foto (JPEG, PNG)');
+}
+
 /** Unico ingresso dei file (caricamento ora, casella email in F6-A1). Il file va su disco **prima** della transazione,
  *  con l'impronta SHA-256 come nome; la riga in coda e l'evento nella stessa transazione (D-36). Se la transazione
  *  fallisce il file resta orfano: stesso contenuto = stesso nome, un nuovo invio lo riusa (ponytail: la pulizia dei
  *  file senza riga arriva con la pulizia notturna, F5-A5). */
 export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: Contesto) {
   if (f.dati.length > MAX_BYTE) throw new PayloadTooLargeException(`Il file supera ${MB} MB`);
-  // tipo dal contenuto, non dall'estensione né dal Content-Type del browser
-  if (!f.dati.subarray(0, 5).equals(Buffer.from('%PDF-'))) throw new UnsupportedMediaTypeException('Il file non è un PDF');
+  const est = formato(f.dati, f.nome);
   const hash = createHash('sha256').update(f.dati).digest('hex');
   const doppione = () => new ConflictException('Documento già caricato: è lo stesso file di uno già arrivato');
   // lo stesso file scartato si può ricaricare: torna in coda sulla stessa riga (D-54)
@@ -54,15 +75,16 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
 
   const radice = process.env.DOCUMENTI_DIR;
   if (!radice) throw new Error('DOCUMENTI_DIR non definita in .env');
-  // D-55: cartelle per anno e giorno di caricamento (giorno di Roma); un file scartato ricaricato resta dove era
+  // D-60: in coda in_arrivo/AAAA/AAAAMMGG/<impronta>.<est> (giorno di Roma); all'abbinamento va nella cartella della
+  // pratica (archivia). Un file scartato ricaricato resta dove era
   const g = giornoRoma(new Date()).replace(/-/g, '');
-  const file_percorso = gia?.file_percorso ?? `${g.slice(0, 4)}/${g}/${hash}.pdf`;
+  const file_percorso = gia?.file_percorso ?? `in_arrivo/${g.slice(0, 4)}/${g}/${hash}.${est}`;
   await mkdir(dirname(join(radice, file_percorso)), { recursive: true });
   await writeFile(join(radice, file_percorso), f.dati, { flag: 'wx' }).catch((e: NodeJS.ErrnoException) => {
     if (e.code !== 'EEXIST') throw e; // già scritto da un invio non andato a buon fine: stesso contenuto
   });
 
-  const file_nome = basename(f.nome.replace(/\\/g, '/')).replace(/[\x00-\x1f]/g, '').slice(0, 255) || 'documento.pdf';
+  const file_nome = basename(f.nome.replace(/\\/g, '/')).replace(/[\x00-\x1f]/g, '').slice(0, 255) || `documento.${est}`;
   try {
     const d = await db.$transaction(async (tx) => {
       const dati = { origine: f.origine, email_da: f.email_da ?? null, email_oggetto: f.email_oggetto ?? null, file_nome, utente_id: ctx.utente_id ?? null };
@@ -90,6 +112,62 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
     throw e;
   }
 }
+
+/** Pezzo di nome leggibile e sicuro per il disco: lettere senza accenti, cifre, . _ - (D-60). */
+const pulisci = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 60);
+
+/** Archivio per pratica (D-60 §19, sostituisce D-55): dopo il commit il file abbinato va in
+ *  pratiche/AAAA/AAAAMM/<numero pratica>/<tipo>_<numero o data>.<est> (AAAA/AAAAMM = data della pratica), con _2, _3… se
+ *  il nome c'è già. Ordine sicuro: copia (mai sopra un altro file) → percorso nel database solo se nessuno l'ha cambiato →
+ *  via il vecchio. Se qualcosa fallisce il file resta dov'era e il percorso salvato è giusto; al più resta una copia orfana. */
+export async function archivia(db: PrismaService, arrivo_id: bigint) {
+  const radice = process.env.DOCUMENTI_DIR;
+  if (!radice) throw new Error('DOCUMENTI_DIR non definita in .env');
+  const a = await db.documenti_in_arrivo.findUnique({
+    where: { id: arrivo_id },
+    select: { file_percorso: true, documenti: { orderBy: { id: 'asc' }, take: 1, include: { testata: { select: { numero_ordine: true, data_ordine: true } } } } },
+  });
+  const d = a?.documenti[0];
+  if (!a || !d) return null;
+  // la cartella non segue la data della pratica, che cambia con gli ordini: si riusa quella dei file già archiviati
+  const nome = pulisci(d.testata.numero_ordine) || 'pratica';
+  const gia = await db.documenti_in_arrivo.findFirst({
+    where: { file_percorso: { startsWith: 'pratiche/' }, documenti: { some: { testata_id: d.testata_id } } },
+    select: { file_percorso: true },
+  });
+  const g = iso(d.testata.data_ordine).replace(/-/g, '');
+  const cartella = gia?.file_percorso.startsWith('pratiche/') && dirname(gia.file_percorso).endsWith('/' + nome)
+    ? dirname(gia.file_percorso) : `pratiche/${g.slice(0, 4)}/${g.slice(0, 6)}/${nome}`;
+  if (dirname(a.file_percorso) === cartella) return a.file_percorso; // già nella sua pratica
+  const base = `${d.tipo}_${pulisci(d.numero) || iso(d.data)}`;
+  await mkdir(join(radice, cartella), { recursive: true });
+  for (let n = 1; ; n++) {
+    const nuovo = `${cartella}/${base}${n > 1 ? '_' + n : ''}${extname(a.file_percorso)}`;
+    try {
+      await copyFile(join(radice, a.file_percorso), join(radice, nuovo), constants.COPYFILE_EXCL);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === 'EEXIST' && n < 100) continue;
+      if (code === 'ENOENT') { // un'altra richiesta l'ha già spostato: vale il percorso salvato adesso
+        const ora = await db.documenti_in_arrivo.findUnique({ where: { id: arrivo_id }, select: { file_percorso: true } });
+        if (ora && ora.file_percorso !== a.file_percorso) return ora.file_percorso;
+      }
+      throw e;
+    }
+    let fatto = false;
+    try {
+      fatto = (await db.documenti_in_arrivo.updateMany({ where: { id: arrivo_id, file_percorso: a.file_percorso }, data: { file_percorso: nuovo } })).count > 0;
+    } finally {
+      await rm(join(radice, fatto ? a.file_percorso : nuovo), { force: true });
+    }
+    return fatto ? nuovo : null;
+  }
+}
+const log = new Logger('documenti');
+/** Dopo il commit: uno spostamento che fallisce non annulla l'abbinamento, già salvato (il file resta dov'era). */
+const archiviaDopo = async (db: PrismaService, arrivo_id: bigint | null) => {
+  if (arrivo_id) await archivia(db, arrivo_id).catch((e: Error) => log.warn(`file del documento in arrivo ${arrivo_id} non spostato: ${e.message}`));
+};
 
 /** Parametri della ricerca dei documenti per l'abbinamento a mano (§7.7, §8.1). */
 class CercaDocumenti {
@@ -136,7 +214,7 @@ export class DocumentiController {
       JOIN clienti c ON c.id = t.cliente_id
       LEFT JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
       LEFT JOIN bollettino_riga rb ON rb.documento_id = d.id
-      WHERE t.fornitore_id = ${BigInt(q.fornitore_id)}
+      WHERE t.fornitore_id = ${BigInt(q.fornitore_id)} AND d.tipo IN ('fattura', 'nota_credito')
         AND (${testo} = '' OR d.numero ILIKE ${simile} OR coalesce(cv.ragione_sociale, '') ILIKE ${simile})
       ORDER BY CASE WHEN ${mese} <> '' AND to_char(d.data, 'YYYY-MM') = ${mese} THEN 0 ELSE 1 END,
                d.data DESC, d.numero
@@ -148,7 +226,7 @@ export class DocumentiController {
     }));
   }
 
-  /** Caricamento manuale (§8.1): multipart, campo `file`, un PDF. Va in coda "da leggere". */
+  /** Caricamento manuale (§8.1): multipart, campo `file`, un PDF o una foto (D-60). Va in coda "da leggere". */
   @Post('carica')
   @Richiede('provvigioni.modifica')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_BYTE, files: 1 } }))
@@ -157,8 +235,8 @@ export class DocumentiController {
     return riceviDocumento(this.db, { nome: file.originalname, dati: file.buffer, origine: 'caricamento' }, contesto(req));
   }
 
-  /** Il PDF originale di un documento arrivato (F2-A3, §8.1). Il percorso viene solo dal database
-   *  (D-55), mai dal browser; la risposta è in linea e chiusa in una sandbox. */
+  /** Il file originale di un documento arrivato (F2-A3, §8.1): PDF o foto. Il percorso viene solo dal database
+   *  (D-60), mai dal browser; la risposta è in linea e chiusa in una sandbox. */
   @Get(':id/file')
   @Richiede('provvigioni.consulta')
   async file(@Param('id', ParseIntPipe) id: number, @Res({ passthrough: true }) res: Response) {
@@ -178,7 +256,7 @@ export class DocumentiController {
     // RFC 5987: niente virgolette né a capo nell'intestazione (il nome arriva dal browser)
     const nome = encodeURIComponent(d.file_nome).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
     res.set({
-      'Content-Type': 'application/pdf',
+      'Content-Type': FORMATI.find((f) => '.' + f.est === extname(d.file_percorso))?.mime ?? 'application/octet-stream',
       'Content-Disposition': `inline; filename*=UTF-8''${nome}`,
       'X-Content-Type-Options': 'nosniff',
       'Content-Security-Policy': 'sandbox',
@@ -201,14 +279,24 @@ class ModificaDocumento {
   @IsOptional() @IsString() @MaxLength(2000) note?: string | null; // null svuota la nota
 }
 class NuovoDocumento {
-  @IsIn(['fattura', 'nota_credito']) tipo!: 'fattura' | 'nota_credito';
-  @Testo() @IsString() @IsNotEmpty() @MaxLength(50) numero!: string;
-  @Data() data!: string;
+  @IsIn(TIPI_DOCUMENTO) tipo!: TipoDocumento; // D-60
+  // obbligatori per ordine, fattura e nota di credito (registra); un pagamento può non avere numero
+  @Facoltativo() @Testo() @IsString() @IsNotEmpty() @MaxLength(50) numero?: string;
+  @Facoltativo() @Data() data?: string;
   @Facoltativo() @Importo() importo?: number;
   @Facoltativo() @IsBoolean() storno_totale?: boolean;
   @IsOptional() @IsString() @MaxLength(2000) note?: string;
   @Facoltativo() @IsInt() @Min(1) fattura_id?: number; // nota di credito: la fattura stornata (D-34)
   @Facoltativo() @IsInt() @Min(1) arrivo_id?: number; // file in coda dal canale comune
+}
+/** Abbinamento a mano di un file in coda (D-60): pratica esistente, oppure cliente e fornitore per un ordine che apre una pratica nuova. */
+class AbbinaDocumento extends NuovoDocumento {
+  @Facoltativo() @IsInt() @Min(1) pratica_id?: number;
+  @Facoltativo() @IsInt() @Min(1) cliente_id?: number;
+  @Facoltativo() @IsInt() @Min(1) fornitore_id?: number;
+}
+class SpostaDocumento {
+  @IsInt() @Min(1) pratica_id!: number;
 }
 
 type Bozza = { tipo: string; importo?: number; storno_totale: boolean; fattura_id: bigint | null };
@@ -229,15 +317,21 @@ async function bloccaPratiche(tx: Tx, ids: bigint[]) {
 /** Numero unico per fornitore; la stessa fattura su più pratiche (multi-ordine) ha la stessa data (§4.2.7.1).
  *  `escludi` = il documento e le sue copie sulle altre pratiche. */
 async function controllaNumero(tx: Tx, fornitore_id: bigint, testata_id: bigint, tipo: string, numero: string, data: string, escludi: bigint[] = []) {
+  if (!fiscale(tipo) && tipo !== 'ordine') return; // D-60: conferme, proforma, pagamenti e altri non hanno un numero unico
   const stessi = await tx.ordini_fornitore_documenti.findMany({
     where: { tipo, numero, testata: { fornitore_id }, id: { notIn: escludi } }, select: { testata_id: true, data: true },
   });
+  if (tipo === 'ordine' && stessi.length) throw new ConflictException(`Il fornitore ha già un ordine ${numero}`); // un ordine sta in una pratica sola
   if (stessi.some((x) => x.testata_id === testata_id)) throw new ConflictException(`${nomeDi(tipo)} ${numero} è già registrata in questa pratica`);
   if (stessi.some((x) => iso(x.data) !== data)) throw new ConflictException(`Il fornitore ha già una ${nomeDi(tipo).toLowerCase()} ${numero} con un'altra data`);
 }
 
 /** Importo da salvare, con il segno (§5.3). `id` = il documento corretto. */
 async function importoValido(tx: Tx, testata_id: bigint, d: Bozza, id?: bigint) {
+  if (!fiscale(d.tipo)) { // D-60: documento solo tracciato, l'importo (facoltativo) non tocca le provvigioni
+    if (d.storno_totale) throw new BadRequestException('Lo storno totale vale solo per la nota di credito');
+    return r2(d.importo ?? 0);
+  }
   if (d.tipo === 'fattura') {
     if (d.storno_totale) throw new BadRequestException('Lo storno totale vale solo per la nota di credito');
     if (d.importo === undefined) throw new BadRequestException("Manca l'importo");
@@ -273,6 +367,15 @@ async function documentoDi(tx: Tx, testata_id: bigint, did: number | bigint) {
   return d;
 }
 type Doc = Awaited<ReturnType<typeof documentoDi>>;
+/** Si può togliere dalla pratica (annullare o spostare)? Stesse regole per i due casi (D-54, D-60). */
+async function togliibile(tx: Tx, pid: bigint, d: Doc, quale: string, cosa: string) {
+  if (d._count.note_credito) throw new ConflictException(`Una nota di credito storna la ${quale.toLowerCase()}: annulla prima la nota di credito`);
+  if (d.correzione) throw new ConflictException(`${quale} ha una correzione della quota del subagente: toglila prima`);
+  if (d._count.righe_bollettino) throw new ConflictException(`${quale} è già in un bollettino: ${cosa}`);
+  if (d.tipo === 'ordine' && (await tx.ordini_fornitore_documenti.count({ where: { testata_id: pid, tipo: 'ordine' } })) === 1) {
+    throw new ConflictException(`${quale} è l'unico ordine della pratica: ${cosa}`); // la pratica nasce dal primo ordine
+  }
+}
 const inBollettino = (d: Doc) => {
   if (d._count.righe_bollettino) throw new ConflictException(`${nomeDi(d.tipo)} ${d.numero} è già in un bollettino: importo, numero e data non cambiano`);
 };
@@ -309,7 +412,12 @@ function documentiPratica(t: Testata) {
   for (const d of t.documenti) if (d.fattura_id) stornato.set(d.fattura_id, (stornato.get(d.fattura_id) ?? new Dec(0)).minus(d.importo));
   return {
     pratica: { id: String(t.id), numero: t.numero_ordine, stato: t.stato, importo: Number(t.importo) },
-    documenti: t.documenti.map((d) => {
+    // D-60: ordini, conferme, proforma, pagamenti e altri, solo tracciati
+    altri: t.documenti.filter((d) => !fiscale(d.tipo)).map((d) => ({
+      id: String(d.id), tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: Number(d.importo),
+      arrivo_id: d.arrivo_id ? String(d.arrivo_id) : null, file_nome: d.arrivo?.file_nome ?? null, note: d.note,
+    })),
+    documenti: t.documenti.filter((d) => fiscale(d.tipo)).map((d) => {
       const s = stornato.get(d.id) ?? new Dec(0);
       return {
         id: String(d.id), tipo: d.tipo, numero: d.numero, data: iso(d.data),
@@ -338,36 +446,60 @@ export class DocumentiPraticaController {
     return documentiPratica(t);
   }
 
-  /** Registra a mano una fattura o una nota di credito, con il file facoltativo in coda dal canale. */
+  /** Registra a mano un documento della pratica (D-60: ogni tipo), con il file facoltativo in coda dal canale. */
   @Post()
   @Richiede('provvigioni.modifica')
   async crea(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: NuovoDocumento) {
     const ctx = contesto(req);
-    return this.db.$transaction(async (tx) => {
+    const r = await this.db.$transaction(async (tx) => {
       const fid = await bloccaFornitore(tx, id);
       const pid = BigInt(id);
       await bloccaPratiche(tx, [pid]);
-      if (b.tipo === 'fattura' && b.fattura_id) throw new BadRequestException('Solo la nota di credito storna una fattura');
-      const fattura_id = b.fattura_id ? BigInt(b.fattura_id) : null;
-      const storno_totale = b.storno_totale ?? false;
-      await controllaNumero(tx, fid, pid, b.tipo, b.numero, b.data);
-      const importo = await importoValido(tx, pid, { tipo: b.tipo, importo: b.importo, storno_totale, fattura_id });
-      let arrivo_id: bigint | null = null;
-      if (b.arrivo_id) {
-        arrivo_id = BigInt(b.arrivo_id);
-        await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${arrivo_id} FOR UPDATE`;
-        const a = await tx.documenti_in_arrivo.findUnique({ where: { id: arrivo_id } });
-        if (!a) throw new BadRequestException('File non trovato');
-        // solo un file in coda: uno già abbinato, scartato o in lettura non si riusa (D-54)
-        if (a.stato !== 'in_coda') throw new ConflictException('Il file non è più in coda: è già abbinato, scartato o in lettura');
-        await tx.documenti_in_arrivo.update({ where: { id: arrivo_id }, data: { stato: 'abbinato', tipo: b.tipo, abbinato_pratica_id: pid, controllato_il: new Date() } });
-      }
-      const d = await tx.ordini_fornitore_documenti.create({
-        data: { testata_id: pid, tipo: b.tipo, numero: b.numero, data: new Date(b.data), importo, storno_totale, fattura_id, arrivo_id, note: b.note },
-      });
-      await logEvent(tx, { tipo: 'documento', azione: 'create', entita: 'documento', entita_id: d.id, esito: 'successo', dettaglio: { ...perEvento(d), arrivo_id: arrivo_id ? String(arrivo_id) : null } }, ctx);
-      return documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(b.tipo)} ${b.numero}`));
+      const d = await registra(tx, fid, pid, b, ctx);
+      return documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(d.tipo)} ${d.numero}`.trim()));
     });
+    await archiviaDopo(this.db, b.arrivo_id ? BigInt(b.arrivo_id) : null);
+    return r;
+  }
+
+  /** Sposta un documento in un'altra pratica dello stesso fornitore (correzione, D-60): non se liquidato, in un
+   *  bollettino o legato a una nota di credito (come l'annullamento, D-54). Righe e file lo seguono. */
+  @Post(':did/sposta')
+  @HttpCode(200)
+  @Richiede('provvigioni.modifica')
+  async sposta(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Param('did', ParseIntPipe) did: number, @Body() b: SpostaDocumento) {
+    const ctx = contesto(req);
+    if (b.pratica_id === id) throw new BadRequestException('Il documento è già in questa pratica');
+    let arrivo_id: bigint | null = null;
+    const r = await this.db.$transaction(async (tx) => {
+      const fid = await bloccaFornitore(tx, id);
+      const pid = BigInt(id), nid = BigInt(b.pratica_id);
+      const nuova = await tx.ordini_fornitore_testata.findUnique({ where: { id: nid }, select: { fornitore_id: true, numero_ordine: true } });
+      if (!nuova) throw new NotFoundException('Pratica di destinazione non trovata');
+      if (nuova.fornitore_id !== fid) throw new BadRequestException('La pratica di destinazione è di un altro fornitore');
+      await bloccaPratiche(tx, [pid, nid]);
+      const d = await documentoDi(tx, pid, did); // liquidato: 409
+      const quale = `${nomeDi(d.tipo)} ${d.numero}`.trim();
+      if (d.fattura_id) throw new ConflictException(`${quale} storna una fattura: si sposta con la sua fattura, non da sola`);
+      await togliibile(tx, pid, d, quale, 'non si sposta');
+      await controllaNumero(tx, fid, nid, d.tipo, d.numero, iso(d.data), [d.id]);
+      await tx.ordini_fornitore_documenti.update({ where: { id: d.id }, data: { testata_id: nid } });
+      await tx.ordini_fornitore_righe.updateMany({ where: { documento_id: d.id }, data: { testata_id: nid } });
+      if (d.arrivo_id) {
+        arrivo_id = d.arrivo_id;
+        await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${d.arrivo_id} FOR UPDATE`;
+        await tx.documenti_in_arrivo.update({ where: { id: d.arrivo_id }, data: { abbinato_pratica_id: nid } });
+      }
+      await logEvent(tx, {
+        tipo: 'documento', azione: 'move', entita: 'documento', entita_id: d.id, esito: 'successo',
+        dettaglio: { etichetta: quale, documento_id: String(d.id), tipo: d.tipo, prima: { pratica_id: String(pid) }, dopo: { pratica_id: String(nid), numero: nuova.numero_ordine } },
+      }, ctx);
+      const motivo = `${quale} spostato in ${nuova.numero_ordine}`;
+      await aggiornaPratica(tx, pid, ctx, motivo);
+      return documentiPratica(await aggiornaPratica(tx, nid, ctx, motivo));
+    });
+    await archiviaDopo(this.db, arrivo_id); // il file segue il documento
+    return r;
   }
 
   /** Correzione. Numero e data valgono per tutte le copie della stessa fattura sulle altre pratiche (multi-ordine);
@@ -381,7 +513,7 @@ export class DocumentiPraticaController {
       const pid = BigInt(id);
       const x = await tx.ordini_fornitore_documenti.findUnique({ where: { id: BigInt(did) }, select: { tipo: true, numero: true } });
       // con il fornitore bloccato le copie non cambiano: si trovano prima, poi si bloccano le pratiche in ordine di id
-      const copie = x
+      const copie = x && fiscale(x.tipo) // D-60: la stessa fattura su più pratiche; i documenti tracciati non hanno copie
         ? await tx.ordini_fornitore_documenti.findMany({ where: { tipo: x.tipo, numero: x.numero, testata: { fornitore_id: fid }, id: { not: BigInt(did) } }, select: { id: true, testata_id: true } })
         : [];
       await bloccaPratiche(tx, [pid, ...copie.map((c) => c.testata_id)]);
@@ -431,9 +563,7 @@ export class DocumentiPraticaController {
       await bloccaPratiche(tx, [pid]);
       const d = await documentoDi(tx, pid, did);
       const quale = `${nomeDi(d.tipo)} ${d.numero}`;
-      if (d._count.note_credito) throw new ConflictException(`Una nota di credito storna la ${quale.toLowerCase()}: annulla prima la nota di credito`);
-      if (d.correzione) throw new ConflictException(`${quale} ha una correzione della quota del subagente: toglila prima`);
-      if (d._count.righe_bollettino) throw new ConflictException(`${quale} è già in un bollettino: non si annulla`);
+      await togliibile(tx, pid, d, quale, 'non si annulla');
       await tx.ordini_fornitore_documenti.delete({ where: { id: d.id } });
       // il file torna in coda, se nessun altro documento lo usa
       if (d.arrivo_id && !(await tx.ordini_fornitore_documenti.count({ where: { arrivo_id: d.arrivo_id } }))) {
@@ -446,5 +576,101 @@ export class DocumentiPraticaController {
       }, ctx);
       await aggiornaPratica(tx, pid, ctx, `${quale} annullata`);
     });
+  }
+}
+
+/** Registra un documento nella pratica già bloccata (D-60 §19): un posto solo per la registrazione a mano e
+ *  l'abbinamento di un file in coda. Fattura e nota di credito con le regole di F2-A3 (numero unico, importo, storno);
+ *  l'ordine con numero unico per fornitore; gli altri tipi solo tracciati. Evento documento.create. */
+async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx: Contesto) {
+  if ((fiscale(b.tipo) || b.tipo === 'ordine') && (!b.numero || !b.data)) throw new BadRequestException(`${nomeDi(b.tipo)}: numero e data sono obbligatori`);
+  if (b.tipo !== 'nota_credito' && b.fattura_id) throw new BadRequestException('Solo la nota di credito storna una fattura');
+  const numero = b.numero ?? '', data = b.data ?? giornoRoma(new Date());
+  const fattura_id = b.fattura_id ? BigInt(b.fattura_id) : null;
+  const storno_totale = b.storno_totale ?? false;
+  await controllaNumero(tx, fid, pid, b.tipo, numero, data);
+  const importo = await importoValido(tx, pid, { tipo: b.tipo, importo: b.importo, storno_totale, fattura_id });
+  let arrivo_id: bigint | null = null;
+  if (b.arrivo_id) {
+    arrivo_id = BigInt(b.arrivo_id);
+    await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${arrivo_id} FOR UPDATE`;
+    const a = await tx.documenti_in_arrivo.findUnique({ where: { id: arrivo_id } });
+    if (!a) throw new NotFoundException('File non trovato');
+    // solo un file in coda o letto da controllare: uno già abbinato, scartato o in lettura non si riusa (D-54)
+    if (a.stato !== 'in_coda' && a.stato !== 'da_controllare') throw new ConflictException('Il file non è più in coda: è già abbinato, scartato o in lettura');
+    await tx.documenti_in_arrivo.update({ where: { id: arrivo_id }, data: { stato: 'abbinato', tipo: b.tipo, abbinato_pratica_id: pid, controllato_il: new Date(), utente_id: ctx.utente_id ?? a.utente_id } });
+  }
+  const d = await tx.ordini_fornitore_documenti.create({
+    data: { testata_id: pid, tipo: b.tipo, numero, data: new Date(data), importo, storno_totale, fattura_id, arrivo_id, note: b.note },
+  });
+  await logEvent(tx, { tipo: 'documento', azione: 'create', entita: 'documento', entita_id: d.id, esito: 'successo', dettaglio: { ...perEvento(d), arrivo_id: arrivo_id ? String(arrivo_id) : null } }, ctx);
+  return d;
+}
+
+/** Pratica nuova dal primo ordine (D-60): numero OF/AAAA/NNN, AAAA = anno dell'ordine, NNN = il più alto dell'anno + 1.
+ *  Il blocco consultivo fa passare una alla volta le pratiche nuove: niente numeri doppi. Cliente e fornitore con la
+ *  versione corrente (D-46). Evento crud.create. */
+async function nuovaPratica(tx: Tx, b: AbbinaDocumento, ctx: Contesto) {
+  if (!b.cliente_id || !b.fornitore_id) throw new BadRequestException('Per aprire una pratica servono cliente e fornitore');
+  if (!b.numero || !b.data) throw new BadRequestException('Ordine: numero e data sono obbligatori');
+  const fid = BigInt(b.fornitore_id), cid = BigInt(b.cliente_id);
+  await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${fid} FOR UPDATE`;
+  const [f, c] = await Promise.all([
+    tx.fornitori.findUnique({ where: { id: fid }, select: { versione_corrente_id: true } }),
+    tx.clienti.findUnique({ where: { id: cid }, select: { versione_corrente_id: true } }),
+  ]);
+  if (!f?.versione_corrente_id) throw new BadRequestException('Fornitore non trovato');
+  if (!c?.versione_corrente_id) throw new BadRequestException('Cliente non trovato');
+  // l'agenzia cliente × fornitore alla data dell'ordine dà il subagente e l'agente (D-60): senza, la pratica non si apre
+  const ag = await tx.interscambio.findFirst({
+    where: { cliente_id: cid, fornitore_id: fid, valido_dal: { lte: new Date(b.data) }, OR: [{ valido_al: null }, { valido_al: { gt: new Date(b.data) } }] },
+    select: { subagente: { select: { agente_id: true } } },
+  });
+  if (!ag) throw new ConflictException("Il cliente non ha un'agenzia con questo fornitore alla data dell'ordine: aggiungila in Clienti");
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ordini_fornitore_testata.numero_ordine'))`;
+  const anno = b.data.slice(0, 4);
+  const [m] = await tx.$queryRaw<{ n: number | null }[]>`
+    SELECT max(substring(numero_ordine FROM ${'^OF/' + anno + '/(\\d+)$'})::int) AS n FROM ordini_fornitore_testata WHERE numero_ordine LIKE ${'OF/' + anno + '/%'}`;
+  const numero_ordine = `OF/${anno}/${String((m.n ?? 0) + 1).padStart(3, '0')}`;
+  const t = await tx.ordini_fornitore_testata.create({ data: {
+    fornitore_id: fid, fornitore_versione_id: f.versione_corrente_id, cliente_id: cid, cliente_versione_id: c.versione_corrente_id,
+    numero_ordine, data_ordine: new Date(b.data), importo_merce: b.importo ?? null, agente_id: ag.subagente.agente_id,
+  } });
+  await logEvent(tx, {
+    tipo: 'crud', azione: 'create', entita: 'pratica', entita_id: t.id, esito: 'successo',
+    dettaglio: { etichetta: numero_ordine, cliente_id: String(cid), fornitore_id: String(fid), ordine: b.numero, data: b.data },
+  }, ctx);
+  return { fid, pid: t.id };
+}
+
+@Controller('documenti')
+export class DocumentiAbbinaController {
+  constructor(private readonly db: PrismaService) {}
+
+  /** Abbinamento a mano di un file in coda (D-60 §19, §7.9): tipo e pratica li sceglie la persona, anche contro i
+   *  suggerimenti della lettura. Un ordine senza pratica apre la pratica; fattura e nota di credito passano dalle
+   *  regole di F2-A3. Una transazione; poi il file va nella cartella della pratica. Blocchi: fornitore → pratica → file. */
+  @Post(':id/abbina')
+  @Richiede('provvigioni.modifica')
+  async abbina(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: AbbinaDocumento) {
+    const ctx = contesto(req);
+    const r = await this.db.$transaction(async (tx) => {
+      let fid: bigint, pid: bigint;
+      if (b.pratica_id) {
+        fid = await bloccaFornitore(tx, b.pratica_id);
+        pid = BigInt(b.pratica_id);
+        await bloccaPratiche(tx, [pid]);
+      } else if (b.tipo === 'ordine') {
+        ({ fid, pid } = await nuovaPratica(tx, b, ctx));
+      } else throw new BadRequestException('Scegli la pratica: solo un ordine apre una pratica nuova');
+      const d = await registra(tx, fid, pid, { ...b, arrivo_id: id }, ctx);
+      await logEvent(tx, {
+        tipo: 'documento', azione: 'match', entita: 'documento', entita_id: d.id, esito: 'successo',
+        dettaglio: { etichetta: `${nomeDi(d.tipo)} ${d.numero}`.trim(), documento_id: String(d.id), arrivo_id: String(id), pratica_id: String(pid), tipo: d.tipo, pratica_nuova: !b.pratica_id },
+      }, ctx);
+      return { documento_id: String(d.id), ...documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(d.tipo)} ${d.numero}`.trim())) };
+    });
+    await archiviaDopo(this.db, BigInt(id));
+    return r;
   }
 }
