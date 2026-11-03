@@ -40,6 +40,11 @@ export const SCHEMI: Record<string, string[]> = {
   'crud.delete': [],
   'stato.change_state': ['prima', 'dopo'],
   'errore.error': ['rotta', 'metodo', 'http_status', 'errore'],
+  // documenti (§15.2.4, F2-A3)
+  'documento.upload': ['documento_id', 'file_nome', 'dimensione', 'origine'],
+  'documento.create': ['pratica_id', 'documento_id', 'tipo', 'numero', 'data', 'importo', 'storno_totale', 'fattura_id'],
+  'documento.update': ['documento_id', 'pratica_id', 'prima', 'dopo'],
+  'documento.delete': ['documento_id', 'pratica_id', 'tipo', 'numero', 'importo'],
   // sincronizzazione da Integra (§7.14.3): anomalie, non eventi
   'integra.connessione': ['errore'],
   'integra.vista': ['vista', 'errore'],

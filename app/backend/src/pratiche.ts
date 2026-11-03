@@ -6,6 +6,7 @@ import { Richiede } from './accesso';
 import { CON_PRATICA, giornoRoma, praticaDaDb } from './motore/dati';
 import { confronto, fasePratica, haVariazioni, importoPratica, r2 } from './motore/motore';
 import { PrismaService } from './prisma.service';
+import { type Contesto, logEvent } from './registro';
 
 // Elenco delle pratiche (F2-A1, §7.2, §8.1): filtri, conteggi dei segmenti (D-23), ordinamento e
 // paginazione nel database. Stato, importo e variazioni li ricava il motore dai documenti e li salva
@@ -40,15 +41,23 @@ const STATO_DB = { attesa: 'inviato', confermata: 'confermato', fatturata: 'fatt
 
 /** Ricalcola con il motore quello che la pratica salva (D-52 §19): stato dai documenti, importo,
  *  variazioni. Va chiamata nella stessa transazione di ogni scrittura su documenti, righe o conferma
- *  della pratica (V13, D-36). Blocca la testata: due modifiche insieme non si perdono a vicenda. */
-export async function aggiornaPratica(tx: Prisma.TransactionClient, id: bigint) {
+ *  della pratica (V13, D-36). Blocca la testata: due modifiche insieme non si perdono a vicenda.
+ *  Con `motivo`, se lo stato cambia scrive lei l'evento stato.change_state (§15.2.4): un posto solo.
+ *  Restituisce la pratica già caricata con i valori nuovi, per non rileggerla. */
+export async function aggiornaPratica(tx: Prisma.TransactionClient, id: bigint, ctx: Contesto = {}, motivo?: string) {
   await tx.$queryRaw`SELECT 1 FROM ordini_fornitore_testata WHERE id = ${id} FOR UPDATE`;
-  const p = praticaDaDb(await tx.ordini_fornitore_testata.findUniqueOrThrow({ where: { id }, include: CON_PRATICA }));
+  const t = await tx.ordini_fornitore_testata.findUniqueOrThrow({ where: { id }, include: CON_PRATICA });
+  const p = praticaDaDb(t);
   const variazione = r2(confronto(p).filter((r) => r.varia).reduce((s, r) => s.plus(r.delta), new Prisma.Decimal(0)));
-  await tx.ordini_fornitore_testata.update({
-    where: { id },
-    data: { stato: STATO_DB[fasePratica(p)], importo: importoPratica(p), variazioni: haVariazioni(p), variazione },
-  });
+  const nuovi = { stato: STATO_DB[fasePratica(p)], importo: importoPratica(p), variazioni: haVariazioni(p), variazione };
+  await tx.ordini_fornitore_testata.update({ where: { id }, data: nuovi });
+  if (motivo && t.stato !== nuovi.stato) {
+    await logEvent(tx, {
+      tipo: 'stato', azione: 'change_state', entita: 'pratica', entita_id: id, esito: 'successo',
+      dettaglio: { etichetta: t.numero_ordine, prima: { stato: t.stato }, dopo: { stato: nuovi.stato }, motivo },
+    }, ctx);
+  }
+  return { ...t, ...nuovi };
 }
 
 type Riga = {

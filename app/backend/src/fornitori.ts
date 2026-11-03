@@ -9,7 +9,7 @@ import {
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { unico } from './clienti';
-import { giornoRoma, ultimaChiusura } from './motore/dati';
+import { giornoRoma, iso, ultimaChiusura } from './motore/dati';
 import { piuGiorni } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
@@ -18,7 +18,7 @@ import { logEvent } from './registro';
 // Integra e si leggono da fornitori_versioni: qui si modificano solo le regole del CRM.
 
 // Campo facoltativo che non accetta null: @IsOptional lascerebbe passare null su colonne NOT NULL (500)
-const Facoltativo = () => ValidateIf((_o, v) => v !== undefined);
+export const Facoltativo = () => ValidateIf((_o, v) => v !== undefined);
 
 class ModificaFornitore {
   @Facoltativo() @IsInt() @Min(0) giorni_attesa_conferma?: number;
@@ -39,7 +39,7 @@ class ScaglioneNuovo {
 }
 
 // Data 'aaaa-mm-gg' valida (2026-02-30 no)
-const Data = () => applyDecorators(Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data nel formato aaaa-mm-gg' }), IsISO8601({ strict: true }));
+export const Data = () => applyDecorators(Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data nel formato aaaa-mm-gg' }), IsISO8601({ strict: true }));
 
 class ScaglioniVersione {
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => ScaglioneNuovo) scaglioni!: ScaglioneNuovo[];
@@ -72,7 +72,6 @@ class FiltroEccezioni {
 }
 
 type Db = Prisma.TransactionClient | PrismaService;
-const iso = (d: Date) => d.toISOString().slice(0, 10); // colonne DATE: mezzanotte UTC
 const nomeSub = (s: { nome: string; cognome: string }) => `${s.cognome} ${s.nome}`;
 
 /** Versioni delle percentuali del fornitore, dalla più recente; in vigore = la più recente con valido_dal ≤ oggi (D-25).

@@ -9,16 +9,17 @@ type Db = Prisma.TransactionClient;
 const Dec = Prisma.Decimal;
 const ZERO = new Dec(0);
 const id = (x: bigint) => String(x);
-const giorno = (d: Date) => d.toISOString().slice(0, 10); // colonne DATE: mezzanotte UTC
+/** Giorno 'aaaa-mm-gg' di una colonna DATE (mezzanotte UTC). */
+export const iso = (d: Date) => d.toISOString().slice(0, 10);
 /** Giorno a Roma di un TIMESTAMPTZ. */
 export const giornoRoma = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
 
 /** Testata con righe e documenti: quello che serve al motore per una pratica. */
 export const CON_PRATICA = {
   righe: { orderBy: { numero_riga: 'asc' } },
-  documenti: { orderBy: { id: 'asc' }, include: { correzione: true } },
+  documenti: { orderBy: { id: 'asc' }, include: { correzione: true, arrivo: { select: { file_nome: true } } } },
 } satisfies Prisma.ordini_fornitore_testataInclude;
-type Testata = Prisma.ordini_fornitore_testataGetPayload<{ include: typeof CON_PRATICA }>;
+export type Testata = Prisma.ordini_fornitore_testataGetPayload<{ include: typeof CON_PRATICA }>;
 
 const riga = (r: Testata['righe'][number]) => {
   const qta = r.quantita ?? ZERO, prezzo = r.prezzo_unitario ?? ZERO;
@@ -27,8 +28,8 @@ const riga = (r: Testata['righe'][number]) => {
 
 /** Una pratica nella forma del motore (M.S.pratiche). */
 export const praticaDaDb = (t: Testata) => ({
-  id: id(t.id), numero: t.numero_ordine, fornitore_id: id(t.fornitore_id), cliente_id: id(t.cliente_id), data: giorno(t.data_ordine),
-  conferma: t.conferma_data ? { numero: t.conferma_numero, data: giorno(t.conferma_data) } : null,
+  id: id(t.id), numero: t.numero_ordine, fornitore_id: id(t.fornitore_id), cliente_id: id(t.cliente_id), data: iso(t.data_ordine),
+  conferma: t.conferma_data ? { numero: t.conferma_numero, data: iso(t.conferma_data) } : null,
   // tre fotografie delle righe (§4.2.8): le tranche di fattura stanno tutte nella fase 'fattura'
   righe: {
     ordine: t.righe.filter((r) => r.fase === 'ordine').map(riga),
@@ -37,12 +38,12 @@ export const praticaDaDb = (t: Testata) => ({
   },
   // documenti fiscali: fatture e note di credito (§4.2.7.1), importo negativo per le note
   documenti: t.documenti.map((d) => ({
-    id: id(d.id), tipo: d.tipo, numero: d.numero, data: giorno(d.data), importo: d.importo,
+    id: id(d.id), tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: d.importo,
     fattura_id: d.fattura_id ? id(d.fattura_id) : null, // nota di credito → fattura stornata, per id (D-34)
     liquidazione_id: d.liquidazione_id ? id(d.liquidazione_id) : null,
     // segnalazione a mano del fornitore (§5.14): vince sui bollettini se non è più vecchia
-    incasso: d.fonte_incasso === 'manuale' ? { stato: d.stato_incasso, dal: giorno((d.stato_incasso === 'insoluta' ? d.insoluta_dal : d.pagata_il) ?? d.data) } : null,
-    solleciti: d.solleciti, sollecitata_il: d.sollecitata_il ? giorno(d.sollecitata_il) : null,
+    incasso: d.fonte_incasso === 'manuale' ? { stato: d.stato_incasso, dal: iso((d.stato_incasso === 'insoluta' ? d.insoluta_dal : d.pagata_il) ?? d.data) } : null,
+    solleciti: d.solleciti, sollecitata_il: d.sollecitata_il ? iso(d.sollecitata_il) : null,
     correzione: d.correzione ? { tipo: d.correzione.tipo, valore: d.correzione.valore, motivo: d.correzione.motivo } : null,
   })),
 });
@@ -70,16 +71,16 @@ export async function caricaDati(db: Db, oggi = giornoRoma(new Date())) {
     clienti: new Map(clienti.map((c) => [id(c.id), { id: id(c.id), piva: c.corrente?.piva ?? null, nome: c.corrente?.ragione_sociale ?? '' }])),
     subagenti: new Map(subagenti.map((s) => [id(s.id), { id: id(s.id), nome: `${s.nome} ${s.cognome}`, attivo: s.attivo }])),
     scaglioni: scaglioni.map((s) => ({
-      id: id(s.id), fornitore_id: id(s.fornitore_id), sconto: s.sconto_min, pct_agente: s.pct_agente, pct_sub: s.pct_subagente, valido_dal: giorno(s.valido_dal),
+      id: id(s.id), fornitore_id: id(s.fornitore_id), sconto: s.sconto_min, pct_agente: s.pct_agente, pct_sub: s.pct_subagente, valido_dal: iso(s.valido_dal),
     })),
     eccezioni: eccezioni.map((e) => ({ // D-51 §19: per fornitore × sconto, con periodo (valido_al escluso)
       fornitore_id: id(e.fornitore_id), subagente_id: id(e.subagente_id), sconto: e.sconto_min, pct: e.pct_personale,
-      valido_dal: giorno(e.valido_dal), valido_al: e.valido_al ? giorno(e.valido_al) : null,
+      valido_dal: iso(e.valido_dal), valido_al: e.valido_al ? iso(e.valido_al) : null,
     })),
     interscambio: interscambio.map((a) => ({
       id: id(a.id), subagente_id: id(a.subagente_id), cliente_id: id(a.cliente_id), fornitore_id: id(a.fornitore_id),
       codice: a.codice_cliente_fornitore, sconto: a.sconto, pct_subagente: a.pct_subagente, regola_mensile: a.regola_mensile,
-      valido_dal: giorno(a.valido_dal), valido_al: a.valido_al ? giorno(a.valido_al) : null,
+      valido_dal: iso(a.valido_dal), valido_al: a.valido_al ? iso(a.valido_al) : null,
     })),
     pratiche: testate.map(praticaDaDb),
     bollettini: bollettini.map((b) => ({
@@ -87,7 +88,7 @@ export async function caricaDati(db: Db, oggi = giornoRoma(new Date())) {
       ricevuto: giornoRoma(b.creato_il), chiuso_il: b.chiuso_il ? giornoRoma(b.chiuso_il) : null,
       righe: b.righe.map((r) => ({
         id: id(r.id), documento_id: r.documento_id ? id(r.documento_id) : null, liquidazione_id: r.liquidazione_id ? id(r.liquidazione_id) : null, // D-34, D-11
-        numero: r.fattura_numero, data: r.fattura_data ? giorno(r.fattura_data) : null, imponibile: r.importo_merce, pct: r.pct_riconosciuta, importo: r.importo_riconosciuto,
+        numero: r.fattura_numero, data: r.fattura_data ? iso(r.fattura_data) : null, imponibile: r.importo_merce, pct: r.pct_riconosciuta, importo: r.importo_riconosciuto,
         tipo: r.tipo_riga === 'provvigione' ? null : r.tipo_riga, // storno | riaccredito (§5.14)
         pct_calcolata: r.pct_calcolata, importo_calcolato: r.importo_calcolato, // congelati alla verifica (§5.11)
         decisione: r.decisione ? { esito: r.decisione, motivo: r.decisione_motivo } : null, // riga che non quadra (D-49)

@@ -10,6 +10,7 @@ import { AgentiController, SubagentiController } from './subagenti';
 import { ClientiController } from './clienti';
 import { IntegraController, IntegraService } from './integra';
 import { PraticheController } from './pratiche';
+import { DocumentiController, DocumentiPraticaController } from './documenti';
 
 @Controller('salute')
 class SaluteController {
@@ -38,7 +39,7 @@ export function limiti(env = process.env) {
 
 @Module({
   imports: [PrismaModule, ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
-  controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, PraticheController, IntegraController],
+  controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, PraticheController, DocumentiController, DocumentiPraticaController, IntegraController],
   providers: [
     IntegraService,
     { provide: APP_FILTER, useClass: ErroriFilter }, // con Prisma iniettato: scrive nel registro

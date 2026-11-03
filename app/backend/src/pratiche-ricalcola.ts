@@ -10,7 +10,7 @@ if (require.main === module) {
   (async () => {
     const pratiche = await db.ordini_fornitore_testata.findMany({ select: { id: true }, orderBy: { id: 'asc' } });
     // una transazione per pratica: aggiornaPratica la blocca solo il tempo del suo calcolo
-    for (const { id } of pratiche) await db.$transaction((tx) => aggiornaPratica(tx, id));
+    for (const { id } of pratiche) await db.$transaction((tx) => aggiornaPratica(tx, id, {}, 'ricalcolo')); // evento se lo stato cambia
     console.log(`Pratiche ricalcolate: ${pratiche.length}.`);
   })()
     .catch((e: Error) => { console.error(e.message); process.exitCode = 1; })
