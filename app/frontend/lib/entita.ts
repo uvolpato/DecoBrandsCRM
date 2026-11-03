@@ -48,6 +48,7 @@ export function vociMenu<R>(ent: Entita<R>, ctx: Contesto, tutte: R[]) {
 }
 
 import { api } from '@/lib/api';
+import { data } from '@/lib/formati';
 
 export const fornitore: Entita<any> = {
   titolo: 'Fornitore',
@@ -113,5 +114,21 @@ export const agente: Entita<any> = {
   colonne: [
     { key: 'nome', header: 'Agente', grow: true },
     { key: 'codice', header: 'Codice' },
+  ] as any,
+};
+
+/** Documenti fiscali del mese di un bollettino: le voci arrivano dal suo dettaglio (contesto.documenti),
+ *  così l'abbinamento a mano non ha bisogno di una rotta in più (§7.7). */
+export const documentoMese: Entita<any> = {
+  titolo: 'Documento',
+  voci: (ctx) => (ctx.documenti as any[] | undefined) ?? [],
+  chiave: (r: any) => r.documento_id,
+  testo: (r: any) => r.numero ?? '',
+  dettaglio: (r: any) => [data(r.data), r.cliente, r.tipo === 'nota_credito' ? 'nota di credito' : r.tipo === 'fattura' ? 'fattura' : ''].filter(Boolean).join(' · '),
+  cerca: (r: any) => [r.numero, r.cliente].filter(Boolean).join(' '),
+  colonne: [
+    { key: 'numero', header: 'Documento', grow: true },
+    { key: 'data', header: 'Data', tipo: 'data' },
+    { key: 'cliente', header: 'Cliente' },
   ] as any,
 };

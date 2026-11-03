@@ -166,17 +166,22 @@
         ['Accetta il loro importo', 'Sulla riga: accetti quanto dice il fornitore, con motivo.'],
         ['Contesta', 'Sulla riga: contesti, con motivo obbligatorio.'],
         ['Attendi il prossimo', 'Documento assente dal bollettino: lo aspetti nel mese successivo.'],
-        ['Abbina il documento', 'Riga del fornitore senza documento nostro, ma il documento è in coda: va ad abbinarlo.'],
-        ['Segna come verificato · Segna come contestato', 'Chiude il bollettino.'],
+        ['Abbina il documento', 'Riga del fornitore che non corrisponde: scegli il documento del mese giusto fra quelli del bollettino. Un documento sta su una sola riga.'],
+        ['Segna come verificato · Segna come contestato', 'Chiude il bollettino: chiede conferma, il mese diventa chiuso e la pagina resta in sola lettura.'],
         ['Prepara la contestazione', 'Testo per il fornitore con le righe contestate e gli importi attesi.'],
-        ['Prepara il sollecito al cliente', 'Su una riga di storno: testo per il cliente con le fatture non pagate.']
+        ['Prepara il sollecito al cliente', 'Su una riga di storno: testo per il cliente con le fatture non pagate.'],
+        ['PDF del bollettino', 'Se il fornitore l’ha mandato, sta a sinistra della cerniera; sul tablet va sopra.']
       ],
       finestre: [
         { nome: 'Accetta · Contesta · Attendi', da: 'pulsanti sulla riga', cosa: 'Registra la decisione sulla riga.', campi: [['Motivo', 'Obbligatorio per contestare.']], azioni: [['Conferma · Contesta', 'Salva la decisione; la riga passa fra le decise.']] },
         { nome: 'Sollecito · Contestazione', da: 'Sollecita · Prepara la contestazione', cosa: 'Testo pronto da inviare al fornitore.', azioni: [['Copia il testo', 'Copia negli appunti e lo annota nel registro.']] },
         { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }
       ],
-      sapere: ['Gruppo <b>Incassi dei clienti</b> in fondo al bollettino. Sul fatturato: <i>storno</i> (il cliente non ha pagato: fattura Non pagata) e <i>riaccredito</i> (ha pagato). Sul maturato: fatture del mese non ancora pagate, con i giorni dalla fattura (gialli oltre i giorni d’incasso), e fatture di mesi precedenti riconosciute ora che il cliente ha pagato.'] },
+      sapere: [
+        'Gruppo <b>Incassi dei clienti</b> in fondo al bollettino. Sul fatturato: <i>storno</i> (il cliente non ha pagato: fattura Non pagata) e <i>riaccredito</i> (ha pagato). Sul maturato: fatture del mese non ancora pagate, con i giorni dalla fattura (gialli oltre i giorni d’incasso), e fatture di mesi precedenti riconosciute ora che il cliente ha pagato.',
+        'Contestare una riga vuole il motivo: comparirà nel testo della contestazione. Se il fornitore non ha scritto un documento del mese, <i>Attendi il prossimo</i> vale finché manca: abbinando una riga a quel documento l’attesa si toglie da sola.',
+        'La chiusura (<i>Segna come verificato</i> o <i>Segna come contestato</i>) è attiva quando tutte le righe quadrano o sono decise. Chiede conferma e chiude il mese: da lì percentuali e documenti di quel mese non si cambiano più e la pagina resta in sola lettura. Anche una contestazione chiude il mese.'
+      ] },
 
     { id: 'liquidazioni', titolo: 'Liquidazioni', gruppo: 'Lavoro', vai: '#/liquidazioni',
       sintesi: 'Le provvigioni ai subagenti per trimestre: cosa è liquidabile, cosa è ancora in attesa dei bollettini, il prospetto da inviare.',

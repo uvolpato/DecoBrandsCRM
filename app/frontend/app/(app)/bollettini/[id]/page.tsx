@@ -1,6 +1,9 @@
-import { InCostruzione } from '@/componenti/InCostruzione';
+'use client';
+import { useParams } from 'next/navigation';
+import { VistaBollettino } from './VistaBollettino';
 
-// Segnaposto del dettaglio (F3-A2): qui arriva il clic su una cella della matrice.
+// Il dettaglio si disegna da sé: il layout dei bollettini monta l'elenco solo senza id.
 export default function Pagina() {
-  return <InCostruzione titolo="Bollettino" />;
+  const { id } = useParams<{ id: string }>();
+  return <VistaBollettino id={id} />;
 }
