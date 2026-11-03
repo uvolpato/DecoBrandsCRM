@@ -160,7 +160,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
     setFinestra(
       <FormModal titolo={'Modifica le regole di ' + (x.ragione_sociale ?? '')} conferma="Salva" colonne={2}
         campi={[
-          { nome: 'giorni_attesa_conferma', etichetta: 'Giorni di attesa della conferma', tipo: 'testo', valore: String(x.giorni_attesa_conferma) },
+          { nome: 'giorni_attesa_conferma', etichetta: 'Giorni attesa conferma', tipo: 'testo', valore: String(x.giorni_attesa_conferma) },
           { nome: 'giorno_bollettino', etichetta: 'Giorno del bollettino (mese successivo)', tipo: 'testo', valore: String(x.giorno_bollettino) },
           { nome: 'tipo_provvigione', etichetta: 'Tipo di provvigione', tipo: 'select', valore: x.tipo_provvigione, opzioni: [{ value: 'maturato', label: 'Sul maturato' }, { value: 'fatturato', label: 'Sul fatturato' }] },
           { nome: 'giorni_incasso', etichetta: 'Giorni per l’incasso dal cliente', tipo: 'testo', valore: String(x.giorni_incasso) },
@@ -334,7 +334,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               { etichetta: 'P.IVA', valore: u.piva ?? '—' },
               { etichetta: 'Paese', valore: u.paese ?? '—' },
               { etichetta: 'Codice Integra', valore: u.codice_integra ?? '—' },
-              { etichetta: 'Giorni di attesa della conferma', valore: u.giorni_attesa_conferma },
+              { etichetta: 'Giorni attesa conferma', valore: u.giorni_attesa_conferma },
               { etichetta: 'Giorno del bollettino', valore: u.giorno_bollettino },
               { etichetta: 'Tipo di provvigione', valore: u.tipo_provvigione === 'maturato' ? 'Sul maturato' : 'Sul fatturato' },
               { etichetta: 'Giorni per l’incasso', valore: u.giorni_incasso },

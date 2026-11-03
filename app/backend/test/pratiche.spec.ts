@@ -4,7 +4,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
-import { giornoRoma } from '../src/motore/dati';
+import { caricaDati, giornoRoma } from '../src/motore/dati';
+import { haVariazioni, importoPratica, statoPratica } from '../src/motore/motore';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
 import { seed } from '../prisma/seed';
@@ -155,6 +156,20 @@ describe('GET /api/pratiche', () => {
     const stato = (await resp.get('/pratiche?ordina=stato&dir=asc&perPagina=200').expect(200)).body as Elenco;
     const ordine = { scaduta: 0, attesa: 1, confermata: 2, fatturata: 3 } as Record<string, number>;
     expect(stato.righe.map((x) => ordine[x.stato])).toEqual(stato.righe.map((x) => ordine[x.stato]).slice().sort((a, b) => a - b));
+  });
+
+  it('stato, importo e variazioni salvati e lo stato della query coincidono con il motore (D-52)', async () => {
+    const S = await caricaDati(db);
+    const b = (await resp.get('/pratiche?perPagina=200').expect(200)).body as Elenco;
+    expect(b.totale).toBe(S.pratiche.length);
+    const riga = new Map(b.righe.map((x) => [x.id, x]));
+    const salvate = new Map((await db.ordini_fornitore_testata.findMany()).map((t) => [String(t.id), t]));
+    const nomeDb = { fatturata: 'fatturato', confermata: 'confermato', attesa: 'inviato', scaduta: 'inviato' } as const;
+    for (const p of S.pratiche) {
+      const st = statoPratica(S, p).chiave, t = salvate.get(p.id)!;
+      expect([p.numero, t.stato, t.importo.toFixed(2), t.variazioni, riga.get(p.id)!.stato])
+        .toEqual([p.numero, nomeDb[st], importoPratica(p).toFixed(2), haVariazioni(p), st]);
+    }
   });
 
   it('la lettura dell\'area Provvigioni può consultare; chi non ce l\'ha: 403', async () => {

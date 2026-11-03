@@ -34,10 +34,14 @@ export const netto = (p: Pratica) => r2(somma(p.documenti.map((d) => d.importo))
 /** Netto se ci sono documenti fiscali, altrimenti conferma o ordine (solo stima). */
 export const importoPratica = (p: Pratica) => (p.documenti.length ? netto(p) : importoRighe(p.conferma ? p.righe.conferma : p.righe.ordine));
 
+/** Parte dello stato che dipende solo dai documenti: si salva sulla pratica (D-52 §19). */
+export const fasePratica = (p: Pratica) =>
+  p.documenti.some((d) => d.tipo === 'fattura') ? ('fatturata' as const) : p.conferma ? ('confermata' as const) : ('attesa' as const);
+
 /** Lo stato si ricava dai documenti arrivati, non si scrive a mano (§5.1). */
 export function statoPratica(S: Dati, p: Pratica) {
-  if (p.documenti.some((d) => d.tipo === 'fattura')) return { chiave: 'fatturata' as const };
-  if (p.conferma) return { chiave: 'confermata' as const };
+  const fase = fasePratica(p);
+  if (fase !== 'attesa') return { chiave: fase };
   const scadenza = piuGiorni(p.data, S.fornitori.get(p.fornitore_id)!.giorni_conferma);
   const g = giorni(S.oggi, scadenza);
   return { chiave: g < 0 ? ('scaduta' as const) : ('attesa' as const), scadenza, giorni: g };

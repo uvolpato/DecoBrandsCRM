@@ -80,7 +80,7 @@
     CRM.FormModal({
       titolo: 'Condizioni di ' + f.breve, conferma: 'Salva condizioni', colonne: 2,
       campi: [
-        { nome: 'giorni_conferma', etichetta: 'Giorni di attesa della conferma', tipo: 'numero', valore: f.giorni_conferma },
+        { nome: 'giorni_conferma', etichetta: 'Giorni attesa conferma', tipo: 'numero', valore: f.giorni_conferma },
         { nome: 'giorno_bollettino', etichetta: 'Bollettino atteso entro il giorno', tipo: 'numero', valore: f.giorno_bollettino || 10, aiuto: 'del mese successivo (1–28); dopo questa data in Oggi compare il sollecito' },
         { nome: 'maturazione', etichetta: 'Pagamento provvigioni', tipo: 'select', valore: f.maturazione, opzioni: [{ value: 'maturato', label: 'Sul maturato (incassi)' }, { value: 'fatturato', label: 'Sul fatturato' }] },
         { nome: 'giorni_incasso', etichetta: 'Giorni per l’incasso dal cliente', tipo: 'numero', valore: f.giorni_incasso || 60, aiuto: 'sul maturato: dopo questi giorni dalla fattura non ancora riconosciuta l’incasso va verificato (§5.14)' }

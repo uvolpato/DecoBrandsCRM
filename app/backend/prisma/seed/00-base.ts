@@ -9,6 +9,7 @@ import { cifra } from '../../src/password';
 import { logEvent } from '../../src/registro';
 import { caricaDati } from '../../src/motore/dati';
 import { fotografiaLiquidazione, righeLiquidazione } from '../../src/motore/motore';
+import { aggiornaPratica } from '../../src/pratiche';
 
 type Tx = Prisma.TransactionClient;
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -94,12 +95,10 @@ export async function base(tx: Tx) {
     const doc = (t: string) => p.documenti.find((d: any) => d.tipo === t);
     const ordine = doc('ordine'), conferma = doc('conferma');
     const fiscali = p.documenti.filter((d: any) => d.tipo === 'fattura' || d.tipo === 'nota_credito');
-    // stato ricavato dai documenti arrivati (§5.1): la colonna è la copia che tiene il motore
-    const stato = fiscali.some((d: any) => d.tipo === 'fattura') ? 'fatturato' : conferma ? 'confermato' : 'inviato';
     const t = await tx.ordini_fornitore_testata.create({ data: {
       fornitore_id: ids.fornitori[p.fornitore_id], fornitore_versione_id: ids.versioniF[p.fornitore_id],
       cliente_id: ids.clienti[p.cliente_piva], cliente_versione_id: ids.versioniC[p.cliente_piva], agente_id: agente.id,
-      numero_ordine: p.numero, data_ordine: data(p.data), importo_merce: importoDoc(ordine), stato,
+      numero_ordine: p.numero, data_ordine: data(p.data), importo_merce: importoDoc(ordine),
       conferma_data: conferma ? data(conferma.data) : null, conferma_numero: conferma?.numero ?? null } });
     for (const fase of ['ordine', 'conferma', 'fattura']) {
       let n = 0; // più fatture (tranche): le righe di una fase si numerano di seguito
@@ -115,6 +114,7 @@ export async function base(tx: Tx) {
       if (f) fatturaId[d.numero] = creato.id; else note.push([creato.id, d.riferimento]);
       praticaDi[d.numero] = p; documentoId[d.numero] = creato.id;
     }
+    await aggiornaPratica(tx, t.id); // stato, importo e variazioni dal motore (D-52 §19)
   }
   for (const [id, rif] of note) await tx.ordini_fornitore_documenti.update({ where: { id }, data: { fattura_id: fatturaId[rif] } });
 

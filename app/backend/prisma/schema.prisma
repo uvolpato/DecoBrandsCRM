@@ -208,10 +208,14 @@ model ordini_fornitore_testata {
   cliente_versione_id   BigInt
   agente_id             BigInt?
   importo_merce         Decimal?  @db.Decimal(12, 2)
-  stato                 String    @default("inviato") @db.VarChar(20) // inviato | confermato | fatturato
+  stato                 String    @default("inviato") @db.VarChar(20) // inviato | confermato | fatturato: dal motore (D-52)
   conferma_data         DateTime? @db.Date
   conferma_numero       String?   @db.VarChar(50)
   note                  String?
+  // risultato del motore, scritto da aggiornaPratica nella stessa transazione di ogni modifica (D-52 §19)
+  importo               Decimal   @default(0) @db.Decimal(14, 2) // importoPratica
+  variazioni            Boolean   @default(false) // haVariazioni
+  variazione            Decimal   @default(0) @db.Decimal(14, 2) // scostamento delle righe che variano
   creato_il             DateTime  @default(now()) @db.Timestamptz(6)
   modificato_il         DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
@@ -224,6 +228,8 @@ model ordini_fornitore_testata {
 
   @@index([fornitore_id, stato])
   @@index([cliente_id])
+  @@index([data_ordine])
+  @@index([importo])
 }
 
 /// Fatture e note di credito della pratica: la base delle provvigioni (§4.2.7.1, §5.3).

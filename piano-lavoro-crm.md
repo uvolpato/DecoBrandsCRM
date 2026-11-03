@@ -180,10 +180,12 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 | Attività | Ore | Dipende da | Sorgente prototipo da replicare | Riferimenti spec |
 |---|---|---|---|---|
-| **F2-A1** Elenco pratiche (segmenti di stato con conteggi, filtri standard, segno delle variazioni) | 2 | F0 | `prototipo-alternativo/assets/viste-giorno.js` (Pratiche: segmenti con conteggi, filtri standard, DataTable) | §7.2, §8.1, §15.2.4 |
+| **F2-A1** Elenco pratiche (segmenti di stato con conteggi, filtri standard, segno delle variazioni); stato, importo e variazioni salvati sulla pratica e elenco in SQL (D-52) | 2 + 2 · **da approvare** | F0 | `prototipo-alternativo/assets/viste-giorno.js` (Pratiche: segmenti con conteggi, filtri standard, DataTable) | §7.2, §8.1, §15.2.4 |
 | **F2-A2** Dettaglio pratica: binario delle fasi, schede *Riepilogo · Righe a confronto* con avviso delle variazioni, documenti affiancati | 2 | F0, F2-A1 | `prototipo-alternativo/assets/viste-giorno.js` (Pratica: binario delle fasi, schede *Riepilogo · Righe a confronto*, documenti affiancati) | §7.3, §6.1, §5.8, §5.9, §5.10, §15.2.4 |
 | **F2-A3** Documenti fiscali (fatture/NC, netto) + canale comune upload/validazione §6 | 2 | F0 | card "Documenti fiscali", modale NC (§6 canale: upload → coda → validazione → salvataggio) | §4.2.7.1, §5.3, §6, §8.1 (`/api/pratiche/:id/documenti`), §15.2.4 |
 
+- **F2-A1: 2 h fuori preventivo, da approvare** (D-52: colonne `importo`, `variazioni`, `variazione` sulla pratica, `aggiornaPratica` nella stessa transazione di ogni modifica, elenco con filtri, conteggi, ordinamento e pagine in SQL, `npm run pratiche:ricalcola`; ~10.000 pratiche: da 1,5–1,8 s a 10–35 ms).
+- **Regola per F2-A3 e F6 (D-52):** ogni scrittura su documenti, righe o conferma di una pratica chiama `aggiornaPratica(tx, id)` nella stessa transazione.
 - **Nota:** il confronto fasi non si salva: calcolato al volo da `F0-A5` sugli snapshot per fase (§4.2.8 `fase = ordine|conferma|fattura`).
 - **DoD:**NC totale → provvigione 0; variazioni comparse/spariti evidenziate; cambio stato = evento `crud/update` + `stato/change_state` (due righe §15.2.4).
 

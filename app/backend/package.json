@@ -17,7 +17,8 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "ponte:prova": "ts-node prisma/ponte-prova.ts",
-    "superutente": "node dist/src/superutente.js"
+    "superutente": "node dist/src/superutente.js",
+    "pratiche:ricalcola": "node dist/src/pratiche-ricalcola.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.26",
