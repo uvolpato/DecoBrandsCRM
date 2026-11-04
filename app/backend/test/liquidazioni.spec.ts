@@ -40,7 +40,7 @@ async function entra(utente: string) {
     post: (p: string, b: object = {}) => agente.post('/api' + p).set('x-csrf-token', csrf).send(b),
   };
 }
-let resp: Awaited<ReturnType<typeof entra>>, op: Awaited<ReturnType<typeof entra>>, dati: Awaited<ReturnType<typeof entra>>;
+let resp: Awaited<ReturnType<typeof entra>>, op: Awaited<ReturnType<typeof entra>>, lett: Awaited<ReturnType<typeof entra>>, dati: Awaited<ReturnType<typeof entra>>;
 
 const fornitore = async (nome: string) => (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: nome } } })).fornitore_id;
 const pagina = async (a: number, t: number) => (await resp.get(`/liquidazioni?anno=${a}&trimestre=${t}`).expect(200)).body;
@@ -56,8 +56,9 @@ beforeAll(async () => {
   await seed(db);
   await creaUtente('resp-liq', 'responsabile');
   await creaUtente('op-liq', 'operatore');
+  await creaUtente('lett-liq', 'lettura');
   await creaUtente('dati-liq', 'responsabile', 'dati');
-  [resp, op, dati] = await Promise.all([entra('resp-liq'), entra('op-liq'), entra('dati-liq')]);
+  [resp, op, lett, dati] = await Promise.all([entra('resp-liq'), entra('op-liq'), entra('lett-liq'), entra('dati-liq')]);
   M = prototipo();
   M.S.oggi = OGGI;
 }, 120_000);
@@ -146,6 +147,75 @@ describe('GET /api/liquidazioni', () => {
     await resp.get('/liquidazioni?anno=2026&trimestre=5').expect(400);
     await resp.get('/liquidazioni?anno=abc').expect(400);
     await dati.get('/liquidazioni').expect(403);
+  });
+});
+
+describe('GET /api/liquidazione/report', () => {
+  const report = async (q: string) => (await resp.get('/liquidazione/report' + q).expect(200)).body;
+  const delta = (v: number, p: number) => (Math.abs(p) > 0.01 ? Math.round((100 * (v - p)) / Math.abs(p)) : null);
+
+  it('senza subagente: elenco con quota e variazione sul trimestre prima, come il prototipo', async () => {
+    const b = await report('?anno=2026&trimestre=3');
+    const an = M.analisiTrimestre(2026, 3), prec = M.analisiTrimestre(2026, 2);
+    const attesi = an.subagenti.map((x: any) => {
+      const p = prec.subagenti.find((y: any) => String(y.chiave) === String(x.chiave));
+      return [x.nome, x.clienti, x.documenti, x.fatturato, x.prese, x.pagate, x.margine, x.prese ? M.r2((100 * x.pagate) / x.prese) : 0, delta(x.pagate, p ? p.pagate : 0)];
+    }).sort((x: any, y: any) => y[5] - x[5]);
+    expect(b.precedente).toEqual({ anno: 2026, trimestre: 2 });
+    expect(b.subagenti.map((s: any) => [s.nome, s.clienti, s.documenti, s.fatturato, s.prese, s.pagate, s.margine, s.quota, s.delta])).toEqual(j(attesi));
+  });
+
+  it('un subagente: numeri con confronto, trimestri dell’anno senza i futuri, primi 5 clienti', async () => {
+    const an = M.analisiTrimestre(2026, 3), prec = M.analisiTrimestre(2026, 2);
+    for (const s of an.subagenti) {
+      const id = String(s.chiave);
+      const b = await report(`?anno=2026&trimestre=3&subagente=${id}`);
+      const p = prec.subagenti.find((y: any) => String(y.chiave) === id);
+      expect(b.subagente).toEqual({ id, nome: s.nome });
+      expect([b.numeri.fatturato, b.numeri.prese, b.numeri.pagate, b.numeri.margine, b.numeri.clienti, b.numeri.documenti])
+        .toEqual([s.fatturato, s.prese, s.pagate, s.margine, s.clienti, s.documenti]);
+      expect(b.numeri.delta).toEqual({
+        fatturato: delta(s.fatturato, p ? p.fatturato : 0),
+        pagate: delta(s.pagate, p ? p.pagate : 0),
+        margine: delta(s.margine, p ? p.margine : 0),
+      });
+      expect(b.numeri.pct.margine_su_prese).toBe(s.prese ? M.r2((100 * s.margine) / s.prese) : 0);
+      const trim = [1, 2, 3, 4].filter((q) => M.statoTrimestre(2026, q).chiave !== 'futura').map((q) => {
+        const y = M.analisiTrimestre(2026, q).subagenti.find((z: any) => String(z.chiave) === id);
+        return [q, y ? y.pagate : 0, y ? y.margine : 0, q === 3];
+      });
+      expect(b.trimestri.map((x: any) => [x.trimestre, x.pagate, x.margine, x.attivo])).toEqual(j(trim));
+      const perCli: Record<string, { nome: string; fatturato: number; provvigione: number }> = {};
+      M.righeLiquidazione(2026, 3).filter((r: any) => String(r.subagente_id) === id).forEach((r: any) => {
+        const c = (perCli[r.cliente] = perCli[r.cliente] || { nome: M.nomeCliente(r.cliente), fatturato: 0, provvigione: 0 });
+        c.fatturato += r.importo;
+        c.provvigione += r.provvigione;
+      });
+      const cli = Object.values(perCli).sort((u, v) => v.fatturato - u.fatturato).slice(0, 5)
+        .map((c) => [c.nome, M.r2(c.fatturato), M.r2(c.provvigione)]);
+      expect(b.primi_clienti.map((c: any) => [c.nome, c.fatturato, c.provvigione])).toEqual(j(cli));
+    }
+  });
+
+  it('subagente senza documenti: zeri, non un errore; i trimestri futuri non ci sono', async () => {
+    const primo = M.analisiTrimestre(2026, 3).subagenti[0];
+    const b = await report(`?anno=2024&trimestre=1&subagente=${primo.chiave}`);
+    expect(b.numeri).toEqual({
+      fatturato: 0, prese: 0, pagate: 0, margine: 0, clienti: 0, documenti: 0,
+      delta: { fatturato: null, pagate: null, margine: null }, pct: { margine_su_prese: 0 },
+    });
+    expect(b.trimestri).toEqual([1, 2, 3, 4].map((q) => ({ trimestre: q, pagate: 0, margine: 0, attivo: q === 1 })));
+    expect(b.primi_clienti).toEqual([]);
+    // anno non ancora iniziato: il report non inventa trimestri
+    expect((await report(`?anno=2027&trimestre=1&subagente=${primo.chiave}`)).trimestri).toEqual([]);
+  });
+
+  it('parametri non validi 400; subagente inesistente 404; sola lettura 200 e 403 senza area', async () => {
+    await resp.get('/liquidazione/report?anno=2026&trimestre=5').expect(400);
+    await resp.get('/liquidazione/report?anno=abc').expect(400);
+    await resp.get('/liquidazione/report?anno=2026&trimestre=3&subagente=999999').expect(404);
+    expect((await lett.get('/liquidazione/report?anno=2026&trimestre=3').expect(200)).body.subagenti.length).toBeGreaterThan(0);
+    await dati.get('/liquidazione/report?anno=2026&trimestre=3').expect(403);
   });
 });
 
@@ -258,3 +328,4 @@ describe('chiusura del trimestre', () => {
     });
   });
 });
+

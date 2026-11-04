@@ -1,11 +1,11 @@
-import { BadRequestException, ConflictException, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
+import { BadRequestException, ConflictException, Controller, Get, HttpCode, NotFoundException, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { type Dati, caricaDati, giornoRoma } from './motore/dati';
-import { fotografiaLiquidazione, giorni, limiti, r2, righeLiquidazione, trimestre } from './motore/motore';
+import { analisiTrimestre, fotografiaLiquidazione, giorni, limiti, r2, righeLiquidazione, trimestre } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -170,5 +170,91 @@ export class LiquidazioniController {
       }, ctx);
     }, { timeout: 30_000 });
     return liquidazione(this.db, a, t);
+  }
+}
+
+/* ---------- Report subagenti (F4-A4, §7.8, D-18 §19) ---------- */
+class Report extends Periodo {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) subagente?: number;
+}
+
+/** Variazione percentuale sul trimestre prima, arrotondata: null se il precedente è zero. */
+const variazione = (v: Prisma.Decimal, p: Prisma.Decimal) =>
+  (p.abs().lt(new Dec('0.01')) ? null : Math.round(v.minus(p).times(100).div(p.abs()).toNumber()));
+
+/** Report subagenti del trimestre: elenco (quota e variazione per subagente) oppure uno solo (numeri,
+ *  trimestri dell'anno, primi clienti). Stessi numeri della liquidazione (`analisiTrimestre`, §7.8). */
+export async function reportSubagenti(db: Db, a: number, t: number, subagente?: number) {
+  const S = await caricaDati(db);
+  const cache = new Map<number, ReturnType<typeof analisiTrimestre>>();
+  const analisi = (anno: number, tri: number) => {
+    const k = anno * 10 + tri;
+    if (!cache.has(k)) cache.set(k, analisiTrimestre(S, anno, tri));
+    return cache.get(k)!;
+  };
+  // ponytail: fino a 7 passate su tutte le pratiche (trimestre, precedente, trimestri dell'anno, clienti);
+  // sui volumi veri costa secondi. Se cresce, `analisiTrimestre` prende le righe già calcolate.
+  const an = analisi(a, t), pa = t > 1 ? a : a - 1, pt = t > 1 ? t - 1 : 4, prec = analisi(pa, pt);
+  const precedente = { anno: pa, trimestre: pt };
+  const num = (x: Prisma.Decimal | undefined) => Number(x ?? 0);
+  if (subagente == null) {
+    const subagenti = an.subagenti.map((x) => {
+      const p = prec.subagenti.find((y) => y.chiave === x.chiave);
+      return {
+        id: x.chiave, nome: x.nome, clienti: x.clienti, documenti: x.documenti,
+        fatturato: num(x.fatturato), prese: num(x.prese), pagate: num(x.pagate), margine: num(x.margine),
+        quota: x.prese.isZero() ? 0 : Number(r2(x.pagate.times(100).div(x.prese))),
+        delta: variazione(x.pagate, p?.pagate ?? new Dec(0)),
+      };
+    }).sort((x, y) => y.pagate - x.pagate);
+    return { anno: a, trimestre: t, precedente, subagenti };
+  }
+  const s = S.subagenti.get(String(subagente));
+  if (!s) throw new NotFoundException('Subagente non trovato');
+  const x = an.subagenti.find((y) => y.chiave === String(subagente));
+  const p = prec.subagenti.find((y) => y.chiave === String(subagente));
+  const fatturato = x?.fatturato ?? new Dec(0), prese = x?.prese ?? new Dec(0);
+  const pagate = x?.pagate ?? new Dec(0), margine = x?.margine ?? new Dec(0);
+  // trimestri dell'anno già iniziati: i futuri non hanno numeri (come il prototipo)
+  const trimestri = [1, 2, 3, 4].filter((q) => limiti(a, q).da <= S.oggi).map((q) => {
+    const y = q === t ? x : analisi(a, q).subagenti.find((z) => z.chiave === String(subagente));
+    return { trimestre: q, pagate: num(y?.pagate), margine: num(y?.margine), attivo: q === t };
+  });
+  const clienti = new Map<string, { nome: string; fatturato: Prisma.Decimal; provvigione: Prisma.Decimal }>();
+  for (const r of righeLiquidazione(S, a, t)) {
+    if (r.subagente_id !== String(subagente)) continue;
+    const c = clienti.get(r.cliente_id) ?? { nome: S.clienti.get(r.cliente_id)?.nome ?? '', fatturato: new Dec(0), provvigione: new Dec(0) };
+    c.fatturato = c.fatturato.plus(r.importo);
+    c.provvigione = c.provvigione.plus(r.provvigione);
+    clienti.set(r.cliente_id, c);
+  }
+  const primi_clienti = [...clienti.values()].sort((u, v) => v.fatturato.comparedTo(u.fatturato)).slice(0, 5)
+    .map((c) => ({ nome: c.nome, fatturato: Number(r2(c.fatturato)), provvigione: Number(r2(c.provvigione)) }));
+  return {
+    anno: a, trimestre: t, precedente, subagente: { id: String(subagente), nome: s.nome },
+    numeri: {
+      fatturato: num(fatturato), prese: num(prese), pagate: num(pagate), margine: num(margine),
+      clienti: x?.clienti ?? 0, documenti: x?.documenti ?? 0,
+      delta: {
+        fatturato: variazione(fatturato, p?.fatturato ?? new Dec(0)),
+        pagate: variazione(pagate, p?.pagate ?? new Dec(0)),
+        margine: variazione(margine, p?.margine ?? new Dec(0)),
+      },
+      pct: { margine_su_prese: prese.isZero() ? 0 : Number(r2(margine.times(100).div(prese))) },
+    },
+    trimestri, primi_clienti,
+  };
+}
+
+@Controller('liquidazione')
+export class LiquidazioneReportController {
+  constructor(private readonly db: PrismaService) {}
+
+  /** Report subagenti del trimestre (F4-A4, §7.8): senza `subagente` l'elenco, con `subagente` uno solo. */
+  @Get('report')
+  @Richiede('provvigioni.consulta')
+  async report(@Query() q: Report) {
+    const oggi = giornoRoma(new Date());
+    return reportSubagenti(this.db, q.anno ?? Number(oggi.slice(0, 4)), q.trimestre ?? trimestre(oggi), q.subagente);
   }
 }

@@ -2,15 +2,17 @@
 import Link from 'next/link';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { DataTable } from '@/componenti/DataTable';
-import { Periodi } from '@/componenti/Flussi';
+import { Elenco, Periodi } from '@/componenti/Flussi';
+import { COLORI_GRAFICI, Grafico } from '@/componenti/Grafico';
+import { KpiRow } from '@/componenti/Kpi';
 import { Conferma } from '@/componenti/Modale';
-import { Pagina, Pannello } from '@/componenti/Pagina';
+import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
-import { Sagoma, SagomaTabella, useSagome } from '@/componenti/Sagoma';
+import { Sagoma, SagomaRiquadri, SagomaTabella, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
 import { api } from '@/lib/api';
-import { classeSegno, data, euro, pct } from '@/lib/formati';
+import { classeSegno, data, euro, num, pct } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
 
 // Liquidazioni (F4-A1, §7.8, D-18): i quattro trimestri, l'elenco dei subagenti che fa da filtro e i documenti
@@ -25,6 +27,20 @@ interface Documento {
   imponibile: number; pct: number; provvigione: number;
   liquidabile: boolean; incasso: boolean; voce: 'storno' | 'riaccredito' | null; motivo_testo: string | null;
   stato: { etichetta: string; variante: Variante };
+}
+interface RigaReport { id: string; nome: string; clienti: number; documenti: number; fatturato: number; prese: number; pagate: number; margine: number; quota: number; delta: number | null }
+interface NumeriReport {
+  fatturato: number; prese: number; pagate: number; margine: number; clienti: number; documenti: number;
+  delta: { fatturato: number | null; pagate: number | null; margine: number | null };
+  pct: { margine_su_prese: number };
+}
+interface Report {
+  anno: number; trimestre: number; precedente: { anno: number; trimestre: number };
+  subagenti?: RigaReport[];
+  subagente?: { id: string; nome: string };
+  numeri?: NumeriReport;
+  trimestri?: { trimestre: number; pagate: number; margine: number; attivo: boolean }[];
+  primi_clienti?: { nome: string; fatturato: number; provvigione: number }[];
 }
 interface Risposta {
   anno: number; trimestre: number;
@@ -43,7 +59,11 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
   const [errore, setErrore] = useState('');
   const [caricando, setCaricando] = useState(true);
   const [chiedi, setChiedi] = useState(false);
+  const [report, setReport] = useState<Report | null>(null);
+  const [reportCaricando, setReportCaricando] = useState(true);
+  const [reportErrore, setReportErrore] = useState('');
   const sagome = useSagome(caricando && !dati);
+  const sagomeReport = useSagome(reportCaricando && !report);
 
   useEffect(() => {
     let vivo = true;
@@ -55,6 +75,24 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
     });
     return () => { vivo = false; };
   }, [anno, trimestre]);
+
+  // Report subagenti (F4-A4): si rilegge cambiando trimestre o subagente scelto; numeri dal server (V12)
+  useEffect(() => {
+    const d = dati && dati.anno === anno && dati.trimestre === trimestre ? dati : null;
+    if (!d) { setReportCaricando(true); return; }
+    const sub = d.subagenti.some((s) => s.id === subSel) ? subSel : null;
+    let vivo = true;
+    setReportCaricando(true);
+    setReportErrore('');
+    const p = new URLSearchParams({ anno: String(anno), trimestre: String(trimestre) });
+    if (sub) p.set('subagente', sub);
+    void api<Report>('liquidazione/report?' + p.toString()).then((r) => {
+      if (!vivo) return;
+      setReportCaricando(false);
+      if (r.ok) setReport(r.dati); else { setReport(null); setReportErrore(r.messaggio); }
+    });
+    return () => { vivo = false; };
+  }, [dati, anno, trimestre, subSel]);
 
   // cambio trimestre dall'indirizzo: finché i dati nuovi non arrivano non si mostrano quelli di prima
   const b = dati && dati.anno === anno && dati.trimestre === trimestre ? dati : null;
@@ -76,6 +114,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
   const q = b.trimestri[trimestre - 1];
   const chiusa = b.stato.chiave === 'chiusa';
   const scelto = b.subagenti.find((s) => s.id === subSel) ?? null;
+  const rep = report && report.anno === anno && report.trimestre === trimestre && (report.subagente?.id ?? null) === (scelto?.id ?? null) ? report : null;
   const visibili = scelto ? b.documenti.filter((d) => d.subagente_id === scelto.id) : b.documenti;
   const inAttesa = b.riepilogo?.bloccanti ?? 0;
   const puoChiudere = puo('provvigioni.chiudi');
@@ -170,6 +209,14 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
                     emptyText="Nessun documento" emptyHint="Nessuna fattura o nota di credito con data in questo trimestre." />
                 </div>
               ),
+            },
+            {
+              id: 'report', etichetta: 'Report subagenti',
+              contenuto: () => rep ? <ReportSubagenti r={rep} analisi={analisi} />
+                : <div className="report-sub">
+                  {reportErrore ? <div className="vuoto"><b>Report non caricato</b>{reportErrore}</div>
+                    : sagomeReport ? <><SagomaRiquadri n={3} /><SagomaTabella righe={5} colonne={5} naturale /></> : null}
+                </div>,
             }]} />
             </Pannello>
           </div>
@@ -179,5 +226,79 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
         testo={`Gli importi vengono fissati: ${euro(b.riepilogo?.provvigione ?? 0)} a ${b.subagenti.filter((s) => s.liquidabili > 0).length} subagenti.`}
         etichetta="Chiudi il trimestre" onRisposta={(si) => (si ? void chiudi() : setChiedi(false))} />}
     </Pagina>
+  );
+}
+
+/** Report subagenti (F4-A4, §7.8, D-18): numeri calcolati dal server. Senza subagente scelto l'elenco con
+ *  quota e variazione; con un subagente i suoi numeri, i trimestri dell'anno e i primi clienti. */
+function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
+  const etPrec = 'sul ' + r.precedente.trimestre + '° trimestre' + (r.precedente.anno !== r.anno ? ' ' + r.precedente.anno : '');
+  const conf = (d: number | null) => (d == null
+    ? { testo: 'nessun importo ' + etPrec }
+    : { testo: (d >= 0 ? '+' : '−') + num(Math.abs(d)) + '% ' + etPrec, variante: (d >= 0 ? 'ok' : 'errore') as 'ok' | 'errore' });
+  if (r.subagenti) {
+    if (!r.subagenti.length) return <div className="report-sub"><div className="vuoto"><b>Nessun subagente con documenti</b></div></div>;
+    return (
+      <div className="report-sub">
+        <Grafico tipo="bar" orizzontale impilato altezza={Math.max(140, 30 * r.subagenti.length + 56)} titolo="Provvigioni generate per subagente"
+          etichette={r.subagenti.map((x) => x.nome)}
+          serie={[
+            { nome: 'Al subagente', valori: r.subagenti.map((x) => x.pagate), colore: COLORI_GRAFICI.neutro },
+            { nome: 'Margine Decobrands', valori: r.subagenti.map((x) => x.margine), colore: COLORI_GRAFICI.ok },
+          ]} />
+        <DataTable naturale compatta perPagina={false} righe={r.subagenti} chiave={(x) => x.id}
+          ordinamentoIniziale={{ key: 'pagate', dir: 'desc' }} etichettaTotale="Totale"
+          colonne={[
+            {
+              key: 'nome', header: 'Subagente', grow: true,
+              cell: (x) => <><b>{x.nome}</b><span className="sec-riga">{x.clienti} {x.clienti === 1 ? 'cliente' : 'clienti'} · {x.documenti} {x.documenti === 1 ? 'documento' : 'documenti'}</span></>,
+            },
+            { key: 'fatturato', header: 'Fatturato', tipo: 'euro', totale: 'somma' },
+            { key: 'pagate', header: 'Provvigione', tipo: 'euro', totale: 'somma' },
+            { key: 'margine', header: 'Margine', tipo: 'euro', totale: 'somma' },
+            {
+              key: 'delta', header: 'Sul ' + r.precedente.trimestre + '° trim.', tipo: 'numero', sortValue: (x) => x.delta ?? -1e9,
+              cell: (x) => x.delta == null ? <span className="testo-tenue">—</span>
+                : <span className={x.delta >= 0 ? 'positivo' : 'negativo'}>{x.delta >= 0 ? '+' : '−'}{num(Math.abs(x.delta))}%</span>,
+            },
+          ]}
+          piede={'Margine = provvigioni dai fornitori meno la provvigione al subagente. Ultima colonna: provvigione al subagente ' + etPrec + '. Clic su un subagente a sinistra per il suo report.'} />
+        <Nota>Numeri del trimestre di liquidazione, compresi i documenti in attesa e le voci di storno. Altri periodi, filtri ed esportazione: <Link href={analisi}>Analisi completa</Link>.</Nota>
+      </div>
+    );
+  }
+  const n = r.numeri, sub = r.subagente;
+  if (!n || !sub) return null;
+  return (
+    <div className="report-sub">
+      <KpiRow voci={[
+        {
+          id: 'f', etichetta: 'Fatturato dei suoi clienti', valore: n.fatturato, variante: 'primario',
+          dettagli: [conf(n.delta.fatturato), { testo: `${n.clienti} ${n.clienti === 1 ? 'cliente' : 'clienti'} · ${n.documenti} ${n.documenti === 1 ? 'documento' : 'documenti'}` }],
+        },
+        { id: 's', etichetta: 'Provvigione al subagente', valore: n.pagate, variante: 'attesa', dettagli: [conf(n.delta.pagate)] },
+        {
+          id: 'm', etichetta: 'Margine Decobrands', valore: n.margine, variante: 'ok',
+          dettagli: [conf(n.delta.margine), ...(n.prese ? [{ testo: pct(n.pct.margine_su_prese) + ' delle provvigioni' }] : [])],
+        },
+      ]} />
+      <div className="griglia-bi">
+        <Pannello titolo={'Trimestri ' + r.anno}>
+          <Grafico tipo="bar" impilato altezza={200} titolo="Provvigioni generate per trimestre"
+            etichette={(r.trimestri ?? []).map((x) => x.trimestre + '° trim.' + (x.attivo ? ' ●' : ''))}
+            serie={[
+              { nome: 'Al subagente', valori: (r.trimestri ?? []).map((x) => x.pagate), colore: COLORI_GRAFICI.neutro },
+              { nome: 'Margine Decobrands', valori: (r.trimestri ?? []).map((x) => x.margine), colore: COLORI_GRAFICI.ok },
+            ]} />
+        </Pannello>
+        <Pannello titolo="Clienti principali" nota={n.clienti > 5 ? 'primi 5 di ' + n.clienti : ''}>
+          <Elenco vuoto="Nessun cliente" voci={(r.primi_clienti ?? []).map((c) => ({
+            testo: <><b>{c.nome}</b> <span className="testo-tenue">fatturato {euro(c.fatturato)}</span></>,
+            destra: euro(c.provvigione),
+          }))} />
+        </Pannello>
+      </div>
+      <Nota>Numeri del trimestre di liquidazione. Altri periodi, confronti ed esportazione: <Link href={analisi}>Analisi completa di {sub.nome}</Link>.</Nota>
+    </div>
   );
 }

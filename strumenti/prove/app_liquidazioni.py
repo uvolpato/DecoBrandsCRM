@@ -45,6 +45,7 @@ with sync_playwright() as p:
     destra = '.colonne > div > .pannello '
     documenti = lambda pg: pg.locator(destra + '.schede-corpo .dt tbody tr')
     scheda_documenti = lambda pg: pg.locator(destra + '.schede-barra [role=tab]').first
+    schede = lambda pg: pannelli(pg).nth(1).locator('.schede-barra [role=tab]')
 
     def attesa(pg):
         pg.wait_for_timeout(500)
@@ -85,6 +86,22 @@ with sync_playwright() as p:
        'riga in attesa con il motivo')
     ok(pg.locator(destra + '.schede-corpo .dt tbody tr', has_text='Liquidabile').count() == 8, 'righe liquidabili: 8')
     ok(pg.locator(destra + '.schede-corpo .dt tbody a').count() == 10, 'ogni documento porta alla pratica')
+
+    # scheda Report subagenti (F4-A4): elenco con grafico, tabella e variazione sul trimestre prima
+    ok(schede(pg).count() == 2 and 'Report subagenti' in schede(pg).nth(1).inner_text(), 'seconda scheda: Report subagenti')
+    schede(pg).nth(1).click()
+    pg.wait_for_selector(destra + '.report-sub canvas')
+    report = pannelli(pg).nth(1).locator('.report-sub')
+    ok(report.locator('canvas').count() == 1, 'report: grafico delle provvigioni per subagente')
+    righe_report = report.locator('.dt tbody tr')
+    ok(righe_report.count() == 4 and 'Marco Nista' in righe_report.first.inner_text() and '960,00' in righe_report.first.inner_text(),
+       'report: una riga per subagente, Marco Nista primo per provvigione')
+    ok('Sul 2° trim.' in report.locator('.dt thead').inner_text(), 'report: colonna della variazione sul 2° trimestre')
+    ok('2.492,18' in piatto(report.locator('.dt tfoot').inner_text()), 'report: totale provvigioni 2.492,18 €')
+    link = report.locator('a', has_text='Analisi completa')
+    ok(link.count() == 1 and link.get_attribute('href') == '/analisi?dal=2026-07&al=2026-09',
+       'report: link ad Analisi completa con il trimestre')
+    schede(pg).nth(0).click(); pg.wait_for_selector(destra + '.schede-corpo .dt tbody tr')
 
     # clic su un subagente: filtra; di nuovo: tutti (D-18)
     marco = subagenti(pg).filter(has_text='Marco Nista').first
@@ -173,6 +190,24 @@ with sync_playwright() as p:
        and scheda_documenti(pg).locator('.schede-conta').inner_text() == '2',
        'ritorno: il subagente scelto è ancora quello')
 
+    # report del subagente scelto (Marco): 3 numeri, trimestri dell'anno, primi clienti (F4-A4)
+    schede(pg).nth(1).click()
+    pg.wait_for_selector(destra + '.report-sub .kpi-riga')
+    sub_report = pannelli(pg).nth(1).locator('.report-sub')
+    kpi = [piatto(x) for x in sub_report.locator('.kpi .kpi-valore').all_inner_texts()]
+    ok(kpi == ['12.000,00 €', '960,00 €', '1.800,00 €'], 'report del subagente: fatturato, provvigione e margine')
+    ok('nessun importo sul 2° trimestre' in piatto(sub_report.inner_text()), 'confronto con il trimestre prima: nessun importo')
+    ok('65,22% delle provvigioni' in piatto(sub_report.inner_text()), 'margine sulle provvigioni calcolato dal server')
+    ok(sub_report.locator('.griglia-bi .pannello').count() == 2 and 'Trimestri 2026' in piatto(sub_report.inner_text())
+       and 'Clienti principali' in piatto(sub_report.inner_text()), 'trimestri dell’anno e primi clienti')
+    elenco = piatto(sub_report.locator('.elenco').inner_text())
+    ok('Il Giardino di Sofia srl' in elenco and 'fatturato 12.000,00 €' in elenco and '960,00 €' in elenco,
+       'primi clienti: nome, fatturato e provvigione')
+    link = sub_report.locator('a', has_text='Analisi completa di Marco Nista')
+    ok(link.count() == 1 and link.get_attribute('href') == '/analisi?dal=2026-07&al=2026-09&subagenti=2',
+       'report del subagente: link ad Analisi con periodo e subagente')
+    pg.screenshot(path=str(USCITA / 'app-liquidazioni-report-1440.png'))
+
     # 768 px: niente scorrimento di lato
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(600)
     ok(not pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth'), '768 px: nessuno scorrimento orizzontale')
@@ -183,10 +218,15 @@ with sync_playwright() as p:
     def ritarda(route):
         time.sleep(0.6); route.continue_()
     pg = entra(S + '-oper', attese=ritarda)
+    pg.route('**/api/liquidazione/report?*', ritarda)
     pg.goto(BASE + '/liquidazioni/2026/3')
     pg.wait_for_selector('.sagoma')
     ok(pg.locator('.sagoma').count() > 0 and pg.locator('.periodi a').count() == 0, 'sagome durante il caricamento')
-    pg.wait_for_selector('.periodi a.attivo'); quieta(pg)
+    pg.wait_for_selector('.periodi a.attivo')
+    schede(pg).nth(1).click()
+    pg.wait_for_selector('.report-sub .sagoma')
+    ok(pg.locator('.report-sub .sagoma').count() > 0, 'sagome anche nella scheda report')
+    pg.wait_for_selector('.report-sub canvas'); quieta(pg)
     ok(pg.locator('.sagoma').count() == 0 and periodi(pg).count() == 4, 'dati arrivati: sagome sparite')
     pg.close()
 
