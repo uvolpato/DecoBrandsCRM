@@ -95,16 +95,28 @@ describe('F3-A3 incassi dei clienti', () => {
   it('PUT /api/documenti/:id/incasso: segna non pagata, compare fra i solleciti, evento', async () => {
     const d = await documento('F-2026-0822');
     expect(d.tipo).toBe('fattura');
+    await db.ordini_fornitore_documenti.update({ where: { id: d.id }, data: { note: 'nota del documento' } });
     await op.put(`/documenti/${d.id}/incasso`, { stato: 'boh' }).expect(400);
     const r = (await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta', nota: 'email di Gasper del 3/9' }).expect(200)).body;
     expect(r.stato_incasso).toBe('insoluta');
     expect(await eventi('stato.change_state', d.id)).toBe(1);
+    // D-62: la nota della segnalazione sta in nota_incasso, quella del documento non si tocca
+    const dopo = await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: d.id } });
+    expect(dopo.nota_incasso).toBe('email di Gasper del 3/9');
+    expect(dopo.note).toBe('nota del documento');
     // ora è fra i pagamenti da sollecitare, nello stato della pratica e nel dettaglio
     const solleciti = (await op.get('/pagamenti/solleciti').expect(200)).body;
     expect(solleciti.voci.map((v: any) => v.numero)).toContain('F-2026-0822');
     expect(solleciti.voci.find((v: any) => v.numero === 'F-2026-0822').stato.stato).toBe('insoluta');
     const pratica = (await op.get(`/pratiche/${d.testata_id}`).expect(200)).body;
-    expect(pratica.incassi.find((x: any) => x.numero === 'F-2026-0822').stato).toMatchObject({ stato: 'insoluta', manuale: true });
+    expect(pratica.incassi.find((x: any) => x.numero === 'F-2026-0822').stato).toMatchObject(
+      { stato: 'insoluta', manuale: true, nota: 'email di Gasper del 3/9' });
+    // un nuovo segno senza nota la sostituisce (la vecchia resta nel registro), il documento non cambia
+    await op.put(`/documenti/${d.id}/incasso`, { stato: 'pagata' }).expect(200);
+    const ancora = await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: d.id } });
+    expect(ancora.nota_incasso).toBeNull();
+    expect(ancora.note).toBe('nota del documento');
+    await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta', nota: 'email di Gasper del 3/9' }).expect(200);
   });
 
   it('PUT /api/documenti/:id/incasso su una nota di credito: 400', async () => {

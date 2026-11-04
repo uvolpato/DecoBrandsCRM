@@ -51,7 +51,7 @@ export const praticaDaDb = (t: Testata) => {
       fattura_id: d.fattura_id ? id(d.fattura_id) : null, // nota di credito → fattura stornata, per id (D-34)
       liquidazione_id: d.liquidazione_id ? id(d.liquidazione_id) : null,
       // segnalazione a mano del fornitore (§5.14): vince sui bollettini se non è più vecchia
-      incasso: d.fonte_incasso === 'manuale' ? { stato: d.stato_incasso, dal: iso((d.stato_incasso === 'insoluta' ? d.insoluta_dal : d.pagata_il) ?? d.data) } : null,
+      incasso: d.fonte_incasso === 'manuale' ? { stato: d.stato_incasso, dal: iso((d.stato_incasso === 'insoluta' ? d.insoluta_dal : d.pagata_il) ?? d.data), nota: d.nota_incasso } : null,
       solleciti: d.solleciti, sollecitata_il: d.sollecitata_il ? iso(d.sollecitata_il) : null,
       correzione: d.correzione ? { tipo: d.correzione.tipo, valore: d.correzione.valore, motivo: d.correzione.motivo } : null,
     })),

@@ -69,14 +69,16 @@ export class IncassiController {
       if (d.tipo !== 'fattura') throw new BadRequestException('Solo le fatture hanno uno stato di incasso');
       const oggi = giornoRoma(new Date());
       const prima = d.stato_incasso;
-      const nota = b.nota !== undefined ? b.nota : d.note;
+      // D-62: la nota della segnalazione ha la sua colonna e si sostituisce a ogni segno, come il prototipo;
+      // quella del documento (note) non si tocca. La storia resta nel registro.
+      const nota = b.nota?.trim() || null;
       await tx.ordini_fornitore_documenti.update({
         where: { id: d.id },
         data: {
           stato_incasso: b.stato, fonte_incasso: 'manuale',
           insoluta_dal: b.stato === 'insoluta' ? new Date(oggi) : null,
           pagata_il: b.stato === 'pagata' ? new Date(oggi) : null,
-          note: nota,
+          nota_incasso: nota,
         },
       });
       await logEvent(tx, {

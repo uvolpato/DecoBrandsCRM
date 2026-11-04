@@ -246,6 +246,7 @@ model ordini_fornitore_documenti {
   insoluta_dal    DateTime? @db.Date
   pagata_il       DateTime? @db.Date
   fonte_incasso   String?   @db.VarChar(20)
+  nota_incasso    String? // segnalazione del fornitore (§5.14), separata dalle note del documento
   sollecitata_il  DateTime? @db.Date
   solleciti       Int       @default(0) @db.SmallInt
   arrivo_id       BigInt? // file nel documento in arrivo

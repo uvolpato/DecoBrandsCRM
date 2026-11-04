@@ -273,15 +273,15 @@ export function statoIncasso(S: Dati, p: Pratica, d: Documento) {
   // maturato pagato = riconosciuto in un bollettino verificato (riconosciutoIn). Il prototipo guarda tutti i bollettini.
   const rb = righeBollettinoDi(S, d, p.fornitore_id);
   const ultimo = rb.filter((x) => x.r.tipo && x.b.stato !== 'da_verificare').pop();
-  let st: { stato: string; dal: string | null; bollettino_id: string | null; manuale: boolean };
+  let st: { stato: string; dal: string | null; bollettino_id: string | null; manuale: boolean; nota: string | null };
   if (f.maturazione === 'maturato') {
     const ric = rb.find((x) => !x.r.tipo && x.b.stato === 'verificato');
-    st = ric ? { stato: 'pagata', dal: aaaamm(ric.b.anno, ric.b.mese) + '-01', bollettino_id: ric.b.id, manuale: false }
-      : { stato: gg > limite ? 'da_verificare' : 'da_incassare', dal: null, bollettino_id: null, manuale: false };
+    st = ric ? { stato: 'pagata', dal: aaaamm(ric.b.anno, ric.b.mese) + '-01', bollettino_id: ric.b.id, manuale: false, nota: null }
+      : { stato: gg > limite ? 'da_verificare' : 'da_incassare', dal: null, bollettino_id: null, manuale: false, nota: null };
   } else if (ultimo) {
-    st = { stato: ultimo.r.tipo === 'storno' ? 'insoluta' : 'pagata', dal: ultimo.b.ricevuto, bollettino_id: ultimo.b.id, manuale: false };
-  } else st = { stato: 'da_incassare', dal: null, bollettino_id: null, manuale: false };
-  if (d.incasso && (!st.dal || d.incasso.dal >= st.dal)) st = { stato: d.incasso.stato, dal: d.incasso.dal, bollettino_id: null, manuale: true };
+    st = { stato: ultimo.r.tipo === 'storno' ? 'insoluta' : 'pagata', dal: ultimo.b.ricevuto, bollettino_id: ultimo.b.id, manuale: false, nota: null };
+  } else st = { stato: 'da_incassare', dal: null, bollettino_id: null, manuale: false, nota: null };
+  if (d.incasso && (!st.dal || d.incasso.dal >= st.dal)) st = { stato: d.incasso.stato, dal: d.incasso.dal, bollettino_id: null, manuale: true, nota: d.incasso.nota ?? null };
   return { ...st, giorni: gg, limite, solleciti: d.solleciti, sollecitata_il: d.sollecitata_il };
 }
 

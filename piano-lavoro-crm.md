@@ -203,6 +203,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 - **DoD:** bollettino unico per `(fornitore, mese, anno)`; differenze = calcolo `F0-A5`; verifica/contestazione genera `calcolo/verify` + `stato/change_state` (§15.2.5).
 - **F3-A3: 4 h fuori preventivo, da approvare** (regole chiarite da Decobrands il 16/10/2026; restano le domande di §5.14).
+- **F3-A3: correzione del 04/11/2026, 1 h da approvare** (D-62): la nota della segnalazione d'incasso ha la sua colonna `nota_incasso` e non sovrascrive più la nota del documento.
 
 ## 8. Fase 4 — Liquidazione (3 h, 2–3 agenti in parallelo)
 
