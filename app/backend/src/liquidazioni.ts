@@ -18,7 +18,9 @@ import { logEvent } from './registro';
 type Db = Prisma.TransactionClient;
 type Foto = ReturnType<typeof fotografiaLiquidazione>;
 type Righe = ReturnType<typeof righeLiquidazione>;
+type Riga = Righe[number] | Foto['documenti'][number];
 const NOMI = ['gennaio–marzo', 'aprile–giugno', 'luglio–settembre', 'ottobre–dicembre'];
+const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 const dataIt = (s: string) => s.split('-').reverse().join('/');
 const Dec = Prisma.Decimal;
 
@@ -54,6 +56,31 @@ function bloccoChiusura(S: Dati, st: { chiave: string }, righe: Righe, a: number
 const chiuseDellAnno = (db: Db, anno: number) =>
   db.liquidazioni.findMany({ where: { anno }, include: { autore: { select: { nome: true } } } });
 
+/** Riga del prospetto con i nomi risolti e le etichette decise qui (V12, §7.8): il browser mostra e basta. */
+function rigaDocumento(S: Dati, r: Riga, chiusa: boolean) {
+  const fornitore = S.fornitori.get(r.fornitore_id)?.nome ?? '';
+  const b = r.bollettino_id ? S.bollettini.find((x) => x.id === r.bollettino_id) : null;
+  const origine = r.origine ?? r.data;
+  const quando = `${dataIt(origine)} (${trimestre(origine)}° trimestre ${origine.slice(0, 4)}${b ? '; bollettino di ' + MESI[b.mese - 1] : ''})`;
+  const motivo_testo = r.voce
+    ? (r.voce === 'storno' ? 'Storno: il cliente non ha pagato' : 'Riaccredito: il cliente ha pagato') + ' la fattura del ' + quando
+    : r.motivo === 'attesa_incasso' ? `In attesa di incasso: ${fornitore} la riconosce quando il cliente paga`
+      : r.motivo === 'bollettino_da_verificare' ? `Il bollettino di ${b ? MESI[b.mese - 1] : ''} di ${fornitore} non è ancora verificato`
+        : r.motivo === 'non_riconosciuta' ? `Non ancora riconosciuto da ${fornitore}` : null;
+  const stato = r.voce === 'storno' ? { etichetta: 'Storno: cliente non pagante', variante: 'errore' }
+    : r.voce === 'riaccredito' ? { etichetta: 'Riaccredito', variante: 'ok' }
+      : r.liquidabile ? { etichetta: chiusa ? 'Liquidata' : 'Liquidabile', variante: 'ok' }
+        : r.incasso ? { etichetta: 'Attesa incasso', variante: 'neutro' }
+          : { etichetta: 'In attesa', variante: 'attesa' };
+  return {
+    documento_id: r.documento_id, numero: r.numero, tipo: r.tipo, data: r.data, origine: r.origine, pratica_id: r.pratica_id,
+    cliente_id: r.cliente_id, cliente: S.clienti.get(r.cliente_id)?.nome ?? '', codice_cliente: r.codice_cliente,
+    fornitore_id: r.fornitore_id, fornitore, subagente_id: r.subagente_id, subagente: S.subagenti.get(r.subagente_id)?.nome ?? '',
+    imponibile: Number(r.importo), pct: Number(r.pct), provvigione: Number(r.provvigione),
+    liquidabile: r.liquidabile, incasso: r.incasso, voce: r.voce, motivo: r.motivo, motivo_testo, bollettino_id: r.bollettino_id, stato,
+  };
+}
+
 /** Pagina della liquidazione di un trimestre; esportata per le prove. */
 export async function liquidazione(db: Db, a: number, t: number, oggi?: string) {
   const [S, chiuse] = await Promise.all([caricaDati(db, oggi), chiuseDellAnno(db, a)]);
@@ -67,8 +94,11 @@ export async function liquidazione(db: Db, a: number, t: number, oggi?: string) 
     return { trimestre: q, nome: NOMI[q - 1], da: lim.da, a: lim.a, ...st, totale: st.chiave === 'futura' ? null : Number(foto(q).totale.provvigione) };
   });
   const st = trimestri[t - 1], l = chiusa(t);
-  if (st.chiave === 'futura') return { anno: a, trimestre: t, stato: st, trimestri, subagenti: [], senza_documenti: S.subagenti.size, riepilogo: null, chiusura: { possibile: false, motivo: 'Il trimestre non è iniziato' }, chiusa_il: null, chiusa_da: null };
+  if (st.chiave === 'futura') return { anno: a, trimestre: t, stato: st, trimestri, subagenti: [], senza_documenti: S.subagenti.size, riepilogo: null, chiusura: { possibile: false, motivo: 'Il trimestre non è iniziato' }, chiusa_il: null, chiusa_da: null, documenti: [] };
   const f = foto(t);
+  // chiuso: le righe salvate con la fotografia (non si ricalcola, §4.2.19); aperto: quelle del motore
+  // shortcut: le fotografie salvate prima di F4-A1 non hanno le righe, si ricalcolano finché non si rigenera il seed
+  const documenti = (l ? (f.documenti ?? righe(t)) : righe(t)).map((r) => rigaDocumento(S, r, st.chiave === 'chiusa'));
   const subagenti = f.subagenti.map((s) => ({
     id: s.subagente_id, nome: s.nome, attivo: S.subagenti.get(s.subagente_id)?.attivo ?? true, documenti: s.documenti, liquidabili: s.liquidabili,
     imponibile: Number(s.imponibile), provvigione: Number(s.provvigione), in_attesa: Number(s.in_attesa), storni: s.storni,
@@ -85,6 +115,7 @@ export async function liquidazione(db: Db, a: number, t: number, oggi?: string) 
     },
     chiusura: { possibile: !motivo, motivo },
     chiusa_il: l ? giornoRoma(l.chiusa_il) : null, chiusa_da: l?.autore?.nome ?? null,
+    documenti,
   };
 }
 

@@ -386,13 +386,15 @@ export function riepilogoLiquidazione(S: Dati, righe: RigaLiquidazione[]) {
   }).sort((x, y) => x.nome.localeCompare(y.nome));
 }
 
-/** Fotografia del prospetto alla chiusura (liquidazioni.totali, §4.2.19, D-33): importi come testo, niente virgola mobile. */
+/** Fotografia del prospetto alla chiusura (liquidazioni.totali, §4.2.19, D-33): importi come testo, niente virgola mobile.
+ *  Le righe dei documenti restano quelle pagate: il trimestre chiuso si rilegge uguale anche se i dati cambiano dopo. */
 export function fotografiaLiquidazione(S: Dati, righe: RigaLiquidazione[]) {
   const sub = riepilogoLiquidazione(S, righe);
   const testo = (x: Dec) => x.toFixed(2);
   return {
     subagenti: sub.map((s) => ({ ...s, imponibile: testo(s.imponibile), provvigione: testo(s.provvigione), in_attesa: testo(s.in_attesa) })),
     totale: { documenti: sub.reduce((n, s) => n + s.liquidabili, 0), imponibile: testo(r2(somma(sub.map((s) => s.imponibile)))), provvigione: testo(r2(somma(sub.map((s) => s.provvigione)))) },
+    documenti: righe.map((r) => ({ ...r, importo: testo(r.importo), provvigione: testo(r.provvigione), pct: Number(r.pct) })),
   };
 }
 

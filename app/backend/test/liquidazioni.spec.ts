@@ -45,6 +45,7 @@ let resp: Awaited<ReturnType<typeof entra>>, op: Awaited<ReturnType<typeof entra
 const fornitore = async (nome: string) => (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: nome } } })).fornitore_id;
 const pagina = async (a: number, t: number) => (await resp.get(`/liquidazioni?anno=${a}&trimestre=${t}`).expect(200)).body;
 const SENZA_PAGINA = (b: any) => ({ ...b, trimestri: b.trimestri.map((q: any) => ({ ...q, etichetta: undefined })) });
+const dataIt = (s: string) => s.split('-').reverse().join('/');
 
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -90,6 +91,37 @@ describe('GET /api/liquidazioni', () => {
       expect(b.senza_documenti).toBe(M.S.subagenti.length - attesi.length);
       expect(b.riepilogo.bloccanti).toBe(loro.filter((r: any) => !r.liquidabile && !r.incasso).length);
       expect(b.trimestri[t - 1].totale).toBe(b.riepilogo.provvigione);
+      // i documenti del trimestre: stessi numeri del prototipo, nomi risolti e stato deciso dal server (V12)
+      expect(b.documenti.map((x: any) => [x.numero, x.tipo, x.data, x.cliente, x.fornitore, x.subagente, x.codice_cliente, x.imponibile, x.pct, x.provvigione, x.liquidabile, x.incasso, x.voce]))
+        .toEqual(loro.map((r: any) => [r.doc.numero, r.doc.tipo, r.doc.data, M.nomeCliente(r.cliente), r.fornitore.nome, M.subagente(r.subagente_id).nome, r.codice_cliente, r.importo, r.pct, r.provvigione, r.liquidabile, r.incasso, r.voce ?? null]));
+      for (const x of b.documenti) {
+        if (x.voce) continue; // storni e riaccrediti hanno l'etichetta della voce (prova sotto)
+        expect(x.stato.etichetta).toBe(x.liquidabile ? 'Liquidabile' : x.incasso ? 'Attesa incasso' : 'In attesa');
+        expect(!!x.motivo_testo).toBe(!x.liquidabile);
+      }
+    }
+  });
+
+  it('storno e riaccredito: voce con segno, fattura d’origine e trimestre (D-11)', async () => {
+    // caso costruito: il bollettino di agosto di Gasper (che contiene lo storno) viene chiuso; poi torna com'era
+    const gasper = await fornitore('Gasper');
+    const dove = { fornitore_id: gasper, anno: 2026, mese: 8 };
+    const b0 = await db.bollettini_testata.findFirstOrThrow({ where: dove, include: { righe: true } });
+    const riga = b0.righe.find((r) => r.tipo_riga === 'storno')!;
+    const ugo = (await db.utenti.findFirstOrThrow({ where: { username: 'ugo' } })).id;
+    await db.bollettini_testata.updateMany({ where: dove, data: { stato: 'verificato', chiuso_il: new Date('2026-09-10T10:00:00Z'), chiuso_da: ugo } });
+    try {
+      const voce = (await pagina(2026, 3)).documenti.find((x: any) => x.voce === 'storno');
+      expect(voce).toMatchObject({ stato: { etichetta: 'Storno: cliente non pagante', variante: 'errore' }, voce: 'storno' });
+      expect(voce.provvigione).toBeLessThan(0);
+      expect(voce.motivo_testo).toBe(`Storno: il cliente non ha pagato la fattura del ${dataIt(voce.origine)} (2° trimestre 2026; bollettino di agosto)`);
+      await db.bollettini_righe.update({ where: { id: riga.id }, data: { tipo_riga: 'riaccredito' } });
+      const riaccredito = (await pagina(2026, 3)).documenti.find((x: any) => x.voce === 'riaccredito');
+      expect(riaccredito).toMatchObject({ stato: { etichetta: 'Riaccredito', variante: 'ok' }, voce: 'riaccredito' });
+      expect(riaccredito.provvigione).toBeGreaterThan(0);
+    } finally {
+      await db.bollettini_righe.update({ where: { id: riga.id }, data: { tipo_riga: 'storno' } });
+      await db.bollettini_testata.updateMany({ where: dove, data: { stato: 'da_verificare', chiuso_il: null, chiuso_da: null } });
     }
   });
 
@@ -100,6 +132,11 @@ describe('GET /api/liquidazioni', () => {
     expect(b.stato.chiave).toBe('chiusa');
     expect(b.subagenti.map((s: any) => [s.id, s.provvigione, s.in_attesa])).toEqual(f.subagenti.map((s: any) => [s.subagente_id, Number(s.provvigione), Number(s.in_attesa)]));
     expect(b.riepilogo.provvigione).toBe(Number(f.totale.provvigione));
+    // le righe vengono dalla fotografia: stessi documenti e stessi importi della chiusura
+    expect(f.documenti.length).toBeGreaterThan(0);
+    expect(b.documenti.map((x: any) => [x.documento_id, x.numero, x.imponibile, x.provvigione, x.stato.etichetta]))
+      .toEqual(f.documenti.map((r: any) => [r.documento_id, r.numero, Number(r.importo), Number(r.provvigione),
+        r.voce ? (r.voce === 'storno' ? 'Storno: cliente non pagante' : 'Riaccredito') : r.liquidabile ? 'Liquidata' : r.incasso ? 'Attesa incasso' : 'In attesa']));
     expect(b).toMatchObject({ chiusura: { possibile: false, motivo: 'Trimestre già liquidato' }, chiusa_il: giornoRoma(liq.chiusa_il), chiusa_da: liq.autore!.nome });
   });
 

@@ -87,7 +87,25 @@ export function VistaAnalisi() {
     return p;
   };
 
+  // Arrivando dalla Liquidazione con *Analisi completa* i parametri stanno nell'indirizzo (F4-A1, §7.8):
+  // si applicano prima della prima richiesta, e l'indirizzo torna pulito così ricaricare non li riapplica.
+  const [pronto, setPronto] = useState(false);
   useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const da = p.get('dal'), a = p.get('al');
+    const q = (k: string) => (p.get(k) ?? '').split(',').filter(Boolean);
+    if (da && a) setPeriodo({ da, a });
+    // col link arrivano solo i filtri del pulsante: gli altri si tolgono
+    if (p.toString()) {
+      setValori({ fornitori: q('fornitori'), subagenti: q('subagenti'), clienti: q('clienti') });
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    setPronto(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta sola all'apertura
+  }, []);
+
+  useEffect(() => {
+    if (!pronto) return;
     let vivo = true;
     setCaricando(true);
     const p = parametri();

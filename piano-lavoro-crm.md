@@ -218,6 +218,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **F4-A6: 4 h fuori preventivo, da approvare** (filtri standard 2 h, aggiornamento dal vivo dei numeri 2 h).
 - **F4-A4 + F4-A5: 13 h fuori preventivo, da approvare** (sostituiscono le 3 h della sintesi, D-17 → D-18). Ripartizione F4-A5: dati e API 3 h, pagina con filtri e grafici 4 h, selezione multipla nel componente di ricerca (campo e maschera) 1 h, esportazione con grafici 3 h (i grafici come immagine e il PDF si chiudono con F4-A3).
 - **DoD:** solo pratiche `fatturate` del trimestre del subagente; KPI = somma righe; export = 8 campi §11; evento `export/export` solo al download.
+- **F4-A1: fatta il 04/11/2026** (pagina `/liquidazioni/:anno/:trimestre`, riquadri, subagenti, scheda *Documenti* con contatore, chiusura e fotografia; `documenti` nel `GET /api/liquidazioni`). La scheda *Documenti* prevista da **F4-A2** è compresa: F4-A2 è chiusa con F4-A1. La correzione della quota del subagente (D-27) resta in **F1-A6**.
 
 ## 9. Fase 5 — Dashboard + registro (2 h, 2 agenti in parallelo)
 
