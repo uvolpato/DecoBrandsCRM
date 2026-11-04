@@ -1,6 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { Aggiornamenti } from '@/componenti/Aggiornamenti';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Pagina, Pannello } from '@/componenti/Pagina';
@@ -8,6 +9,7 @@ import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
 import { useSagome } from '@/componenti/Sagoma';
 import { api } from '@/lib/api';
 import { cliente, fornitore, subagente } from '@/lib/entita';
+import { useEventi } from '@/lib/eventi';
 import { euro, euroSegno } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
 
@@ -60,34 +62,65 @@ export function VistaPratiche() {
   const [ordine, setOrdine] = useMemoria<{ key: string; dir: 'asc' | 'desc' }>('ordine', { key: 'stato', dir: 'asc' });
   const [pagina, setPagina] = useMemoria<number>('pagina', 0);
   const [dati, setDati] = useState<Risposta | null>(null);
+  const [inAttesa, setInAttesa] = useState<Risposta | null>(null);
   const [errore, setErrore] = useState('');
   const [caricando, setCaricando] = useState(true);
   const sagome = useSagome(caricando);
   const primaVolta = useRef(true);
+  const eventi = useEventi();
+  // anche i documenti: una fattura o un ordine cambia stato e importi della pratica senza un evento suo
+  const vEventi = (eventi.pratiche ?? 0) + (eventi.documenti ?? 0);
+  const vVista = useRef(vEventi);
+
+  const parametri = () => {
+    const p = new URLSearchParams();
+    p.set('stato', String(valori.stato ?? 'tutte'));
+    if (valori.q) p.set('q', String(valori.q));
+    for (const nome of ['fornitori', 'clienti', 'subagenti']) {
+      const scelte = (valori[nome] as string[] | undefined) ?? [];
+      if (scelte.length) p.set(nome, scelte.join(','));
+    }
+    p.set('ordina', ordine.key);
+    p.set('dir', ordine.dir);
+    p.set('pagina', String(pagina));
+    return p;
+  };
 
   useEffect(() => {
     let vivo = true;
     setCaricando(true);
     const t = setTimeout(() => {
-      const p = new URLSearchParams();
-      p.set('stato', String(valori.stato ?? 'tutte'));
-      if (valori.q) p.set('q', String(valori.q));
-      for (const nome of ['fornitori', 'clienti', 'subagenti']) {
-        const scelte = (valori[nome] as string[] | undefined) ?? [];
-        if (scelte.length) p.set(nome, scelte.join(','));
-      }
-      p.set('ordina', ordine.key);
-      p.set('dir', ordine.dir);
-      p.set('pagina', String(pagina));
-      void api<Risposta>('pratiche?' + p.toString()).then((r) => {
+      void api<Risposta>('pratiche?' + parametri().toString()).then((r) => {
         if (!vivo) return;
         setCaricando(false);
-        if (r.ok) { setDati(r.dati); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
+        if (r.ok) { setDati(r.dati); setInAttesa(null); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
       });
     }, primaVolta.current ? 0 : 250);
     primaVolta.current = false;
     return () => { vivo = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- i parametri sono valori (valori, ordine, pagina)
   }, [valori, ordine, pagina]);
+
+  // aggiornamenti dal server (F4-A6, D-23): contatori subito, righe ferme; se sono cambiate compare la barra
+  useEffect(() => {
+    if (vEventi === vVista.current) return;
+    vVista.current = vEventi;
+    if (!dati) return;
+    let vivo = true;
+    void api<Risposta>('pratiche?' + parametri().toString()).then((r) => {
+      if (!vivo || !r.ok) return;
+      setDati((d) => (d ? { ...d, conteggi: r.dati.conteggi, totali: r.dati.totali } : d));
+      setInAttesa(JSON.stringify(dati.righe) === JSON.stringify(r.dati.righe) ? null : r.dati);
+    });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo all'evento, con i filtri di adesso
+  }, [vEventi]);
+
+  const applica = () => {
+    if (!inAttesa) return;
+    setDati(inAttesa);
+    setInAttesa(null);
+  };
 
   const colonne: Colonna<Pratica>[] = [
     { key: 'numero', header: 'Pratica', cell: (p) => <b>{p.numero}</b> },
@@ -119,6 +152,7 @@ export function VistaPratiche() {
           { nome: 'clienti', tipo: 'ricerca', entita: cliente, multipla: true, etichetta: 'Cliente', placeholder: 'Tutti i clienti' },
           { nome: 'subagenti', tipo: 'ricerca', entita: subagente, multipla: true, etichetta: 'Subagente', placeholder: 'Tutti i subagenti' },
         ]} />
+        {inAttesa && <Aggiornamenti onAggiorna={applica} />}
         <div className="riempi">
           {errore && !dati
             ? <Pannello><div className="vuoto"><b>Pratiche non caricate</b>{errore}</div></Pannello>

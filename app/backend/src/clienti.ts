@@ -153,6 +153,7 @@ export class ClientiController {
       id: String(p.id),
       numero_ordine: p.numero_ordine,
       data_ordine: iso(p.data_ordine)!,
+      fornitore_id: String(p.fornitore_id),
       fornitore: p.fornitore?.ragione_sociale ?? null,
       importo_merce: p.importo_merce === null ? null : Number(p.importo_merce),
       stato: p.stato,

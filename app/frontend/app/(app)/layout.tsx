@@ -6,6 +6,7 @@ import { ClasseBody } from '@/componenti/ClasseBody';
 import { Riservata } from '@/componenti/Pagina';
 import { UtenteCtx } from '@/componenti/Utente';
 import { api, type Io } from '@/lib/api';
+import { EventiProvider } from '@/lib/eventi';
 
 // Guscio dell'app (passo 1.11): chiede al server chi è l'utente (D-38) a ogni cambio pagina;
 // senza sessione porta all'accesso e poi torna qui; con la password provvisoria solo il cambio.
@@ -35,12 +36,14 @@ export default function Guscio({ children }: { children: ReactNode }) {
   const solaLettura = !!voce?.area && io.aree[voce.area] === 'lettura';
   return (
     <UtenteCtx.Provider value={io}>
-      {/* stile.css: body.sola-lettura mostra la fascia e spegne i pulsanti che modificano (§8.3) */}
-      {solaLettura && <ClasseBody classe="sola-lettura" />}
-      <Barra />
-      <main className="principale" id="principale">
-        {voce?.permesso ? <Riservata permesso={voce.permesso} titolo={voce.t}>{children}</Riservata> : children}
-      </main>
+      <EventiProvider>
+        {/* stile.css: body.sola-lettura mostra la fascia e spegne i pulsanti che modificano (§8.3) */}
+        {solaLettura && <ClasseBody classe="sola-lettura" />}
+        <Barra />
+        <main className="principale" id="principale">
+          {voce?.permesso ? <Riservata permesso={voce.permesso} titolo={voce.t}>{children}</Riservata> : children}
+        </main>
+      </EventiProvider>
     </UtenteCtx.Provider>
   );
 }

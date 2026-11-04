@@ -48,7 +48,7 @@ with sync_playwright() as p:
         pg.click('button:has-text("Carica un bollettino")')
         pg.wait_for_selector('.velo form#carica-bollettino')
         pg.locator('.velo .ricerca .ricerca-testo').first.fill(fornitore)
-        pg.wait_for_timeout(400)
+        pg.wait_for_timeout(700)
         pg.locator('.velo .ricerca .ricerca-testo').first.press('Enter')
         pg.wait_for_timeout(200)
         pg.select_option('#c-mese', str(mese)); pg.select_option('#c-anno', str(anno))

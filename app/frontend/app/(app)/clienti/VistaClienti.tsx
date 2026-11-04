@@ -48,6 +48,7 @@ interface Pratica {
   id: string;
   numero_ordine: string;
   data_ordine: string;
+  fornitore_id: string;
   fornitore: string | null;
   importo_merce: number | null;
   stato: string;
@@ -92,6 +93,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   const [subagenti, setSubagenti] = useState<Subagente[]>([]);
   const [valori, setValori] = useMemoria<Valori>('filtri', { vista: 'tutti', q: '', fornitori: [], subagenti: [] });
   const [valoriAg, setValoriAg] = useMemoria<Valori>('filtri-agenzie', { fornitori: [], subagenti: [] });
+  const [valoriPr, setValoriPr] = useMemoria<Valori>('filtri-pratiche', { vista: 'aperte', fornitori: [], q: '' });
   const scaglioni = useRef<Record<string, Scaglione[]>>({});
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [errore, setErrore] = useState('');
@@ -265,11 +267,22 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
 
   const colonnePratiche: Colonna<Pratica>[] = [
     { key: 'numero_ordine', header: 'Pratica', cell: (p) => p.numero_ordine },
-    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (p) => p.fornitore ?? '—' },
+    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (p) => p.fornitore ?? '-' },
     { key: 'data_ordine', header: 'Data', cell: (p) => quando(p.data_ordine) },
-    { key: 'importo_merce', header: 'Importo', align: 'right', cell: (p) => (p.importo_merce === null ? '—' : p.importo_merce) },
+    { key: 'importo_merce', header: 'Importo', align: 'right', cell: (p) => (p.importo_merce === null ? '-' : p.importo_merce) },
     { key: 'stato', header: 'Stato', cell: (p) => p.stato },
   ];
+
+  // filtri standard della scheda Pratiche (D-22): i conteggi dei segmenti valgono con gli altri filtri
+  const praticheFiltrate = useMemo(() => {
+    const tutte = pratiche ?? [];
+    const q = String(valoriPr.q ?? '').trim().toLowerCase();
+    const scelti = (valoriPr.fornitori as string[] | undefined) ?? [];
+    const base = tutte.filter((p) => (!scelti.length || scelti.includes(p.fornitore_id)) && (!q || p.numero_ordine.toLowerCase().includes(q)));
+    const dentro = (p: Pratica, v: string) => (v === 'aperte' ? p.stato !== 'fatturata' : v === 'ritardo' ? p.stato === 'scaduta' : v === 'fatturate' ? p.stato === 'fatturata' : true);
+    const conteggi = Object.fromEntries(['aperte', 'ritardo', 'fatturate', 'tutte'].map((v) => [v, base.filter((p) => dentro(p, v)).length]));
+    return { righe: base.filter((p) => dentro(p, String(valoriPr.vista ?? 'aperte'))), conteggi, fornitori: [...new Set(tutte.map((p) => p.fornitore_id))] };
+  }, [pratiche, valoriPr]);
 
   const pagina = (corpo?: ReactNode) => (
     <Pagina titolo="Clienti" pieno azioni={[]} sottotitolo="Anagrafica da Integra (sola lettura). Qui si gestiscono le agenzie (interscambio) del cliente.">
@@ -343,8 +356,23 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
               },
               {
                 id: 'pratiche', etichetta: 'Pratiche', contenuto: () => (
-                  <div className="riempi">
-                    <DataTable righe={pratiche ?? []} colonne={colonnePratiche} chiave={(p) => p.id} caricando={!pratiche} emptyText="Nessuna pratica" memoria="clienti-pratiche" />
+                  <div className="pila riempi">
+                    <FilterBar valori={valoriPr} onChange={setValoriPr} riepilogo caricando={!pratiche} campi={[
+                      {
+                        nome: 'vista', tipo: 'segmenti', etichetta: 'Stato', opzioni: [
+                          { value: 'aperte', label: 'Aperte', n: praticheFiltrate.conteggi.aperte },
+                          { value: 'ritardo', label: 'In ritardo', n: praticheFiltrate.conteggi.ritardo },
+                          { value: 'fatturate', label: 'Fatturate', n: praticheFiltrate.conteggi.fatturate },
+                          { value: 'tutte', label: 'Tutte', n: praticheFiltrate.conteggi.tutte },
+                        ],
+                      },
+                      { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, etichetta: 'Fornitore', placeholder: 'Tutti i fornitori', contesto: { limita: praticheFiltrate.fornitori } },
+                      { nome: 'q', tipo: 'cerca', etichetta: 'Numero', placeholder: 'Numero' },
+                    ]} />
+                    <div className="riempi">
+                      <DataTable righe={praticheFiltrate.righe} colonne={colonnePratiche} chiave={(p) => p.id} caricando={!pratiche}
+                        filtro={JSON.stringify(valoriPr)} memoria="clienti-pratiche" emptyText="Nessuna pratica" emptyHint="Prova a togliere il filtro." />
+                    </div>
                   </div>
                 ),
               },

@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Aggiornamenti } from '@/componenti/Aggiornamenti';
 import { Campo } from '@/componenti/Campo';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Caricamento, Matrice } from '@/componenti/Flussi';
@@ -11,6 +12,7 @@ import { Sagoma, SagomaMatrice, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
 import { fornitore } from '@/lib/entita';
+import { useEventi } from '@/lib/eventi';
 import { data, euro } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
 
@@ -41,30 +43,62 @@ export function VistaBollettini() {
   const [valori, setValori] = useMemoria<Valori>('filtri', { fornitori: [], vista: 'tutti' });
   const [periodo, setPeriodo] = useMemoria<{ da: string; a: string }>('periodo', { da: '', a: '' });
   const [dati, setDati] = useState<Risposta | null>(null);
+  const [inAttesa, setInAttesa] = useState<Risposta | null>(null);
   const [errore, setErrore] = useState('');
   const [carica, setCarica] = useState(false);
   const [versione, setVersione] = useState(0);
   const [caricando, setCaricando] = useState(true);
   const sagome = useSagome(caricando);
+  const eventi = useEventi();
+  // anche i documenti: una fattura nuova cambia le celle "atteso" / "nessuna fattura"
+  const vEventi = (eventi.bollettini ?? 0) + (eventi.documenti ?? 0);
+  const vVista = useRef(vEventi);
 
-  useEffect(() => {
-    let vivo = true;
-    setCaricando(true);
+  const parametri = () => {
     const p = new URLSearchParams();
     if (periodo.a) p.set('al', periodo.a);
     const scelte = (valori.fornitori as string[] | undefined) ?? [];
     if (scelte.length) p.set('fornitori', scelte.join(','));
     p.set('vista', String(valori.vista ?? 'tutti'));
-    void api<Risposta>('bollettini?' + p.toString()).then((r) => {
+    return p;
+  };
+
+  useEffect(() => {
+    let vivo = true;
+    setCaricando(true);
+    void api<Risposta>('bollettini?' + parametri().toString()).then((r) => {
       if (!vivo) return;
       setCaricando(false);
       if (r.ok) {
         setDati(r.dati);
+        setInAttesa(null);
         setErrore('');
       } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
     });
     return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- i parametri sono valori (valori, periodo, versione)
   }, [valori, periodo, versione]);
+
+  // aggiornamenti dal server (F4-A6, D-23): contatori subito, matrice ferma; se è cambiata compare la barra
+  useEffect(() => {
+    if (vEventi === vVista.current) return;
+    vVista.current = vEventi;
+    if (!dati) return;
+    let vivo = true;
+    void api<Risposta>('bollettini?' + parametri().toString()).then((r) => {
+      if (!vivo || !r.ok) return;
+      setDati((d) => (d ? { ...d, conteggi: r.dati.conteggi } : d));
+      setInAttesa(JSON.stringify(dati.fornitori) === JSON.stringify(r.dati.fornitori) ? null : r.dati);
+    });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo all'evento, con i filtri di adesso
+  }, [vEventi]);
+
+  const applica = () => {
+    if (!inAttesa) return;
+    setDati(inAttesa);
+    setInAttesa(null);
+  };
 
   const da = periodo.da || dati?.da || '';
   const a = periodo.a || dati?.al || '';
@@ -103,6 +137,8 @@ export function VistaBollettini() {
             },
           ]} />
         </div>
+
+        {inAttesa && <Aggiornamenti onAggiorna={applica} />}
 
         {errore && !dati ? <Pannello><div className="vuoto"><b>Bollettini non caricati</b>{errore}</div></Pannello>
           : !dati ? (sagome ? <SagomaMatrice righe={6} colonne={6} /> : null)
