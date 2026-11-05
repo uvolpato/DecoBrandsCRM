@@ -248,3 +248,18 @@ describe('GET /api/pratiche/:id', () => {
     await senzaPermesso.get(`/pratiche/${elenco.righe[0].id}`).expect(403);
   });
 });
+
+describe('GET /api/pratiche/cerca (D-60: il campo di ricerca dello Sposta)', () => {
+  it('solo le pratiche del fornitore, con numero, cliente, data e stato', async () => {
+    const f = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
+    const b = (await resp.get(`/pratiche/cerca?fornitore_id=${f}`).expect(200)).body as { id: string; numero: string; cliente: string; data: string; stato: string }[];
+    const attese = M.S.pratiche.filter((p: any) => String(p.fornitore_id) === String(f));
+    expect(b.map((x) => x.numero).sort()).toEqual(attese.map((p: any) => p.numero).sort());
+    expect(b.every((x) => x.cliente !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(x.data) && ['attesa', 'confermata', 'fatturata'].includes(x.stato))).toBe(true);
+  });
+
+  it('senza fornitore_id: 400; senza l\'area Provvigioni: 403', async () => {
+    await resp.get('/pratiche/cerca').expect(400);
+    await senzaPermesso.get('/pratiche/cerca?fornitore_id=1').expect(403);
+  });
+});

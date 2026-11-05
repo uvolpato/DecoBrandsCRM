@@ -21,6 +21,9 @@ app/
    `CREATE DATABASE decobrands_test OWNER decobrands;` e poi, in Git Bash,
    `DATABASE_URL=$(grep '^DATABASE_URL' .env | cut -d= -f2- | sed 's#/decobrands_db#/decobrands_test#') npx prisma migrate deploy`
    (da rifare a ogni migrazione nuova).
+   Nel `.env` metti anche `DOCUMENTI_DIR` su una cartella locale (es.
+   `C:/Progetti/Decobrands_CRM/app/documenti`, che non va nel repository): senza, ogni
+   caricamento di documento risponde 500.
 2. In `frontend/`: `npm install`.
 3. Il primo utente: `npm run build && npm run superutente -- <nome utente> <email> "<nome>"`.
 4. `avvia.bat` apre backend (8002) e frontend (8001): http://localhost:8001

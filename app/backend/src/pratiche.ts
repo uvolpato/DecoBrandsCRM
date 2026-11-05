@@ -35,6 +35,11 @@ class FiltroPratiche {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) perPagina?: number;
 }
 
+/** Campo di ricerca delle pratiche per fornitore (D-60, §7.3: lo *Sposta*). */
+class CercaPratiche {
+  @Type(() => Number) @IsInt() @Min(1) fornitore_id!: number;
+}
+
 const idElenco = (s: string | undefined) => (s ? s.split(',').map((x) => BigInt(x)) : []);
 
 // la colonna `stato` tiene la fase con i nomi di §4.2.7; l'elenco usa quelli del motore
@@ -165,6 +170,25 @@ export class PraticheController {
       pagine,
       per_pagina: perPagina,
     };
+  }
+
+  /** Pratiche di un fornitore per il campo di ricerca (D-60, §7.3: lo *Sposta*), con i soli dati
+   *  che il menu mostra. Il filtro per numero o cliente lo fa il campo; qui conta il fornitore.
+   *  shortcut: tutte le pratiche del fornitore in una volta, con migliaia per fornitore serve una
+   *  ricerca a testo sul server. */
+  @Get('cerca')
+  @Richiede('provvigioni.consulta')
+  async cerca(@Query() q: CercaPratiche) {
+    const righe = await this.db.$queryRaw<{ id: bigint; numero: string; cliente: string; data: string; stato: string }[]>`
+      SELECT t.id, t.numero_ordine AS numero, coalesce(cv.ragione_sociale, '') AS cliente,
+             to_char(t.data_ordine, 'YYYY-MM-DD') AS data,
+             CASE t.stato WHEN 'fatturato' THEN 'fatturata' WHEN 'confermato' THEN 'confermata' ELSE 'attesa' END AS stato
+      FROM ordini_fornitore_testata t
+      JOIN clienti c ON c.id = t.cliente_id
+      LEFT JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
+      WHERE t.fornitore_id = ${BigInt(q.fornitore_id)}
+      ORDER BY t.data_ordine DESC, t.id DESC`;
+    return righe.map((r) => ({ id: String(r.id), numero: r.numero, cliente: r.cliente, data: r.data, stato: r.stato }));
   }
 
   /** Dettaglio della pratica (§7.3, §8.1): testata, stato, binario delle fasi, righe a confronto,

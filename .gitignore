@@ -5,6 +5,7 @@ image.png
 Claude outputs/
 # documenti reali dei fornitori: non vanno nel repository
 documenti veri/
+app/documenti/
 # grafo di graphify: locale, si ricostruisce con `graphify update .`
 graphify-out/
 __pycache__/

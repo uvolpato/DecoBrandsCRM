@@ -278,8 +278,10 @@ with sync_playwright() as p:
     # la fattura spostata si annulla dalla pratica di arrivo (pulizia del giro di prova)
     cerca_e_apri(pg, 'OF/2026/041')
     pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='PROVA-FT-' + marca).locator('button:has-text("Annulla")').click()
-    pg.wait_for_selector('.velo'); pg.click('.modale-piede button.pericolo'); pg.wait_for_timeout(1800)
-    ok(pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='PROVA-FT-' + marca).count() == 0, 'annullata la fattura spostata')
+    pg.wait_for_selector('.velo'); pg.click('.modale-piede button.pericolo')
+    riga_ann = pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='PROVA-FT-' + marca)
+    riga_ann.wait_for(state='detached', timeout=20000)
+    ok(riga_ann.count() == 0, 'annullata la fattura spostata')
 
     # pulizia: i documenti creati dal giro di prova si tolgono dalle pratiche (stesse regole dell’annullamento)
     tolti = pg.evaluate("""async () => {

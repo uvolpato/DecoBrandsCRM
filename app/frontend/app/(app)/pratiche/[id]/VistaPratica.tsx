@@ -62,13 +62,12 @@ interface Fiscali {
 }
 
 // D-60 §19: le pratiche dello stesso fornitore fra cui spostare un documento. Servono al campo di
-// ricerca della finestra Sposta, a selezione singola come nel prototipo.
+// ricerca della finestra Sposta, a selezione singola come nel prototipo; le cerca il server.
 const PRATICA: Entita = {
   titolo: 'Pratica',
-  // shortcut: le prime 200 pratiche del fornitore (l'elenco non ha una ricerca per il campo), basta finché un fornitore non ne ha di più
   voci: async (ctx) => {
-    const r = await api<{ righe: Record<string, unknown>[] }>('pratiche?fornitori=' + String(ctx.fornitore_id ?? '') + '&perPagina=200&ordina=data&dir=desc');
-    return r.ok ? r.dati.righe : [];
+    const r = await api<Record<string, unknown>[]>('pratiche/cerca?fornitore_id=' + String(ctx.fornitore_id ?? ''));
+    return r.ok ? r.dati : [];
   },
   chiave: (p) => p.id,
   testo: (p) => p.numero,
