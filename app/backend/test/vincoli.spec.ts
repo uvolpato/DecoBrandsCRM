@@ -274,11 +274,12 @@ describe('utenti, sessioni, registro (D-30, D-31, D-33)', () => {
   });
 
   it('eventi immutabili, salvo la pulizia', async () => {
-    await q(`INSERT INTO registro (id, genere, codice, utente_id) VALUES (1, 'evento', 'prova', 1)`);
-    expect(await errore(`UPDATE registro SET codice = 'altro' WHERE id = 1`)).not.toBe('');
-    expect(await errore(`DELETE FROM registro WHERE id = 1`)).not.toBe('');
+    // id dal database: un evento rimasto da un giro interrotto non fa fallire la prova
+    const { rows: [ev] } = await q(`INSERT INTO registro (genere, codice, utente_id) VALUES ('evento', 'prova', 1) RETURNING id`);
+    expect(await errore(`UPDATE registro SET codice = 'altro' WHERE id = ${ev.id}`)).not.toBe('');
+    expect(await errore(`DELETE FROM registro WHERE id = ${ev.id}`)).not.toBe('');
     await q(`SET LOCAL decobrands.pulizia_registro = 'si'`);
-    expect(await errore(`DELETE FROM registro WHERE id = 1`)).toBe('');
+    expect(await errore(`DELETE FROM registro WHERE id = ${ev.id}`)).toBe('');
   });
 
   it('una sola anomalia aperta per causa', async () => {
