@@ -116,8 +116,8 @@ export function VistaAnalisi() {
       if (r.ok) { setDati(r.dati); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
     });
     return () => { vivo = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- i parametri sono valori (valori, periodo, raggruppa)
-  }, [valori, periodo, raggruppa]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- i parametri sono valori (valori, periodo, raggruppa); `pronto` fa partire la prima richiesta
+  }, [pronto, valori, periodo, raggruppa]);
 
   const mesi = dati?.periodo.mesi ?? 12;
   const scelteDi = (d: Dimensione) => (valori[d] as string[] | undefined) ?? [];
