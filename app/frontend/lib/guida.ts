@@ -175,6 +175,9 @@ export const GUIDA: Argomento[] = [
       ['Solo righe che cambiano · Tutte le righe', 'Nella scheda Righe: filtra il confronto.'],
       ['Registra fattura · Nota di credito', 'Nella card Documenti fiscali: registra il documento quando arriva dal fornitore, con il PDF facoltativo. La nota di credito sceglie la fattura da stornare.'],
       ['Correggi · Annulla', 'Su una riga della card: correggi numero, data, importo o note, oppure annulla il documento (se ha un file, torna fra i documenti da controllare).'],
+      ['Registra un documento', 'Nella card Documenti: ordine, conferma, proforma, pagamento o allegato. Restano fuori dal netto e dalla provvigione.'],
+      ['Sposta', 'Su una riga di una delle due card: porta il documento, con righe e file, in un’altra pratica dello stesso fornitore.'],
+      ['Pagamento del cliente', 'Riquadro in alto a destra quando c’è un documento di pagamento: il segno Pagato, senza effetto sulla provvigione.'],
       ['PDF', 'Apre il PDF originale accanto ai dati del documento.'],
       ['Carica un documento', 'Nella scheda: carica un documento già destinato a questa pratica.'],
       ['Consulta affiancati', 'Apre i documenti della pratica affiancati al confronto.'],
@@ -213,6 +216,24 @@ export const GUIDA: Argomento[] = [
         azioni: [
           ['Registra', 'Salva la nota con importo negativo; oltre il residuo il server rifiuta e la finestra resta aperta.'],
         ] },
+      { nome: 'Registra un documento', da: 'Registra un documento', cosa: 'Registra ordine, conferma, proforma, pagamento o allegato sulla pratica.',
+        campi: [
+          ['Tipo di documento', 'Ordine, conferma, proforma, pagamento o altro.'],
+          ['Numero', 'Obbligatorio per l’ordine; per gli altri facoltativo.'],
+          ['Data', 'Quella del documento; di oggi se non la cambi.'],
+          ['Importo', 'Facoltativo: non tocca il netto né la provvigione.'],
+          ['Note · PDF o foto', 'Facoltativi; per il pagamento va bene la foto.'],
+        ],
+        azioni: [
+          ['Registra', 'Salva il documento; per un numero d’ordine già usato dal fornitore il server rifiuta e il motivo compare nella finestra.'],
+        ] },
+      { nome: 'Sposta in un’altra pratica', da: 'Sposta', cosa: 'Porta il documento, con le sue righe e il suo file, in un’altra pratica dello stesso fornitore.',
+        campi: [
+          ['Pratica di arrivo', 'Campo di ricerca: solo le pratiche dello stesso fornitore.'],
+        ],
+        azioni: [
+          ['Sposta', 'Se il documento è liquidato, in un bollettino, legato a una nota di credito o è l’unico ordine della pratica, il server rifiuta e il motivo compare nella finestra.'],
+        ] },
       { nome: 'Fattura non pagata', da: 'Segna come non pagata', cosa: 'Registra la segnalazione del fornitore che il cliente non ha pagato.',
         campi: [
           ['Nota', 'Facoltativa, es. “email di Gasper del 12/09”.'],
@@ -234,6 +255,7 @@ export const GUIDA: Argomento[] = [
       'Le righe contano soprattutto quando qualcosa non torna: per questo stanno nella seconda scheda, ma il contatore rosso e l’avviso nel Riepilogo non le lasciano passare inosservate.',
       'La nota di credito non può superare quello che resta della fattura: il server rifiuta e la finestra resta aperta per correggere l’importo.',
       'Un documento che è in un bollettino non si cambia (importo, numero, data): si corregge con una nota di credito.',
+      'Ordini, conferme, proforma, pagamenti e allegati sono solo tracciati: il netto e la provvigione restano su fatture e note di credito. Il segno <b>Pagato</b> arriva da un documento di pagamento.',
       'Numero e data valgono per tutte le pratiche della stessa fattura (una fattura su più ordini): correggendoli si aggiornano tutte.',
       'Stati d’incasso: <b>Pagata</b> · <b>Non pagata</b> (stornata o segnalata) · <b>Incasso da verificare</b> (maturato, oltre i giorni d’incasso) · <b>In attesa di incasso</b> · <b>Nessuna segnalazione</b>. Vedi <a href="/guida/incassi">Incassi dei clienti</a>.',
     ],
