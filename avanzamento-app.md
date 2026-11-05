@@ -91,7 +91,7 @@ piccole correzioni, ovunque.
 | 7 · F5 Gestione | F5-A1 Oggi | 1 | Sonnet | [ ] |
 | | F5-A2 Pagina del registro | 1 | Sonnet | [ ] |
 | | F5-A6 Impostazioni (password e segreti) | 1 | **Opus** | [ ] |
-| | F5-A8 Guida | 1 | Sonnet | [ ] |
+| | F5-A8 Guida (fatta da sola, fuori gruppo): `/guida/:argomento` con i 17 argomenti del prototipo (senza *Vendita diretta*), ricerca in tutto il testo (anche nomi di pulsanti e finestre), schemi del ciclo, degli stati e degli incassi, argomenti di *Gestione* solo con il permesso, link alle pagine vere, contenuti in `lib/guida.ts`; `app_guida.py` 26 OK, schermate 1440/768. Resta il pulsante *Guida* nelle testate, da aggiungere con ogni pagina | 1 | Sonnet | [x] |
 | | F5-A5 Stato del sistema (dopo F6-A1) e F5-A7 Scartati (dopo F6-A4) | blocco 8 | Sonnet | [ ] |
 | 8 · F6 Documenti | F6-A1 Ricezione e coda | 1 | Sonnet | [ ] |
 | | F6-A2 Lettura con GLM-OCR | 1 | **Opus** | [ ] |
