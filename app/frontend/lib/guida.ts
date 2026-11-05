@@ -334,13 +334,13 @@ export const GUIDA: Argomento[] = [
       ['Grafici', 'Passando col mouse su una barra si legge l’importo; clic su una voce della legenda la nasconde o la mostra.'],
       ['Riga del subagente', 'Filtra documenti e report su quel subagente; secondo clic per tutti.'],
       ['vai ai bollettini', 'Se ci sono documenti in attesa: porta ai bollettini da verificare.'],
-      ['Esporta in Excel', 'Apre la finestra di esportazione.'],
+      ['Esporta', 'Apre la finestra: tutto il trimestre, un solo subagente o solo il riepilogo; Excel, PDF o CSV.'],
       ['Chiudi il trimestre', 'Fissa gli importi; chiede conferma.'],
       ['Voce Storno · Riaccredito', 'Fra i documenti: provvigione negativa o positiva su una fattura di un trimestre precedente; nell’esportazione compare come “Storno F-…”.'],
       ['Correggi · Cambia la correzione', 'Sotto la provvigione di un documento: cambia solo quanto va al subagente su quel documento, con un motivo.'],
     ],
     finestre: [
-      { nome: 'Esporta la liquidazione', da: 'Esporta in Excel', cosa: 'Scegli cosa e in che formato.',
+      { nome: 'Esporta la liquidazione', da: 'Esporta', cosa: 'Scegli cosa e in che formato.',
         campi: [
           ['Cosa', 'Tutto il trimestre diviso per subagente (dettaglio e riepilogo) · Un solo subagente · Solo il riepilogo.'],
           ['Formato', 'Excel (.xlsx) · PDF identico all’Excel · CSV di soli dati.'],
@@ -364,7 +364,7 @@ export const GUIDA: Argomento[] = [
         ] }
     ],
     sapere: [
-      'Il Report subagenti usa i numeri del trimestre di liquidazione (compresi i documenti in attesa e gli storni), non quelli incassati. Margine = provvigioni dai fornitori − provvigioni ai subagenti. Per altri periodi, filtri ed esportazione c’è la pagina <b>Analisi</b>.',
+      'Il Report subagenti usa i numeri del trimestre di liquidazione (compresi i documenti in attesa e gli storni), non quelli incassati. Margine = provvigioni dai fornitori − provvigioni ai subagenti. Per altri periodi e filtri c’è la pagina <b>Analisi</b>; l’esportazione di questo trimestre è nel pulsante <b>Esporta</b>.',
       'Chi paga sul <b>fatturato</b> (es. Gasper, Ing’s): la provvigione entra nel trimestre della fattura. Se il cliente non paga, il fornitore la storna 1–2 mesi dopo e la riaccredita quando il cliente paga: al subagente lo storno arriva nella liquidazione successiva come <b>voce negativa</b> (il riaccredito come voce positiva).',
       'Chi paga sul <b>maturato</b> (es. Gries): la provvigione arriva nel bollettino del mese in cui il cliente paga ed entra quando quel bollettino è verificato.',
     ],
@@ -377,7 +377,7 @@ export const GUIDA: Argomento[] = [
       ['Filtra', 'Campi Fornitore, Subagente, Cliente: puoi scegliere più voci in ognuno; oppure un clic su una fetta, una barra o una riga.'],
       ['Leggi', '4 numeri con la variazione sul periodo precedente, l’andamento mese per mese, i pesi di fornitori, subagenti e clienti.'],
       ['Approfondisci', 'Tabella Dettaglio per subagente, fornitore, cliente, mese o documento per documento.'],
-      ['Esporta', 'Excel con i grafici, PDF o CSV, con gli stessi filtri.'],
+      ['Esporta', 'Excel con i fogli, PDF o CSV, con gli stessi filtri.'],
     ],
     pulsanti: [
       ['Periodo · ‹ ›', 'Sceglie il mese d’inizio o sposta il periodo di un mese.'],
@@ -401,7 +401,7 @@ export const GUIDA: Argomento[] = [
         ] },
       { nome: 'Esporta l’analisi', da: 'Esporta', cosa: 'Periodo e filtri attivi sono quelli della pagina.',
         campi: [
-          ['Formato', 'Excel: riepilogo con i grafici, un foglio per subagente, fornitore, cliente e mese, l’elenco dei documenti · PDF con lo stesso contenuto · CSV con i soli documenti.'],
+          ['Formato', 'Excel: riepilogo, un foglio per subagente, fornitore, cliente e mese, l’elenco dei documenti · PDF con lo stesso contenuto · CSV con i soli documenti.'],
         ],
         azioni: [
           ['Scarica', 'Genera il file.'],

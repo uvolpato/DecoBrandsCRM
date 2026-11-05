@@ -222,6 +222,7 @@ Lo stack ricalca il **Portale B2B Luis** (spec §16.3):
 | Stile | `stile.css` del prototipo ufficiale, Public Sans, niente Bootstrap |
 | Grafici | Chart.js |
 | Excel | `exceljs` |
+| PDF | LibreOffice senza interfaccia (converte il medesimo Excel, §11) |
 | Processi | Node 24, Caddy, due processi (porte 8001 e 8002) |
 
 - ⚠ **Calcoli e operazioni sensibili solo nel backend NestJS, dal database; mai fidarsi dei dati del frontend** (V12, D-28).

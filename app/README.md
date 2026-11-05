@@ -23,7 +23,9 @@ app/
    (da rifare a ogni migrazione nuova).
    Nel `.env` metti anche `DOCUMENTI_DIR` su una cartella locale (es.
    `C:/Progetti/Decobrands_CRM/app/documenti`, che non va nel repository): senza, ogni
-   caricamento di documento risponde 500.
+   caricamento di documento risponde 500. Per il PDF di liquidazioni e Analisi serve
+   LibreOffice: `SOFFICE` (es. `C:\Program Files\LibreOffice\program\soffice.com`); senza,
+   basta `soffice.com` nel PATH su Windows o `soffice` su Linux.
 2. In `frontend/`: `npm install`.
 3. Il primo utente: `npm run build && npm run superutente -- <nome utente> <email> "<nome>"`.
 4. `avvia.bat` apre backend (8002) e frontend (8001): http://localhost:8001

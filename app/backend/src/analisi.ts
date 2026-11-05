@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import { IsIn, IsOptional, Matches } from 'class-validator';
 import type { Response } from 'express';
 import { Richiede } from './accesso';
+import { convertiPdf } from './esporta-liquidazione';
 import { type Dati, caricaDati } from './motore/dati';
 import { fattiAnalisi, r2 } from './motore/motore';
 import { PrismaService } from './prisma.service';
@@ -23,7 +24,7 @@ const ZERO = new Dec(0);
 const MESE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const ELENCO_ID = /^\d{1,18}(,\d{1,18})*$/;
 const RAGGRUPPA = ['subagente', 'fornitore', 'cliente', 'mese', 'documento'] as const;
-const FORMATI = ['xlsx', 'csv'] as const;
+const FORMATI = ['xlsx', 'pdf', 'csv'] as const;
 type Raggruppa = (typeof RAGGRUPPA)[number];
 type Formato = (typeof FORMATI)[number];
 
@@ -399,8 +400,8 @@ export class AnalisiController {
     return pagina(S, calcola(S, fattiAnalisi(S), q), q);
   }
 
-  /** Esportazione (§11): Excel con i fogli e i totali a formule, o CSV dei documenti. Il PDF arriva con
-   *  F4-A3, che converte il medesimo .xlsx con LibreOffice. */
+  /** Esportazione (§11): Excel con i fogli e i totali a formule, CSV dei documenti, o PDF convertito dal
+   *  medesimo .xlsx con LibreOffice (F4-A3, D-61). */
   @Get('esporta')
   @Richiede('provvigioni.esporta')
   async esporta(@Query() q: FiltriEsporta, @Res({ passthrough: true }) res: Response) {
@@ -410,11 +411,14 @@ export class AnalisiController {
     const formato = q.formato ?? 'xlsx';
     const filtro = (Object.keys(DIM) as Dimensione[]).some((d) => scelte(q[d]).size) ? '_filtrata' : '';
     const nome = `Analisi_${c.periodo.da}_${c.periodo.a}${filtro}.${formato}`;
+    const dati = formato === 'csv' ? csv(S, c) : await excel(S, c, q);
     res.set({
-      'Content-Type': formato === 'csv' ? 'text/csv; charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type': formato === 'csv' ? 'text/csv; charset=utf-8'
+        : formato === 'pdf' ? 'application/pdf'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${nome}"`,
       'X-Content-Type-Options': 'nosniff',
     });
-    return new StreamableFile(formato === 'csv' ? csv(S, c) : await excel(S, c, q));
+    return new StreamableFile(formato === 'pdf' ? await convertiPdf(dati) : dati);
   }
 }

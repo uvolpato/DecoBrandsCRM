@@ -1,6 +1,6 @@
 # Prova della pagina Analisi dell'app (F4-A5), con Playwright: i 4 numeri e i 4 grafici, il periodo con le
 # frecce e la durata, i filtri multipli con il riepilogo, le voci dei campi (D-23), il filtro incrociato da
-# una barra e da una riga, i raggruppamenti della tabella, l'esportazione Excel e CSV, le sagome (D-59), il
+# una barra e da una riga, i raggruppamenti della tabella, l'esportazione Excel, CSV e PDF, le sagome (D-59), il
 # ritorno nello stesso punto (§7.12), la sola lettura e i 768 px.
 # Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi, <s>-lett
 # (password-di-prova, da utenti_prova.js crea <s>). Nel database di prova c'è il seed.
@@ -52,7 +52,7 @@ with sync_playwright() as p:
         pg.click('.testa-azioni button:has-text("Esporta")')
         pg.wait_for_selector('.velo .formato-esporta')
         if formato != 'xlsx': pg.locator('.velo .formato-esporta [role=radio]', has_text=formato.upper()).click()
-        with pg.expect_download() as attesa:
+        with pg.expect_download(timeout=180000) as attesa:  # il PDF passa da LibreOffice
             pg.click('.velo .modale-piede button:has-text("Scarica")')
         return attesa.value
 
@@ -149,6 +149,9 @@ with sync_playwright() as p:
     ok(csv.suggested_filename == 'Analisi_2025-10_2026-09.csv' and testo_csv.startswith('Data;Documento;Tipo;Fornitore;'),
        'CSV scaricato: intestazioni')
     ok(len([r for r in testo_csv.strip().splitlines() if r]) == 22, 'CSV: 21 documenti e l’intestazione')
+    pdf = scarica(pg, 'pdf')
+    ok(pdf.suggested_filename == 'Analisi_2025-10_2026-09.pdf' and pathlib.Path(pdf.path()).read_bytes()[:5] == b'%PDF-',
+       'PDF scaricato: %s' % pdf.suggested_filename)
     ok(not pg.locator('.velo').count(), 'finestra di esportazione chiusa')
 
     # ritorno alla pagina nello stesso punto (§7.12): periodo, filtro e raggruppamento ricordati

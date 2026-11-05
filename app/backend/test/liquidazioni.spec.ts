@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import ExcelJS from 'exceljs';
 import request from 'supertest';
+import { sofficeDisponibile } from '../src/esporta-liquidazione';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { caricaDati, giornoRoma, ultimaChiusura } from '../src/motore/dati';
@@ -216,6 +218,135 @@ describe('GET /api/liquidazione/report', () => {
     await resp.get('/liquidazione/report?anno=2026&trimestre=3&subagente=999999').expect(404);
     expect((await lett.get('/liquidazione/report?anno=2026&trimestre=3').expect(200)).body.subagenti.length).toBeGreaterThan(0);
     await dati.get('/liquidazione/report?anno=2026&trimestre=3').expect(403);
+  });
+});
+
+describe('GET /api/liquidazione/export', () => {
+  const bin = (res: request.Response, cb: (e: Error | null, b: Buffer) => void) => {
+    const pezzi: Buffer[] = [];
+    res.on('data', (c: Buffer) => pezzi.push(c));
+    res.on('end', () => cb(null, Buffer.concat(pezzi)));
+  };
+  const file = (p: string, chi = resp) => chi.get('/liquidazione/export?' + p).buffer(true).parse(bin);
+  const excel = async (p: string) => {
+    const r = await file(p).expect(200);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(r.body as unknown as ArrayBuffer);
+    return { r, wb };
+  };
+  const testo = (v: unknown) => (v && typeof v === 'object' && 'text' in v ? (v as { text: string }).text : v);
+  const rigaCon = (ws: ExcelJS.Worksheet, inizio: string) => {
+    for (let i = 1; i <= ws.rowCount; i++) if (String(testo(ws.getRow(i).getCell(1).value) ?? '').startsWith(inizio)) return ws.getRow(i);
+    throw new Error('riga non trovata: ' + inizio);
+  };
+
+  it('Excel completo: Riepilogo + un foglio per subagente, totali uguali alla pagina', async () => {
+    const b = await pagina(2026, 3);
+    const { r, wb } = await excel('anno=2026&trimestre=3&contenuto=completa&formato=xlsx');
+    expect(r.headers['content-type']).toContain('spreadsheetml');
+    expect(r.headers['content-disposition']).toBe('attachment; filename="Liquidazione_2026_T3_completa.xlsx"');
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Riepilogo', ...b.subagenti.map((s: any) => s.nome)]);
+
+    const rip = wb.getWorksheet('Riepilogo')!;
+    expect(rip.getRow(5).values).toEqual([undefined, 'Subagente', 'Documenti', 'Imponibile', 'Provvigione da liquidare', 'In attesa dei bollettini']);
+    expect(rip.getRow(5).getCell(1).fill).toMatchObject({ fgColor: { argb: 'FFE9F0FD' } });
+    expect(rip.views[0]).toMatchObject({ state: 'frozen', ySplit: 5, showGridLines: false });
+    expect(rip.pageSetup).toMatchObject({ orientation: 'landscape', fitToPage: true, fitToWidth: 1, printTitlesRow: '5:5' });
+    expect(rip.headerFooter!.oddFooter).toContain('Decobrands SRL · Riepilogo · pagina &P di &N');
+    expect(rip.autoFilter).toBeTruthy();
+
+    b.subagenti.forEach((s: any, i: number) => {
+      const riga = rip.getRow(6 + i);
+      expect([testo(riga.getCell(1).value), riga.getCell(2).value, riga.getCell(3).value, riga.getCell(4).value, riga.getCell(5).value])
+        .toEqual([s.nome, s.liquidabili, s.imponibile, s.provvigione, s.in_attesa]);
+      // il nome è un collegamento al foglio del subagente (solo nel file completo)
+      const v = riga.getCell(1).value as { hyperlink?: string };
+      expect(v.hyperlink).toBe("#'" + s.nome + "'!A1");
+    });
+    const totale = rigaCon(rip, 'Totale · ');
+    expect(totale.getCell(2).value).toMatchObject({ formula: expect.stringMatching(/^SUM\(/), result: b.riepilogo.liquidabili });
+    expect(totale.getCell(3).value).toMatchObject({ result: b.riepilogo.imponibile });
+    expect(totale.getCell(4).value).toMatchObject({ result: b.riepilogo.provvigione });
+    expect(totale.getCell(5).value).toMatchObject({ result: b.riepilogo.in_attesa });
+
+    const s0 = b.subagenti[0];
+    const ws = wb.getWorksheet(s0.nome)!;
+    expect(ws.getRow(5).values).toEqual([undefined, 'Fornitore', 'N. documento', 'Data documento', 'Codice cliente', 'Ragione sociale', 'Importo documento', '% provvigione', 'Importo provvigionale']);
+    const doc = b.documenti.find((d: any) => d.subagente_id === s0.id && d.liquidabile);
+    const prima = ws.getRow(6);
+    expect([prima.getCell(1).value, prima.getCell(2).value, prima.getCell(6).value, prima.getCell(8).value])
+      .toEqual([doc.fornitore, (doc.voce === 'storno' ? 'Storno ' : doc.voce === 'riaccredito' ? 'Riaccredito ' : '') + doc.numero, doc.imponibile, doc.provvigione]);
+    expect(prima.getCell(3).value).toBeInstanceOf(Date);
+    expect(prima.getCell(7).value).toBeCloseTo(doc.pct / 100, 6);
+    const totSub = rigaCon(ws, 'Totale ' + s0.nome);
+    expect(totSub.getCell(6).value).toMatchObject({ formula: expect.stringMatching(/^SUM\(/), result: s0.imponibile });
+    expect(totSub.getCell(8).value).toMatchObject({ result: s0.provvigione });
+  });
+
+  it('un solo subagente e solo il riepilogo: un foglio e il nome del file giusto', async () => {
+    const b = await pagina(2026, 3);
+    const s = b.subagenti.find((x: any) => x.nome === 'Marco Nista')!;
+    const uno = await excel(`anno=2026&trimestre=3&contenuto=subagente&subagente=${s.id}`);
+    expect(uno.r.headers['content-disposition']).toBe('attachment; filename="Liquidazione_2026_T3_Marco_Nista.xlsx"');
+    expect(uno.wb.worksheets.map((w) => w.name)).toEqual(['Marco Nista']);
+
+    const rip = await excel('anno=2026&trimestre=3&contenuto=riepilogo');
+    expect(rip.r.headers['content-disposition']).toBe('attachment; filename="Liquidazione_2026_T3_riepilogo.xlsx"');
+    expect(rip.wb.worksheets.map((w) => w.name)).toEqual(['Riepilogo']);
+    // nel solo riepilogo il nome non è un collegamento
+    expect(typeof rip.wb.getWorksheet('Riepilogo')!.getRow(6).getCell(1).value).toBe('string');
+  });
+
+  it('CSV: solo dati, ; e virgola decimale, BOM, date gg/mm/aaaa; completo, subagente e riepilogo', async () => {
+    const b = await pagina(2026, 3);
+    const r = await file('anno=2026&trimestre=3&contenuto=completa&formato=csv').expect(200);
+    expect(r.headers['content-type']).toContain('text/csv');
+    expect(r.headers['content-disposition']).toBe('attachment; filename="Liquidazione_2026_T3_completa.csv"');
+    const buf = r.body as Buffer;
+    expect([buf[0], buf[1], buf[2]]).toEqual([0xef, 0xbb, 0xbf]);
+    const righe = buf.toString('utf8').slice(1).split('\r\n');
+    expect(righe[0]).toBe('Subagente;Fornitore;N. documento;Data documento;Codice cliente;Ragione sociale;Importo documento;% provvigione;Importo provvigionale;Stato');
+    expect(righe.length - 1).toBe(b.documenti.length);
+    expect(righe[1]).toMatch(/^[^;]+;[^;]+;.*;\d{2}\/\d{2}\/\d{4};/);
+    const liquidabili = righe.slice(1).filter((x) => x.endsWith(';liquidabile'));
+    const totale = M.r2(liquidabili.reduce((s: number, x: string) => s + Number(x.split(';')[8].replace(',', '.')), 0));
+    expect(totale).toBe(b.riepilogo.provvigione);
+    expect(liquidabili.length).toBe(b.riepilogo.liquidabili);
+
+    const s = b.subagenti.find((x: any) => x.nome === 'Marco Nista')!;
+    const uno = (await file(`anno=2026&trimestre=3&contenuto=subagente&subagente=${s.id}&formato=csv`).expect(200)).body as Buffer;
+    const righeUno = uno.toString('utf8').slice(1).split('\r\n');
+    expect(righeUno.length - 1).toBe(b.documenti.filter((d: any) => d.subagente_id === s.id).length);
+    expect(righeUno.slice(1).every((x) => x.startsWith('Marco Nista;'))).toBe(true);
+
+    const rip = (await file('anno=2026&trimestre=3&contenuto=riepilogo&formato=csv').expect(200)).body as Buffer;
+    const righeRip = rip.toString('utf8').slice(1).split('\r\n');
+    expect(righeRip[0]).toBe('Subagente;Documenti;Imponibile;Provvigione da liquidare;In attesa dei bollettini');
+    expect(righeRip.length - 1).toBe(b.subagenti.length);
+    expect(righeRip[1].split(';')[0]).toBe(b.subagenti[0].nome);
+  });
+
+  (sofficeDisponibile() ? it : it.skip)('PDF: il medesimo .xlsx convertito, inizia con %PDF-', async () => {
+    const r = await file('anno=2026&trimestre=3&contenuto=completa&formato=pdf').expect(200);
+    expect(r.headers['content-type']).toBe('application/pdf');
+    expect(r.headers['content-disposition']).toBe('attachment; filename="Liquidazione_2026_T3_completa.pdf"');
+    const buf = r.body as Buffer;
+    expect(buf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(buf.length).toBeGreaterThan(1000);
+  }, 180_000);
+
+  it('permesso provvigioni.esporta, parametri e trimestri non validi; evento export.export', async () => {
+    await dati.get('/liquidazione/export?anno=2026&trimestre=3').expect(403);
+    await lett.get('/liquidazione/export?anno=2026&trimestre=3&contenuto=riepilogo').expect(200);
+    await resp.get('/liquidazione/export?anno=2026&trimestre=3&contenuto=altro').expect(400);
+    await resp.get('/liquidazione/export?anno=2026&trimestre=3&contenuto=subagente').expect(400);
+    expect((await resp.get('/liquidazione/export?anno=2026&trimestre=3&contenuto=subagente&subagente=999999').expect(400)).body.message)
+      .toBe('Il subagente non ha documenti nel trimestre');
+    await resp.get('/liquidazione/export?anno=2027&trimestre=4&contenuto=completa').expect(400);
+    const eventi = await db.registro.findMany({ where: { codice: 'export.export', entita: 'liquidazione' } });
+    expect(eventi.length).toBeGreaterThan(0);
+    expect(eventi.some((e) => JSON.stringify(e.dettaglio).includes('"scelta":"completa"'))).toBe(true);
+    expect(eventi[0].dettaglio).toMatchObject({ periodo: { anno: 2026, trimestre: 3 }, n_righe: expect.any(Number), importo_totale: expect.any(Number) });
   });
 });
 

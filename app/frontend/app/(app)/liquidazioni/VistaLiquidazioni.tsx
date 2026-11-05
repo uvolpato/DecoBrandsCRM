@@ -5,7 +5,7 @@ import { DataTable } from '@/componenti/DataTable';
 import { Elenco, Periodi } from '@/componenti/Flussi';
 import { COLORI_GRAFICI, Grafico } from '@/componenti/Grafico';
 import { KpiRow } from '@/componenti/Kpi';
-import { Conferma } from '@/componenti/Modale';
+import { Conferma, Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, SagomaRiquadri, SagomaTabella, useSagome } from '@/componenti/Sagoma';
@@ -59,6 +59,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
   const [errore, setErrore] = useState('');
   const [caricando, setCaricando] = useState(true);
   const [chiedi, setChiedi] = useState(false);
+  const [esporta, setEsporta] = useState(false);
   const [report, setReport] = useState<Report | null>(null);
   const [reportCaricando, setReportCaricando] = useState(true);
   const [reportErrore, setReportErrore] = useState('');
@@ -118,7 +119,29 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
   const visibili = scelto ? b.documenti.filter((d) => d.subagente_id === scelto.id) : b.documenti;
   const inAttesa = b.riepilogo?.bloccanti ?? 0;
   const puoChiudere = puo('provvigioni.chiudi');
+  const puoEsportare = puo('provvigioni.esporta');
   const analisi = '/analisi?dal=' + q.da.slice(0, 7) + '&al=' + q.a.slice(0, 7) + (scelto ? '&subagenti=' + scelto.id : '');
+
+  /** Esportazione (§11): il server prepara il file dagli stessi numeri della pagina (V12). */
+  const scarica = async (contenuto: string, subagente: string | null, formato: string) => {
+    const p = new URLSearchParams({ anno: String(anno), trimestre: String(trimestre), contenuto, formato });
+    if (contenuto === 'subagente' && subagente) p.set('subagente', subagente);
+    const r = await fetch('/api/liquidazione/export?' + p.toString(), { credentials: 'same-origin' });
+    if (!r.ok) {
+      let messaggio = 'Non è stato possibile esportare: riprova.';
+      try { const j = await r.json() as { message?: string }; if (j.message) messaggio = j.message; } catch { /* risposta senza JSON */ }
+      avviso(messaggio, true);
+      return;
+    }
+    const nome = (r.headers.get('content-disposition') ?? '').match(/filename="([^"]+)"/)?.[1] ?? ('liquidazione.' + formato);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await r.blob());
+    a.download = nome;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setEsporta(false);
+    avviso('Scaricato ' + nome);
+  };
 
   const chiudi = async () => {
     setChiedi(false);
@@ -129,12 +152,20 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
 
   return (
     <Pagina titolo="Liquidazioni" pieno sottotitolo="Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre."
-      azioni={[{
-        etichetta: chiusa ? 'Liquidazione chiusa' : 'Chiudi il trimestre', icona: 'spunta',
-        disabilitato: !b.chiusura.possibile || !puoChiudere,
-        titolo: !puoChiudere ? 'Serve il livello responsabile nell’area Provvigioni' : (b.chiusura.motivo ?? ''),
-        onClick: () => setChiedi(true),
-      }]}>
+      azioni={[
+        {
+          etichetta: 'Esporta', icona: 'scarica', variante: 'sec', consentito: puoEsportare,
+          disabilitato: !puoEsportare || !b.documenti.length,
+          titolo: !puoEsportare ? 'Non hai il permesso di esportare' : b.documenti.length ? '' : 'Nessun documento nel trimestre',
+          onClick: () => setEsporta(true),
+        },
+        {
+          etichetta: chiusa ? 'Liquidazione chiusa' : 'Chiudi il trimestre', icona: 'spunta',
+          disabilitato: !b.chiusura.possibile || !puoChiudere,
+          titolo: !puoChiudere ? 'Serve il livello responsabile nell’area Provvigioni' : (b.chiusura.motivo ?? ''),
+          onClick: () => setChiedi(true),
+        },
+      ]}>
       <Periodi etichetta={'Trimestri ' + anno} voci={b.trimestri.map((x) => ({
         href: `/liquidazioni/${anno}/${x.trimestre}`, titolo: `${x.trimestre}° trimestre`, sotto: x.nome,
         stato: x.etichetta, attivo: x.trimestre === trimestre, futuro: x.chiave === 'futura', avanzamento: x.avanzamento ?? undefined,
@@ -222,6 +253,9 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
           </div>
         </div>}
 
+      {esporta && <FinestraEsporta anno={anno} trimestre={trimestre} chiusa={chiusa} subagenti={b.subagenti} scelto={scelto}
+        onChiudi={() => setEsporta(false)} onScarica={scarica} />}
+
       {chiedi && <Conferma titolo={`Chiudere la liquidazione del ${trimestre}° trimestre?`}
         testo={`Gli importi vengono fissati: ${euro(b.riepilogo?.provvigione ?? 0)} a ${b.subagenti.filter((s) => s.liquidabili > 0).length} subagenti.`}
         etichetta="Chiudi il trimestre" onRisposta={(si) => (si ? void chiudi() : setChiedi(false))} />}
@@ -263,7 +297,7 @@ function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
             },
           ]}
           piede={'Margine = provvigioni dai fornitori meno la provvigione al subagente. Ultima colonna: provvigione al subagente ' + etPrec + '. Clic su un subagente a sinistra per il suo report.'} />
-        <Nota>Numeri del trimestre di liquidazione, compresi i documenti in attesa e le voci di storno. Altri periodi, filtri ed esportazione: <Link href={analisi}>Analisi completa</Link>.</Nota>
+        <Nota>Numeri del trimestre di liquidazione, compresi i documenti in attesa e le voci di storno. L’esportazione di questo trimestre è nel pulsante <b>Esporta</b>; altri periodi e filtri: <Link href={analisi}>Analisi completa</Link>.</Nota>
       </div>
     );
   }
@@ -298,7 +332,69 @@ function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
           }))} />
         </Pannello>
       </div>
-      <Nota>Numeri del trimestre di liquidazione. Altri periodi, confronti ed esportazione: <Link href={analisi}>Analisi completa di {sub.nome}</Link>.</Nota>
+      <Nota>Numeri del trimestre di liquidazione. L’esportazione del trimestre è nel pulsante <b>Esporta</b>; altri periodi e confronti: <Link href={analisi}>Analisi completa di {sub.nome}</Link>.</Nota>
     </div>
+  );
+}
+
+/** Finestra di esportazione (§11): contenuto e formato. Se la pagina è filtrata su un subagente,
+ *  quello è già scelto. Il file lo prepara il server dagli stessi numeri della pagina (V12). */
+function FinestraEsporta({ anno, trimestre, chiusa, subagenti, scelto, onChiudi, onScarica }: {
+  anno: number; trimestre: number; chiusa: boolean; subagenti: Subagente[]; scelto: Subagente | null;
+  onChiudi: () => void; onScarica: (contenuto: string, subagente: string | null, formato: string) => Promise<void>;
+}) {
+  const [contenuto, setContenuto] = useState(scelto ? 'subagente' : 'completa');
+  const [sub, setSub] = useState(scelto?.id ?? subagenti[0]?.id ?? '');
+  const [formato, setFormato] = useState('xlsx');
+  const [attesa, setAttesa] = useState(false);
+  const note: Record<string, string> = {
+    xlsx: 'Fogli impaginati, totali con formule, pronti da stampare.',
+    pdf: 'Stesso contenuto e stessa impaginazione dell’Excel, da inviare o archiviare.',
+    csv: 'Solo dati, senza totali né formattazione: separatore punto e virgola, per altri programmi.',
+  };
+  const scarica = async () => {
+    setAttesa(true);
+    try { await onScarica(contenuto, contenuto === 'subagente' ? sub : null, formato); }
+    finally { setAttesa(false); }
+  };
+  const scelte = [
+    { v: 'completa', t: 'Tutto il trimestre, diviso per subagente', d: `Foglio Riepilogo + un foglio per ognuno dei ${subagenti.length} subagenti con il dettaglio dei documenti e il totale.` },
+    { v: 'subagente', t: 'Un solo subagente', d: 'Il dettaglio dei suoi documenti e il suo totale.' },
+    { v: 'riepilogo', t: 'Solo il riepilogo', d: 'Una riga per subagente: documenti, imponibile, provvigione da liquidare' + (chiusa ? '.' : ' e in attesa dei bollettini.') },
+  ];
+  return (
+    <Modale titolo={`Esporta la liquidazione del ${trimestre}° trimestre ${anno}`}
+      testo="Campi concordati: fornitore, numero e data documento, codice cliente, ragione sociale, importo, % e importo provvigionale."
+      onChiudi={() => { if (!attesa) onChiudi(); }}
+      piede={<>
+        <button type="button" className="btn sec" onClick={onChiudi} disabled={attesa}>Annulla</button>
+        <button type="button" className="btn" onClick={scarica} disabled={attesa}>{attesa ? 'Attendi…' : 'Scarica'}</button>
+      </>}>
+      <div className="scelte-esporta" role="radiogroup" aria-label="Cosa esportare">
+        {scelte.map((x) => (
+          <label key={x.v} className="scelta-esporta">
+            <input type="radio" name="esporta" value={x.v} checked={contenuto === x.v} onChange={() => setContenuto(x.v)} />
+            <span>
+              <b>{x.t}</b><span>{x.d}</span>
+              {x.v === 'subagente' && (
+                <select className="filtro-select" id="esporta-sub" aria-label="Subagente" value={sub} disabled={contenuto !== 'subagente'}
+                  onChange={(e) => { setSub(e.target.value); setContenuto('subagente'); }}>
+                  {subagenti.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                </select>
+              )}
+            </span>
+          </label>
+        ))}
+      </div>
+      <div className="formato-esporta">
+        <span>Formato</span>
+        <div className="segmenti" role="radiogroup" aria-label="Formato del file">
+          {[['xlsx', 'Excel'], ['pdf', 'PDF'], ['csv', 'CSV']].map(([f, t]) => (
+            <button key={f} type="button" role="radio" aria-checked={formato === f} aria-selected={formato === f} onClick={() => setFormato(f)}>{t}</button>
+          ))}
+        </div>
+        <p className="testo-tenue" id="formato-nota">{note[formato]}</p>
+      </div>
+    </Modale>
   );
 }

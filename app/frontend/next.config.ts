@@ -2,6 +2,9 @@ import type { NextConfig } from 'next';
 
 const config: NextConfig = {
   poweredByHeader: false,
+  // Il PDF passa da LibreOffice e su alcune macchine impiega ~1 minuto: il proxy di Next non
+  // deve chiudere la richiesta prima (F4-A3, §11).
+  experimental: { proxyTimeout: 180_000 },
   // Le intestazioni di sicurezza delle pagine; /api le mette Helmet nel backend.
   async headers() {
     return [

@@ -8,7 +8,7 @@
 # quindi va rilanciato il seed dopo.
 # Uso: python strumenti/prove/app_liquidazioni.py <suffisso> <cartella schermate> [base]
 import re
-import sys, pathlib, time
+import sys, pathlib, time, zipfile
 from playwright.sync_api import sync_playwright
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
@@ -52,6 +52,16 @@ with sync_playwright() as p:
 
     def quieta(pg):
         pg.wait_for_function("() => document.querySelector('.periodi a.attivo') && !document.querySelector('.colonne .dt[aria-busy=true]')")
+
+    def esporta(pg, contenuto, formato='xlsx', sub=None):
+        pg.click('.testa-azioni button:has-text("Esporta")')
+        pg.wait_for_selector('.velo .scelte-esporta')
+        pg.locator('.velo .scelta-esporta input[value="%s"]' % contenuto).check()
+        if sub: pg.select_option('.velo #esporta-sub', label=sub)
+        if formato != 'xlsx': pg.locator('.velo .formato-esporta [role=radio]', has_text=formato.upper()).click()
+        with pg.expect_download(timeout=180000) as attesa:  # il PDF passa da LibreOffice
+            pg.click('.velo .modale-piede button:has-text("Scarica")')
+        return attesa.value
 
     def chiama(pg, metodo, percorso, corpo=None):
         csrf = pg.request.get(BASE + '/api/accesso/io').json()['csrf']
@@ -116,6 +126,45 @@ with sync_playwright() as p:
     marco.click(); attesa(pg)
     ok(documenti(pg).count() == 10 and scheda_documenti(pg).locator('.schede-conta').inner_text() == '10', 'di nuovo sul subagente: tornano tutti')
 
+    # esportazione (§11): finestra con tre contenuti e tre formati, file scaricati e letto il CSV
+    pg.click('.testa-azioni button:has-text("Esporta")'); pg.wait_for_selector('.velo .scelte-esporta')
+    ok(pg.locator('.velo .scelta-esporta').count() == 3 and pg.locator('.velo .formato-esporta [role=radio]').count() == 3,
+       'finestra Esporta: tre contenuti e tre formati')
+    ok(pg.locator('.velo input[value=completa]').is_checked() and pg.locator('.velo .formato-esporta [role=radio]', has_text='Excel').get_attribute('aria-selected') == 'true',
+       'finestra Esporta: tutto il trimestre in Excel, come predefinito')
+    pg.screenshot(path=str(USCITA / 'app-liquidazioni-export-1440.png'))
+    pg.keyboard.press('Escape'); pg.wait_for_function("!document.querySelector('.velo')")
+
+    xlsx = esporta(pg, 'completa', 'xlsx')
+    ok(xlsx.suggested_filename == 'Liquidazione_2026_T3_completa.xlsx' and pathlib.Path(xlsx.path()).stat().st_size > 1000,
+       'Excel completo scaricato: %s' % xlsx.suggested_filename)
+    with zipfile.ZipFile(xlsx.path()) as z:
+        fogli = z.read('xl/workbook.xml').decode('utf-8')
+    ok('name="Riepilogo"' in fogli and 'name="Marco Nista"' in fogli and 'name="Giorgio Pontoglio"' in fogli,
+       'Excel completo: foglio Riepilogo e un foglio per subagente')
+
+    pdf = esporta(pg, 'subagente', 'pdf', 'Marco Nista')
+    ok(pdf.suggested_filename == 'Liquidazione_2026_T3_Marco_Nista.pdf' and pathlib.Path(pdf.path()).read_bytes()[:5] == b'%PDF-',
+       'PDF di un subagente scaricato: %s' % pdf.suggested_filename)
+
+    csv = esporta(pg, 'riepilogo', 'csv')
+    testo_csv = pathlib.Path(csv.path()).read_text(encoding='utf-8-sig')
+    righe_csv = [r for r in testo_csv.strip().splitlines() if r]
+    ok(csv.suggested_filename == 'Liquidazione_2026_T3_riepilogo.csv'
+       and righe_csv[0] == 'Subagente;Documenti;Imponibile;Provvigione da liquidare;In attesa dei bollettini'
+       and len(righe_csv) == 5, 'CSV del solo riepilogo: intestazione e 4 subagenti')
+    totale_csv = sum(float(r.split(';')[3].replace('.', '').replace(',', '.')) for r in righe_csv[1:])
+    ok(abs(totale_csv - 1986.38) < 0.01, 'CSV del riepilogo: totale da liquidare 1.986,38 €')
+    ok(not pg.locator('.velo').count(), 'finestra di esportazione chiusa')
+
+    # con la pagina filtrata su un subagente, la finestra lo propone già scelto
+    marco.click(); attesa(pg)
+    pg.click('.testa-azioni button:has-text("Esporta")'); pg.wait_for_selector('.velo .scelte-esporta')
+    ok(pg.locator('.velo input[value=subagente]').is_checked() and pg.locator('.velo #esporta-sub').input_value() == '2',
+       'finestra Esporta: il subagente della pagina è già scelto')
+    pg.keyboard.press('Escape'); pg.wait_for_function("!document.querySelector('.velo')")
+    marco.click(); attesa(pg)
+
     # il link arriva all'Analisi con il trimestre e il subagente (F4-A5 legge i parametri dall'indirizzo)
     pg.goto(BASE + href)
     pg.wait_for_function("document.querySelector('.periodo-btn') && document.querySelector('.periodo-btn').textContent.includes('lug 2026')")
@@ -166,9 +215,10 @@ with sync_playwright() as p:
        'conferma con importo e numero di subagenti')
     pg.click('.velo .modale-piede button:has-text("Chiudi il trimestre")')
     pg.wait_for_function("!document.querySelector('.velo')")
-    pg.wait_for_function("document.querySelector('.testa-azioni button') && document.querySelector('.testa-azioni button').innerText === 'Liquidazione chiusa'")
+    pg.wait_for_function("document.querySelector('.testa-azioni button:last-child') && document.querySelector('.testa-azioni button:last-child').innerText === 'Liquidazione chiusa'")
     attesa(pg)
-    ok('Liquidazione chiusa' in testo(pg, '.testa-azioni') and pg.locator('.testa-azioni button').is_disabled(), 'dopo la chiusura il pulsante dice Liquidazione chiusa ed è spento')
+    chiuso = pg.locator('.testa-azioni button:has-text("Liquidazione chiusa")')
+    ok(chiuso.count() == 1 and chiuso.is_disabled(), 'dopo la chiusura il pulsante dice Liquidazione chiusa ed è spento')
     ok(re.search(r'Liquidazione chiusa il \d{2}/\d{2}/\d{4} da Prova Ammi', testo(pg, '.nota')) is not None, 'la pagina dice chi l’ha chiusa e quando')
     ok('Liquidata il' in testo(pg, '.periodi a.attivo'), 'il riquadro del trimestre passa a Liquidata')
     ok(pg.locator(destra + '.schede-corpo .dt tbody .stato.s-ok', has_text='Liquidata').count() == 10, 'i documenti sono tutti Liquidata')
@@ -176,7 +226,7 @@ with sync_playwright() as p:
 
     # trimestre chiuso da prima (2° 2026): si legge dalla fotografia, niente riapertura
     periodi(pg).nth(1).click(); pg.wait_for_function("location.pathname === '/liquidazioni/2026/2'"); quieta(pg)
-    ok('Liquidata il 10/07/2026' in testo(pg, '.periodi a.attivo') and pg.locator('.testa-azioni button').is_disabled(),
+    ok('Liquidata il 10/07/2026' in testo(pg, '.periodi a.attivo') and pg.locator('.testa-azioni button:has-text("Liquidazione chiusa")').is_disabled(),
        '2° trimestre: chiuso, si legge dalla fotografia')
 
     # ritorno allo stesso punto (§7.12): subagente scelto, si va via e si torna
@@ -212,6 +262,10 @@ with sync_playwright() as p:
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(600)
     ok(not pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth'), '768 px: nessuno scorrimento orizzontale')
     pg.screenshot(path=str(USCITA / 'app-liquidazioni-768.png'), full_page=True)
+    pg.click('.testa-azioni button:has-text("Esporta")'); pg.wait_for_selector('.velo .scelte-esporta')
+    ok(not pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth'), '768 px: finestra Esporta senza scorrimento orizzontale')
+    pg.screenshot(path=str(USCITA / 'app-liquidazioni-export-768.png'))
+    pg.keyboard.press('Escape'); pg.wait_for_function("!document.querySelector('.velo')")
     pg.close()
 
     # sagome durante il caricamento (D-59): il server risponde dopo mezzo secondo
@@ -233,10 +287,12 @@ with sync_playwright() as p:
     # sola lettura: consulta, ma non chiude
     pg = entra(S + '-lett')
     pg.goto(BASE + '/liquidazioni/2026/3'); pg.wait_for_selector('.periodi a.attivo'); quieta(pg)
-    chiudi = pg.locator('.testa-azioni button')
+    chiudi = pg.locator('.testa-azioni button:last-child')
     ok(pg.evaluate("document.body.classList.contains('sola-lettura')") and chiudi.is_disabled()
        and 'Serve il livello responsabile' in (chiudi.get_attribute('title') or ''),
        'sola lettura: i documenti si vedono, la chiusura no')
+    esporta_btn = pg.locator('.testa-azioni button:has-text("Esporta")')
+    ok(esporta_btn.count() == 1 and not esporta_btn.is_disabled(), 'sola lettura: il pulsante Esporta resta attivo')
     pg.close()
     b.close()
 

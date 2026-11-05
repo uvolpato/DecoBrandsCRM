@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import ExcelJS from 'exceljs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { sofficeDisponibile } from '../src/esporta-liquidazione';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
@@ -218,7 +219,7 @@ describe('regole e permessi', () => {
     await resp.get('/analisi?dal=2026-09&al=2026-01').expect(400);
     await resp.get('/analisi?raggruppa=piva').expect(400);
     await resp.get('/analisi?fornitori=abc').expect(400);
-    await resp.get('/analisi/esporta?formato=pdf').expect(400);
+    await resp.get('/analisi/esporta?formato=doc').expect(400);
   });
 
   it('senza documenti: numeri a zero, grafici e tabella vuoti', async () => {
@@ -281,4 +282,13 @@ describe('GET /api/analisi/esporta', () => {
     expect(M.r2(totale)).toBe(b.numeri.fatturato);
     expect(righe[1]).toMatch(/^\d{2}\/\d{2}\/\d{4};/);
   });
+
+  (sofficeDisponibile() ? it : it.skip)('PDF: il medesimo .xlsx convertito, inizia con %PDF-', async () => {
+    const r = await file('dal=2025-10&al=2026-09&formato=pdf');
+    expect(r.headers['content-type']).toBe('application/pdf');
+    expect(r.headers['content-disposition']).toBe('attachment; filename="Analisi_2025-10_2026-09.pdf"');
+    const buf = r.body as Buffer;
+    expect(buf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(buf.length).toBeGreaterThan(1000);
+  }, 180_000);
 });

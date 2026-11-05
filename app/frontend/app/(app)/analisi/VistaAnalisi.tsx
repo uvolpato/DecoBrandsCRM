@@ -63,6 +63,7 @@ const DIM_FILTRO: Record<string, Dimensione | undefined> = { fornitore: 'fornito
 const TITOLO_VOCE: Record<string, string> = { fornitore: 'Fornitore', subagente: 'Subagente', cliente: 'Cliente', mese: 'Mese' };
 const NOTE: Record<string, string> = {
   xlsx: 'Foglio Riepilogo con i 4 numeri e il periodo precedente, un foglio per subagente, fornitore, cliente e mese con i totali a formule, l’elenco dei documenti.',
+  pdf: 'Stesso contenuto e stessa impaginazione dell’Excel, da inviare o archiviare.',
   csv: 'Solo l’elenco dei documenti filtrati, separatore punto e virgola, per altri programmi.',
 };
 
@@ -285,7 +286,7 @@ export function VistaAnalisi() {
   );
 }
 
-/** Scelta del formato (§7.22): Excel (con i fogli) o CSV dei documenti. Il PDF arriva con F4-A3. */
+/** Scelta del formato (§7.22, §11): Excel (con i fogli), PDF (lo stesso .xlsx convertito) o CSV dei documenti. */
 function FinestraEsporta({ periodo, filtri, onChiudi, onScarica }: {
   periodo: string; filtri: boolean; onChiudi: () => void; onScarica: (formato: string) => Promise<void>;
 }) {
@@ -305,7 +306,7 @@ function FinestraEsporta({ periodo, filtri, onChiudi, onScarica }: {
       <div className="formato-esporta">
         <span>Formato</span>
         <div className="segmenti" role="radiogroup" aria-label="Formato del file">
-          {[['xlsx', 'Excel'], ['csv', 'CSV']].map(([f, t]) => (
+          {[['xlsx', 'Excel'], ['pdf', 'PDF'], ['csv', 'CSV']].map(([f, t]) => (
             <button key={f} type="button" role="radio" aria-checked={formato === f} aria-selected={formato === f} onClick={() => setFormato(f)}>{t}</button>
           ))}
         </div>
