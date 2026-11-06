@@ -42,8 +42,9 @@ export const SCHEMI: Record<string, string[]> = {
   // bollettini (§15.2.5)
   'calcolo.verify': ['bollettino_id', 'periodo', 'importo_riconosciuto', 'importo_calcolato', 'differenza_totale'],
   'errore.error': ['rotta', 'metodo', 'http_status', 'errore'],
-  // documenti (§15.2.4, F2-A3)
-  'documento.upload': ['documento_id', 'file_nome', 'dimensione', 'origine'],
+  // documenti (§15.2.4, F2-A3). L'esito `errore` (lettura fallita, §15.2.4) ha tentativi ed errore
+  // al posto di dimensione e origine: restano solo le chiavi sempre presenti.
+  'documento.upload': ['documento_id', 'file_nome'],
   'documento.create': ['pratica_id', 'documento_id', 'tipo', 'numero', 'data', 'importo', 'storno_totale', 'fattura_id'],
   'documento.update': ['documento_id', 'pratica_id', 'prima', 'dopo'],
   'documento.delete': ['documento_id', 'pratica_id', 'tipo', 'numero', 'importo'],
@@ -59,6 +60,12 @@ export const SCHEMI: Record<string, string[]> = {
   'integra.piva_doppia': ['piva'],
   'integra.riga': ['vista', 'id_integra', 'errore'],
   'integra.lenta': ['secondi'],
+  // casella dei documenti e lettura (§7.14.3): anomalie, non eventi
+  'casella.connessione': ['errore'],
+  'casella.cartella': ['cartella'],
+  'casella.allegato': ['nome', 'errore'],
+  'casella.vuota': ['oggetto'],
+  'lettura.fallita': ['documento_id', 'errore'],
 };
 
 /** Anomalia del registro (§4.2.11, D-31): una per chiave finché resta aperta; si ripete e si chiude. */

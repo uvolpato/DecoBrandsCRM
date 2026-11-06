@@ -17,7 +17,7 @@ import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, i
 import { netto, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
 import { PrismaService } from './prisma.service';
-import { type Contesto, logEvent } from './registro';
+import { type Contesto, apriAnomalia, logEvent } from './registro';
 
 // Documenti fiscali della pratica e canale comune di ingresso dei file (F2-A3, §4.2.7.1, §5.3, §6.5, §8.1).
 // Il browser manda solo i valori digitati; netto, totali e stato li calcola il server (V12, D-28).
@@ -111,6 +111,50 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
     if ((e as { code?: string }).code === 'P2002') throw doppione(); // stesso file arrivato insieme da due parti
     throw e;
   }
+}
+
+/* ---------- Coda per il lettore (F6-A1, §6.5 punto 2): la userà F6-A2, senza rotte ---------- */
+
+/** Prende il documento più vecchio in coda e lo porta `in_lettura`: prelievo e cambio di stato nella
+ *  stessa transazione (V13). `SKIP LOCKED`: più processi leggono insieme, ognuno un file diverso. */
+export async function prelevaDocumento(db: PrismaService): Promise<{ id: bigint; file_nome: string; file_percorso: string; tentativi: number } | null> {
+  return db.$transaction(async (tx) => {
+    const righe = await tx.$queryRaw<{ id: bigint; file_nome: string; file_percorso: string; tentativi: number }[]>`
+      SELECT id, file_nome, file_percorso, tentativi FROM documenti_in_arrivo
+      WHERE stato = 'in_coda' ORDER BY ricevuto_il, id FOR UPDATE SKIP LOCKED LIMIT 1`;
+    const d = righe[0];
+    if (!d) return null;
+    const tentativi = d.tentativi + 1;
+    await tx.documenti_in_arrivo.update({ where: { id: d.id }, data: { stato: 'in_lettura', tentativi } });
+    return { id: d.id, file_nome: d.file_nome, file_percorso: d.file_percorso, tentativi };
+  });
+}
+
+/** Lettura non riuscita (§6.5 punto 2): fino a 3 tentativi torna `in_coda` con l'errore; al terzo
+ *  porta `errore`, scrive l'evento e apre `lettura.fallita`. Se la riga non è `in_lettura` non si
+ *  tocca (un'altra richiesta l'ha già presa). Ritorna lo stato finale. */
+export async function letturaFallita(db: PrismaService, id: bigint, errore: string): Promise<string> {
+  return db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${id} FOR UPDATE`;
+    const riga = await tx.documenti_in_arrivo.findUnique({ where: { id } });
+    if (!riga || riga.stato !== 'in_lettura') return riga?.stato ?? ''; // non in lettura: non si tocca
+    const errorePulito = errore.replace(/\s+/g, ' ').slice(0, 300);
+    if (riga.tentativi >= 3) {
+      await tx.documenti_in_arrivo.update({ where: { id }, data: { stato: 'errore', errore: errorePulito } });
+      await logEvent(tx, {
+        tipo: 'documento', azione: 'upload', entita: 'documento', entita_id: id, esito: 'errore',
+        dettaglio: { etichetta: riga.file_nome, documento_id: String(id), file_nome: riga.file_nome, tentativi: riga.tentativi, errore: errorePulito },
+      }, {});
+      await apriAnomalia(tx, {
+        servizio: 'lettura', codice: 'lettura.fallita', chiave: String(id),
+        messaggio: `Il documento ${riga.file_nome} non si legge dopo 3 tentativi: aprirlo in Documenti e inserire i dati a mano, o scartarlo.`,
+        dettaglio: { documento_id: String(id), errore: errorePulito },
+      });
+      return 'errore';
+    }
+    await tx.documenti_in_arrivo.update({ where: { id }, data: { stato: 'in_coda', errore: errorePulito } });
+    return 'in_coda';
+  });
 }
 
 /** Pezzo di nome leggibile e sicuro per il disco: lettere senza accenti, cifre, . _ - (D-60). */

@@ -246,7 +246,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 | Attività | Ore | Dipende da | Sorgente prototipo | Riferimenti spec |
 |---|---|---|---|---|
-| **F6-A1** Ricezione e coda: lettura casella (`imapflow`, lavoro pianificato), caricamento manuale, `file_hash` contro i doppioni, coda con `SKIP LOCKED`, tentativi ed errori | 3 | F0 | — | §4.2.12, §6.5 punti 1–2, §8.1 |
+| **F6-A1** Ricezione e coda: lettura casella (`imapflow`, lavoro pianificato ogni N minuti da Impostazioni → Casella; allegati PDF/JPEG/PNG in `riceviDocumento`, doppioni ignorati, email lette spostate), caricamento manuale già fatto (F2-A3), coda con `SKIP LOCKED` e 3 tentativi (`prelevaDocumento`/`letturaFallita`), anomalie `casella.*` e `lettura.fallita` | 3 | F0 | — | §4.2.12, §6.5 punti 1–2, §8.1 |
 | **F6-A2** Servizio di lettura: PDF → immagini, chiamata GLM-OCR/vLLM con schema per tipo documento, `logprobs` → affidabilità per campo, posizione nel PDF, unione righe multipagina, bollettini Excel con `exceljs` | 6 | F0-A6 | — | §6.5 punti 3–4, §4.2.13, V11 |
 | **F6-A3** Controlli fissi e livello del documento; proposta di abbinamento (codice cliente + articoli in comune) | 2 | F0-A5, F6-A2 | `prototipo-alternativo/assets/motore.js` (`proposta`, `daFare`) | §6.5 punti 5–6 |
 | **F6-A4** Schermata `/documenti` + finestra di correzione (PDF a sinistra, testata e righe a destra, campi incerti evidenziati, evidenziazione nel PDF), abbina / apri pratica / registra bollettino / scarta | 4 | F0-A4, F6-A3 | `prototipo-alternativo/` vista Documenti | §6.5 punto 7, §7.9, §15.2.4 |

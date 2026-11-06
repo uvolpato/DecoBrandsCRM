@@ -109,14 +109,14 @@ export const GUIDA: Argomento[] = [
   { id: 'documenti', titolo: 'Documenti', gruppo: 'Lavoro', vai: '/documenti',
     sintesi: 'L’unico ingresso di tutti i documenti dei fornitori: ordini, conferme, fatture, note di credito, bollettini. Ogni documento viene letto, controllato e mandato al posto giusto.',
     flusso: [
-      ['Entra', 'Dalla casella email ogni pochi minuti, o trascinando i file nel riquadro a sinistra.'],
+      ['Entra', 'Dalla casella email in automatico (il ritmo si fissa in Impostazioni → Casella dei documenti) o trascinando i file nel riquadro a sinistra. Gli Excel non si prendono: solo PDF e foto.'],
       ['Viene letto', 'Testata e righe con un’affidabilità per campo; controlli fissi (codice cliente, totale, doppioni).'],
       ['Controlli', 'Se ci sono punti incerti: Correggi i dati letti.'],
       ['Decidi', 'Ordine → apri la pratica; conferma, fattura, nota di credito → abbina; bollettino → registra.'],
       ['Esce dalla coda', 'La pratica o il bollettino si aggiornano; il documento resta consultabile lì.'],
     ],
     pulsanti: [
-      ['Trascina qui · Scegli i file', 'Carica PDF ed Excel.'],
+      ['Trascina qui · Scegli i file', 'Carica PDF e foto.'],
       ['N scartati', 'In alto all’elenco: apre i documenti scartati.'],
       ['Correggi i dati letti', 'Apre la finestra di correzione; il numero sul pulsante sono i punti da controllare.'],
       ['Schede del documento', 'Prima l’azione proposta (Pratica proposta · Nuova pratica · Scegli la pratica · Cosa farne), poi Righe lette: il contatore dice quante righe sono incerte.'],
