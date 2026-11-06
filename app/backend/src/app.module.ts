@@ -11,6 +11,7 @@ import { AgentiController, SubagentiController } from './subagenti';
 import { ClientiController } from './clienti';
 import { IntegraController, IntegraService } from './integra';
 import { CasellaService } from './casella';
+import { LetturaService } from './lettura';
 import { PraticheController } from './pratiche';
 import { DocumentiAbbinaController, DocumentiController, DocumentiFiscaliController, DocumentiPraticaController } from './documenti';
 import { BollettiniController } from './bollettini';
@@ -58,6 +59,7 @@ export function limiti(env = process.env) {
   providers: [
     IntegraService,
     CasellaService,
+    LetturaService,
     EventiService,
     PuliziaRegistro,
     { provide: APP_FILTER, useClass: ErroriFilter }, // con Prisma iniettato: scrive nel registro

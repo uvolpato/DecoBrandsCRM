@@ -8,32 +8,8 @@ import { basename } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { letturaConfig } from './impostazioni';
+import { PROMPT_DOCUMENTO, SCHEMA_DOCUMENTO } from './lettura';
 import { leggiDocumento } from './lettore';
-
-// Schema di prova, generico: serve solo a vedere cosa restituisce il connettore. I veri schemi per
-// tipo documento arrivano con F6-A2.
-const SCHEMA_PROVA = {
-  type: 'object',
-  properties: {
-    fornitore: { type: 'string', description: 'Ragione sociale del fornitore' },
-    tipo: { type: 'string', description: 'ordine, conferma, fattura, nota di credito, pagamento' },
-    numero: { type: 'string', description: 'Numero del documento' },
-    data: { type: 'string', description: 'Data del documento in formato AAAA-MM-GG' },
-    codice_cliente: { type: 'string', description: 'Codice cliente del fornitore' },
-    importo_totale: { type: 'number', description: 'Totale del documento in euro' },
-    righe: {
-      type: 'array',
-      description: 'Righe del documento',
-      items: {
-        type: 'object',
-        properties: {
-          codice: { type: 'string' }, descrizione: { type: 'string' },
-          quantita: { type: 'number' }, prezzo: { type: 'number' }, importo: { type: 'number' },
-        },
-      },
-    },
-  },
-};
 
 async function main(argv: string[]) {
   const [file, schemaFile] = argv;
@@ -43,8 +19,8 @@ async function main(argv: string[]) {
     const c = await letturaConfig(db);
     if (!c) throw new Error('Server di lettura non configurato: in Impostazioni → Server di lettura scegli il connettore e salva la chiave API.');
     const dati = await readFile(file);
-    const schema = schemaFile ? JSON.parse(await readFile(schemaFile, 'utf8')) : SCHEMA_PROVA;
-    const r = await leggiDocumento(c, basename(file), dati, schema);
+    const schema = schemaFile ? JSON.parse(await readFile(schemaFile, 'utf8')) : SCHEMA_DOCUMENTO;
+    const r = await leggiDocumento(c, basename(file), dati, schema, PROMPT_DOCUMENTO);
     console.log(JSON.stringify(r.risultato, null, 2));
     console.log('');
     for (const x of r.campi) {

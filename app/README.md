@@ -62,8 +62,9 @@ npm run lettura:prova -- "C:\...\fattura.pdf" [schema.json]
 ```
 
 Stampa i campi con affidabilità e pagina/riquadro, i crediti usati e cancella il file dal cloud.
-Senza `schema.json` usa uno schema generico di prova; gli schemi per tipo documento arrivano con
-F6-A2.
+Senza `schema.json` usa lo schema vero dei documenti (`SCHEMA_DOCUMENTO` e `PROMPT_DOCUMENTO`).
+I parametri del `.env` (come `SEGRETI_CHIAVE`) si leggono in sola lettura in fondo alla sezione delle
+Impostazioni; dopo averli cambiati nel file si riavvia il backend (D-70).
 
 Senza `PONTE_URL` la sincronizzazione non parte. Il ponte vero (F0-A8) si prepara con
 `strumenti/integra/viste-crm.sql`; il CRM legge solo le viste, mai Integra.

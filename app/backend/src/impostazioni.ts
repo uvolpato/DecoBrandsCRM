@@ -248,7 +248,7 @@ export async function applica(db: Db, chiave: string, valori: Record<string, unk
       try {
         nuovo[c.nome] = cifra(String(v));
       } catch {
-        throw new BadRequestException('Il server non ha la chiave dei segreti (SEGRETI_CHIAVE): chiedi a chi amministra il server di impostarla nel .env.');
+        throw new BadRequestException('Il server non ha la chiave dei segreti (SEGRETI_CHIAVE): va scritta nel file .env del server (app/backend/.env) e poi bisogna riavviare il backend. I parametri del server sono elencati sotto la sezione.');
       }
       prima[c.nome] = attuale[c.nome] ? 'impostata' : 'non impostata';
       dopo[c.nome] = 'sostituita';

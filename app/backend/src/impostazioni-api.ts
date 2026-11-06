@@ -22,6 +22,15 @@ class Salva {
   valori!: Record<string, unknown>;
 }
 
+/** Parametri che vivono nel .env del server, non nelle Impostazioni (D-70): si mostrano in sola
+ *  lettura, con la sezione che li usa e se ci sono; i valori segreti non escono mai. */
+const AMBIENTE = [
+  { nome: 'SEGRETI_CHIAVE', uso: 'Chiave per cifrare le password salvate qui: senza, non si possono salvare segreti.', sezioni: ['casella', 'lettura', 'posta', 'integra'], segreto: true },
+  { nome: 'DOCUMENTI_DIR', uso: 'Cartella dei documenti arrivati, sul server.', sezioni: ['casella', 'conservazione'] },
+  { nome: 'DOCUMENTI_MAX_MB', uso: 'Dimensione massima di un documento caricato, in MB.', sezioni: ['casella'] },
+  { nome: 'APP_URL', uso: 'Indirizzo pubblico dell’app, per i link nelle email.', sezioni: ['posta'] },
+];
+
 const TESTO_PROVA: Record<string, string> = {
   casella: 'Casella non configurata: completa server, utente e password.',
   posta: 'Posta non configurata: completa server, utente e password.',
@@ -39,7 +48,12 @@ export class ImpostazioniController {
   async elenco() {
     const sezioni = await Promise.all((['azienda', 'casella', 'lettura', 'posta', 'integra', 'conservazione'] as const)
       .map((chiave) => sezionePubblica(this.db, chiave)));
-    return { sezioni };
+    const ambiente = AMBIENTE.map(({ nome, uso, sezioni: dove, segreto }) => ({
+      nome, uso, sezioni: dove,
+      impostato: !!process.env[nome],
+      valore: segreto ? null : (process.env[nome] ?? null), // un segreto non esce nemmeno qui
+    }));
+    return { sezioni, ambiente };
   }
 
   @Put(':chiave')

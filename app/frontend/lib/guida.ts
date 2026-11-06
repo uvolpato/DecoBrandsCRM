@@ -616,6 +616,7 @@ export const GUIDA: Argomento[] = [
       'Server di lettura: scegli il modello dal menu (LlamaCloud UE o GLM-OCR locale quando c’è la macchina); ognuno ha i suoi parametri e la pagina mostra quelli del modello scelto, che è quello usato per leggere i documenti. La chiave non si rilegge e il file si cancella dal cloud dopo la lettura.',
       'Righe per pagina: quante righe mostrano le tabelle prima di andare a pagina successiva.',
       'Le impostazioni si usano davvero: la posta in uscita, la sincronizzazione da Integra, la conservazione del registro, le righe per pagina e l’intestazione delle esportazioni.',
+      'Alcuni parametri non stanno qui ma nel file .env del server (per esempio SEGRETI_CHIAVE, senza cui le password non si possono salvare): li trovi elencati in fondo alla sezione, in sola lettura, con il file da modificare e il riavvio del backend che serve per caricarli.',
     ],
     modifica: 'Superutente e Amministratore.',
   },

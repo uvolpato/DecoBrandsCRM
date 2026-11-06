@@ -15,12 +15,15 @@ import { api } from '@/lib/api';
 
 interface CampoRisposta { nome: string; etichetta: string; tipo: string; aiuto?: string; largo?: boolean; min?: number; max?: number; step?: number; opzioni?: { value: string; label: string }[]; gruppo?: string; valore?: unknown; impostata?: boolean }
 interface Sezione { chiave: string; titolo: string; sotto: string; campi: CampoRisposta[] }
+// Parametri del .env del server (D-70): si mostrano in sola lettura, non si modificano da qui.
+interface ParametroServer { nome: string; uso: string; sezioni: string[]; impostato: boolean; valore: string | null }
 
 const PROVABILE = ['casella', 'lettura', 'posta', 'integra'];
 
 export function VistaImpostazioni() {
   const { sezione } = useParams<{ sezione: string }>();
   const [sezioni, setSezioni] = useState<Sezione[] | null>(null);
+  const [ambiente, setAmbiente] = useState<ParametroServer[]>([]);
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
   const [prova, setProva] = useState<{ ok: boolean; testo: string } | null>(null);
@@ -28,8 +31,8 @@ export function VistaImpostazioni() {
   const sagome = useSagome(!sezioni);
 
   const carica = useCallback(async () => {
-    const r = await api<{ sezioni: Sezione[] }>('impostazioni');
-    if (r.ok) { setSezioni(r.dati.sezioni); setErrore(''); }
+    const r = await api<{ sezioni: Sezione[]; ambiente: ParametroServer[] }>('impostazioni');
+    if (r.ok) { setSezioni(r.dati.sezioni); setAmbiente(r.dati.ambiente ?? []); setErrore(''); }
     else if (!sezioni) setErrore(r.messaggio); else avviso(r.messaggio, true);
   }, [sezioni]);
 
@@ -43,6 +46,7 @@ export function VistaImpostazioni() {
     setConnettore(typeof scelto === 'string' ? scelto : '');
   }, [sez?.chiave]); // eslint-disable-line react-hooks/exhaustive-deps -- solo al cambio sezione
   const visibili = sez ? sez.campi.filter((c) => !c.gruppo || c.gruppo === connettore) : [];
+  const parametri = sez ? ambiente.filter((p) => p.sezioni.includes(sez.chiave)) : [];
 
   const salva = async (ev: FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
@@ -111,6 +115,26 @@ export function VistaImpostazioni() {
               {prova && <p className={'nota' + (prova.ok ? '' : ' nota-errore')} role="status">{prova.testo}</p>}
             </div>
           </form>
+          {parametri.length > 0 && (
+            <div className="nota" style={{ marginTop: 16 }}>
+              <b>Parametri del server (file .env)</b>
+              <p style={{ margin: '4px 0' }}>
+                Si leggono qui e <b>non si modificano da questa pagina</b>: si cambiano nel file{' '}
+                <code>app/backend/.env</code> sul server, poi si riavvia il backend.
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {parametri.map((p) => (
+                  <li key={p.nome}>
+                    <code>{p.nome}</code> — {p.uso}{' '}
+                    <span style={p.impostato ? undefined : { color: 'var(--errore-testo, #842029)' }}>
+                      {p.impostato ? 'impostato' : 'mancante'}
+                    </span>
+                    {p.valore ? ' · ' + p.valore : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Pannello>
       </div>
     </Pagina>

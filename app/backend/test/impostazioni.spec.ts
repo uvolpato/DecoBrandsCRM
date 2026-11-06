@@ -99,6 +99,22 @@ describe('F5-A6 rotte delle impostazioni', () => {
     expect(lettura.campi.find((c) => c.nome === 'connettore')).toMatchObject({ tipo: 'select', valore: 'llamacloud_eu' });
     expect(lettura.campi.find((c) => c.nome === 'llamacloud_chiave')).toMatchObject({ tipo: 'password', valore: null, impostata: false });
     expect(JSON.stringify(r.body)).not.toContain('v1:'); // mai il valore cifrato nella risposta
+    // parametri del .env (D-70): in sola lettura, con lo stato; il segreto non esce
+    const ambiente = r.body.ambiente as { nome: string; sezioni: string[]; impostato: boolean; valore: unknown }[];
+    expect(ambiente.find((p) => p.nome === 'SEGRETI_CHIAVE')).toMatchObject({ impostato: true, valore: null });
+    expect(ambiente.find((p) => p.nome === 'SEGRETI_CHIAVE')!.sezioni).toEqual(expect.arrayContaining(['casella', 'lettura', 'posta', 'integra']));
+    expect(JSON.stringify(r.body)).not.toContain('chiave-di-prova-impostazioni');
+  });
+
+  it('ambiente: un parametro mancante si vede, senza dire il valore dei segreti', async () => {
+    const originale = process.env.SEGRETI_CHIAVE;
+    delete process.env.SEGRETI_CHIAVE;
+    try {
+      const r = await ammi.get('/api/impostazioni').expect(200);
+      expect((r.body.ambiente as { nome: string; impostato: boolean }[]).find((p) => p.nome === 'SEGRETI_CHIAVE')).toMatchObject({ impostato: false });
+    } finally {
+      process.env.SEGRETI_CHIAVE = originale;
+    }
   });
 
   it('PUT: salvataggio, rilettura, campo sconosciuto e chiave sconosciuta', async () => {
