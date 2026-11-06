@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useScorrimento } from '@/lib/memoria';
+import { voceDi } from './Barra';
 import { Icona } from './Icona';
 import { AREE, usePuo, useUtente } from './Utente';
 
@@ -20,6 +21,16 @@ function argomentoGuida(percorso: string): string | null {
   if (percorso === '/') return 'oggi';
   return GUIDA_ROTTE.find(([rotta]) => percorso === rotta || percorso.startsWith(rotta + '/'))?.[1] ?? 'panoramica';
 }
+/** "Torna a …" con l'articolo giusto per la voce (D-47, §7.12). */
+const ARTICOLO: Record<string, string> = {
+  Oggi: 'a Oggi', Documenti: 'ai Documenti', Pratiche: 'alle Pratiche', 'Documenti scartati': 'ai Documenti scartati',
+  Bollettini: 'ai Bollettini', Liquidazioni: 'alle Liquidazioni', Analisi: "all'Analisi", Fornitori: 'ai Fornitori',
+  Subagenti: 'ai Subagenti', Clienti: 'ai Clienti', 'Utenti e ruoli': 'a Utenti e ruoli',
+  'Stato del sistema': 'allo Stato del sistema', Registro: 'al Registro', Impostazioni: 'alle Impostazioni',
+  Componenti: 'ai Componenti', Guida: 'alla Guida',
+};
+// l'ultimo percorso aperto: il link "Torna a …" riporta lì con la memoria della schermata (§7.12)
+let ultima: { percorso: string; titolo: string } | null = null;
 export interface Azione {
   etichetta: string;
   icona?: string;
@@ -54,10 +65,26 @@ export interface PaginaProps {
 export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], pieno, children }: PaginaProps) {
   // anche a ogni cambio d'indirizzo: navigando, Next rimette il titolo del layout ("Decobrands")
   const percorso = usePathname();
+  const router = useRouter();
   const corpo = useScorrimento<HTMLElement>('corpo'); // posizione di scorrimento ritrovata tornando (§7.12)
   useEffect(() => { document.title = titolo + ' · Decobrands'; }, [titolo, percorso]);
+  // "Torna a …" (§7.12): la schermata lasciata, con filtri e posizione; niente su un accesso diretto
+  const [torna, setTorna] = useState<{ percorso: string; titolo: string } | null>(null);
+  useEffect(() => {
+    if (ultima && ultima.percorso !== percorso) setTorna(ultima);
+    ultima = { percorso, titolo: voceDi(percorso)?.t ?? 'la pagina precedente' };
+  }, [percorso]);
+  const indietro = torna ? [{
+    etichetta: 'Torna ' + (ARTICOLO[torna.titolo] ?? 'a ' + torna.titolo),
+    icona: 'indietro', variante: 'sec' as const, onClick: () => router.back(), consentito: true,
+    titolo: 'Torna alla schermata precedente, con filtri e posizione',
+  }] : [];
   const guida = argomentoGuida(percorso);
-  const tutte = [...azioni, ...(guida ? [{ etichetta: 'Guida', href: '/guida/' + guida, variante: 'sec' as const, consentito: true }] : [])];
+  const tutte = [
+    ...indietro,
+    ...azioni,
+    ...(guida ? [{ etichetta: 'Guida', href: '/guida/' + guida, variante: 'sec' as const, consentito: true }] : []),
+  ];
   return (
     <>
       <header className="testa">

@@ -124,6 +124,16 @@ describe('abbinamento a mano (POST /api/documenti/:id/abbina)', () => {
     expect((await arrivo(b.id)).stato).toBe('in_coda');
   });
 
+  it('GET /api/pratiche/:id/documenti: ogni documento porta le righe per il confronto affiancato', async () => {
+    const r = (await op.get(`/pratiche/${base.id}/documenti`).expect(200)).body;
+    const ord = r.altri.find((x: { tipo: string }) => x.tipo === 'ordine');
+    expect(ord.righe.length).toBeGreaterThan(0);
+    expect(ord.righe[0]).toEqual(expect.objectContaining({
+      codice: expect.any(String), quantita: expect.any(Number), prezzo: expect.any(Number), importo: expect.any(Number),
+    }));
+    expect(ord.riferimento).toBeNull();
+  });
+
   it('senza pratica solo un ordine; tipo sconosciuto 400', async () => {
     const a = (await op.carica(pdf('fattura sola'), 'f.pdf').expect(201)).body;
     await op.post(`/documenti/${a.id}/abbina`, { tipo: 'fattura', numero: 'X1', data: '2026-09-01', importo: 1 }).expect(400);

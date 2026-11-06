@@ -305,9 +305,9 @@ describe('PUT /api/documenti/:id — correzione dei dati letti', () => {
     expect(numero).toMatchObject({ valore_letto: 'F-1', valore_finale: 'F-1-CORRETTO', verificato: true });
     expect(numero.corretto_da).toBe(utenteId);
     expect(numero.corretto_il).not.toBeNull();
-    // riga 0: metadati conservati; riga 1: quella vecchia sostituita e rinumerata, nasce verificata
+    // riga 0: metadati conservati; senza ✓ il campo invariato resta non verificato (F6-A4b)
     const codice0 = campi.find((c) => c.campo === 'righe[0].codice')!;
-    expect(codice0).toMatchObject({ valore_letto: 'A1', valore_finale: 'A1', verificato: true });
+    expect(codice0).toMatchObject({ valore_letto: 'A1', valore_finale: 'A1', verificato: false });
     expect(Number(codice0.affidabilita)).toBe(0.99);
     expect(codice0.posizione).toMatchObject({ tipo: 'pdf', pagina: 1 });
     const codice1 = campi.find((c) => c.campo === 'righe[1].codice')!;
@@ -321,11 +321,30 @@ describe('PUT /api/documenti/:id — correzione dei dati letti', () => {
     expect(ev.dettaglio).toMatchObject({ documento_id: String(id), campi_corretti: 4, livello_prima: null, livello_dopo: 'affidabile' });
   });
 
-  it('un campo a 0,5 corretto porta il livello ad affidabile', async () => {
+  it('un campo a 0,5 confermato con ✓ porta il livello ad affidabile', async () => {
     const id = await creaDoc({ tipo: 'fattura', campi: [{ campo: 'numero', letto: 'F-2', aff: 0.5 }] });
-    const r = await oper.put(`/documenti/${id}`, { testata: { tipo: 'fattura', numero: 'F-2' }, righe: [] }).expect(200);
+    const r = await oper.put(`/documenti/${id}`, { testata: { tipo: 'fattura', numero: 'F-2' }, righe: [], verificati: ['numero'] }).expect(200);
     expect(r.body.livello).toBe('affidabile');
     expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } })).livello).toBe('affidabile');
+  });
+
+  it('con ✓ solo il campo confermato diventa verificato; gli altri incerti restano', async () => {
+    const id = await creaDoc({
+      tipo: 'fattura', campi: [
+        { campo: 'numero', letto: 'F-3', aff: 0.5 },
+        { campo: 'data', letto: '2026-09-01', aff: 0.6 },
+      ],
+    });
+    const r = await oper.put(`/documenti/${id}`, {
+      testata: { tipo: 'fattura', numero: 'F-3', data: '2026-09-01' }, righe: [], verificati: ['numero'],
+    }).expect(200);
+    const campi = await db.documenti_campi.findMany({ where: { documento_id: id } });
+    expect(campi.find((c) => c.campo === 'numero')!.verificato).toBe(true);
+    const data = campi.find((c) => c.campo === 'data')!;
+    expect(data).toMatchObject({ valore_finale: '2026-09-01', verificato: false });
+    // la data resta incerta: il documento non è ancora affidabile
+    expect(r.body.livello).toBe('bassa');
+    expect(r.body.campi.find((c: { campo: string }) => c.campo === 'data')!.verificato).toBe(false);
   });
 
   it('un totale sbagliato porta a bassa; corretto il totale torna affidabile', async () => {

@@ -67,7 +67,7 @@ try:
         ok(pg.locator('.aff-sx object[type="application/pdf"]').count() == 1, 'finestra di correzione: PDF originale a sinistra')
         ok(pg.input_value('input[data-campo="numero"]') == 'PROVA-' + S.upper(), 'finestra di correzione: numero letto')
         ok(pg.locator('.aff-dx .incerto-errore').count() >= 1 and pg.locator('.aff-dx .incerto-attesa').count() >= 1, 'campi bordati giallo e rosso')
-        ok('pagina' in testo(pg, '.aff-sx') or 'Seleziona un campo' in testo(pg, '.aff-sx'), 'posizione del campo sotto il documento')
+        ok('pagina' in testo(pg, '.aff-dx') or 'Seleziona un campo' in testo(pg, '.aff-dx'), 'posizione del campo accanto ai dati')
         pg.fill('input[data-campo="numero"]', 'PROVA-' + S.upper() + '-B')
         pg.fill('input[data-campo="importo"]', '260')
         pg.click('button:has-text("Aggiungi riga")'); pg.wait_for_timeout(100)
@@ -76,6 +76,15 @@ try:
         pg.fill('input[data-campo="righe[2].quantita"]', '1')
         pg.fill('input[data-campo="righe[2].prezzo"]', '10')
         pg.fill('input[data-campo="righe[2].importo"]', '10')
+        # il segno di conferma accanto al campo incerto non cambia il valore (F6-A4b)
+        const_cerchi = pg.locator('.aff-dx .conferma-campo').count()
+        ok(const_cerchi >= 1, 'finestra: il segno di conferma per i campi incerti')
+        for _ in range(40):
+            if not pg.locator('.aff-dx .conferma-campo').count():
+                break
+            pg.locator('.aff-dx .conferma-campo').first.click(); pg.wait_for_timeout(50)
+        ok(pg.locator('.aff-dx .conferma-campo').count() == 0, 'tutti i campi confermati: niente più segni')
+        ok('tutti i campi sono controllati' in testo(pg, '.aff-riepilogo'), 'riepilogo: nessun punto da controllare')
         pg.screenshot(path=str(USCITA / 'app-documenti-correggi-1440.png'))
         pg.click('button:has-text("Salva e ricalcola")'); pg.wait_for_selector('.avviso:has-text("Dati salvati")')
         ok(pg.locator('.affiancata').count() == 0, 'salvataggio: la finestra si chiude')

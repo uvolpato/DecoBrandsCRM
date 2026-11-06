@@ -80,7 +80,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .principale { min-width: 0; height: 100vh; display: flex; flex-direction: column; padding: 24px 30px 20px; gap: 18px; overflow: hidden; }
 .testa { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex: none; }
 .testa h1 { font-size: 22px; font-weight: 700; }
-.testa .testa-badge { display: inline-block; vertical-align: 4px; }
+.testa .testa-badge { display: inline-block; vertical-align: 4px; margin-left: 10px; }
 .testa .sotto { color: var(--testo-tenue); margin-top: 4px; max-width: 90ch; }
 .torna { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 6px -6px; padding: 3px 8px 3px 4px; border: 0; border-radius: 6px; background: none; color: var(--primario); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .torna:hover { background: var(--primario-tenue, rgba(0,102,255,.08)); }

@@ -15,7 +15,7 @@ export function Elenco({ voci, vuoto = 'Nessun elemento' }: { voci: { testo: Rea
   return (
     <ul className="elenco">
       {voci.length ? voci.map((v, i) => v.onClick
-        ? <li key={i} className="cliccabile" tabIndex={0} role="button" title={v.titolo} onClick={(e) => { if (!(e.target as Element).closest('a')) v.onClick!(); }}
+        ? <li key={i} className="cliccabile" tabIndex={0} role="button" title={v.titolo} onClick={(e) => { if (!(e.target as Element).closest('a, button')) v.onClick!(); }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); v.onClick!(); } }}><span>{v.testo}</span>{v.destra != null && <span className="destra">{v.destra}</span>}</li>
         : <li key={i}><span>{v.testo}</span>{v.destra != null && <span className="destra">{v.destra}</span>}</li>) : <li className="testo-tenue">{vuoto}</li>}
     </ul>

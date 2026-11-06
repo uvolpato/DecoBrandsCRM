@@ -48,7 +48,8 @@ export const GUIDA: Argomento[] = [
   { id: 'comandi', titolo: 'Comandi comuni', gruppo: 'Inizia qui', vai: '/',
     sintesi: 'Gli stessi comandi valgono in tutte le pagine: impari una volta, li ritrovi ovunque.',
     pulsanti: [
-      ['‹ Torna a …', 'In alto a sinistra: torna alla schermata precedente con filtri, ordinamento, pagina e scorrimento come li avevi lasciati. Anche Alt + ← o il tasto Indietro del browser.'],
+      ['‹ Torna a …', 'In alto a destra, accanto a Guida: torna alla schermata precedente con filtri, ordinamento, pagina e scorrimento come li avevi lasciati. Anche Alt + ← o il tasto Indietro del browser.'],
+      ['Numeri del menu', 'Accanto a Oggi, Documenti, Pratiche e Bollettini dicono quante cose ci sono da fare; giallo = urgente. Sono contati dal server.'],
       ['Carica documenti', 'Nella barra, da qualsiasi pagina: scegli o trascina PDF ed Excel; finiscono in Documenti.'],
       ['Guida', 'In alto a destra di ogni pagina: apre l’argomento di quella pagina.'],
       ['Segmenti (Tutti · Aperte · …)', 'Filtrano le righe della tabella sotto; il numero dice quante righe resterebbero, tenendo conto degli altri filtri. Si aggiorna subito, senza ricaricare la pagina.'],
@@ -111,7 +112,7 @@ export const GUIDA: Argomento[] = [
     flusso: [
       ['Entra', 'Dalla casella email in automatico (il ritmo si fissa in Impostazioni → Casella dei documenti) o trascinando i file nel riquadro in alto. Solo PDF e foto (JPEG, PNG): gli Excel e i messaggi di Outlook si rifiutano (D-60).'],
       ['Viene letto', 'Testata e righe con un’affidabilità per campo; controlli fissi (codice cliente, totale, doppioni).'],
-      ['Controlli', 'Se ci sono punti incerti: Correggi i dati letti.'],
+      ['Controlli', 'Se ci sono punti incerti: Correggi i dati letti. Accanto a un campo incerto il ✓ conferma il valore senza cambiarlo: il campo diventa verde e non conta più.'],
       ['Decidi', 'Ordine → apri la pratica; conferma, fattura, nota di credito → abbina; bollettino → registra.'],
       ['Esce dalla coda', 'La pratica o il bollettino si aggiornano; il documento resta consultabile lì.'],
     ],
@@ -119,6 +120,7 @@ export const GUIDA: Argomento[] = [
       ['Trascina qui i documenti · Scegli i file', 'Carica PDF e foto; la lettura parte da sola.'],
       ['Da controllare', 'A sinistra i documenti da controllare, con fornitore, importo e livello; clic su un documento per vederlo a destra senza cambiare pagina.'],
       ['Correggi i dati letti', 'Apre la finestra di correzione; il numero sul pulsante sono i punti da controllare.'],
+      ['PDF', 'Riapre il file originale accanto ai dati letti, senza passare dalla correzione.'],
       ['Schede del documento', 'Prima l’azione proposta (Pratica proposta · Nuova pratica · Scegli la pratica · Cosa farne), poi Righe lette: il contatore dice quante righe sono incerte.'],
       ['Vedi le righe', 'Nell’avviso giallo: apre la scheda Righe lette con le righe incerte evidenziate.'],
       ['Abbina a …', 'Abbina il documento alla pratica proposta (codice cliente + articoli in comune).'],
@@ -129,7 +131,7 @@ export const GUIDA: Argomento[] = [
     finestre: [
       { nome: 'Correggi i dati letti', da: 'Correggi i dati letti', cosa: 'A tutto schermo: a sinistra il documento originale (PDF o foto), a destra testata e righe modificabili. Il PDF si apre alla pagina del campo scelto. Sotto gli 860 px i due lati si impilano.',
         campi: [
-          ['Campi bordati', 'Giallo = incerto, rosso = poco affidabile, con la percentuale; verde quando il valore è confermato.'],
+          ['Campi bordati', 'Giallo = incerto, rosso = poco affidabile, con la percentuale; verde quando il valore è confermato. Il ✓ accanto al campo conferma il valore letto senza cambiarlo.'],
           ['Posizione', 'Sotto il documento: pagina e precisione (esatta, approssimata, assente) del campo scelto.'],
           ['Righe', 'Tabella modificabile: aggiungi una riga vuota, correggi i valori, elimina con ✕.'],
         ],
@@ -186,13 +188,13 @@ export const GUIDA: Argomento[] = [
       ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Nel riquadro Incasso: sollecito al cliente, o segnalazione del fornitore ricevuta per email o telefono.'],
     ],
     finestre: [
-      { nome: 'Documenti della pratica', da: 'PDF · Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato. Nell’app, per ora, a destra ci sono i dati del documento.',
+      { nome: 'Documenti della pratica', da: 'PDF · Consulta affiancati · clic su un documento o su una riga a confronto', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra i dati e il confronto riga per riga con un altro documento. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato.',
         campi: [
           ['Confrontato con', 'Sceglie il documento di confronto.'],
           ['Solo righe che cambiano · Tutte', 'Filtra il confronto.'],
         ],
         azioni: [
-          ['Clic su una riga', 'La evidenzia nel documento a sinistra.'],
+          ['Clic su una riga', 'La seleziona nella tabella; nel PDF il rettangolo sul valore non si disegna ancora (D-06).'],
           ['Esc', 'Chiude.'],
         ] },
       { nome: 'Registra la fattura', da: 'Registra fattura', cosa: 'Registra la fattura del fornitore sulla pratica; da lì la pratica passa a Fatturata e il netto si aggiorna.',

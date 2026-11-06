@@ -55,18 +55,34 @@ export function Barra() {
   const router = useRouter();
   const sigla = io.nome.split(' ').map((x) => x[0]).join('').slice(0, 2);
   const libera = (v: Voce) => !permessoDi(v) || puo(permessoDi(v)!);
-  // contatore dei problemi da vedere (§7.14): un numero letto dal server a ogni cambio pagina
+  // contatori delle voci (§7.1, come il prototipo): numeri letti dal server a ogni cambio pagina.
+  // Oggi, Documenti, Pratiche e Bollettini; Documenti e Pratiche sono urgenti (gialli) quando c'è
+  // qualcosa da fare. Il browser non calcola niente (V12).
+  const [conteggi, setConteggi] = useState<{ oggi: number; documenti: number; pratiche: number; bollettini: number } | null>(null);
   const [problemi, setProblemi] = useState<{ problemi: number; errore: boolean } | null>(null);
   useEffect(() => {
-    if (!puo('sistema.stato')) { setProblemi(null); return; }
     let vivo = true;
-    void api<{ problemi: number; errore: boolean }>('sistema/contatore').then((r) => {
-      if (vivo && r.ok) setProblemi(r.dati);
-    });
+    if (puo('provvigioni.consulta')) {
+      void api<{ oggi: number; documenti: number; pratiche: number; bollettini: number }>('oggi/conteggi').then((r) => {
+        if (vivo && r.ok) setConteggi(r.dati);
+      });
+    } else setConteggi(null);
+    if (puo('sistema.stato')) {
+      void api<{ problemi: number; errore: boolean }>('sistema/contatore').then((r) => {
+        if (vivo && r.ok) setProblemi(r.dati);
+      });
+    } else setProblemi(null);
     return () => { vivo = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- il contatore si rilegge a ogni cambio pagina
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- i contatori si rileggono a ogni cambio pagina
   }, [percorso]);
-  const conta = (n?: number) => (n ? <span className={'conta' + (problemi?.errore ? ' urgente' : '')}>{n}</span> : null);
+  const conta = (n?: number, urgente?: boolean) => (n ? <span className={'conta' + (urgente ? ' urgente' : '')}>{n}</span> : null);
+  const contaVoce = (href: string) => {
+    if (href === '/') return conta(conteggi?.oggi);
+    if (href === '/documenti') return conta(conteggi?.documenti, true);
+    if (href === '/pratiche') return conta(conteggi?.pratiche, true);
+    if (href === '/bollettini') return conta(conteggi?.bollettini);
+    return null;
+  };
   // per ogni area le voci che l'utente può aprire; un'area senza voci non compare
   const aree = AREE_MENU.map((a) => ({ ...a, gruppi: a.gruppi.map((g) => ({ ...g, voci: g.voci.filter(libera) })).filter((g) => g.voci.length) }))
     .filter((a) => a.gruppi.length);
@@ -109,7 +125,7 @@ export function Barra() {
     return (
       <Link key={v.href} className={'voce' + (si ? ' attiva' : '')} href={v.href} aria-current={si ? 'page' : undefined}>
         <Icona nome={v.icona} /><span>{v.t}</span>
-        {v.href === '/sistema' && conta(problemi?.problemi)}
+        {v.href === '/sistema' ? conta(problemi?.problemi, problemi?.errore) : contaVoce(v.href)}
       </Link>
     );
   };
@@ -126,7 +142,7 @@ export function Barra() {
       <div className="barra-menu">
         {qui?.gruppi.map((g) => (
           <nav key={g.gruppo} className="gruppo" aria-label={g.gruppo}>
-            <div className="gruppo-nome">{g.gruppo}{qui.id === 'gestione' && conta(problemi?.problemi)}</div>
+            <div className="gruppo-nome">{g.gruppo}{qui.id === 'gestione' && conta(problemi?.problemi, problemi?.errore)}</div>
             {g.voci.map(voce)}
           </nav>
         ))}

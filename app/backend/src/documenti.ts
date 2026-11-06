@@ -248,6 +248,7 @@ class ScartaDocumento {
 interface CorrezioneLettura {
   testata: Record<string, unknown>;
   righe: Record<string, unknown>[];
+  verificati?: string[]; // campi confermati con il ✓ (F6-A4b): restano verificati anche se il valore non cambia
 }
 
 type DbLetto = Prisma.TransactionClient | PrismaClient;
@@ -533,6 +534,8 @@ export class DocumentiController {
 
       const testata = b.testata ?? {};
       const righeInput = Array.isArray(b.righe) ? b.righe : [];
+      // campi confermati con il ✓: si segnano verificati anche se il valore resta quello letto
+      const confermati = new Set((Array.isArray(b.verificati) ? b.verificati : []).filter((x): x is string => typeof x === 'string'));
       const tipo = valoreCampo(testata.tipo, 'tipo', 'testo');
       if (!tipo || !TIPI_ARRIVO.includes(tipo as (typeof TIPI_ARRIVO)[number])) {
         throw new BadRequestException('Tipo del documento non valido');
@@ -570,11 +573,16 @@ export class DocumentiController {
           if (gia) await tx.documenti_campi.delete({ where: { id: gia.id } });
           continue;
         }
-        if (diverso(def.tipo, gia?.valore_letto ?? null, valore)) corretti++;
+        const cambiato = diverso(def.tipo, gia?.valore_letto ?? null, valore);
+        if (cambiato) corretti++;
         if (gia) {
           await tx.documenti_campi.update({
             where: { id: gia.id },
-            data: { valore_finale: valore, verificato: true, corretto_da: ctx.utente_id ?? null, corretto_il: ora },
+            data: {
+              valore_finale: valore,
+              verificato: cambiato || confermati.has(def.campo) || gia.verificato,
+              corretto_da: ctx.utente_id ?? null, corretto_il: ora,
+            },
           });
         } else {
           await tx.documenti_campi.create({
@@ -614,13 +622,16 @@ export class DocumentiController {
           const valore = valoreCampo(r[chiave], `righe[${j}].${chiave}`, tipoCampo);
           if (valore == null) continue;
           const gia = origine?.get(chiave);
-          if (!rigaNuova && diverso(tipoCampo, gia?.valore_letto ?? null, valore)) corretti++;
+          const cambiato = !rigaNuova && diverso(tipoCampo, gia?.valore_letto ?? null, valore);
+          if (cambiato) corretti++;
+          const confermato = i != null && confermati.has(`righe[${i}].${chiave}`);
           nuove.push({
             documento_id: did, campo: `righe[${j}].${chiave}`,
             valore_letto: gia?.valore_letto ?? null, valore_finale: valore,
             affidabilita: gia?.affidabilita ?? null,
             posizione: gia?.posizione != null ? (gia.posizione as Prisma.InputJsonValue) : Prisma.DbNull,
-            precisione: gia?.precisione ?? 'assente', verificato: true,
+            precisione: gia?.precisione ?? 'assente',
+            verificato: rigaNuova || cambiato || confermato || !!gia?.verificato,
             corretto_da: ctx.utente_id ?? null, corretto_il: ora,
           });
         }
@@ -836,12 +847,22 @@ function documentiPratica(t: Testata) {
   const somma = (tipo: string) => r2(t.documenti.filter((d) => d.tipo === tipo).reduce((s, d) => s.plus(d.importo), new Dec(0)));
   const stornato = new Map<bigint, Prisma.Decimal>();
   for (const d of t.documenti) if (d.fattura_id) stornato.set(d.fattura_id, (stornato.get(d.fattura_id) ?? new Dec(0)).minus(d.importo));
+  // righe per documento: servono al confronto affiancato della pagina pratica (§7.3)
+  const righeDi = (d: { id: bigint }) => t.righe.filter((r) => r.documento_id === d.id).map((r) => ({
+    codice: r.codice, descrizione: r.descrizione,
+    quantita: r.quantita == null ? null : Number(r.quantita),
+    prezzo: r.prezzo_unitario == null ? null : Number(r.prezzo_unitario),
+    importo: r.importo == null ? null : Number(r.importo),
+  }));
+  const riferimento = (d: { fattura_id: bigint | null }) =>
+    d.fattura_id ? (t.documenti.find((x) => x.id === d.fattura_id)?.numero ?? null) : null;
   return {
     pratica: { id: String(t.id), numero: t.numero_ordine, stato: t.stato, importo: Number(t.importo) },
     // D-60: ordini, conferme, proforma, pagamenti e altri, solo tracciati
     altri: t.documenti.filter((d) => !fiscale(d.tipo)).map((d) => ({
       id: String(d.id), tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: Number(d.importo),
       arrivo_id: d.arrivo_id ? String(d.arrivo_id) : null, file_nome: d.arrivo?.file_nome ?? null, note: d.note,
+      righe: righeDi(d), riferimento: riferimento(d),
     })),
     documenti: t.documenti.filter((d) => fiscale(d.tipo)).map((d) => {
       const s = stornato.get(d.id) ?? new Dec(0);
@@ -854,6 +875,7 @@ function documentiPratica(t: Testata) {
         arrivo_id: d.arrivo_id ? String(d.arrivo_id) : null, file_nome: d.arrivo?.file_nome ?? null,
         stato_incasso: d.tipo === 'fattura' ? d.stato_incasso : null,
         liquidato: d.liquidazione_id !== null, note: d.note,
+        righe: righeDi(d), riferimento: riferimento(d),
       };
     }),
     totali: { fatture: Number(somma('fattura')), note_credito: Number(somma('nota_credito')), netto: Number(netto(praticaDaDb(t))) },

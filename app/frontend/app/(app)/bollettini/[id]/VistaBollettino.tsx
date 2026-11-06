@@ -282,8 +282,7 @@ export function VistaBollettino({ id }: { id: string }) {
       sottotitolo={<>
         Ricevuto il {data(d.ricevuto)} · {d.file ? d.file.nome : 'nessun file allegato'} · paga sul {d.maturazione}
         {d.maturazione === 'maturato' ? ': verificando il bollettino si sbloccano le provvigioni dei subagenti su queste fatture.' : '.'}
-      </>}
-      azioni={[{ etichetta: 'Torna ai bollettini', icona: 'indietro', variante: 'sec', href: '/bollettini' }]}>
+      </>}>
       <div className="pila" style={{ flex: '1 1 auto', minHeight: 0 }}>
         {barra}
         {d.file ? (

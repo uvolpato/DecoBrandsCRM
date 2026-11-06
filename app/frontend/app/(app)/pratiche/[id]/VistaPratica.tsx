@@ -14,6 +14,7 @@ import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { SollecitiConferme, SollecitiPagamento } from '@/componenti/Solleciti';
 import { usePuo } from '@/componenti/Utente';
+import { ConsultaDocumenti } from '@/componenti/ConsultaDocumenti';
 import { api, caricaPdf } from '@/lib/api';
 import type { Entita } from '@/lib/entita';
 import { data as dataIt, euro, euroSegno, pct } from '@/lib/formati';
@@ -63,6 +64,8 @@ interface Documento {
   storno_totale?: boolean; fattura_id?: string | null; stornato?: number; residuo?: number;
   arrivo_id: string | null; file_nome: string | null; stato_incasso?: string | null;
   liquidato?: boolean; note: string | null;
+  righe: { codice: string | null; descrizione: string | null; quantita: number | null; prezzo: number | null; importo: number | null }[];
+  riferimento: string | null;
 }
 interface Fiscali {
   pratica: { id: string; numero: string; stato: string; importo: number };
@@ -168,11 +171,21 @@ export function VistaPratica({ id }: { id: string }) {
     />);
   }
 
-  function apriDoc(doc: Documento) {
-    // D-60: nel visualizzatore ci sono le schede di tutti i documenti con un file, fiscali e non
-    const docs = [...(fiscali?.altri ?? []), ...(fiscali?.documenti ?? [])].filter((x) => x.arrivo_id).sort((a, b) => Number(a.id) - Number(b.id));
-    if (!doc.arrivo_id || !docs.length) { avviso('Il PDF di questo documento non è disponibile.', true); return; }
-    setFinestra(<Visualizzatore docs={docs} iniziale={doc} onChiudi={chiudi} />);
+  function apriDoc(doc?: Documento, codice?: string) {
+    // D-60: nel visualizzatore ci sono le schede di tutti i documenti della pratica, fiscali e non;
+    // il file c'è solo per quelli arrivati dal canale comune, gli altri si confrontano lo stesso
+    const docs = [...(fiscali?.altri ?? []), ...(fiscali?.documenti ?? [])].sort((a, b) => Number(a.id) - Number(b.id));
+    if (!docs.length) return;
+    setFinestra(<ConsultaDocumenti docs={docs} iniziale={doc ?? docs[0]} codiceIniziale={codice}
+      pratica={{ numero: d!.numero, cliente: d!.cliente, fornitore: d!.fornitore }} onChiudi={chiudi} />);
+  }
+
+  /** Il documento dell'ultima fase (di norma la fattura): quello che si apre cliccando una riga a confronto. */
+  function ultimoDocumento() {
+    const tutti = [...(fiscali?.altri ?? []), ...(fiscali?.documenti ?? [])];
+    const tipo = d!.confronto.fasi[d!.confronto.fasi.length - 1]?.tipo;
+    const delTipo = tipo ? tutti.filter((x) => x.tipo === tipo) : [];
+    return (delTipo.length ? delTipo : tutti).sort((a, b) => Number(a.id) - Number(b.id)).pop();
   }
 
   function correggi(doc: Documento) {
@@ -277,6 +290,8 @@ export function VistaPratica({ id }: { id: string }) {
   // D-60: fatture e note di credito; il netto è fatture − note di credito (lo calcola il server)
   const fiscaliElenco = (
     <Elenco voci={fiscali.documenti.map((x) => ({
+      onClick: () => apriDoc(x),
+      titolo: 'Apri ' + TIPO[x.tipo].toLowerCase() + ' ' + x.numero + ' accanto al confronto',
       testo: <>
         <b>{x.numero}</b>
         <span className="sec-riga">
@@ -298,6 +313,8 @@ export function VistaPratica({ id }: { id: string }) {
   // D-60: ordini, conferme, proforma, pagamenti e allegati; fuori dal netto e dalla provvigione
   const altri = (
     <Elenco voci={fiscali.altri.map((x) => ({
+      onClick: () => apriDoc(x),
+      titolo: 'Apri ' + TIPO[x.tipo].toLowerCase() + ' ' + x.numero + ' accanto al confronto',
       testo: <>
         <b>{x.numero || TIPO[x.tipo]}</b>
         <span className="sec-riga">
@@ -397,7 +414,10 @@ export function VistaPratica({ id }: { id: string }) {
               <Nota>Il netto è fatture − note di credito. Un documento in un bollettino non si cambia: si corregge con una nota di credito.</Nota>
             </Pannello>
             <Pannello titolo="Documenti" nota={String(fiscali.altri.length)}
-              azioni={puoModifica ? [{ etichetta: 'Registra un documento', icona: 'piu', onClick: registraAltro }] : []}>
+              azioni={[
+                { etichetta: 'Consulta affiancati', icona: 'file', onClick: () => apriDoc(), consentito: true },
+                ...(puoModifica ? [{ etichetta: 'Registra un documento', icona: 'piu', onClick: registraAltro }] : []),
+              ]}>
               {altri}
               <Nota>Ordini, conferme, proforma, pagamenti e allegati: restano fuori dal netto e dalla provvigione.</Nota>
             </Pannello>
@@ -427,9 +447,9 @@ export function VistaPratica({ id }: { id: string }) {
           <DataTable righe={mostra} colonne={colonneRighe} chiave={(r) => r.codice} compatta
             ordinamentoIniziale={{ key: 'codice', dir: 'asc' }} filtro={vista}
             rowClass={(r) => r.varia ? 'evidenzia' : ''}
-            onRowClick={d.confronto.fasi.length > 1 ? () => {
-              const ultimo = [...fiscali.altri, ...fiscali.documenti].filter((x) => x.arrivo_id).sort((a, b) => Number(a.id) - Number(b.id)).pop();
-              if (ultimo) apriDoc(ultimo);
+            onRowClick={d.confronto.fasi.length > 1 ? (r) => {
+              const ultimo = ultimoDocumento();
+              if (ultimo) apriDoc(ultimo, r.codice);
             } : undefined}
             emptyText="Nessuna riga" emptyHint="Il confronto parte quando arriva la conferma." />
         </div>
@@ -444,7 +464,6 @@ export function VistaPratica({ id }: { id: string }) {
       etichetta: 'Prepara il sollecito', icona: 'posta', variante: 'sec' as const, consentito: true,
       onClick: () => setFinestra(<SollecitiConferme onChiudi={chiudi} />),
     }] : []),
-    { etichetta: 'Torna alle pratiche', icona: 'indietro', variante: 'sec', href: '/pratiche' },
   ];
 
   return (
@@ -467,46 +486,7 @@ export function VistaPratica({ id }: { id: string }) {
   );
 }
 
-/* ---------- Documenti affiancati: PDF a sinistra, dati a destra (§7.3) ---------- */
-
-function Visualizzatore({ docs, iniziale, onChiudi }: { docs: Documento[]; iniziale: Documento; onChiudi: () => void }) {
-  const [cur, setCur] = useState(iniziale);
-  const src = '/api/documenti/' + cur.arrivo_id + '/file';
-  // D-60: i pagamenti arrivano spesso come foto JPEG o PNG
-  const foto = /\.(jpe?g|png)$/i.test(cur.file_nome ?? '');
-  return (
-    <Modale larga titolo="Documenti della pratica" onChiudi={onChiudi}
-      testo="A sinistra il documento originale, a destra i suoi dati.">
-      <div className="aff-schede" role="tablist" aria-label="Documenti con file">
-        {docs.map((x) => (
-          <button key={x.id} type="button" role="tab" aria-selected={x.id === cur.id} onClick={() => setCur(x)}>
-            {TIPO[x.tipo]}<span>{x.numero || dataIt(x.data)}</span>
-          </button>
-        ))}
-      </div>
-      <div className="colonne pari" style={{ alignItems: 'start' }}>
-        {foto
-          ? <img src={src} alt={'Foto del documento ' + (cur.numero || dataIt(cur.data))}
-            style={{ width: '100%', border: 0, borderRadius: 8, background: '#f1f3f5' }} />
-          : <object data={src} type="application/pdf" aria-label={'PDF di ' + (cur.numero || dataIt(cur.data))}
-            style={{ width: '100%', height: '430px', border: 0, borderRadius: 8, background: '#f1f3f5' }}>
-            <p>Il browser non mostra il PDF qui. <a href={src} target="_blank" rel="noreferrer">Apri il PDF in una scheda</a>.</p>
-          </object>}
-        <div className="pila">
-          <Dettagli inColonne voci={[
-            { etichetta: 'Tipo', valore: TIPO[cur.tipo] },
-            { etichetta: 'Numero', valore: cur.numero || <span className="testo-tenue">—</span> },
-            { etichetta: 'Data', valore: dataIt(cur.data) },
-            { etichetta: 'Importo', valore: euro(cur.importo) },
-            ...(cur.tipo === 'fattura' ? [{ etichetta: 'Residuo', valore: euro(cur.residuo ?? 0) }] : []),
-          ]} />
-          {cur.note && <Nota>{cur.note}</Nota>}
-          <p><a href={src} target="_blank" rel="noreferrer">{foto ? 'Apri la foto in una scheda' : 'Apri il PDF in una scheda'}</a></p>
-        </div>
-      </div>
-    </Modale>
-  );
-}
+/* ---------- Documenti affiancati: componente condiviso con Documenti (componenti/Visualizzatore) ---------- */
 
 /* ---------- Registra un documento (D-60) / fattura e nota di credito (F2-A3, §4.2.7.1) ---------- */
 

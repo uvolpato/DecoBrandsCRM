@@ -77,6 +77,21 @@ async function mesiBollettini(db: PrismaService, oggi: string): Promise<MeseBoll
 const aperto = (m: MeseBollettino) => m.bollettino_id != null && m.stato !== 'verificato' && m.stato !== 'contestato';
 const mancante = (m: MeseBollettino, oggi: string) => m.bollettino_id == null && m.fine < oggi && m.documenti > 0 && oggi > m.entro;
 
+/** I numeri accanto alle voci del menu (§7.1, come CRM.Barra del prototipo): Oggi è quello che
+ *  chiede un'azione, Documenti i file da controllare, Pratiche le conferme scadute, Bollettini
+ *  gli aperti e i mancanti. Calcolati qui dal database (V12): il browser mostra e basta. */
+export async function conteggiBarra(db: PrismaService, S: Dati) {
+  const conferme = confermeInRitardo(S).length;
+  const pagamenti = pagamentiDaSollecitare(S).length;
+  const pratiche = S.pratiche.filter((p) => statoPratica(S, p).chiave === 'scaduta').length;
+  const mesi = await mesiBollettini(db, S.oggi);
+  const bollettini = mesi.filter(aperto).length + mesi.filter((m) => mancante(m, S.oggi)).length;
+  const documenti = await db.documenti_in_arrivo.count({
+    where: { stato: { not: 'scartato' }, abbinato_pratica_id: null, abbinato_bollettino_id: null },
+  });
+  return { oggi: documenti + conferme + bollettini + pagamenti, documenti, pratiche, bollettini };
+}
+
 /** Quello che la pagina Oggi mostra, calcolato una volta sola; esportata per le prove con il giorno del prototipo.
  *  `conErrori`: il contatore *Errori di oggi* (§15.6) solo per chi ha `sistema.registro`. */
 export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false) {
@@ -247,6 +262,14 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
 @Controller('oggi')
 export class OggiController {
   constructor(private readonly db: PrismaService) {}
+
+  /** I numeri del menu (barra laterale): Oggi, Documenti, Pratiche, Bollettini. */
+  @Get('conteggi')
+  @Richiede('provvigioni.consulta')
+  async conteggi() {
+    const S = await caricaDati(this.db, giornoRoma(new Date()));
+    return conteggiBarra(this.db, S);
+  }
 
   /** La pagina Oggi (§7.1): riquadri, gruppi, scadenze, ultime operazioni e trimestre in corso. */
   @Get()

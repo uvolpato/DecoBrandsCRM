@@ -258,7 +258,7 @@ with sync_playwright() as p:
        'conferma con importo e numero di subagenti')
     pg.click('.velo .modale-piede button:has-text("Chiudi il trimestre")')
     pg.wait_for_function("!document.querySelector('.velo')")
-    pg.wait_for_function("document.querySelector('.testa-azioni button:last-child') && document.querySelector('.testa-azioni button:last-child').innerText === 'Liquidazione chiusa'")
+    pg.wait_for_function("() => [...document.querySelectorAll('.testa-azioni button')].some(b => b.innerText === 'Liquidazione chiusa')")
     attesa(pg)
     chiuso = pg.locator('.testa-azioni button:has-text("Liquidazione chiusa")')
     ok(chiuso.count() == 1 and chiuso.is_disabled(), 'dopo la chiusura il pulsante dice Liquidazione chiusa ed è spento')
@@ -330,7 +330,7 @@ with sync_playwright() as p:
     # sola lettura: consulta, ma non chiude
     pg = entra(S + '-lett')
     pg.goto(BASE + '/liquidazioni/2026/3'); pg.wait_for_selector('.periodi a.attivo'); quieta(pg)
-    chiudi = pg.locator('.testa-azioni button:last-child')
+    chiudi = pg.locator('.testa-azioni button:has-text("Liquidazione chiusa")')
     ok(pg.evaluate("document.body.classList.contains('sola-lettura')") and chiudi.is_disabled()
        and 'Serve il livello responsabile' in (chiudi.get_attribute('title') or ''),
        'sola lettura: i documenti si vedono, la chiusura no')

@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { caricaDati } from '../src/motore/dati';
 import { pagamentiDaSollecitare } from '../src/motore/motore';
-import { calcolaOggi } from '../src/oggi';
+import { calcolaOggi, conteggiBarra } from '../src/oggi';
 import { sollecitiConferme } from '../src/solleciti';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
@@ -102,6 +102,21 @@ describe('F5-A1 pagina Oggi', () => {
     // bollettini: 3 aperti e 1 non arrivato
     expect(gruppo('bollettini').voci.filter((v) => v.azione === 'Vedi')).toHaveLength(1);
     expect(gruppo('bollettini').voci.filter((v) => v.azione === 'Vedi')[0].titolo).toContain('giugno');
+  });
+
+  it('i numeri del menu sono gli stessi del prototipo (Oggi, Documenti, Pratiche, Bollettini)', async () => {
+    const M = prototipo();
+    const fare = M.daFare();
+    const S = await caricaDati(db, OGGI);
+    const r = await conteggiBarra(db, S);
+    expect(r.oggi).toBe(fare.length);
+    expect(r.pratiche).toBe(M.S.pratiche.filter((p: any) => M.statoPratica(p).chiave === 'scaduta').length);
+    expect(r.bollettini).toBe(fare.filter((x: any) => x.gruppo === 'bollettini').length);
+    expect(r.documenti).toBe(11); // i documenti in arrivo del seed, tutti da controllare
+    const api = (await op.get('/api/oggi/conteggi').expect(200)).body;
+    expect(Object.keys(api).sort()).toEqual(['bollettini', 'documenti', 'oggi', 'pratiche']);
+    expect(Object.values(api).every((n) => typeof n === 'number')).toBe(true);
+    await senza.get('/api/oggi/conteggi').expect(403);
   });
 
   it('scadenze e trimestre in corso', async () => {

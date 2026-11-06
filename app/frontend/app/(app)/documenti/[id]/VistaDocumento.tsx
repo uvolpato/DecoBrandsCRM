@@ -13,6 +13,7 @@ import { avviso, Dettagli, quando, Stato, type Variante } from '@/componenti/Pic
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { Schede, type Scheda } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
+import { Visualizzatore, type DocFile } from '@/componenti/Visualizzatore';
 import { api } from '@/lib/api';
 import { cliente as entitaCliente, fornitore as entitaFornitore, type Entita } from '@/lib/entita';
 import { data, euro, euroSegno } from '@/lib/formati';
@@ -296,7 +297,20 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         }} />);
   }
 
+  /** Riapre il file originale accanto ai dati letti, senza passare dalla correzione. */
+  function apriPdf() {
+    const f: DocFile = {
+      id: doc.id, arrivo_id: doc.id, file_nome: doc.file_nome, tipo: t.tipo ?? 'altro', numero: t.numero,
+      data: t.data ?? doc.ricevuto_il.slice(0, 10), importo: t.importo,
+    };
+    setFinestra(<Visualizzatore docs={[f]} iniziale={f} onChiudi={chiudi}
+      titolo="Il documento originale" testo="A sinistra il file, a destra i dati letti." />);
+  }
+
   const azioni: Azione[] = [
+    ...(doc.file_nome ? [{
+      etichetta: 'PDF', variante: 'sec' as const, onClick: apriPdf, titolo: 'Riapri il documento originale',
+    }] : []),
     ...(puoModifica && d.stato === 'da_controllare' ? [{
       etichetta: 'Correggi i dati letti', onClick: () => setFinestra(<FinestraCorreggi d={d} onChiudi={chiudi} onSalvato={salvato} />),
       conta: n || undefined, contaVariante: d.livello === 'bassa' ? 'errore' as const : 'attesa' as const,
@@ -489,14 +503,20 @@ interface Bozza {
 }
 const RIGA_KEYS = ['codice', 'descrizione', 'quantita', 'prezzo', 'importo', 'numero_fattura', 'data_fattura', 'provvigione'] as const;
 
-/** Campo con il bordo dell'affidabilità (giallo 0,70–0,90 · rosso < 0,70 · verde se confermato). */
-function CampoLetto({ x, etichetta, children }: { x: Campo | undefined; etichetta: string; children: ReactNode }) {
+/** Campo con il bordo dell'affidabilità (giallo 0,70–0,90 · rosso < 0,70 · verde se confermato).
+ *  Il ✓ accanto al campo conferma il valore letto: da lì non conta più fra i punti da controllare. */
+function CampoLetto({ x, etichetta, verificato, onConferma, children }: {
+  x: Campo | undefined; etichetta: string; verificato: boolean; onConferma?: () => void; children: ReactNode;
+}) {
   const a = x?.affidabilita ?? null;
-  const incerto = a != null && !x?.verificato && a < SOGLIA_OK;
+  const incerto = a != null && !verificato && a < SOGLIA_OK;
   return (
-    <div className={'campo-letto ' + classeAff(a, !!x?.verificato)}>
+    <div className={'campo-letto ' + classeAff(a, verificato)}>
       <label>{etichetta}{incerto && <span className="aff">{Math.round(a * 100)}%</span>}</label>
-      <div className="campo-riga">{children}</div>
+      <div className="campo-riga">
+        {children}
+        {incerto && <button type="button" className="conferma-campo" title="Il valore è giusto: confermalo" aria-label={'Conferma ' + etichetta} onClick={onConferma}>✓</button>}
+      </div>
     </div>
   );
 }
@@ -520,8 +540,15 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
   const [campo, setCampo] = useState<string | null>(null);
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
+  // campi già validati (dal server o con il ✓ in questa finestra): non sono più punti da controllare
+  const [verificati, setVerificati] = useState<Set<string>>(() => new Set(d.campi.filter((c) => c.verificato).map((c) => c.campo)));
   const af = useMemo(() => new Map(d.campi.map((c) => [c.campo, c])), [d.campi]);
   const boll = b.testata.tipo === 'bollettino';
+  const verificato = (k: string) => verificati.has(k);
+  const conferma = (k: string) => setVerificati((s) => s.has(k) ? s : new Set(s).add(k));
+  const campoSi = (k: string, etichetta: string, children: ReactNode) => (
+    <CampoLetto x={af.get(k)} etichetta={etichetta} verificato={verificato(k)} onConferma={() => conferma(k)}>{children}</CampoLetto>
+  );
 
   useEffect(() => {
     const tasto = (e: KeyboardEvent) => { if (e.key === 'Escape') onChiudi(); };
@@ -534,6 +561,11 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
   const campoRiga = (riga: BozzaRiga, idx: number, k: string) => `righe[${riga.i ?? idx}].${k}`;
   const pos = campo ? af.get(campo) : null;
   const pagina = pos?.posizione?.pagina;
+  // punti ancora aperti: controlli falliti + campi incerti non confermati (si aggiorna a ogni ✓)
+  const restanti = d.campi.filter((c) => c.campo !== 'tipo' && !verificato(c.campo) && c.affidabilita != null
+    && c.affidabilita < SOGLIA_OK && (c.valore_finale ?? c.valore_letto) != null);
+  const nPunti = d.controlli.length + restanti.length;
+  const bassa = d.controlli.some((c) => c.grave) || restanti.some((c) => (c.affidabilita ?? 1) < SOGLIA_BASSA);
 
   async function salva() {
     if (!boll && !b.testata.numero.trim()) { setErrore('Il numero del documento è obbligatorio.'); return; }
@@ -549,7 +581,9 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
       const righe = b.righe
         .filter((x) => x.i != null || RIGA_KEYS.some((k) => x[k].trim() !== ''))
         .map((x) => ({ i: x.i, ...Object.fromEntries(RIGA_KEYS.map((k) => [k, x[k]])) }));
-      const res = await api<Dettaglio>('documenti/' + d.id, { testata, righe }, 'PUT');
+      // i ✓ valgono per campo: il server segna verificati solo questi (e i valori cambiati)
+      const verificatiInviati = [...verificati].filter((k) => !k.startsWith('righe[new-'));
+      const res = await api<Dettaglio>('documenti/' + d.id, { testata, righe, verificati: verificatiInviati }, 'PUT');
       if (!res.ok) { setErrore(res.messaggio); return; }
       onSalvato(res.dati);
     } finally {
@@ -585,58 +619,46 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
             </p>
             <div className="aff-riepilogo">
               <div className="riep-testa" style={{ cursor: 'default' }}>
-                <Stato v={d.livello === 'bassa' ? 'errore' : d.livello === 'affidabile' ? 'ok' : 'attesa'}>
-                  {d.livello === 'bassa' ? 'Affidabilità bassa' : d.livello === 'affidabile' ? 'Lettura affidabile' : 'Da controllare'}
+                <Stato v={bassa ? 'errore' : nPunti ? 'attesa' : 'ok'}>
+                  {bassa ? 'Affidabilità bassa' : nPunti ? 'Da controllare' : 'Lettura affidabile'}
                 </Stato>
-                <span>{punti(d) ? punti(d) + (punti(d) === 1 ? ' punto da controllare' : ' punti da controllare') : 'tutti i campi sono controllati'}</span>
+                <span>{nPunti ? nPunti + (nPunti === 1 ? ' punto da controllare' : ' punti da controllare') : 'tutti i campi sono controllati'}</span>
               </div>
             </div>
             <h3>Testata</h3>
             <div className="griglia-letti">
               {boll ? (
                 <>
-                  <CampoLetto x={af.get("fornitore_id")} etichetta="Fornitore">
-                    <CampoRicerca entita={entitaFornitore} valore={b.testata.fornitore_id} onChange={(v) => t('fornitore_id', v)} />
-                  </CampoLetto>
-                  <CampoLetto x={af.get("mese")} etichetta="Mese">
+                  {campoSi('fornitore_id', 'Fornitore',
+                    <CampoRicerca entita={entitaFornitore} valore={b.testata.fornitore_id} onChange={(v) => t('fornitore_id', v)} />)}
+                  {campoSi('mese', 'Mese',
                     <select data-campo="mese" value={b.testata.mese} onFocus={() => setCampo('mese')} onChange={(e) => t('mese', e.target.value)}>
                       {MESI.map((m, i) => <option key={m} value={String(i + 1)}>{m}</option>)}
-                    </select>
-                  </CampoLetto>
-                  <CampoLetto x={af.get("anno")} etichetta="Anno">
-                    <input data-campo="anno" type="number" value={b.testata.anno} onFocus={() => setCampo('anno')} onChange={(e) => t('anno', e.target.value)} />
-                  </CampoLetto>
+                    </select>)}
+                  {campoSi('anno', 'Anno',
+                    <input data-campo="anno" type="number" value={b.testata.anno} onFocus={() => setCampo('anno')} onChange={(e) => t('anno', e.target.value)} />)}
                 </>
               ) : (
                 <>
-                  <CampoLetto x={af.get("tipo")} etichetta="Tipo">
+                  {campoSi('tipo', 'Tipo',
                     <select data-campo="tipo" value={b.testata.tipo} onFocus={() => setCampo('tipo')} onChange={(e) => t('tipo', e.target.value)}>
                       {Object.entries(TIPO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                  </CampoLetto>
-                  <CampoLetto x={af.get("numero")} etichetta="Numero">
-                    <input data-campo="numero" value={b.testata.numero} onFocus={() => setCampo('numero')} onChange={(e) => t('numero', e.target.value)} />
-                  </CampoLetto>
-                  <CampoLetto x={af.get("data")} etichetta="Data">
-                    <input data-campo="data" type="date" value={b.testata.data} onFocus={() => setCampo('data')} onChange={(e) => t('data', e.target.value)} />
-                  </CampoLetto>
-                  <CampoLetto x={af.get("fornitore_id")} etichetta="Fornitore">
-                    <CampoRicerca entita={entitaFornitore} valore={b.testata.fornitore_id} onChange={(v) => t('fornitore_id', v)} />
-                  </CampoLetto>
-                  <CampoLetto x={af.get("codice_cliente")} etichetta="Codice cliente">
-                    <input data-campo="codice_cliente" value={b.testata.codice_cliente} onFocus={() => setCampo('codice_cliente')} onChange={(e) => t('codice_cliente', e.target.value)} />
-                  </CampoLetto>
-                  <CampoLetto x={af.get("cliente")} etichetta="Cliente letto">
-                    <input data-campo="cliente" value={b.testata.cliente} onFocus={() => setCampo('cliente')} onChange={(e) => t('cliente', e.target.value)} />
-                  </CampoLetto>
-                  <CampoLetto x={af.get("importo_totale")} etichetta="Importo">
-                    <input data-campo="importo" type="number" step="0.01" value={b.testata.importo} onFocus={() => setCampo('importo_totale')} onChange={(e) => t('importo', e.target.value)} />
-                  </CampoLetto>
-                  {b.testata.tipo === 'nota_credito' && (
-                    <CampoLetto x={af.get("riferimento_fattura")} etichetta="Fattura stornata">
-                      <input data-campo="riferimento_fattura" value={b.testata.riferimento_fattura} onFocus={() => setCampo('riferimento_fattura')} onChange={(e) => t('riferimento_fattura', e.target.value)} />
-                    </CampoLetto>
-                  )}
+                    </select>)}
+                  {campoSi('numero', 'Numero',
+                    <input data-campo="numero" value={b.testata.numero} onFocus={() => setCampo('numero')} onChange={(e) => t('numero', e.target.value)} />)}
+                  {campoSi('data', 'Data',
+                    <input data-campo="data" type="date" value={b.testata.data} onFocus={() => setCampo('data')} onChange={(e) => t('data', e.target.value)} />)}
+                  {campoSi('fornitore_id', 'Fornitore',
+                    <CampoRicerca entita={entitaFornitore} valore={b.testata.fornitore_id} onChange={(v) => t('fornitore_id', v)} />)}
+                  {campoSi('codice_cliente', 'Codice cliente',
+                    <input data-campo="codice_cliente" value={b.testata.codice_cliente} onFocus={() => setCampo('codice_cliente')} onChange={(e) => t('codice_cliente', e.target.value)} />)}
+                  {campoSi('cliente', 'Cliente letto',
+                    <input data-campo="cliente" value={b.testata.cliente} onFocus={() => setCampo('cliente')} onChange={(e) => t('cliente', e.target.value)} />)}
+                  {campoSi('importo_totale', 'Importo',
+                    <input data-campo="importo" type="number" step="0.01" value={b.testata.importo} onFocus={() => setCampo('importo_totale')} onChange={(e) => t('importo', e.target.value)} />)}
+                  {b.testata.tipo === 'nota_credito' &&
+                    campoSi('riferimento_fattura', 'Fattura stornata',
+                      <input data-campo="riferimento_fattura" value={b.testata.riferimento_fattura} onFocus={() => setCampo('riferimento_fattura')} onChange={(e) => t('riferimento_fattura', e.target.value)} />)}
                 </>
               )}
             </div>
@@ -662,11 +684,19 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                       const c = campoRiga(x, idx, k);
                       // una riga nuova non ha affidabilità: la chiave non deve scontrarsi con una riga tolta
                       const keyAff = x.i != null ? c : `righe[new-${idx}].${k}`;
+                      const aff = af.get(keyAff)?.affidabilita ?? null;
+                      const ver = verificato(keyAff);
                       const extra = k === 'descrizione' ? 'largo ' : k === 'codice' || k === 'numero_fattura' ? 'col-codice ' : '';
                       return (
-                        <td key={k} className={extra + classeAff(af.get(keyAff)?.affidabilita ?? null, !!af.get(keyAff)?.verificato)}>
-                          <input data-campo={c} type={tipo} step={tipo === 'number' ? 'any' : undefined} value={String(x[k] ?? '')}
-                            onFocus={() => setCampo(keyAff)} onChange={(e) => r(idx, k, e.target.value)} />
+                        <td key={k} className={extra + classeAff(aff, ver)}>
+                          <div className="campo-riga">
+                            <input data-campo={c} type={tipo} step={tipo === 'number' ? 'any' : undefined} value={String(x[k] ?? '')}
+                              onFocus={() => setCampo(keyAff)} onChange={(e) => { r(idx, k, e.target.value); conferma(keyAff); }} />
+                            {aff != null && !ver && aff < SOGLIA_OK && (
+                              <button type="button" className="conferma-campo" title="Il valore è giusto: confermalo"
+                                aria-label={'Conferma la riga ' + (idx + 1)} onClick={() => conferma(keyAff)}>✓</button>
+                            )}
+                          </div>
                         </td>
                       );
                     };
