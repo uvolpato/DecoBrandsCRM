@@ -462,17 +462,17 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
   );
 }
 
-/** PDF o foto come nel prototipo: il PDF alla pagina del campo selezionato. */
+/** PDF o foto come nel prototipo, a tutta altezza nel pannello di sinistra: il PDF alla pagina del campo. */
 function FileDocumento({ d, pagina }: { d: Dettaglio; pagina?: number }) {
   const src = '/api/documenti/' + d.id + '/file';
   if (d.file_tipo !== 'pdf') {
-    return <img src={src} alt={'Foto del documento ' + d.file_nome} style={{ maxWidth: '100%', borderRadius: 8, background: '#f1f3f5' }} />;
+    return <img src={src} alt={'Foto del documento ' + d.file_nome} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />;
   }
   return (
     <object key={pagina ?? 1} data={src + (pagina && pagina > 1 ? '#page=' + pagina : '')} type="application/pdf"
       aria-label={'PDF del documento ' + d.file_nome}
-      style={{ width: '100%', height: '100%', minHeight: 420, border: 0, borderRadius: 8, background: '#f1f3f5' }}>
-      <p>Il browser non mostra il PDF qui. <a href={src} target="_blank" rel="noreferrer">Apri il PDF in una scheda</a>.</p>
+      style={{ width: '100%', height: '100%', border: 0, background: '#525659' }}>
+      <p style={{ padding: 16, color: '#fff' }}>Il browser non mostra il PDF qui. <a href={src} target="_blank" rel="noreferrer" style={{ color: '#fff' }}>Apri il PDF in una scheda</a>.</p>
     </object>
   );
 }
@@ -568,20 +568,20 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
           <button type="button" className="btn-chiudi" onClick={onChiudi} aria-label="Chiudi"><Icona nome="chiudi" /></button>
         </div>
         <div className="aff-corpo">
-          <div className="aff-sx">
+          <div className="aff-sx aff-pdf">
             <FileDocumento d={d} pagina={pagina} />
-            <p className="testo-tenue" style={{ marginTop: 10, fontSize: 12.5 }}>
-              {d.file_tipo === 'pdf'
-                ? pos
-                  ? `Posizione: pagina ${pagina ?? 1} (${pos.precisione ?? 'assente'})`
-                  : 'Seleziona un campo per aprire il PDF alla sua pagina.'
-                : 'La foto resta ferma: la posizione del valore non si evidenzia.'}
-            </p>
           </div>
           <div className="aff-dx">
             <p className="avviso-verifica">
               <Icona nome="avviso" />
               <span><b>Funzione da verificare.</b> Il rettangolo sul valore letto non si disegna ancora (D-06, prova F0-A7): la finestra apre il PDF alla pagina del campo e dice quanto è precisa la posizione. La correzione funziona comunque.</span>
+            </p>
+            <p className="testo-tenue" style={{ fontSize: 12.5, margin: '0 0 10px' }}>
+              {d.file_tipo === 'pdf'
+                ? pos
+                  ? `Posizione: pagina ${pagina ?? 1} (${pos.precisione ?? 'assente'})`
+                  : 'Seleziona un campo per aprire il PDF alla sua pagina.'
+                : 'La foto resta ferma: la posizione del valore non si evidenzia.'}
             </p>
             <div className="aff-riepilogo">
               <div className="riep-testa" style={{ cursor: 'default' }}>
