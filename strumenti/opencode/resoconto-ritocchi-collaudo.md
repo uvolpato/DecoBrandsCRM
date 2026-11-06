@@ -17,11 +17,14 @@ Data: 07/11/2026 · ramo `main` · nessuna migrazione.
   segna verificati solo i campi cambiati, confermati o già verificati (sostituisce il "tutto
   verificato" di D-72).
 - **Consulta affiancati (D-78).** `GET /api/pratiche/:id/documenti` restituisce anche `righe` e
-  `riferimento` (nota di credito). `componenti/ConsultaDocumenti.tsx` apre il confronto: schede dei
-  documenti, file a sinistra, dati e confronto riga per riga a destra, *Confrontato con*, differenza,
-  segmenti *Solo righe che cambiano / Tutte*, ← → per cambiare documento, riga selezionata. Il
-  pulsante *Consulta affiancati* e il clic su un documento o su una riga a confronto aprono la stessa
-  finestra. Il rettangolo sul PDF resta rinviato (D-06).
+  `riferimento` (nota di credito). `componenti/ConsultaDocumenti.tsx` apre il confronto a tutto schermo
+  come la finestra del prototipo: schede dei documenti e file (o anteprima costruita dai dati) a
+  sinistra, dati e confronto riga per riga a destra, *Confrontato con*, differenza, segmenti *Solo
+  righe che cambiano / Tutte*, ← → per cambiare documento, riga selezionata. Il pulsante *Consulta
+  affiancati* e il clic su un documento o su una riga a confronto aprono la stessa finestra. Se il
+  documento è stato inserito a mano, a sinistra si mostra la pagina del prototipo costruita dai dati
+  (articolo, quantità, prezzo, totale), non un riquadro vuoto. Il rettangolo sul PDF resta rinviato
+  (D-06).
 - **Pillola del titolo (D-79).** `.testa .testa-badge` ha 10 px di spazio dal numero.
 - **PDF riapribile.** Nel pannello del documento di `/documenti` il pulsante *PDF* riapre il file
   originale accanto ai dati letti.

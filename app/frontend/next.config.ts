@@ -2,6 +2,8 @@ import type { NextConfig } from 'next';
 
 const config: NextConfig = {
   poweredByHeader: false,
+  // niente pallino di Next in sviluppo: copre il piede delle finestre a tutto schermo
+  devIndicators: false,
   // Il PDF passa da LibreOffice e su alcune macchine impiega ~1 minuto: il proxy di Next non
   // deve chiudere la richiesta prima (F4-A3, §11).
   experimental: { proxyTimeout: 180_000 },

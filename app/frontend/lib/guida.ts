@@ -188,7 +188,7 @@ export const GUIDA: Argomento[] = [
       ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Nel riquadro Incasso: sollecito al cliente, o segnalazione del fornitore ricevuta per email o telefono.'],
     ],
     finestre: [
-      { nome: 'Documenti della pratica', da: 'PDF · Consulta affiancati · clic su un documento o su una riga a confronto', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra i dati e il confronto riga per riga con un altro documento. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato.',
+      { nome: 'Documenti della pratica', da: 'PDF · Consulta affiancati · clic su un documento o su una riga a confronto', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra i dati e il confronto riga per riga con un altro documento. Se il file originale non c’è, a sinistra c’è l’anteprima costruita dai dati. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato.',
         campi: [
           ['Confrontato con', 'Sceglie il documento di confronto.'],
           ['Solo righe che cambiano · Tutte', 'Filtra il confronto.'],
