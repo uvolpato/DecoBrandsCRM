@@ -4,7 +4,7 @@ import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'c
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { type Dati, caricaDatiBollettino, fiscale } from './motore/dati';
-import { riconcilia } from './motore/motore';
+import { riconcilia, statoIncasso } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { type Contesto, logEvent } from './registro';
 
@@ -99,6 +99,32 @@ const eventoRiga = (tx: Tx, S: Dati, b: Dati['bollettini'][number], x: Riconcili
   tipo: 'crud', azione: 'update', entita: 'riga_bollettino', entita_id: riga_id, esito: 'successo',
   dettaglio: { etichetta: `${x.numero}${x.cliente_id ? ' · ' + (S.clienti.get(x.cliente_id)?.nome ?? '') : ''}`, riga_bollettino_id: String(riga_id), bollettino_id: b.id, prima, dopo },
 }, ctx);
+
+type Pratica = Dati['pratiche'][number];
+type Documento = Pratica['documenti'][number];
+
+/** Alla chiusura il mese è chiuso: per le fatture con storno, riaccredito o riconoscimento al pagamento
+ *  lo stato d'incasso può cambiare. Scrive un evento per ogni documento che cambia (§15.2.5, F3-A3). */
+async function eventiIncassi(tx: Tx, S: Dati, b: Dati['bollettini'][number], r: ReturnType<typeof riconcilia>, stato: string, ctx: Contesto) {
+  const chiuso: Dati = { ...S, bollettini: S.bollettini.map((x) => (x.id === b.id ? { ...b, stato } : x)) };
+  const perDocumento = new Map<string, { p: Pratica; d: Documento }>();
+  for (const p of S.pratiche) for (const d of p.documenti) perDocumento.set(d.id, { p, d });
+  for (const x of r.righe) {
+    const nellaRiga = x.categoria === 'storno' || x.categoria === 'riaccredito' || x.pagamento;
+    if (!x.id || !x.documento_id || !nellaRiga || x.tipo !== 'fattura') continue;
+    const v = perDocumento.get(x.documento_id);
+    if (!v) continue;
+    const prima = statoIncasso(S, v.p, v.d), dopo = statoIncasso(chiuso, v.p, v.d);
+    if (!prima || !dopo || prima.stato === dopo.stato) continue;
+    await logEvent(tx, {
+      tipo: 'stato', azione: 'change_state', entita: 'documento', entita_id: BigInt(v.d.id), esito: 'successo',
+      dettaglio: {
+        etichetta: `${v.d.numero} · Fattura`, prima: { stato_incasso: prima.stato }, dopo: { stato_incasso: dopo.stato },
+        bollettino_id: b.id, tipo_riga: x.categoria === 'storno' || x.categoria === 'riaccredito' ? x.categoria : 'provvigione',
+      },
+    }, ctx);
+  }
+}
 
 @Controller('bollettini')
 export class BollettinoController {
@@ -261,6 +287,7 @@ export class BollettinoController {
       await tx.bollettini_attese.deleteMany({ where: { testata_id: BigInt(id), documento_id: { notIn: mancanti } } });
       const note = c.note === undefined ? undefined : c.note?.trim() || null;
       await tx.bollettini_testata.update({ where: { id: BigInt(id) }, data: { stato: c.stato, chiuso_il: new Date(), chiuso_da: ctx.utente_id ?? null, note } });
+      await eventiIncassi(tx, S, b, r, c.stato, ctx);
       const et = etichetta(S, b);
       await logEvent(tx, {
         tipo: 'calcolo', azione: 'verify', entita: 'bollettino', entita_id: BigInt(id), esito: 'successo',

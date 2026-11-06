@@ -8,8 +8,18 @@ import { AREE, usePuo, useUtente } from './Utente';
 
 // Pagina e Intestazione come CRM.Pagina / CRM.Intestazione del prototipo: testata con titolo,
 // sottotitolo e azioni, poi il corpo. La barra la mette il guscio (app/(app)/layout.tsx).
-// ponytail: "Torna a…" con la memoria della schermata (§7.12) e il link Guida arrivano con le
-// pagine che li usano.
+// "Torna a…" con la memoria della schermata (§7.12); il link Guida c'è in ogni testata (F5-A8).
+const GUIDA_ROTTE: [string, string][] = [
+  ['/documenti', 'documenti'], ['/pratiche', 'pratiche'], ['/bollettini', 'bollettini'], ['/liquidazioni', 'liquidazioni'],
+  ['/analisi', 'analisi'], ['/fornitori', 'fornitori'], ['/subagenti', 'subagenti'], ['/clienti', 'clienti'],
+  ['/registro', 'registro'], ['/sistema', 'sistema'], ['/scartati', 'scartati'], ['/impostazioni', 'impostazioni'], ['/utenti', 'utenti'],
+];
+/** L'argomento della Guida per la pagina corrente: la rotta più lunga che la contiene. */
+function argomentoGuida(percorso: string): string | null {
+  if (percorso.startsWith('/guida')) return null;
+  if (percorso === '/') return 'oggi';
+  return GUIDA_ROTTE.find(([rotta]) => percorso === rotta || percorso.startsWith(rotta + '/'))?.[1] ?? 'panoramica';
+}
 export interface Azione {
   etichetta: string;
   icona?: string;
@@ -46,6 +56,8 @@ export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], pien
   const percorso = usePathname();
   const corpo = useScorrimento<HTMLElement>('corpo'); // posizione di scorrimento ritrovata tornando (§7.12)
   useEffect(() => { document.title = titolo + ' · Decobrands'; }, [titolo, percorso]);
+  const guida = argomentoGuida(percorso);
+  const tutte = [...azioni, ...(guida ? [{ etichetta: 'Guida', href: '/guida/' + guida, variante: 'sec' as const, consentito: true }] : [])];
   return (
     <>
       <header className="testa">
@@ -54,7 +66,7 @@ export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], pien
           <h1>{titolo}{badge && <span className="testa-badge">{badge}</span>}</h1>
           {sottotitolo && <div className="sotto">{sottotitolo}</div>}
         </div>
-        <div className="testa-azioni">{azioni.map((a) => <Pulsante key={a.etichetta} a={a} />)}</div>
+        <div className="testa-azioni">{tutte.map((a) => <Pulsante key={a.etichetta} a={a} />)}</div>
       </header>
       <section ref={corpo} className={'corpo' + (pieno ? ' pieno' : '')}>{children}</section>
     </>

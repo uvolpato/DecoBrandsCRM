@@ -250,6 +250,9 @@ describe('documento mancante, abbinamento e chiusura (Gasper agosto, fatturato)'
     expect([f0921.documento_id, Number(f0921.importo_calcolato), Number(f0921.differenza)]).toEqual([await documento('F-2026-0921'), Number(riga(prima, 'F-2026-0921').noi.importo), 0]);
     expect([storno.documento_id, storno.importo_calcolato]).toEqual([await documento('F-2026-0822'), null]);
     expect([await eventi('calcolo.verify', id), await eventi('stato.change_state', id)]).toEqual([1, 1]);
+    // F3-A3: la verifica cambia lo stato d'incasso dello storno e lascia l'evento sul documento
+    const evStorno = await db.registro.findFirst({ where: { codice: 'stato.change_state', entita: 'documento', entita_id: await documento('F-2026-0822') } });
+    expect(evStorno?.dettaglio).toMatchObject({ tipo_riga: 'storno', bollettino_id: String(id), dopo: { stato_incasso: 'insoluta' } });
     expect((await attese()).map((x) => x.documento_id)).toEqual([await documento('F-2026-0933')]);
     expect(await ultimaChiusura(db, gasper)).toBe('2026-08-31');
     // nuove percentuali dentro il mese chiuso: 409
