@@ -19,7 +19,7 @@ import { netto, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
 import { type Controllo, lettoDaCampi, propostaDocumento, valutaLettura } from './proposta';
 import { PrismaService } from './prisma.service';
-import { type Contesto, apriAnomalia, logEvent } from './registro';
+import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
 // Documenti fiscali della pratica e canale comune di ingresso dei file (F2-A3, §4.2.7.1, §5.3, §6.5, §8.1).
 // Il browser manda solo i valori digitati; netto, totali e stato li calcola il server (V12, D-28).
@@ -677,6 +677,8 @@ export class DocumentiController {
           pratica_id: null, prima: { stato: d.stato }, dopo: { stato: 'scartato' },
         },
       }, ctx);
+      // §7.14.3: l'anomalia della lettura si chiude quando il documento è scartato
+      await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(did));
     });
   }
 }

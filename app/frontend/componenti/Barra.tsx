@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { api } from '@/lib/api';
 import { Icona } from './Icona';
 import { ruoloBreve, usePuo, useUtente } from './Utente';
 
@@ -9,7 +10,8 @@ import { ruoloBreve, usePuo, useUtente } from './Utente';
 // le sue voci; in fondo l'utente, che apre il menu con le aree, la password, la Guida ed Esci.
 // `area` di una voce è l'area dei permessi (D-45): le sue voci si aprono con *.consulta e seguono
 // il livello (sola lettura).
-// ponytail: i contatori delle voci (Oggi, Documenti, Pratiche…) arrivano con le loro pagine.
+// I contatori dei problemi (Stato del sistema, gruppo Gestione) sono un numero letto dal server a
+// ogni cambio pagina (§7.14, D-23): il browser non calcola niente.
 interface Voce { href: string; t: string; icona: string; area?: string; permesso?: string }
 const AREE_MENU: { id: string; t: string; icona: string; gruppi: { gruppo: string; voci: Voce[] }[] }[] = [
   { id: 'provvigioni', t: 'Provvigioni', icona: 'liquidazioni', gruppi: [
@@ -53,6 +55,18 @@ export function Barra() {
   const router = useRouter();
   const sigla = io.nome.split(' ').map((x) => x[0]).join('').slice(0, 2);
   const libera = (v: Voce) => !permessoDi(v) || puo(permessoDi(v)!);
+  // contatore dei problemi da vedere (§7.14): un numero letto dal server a ogni cambio pagina
+  const [problemi, setProblemi] = useState<{ problemi: number; errore: boolean } | null>(null);
+  useEffect(() => {
+    if (!puo('sistema.stato')) { setProblemi(null); return; }
+    let vivo = true;
+    void api<{ problemi: number; errore: boolean }>('sistema/contatore').then((r) => {
+      if (vivo && r.ok) setProblemi(r.dati);
+    });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- il contatore si rilegge a ogni cambio pagina
+  }, [percorso]);
+  const conta = (n?: number) => (n ? <span className={'conta' + (problemi?.errore ? ' urgente' : '')}>{n}</span> : null);
   // per ogni area le voci che l'utente può aprire; un'area senza voci non compare
   const aree = AREE_MENU.map((a) => ({ ...a, gruppi: a.gruppi.map((g) => ({ ...g, voci: g.voci.filter(libera) })).filter((g) => g.voci.length) }))
     .filter((a) => a.gruppi.length);
@@ -95,6 +109,7 @@ export function Barra() {
     return (
       <Link key={v.href} className={'voce' + (si ? ' attiva' : '')} href={v.href} aria-current={si ? 'page' : undefined}>
         <Icona nome={v.icona} /><span>{v.t}</span>
+        {v.href === '/sistema' && conta(problemi?.problemi)}
       </Link>
     );
   };
@@ -110,7 +125,10 @@ export function Barra() {
       {qui?.id === 'provvigioni' && puo('provvigioni.modifica') && <button type="button" className="carica-barra" id="carica-barra" onClick={() => router.push('/documenti')}><Icona nome="carica" />Carica documenti</button>}
       <div className="barra-menu">
         {qui?.gruppi.map((g) => (
-          <nav key={g.gruppo} className="gruppo" aria-label={g.gruppo}><div className="gruppo-nome">{g.gruppo}</div>{g.voci.map(voce)}</nav>
+          <nav key={g.gruppo} className="gruppo" aria-label={g.gruppo}>
+            <div className="gruppo-nome">{g.gruppo}{qui.id === 'gestione' && conta(problemi?.problemi)}</div>
+            {g.voci.map(voce)}
+          </nav>
         ))}
       </div>
       <div ref={contenitoreUtente} className={'barra-piede' + (menuUtente ? ' aperta' : '')}>

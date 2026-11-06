@@ -25,6 +25,8 @@ import { SollecitiController } from './solleciti';
 import { EventiController, EventiService } from './eventi';
 import { ImpostazioniController } from './impostazioni-api';
 import { PuliziaRegistro, RegistroController } from './registro-api';
+import { ScartatiController } from './scartati';
+import { SistemaController, SistemaService } from './sistema';
 
 @Controller('salute')
 class SaluteController {
@@ -55,13 +57,15 @@ export function limiti(env = process.env) {
   imports: [PrismaModule, ScheduleModule.forRoot(), ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
   controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, PraticheController, DocumentiController, DocumentiAbbinaController, DocumentiPraticaController, DocumentiFiscaliController, IntegraController,
     BollettiniController, // F3-A1: matrice e caricamento (rotte fisse) prima di GET /bollettini/:id
-    BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, OggiController, SollecitiController, EventiController, RegistroController, ImpostazioniController],
+    BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, OggiController, SollecitiController, EventiController, RegistroController, ImpostazioniController,
+    ScartatiController, SistemaController],
   providers: [
     IntegraService,
     CasellaService,
     LetturaService,
     EventiService,
     PuliziaRegistro,
+    SistemaService,
     { provide: APP_FILTER, useClass: ErroriFilter }, // con Prisma iniettato: scrive nel registro
     { provide: APP_GUARD, useClass: AccessoGuard }, // su tutte le rotte: permesso dichiarato o negata
   ],

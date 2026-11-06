@@ -10,6 +10,7 @@ import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
+import { apriAnomalia } from '../src/registro';
 import { svuota } from './svuota';
 
 let app: NestExpressApplication;
@@ -252,11 +253,12 @@ describe('GET /api/documenti/:id — dettaglio', () => {
       tipo: 'bollettino', fornitore_id: forn.id, campi: [
         { campo: 'mese', letto: String(mese), aff: 0.95 }, { campo: 'anno', letto: '2026', aff: 0.95 },
         { campo: 'righe[0].numero_fattura', letto: 'F-1', aff: 0.95 }, { campo: 'righe[0].importo', letto: '10', aff: 0.95 },
+        { campo: 'righe[0].provvigione', letto: '1', aff: 0.95 }, // §7.9: il totale riconosciuto è la provvigione (D-71)
       ],
     });
     let r = await oper.get(`/documenti/${id}`).expect(200);
     expect(r.body.bollettino).toEqual({ esiste: false });
-    expect(r.body.proposta).toMatchObject({ esito: 'bollettino', importo: 10 });
+    expect(r.body.proposta).toMatchObject({ esito: 'bollettino', importo: 1 }); // la provvigione, non l'imponibile
     await db.bollettini_testata.create({
       data: { fornitore_id: forn.id, fornitore_versione_id: forn.versione_id, mese, anno: 2026 },
     });
@@ -367,10 +369,13 @@ describe('PUT /api/documenti/:id — correzione dei dati letti', () => {
 describe('POST /api/documenti/:id/scarta', () => {
   it('scrive stato e campi dello scarto e l\'evento; il file resta sul disco', async () => {
     const id = await creaDoc({ tipo: 'fattura', nome: 'da-scartare.pdf' });
+    // un documento non letto ha l'anomalia aperta: scartandolo si chiude (§7.14.3)
+    await apriAnomalia(db, { servizio: 'lettura', codice: 'lettura.fallita', chiave: String(id), messaggio: 'non si legge' });
     await oper.post(`/documenti/${id}/scarta`, { motivo: 'Doppione', nota: ' già registrato ' }).expect(204);
     const d = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } });
     expect(d).toMatchObject({ stato: 'scartato', motivo_scarto: 'Doppione', nota_scarto: 'già registrato', scartato_da: utenteId });
     expect(d.scartato_il).not.toBeNull();
+    expect(await db.registro.count({ where: { codice: 'lettura.fallita', chiave: String(id), stato: 'aperta' } })).toBe(0);
     const ev = await db.registro.findFirstOrThrow({ where: { codice: 'documento.update', entita_id: id } });
     expect(ev.dettaglio).toMatchObject({ stato: 'scartato', motivo: 'Doppione', nota: 'già registrato' });
   });

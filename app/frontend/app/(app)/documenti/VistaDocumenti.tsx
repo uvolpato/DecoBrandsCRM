@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Caricamento, Elenco, ElencoSelezionabile } from '@/componenti/Flussi';
@@ -44,10 +45,20 @@ export function VistaDocumenti() {
   const [errore, setErrore] = useState('');
   const [caricando, setCaricando] = useState(true);
   const [versione, setVersione] = useState(0);
+  const [scartati, setScartati] = useState<number | null>(null); // il link «N scartati» (§7.16)
   const sagome = useSagome(caricando);
   const attesaLettura = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const ricarica = useCallback(() => setVersione((v) => v + 1), []);
+
+  // il numero degli scartati è un conteggio del server, solo per chi può vederli (§7.16)
+  const puoScartati = puo('provvigioni.scartati');
+  useEffect(() => {
+    if (!puoScartati) return;
+    let vivo = true;
+    void api<{ totale: number }>('scartati?per_pagina=1').then((r) => { if (vivo && r.ok) setScartati(r.dati.totale); });
+    return () => { vivo = false; };
+  }, [puoScartati, versione]);
 
   useEffect(() => {
     let vivo = true;
@@ -86,7 +97,10 @@ export function VistaDocumenti() {
     <Pagina titolo="Documenti" pieno
       sottotitolo="Qui entrano tutti i documenti dei fornitori: ordini, conferme, fatture, note di credito e bollettini. Caricali, controlla i dati letti e abbinali: la pratica avanza da sola.">
       <div className="colonne riempi" style={{ '--colonne': 'minmax(300px,0.85fr) minmax(0,2fr)' } as React.CSSProperties}>
-        <Pannello titolo="Da controllare" nota={dati ? `${dati.totale} ${dati.totale === 1 ? 'documento' : 'documenti'}` : ' '} riempi>
+        <Pannello titolo="Da controllare" nota={dati ? <>
+          {dati.totale} {dati.totale === 1 ? 'documento' : 'documenti'}
+          {scartati != null && <> · <Link href="/scartati">{scartati} scartati</Link></>}
+        </> : ' '} riempi>
           {puoModifica && (
             <>
               <Caricamento titolo="Trascina qui i documenti"
