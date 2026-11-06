@@ -104,7 +104,8 @@ export async function lettoDaCampi(db: Db, documento_id: bigint): Promise<Letto>
     db.documenti_in_arrivo.findUnique({ where: { id: documento_id }, select: { tipo: true, fornitore_id: true } }),
     db.documenti_campi.findMany({ where: { documento_id }, orderBy: { id: 'asc' } }),
   ]);
-  const m = new Map(campi.map((c) => [c.campo, c.valore_letto]));
+  // §6.5 punto 7, D-72: la correzione conta; si legge il valore finale quando c'è
+  const m = new Map(campi.map((c) => [c.campo, c.valore_finale ?? c.valore_letto]));
   return componiLetto(d?.tipo ?? null, d?.fornitore_id ?? null, m);
 }
 

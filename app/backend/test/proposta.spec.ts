@@ -305,6 +305,17 @@ describe('lettoDaCampi', () => {
     expect(l.righe[1].importo).toBe(12.25);
   });
 
+  it('preferisce il valore finale della correzione (D-72)', async () => {
+    const r = await creaArrivo({ tipo: 'fattura', campi: [
+      ['numero', 'LETTO', 0.5], ['righe[0].codice', 'A1', 0.5], ['righe[0].quantita', '2', 0.5],
+    ] });
+    await db.documenti_campi.updateMany({ where: { documento_id: r.id, campo: 'numero' }, data: { valore_finale: 'CORRETTO' } });
+    await db.documenti_campi.updateMany({ where: { documento_id: r.id, campo: 'righe[0].quantita' }, data: { valore_finale: '5' } });
+    const l = await lettoDaCampi(db, r.id);
+    expect(l.numero).toBe('CORRETTO');
+    expect(l.righe[0].quantita).toBe(5);
+  });
+
   it('valori non validi: null, mai eccezione', async () => {
     const r = await creaArrivo({ tipo: 'fattura', campi: [['data', 'ieri', 0.9], ['importo_totale', 'non-un-numero', 0.9], ['mese', '13,5', 0.9]] });
     const l = await lettoDaCampi(db, r.id);

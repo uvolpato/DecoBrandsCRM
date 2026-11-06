@@ -3,7 +3,7 @@ import {
   PayloadTooLargeException, Post, Put, Query, Req, Res, StreamableFile, UnsupportedMediaTypeException, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Prisma } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { createHash } from 'node:crypto';
@@ -13,9 +13,11 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import type { Request, Response } from 'express';
 import { Richiede, contesto } from './accesso';
 import { Data, Facoltativo } from './fornitori';
+import { righePagina } from './impostazioni';
 import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
 import { netto, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
+import { type Controllo, lettoDaCampi, propostaDocumento, valutaLettura } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, logEvent } from './registro';
 
@@ -221,9 +223,208 @@ class CercaDocumenti {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limite?: number;
 }
 
+/* ---------- Pagina Documenti (F6-A4a, §7.9, §8.1, D-72) ---------- */
+
+const STATI_ELENCO = ['da_controllare', 'in_coda', 'in_lettura', 'errore'] as const;
+const TIPI_ARRIVO = [...TIPI_DOCUMENTO, 'bollettino'] as const;
+const MOTIVI_SCARTO = ['Doppione', 'Non riguarda Decobrands', 'Documento illeggibile', 'Altro'] as const;
+
+class ElencoDocumenti {
+  @IsOptional() @IsIn(STATI_ELENCO) stato?: (typeof STATI_ELENCO)[number];
+  @IsOptional() @IsString() @MaxLength(100) q?: string;
+  @IsOptional() @IsIn(TIPI_ARRIVO) tipo?: (typeof TIPI_ARRIVO)[number];
+  @IsOptional() @IsIn(['affidabile', 'da_controllare', 'bassa']) livello?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) pagina?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) per_pagina?: number;
+}
+
+class ScartaDocumento {
+  @IsIn(MOTIVI_SCARTO as unknown as string[]) motivo!: string;
+  @IsOptional() @IsString() @MaxLength(2000) nota?: string;
+}
+
+/** Correzione dei dati letti: testata e righe arrivano come oggetti, validati qui campo per campo
+ *  (le righe con `i` conservano i metadati, quelle senza sono nuove). */
+interface CorrezioneLettura {
+  testata: Record<string, unknown>;
+  righe: Record<string, unknown>[];
+}
+
+type DbLetto = Prisma.TransactionClient | PrismaClient;
+
+/** Tipo del file dall'estensione salvata (D-60): per la pagina, che sceglie PDF o immagine. */
+const fileTipo = (percorso: string) => {
+  const p = percorso.toLowerCase();
+  return p.endsWith('.jpg') || p.endsWith('.jpeg') ? 'jpg' : p.endsWith('.png') ? 'png' : 'pdf';
+};
+
+const controlliFalliti = (v: unknown): number => {
+  const f = (v as { falliti?: unknown[] } | null)?.falliti;
+  return Array.isArray(f) ? f.length : 0;
+};
+
+/** Dettaglio per la pagina (§7.9): testata e righe dai valori finali, campi grezzi per i bordi
+ *  di affidabilità, proposta ricalcolata. Una sola lettura dei campi per proposta e testata. */
+async function dettaglioDocumento(db: DbLetto, id: bigint) {
+  const d = await db.documenti_in_arrivo.findUnique({
+    where: { id }, include: { fornitore: true, campi: { orderBy: { id: 'asc' } } },
+  });
+  if (!d) throw new NotFoundException('Documento non trovato');
+  const letto = await lettoDaCampi(db, id);
+  const p = await propostaDocumento(db, letto);
+  // il cliente dell'abbinamento è un BigInt: nella risposta va come stringa (come gli altri id)
+  const proposta = { ...p, abbinamento: p.abbinamento ? { ...p.abbinamento, cliente_id: String(p.abbinamento.cliente_id) } : null };
+  const controlli = (d.controlli as { falliti?: Controllo[] } | null)?.falliti ?? [];
+  // solo il bollettino ha un omonimo da cercare (D-71): «esiste» dice se è già registrato
+  const bollettino = letto.tipo === 'bollettino'
+    ? {
+      esiste: letto.fornitore_id != null && letto.mese != null && letto.anno != null
+        && !!(await db.bollettini_testata.findFirst({
+          where: { fornitore_id: letto.fornitore_id, mese: letto.mese, anno: letto.anno }, select: { id: true },
+        })),
+    }
+    : null;
+  return {
+    id: String(d.id), file_nome: d.file_nome, file_tipo: fileTipo(d.file_percorso), stato: d.stato,
+    tipo: d.tipo, livello: d.livello, ricevuto_il: d.ricevuto_il.toISOString(),
+    letto_il: d.letto_il?.toISOString() ?? null, errore: d.errore,
+    fornitore: letto.fornitore_id != null ? { id: String(letto.fornitore_id), nome: d.fornitore?.ragione_sociale ?? null } : null,
+    campi: d.campi.map((c) => ({
+      campo: c.campo, valore_letto: c.valore_letto, valore_finale: c.valore_finale,
+      affidabilita: c.affidabilita == null ? null : Number(c.affidabilita),
+      posizione: c.posizione, precisione: c.precisione, verificato: c.verificato,
+    })),
+    testata: {
+      tipo: letto.tipo, numero: letto.numero, data: letto.data,
+      fornitore_id: letto.fornitore_id != null ? String(letto.fornitore_id) : null,
+      codice_cliente: letto.codice_cliente, cliente: letto.cliente, importo: letto.importo,
+      mese: letto.mese, anno: letto.anno, riferimento_fattura: letto.riferimento_fattura,
+    },
+    righe: letto.righe.map((r, i) => ({ i, ...r })),
+    controlli, proposta, bollettino,
+  };
+}
+
+/* ---------- Valori della correzione (V12: il server valida e scrive) ---------- */
+const testoO = (v: unknown): string | null => {
+  if (v == null) return null;
+  const t = String(v).trim();
+  return t ? t : null;
+};
+const dataBuona = (t: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return false;
+  const d = new Date(t + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === t;
+};
+/** Testo normalizzato di un campo, con il 400 che dice il campo (mai il valore). */
+const valoreCampo = (v: unknown, campo: string, tipo: 'testo' | 'data' | 'numero' | 'intero'): string | null => {
+  const t = testoO(v);
+  if (t == null) return null;
+  if (tipo === 'testo') return t;
+  if (tipo === 'data') {
+    if (!dataBuona(t)) throw new BadRequestException(`Data non valida per ${campo}`);
+    return t;
+  }
+  const n = Number(t.replace(',', '.'));
+  if (!Number.isFinite(n) || (tipo === 'intero' && !Number.isInteger(n))) throw new BadRequestException(`Valore non valido per ${campo}`);
+  if (campo === 'mese' && (n < 1 || n > 12)) throw new BadRequestException('Mese non valido: da 1 a 12');
+  if (campo === 'anno' && (n < 1900 || n > 2200)) throw new BadRequestException('Anno non valido');
+  return String(n);
+};
+const diverso = (tipo: string, letto: string | null, nuovo: string) => {
+  if (letto == null) return true;
+  // il letto può avere la virgola decimale: si confrontano i numeri, non il testo
+  return tipo === 'numero' || tipo === 'intero'
+    ? Number(letto.replace(',', '.')) !== Number(nuovo)
+    : letto !== nuovo;
+};
+
+/** I campi della testata: nome nell'API → nome in documenti_campi (l'importo è `importo_totale`). */
+const TESTATA_CAMPI: Record<string, { campo: string; tipo: 'testo' | 'data' | 'numero' | 'intero' }> = {
+  numero: { campo: 'numero', tipo: 'testo' },
+  data: { campo: 'data', tipo: 'data' },
+  codice_cliente: { campo: 'codice_cliente', tipo: 'testo' },
+  cliente: { campo: 'cliente', tipo: 'testo' },
+  importo: { campo: 'importo_totale', tipo: 'numero' },
+  mese: { campo: 'mese', tipo: 'intero' },
+  anno: { campo: 'anno', tipo: 'intero' },
+  riferimento_fattura: { campo: 'riferimento_fattura', tipo: 'testo' },
+};
+const RIGA_CAMPI: Record<string, 'testo' | 'data' | 'numero'> = {
+  codice: 'testo', descrizione: 'testo', quantita: 'numero', prezzo: 'numero', importo: 'numero',
+  numero_fattura: 'testo', data_fattura: 'data', provvigione: 'numero',
+};
+
 @Controller('documenti')
 export class DocumentiController {
   constructor(private readonly db: PrismaService) {}
+
+  /** Elenco dei documenti in ingresso (F6-A4a, §7.9, §8.1): segmenti di stato con i conteggi degli
+   *  altri filtri (D-23), ricerca e pagine sul server. Testata e righe stanno in `documenti_campi`
+   *  (valori finali quando ci sono); niente proposta qui, è costosa: la pagina mostra tipo, numero,
+   *  fornitore, importo e livello. */
+  @Get()
+  @Richiede('provvigioni.consulta')
+  async elenco(@Query() q: ElencoDocumenti) {
+    const stato = q.stato ?? 'da_controllare';
+    const perPagina = q.per_pagina ?? await righePagina(this.db);
+    const pagina = q.pagina ?? 1;
+    const testo = (q.q ?? '').trim();
+    const simile = '%' + testo.replace(/[\\%_]/g, '\\$&') + '%'; // % e _ sono lettere, non jolly
+    const tipo = q.tipo ?? '';
+    const livello = q.livello ?? '';
+    // una sola sottoquery dei campi per pagina (niente N+1): finale se c'è, altrimenti letto
+    const campi = Prisma.sql`campi AS (
+      SELECT documento_id,
+        MAX(CASE WHEN campo = 'numero' THEN COALESCE(valore_finale, valore_letto) END) AS numero,
+        MAX(CASE WHEN campo = 'data' THEN COALESCE(valore_finale, valore_letto) END) AS data,
+        MAX(CASE WHEN campo = 'codice_cliente' THEN COALESCE(valore_finale, valore_letto) END) AS codice_cliente,
+        MAX(CASE WHEN campo = 'cliente' THEN COALESCE(valore_finale, valore_letto) END) AS cliente,
+        MAX(CASE WHEN campo = 'importo_totale' THEN COALESCE(valore_finale, valore_letto) END) AS importo
+      FROM documenti_campi GROUP BY documento_id
+    )`;
+    const altro = Prisma.sql`
+      (${testo} = '' OR COALESCE(c.numero, '') ILIKE ${simile} OR d.file_nome ILIKE ${simile}
+        OR COALESCE(fv.ragione_sociale, '') ILIKE ${simile} OR COALESCE(c.cliente, '') ILIKE ${simile})
+      AND (${tipo} = '' OR d.tipo = ${tipo})
+      AND (${livello} = '' OR d.livello = ${livello})`;
+    const righe = await this.db.$queryRaw<{
+      id: bigint; file_nome: string; file_percorso: string; tipo: string | null; fornitore_id: bigint | null;
+      fornitore: string | null; numero: string | null; data: string | null; codice_cliente: string | null;
+      cliente: string | null; importo: string | null; livello: string | null; ricevuto_il: Date;
+      letto_il: Date | null; controlli: Prisma.JsonValue | null;
+    }[]>`
+      WITH ${campi}
+      SELECT d.id, d.file_nome, d.file_percorso, d.tipo, d.fornitore_id, fv.ragione_sociale AS fornitore,
+             c.numero, c.data, c.codice_cliente, c.cliente, c.importo, d.livello, d.ricevuto_il, d.letto_il, d.controlli
+      FROM documenti_in_arrivo d
+      LEFT JOIN campi c ON c.documento_id = d.id
+      LEFT JOIN fornitori_versioni fv ON fv.fornitore_id = d.fornitore_id AND fv.id = d.fornitore_versione_id
+      WHERE d.stato = ${stato} AND ${altro}
+      ORDER BY d.ricevuto_il DESC, d.id DESC
+      LIMIT ${perPagina} OFFSET ${(pagina - 1) * perPagina}`;
+    const conti = await this.db.$queryRaw<{ stato: string; n: bigint }[]>`
+      WITH ${campi}
+      SELECT d.stato, count(*) AS n
+      FROM documenti_in_arrivo d
+      LEFT JOIN campi c ON c.documento_id = d.id
+      LEFT JOIN fornitori_versioni fv ON fv.fornitore_id = d.fornitore_id AND fv.id = d.fornitore_versione_id
+      WHERE ${altro}
+      GROUP BY d.stato`;
+    const conteggi: Record<(typeof STATI_ELENCO)[number], number> = { da_controllare: 0, in_coda: 0, in_lettura: 0, errore: 0 };
+    for (const c of conti) if (c.stato in conteggi) conteggi[c.stato as keyof typeof conteggi] = Number(c.n);
+    return {
+      documenti: righe.map((r) => ({
+        id: String(r.id), file_nome: r.file_nome, file_tipo: fileTipo(r.file_percorso), tipo: r.tipo,
+        numero: r.numero, data: r.data, fornitore_id: r.fornitore_id != null ? String(r.fornitore_id) : null,
+        fornitore: r.fornitore, codice_cliente: r.codice_cliente, cliente: r.cliente,
+        importo: r.importo == null ? null : Number(r.importo), livello: r.livello,
+        ricevuto_il: r.ricevuto_il.toISOString(), letto_il: r.letto_il?.toISOString() ?? null,
+        controlli_n: controlliFalliti(r.controlli),
+      })),
+      conteggi, totale: conteggi[stato], pagina, per_pagina: perPagina,
+    };
+  }
 
   /** Documenti di un fornitore per l'abbinamento a mano (F3-A2b, §7.7, §8.1): fatture e note di
    *  credito di ogni periodo, cercate per numero o per cliente. Prima quelli del mese del
@@ -306,6 +507,177 @@ export class DocumentiController {
       'Content-Security-Policy': 'sandbox',
     });
     return new StreamableFile(dati);
+  }
+
+  /** Dettaglio del documento (F6-A4a, §7.9, §8.1): dati letti con affidabilità e posizioni,
+   *  testata e righe dai valori finali, proposta di abbinamento ricalcolata. */
+  @Get(':id')
+  @Richiede('provvigioni.consulta')
+  async dettaglio(@Param('id', ParseIntPipe) id: number) {
+    return dettaglioDocumento(this.db, BigInt(id));
+  }
+
+  /** Correzione dei dati letti (F6-A4a, §6.5 punto 7, D-72). Una transazione con la riga bloccata
+   *  (V13): testata e righe riscritte nei campi, tutto verificato, livello e controlli ricalcolati
+   *  dai valori finali. `i` = riga originale (metadati conservati), `null` = riga nuova. */
+  @Put(':id')
+  @Richiede('provvigioni.modifica')
+  async correggi(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: CorrezioneLettura) {
+    const ctx = contesto(req);
+    const did = BigInt(id);
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
+      const d = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
+      if (!d) throw new NotFoundException('Documento non trovato');
+      if (d.stato !== 'da_controllare') throw new ConflictException('Il documento non è più da controllare');
+
+      const testata = b.testata ?? {};
+      const righeInput = Array.isArray(b.righe) ? b.righe : [];
+      const tipo = valoreCampo(testata.tipo, 'tipo', 'testo');
+      if (!tipo || !TIPI_ARRIVO.includes(tipo as (typeof TIPI_ARRIVO)[number])) {
+        throw new BadRequestException('Tipo del documento non valido');
+      }
+
+      // fornitore con la versione corrente (D-46); null svuota i due campi insieme
+      let fornitore_id: bigint | null = d.fornitore_id;
+      let fornitore_versione_id: bigint | null = d.fornitore_versione_id;
+      if ('fornitore_id' in testata) {
+        const f = testoO(testata.fornitore_id);
+        if (f == null) {
+          fornitore_id = null;
+          fornitore_versione_id = null;
+        } else {
+          const n = Number(f);
+          if (!Number.isInteger(n) || n < 1) throw new BadRequestException('Fornitore non valido');
+          const fornitore = await tx.fornitori.findUnique({ where: { id: BigInt(f) }, select: { versione_corrente_id: true } });
+          if (!fornitore?.versione_corrente_id) throw new BadRequestException('Fornitore non valido');
+          fornitore_id = BigInt(f);
+          fornitore_versione_id = fornitore.versione_corrente_id;
+        }
+      }
+
+      const campiGia = await tx.documenti_campi.findMany({ where: { documento_id: did } });
+      const giaPerCampo = new Map(campiGia.map((c) => [c.campo, c]));
+      const ora = new Date();
+      let corretti = 0;
+
+      // testata: aggiorna o crea; un valore vuoto toglie il campo
+      for (const [chiave, def] of Object.entries(TESTATA_CAMPI)) {
+        if (!(chiave in testata)) continue;
+        const valore = valoreCampo(testata[chiave], chiave, def.tipo);
+        const gia = giaPerCampo.get(def.campo);
+        if (valore == null) {
+          if (gia) await tx.documenti_campi.delete({ where: { id: gia.id } });
+          continue;
+        }
+        if (diverso(def.tipo, gia?.valore_letto ?? null, valore)) corretti++;
+        if (gia) {
+          await tx.documenti_campi.update({
+            where: { id: gia.id },
+            data: { valore_finale: valore, verificato: true, corretto_da: ctx.utente_id ?? null, corretto_il: ora },
+          });
+        } else {
+          await tx.documenti_campi.create({
+            data: {
+              documento_id: did, campo: def.campo, valore_letto: null, valore_finale: valore,
+              affidabilita: null, posizione: Prisma.DbNull, precisione: 'assente', verificato: true,
+              corretto_da: ctx.utente_id ?? null, corretto_il: ora,
+            },
+          });
+        }
+      }
+
+      // righe: elimina le vecchie, ricrea nell'ordine ricevuto (numerazione 0..n-1);
+      // la riga con lo stesso `i` porta con sé valore letto, affidabilità, posizione e precisione
+      const giaPerRiga = new Map<number, Map<string, (typeof campiGia)[number]>>();
+      for (const c of campiGia) {
+        const m = /^righe\[(\d+)\]\.(.+)$/.exec(c.campo);
+        if (!m) continue;
+        const ri = Number(m[1]);
+        if (!giaPerRiga.has(ri)) giaPerRiga.set(ri, new Map());
+        giaPerRiga.get(ri)!.set(m[2], c);
+      }
+      await tx.documenti_campi.deleteMany({ where: { documento_id: did, campo: { startsWith: 'righe[' } } });
+      const nuove: Prisma.documenti_campiCreateManyInput[] = [];
+      righeInput.forEach((r, j) => {
+        let i: number | null = null;
+        if (r.i != null && r.i !== '') {
+          const n = Number(r.i);
+          if (!Number.isInteger(n) || n < 0) throw new BadRequestException('Indice di riga non valido');
+          i = n;
+        }
+        const origine = i == null ? undefined : giaPerRiga.get(i);
+        const rigaNuova = i == null;
+        if (rigaNuova) corretti++; // una riga aggiunta conta come una correzione
+        for (const [chiave, tipoCampo] of Object.entries(RIGA_CAMPI)) {
+          if (!(chiave in r)) continue;
+          const valore = valoreCampo(r[chiave], `righe[${j}].${chiave}`, tipoCampo);
+          if (valore == null) continue;
+          const gia = origine?.get(chiave);
+          if (!rigaNuova && diverso(tipoCampo, gia?.valore_letto ?? null, valore)) corretti++;
+          nuove.push({
+            documento_id: did, campo: `righe[${j}].${chiave}`,
+            valore_letto: gia?.valore_letto ?? null, valore_finale: valore,
+            affidabilita: gia?.affidabilita ?? null,
+            posizione: gia?.posizione != null ? (gia.posizione as Prisma.InputJsonValue) : Prisma.DbNull,
+            precisione: gia?.precisione ?? 'assente', verificato: true,
+            corretto_da: ctx.utente_id ?? null, corretto_il: ora,
+          });
+        }
+      });
+      if (nuove.length) await tx.documenti_campi.createMany({ data: nuove });
+
+      const livelloPrima = d.livello;
+      await tx.documenti_in_arrivo.update({
+        where: { id: did },
+        data: { tipo, fornitore_id, fornitore_versione_id, errore: null },
+      });
+      const val = await valutaLettura(tx, did);
+      await tx.documenti_in_arrivo.update({
+        where: { id: did },
+        data: { livello: val.livello, controlli: { falliti: val.controlli } as unknown as Prisma.InputJsonValue },
+      });
+      await logEvent(tx, {
+        tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
+        dettaglio: {
+          etichetta: d.file_nome, documento_id: String(did), pratica_id: null,
+          campi_corretti: corretti, livello_prima: livelloPrima, livello_dopo: val.livello,
+          prima: { livello: livelloPrima }, dopo: { livello: val.livello },
+        },
+      }, ctx);
+      return dettaglioDocumento(tx, did);
+    });
+  }
+
+  /** Scarto del documento (F6-A4a, §7.9, D-72): il file resta sul disco (la conservazione è F5-A7);
+   *  si scarta da `da_controllare`, `errore` o `in_coda`, non se è già abbinato o in lettura. */
+  @Post(':id/scarta')
+  @HttpCode(204)
+  @Richiede('provvigioni.modifica')
+  async scarta(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: ScartaDocumento) {
+    const ctx = contesto(req);
+    const did = BigInt(id);
+    await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
+      const d = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
+      if (!d) throw new NotFoundException('Documento non trovato');
+      if (!['da_controllare', 'errore', 'in_coda'].includes(d.stato)) {
+        throw new ConflictException('Il documento è già abbinato, scartato o in lettura');
+      }
+      const nota = b.nota?.trim() || null;
+      await tx.documenti_in_arrivo.update({
+        where: { id: did },
+        data: { stato: 'scartato', scartato_il: new Date(), scartato_da: ctx.utente_id ?? null, motivo_scarto: b.motivo, nota_scarto: nota },
+      });
+      // il catalogo §15.2.4 non ha un codice per lo scarto: si usa documento/update (D-72)
+      await logEvent(tx, {
+        tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
+        dettaglio: {
+          etichetta: d.file_nome, documento_id: String(did), stato: 'scartato', motivo: b.motivo, nota,
+          pratica_id: null, prima: { stato: d.stato }, dopo: { stato: 'scartato' },
+        },
+      }, ctx);
+    });
   }
 }
 
