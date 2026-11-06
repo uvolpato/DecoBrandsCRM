@@ -101,6 +101,9 @@ describe('F6-A2 lettura dalla coda', () => {
     const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } });
     expect(riga).toMatchObject({ stato: 'da_controllare', tipo: 'fattura', modello: 'finto:1', errore: null, tentativi: 0 });
     expect(riga.letto_il).not.toBeNull();
+    // F6-A3: livello e controlli calcolati al salvataggio; il campo righe[0].prezzo a 0,62 porta il livello a bassa
+    expect(riga.livello).toBe('bassa');
+    expect(riga.controlli).toEqual({ falliti: [] });
 
     const campi = await db.documenti_campi.findMany({ where: { documento_id: d.id }, orderBy: { id: 'asc' } });
     expect(campi.map((c) => c.campo)).toEqual([
@@ -163,5 +166,44 @@ describe('F6-A2 lettura dalla coda', () => {
     });
     expect(await db.documenti_campi.count({ where: { documento_id: d.id } })).toBe(0);
     expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } })).stato).toBe('abbinato');
+  });
+
+  it('con fornitore riconosciuto salva fornitore_id e versione (D-71)', async () => {
+    const f = await db.fornitori.create({ data: {} });
+    const v = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'Gries GmbH & Co. KG' } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: v.id } });
+    const d = await inCoda();
+    const r: Lettura = {
+      modello: 'finto:1', crediti: null, risultato: { tipo: 'fattura', fornitore: 'gries gmbh & co. kg' },
+      campi: [campo('tipo', 'fattura', 0.98), campo('fornitore', 'Gries GmbH & Co. KG', 0.97)],
+    };
+    await leggiDallaCoda(db, config, async () => r);
+    const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } });
+    expect(riga).toMatchObject({ fornitore_id: f.id, fornitore_versione_id: v.id });
+  });
+
+  it('un campo a 0,5 porta il livello a bassa', async () => {
+    const d = await inCoda();
+    const r: Lettura = {
+      modello: 'finto:1', crediti: null, risultato: { tipo: 'fattura' },
+      campi: [campo('tipo', 'fattura', 0.98), campo('numero', 'F-1', 0.98), campo('data', '2026-06-01', 0.5)],
+    };
+    await leggiDallaCoda(db, config, async () => r);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } })).livello).toBe('bassa');
+  });
+
+  it('un controllo fallito compare in controlli e porta il livello a bassa', async () => {
+    const f = await db.fornitori.create({ data: {} });
+    const v = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'Gries GmbH & Co. KG' } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: v.id } });
+    const d = await inCoda();
+    const r: Lettura = {
+      modello: 'finto:1', crediti: null, risultato: { tipo: 'fattura', fornitore: 'Gries GmbH & Co. KG', codice_cliente: 'ZZZ-999' },
+      campi: [campo('tipo', 'fattura', 0.98), campo('codice_cliente', 'ZZZ-999', 0.98)],
+    };
+    await leggiDallaCoda(db, config, async () => r);
+    const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } });
+    expect(riga.controlli).toEqual({ falliti: [{ codice: 'codice_cliente', campo: 'codice_cliente', testo: 'Codice cliente ZZZ-999 non presente fra i clienti del fornitore', grave: true }] });
+    expect(riga.livello).toBe('bassa');
   });
 });
