@@ -5,12 +5,14 @@ import { Campo } from '@/componenti/Campo';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar } from '@/componenti/FilterBar';
 import { Binario, Caricamento, Elenco } from '@/componenti/Flussi';
+import { FormModal } from '@/componenti/FormModal';
 import { Cifre } from '@/componenti/Kpi';
 import { Conferma, Modale } from '@/componenti/Modale';
-import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
+import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
+import { SollecitiConferme, SollecitiPagamento } from '@/componenti/Solleciti';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
 import type { Entita } from '@/lib/entita';
@@ -36,6 +38,13 @@ interface Provvigione {
   sub: number; eccezione: boolean; da_fornitore: number; a_decobrands: number; a_subagente: number;
   maturazione: string | null; regole: string[];
 }
+interface Incasso {
+  documento_id: string; numero: string; data: string; importo: number;
+  stato: {
+    stato: string; dal: string | null; bollettino_id: string | null; manuale: boolean; nota: string | null;
+    giorni: number; limite: number; solleciti: number; sollecitata_il: string | null;
+  } | null;
+}
 interface Dettaglio {
   id: string; numero: string;
   cliente_id: string; cliente: string; fornitore_id: string; fornitore: string;
@@ -47,6 +56,7 @@ interface Dettaglio {
   confronto: { fasi: FaseRiga[]; righe: Riga[]; variazioni: { numero: number; totale: number } };
   provvigione: Provvigione | null;
   azione: { tipo: string; testo: string };
+  incassi: Incasso[];
 }
 interface Documento {
   id: string; tipo: Tipo; numero: string; data: string; importo: number;
@@ -87,6 +97,13 @@ const ETICHETTA: Record<Chiave, { testo: string; v: Variante }> = {
   confermata: { testo: 'Confermata', v: 'info' },
   fatturata: { testo: 'Fatturata', v: 'ok' },
 };
+// Stati d'incasso della fattura (§5.14): il server dice quale, qui si mostra l'etichetta
+const INCASSO: Record<string, { testo: string; v: Variante }> = {
+  pagata: { testo: 'Pagata', v: 'ok' },
+  insoluta: { testo: 'Non pagata', v: 'errore' },
+  da_verificare: { testo: 'Incasso da verificare', v: 'attesa' },
+  da_incassare: { testo: 'In attesa di incasso', v: 'neutro' },
+};
 const TIPO: Record<Tipo, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura',
   nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento',
@@ -121,6 +138,35 @@ export function VistaPratica({ id }: { id: string }) {
     chiudi();
     await carica();
   };
+
+  // Incasso del cliente (§5.14): sollecito, oppure segnalazione del fornitore (pagata / non pagata)
+  function sollecita(doc: Incasso) {
+    setFinestra(<SollecitiPagamento clienteId={d!.cliente_id} onChiudi={chiudi} onCopiato={() => void carica()} />);
+  }
+  async function segnaPagata(doc: Incasso) {
+    const r = await api('documenti/' + doc.documento_id + '/incasso', { stato: 'pagata' }, 'PUT');
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    avviso('Fattura ' + doc.numero + ' segnata come pagata');
+    chiudi();
+    await carica();
+  }
+  function segnaNonPagata(doc: Incasso) {
+    setFinestra(<FormModal
+      titolo={'Fattura ' + doc.numero + ' non pagata'}
+      testo="Il fornitore segnala che il cliente non ha pagato. La fattura passa fra i pagamenti da sollecitare."
+      conferma="Segna come non pagata"
+      campi={[{ nome: 'nota', etichetta: 'Nota', valore: '', largo: true, aiuto: 'es. email di ' + d!.fornitore + ' del …' }]}
+      onChiudi={chiudi}
+      onConferma={async (v) => {
+        const r = await api('documenti/' + doc.documento_id + '/incasso',
+          { stato: 'insoluta', ...(v.nota?.trim() ? { nota: v.nota.trim() } : {}) }, 'PUT');
+        if (!r.ok) return r.messaggio;
+        avviso('Fattura ' + doc.numero + ' fra i pagamenti da sollecitare');
+        chiudi();
+        await carica();
+      }}
+    />);
+  }
 
   function apriDoc(doc: Documento) {
     // D-60: nel visualizzatore ci sono le schede di tutti i documenti con un file, fiscali e non
@@ -310,6 +356,37 @@ export function VistaPratica({ id }: { id: string }) {
                 </div>
               </Pannello>
             )}
+            {!!d.incassi.length && (
+              <Pannello titolo="Incasso del cliente" nota={d.provvigione?.maturazione === 'maturato' ? 'sul maturato' : 'sul fatturato'}>
+                {d.incassi.map((x) => {
+                  const st = x.stato, info = st ? INCASSO[st.stato] : null;
+                  // da dove viene lo stato: bollettino del fornitore o segnalazione a mano (§5.14, D-62)
+                  const fonte = st?.manuale ? 'segnalazione del fornitore' + (st.nota ? ' · ' + st.nota : '')
+                    : st?.bollettino_id ? 'dal bollettino' + (st.dal ? ' del ' + dataIt(st.dal) : '') : '';
+                  return (
+                    <div className="incasso-riga" key={x.documento_id}>
+                      <div>
+                        <b>{x.numero}</b> {info ? <Stato v={info.v}>{info.testo}</Stato> : <Stato v="neutro">Nessuna segnalazione</Stato>}
+                        <span className="sec-riga">
+                          {fonte}{st?.solleciti ? (fonte ? ' · ' : '') + 'sollecitata ' + st.solleciti + (st.solleciti === 1 ? ' volta' : ' volte') + (st.sollecitata_il ? ', ultima il ' + dataIt(st.sollecitata_il) : '') : ''}
+                        </span>
+                      </div>
+                      {puoModifica && st && (
+                        <div className="azioni-cella">
+                          {(st.stato === 'insoluta' || st.stato === 'da_verificare') && <>
+                            <button type="button" className="btn sec piccolo" onClick={() => sollecita(x)}>Sollecita il cliente</button>
+                            <button type="button" className="btn testo piccolo" onClick={() => void segnaPagata(x)}>Segna come pagata</button>
+                          </>}
+                          {st.stato !== 'pagata' && st.stato !== 'insoluta' && st.stato !== 'da_verificare' && (
+                            <button type="button" className="btn testo piccolo" onClick={() => segnaNonPagata(x)}>Segna come non pagata</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </Pannello>
+            )}
             <Pannello titolo="Documenti fiscali" nota={String(fiscali.documenti.length)} riempi
               azioni={puoModifica ? [
                 { etichetta: 'Registra fattura', icona: 'piu', onClick: () => registra('fattura') },
@@ -360,10 +437,20 @@ export function VistaPratica({ id }: { id: string }) {
     );
   };
 
+  // Testata (§7.3): il sollecito di conferma solo finché la conferma è attesa o in ritardo; la copia
+  // non scrive nel database, quindi resta disponibile anche in sola lettura.
+  const azioni: Azione[] = [
+    ...(d.stato === 'attesa' || d.stato === 'scaduta' ? [{
+      etichetta: 'Prepara il sollecito', icona: 'posta', variante: 'sec' as const, consentito: true,
+      onClick: () => setFinestra(<SollecitiConferme onChiudi={chiudi} />),
+    }] : []),
+    { etichetta: 'Torna alle pratiche', icona: 'indietro', variante: 'sec', href: '/pratiche' },
+  ];
+
   return (
     <Pagina pieno titolo={d.numero} badge={<Stato v={s.v}>{s.testo}</Stato>}
       sottotitolo={<>{d.cliente} · {d.fornitore}{d.subagente ? ' · seguita da ' + d.subagente : ' · nessun subagente abbinato'}</>}
-      azioni={[{ etichetta: 'Torna alle pratiche', icona: 'indietro', variante: 'sec', href: '/pratiche' }]}>
+      azioni={azioni}>
       <div className="pila riempi">
         <Pannello senzaMargine><Binario tappe={d.fasi} /></Pannello>
         <Schede riempi memoria={daVariazioni ? undefined : 'pratica-' + d.id} attiva={daVariazioni ? 'righe' : undefined} schede={[

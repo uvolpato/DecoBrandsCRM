@@ -17,6 +17,8 @@ import { LiquidazioniController, LiquidazioneReportController } from './liquidaz
 import { LiquidazioneExportController } from './esporta-liquidazione';
 import { AnalisiController } from './analisi';
 import { IncassiController } from './incassi';
+import { OggiController } from './oggi';
+import { SollecitiController } from './solleciti';
 import { EventiController, EventiService } from './eventi';
 
 @Controller('salute')
@@ -48,7 +50,7 @@ export function limiti(env = process.env) {
   imports: [PrismaModule, ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
   controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, PraticheController, DocumentiController, DocumentiAbbinaController, DocumentiPraticaController, DocumentiFiscaliController, IntegraController,
     BollettiniController, // F3-A1: matrice e caricamento (rotte fisse) prima di GET /bollettini/:id
-    BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, EventiController],
+    BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, OggiController, SollecitiController, EventiController],
   providers: [
     IntegraService,
     EventiService,

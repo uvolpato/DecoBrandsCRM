@@ -106,6 +106,17 @@ with sync_playwright() as p:
     pg.click('.avviso-variazioni button'); pg.wait_for_timeout(400)
     ok(scheda(pg, 'Righe a confronto').get_attribute('aria-selected') == 'true', 'Vedi le righe: si apre Righe a confronto')
 
+    # F5-A1: testata con Prepara il sollecito quando la conferma è attesa o in ritardo
+    pg.goto(BASE + '/pratiche'); pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.dt tbody tr.cliccabile')
+    filtra(pg, 'Conferma in ritardo', 'in ritardo')
+    apri_pratica(pg)
+    ok(pg.locator('.testa-azioni button:has-text("Prepara il sollecito")').count() == 1, 'testata: Prepara il sollecito con la conferma in ritardo')
+    pg.click('.testa-azioni button:has-text("Prepara il sollecito")'); pg.wait_for_selector('.modale')
+    ok(testo(pg, '.modale h2') == 'Solleciti di conferma', 'si apre la finestra Solleciti di conferma')
+    testo_conf = pg.locator('.testo-email').input_value()
+    ok('Gentili colleghi di' in testo_conf and 'vostro codice' in testo_conf and 'attesa entro il' in testo_conf, 'testo per fornitore con codice e data attesa')
+    pg.locator('.modale-piede button:has-text("Chiudi")').click(); pg.wait_for_timeout(300)
+
     # --- ritorno all'elenco nello stesso punto (filtro, ordinamento) ---
     pg.goto(BASE + '/pratiche'); pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.dt tbody tr.cliccabile')
     seg(pg, 'Con variazioni').click(); pg.wait_for_timeout(1200)
@@ -141,6 +152,32 @@ with sync_playwright() as p:
     ok(numero_ft in testo(pg, '.modale') and 'Importo' in testo(pg, '.modale'), 'accanto al PDF i dati del documento')
     pg.screenshot(path=str(USCITA / 'app-pratica-pdf-1440.png'))
     pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+
+    # --- F3-A3: riquadro Incasso del cliente, segnalazione e sollecito ---
+    inc = pannello_esatto(pg, 'Incasso del cliente')
+    ok(inc.count() == 1, 'Riepilogo: il riquadro Incasso del cliente')
+    riga_inc = inc.locator('.incasso-riga', has_text=numero_ft)
+    ok(riga_inc.count() == 1 and 'In attesa di incasso' in riga_inc.inner_text(), 'la fattura appena registrata è In attesa di incasso')
+    riga_inc.locator('button:has-text("Segna come non pagata")').click(); pg.wait_for_selector('.modale')
+    ok('non pagata' in testo(pg, '.modale h2'), 'si apre la finestra della segnalazione con la nota')
+    pg.fill('#c-nota', 'email di prova del fornitore')
+    pg.click('.modale-piede button[type=submit]')
+    pg.wait_for_function("document.querySelector('.velo') === null"); pg.wait_for_timeout(1500)
+    riga_inc = pannello_esatto(pg, 'Incasso del cliente').locator('.incasso-riga', has_text=numero_ft)
+    ok('Non pagata' in riga_inc.inner_text() and 'email di prova del fornitore' in riga_inc.inner_text(), 'segnalazione: Non pagata con la nota')
+    ok(riga_inc.locator('button:has-text("Segna come pagata")').count() == 1, 'con una segnalazione si può segnare come pagata')
+    riga_inc.locator('button:has-text("Sollecita il cliente")').click(); pg.wait_for_selector('.modale')
+    ok(testo(pg, '.modale h2') == 'Solleciti di pagamento', 'si apre la finestra dei solleciti su quel cliente')
+    ok(numero_ft in pg.locator('.testo-email').input_value(), 'il testo del sollecito contiene la fattura')
+    pg.locator('.modale-piede button:has-text("Copia il testo")').click(); pg.wait_for_timeout(1200)
+    ok('copiato' in testo(pg, '.avviso'), 'copia del sollecito')
+    pg.locator('.modale-piede button:has-text("Chiudi")').click(); pg.wait_for_timeout(2200)
+    riga_inc = pannello_esatto(pg, 'Incasso del cliente').locator('.incasso-riga', has_text=numero_ft)
+    ok('sollecitata 1 volta' in riga_inc.inner_text(), 'il sollecito resta sulla fattura (quante volte)')
+    riga_inc.locator('button:has-text("Segna come pagata")').click(); pg.wait_for_timeout(1500)
+    riga_inc = pannello_esatto(pg, 'Incasso del cliente').locator('.incasso-riga', has_text=numero_ft)
+    ok('Pagata' in riga_inc.inner_text(), 'segna come pagata: la fattura passa a Pagata')
+    pg.screenshot(path=str(USCITA / 'app-pratica-incasso-1440.png'), full_page=True)
 
     # nota di credito oltre il residuo: errore del server nella finestra, che resta aperta
     pg.click('button:has-text("Nota di credito")'); pg.wait_for_selector('.modale')
@@ -309,6 +346,8 @@ with sync_playwright() as p:
     testi = ' '.join(pg.locator('button, a.btn').all_inner_texts())
     ok('Registra fattura' not in testi and 'Nota di credito' not in testi and 'Correggi' not in testi and 'Annulla' not in testi,
        'lettura: nessun pulsante di scrittura')
+    ok(pg.locator('.incasso-riga button:has-text("Segna come")').count() == 0 and pg.locator('.incasso-riga button:has-text("Sollecita")').count() == 0,
+       'lettura: nessun comando nel riquadro Incasso del cliente')
     ok(pg.locator('.binario .tappa').count() == 4 and scheda(pg, 'Riepilogo').count() == 1, 'lettura: binario, schede e provvigione in consultazione')
     pg.close()
     b.close()

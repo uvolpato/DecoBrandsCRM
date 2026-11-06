@@ -86,7 +86,7 @@ export const GUIDA: Argomento[] = [
     finestre: [
       { nome: 'Solleciti di conferma', da: 'Prepara i solleciti (conferme)', cosa: 'Un testo pronto per ogni fornitore, in schede, con l’elenco delle pratiche in ritardo.',
         azioni: [
-          ['Copia il testo', 'Copia negli appunti e passa al fornitore successivo; il sollecito resta nel registro.'],
+          ['Copia il testo', 'Copia negli appunti e passa al fornitore successivo. La copia non scrive un evento nel registro.'],
           ['Chiudi', 'Esce senza registrare altro.'],
         ] },
       { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.',

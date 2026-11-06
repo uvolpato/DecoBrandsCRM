@@ -70,7 +70,7 @@
       ],
       finestre: [
         { nome: 'Solleciti di conferma', da: 'Prepara i solleciti (conferme)', cosa: 'Un testo pronto per ogni fornitore, in schede, con l’elenco delle pratiche in ritardo.',
-          azioni: [['Copia il testo', 'Copia negli appunti e passa al fornitore successivo; il sollecito resta nel registro.'], ['Chiudi', 'Esce senza registrare altro.']] },
+          azioni: [['Copia il testo', 'Copia negli appunti e passa al fornitore successivo. La copia non scrive un evento nel registro.'], ['Chiudi', 'Esce senza registrare altro.']] },
         { nome: 'Solleciti di pagamento', da: 'Prepara i solleciti · Prepara il sollecito al cliente · Sollecita il cliente', cosa: 'Un testo per ogni cliente con le fatture non pagate: numero, data, fornitore, importo, giorni, totale.', campi: [['Schede in alto', 'Una per cliente, con il numero di fatture; ✓ quando il testo è stato copiato.'], ['Testo', 'Modificabile prima di copiarlo.']], azioni: [['Copia il testo', 'Copia, registra il sollecito sulla fattura (quante volte, ultima data) e passa al cliente successivo.'], ['Chiudi', 'Esce.']] }
       ],
       sapere: ['<b>Pagamenti da sollecitare</b>: fatture che il cliente non ha pagato (stornate dal fornitore o segnalate) e, sul maturato, fatture non ancora riconosciute oltre i giorni d’incasso del fornitore.', 'Una conferma è in ritardo dopo i giorni di attesa fissati nelle condizioni del fornitore.', 'Il bollettino si sollecita solo dopo il giorno in cui il fornitore lo manda di solito.'] },

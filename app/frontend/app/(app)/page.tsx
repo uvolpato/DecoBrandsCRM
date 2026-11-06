@@ -1,7 +1,7 @@
 'use client';
-import { InCostruzione } from '@/componenti/InCostruzione';
+import { VistaOggi } from './oggi/VistaOggi';
 
-// Oggi (§7.1): arriva con il blocco 7 del piano.
+// Oggi (§7.1, F5-A1): la pagina d'arrivo dopo l'accesso.
 export default function Oggi() {
-  return <InCostruzione titolo="Oggi" />;
+  return <VistaOggi />;
 }
