@@ -133,10 +133,11 @@ function componiLetto(tipo: string | null, fornitore_id: bigint | null, m: Map<s
 
 /** Importo della riga come nel prototipo (M.importoRiga): quello letto, altrimenti quantità × prezzo. */
 const importoRigaLetta = (r: RigaLetta) => r.importo ?? (r.quantita != null && r.prezzo != null ? round2(r.quantita * r.prezzo) : 0);
-/** Somma delle righe (M.importoDoc); per il bollettino l'importo è l'imponibile della fattura (D-71). */
+/** Somma delle righe (M.importoDoc). Per il bollettino il **totale riconosciuto** è la somma delle
+ *  provvigioni delle fatture del mese (§7.9), non degli imponibili (D-73). */
 const importoDocumento = (l: Letto) =>
   l.tipo === 'bollettino'
-    ? round2(l.righe.reduce((s, r) => s + (r.importo ?? 0), 0))
+    ? round2(l.righe.reduce((s, r) => s + (r.provvigione ?? 0), 0))
     : round2(l.righe.reduce((s, r) => s + importoRigaLetta(r), 0));
 
 /* ---------- Fornitore per nome normalizzato ---------- */

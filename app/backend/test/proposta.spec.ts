@@ -226,7 +226,7 @@ describe('proposta — bollettino', () => {
   it('bollettino non ancora registrato', async () => {
     const p = await propostaDocumento(db, L({ tipo: 'bollettino', fornitore_id: gries.id, mese: 6, anno: 2026, righe: [R({ numero_fattura: 'F-1', importo: 100, provvigione: 5 })] }));
     expect(p.esito).toBe('bollettino');
-    expect(p.importo).toBe(100);
+    expect(p.importo).toBe(5); // il totale riconosciuto sono le provvigioni, non gli imponibili
   });
 
   it('doppio se già registrato per fornitore+mese+anno', async () => {

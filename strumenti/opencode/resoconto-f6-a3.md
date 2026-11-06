@@ -41,7 +41,8 @@ Nessuna migrazione: tabelle e colonne (`livello`, `controlli`, `fornitore_id`+`f
   provvigione). **Verificato dopo la revisione** sul `Provisionsabrechnung_20_Januar2026.pdf`: righe
   `RE191175` 789,80 / 118,47 e `RE191624` 178,80 / 26,82, totale merce 968,60 e provvigioni 145,29
   (prima restituiva 0 righe).
-- **`importo` del bollettino**: è la somma degli imponibili delle righe (come da schema), non la somma delle provvigioni. Se a F6-A4 servirà il "totale riconosciuto" (somma provvigioni) andrà letto dai campi `provvigione` delle righe.
+- **`importo` del bollettino**: corretto in F6-A4b — ora è la somma delle **provvigioni** delle
+  righe (il "totale riconosciuto"), non degli imponibili. La prova `proposta.spec.ts` lo verifica.
 
 ## Correzioni fatte in revisione (sessione principale)
 
