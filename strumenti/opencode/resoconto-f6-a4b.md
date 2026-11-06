@@ -134,6 +134,23 @@ sviluppo; non fa parte dell'app. Il PDF nelle schermate headless mostra il ripie
   soglie, i bordi della finestra non le seguono. Il livello del documento invece viene
   dal server. Da spostare nel dettaglio quando il server manderà le soglie.
 
+## Correzione: pagina unica come il prototipo (06/11/2026)
+
+La prima consegna era a **due pagine** (`/documenti` elenco → `/documenti/:id` dettaglio), con
+segmenti, filtri e il PDF affiancato nel dettaglio: una scelta mia registrata in D-73, ma contro
+D-24 (il prototipo è la sorgente di verità). Riportata al prototipo:
+
+- una sola pagina: a sinistra *Da controllare* con caricamento ed **elenco selezionabile**
+  (tipo/numero, importo, fornitore, ricevuto, livello), a destra il documento scelto;
+- niente segmenti né filtri; i documenti in coda/lettura/errore si contano in una nota;
+- niente PDF nel dettaglio: il file sta solo nella finestra di correzione;
+- *Correggi i dati letti* e *Scarta il documento* nel pannello, come il prototipo;
+- `/documenti/:id` resta per il collegamento diretto e seleziona il documento.
+- Correzione di un difetto visto nelle schermate: la tabella *Righe lette* ora ha il **totale**
+  (documento o provvigioni) e il pannello mostra il livello come badge (prima era testo grigio).
+
+`app_documenti.py` riscritta per la pagina unica: **29 controlli, 0 KO** (1440 e 768).
+
 ## Dubbi e cose aperte
 
 - **Fattura stornata**: la consegna diceva `GET /api/pratiche/:id`, ma il dettaglio della

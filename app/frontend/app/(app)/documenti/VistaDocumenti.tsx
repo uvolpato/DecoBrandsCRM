@@ -1,35 +1,22 @@
 'use client';
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { DataTable, type Colonna } from '@/componenti/DataTable';
-import { FilterBar, type Valori } from '@/componenti/FilterBar';
-import { Caricamento, Elenco } from '@/componenti/Flussi';
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Caricamento, Elenco, ElencoSelezionabile } from '@/componenti/Flussi';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso, quando, Stato, type Variante } from '@/componenti/Piccoli';
-import { useSagome } from '@/componenti/Sagoma';
+import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
 import { euro } from '@/lib/formati';
-import { useMemoria } from '@/lib/memoria';
+import { VistaDocumento } from './[id]/VistaDocumento';
 
-// Pagina Documenti (F6-A4b, §7.9): caricamento, elenco con i segmenti dei quattro stati (D-23),
-// ricerca e filtri sul server, dettaglio a sé. Qui si compone soltanto (V12, D-28).
+// Pagina Documenti come il prototipo (F6-A4b, §7.9, D-73): una sola pagina, a sinistra
+// «Da controllare» con il caricamento e l'elenco selezionabile, a destra il documento scelto
+// (dati, azione proposta, righe lette). Il file originale sta nella finestra di correzione.
 
 const TIPO: Record<string, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura',
   nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento', bollettino: 'Bollettino',
-};
-const STATI = [
-  { value: 'da_controllare', label: 'Da controllare' },
-  { value: 'in_coda', label: 'In coda' },
-  { value: 'in_lettura', label: 'In lettura' },
-  { value: 'errore', label: 'Errore' },
-];
-const VUOTO: Record<string, string> = {
-  da_controllare: 'Nessun documento da controllare',
-  in_coda: 'Nessun documento in coda',
-  in_lettura: 'Nessun documento in lettura',
-  errore: 'Nessun documento in errore',
 };
 const LIVELLO: Record<string, { testo: string; v: Variante }> = {
   affidabile: { testo: 'Affidabile', v: 'ok' },
@@ -50,42 +37,30 @@ interface Risposta {
 }
 
 export function VistaDocumenti() {
-  const router = useRouter();
+  const { id } = useParams<{ id?: string }>();
   const puo = usePuo();
   const puoModifica = puo('provvigioni.modifica');
-  const [valori, setValori] = useMemoria<Valori>('filtri', { stato: 'da_controllare', q: '', tipo: '', livello: '' });
-  const [pagina, setPagina] = useMemoria<number>('pagina', 0);
-  const [versione, setVersione] = useState(0);
   const [dati, setDati] = useState<Risposta | null>(null);
   const [errore, setErrore] = useState('');
   const [caricando, setCaricando] = useState(true);
+  const [versione, setVersione] = useState(0);
   const sagome = useSagome(caricando);
-  const primaVolta = useRef(true);
+  const attesaLettura = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const parametri = () => {
-    const p = new URLSearchParams();
-    p.set('stato', String(valori.stato ?? 'da_controllare'));
-    if (valori.q) p.set('q', String(valori.q));
-    if (valori.tipo) p.set('tipo', String(valori.tipo));
-    if (valori.livello) p.set('livello', String(valori.livello));
-    p.set('pagina', String(pagina + 1));
-    return p;
-  };
+  const ricarica = useCallback(() => setVersione((v) => v + 1), []);
 
   useEffect(() => {
     let vivo = true;
     setCaricando(true);
-    const t = setTimeout(() => {
-      void api<Risposta>('documenti?' + parametri().toString()).then((r) => {
-        if (!vivo) return;
-        setCaricando(false);
-        if (r.ok) { setDati(r.dati); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
-      });
-    }, primaVolta.current ? 0 : 250);
-    primaVolta.current = false;
-    return () => { vivo = false; clearTimeout(t); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- i parametri sono valori (valori, pagina, versione)
-  }, [valori, pagina, versione]);
+    void api<Risposta>('documenti?stato=da_controllare&pagina=1&per_pagina=200').then((r) => {
+      if (!vivo) return;
+      setCaricando(false);
+      if (r.ok) { setDati(r.dati); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
+    });
+    return () => { vivo = false; };
+  }, [versione]);
+
+  useEffect(() => () => { if (attesaLettura.current) clearTimeout(attesaLettura.current); }, []);
 
   async function carica(files: File[]) {
     let letti = 0;
@@ -94,68 +69,77 @@ export function VistaDocumenti() {
       if (r.ok) letti++;
       else avviso(r.messaggio, true);
     }
-    if (letti) {
-      avviso(letti === 1 ? 'Documento caricato: la lettura parte da sola' : 'Documenti caricati: la lettura parte da sola');
-      setVersione((v) => v + 1);
-    }
+    if (!letti) return;
+    avviso(letti === 1 ? 'Documento caricato: la lettura parte da sola' : 'Documenti caricati: la lettura parte da sola');
+    ricarica();
+    // il lettore prende un documento ogni 15 s: si ricontrolla da soli appena finito
+    if (attesaLettura.current) clearTimeout(attesaLettura.current);
+    attesaLettura.current = setTimeout(ricarica, 16_000);
   }
 
-  const stato = String(valori.stato ?? 'da_controllare');
-  const pagine = dati ? Math.max(1, Math.ceil(dati.totale / dati.per_pagina)) : 1;
-  const colonne: Colonna<Documento>[] = [
-    {
-      key: 'documento', header: 'Documento', grow: true,
-      cell: (d) => <><b>{d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento'}{d.numero ? ' ' + d.numero : ''}</b><span className="sec-riga">{d.file_nome}</span></>,
-    },
-    { key: 'fornitore', header: 'Fornitore', cell: (d) => d.fornitore ?? <span className="testo-tenue">non riconosciuto</span> },
-    { key: 'data', header: 'Data', tipo: 'data' },
-    { key: 'importo', header: 'Importo', tipo: 'euro', cell: (d) => d.importo == null ? <span className="testo-tenue">—</span> : euro(d.importo) },
-    {
-      key: 'livello', header: 'Livello', cell: (d) => {
-        const l = d.livello ? LIVELLO[d.livello] : null;
-        if (l) return <Stato v={l.v}>{l.testo}</Stato>;
-        return stato === 'errore' ? <Stato v="errore">Errore</Stato>
-          : stato === 'in_lettura' ? <Stato v="info">In lettura</Stato>
-            : stato === 'in_coda' ? <Stato v="neutro">In coda</Stato> : <span className="testo-tenue">—</span>;
-      },
-    },
-    { key: 'controlli', header: 'Controlli', cell: (d) => d.controlli_n ? <Stato v="errore">{d.controlli_n}</Stato> : <span className="testo-tenue">—</span> },
-    { key: 'ricevuto', header: 'Ricevuto', cell: (d) => quando(d.ricevuto_il) },
-  ];
+  const documenti = dati?.documenti ?? [];
+  const selezionato = id ?? documenti[0]?.id ?? null;
+  const c = dati?.conteggi;
+  const inAttesa = c ? (c.in_coda ?? 0) + (c.in_lettura ?? 0) : 0;
 
   return (
     <Pagina titolo="Documenti" pieno
       sottotitolo="Qui entrano tutti i documenti dei fornitori: ordini, conferme, fatture, note di credito e bollettini. Caricali, controlla i dati letti e abbinali: la pratica avanza da sola.">
-      <div className="pila riempi">
-        {puoModifica && (
-          <Pannello senzaMargine>
-            <Caricamento titolo="Trascina qui i documenti"
-              testo="PDF di ordini, conferme, fatture e note di credito; bollettini in PDF. Gli Excel non si prendono."
-              accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => void carica(f)} />
-          </Pannello>
-        )}
-        <FilterBar valori={valori} onChange={(v) => { setValori(v); setPagina(0); }} riepilogo caricando={sagome && !dati} campi={[
-          { nome: 'stato', tipo: 'segmenti', etichetta: 'Stato', opzioni: STATI.map((s) => ({ ...s, n: dati?.conteggi[s.value] })) },
-          { nome: 'q', tipo: 'cerca', etichetta: 'Ricerca', placeholder: 'Cerca numero, file, fornitore o cliente' },
-          { nome: 'tipo', tipo: 'select', etichetta: 'Tipo', opzioni: [{ value: '', label: 'Tutti i tipi' }, ...Object.entries(TIPO).map(([value, label]) => ({ value, label }))] },
-          { nome: 'livello', tipo: 'select', etichetta: 'Livello', opzioni: [{ value: '', label: 'Tutti i livelli' }, ...Object.entries(LIVELLO).map(([value, x]) => ({ value, label: x.testo }))] },
-        ]} />
-        <div className="riempi">
-          {errore && !dati
-            ? <Pannello><div className="vuoto"><b>Documenti non caricati</b>{errore}</div></Pannello>
-            : <DataTable righe={dati?.documenti ?? []} colonne={colonne} chiave={(d) => d.id} caricando={sagome}
-                perPagina={dati?.per_pagina ?? 25}
-                paginaServer={dati ? { pagina: dati.pagina - 1, pagine, totale: dati.totale } : { pagina: 0, pagine: 1, totale: 0 }}
-                onPagina={setPagina}
-                filtro={JSON.stringify(valori)}
-                onRowClick={(d) => router.push('/documenti/' + d.id)}
-                emptyText={VUOTO[stato] ?? 'Nessun documento'}
-                emptyHint={valori.q || valori.tipo || valori.livello ? 'Prova a togliere un filtro o a cambiare la ricerca.' : 'I documenti nuovi compaiono qui appena letti.'} />}
-        </div>
-        {dati && !dati.documenti.length && (
-          <Pannello titolo="Come entrano i documenti">
+      <div className="colonne riempi" style={{ '--colonne': 'minmax(300px,0.85fr) minmax(0,2fr)' } as React.CSSProperties}>
+        <Pannello titolo="Da controllare" nota={dati ? `${dati.totale} ${dati.totale === 1 ? 'documento' : 'documenti'}` : ' '} riempi>
+          {puoModifica && (
+            <>
+              <Caricamento titolo="Trascina qui i documenti"
+                testo="PDF di ordini, conferme, fatture e note di credito; bollettini in PDF. Gli Excel non si prendono."
+                accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => void carica(f)} />
+              <div style={{ height: 12 }} />
+            </>
+          )}
+          {inAttesa > 0 && (
+            <Nota>
+              {c?.in_coda ? `${c.in_coda} in coda` : ''}
+              {c?.in_coda && c?.in_lettura ? ' · ' : ''}
+              {c?.in_lettura ? `${c.in_lettura} in lettura` : ''}
+              {': compaiono qui appena letti.'}
+            </Nota>
+          )}
+          {(c?.errore ?? 0) > 0 && (
+            <Nota>{c!.errore} {c!.errore === 1 ? 'documento non letto' : 'documenti non letti'} dopo 3 tentativi: aprili per inserire i dati a mano o scartali.</Nota>
+          )}
+          {errore && !dati ? (
+            <div className="vuoto"><b>Documenti non caricati</b>{errore}
+              <button type="button" className="btn sec piccolo" onClick={ricarica}>Riprova</button></div>
+          ) : sagome && !dati ? (
+            <div className="pila" aria-busy="true">
+              {Array.from({ length: 4 }, (_, i) => <Sagoma key={i} larghezza="100%" altezza={54} />)}
+            </div>
+          ) : documenti.length ? (
+            <ElencoSelezionabile selezionata={selezionato ?? undefined}
+              voci={documenti.map((d) => {
+                const l = d.livello ? LIVELLO[d.livello] : null;
+                return {
+                  id: d.id,
+                  href: '/documenti/' + d.id,
+                  titolo: (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : ''),
+                  valore: d.importo == null ? '' : euro(d.importo),
+                  sotto: (d.fornitore ?? 'fornitore non riconosciuto') + ' · caricato il ' + quando(d.ricevuto_il),
+                  stato: l ? <Stato v={l.v}>{l.testo}</Stato> : undefined,
+                };
+              })} />
+          ) : (
+            <Nota>Nessun documento da controllare.</Nota>
+          )}
+          {dati && dati.totale > documenti.length && (
+            <Nota>Mostrati i primi {documenti.length} documenti: gli altri compaiono man mano che li controlli.</Nota>
+          )}
+        </Pannello>
+
+        {selezionato ? (
+          <VistaDocumento id={selezionato} onFatto={ricarica} />
+        ) : (
+          <Pannello titolo="Come entrano i documenti" riempi>
             <Elenco voci={[
-              { testo: <><b>Carica</b> il file qui sopra o con <b>Carica documenti</b> nella barra a sinistra, da qualsiasi pagina.</> },
+              { testo: <><b>Carica</b> il file qui a sinistra o con <b>Carica documenti</b> nella barra laterale, da qualsiasi pagina.</> },
               { testo: <><b>Lettura automatica</b>: il sistema riconosce fornitore, tipo, numero, data, codice cliente e righe.</> },
               { testo: <><b>Controlla</b> i dati letti e correggili se serve.</> },
               { testo: <><b>Abbina</b>: un ordine apre una nuova pratica; conferme, fatture e note di credito si agganciano alla pratica proposta; un bollettino si registra e si verifica riga per riga.</> },

@@ -117,8 +117,7 @@ export const GUIDA: Argomento[] = [
     ],
     pulsanti: [
       ['Trascina qui i documenti · Scegli i file', 'Carica PDF e foto; la lettura parte da sola.'],
-      ['Segmenti Da controllare · In coda · In lettura · Errore', 'Filtrano l’elenco; il numero dice quanti documenti ci sono con gli altri filtri attivi.'],
-      ['Cerca · Tipo · Livello', 'Cercano per numero, file, fornitore o cliente; tipo e livello restringono l’elenco.'],
+      ['Da controllare', 'A sinistra i documenti da controllare, con fornitore, importo e livello; clic su un documento per vederlo a destra senza cambiare pagina.'],
       ['Correggi i dati letti', 'Apre la finestra di correzione; il numero sul pulsante sono i punti da controllare.'],
       ['Schede del documento', 'Prima l’azione proposta (Pratica proposta · Nuova pratica · Scegli la pratica · Cosa farne), poi Righe lette: il contatore dice quante righe sono incerte.'],
       ['Vedi le righe', 'Nell’avviso giallo: apre la scheda Righe lette con le righe incerte evidenziate.'],

@@ -1,9 +1,7 @@
 'use client';
-import { useParams } from 'next/navigation';
-import { VistaDocumento } from './VistaDocumento';
+import { VistaDocumenti } from '../VistaDocumenti';
 
-// Il dettaglio si disegna da sé: il layout dei documenti monta l'elenco solo senza id.
+// Il documento scelto è nella stessa pagina dell'elenco, come il prototipo: l'id sta nell'indirizzo.
 export default function Pagina() {
-  const { id } = useParams<{ id: string }>();
-  return <VistaDocumento id={id} />;
+  return <VistaDocumenti />;
 }

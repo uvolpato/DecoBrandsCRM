@@ -8,7 +8,7 @@ import { Scelte } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
-import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
+import { Nota, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, quando, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { Schede, type Scheda } from '@/componenti/Schede';
@@ -17,9 +17,9 @@ import { api } from '@/lib/api';
 import { cliente as entitaCliente, fornitore as entitaFornitore, type Entita } from '@/lib/entita';
 import { data, euro, euroSegno } from '@/lib/formati';
 
-// Dettaglio del documento (F6-A4b, §7.9, D-15): prima l'azione proposta, poi le righe lette;
-// terza colonna con il file originale. Azioni, proposta, controlli e affidabilità arrivano dal
-// server (V12, D-28); qui si compone e si mandano solo le scelte.
+// Documento scelto nella pagina Documenti (F6-A4b, §7.9, D-15): pannello di destra con i dati
+// letti, prima l'azione proposta e poi le righe; il file originale sta nella finestra di
+// correzione. Azioni, proposta, controlli e affidabilità arrivano dal server (V12, D-28).
 
 const TIPO: Record<string, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura',
@@ -114,7 +114,7 @@ function righeIncerte(d: Dettaglio) {
 const classeAff = (a: number | null, verificato: boolean) =>
   a == null ? '' : verificato && a < SOGLIA_OK ? 'campo-verificato' : verificato ? '' : a < SOGLIA_BASSA ? 'incerto-errore' : a < SOGLIA_OK ? 'incerto-attesa' : '';
 
-export function VistaDocumento({ id }: { id: string }) {
+export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => void }) {
   const router = useRouter();
   const puo = usePuo();
   const puoModifica = puo('provvigioni.modifica');
@@ -151,25 +151,23 @@ export function VistaDocumento({ id }: { id: string }) {
     const n = punti(x);
     setD(x);
     chiudi();
+    onFatto?.();
     avviso(n ? `Dati salvati: restano ${n} ${n === 1 ? 'punto' : 'punti'} da controllare` : 'Dati salvati: lettura controllata, l’abbinamento è ricalcolato');
   };
 
   if (!d) {
     return (
-      <Pagina titolo="Documento" pieno>
+      <Pannello riempi>
         {errore
-          ? <Pannello><div className="vuoto"><b>Documento non caricato</b>{errore}
-            <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
+          ? <div className="vuoto"><b>Documento non caricato</b>{errore}
+            <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div>
           : sagome && (
-            <div className="pila riempi" aria-busy="true">
+            <div className="pila" aria-busy="true">
               <Sagoma larghezza="100%" altezza={96} />
-              <div className="colonne riempi">
-                <Sagoma larghezza="100%" altezza={420} />
-                <Sagoma larghezza="100%" altezza={420} />
-              </div>
+              <Sagoma larghezza="100%" altezza={420} />
             </div>
           )}
-      </Pagina>
+      </Pannello>
     );
   }
 
@@ -293,6 +291,7 @@ export function VistaDocumento({ id }: { id: string }) {
           const r = await api('documenti/' + id + '/scarta', { motivo: v.motivo, nota: v.nota || undefined });
           if (!r.ok) return r.messaggio;
           avviso('Documento scartato: lo trovi fra gli scartati');
+          onFatto?.();
           router.push('/documenti');
         }} />);
   }
@@ -306,7 +305,6 @@ export function VistaDocumento({ id }: { id: string }) {
     ...(puoModifica && ['da_controllare', 'errore', 'in_coda'].includes(d.stato) ? [{
       etichetta: 'Scarta il documento', variante: 'pericolo' as const, onClick: scarta,
     }] : []),
-    { etichetta: 'Torna ai documenti', icona: 'indietro', variante: 'sec', href: '/documenti' },
   ];
 
   const testata = boll ? [
@@ -449,26 +447,18 @@ export function VistaDocumento({ id }: { id: string }) {
   ];
 
   return (
-    <Pagina pieno titolo={etichettaTipo + (t.numero ? ' ' + t.numero : '')}
-      sottotitolo={<>{d.file_nome} · ricevuto il {quando(d.ricevuto_il)}{d.letto_il ? ' · letto il ' + quando(d.letto_il) : ''}</>}
-      azioni={azioni}>
-      <div className="colonne riempi" style={{ '--colonne': 'minmax(0, 1.55fr) minmax(320px, 1fr)' } as React.CSSProperties}>
-        <div className="pila">
-          <Pannello titolo="Dati letti" nota={d.livello ? (
-            <Stato v={d.livello === 'bassa' ? 'errore' : d.livello === 'affidabile' ? 'ok' : 'attesa'}>
-              {d.livello === 'bassa' ? 'Affidabilità bassa' : d.livello === 'affidabile' ? 'Lettura affidabile' : 'Da controllare'}
-            </Stato>
-          ) : undefined}>
-            <Dettagli inColonne voci={testata} />
-          </Pannello>
+    <>
+      <Pannello riempi
+        titolo={etichettaTipo + (t.numero ? ' ' + t.numero : '') + (doc.fornitore?.nome ? ' · ' + doc.fornitore.nome : '')}
+        nota={<><Icona nome="file" /> {d.file_nome}</>}
+        azioni={azioni}>
+        <div className="pila riempi">
+          <Dettagli inColonne voci={testata} />
           <Schede schede={schede} attiva={scheda} onCambia={setScheda} riempi />
         </div>
-        <Pannello titolo="Documento originale" nota={d.file_nome} riempi>
-          <FileDocumento d={d} />
-        </Pannello>
-      </div>
+      </Pannello>
       {finestra}
-    </Pagina>
+    </>
   );
 }
 
