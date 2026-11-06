@@ -288,14 +288,14 @@ async function sommario(db: PrismaService, servizio: IdServizio): Promise<string
       SELECT coalesce(sum((misure->>'allegati')::int), 0)::int AS n FROM servizi_esecuzioni
       WHERE servizio = 'casella' AND tipo = 'lavoro'
         AND (inizio AT TIME ZONE 'Europe/Rome')::date = (now() AT TIME ZONE 'Europe/Rome')::date`;
-    return r.n ? `${r.n} allegati letti oggi` : 'nessun allegato oggi';
+    return r.n === 1 ? '1 allegato letto oggi' : r.n ? `${r.n} allegati letti oggi` : 'nessun allegato oggi';
   }
   if (servizio === 'lettura') {
     const [r] = await db.$queryRaw<{ n: number }[]>`
       SELECT count(*)::int AS n FROM servizi_esecuzioni
       WHERE servizio = 'lettura' AND tipo = 'lavoro' AND esito = 'ok'
         AND (inizio AT TIME ZONE 'Europe/Rome')::date = (now() AT TIME ZONE 'Europe/Rome')::date`;
-    return r.n ? `${r.n} documenti letti oggi` : 'nessun documento letto oggi';
+    return r.n === 1 ? '1 documento letto oggi' : r.n ? `${r.n} documenti letti oggi` : 'nessun documento letto oggi';
   }
   if (servizio === 'integra') {
     const ultima = await ultimaEsecuzione(db, 'integra', 'lavoro');
