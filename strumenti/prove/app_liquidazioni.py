@@ -113,6 +113,49 @@ with sync_playwright() as p:
        'report: link ad Analisi completa con il trimestre')
     schede(pg).nth(0).click(); pg.wait_for_selector(destra + '.schede-corpo .dt tbody tr')
 
+    # correzione della quota del subagente (F1-A6, D-27): finestra, salvataggio, Cambia la correzione, Togli
+    totale = lambda pg: numero(testo(pg, '.colonne > .pannello tfoot td.dx'))
+    righe_corr = pg.locator(destra + '.schede-corpo .dt tbody tr', has_text='Liquidabile').filter(has=pg.locator('button:has-text("Correggi")'))
+    numero_doc = righe_corr.first.locator('td').first.locator('a').inner_text()
+    riga_doc = lambda: pg.locator(destra + '.schede-corpo .dt tbody tr', has_text=numero_doc)
+    tot_prima = totale(pg)
+    riga_doc().locator('button:has-text("Correggi")').click()
+    pg.wait_for_selector('.velo .modale-corpo #c-tipo')
+    ok('Provvigione di ' in testo(pg, '.velo .modale-testa h2') and 'imponibile' in testo(pg, '.velo .modale-testa'),
+       'finestra Correggi: titolo con subagente e documento, imponibile e provvigione')
+    pg.screenshot(path=str(USCITA / 'app-liquidazioni-correggi-1440.png'))
+    pg.select_option('.velo #c-tipo', label='Importo fisso')
+    pg.fill('.velo #c-valore', '10')
+    pg.fill('.velo #c-motivo', 'prova correzione')
+    pg.click('.velo .modale-piede button:has-text("Salva la correzione")')
+    pg.wait_for_function("!document.querySelector('.velo')")
+    riga_doc().locator('button:has-text("Cambia la correzione")').wait_for(timeout=20000)  # la pagina ha ripreso i numeri dal server
+    ok('Correzione salvata' in testo(pg, '.avviso'), 'avviso: correzione salvata')
+    ok('corretto: 10,00 € — prova correzione' in piatto(riga_doc().inner_text()), 'la riga mostra la correzione')
+    ok(riga_doc().locator('button:has-text("Cambia la correzione")').count() == 1, 'il pulsante passa a Cambia la correzione')
+    ok(totale(pg) != tot_prima, 'il totale da liquidare cambia (%.2f → %.2f)' % (tot_prima, totale(pg)))
+    riga_doc().locator('button:has-text("Cambia la correzione")').click()
+    pg.wait_for_selector('.velo .modale-corpo #c-tipo')
+    ok(pg.locator('.velo #c-tipo').input_value() == 'importo' and pg.locator('.velo #c-motivo').input_value() == 'prova correzione',
+       'Cambia la correzione: finestra precompilata')
+    pg.locator('.velo .modale-piede button:has-text("Togli la correzione")').click()
+    pg.wait_for_selector('.velo .modale-piede button.pericolo')
+    pg.locator('.velo').last.locator('.modale-piede button', has_text='Togli').click()
+    pg.wait_for_function("!document.querySelector('.velo')")
+    riga_doc().locator('button:has-text("Correggi")').wait_for(timeout=20000)  # tornata la regola normale
+    ok('Correzione tolta' in testo(pg, '.avviso'), 'avviso: correzione tolta')
+    ok(totale(pg) == tot_prima and riga_doc().locator('button:has-text("Correggi")').count() == 1,
+       'dopo Togli la correzione torna la regola normale e il totale (%s)' % totale(pg))
+
+    # 768 px: la finestra Correggi sta dentro lo schermo
+    pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
+    riga_doc().locator('button:has-text("Correggi")').click()
+    pg.wait_for_selector('.velo .modale-corpo #c-tipo')
+    ok(not pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth'), '768 px: finestra Correggi senza scorrimento orizzontale')
+    pg.screenshot(path=str(USCITA / 'app-liquidazioni-correggi-768.png'))
+    pg.keyboard.press('Escape'); pg.wait_for_function("!document.querySelector('.velo')")
+    pg.set_viewport_size({'width': 1440, 'height': 900}); pg.wait_for_timeout(400)
+
     # clic su un subagente: filtra; di nuovo: tutti (D-18)
     marco = subagenti(pg).filter(has_text='Marco Nista').first
     marco.click(); attesa(pg)

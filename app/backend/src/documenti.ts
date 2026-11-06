@@ -299,6 +299,14 @@ class SpostaDocumento {
   @IsInt() @Min(1) pratica_id!: number;
 }
 
+/** Correzione della quota del subagente su un documento (§4.2.7.2, D-27): il browser manda solo tipo,
+ *  valore e motivo; il server ricontrolla, ricalcola e scrive (V12). Una correzione per documento. */
+class Correzione {
+  @IsIn(['pct', 'importo', 'nessuna']) tipo!: 'pct' | 'importo' | 'nessuna';
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) valore?: number;
+  @Testo() @IsString() @IsNotEmpty() @MaxLength(2000) motivo!: string;
+}
+
 type Bozza = { tipo: string; importo?: number; storno_totale: boolean; fattura_id: bigint | null };
 const nomeDi = (tipo: string) => NOME[tipo as keyof typeof NOME];
 
@@ -672,5 +680,91 @@ export class DocumentiAbbinaController {
     });
     await archiviaDopo(this.db, BigInt(id));
     return r;
+  }
+}
+
+/* ---------- Correzione della quota del subagente (§4.2.7.2, D-27, §8.1) ---------- */
+
+/** Blocca il fornitore (serializza con la chiusura del trimestre, D-51), poi la riga del documento, e
+ *  ricontrolla che sia fiscale e non ancora liquidato. Si corregge solo a trimestre aperto (§4.2.7.2). */
+async function bloccaDocumento(tx: Tx, id: number) {
+  const t = await tx.ordini_fornitore_documenti.findUnique({ where: { id: BigInt(id) }, select: { testata_id: true } });
+  if (!t) throw new NotFoundException('Documento non trovato');
+  await bloccaFornitore(tx, Number(t.testata_id));
+  await tx.$queryRaw`SELECT id FROM ordini_fornitore_documenti WHERE id = ${BigInt(id)} FOR UPDATE`;
+  const d = await tx.ordini_fornitore_documenti.findUnique({ where: { id: BigInt(id) }, include: { correzione: true, testata: { select: { cliente_id: true, fornitore_id: true } } } });
+  if (!d) throw new NotFoundException('Documento non trovato');
+  if (!fiscale(d.tipo)) throw new BadRequestException(`${nomeDi(d.tipo)} ${d.numero} non dà provvigioni al subagente`);
+  // già pagato al subagente: il trimestre è chiuso, si corregge con una nota di credito (D-11)
+  if (d.liquidazione_id) throw new ConflictException(`${nomeDi(d.tipo)} ${d.numero} già liquidata al subagente: non si modifica, registra una nota di credito`);
+  return d;
+}
+
+/** Nome del subagente che segue il cliente alla data del documento, per l'etichetta dell'evento (D-35). */
+async function nomeSubagente(tx: Tx, testata: { cliente_id: bigint; fornitore_id: bigint }, data: Date) {
+  const a = await tx.interscambio.findFirst({
+    where: { cliente_id: testata.cliente_id, fornitore_id: testata.fornitore_id, valido_dal: { lte: data }, OR: [{ valido_al: null }, { valido_al: { gt: data } }] },
+    select: { subagente: { select: { nome: true, cognome: true } } },
+  });
+  return a ? `${a.subagente.nome} ${a.subagente.cognome}` : '';
+}
+
+@Controller('documenti-fiscali')
+export class DocumentiFiscaliController {
+  constructor(private readonly db: PrismaService) {}
+
+  /** Salva (o aggiorna) la correzione della quota del subagente. Valore: % per pct, € per importo,
+   *  zero per nessuna; motivo obbligatorio. Risponde con la correzione salvata (V12). */
+  @Put(':id/correzione')
+  @Richiede('provvigioni.modifica')
+  async correggi(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: Correzione) {
+    const ctx = contesto(req);
+    const motivo = b.motivo.trim();
+    if (!motivo) throw new BadRequestException('Scrivi il motivo della correzione');
+    let valore: Prisma.Decimal;
+    if (b.tipo === 'nessuna') {
+      valore = new Dec(0);
+    } else {
+      if (b.valore === undefined || Number.isNaN(b.valore)) throw new BadRequestException(b.tipo === 'pct' ? 'Indica una percentuale fra 0 e 100' : 'Indica un importo in euro');
+      valore = r2(b.valore);
+      if (b.tipo === 'pct' && (valore.lt(0) || valore.gt(100))) throw new BadRequestException('Indica una percentuale fra 0 e 100');
+      if (b.tipo === 'importo' && (valore.lte(0) || valore.gt(9_999_999_999.99))) throw new BadRequestException('Indica un importo positivo');
+    }
+    return this.db.$transaction(async (tx) => {
+      const d = await bloccaDocumento(tx, id);
+      const nomeSub = await nomeSubagente(tx, d.testata, d.data);
+      const dopo = { tipo: b.tipo, valore: Number(valore), motivo };
+      const c = d.correzione
+        ? await tx.provvigioni_correzioni.update({ where: { id: d.correzione.id }, data: { tipo: b.tipo, valore, motivo, creato_da: ctx.utente_id ?? null } })
+        : await tx.provvigioni_correzioni.create({ data: { documento_id: d.id, tipo: b.tipo, valore, motivo, creato_da: ctx.utente_id ?? null } });
+      await logEvent(tx, {
+        tipo: 'crud', azione: d.correzione ? 'update' : 'create', entita: 'correzione', entita_id: c.id, esito: 'successo',
+        dettaglio: {
+          etichetta: `${d.numero} · ${nomeSub}`, documento_id: String(d.id),
+          prima: d.correzione ? { tipo: d.correzione.tipo, valore: Number(d.correzione.valore), motivo: d.correzione.motivo } : null,
+          dopo,
+        },
+      }, ctx);
+      return { documento_id: String(d.id), tipo: b.tipo, valore: Number(valore), motivo, creato_da: c.creato_da ? String(c.creato_da) : null, creato_il: c.creato_il.toISOString() };
+    });
+  }
+
+  /** Toglie la correzione: torna a valere la regola dell'agenzia o la percentuale dello scaglione. */
+  @Delete(':id/correzione')
+  @HttpCode(204)
+  @Richiede('provvigioni.modifica')
+  async togli(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
+    const ctx = contesto(req);
+    await this.db.$transaction(async (tx) => {
+      const d = await bloccaDocumento(tx, id);
+      if (!d.correzione) return; // niente da togliere
+      const nomeSub = await nomeSubagente(tx, d.testata, d.data);
+      const correzione = d.correzione;
+      await tx.provvigioni_correzioni.delete({ where: { id: correzione.id } });
+      await logEvent(tx, {
+        tipo: 'crud', azione: 'delete', entita: 'correzione', entita_id: correzione.id, esito: 'successo',
+        dettaglio: { etichetta: `${d.numero} · ${nomeSub}`, documento_id: String(d.id), tipo: correzione.tipo, valore: Number(correzione.valore), motivo: correzione.motivo },
+      }, ctx);
+    });
   }
 }

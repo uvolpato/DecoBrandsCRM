@@ -134,6 +134,9 @@ function blocchiSubagente(g: Gruppo): Blocco[] {
     },
     { tipo: 'nota', testo: g.att.map((x) => x.numero + ': ' + (x.motivo_testo ?? 'in attesa del bollettino')).join(' · '), stretta: true },
   );
+  // correzioni della quota del subagente con il motivo (D-27 §19): la nota *Provvigioni particolari* del prospetto
+  const corrette = g.tutti.filter((x) => x.correzione);
+  if (corrette.length) out.push({ tipo: 'nota', testo: 'Provvigioni particolari: ' + corrette.map((x) => x.numero + ': ' + x.correzione!.motivo).join(' · '), stretta: true });
   out.push({ tipo: 'nota', testo: 'Importi in euro. Le note di credito hanno importo negativo e riducono la provvigione. Percentuale = quota del subagente in vigore alla data del documento.' });
   return out;
 }

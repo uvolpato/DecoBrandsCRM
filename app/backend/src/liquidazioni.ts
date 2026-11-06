@@ -5,7 +5,7 @@ import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { type Dati, caricaDati, giornoRoma } from './motore/dati';
-import { analisiTrimestre, fotografiaLiquidazione, giorni, limiti, r2, righeLiquidazione, trimestre } from './motore/motore';
+import { analisiTrimestre, documentoPerId, fotografiaLiquidazione, giorni, limiti, r2, righeLiquidazione, trimestre } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -72,12 +72,15 @@ function rigaDocumento(S: Dati, r: Riga, chiusa: boolean) {
       : r.liquidabile ? { etichetta: chiusa ? 'Liquidata' : 'Liquidabile', variante: 'ok' }
         : r.incasso ? { etichetta: 'Attesa incasso', variante: 'neutro' }
           : { etichetta: 'In attesa', variante: 'attesa' };
+  // correzione della quota del subagente (D-27 §19): solo sui documenti, non sulle voci di storno
+  const cor = r.voce ? null : documentoPerId(S, r.documento_id)?.doc.correzione ?? null;
   return {
     documento_id: r.documento_id, numero: r.numero, tipo: r.tipo, data: r.data, origine: r.origine, pratica_id: r.pratica_id,
     cliente_id: r.cliente_id, cliente: S.clienti.get(r.cliente_id)?.nome ?? '', codice_cliente: r.codice_cliente,
     fornitore_id: r.fornitore_id, fornitore, subagente_id: r.subagente_id, subagente: S.subagenti.get(r.subagente_id)?.nome ?? '',
     imponibile: Number(r.importo), pct: Number(r.pct), provvigione: Number(r.provvigione),
     liquidabile: r.liquidabile, incasso: r.incasso, voce: r.voce, motivo: r.motivo, motivo_testo, bollettino_id: r.bollettino_id, stato,
+    correzione: cor ? { tipo: cor.tipo, valore: Number(cor.valore), motivo: cor.motivo } : null,
   };
 }
 

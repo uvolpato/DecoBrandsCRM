@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useId, useState, type CSSProperties } from 'react';
 import { DataTable } from '@/componenti/DataTable';
+import { Campo } from '@/componenti/Campo';
 import { Elenco, Periodi } from '@/componenti/Flussi';
 import { COLORI_GRAFICI, Grafico } from '@/componenti/Grafico';
 import { KpiRow } from '@/componenti/Kpi';
@@ -27,6 +28,7 @@ interface Documento {
   imponibile: number; pct: number; provvigione: number;
   liquidabile: boolean; incasso: boolean; voce: 'storno' | 'riaccredito' | null; motivo_testo: string | null;
   stato: { etichetta: string; variante: Variante };
+  correzione: { tipo: string; valore: number; motivo: string } | null;
 }
 interface RigaReport { id: string; nome: string; clienti: number; documenti: number; fatturato: number; prese: number; pagate: number; margine: number; quota: number; delta: number | null }
 interface NumeriReport {
@@ -63,6 +65,8 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
   const [report, setReport] = useState<Report | null>(null);
   const [reportCaricando, setReportCaricando] = useState(true);
   const [reportErrore, setReportErrore] = useState('');
+  const [correggiDoc, setCorreggiDoc] = useState<Documento | null>(null);
+  const [versione, setVersione] = useState(0); // si rilegge la liquidazione dopo una correzione (D-27)
   const sagome = useSagome(caricando && !dati);
   const sagomeReport = useSagome(reportCaricando && !report);
 
@@ -75,7 +79,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
       if (r.ok) { setDati(r.dati); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
     });
     return () => { vivo = false; };
-  }, [anno, trimestre]);
+  }, [anno, trimestre, versione]);
 
   // Report subagenti (F4-A4): si rilegge cambiando trimestre o subagente scelto; numeri dal server (V12)
   useEffect(() => {
@@ -120,6 +124,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
   const inAttesa = b.riepilogo?.bloccanti ?? 0;
   const puoChiudere = puo('provvigioni.chiudi');
   const puoEsportare = puo('provvigioni.esporta');
+  const puoModifica = puo('provvigioni.modifica');
   const analisi = '/analisi?dal=' + q.da.slice(0, 7) + '&al=' + q.a.slice(0, 7) + (scelto ? '&subagenti=' + scelto.id : '');
 
   /** Esportazione (§11): il server prepara il file dagli stessi numeri della pagina (V12). */
@@ -228,7 +233,18 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
                       },
                       {
                         key: 'provvigione', header: 'Provvigione', tipo: 'euro', totale: 'somma',
-                        cell: (d) => <><b className={classeSegno(Math.min(0, d.provvigione))}>{euro(d.provvigione)}</b><span className="sec-riga">{pct(d.pct)} di {euro(d.imponibile)}</span></>,
+                        cell: (d) => <><b className={classeSegno(Math.min(0, d.provvigione))}>{euro(d.provvigione)}</b>
+                          <span className="sec-riga">
+                            {d.correzione
+                              ? 'corretto: ' + (d.correzione.tipo === 'importo' ? euro(d.correzione.valore) : d.correzione.tipo === 'nessuna' ? 'nessuna provvigione' : pct(d.correzione.valore)) + ' — ' + d.correzione.motivo
+                              : `${pct(d.pct)} di ${euro(d.imponibile)}`}
+                          </span>
+                          {!d.voce && !chiusa && puoModifica && (
+                            <button type="button" className="btn testo piccolo" onClick={() => setCorreggiDoc(d)}>
+                              {d.correzione ? 'Cambia la correzione' : 'Correggi'}
+                            </button>
+                          )}
+                        </>,
                       },
                       {
                         key: 'stato', header: 'Stato', sortValue: (d) => (d.liquidabile ? 1 : 0), classe: () => 'avvolgi',
@@ -259,6 +275,10 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
       {chiedi && <Conferma titolo={`Chiudere la liquidazione del ${trimestre}° trimestre?`}
         testo={`Gli importi vengono fissati: ${euro(b.riepilogo?.provvigione ?? 0)} a ${b.subagenti.filter((s) => s.liquidabili > 0).length} subagenti.`}
         etichetta="Chiudi il trimestre" onRisposta={(si) => (si ? void chiudi() : setChiedi(false))} />}
+
+      {correggiDoc && <FinestraCorrezione documento={correggiDoc}
+        onChiudi={() => setCorreggiDoc(null)}
+        onSalvato={() => { setCorreggiDoc(null); setVersione((v) => v + 1); }} />}
     </Pagina>
   );
 }
@@ -395,6 +415,83 @@ function FinestraEsporta({ anno, trimestre, chiusa, subagenti, scelto, onChiudi,
         </div>
         <p className="testo-tenue" id="formato-nota">{note[formato]}</p>
       </div>
+    </Modale>
+  );
+}
+
+/** Correzione della quota del subagente su un documento (D-27 §19): vince su ogni altra regola, motivo
+ *  obbligatorio, resta nel registro e compare nel prospetto. Il browser manda solo tipo, valore e motivo;
+ *  il server ricontrolla e ricalcola (V12). */
+function FinestraCorrezione({ documento, onChiudi, onSalvato }: {
+  documento: Documento; onChiudi: () => void; onSalvato: () => void;
+}) {
+  const id = useId();
+  const c0 = documento.correzione;
+  const [errore, setErrore] = useState('');
+  const [attesa, setAttesa] = useState(false);
+  const [chiediTogli, setChiediTogli] = useState(false);
+
+  async function invia(ev: React.FormEvent<HTMLFormElement>) {
+    ev.preventDefault();
+    const fd = new FormData(ev.currentTarget);
+    const tipo = String(fd.get('tipo'));
+    const motivo = String(fd.get('motivo') ?? '').trim();
+    const valoreTesto = String(fd.get('valore') ?? '').trim().replace(',', '.');
+    if (!motivo) { setErrore('Scrivi il motivo della correzione'); return; }
+    let valore: number | undefined;
+    if (tipo !== 'nessuna') {
+      if (!valoreTesto || Number.isNaN(Number(valoreTesto))) { setErrore(tipo === 'pct' ? 'Indica una percentuale fra 0 e 100' : 'Indica un importo in euro'); return; }
+      valore = Number(valoreTesto);
+      if (tipo === 'pct' && (valore < 0 || valore > 100)) { setErrore('Indica una percentuale fra 0 e 100'); return; }
+      if (tipo === 'importo' && valore <= 0) { setErrore('Indica un importo positivo'); return; }
+    }
+    setErrore(''); setAttesa(true);
+    try {
+      const r = await api(`documenti-fiscali/${documento.documento_id}/correzione`, { tipo, valore, motivo }, 'PUT');
+      if (!r.ok) { setErrore(r.messaggio); return; }
+      avviso('Correzione salvata');
+      onSalvato();
+    } finally {
+      setAttesa(false);
+    }
+  }
+
+  async function togli() {
+    setChiediTogli(false);
+    setErrore(''); setAttesa(true);
+    try {
+      const r = await api(`documenti-fiscali/${documento.documento_id}/correzione`, undefined, 'DELETE');
+      if (!r.ok) { setErrore(r.messaggio); return; }
+      avviso('Correzione tolta');
+      onSalvato();
+    } finally {
+      setAttesa(false);
+    }
+  }
+
+  return (
+    <Modale titolo={`Provvigione di ${documento.subagente} · ${documento.numero}`}
+      testo={`${documento.cliente} · ${documento.fornitore} · imponibile ${euro(documento.imponibile)}. Ora: ${euro(documento.provvigione)} (${pct(documento.pct)}${c0 ? ', ' + (c0.tipo === 'importo' ? 'importo fisso' : c0.tipo === 'nessuna' ? 'nessuna provvigione' : 'corretta') + ': ' + c0.motivo : ''}). Cambia solo quanto va al subagente.`}
+      onChiudi={() => { if (!attesa) onChiudi(); }} piede={<>
+        <button type="button" className="btn sec" onClick={onChiudi} disabled={attesa}>Annulla</button>
+        {c0 && <button type="button" className="btn pericolo" onClick={() => setChiediTogli(true)} disabled={attesa}>Togli la correzione</button>}
+        <button type="submit" form={id} className="btn" disabled={attesa}>{attesa ? 'Attendi…' : 'Salva la correzione'}</button>
+      </>}>
+      <form id={id} className="modulo modulo-2" onSubmit={invia} noValidate>
+        <Campo nome="tipo" etichetta="Provvigione al subagente" tipo="select" largo valore={c0 ? c0.tipo : 'pct'}
+          opzioni={[{ value: 'pct', label: 'Altra percentuale' }, { value: 'importo', label: 'Importo fisso' }, { value: 'nessuna', label: 'Nessuna provvigione' }]} />
+        <Campo nome="valore" etichetta="Percentuale o importo" valore={c0 && c0.tipo !== 'nessuna' ? String(c0.valore) : ''}
+          aiuto="% per «Altra percentuale», € per «Importo fisso»; vuoto per «Nessuna»." />
+        <div className="campo largo">
+          <label htmlFor="c-motivo">Motivo</label>
+          <textarea id="c-motivo" name="motivo" rows={3} defaultValue={c0 ? c0.motivo : ''} />
+          <span className="aiuto">Obbligatorio: compare nel prospetto del subagente e nel registro.</span>
+        </div>
+        <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
+      </form>
+      {chiediTogli && <Conferma titolo="Togliere la correzione?"
+        testo="Torna a valere la regola dell’agenzia o la percentuale dello scaglione."
+        etichetta="Togli" pericolo onRisposta={(si) => (si ? void togli() : setChiediTogli(false))} />}
     </Modale>
   );
 }
