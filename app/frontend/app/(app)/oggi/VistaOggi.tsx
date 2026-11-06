@@ -34,6 +34,7 @@ interface Dati {
   oggi: string; aggiornato_il: string; sottotitolo: string;
   riquadri: Riquadro[]; gruppi: Gruppo[]; scadenze: Scadenza[]; operazioni: Operazione[];
   registro_href: string; trimestre: Trimestre;
+  errori_oggi?: { conteggio: number; href: string }; // solo per chi ha sistema.registro (§15.6)
 }
 
 export function VistaOggi() {
@@ -70,6 +71,7 @@ export function VistaOggi() {
       setDati((d) => d && {
         ...d, riquadri: r.dati.riquadri, scadenze: r.dati.scadenze, operazioni: r.dati.operazioni,
         trimestre: r.dati.trimestre, aggiornato_il: r.dati.aggiornato_il, sottotitolo: r.dati.sottotitolo,
+        errori_oggi: r.dati.errori_oggi,
       });
       setInAttesa(JSON.stringify(dati.gruppi) === JSON.stringify(r.dati.gruppi) ? null : r.dati);
     });
@@ -168,6 +170,16 @@ export function VistaOggi() {
               },
             ]} />
           </Pannello>
+
+          {dati.errori_oggi && (
+            <Pannello titolo="Errori di oggi" azioni={[{ etichetta: 'Apri il registro', variante: 'testo', href: dati.errori_oggi.href }]}>
+              <p style={{ margin: 0 }}>
+                {dati.errori_oggi.conteggio
+                  ? <><b>{dati.errori_oggi.conteggio}</b> {dati.errori_oggi.conteggio === 1 ? 'errore' : 'errori'} nel registro di oggi, anomalie aperte comprese.</>
+                  : 'Nessun errore registrato oggi.'}
+              </p>
+            </Pannello>
+          )}
 
           <Pannello titolo={`${t.trimestre}° trimestre ${t.anno}`} azioni={[{ etichetta: 'Apri liquidazione', variante: 'testo', href: t.href }]}>
             <Periodi etichetta="Trimestre in corso" voci={[{

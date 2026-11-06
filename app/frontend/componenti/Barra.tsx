@@ -24,6 +24,7 @@ const AREE_MENU: { id: string; t: string; icona: string; gruppi: { gruppo: strin
     { gruppo: 'Portale', voci: [
       { href: '/utenti', t: 'Utenti e ruoli', icona: 'subagenti', permesso: 'sistema.utenti' },
       { href: '/sistema', t: 'Stato del sistema', icona: 'sistema', permesso: 'sistema.stato' },
+      { href: '/registro', t: 'Registro', icona: 'file', permesso: 'sistema.registro' },
       { href: '/impostazioni', t: 'Impostazioni', icona: 'impostazioni', permesso: 'sistema.impostazioni' },
       { href: '/componenti', t: 'Componenti', icona: 'componenti', permesso: 'sistema.amministratori' }] }, // catalogo: solo il superutente (Ugo 01/11/2026)
   ] },

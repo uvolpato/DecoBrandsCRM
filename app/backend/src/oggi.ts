@@ -1,6 +1,8 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { Richiede } from './accesso';
+import type { Request } from 'express';
+import { permessiDi, Richiede } from './accesso';
+import { erroriOggi } from './registro-api';
 import { liquidazione } from './liquidazioni';
 import { type Dati, caricaDati, giornoRoma } from './motore/dati';
 import { abbinamento, analisiTrimestre, giorni, importoPratica, pagamentiDaSollecitare, piuGiorni, riconcilia, statoPratica, trimestre } from './motore/motore';
@@ -75,8 +77,9 @@ async function mesiBollettini(db: PrismaService, oggi: string): Promise<MeseBoll
 const aperto = (m: MeseBollettino) => m.bollettino_id != null && m.stato !== 'verificato' && m.stato !== 'contestato';
 const mancante = (m: MeseBollettino, oggi: string) => m.bollettino_id == null && m.fine < oggi && m.documenti > 0 && oggi > m.entro;
 
-/** Quello che la pagina Oggi mostra, calcolato una volta sola; esportata per le prove con il giorno del prototipo. */
-export async function calcolaOggi(db: PrismaService, S: Dati) {
+/** Quello che la pagina Oggi mostra, calcolato una volta sola; esportata per le prove con il giorno del prototipo.
+ *  `conErrori`: il contatore *Errori di oggi* (§15.6) solo per chi ha `sistema.registro`. */
+export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false) {
   const oggi = S.oggi;
   const conferme = confermeInRitardo(S);
   const pagamenti = pagamentiDaSollecitare(S);
@@ -146,6 +149,8 @@ export async function calcolaOggi(db: PrismaService, S: Dati) {
     orderBy: { id: 'desc' }, take: 6,
     select: { codice: true, dettaglio: true, ts: true, utente: { select: { nome: true } } },
   });
+  // §15.6: il contatore degli errori di oggi solo per chi apre il registro (sistema.registro)
+  const errori = conErrori ? await erroriOggi(db, oggi) : null;
 
   const riquadri = [
     {
@@ -228,6 +233,7 @@ export async function calcolaOggi(db: PrismaService, S: Dati) {
       chi: r.utente?.nome ?? 'Sistema',
     })),
     registro_href: '/registro',
+    ...(errori == null ? {} : { errori_oggi: { conteggio: errori, href: '/registro?da=oggi' } }),
     trimestre: {
       anno: a, trimestre: t, nome: liquid.trimestri[t - 1].nome, etichetta: liquid.stato.etichetta,
       avanzamento: liquid.stato.avanzamento, giorni: giorni(oggi, lim.a),
@@ -245,9 +251,10 @@ export class OggiController {
   /** La pagina Oggi (§7.1): riquadri, gruppi, scadenze, ultime operazioni e trimestre in corso. */
   @Get()
   @Richiede('provvigioni.consulta')
-  async pagina() {
+  async pagina(@Req() req: Request) {
     const oggi = giornoRoma(new Date());
     const S = await caricaDati(this.db, oggi);
-    return calcolaOggi(this.db, S);
+    const conErrori = permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('sistema.registro');
+    return calcolaOggi(this.db, S, conErrori);
   }
 }

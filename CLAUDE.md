@@ -104,6 +104,8 @@ Regole del codice del prototipo:
   - le entità si filtrano sempre con un campo di ricerca a selezione multipla
     (`FilterBar { tipo: 'ricerca', entita, multipla: true }`), mai con una tendina;
   - le barre con più filtri hanno il riepilogo (`riepilogo: true`);
+  - il fuoco dei campi è un **bordo interno**, non un `outline` esterno: quello finisce sotto il
+    menu aperto (tendina nativa o ricerca) — D-64, spec §16.4.1;
   - i numeri dei segmenti contano con gli altri filtri e si aggiornano subito
     (`conta`, D-23).
 - Tutte le DataTable sono uguali:

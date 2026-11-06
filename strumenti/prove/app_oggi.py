@@ -85,6 +85,15 @@ with sync_playwright() as p:
     ok(trim.locator('.cifre div').count() == 4, 'trimestre: i quattro numeri')
     ok(trim.locator('a:has-text("Apri liquidazione")').count() == 1, 'trimestre: Apri liquidazione')
 
+    # §15.6: il contatore Errori di oggi c'è per l'amministratore e porta al registro filtrato
+    err = api.get('errori_oggi')
+    ok(bool(err), 'amministratore: Oggi riporta errori_oggi')
+    riq = pg.locator('.pannello').filter(has=pg.locator('h2', has_text='Errori di oggi'))
+    if err:
+        ok(riq.count() == 1, 'riquadro Errori di oggi')
+        ok(str(err['conteggio']) in riq.inner_text(), 'conteggio errori di oggi: %d' % err['conteggio'])
+        ok(riq.locator('a:has-text("Apri il registro")').get_attribute('href') == '/registro?da=oggi', 'il collegamento apre /registro?da=oggi')
+
     pg.screenshot(path=str(USCITA / 'app-oggi-1440.png'), full_page=True)
 
     # finestra dei solleciti di pagamento, aperta dal gruppo
@@ -124,6 +133,8 @@ with sync_playwright() as p:
     # lettura: consulta la pagina; i solleciti di conferma (copia) restano, quelli dei pagamenti no
     pg = entra(S + '-lett')
     ok(pg.locator('.kpi-riga button.kpi').count() == 4, 'lettura: la pagina Oggi si consulta')
+    ok(pg.evaluate("async () => (await (await fetch('/api/oggi')).json()).errori_oggi") is None, 'lettura: il server non manda errori_oggi')
+    ok(pg.locator('.pannello').filter(has=pg.locator('h2', has_text='Errori di oggi')).count() == 0, 'lettura: niente riquadro Errori di oggi')
     gp = gruppo(pg, 'Pagamenti da sollecitare')
     ok(gp.locator('button:has-text("Prepara i solleciti")').count() == 0, 'lettura: niente solleciti di pagamento (scrivono)')
     gconf = gruppo(pg, 'Conferme in ritardo')

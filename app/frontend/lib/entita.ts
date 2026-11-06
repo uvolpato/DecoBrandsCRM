@@ -101,6 +101,22 @@ export const subagente: Entita<any> = {
   ] as any,
 };
 
+export const utente: Entita<any> = {
+  titolo: 'Utente',
+  voci: async () => {
+    const r = await api<any[]>('utenti');
+    return r.ok ? r.dati.map((u: any) => ({ id: u.id, nome: u.nome, username: u.username })) : [];
+  },
+  chiave: (r: any) => r.id,
+  testo: (r: any) => r.nome ?? '',
+  dettaglio: (r: any) => r.username ?? '',
+  cerca: (r: any) => [r.nome, r.username].filter(Boolean).join(' '),
+  colonne: [
+    { key: 'nome', header: 'Utente', grow: true },
+    { key: 'username', header: 'Nome utente' },
+  ] as any,
+};
+
 export const agente: Entita<any> = {
   titolo: 'Agente',
   voci: async () => {

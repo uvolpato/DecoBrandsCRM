@@ -18,6 +18,7 @@ const PERMESSO: Record<string, string> = {
   accesso: 'sistema.utenti', // il prototipo li lega a Utenti e ruoli
   utenti: 'sistema.utenti',
   sistema: 'sistema.stato',
+  registro: 'sistema.registro',
   impostazioni: 'sistema.impostazioni',
   scartati: 'provvigioni.scartati',
 };

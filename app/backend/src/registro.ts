@@ -147,3 +147,29 @@ export async function chiudiAnomalia(db: Db, servizio: string, codice: string, c
     data: { stato: 'chiusa', chiusa_il: ora, ultimo: ora },
   });
 }
+
+// §15.7: le informazioni restano 12 mesi, il resto 36. `eventi_mesi` arriverà dalle Impostazioni
+// con F5-A6; per ora la costante sta qui.
+const INFO_MESI = 12;
+const EVENTI_MESI = 36;
+
+const mesiFa = (ora: Date, mesi: number) => {
+  const d = new Date(ora);
+  d.setMonth(d.getMonth() - mesi);
+  return d;
+};
+
+/** Pulizia notturna (§15.7), in una transazione (V13): il trigger rende immutabili gli eventi e
+ *  accetta le cancellazioni solo con `SET LOCAL decobrands.pulizia_registro = 'si'`. Le anomalie
+ *  aperte non si cancellano mai. */
+export async function pulisciRegistro(db: PrismaClient, ora = new Date()) {
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SET LOCAL decobrands.pulizia_registro = 'si'`;
+    await tx.registro.deleteMany({
+      where: { genere: 'evento', livello: 'info', ts: { lt: mesiFa(ora, INFO_MESI) } },
+    });
+    await tx.registro.deleteMany({
+      where: { ts: { lt: mesiFa(ora, EVENTI_MESI) }, NOT: { genere: 'anomalia', stato: 'aperta' } },
+    });
+  });
+}

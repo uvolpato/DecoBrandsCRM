@@ -48,6 +48,8 @@ export const PERMESSI = {
   'sistema.amministratori': { area: 'sistema', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] },
   'sistema.impostazioni': { area: 'sistema', testo: 'Impostazioni del portale (casella, posta, sincronizzazione, conservazione)', ruoli: ['superutente', 'amministratore'] },
   'sistema.stato': { area: 'sistema', testo: 'Stato del sistema, segnare i problemi come visti', ruoli: ['superutente', 'amministratore'], ancheOperatore: true },
+  // Permesso suo del registro (F5-A2, Ugo 06/11/2026): non si riusa `sistema.utenti`.
+  'sistema.registro': { area: 'sistema', testo: 'Registro di eventi e anomalie: consultare ed esportare', ruoli: ['superutente', 'amministratore'] },
   'dati.consulta': { area: 'dati', testo: 'Consultare fornitori, clienti, subagenti', minimo: 'lettura' },
   'dati.modifica': { area: 'dati', testo: 'Subagenti, agenzie dei clienti (interscambio)', minimo: 'operatore' },
   'dati.condizioni': { area: 'dati', testo: 'Condizioni, scaglioni e percentuali dei fornitori; eccezioni personali', minimo: 'responsabile' },

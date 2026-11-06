@@ -1,5 +1,6 @@
 import { Controller, Get, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AccessoController, AccessoGuard, Pubblica } from './accesso';
 import { ErroriFilter } from './errori.filter';
@@ -20,6 +21,7 @@ import { IncassiController } from './incassi';
 import { OggiController } from './oggi';
 import { SollecitiController } from './solleciti';
 import { EventiController, EventiService } from './eventi';
+import { PuliziaRegistro, RegistroController } from './registro-api';
 
 @Controller('salute')
 class SaluteController {
@@ -47,13 +49,14 @@ export function limiti(env = process.env) {
 }
 
 @Module({
-  imports: [PrismaModule, ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
+  imports: [PrismaModule, ScheduleModule.forRoot(), ThrottlerModule.forRootAsync({ useFactory: () => limiti() })],
   controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, PraticheController, DocumentiController, DocumentiAbbinaController, DocumentiPraticaController, DocumentiFiscaliController, IntegraController,
     BollettiniController, // F3-A1: matrice e caricamento (rotte fisse) prima di GET /bollettini/:id
-    BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, OggiController, SollecitiController, EventiController],
+    BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, OggiController, SollecitiController, EventiController, RegistroController],
   providers: [
     IntegraService,
     EventiService,
+    PuliziaRegistro,
     { provide: APP_FILTER, useClass: ErroriFilter }, // con Prisma iniettato: scrive nel registro
     { provide: APP_GUARD, useClass: AccessoGuard }, // su tutte le rotte: permesso dichiarato o negata
   ],

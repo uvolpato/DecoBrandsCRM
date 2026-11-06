@@ -625,4 +625,31 @@ export const GUIDA: Argomento[] = [
     ],
     modifica: 'Operatore o superiore nell’area Provvigioni; l’eliminazione definitiva è per il responsabile.',
   },
+  { id: 'registro', titolo: 'Registro', gruppo: 'Gestione', vai: '/registro',
+    sintesi: 'Tutto quello che l’applicazione registra: operazioni, accessi, esportazioni e anomalie dei servizi. È in sola lettura.',
+    pulsanti: [
+      ['Tutto · Anomalie aperte · Errori', 'I segmenti filtrano l’elenco e dicono quante righe prendono gli altri filtri.'],
+      ['Filtri', 'Genere, livello, servizio, codice, entità, utenti (ricerca multipla), periodo Dal–Al e ricerca nel messaggio, nel codice o nel riferimento. Il riepilogo li mostra e li toglie.'],
+      ['Clic sulla riga', 'Apre il dettaglio in finestra: campi comuni e dettaglio leggibile, con prima e dopo affiancati.'],
+      ['Stessa operazione', 'Nel dettaglio: mostra tutte le righe della stessa operazione.'],
+      ['Esporta', 'Scarica in CSV le righe filtrate, con le stesse colonne della tabella.'],
+    ],
+    finestre: [
+      { nome: 'Dettaglio', da: 'Clic sulla riga', cosa: 'L’evento o l’anomalia per esteso.',
+        campi: [
+          ['Quando e livello', 'Data e ora, gravità e genere.'],
+          ['Messaggio e codice', 'Cosa è successo e il codice che lo classifica.'],
+          ['Utente o servizio', 'Chi l’ha fatto, oppure il servizio che l’ha scritto.'],
+          ['Riferimento', 'Il collegamento alla pratica, al documento o al bollettino.'],
+          ['Dettaglio', 'I campi dell’evento; per le modifiche Prima e Dopo affiancati.'],
+        ] },
+    ],
+    sapere: [
+      'La pagina è per gli amministratori: chi non ce l’ha non vede nemmeno la voce nel menu.',
+      'Niente si modifica né si elimina dal registro: le correzioni passano dalle normali operazioni, che scrivono nuove righe.',
+      'Le informazioni restano 12 mesi, il resto 36; le anomalie aperte non si cancellano mai.',
+      'Il riferimento porta alla pagina vera quando il server sa dove andare; altrimenti resta il testo dell’etichetta.',
+    ],
+    modifica: 'Amministratore e superutente.',
+  },
 ];

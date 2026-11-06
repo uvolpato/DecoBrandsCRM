@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { caricaVoci, type Contesto, type Entita } from '@/lib/entita';
+import { data as formattaData } from '@/lib/formati';
 import { CampoRicerca } from './CampoRicerca';
 import { Icona } from './Icona';
 import { RiepilogoFiltri, type VoceRiepilogo } from './RiepilogoFiltri';
@@ -8,15 +9,17 @@ import { Sagoma } from './Sagoma';
 
 // Barra dei filtri come CRM.FilterBar del prototipo (D-22 §19), stesso markup .filtri.
 // Tipi: 'cerca' (testo) · 'segmenti' · 'select' (tendina, solo per scelte fisse: periodo, mese) ·
-// 'ricerca' (campo di ricerca su un'entità). REGOLA: i filtri su fornitori, subagenti, clienti (e ogni
+// 'data' (Dal / Al) · 'ricerca' (campo di ricerca su un'entità). REGOLA: i filtri su fornitori, subagenti, clienti (e ogni
 // altra entità) sono sempre 'ricerca' con multipla: true, mai tendine; con due o più filtri la barra ha il
 // riepilogo (`riepilogo`). Il valore di una ricerca multipla è l'elenco delle chiavi.
 // REGOLA dei conteggi (D-23): il numero `n` di ogni segmento conta le righe con TUTTI gli altri filtri
 // applicati (ricerca, fornitore, …) tranne il segmento stesso: chi usa la barra lo ricalcola a ogni cambio.
+// Il fuoco dei campi è un bordo interno (stile `.filtro-select` in `stile.css`): un outline esterno
+// finirebbe sotto il menu aperto, tendina nativa o ricerca (D-64).
 export type Valori = Record<string, string | string[]>;
 export interface CampoFiltro {
   nome: string;
-  tipo: 'cerca' | 'segmenti' | 'select' | 'ricerca';
+  tipo: 'cerca' | 'segmenti' | 'select' | 'data' | 'ricerca';
   opzioni?: { value: string; label: string; n?: number }[]; // segmenti, select
   placeholder?: string;
   etichetta?: string;
@@ -72,7 +75,8 @@ export function FilterBar<V extends Valori>({ campi, valori, onChange, riepilogo
       }
       if (attivo) conta++;
       const s = String(v ?? '');
-      const testo = c.tipo === 'ricerca' ? nome(s) : c.tipo === 'cerca' ? '“' + s + '”' : c.opzioni!.find((o) => String(o.value) === s)?.label ?? s;
+      const testo = c.tipo === 'ricerca' ? nome(s) : c.tipo === 'cerca' ? '“' + s + '”'
+        : c.tipo === 'data' ? formattaData(s) : c.opzioni!.find((o) => String(o.value) === s)?.label ?? s;
       voci.push({
         etichetta: et, vuoto: c.tipo === 'cerca' ? 'nessuna' : 'tutti',
         valori: attivo && s ? [{ testo, togli: () => metti(c.nome, d) }] : c.tipo === 'segmenti' || c.tipo === 'select' ? [{ testo }] : [],
@@ -110,6 +114,10 @@ export function FilterBar<V extends Valori>({ campi, valori, onChange, riepilogo
                   </button>
                 ))}
               </div>
+            ) : c.tipo === 'data' ? (
+              <label className="filtro-etichetta"><span>{c.etichetta}</span>
+                <input type="date" className="filtro-select" aria-label={c.etichetta ?? c.nome} value={str(c.nome)} onChange={(e) => metti(c.nome, e.target.value)} />
+              </label>
             ) : (() => {
               const sel = (
                 <select className="filtro-select" aria-label={c.etichetta ?? c.nome} value={str(c.nome)} onChange={(e) => metti(c.nome, e.target.value)}>
