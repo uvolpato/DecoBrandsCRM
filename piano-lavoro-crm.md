@@ -234,7 +234,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 | **F5-A4** Utenti e ruoli `/utenti` (elenco, scheda, modo di accesso, invito e link di accesso, vincoli) | 2 · **da approvare** | F5-A3 | `prototipo-alternativo/assets/viste-gestione.js` | §7.13 |
 | **F5-A4b** Ruoli per area (D-45): ruolo di Sistema + livello per area (`utenti_aree`), permessi `area.attività`, migrazione dei ruoli esistenti, barra e sola lettura per area, *Cosa può fare ogni ruolo* per area; prototipo, server, app e prove | 3 **da approvare** | F5-A4 | `prototipo-alternativo/assets/motore.js`, `viste-gestione.js` | §8.3, §4.2.18, D-45 |
 | **F5-A5** Stato del sistema `/sistema` + giri in `servizi_esecuzioni` e problemi come **anomalie del registro** (F5-A2), scritti dai servizi: controlli di salute ogni 5 minuti, calcolo dello stato, catalogo dei problemi con apertura, ripetizione e chiusura automatica, *Controlla adesso*, pulizia notturna | 3 · **da approvare** | F6-A1 | idem | §7.14–§7.14.5, §4.2.15 |
-| **F5-A6** Impostazioni `/impostazioni` (7 sezioni con *Accesso con Microsoft 365*, password e segreti cifrati mai riletti, prova connessione) | 3 · **da approvare** | F0 | idem | §7.15, §4.2.14 |
+| **F5-A6** Impostazioni `/impostazioni` (sei sezioni: azienda, casella, lettura, posta, integra, conservazione; password e segreti cifrati mai riletti, prova connessione sui valori salvati) | 3 · **da approvare** | F0 | idem | §7.15, §4.2.14 |
 | **F5-A7** Documenti scartati `/scartati` (motivo, recupero, eliminazione automatica) | 1 · **da approvare** | F6-A4 | idem | §7.16 |
 | **F5-A8** Guida in linea `/guida` + pulsante *Guida* nelle testate | 2 · **da approvare** | F0-A4 | idem (`CRM.GUIDA`) | §7.17 |
 

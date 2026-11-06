@@ -122,15 +122,15 @@ afterAll(async () => {
 const elenco = async (query = '') => (await ammi.get('/api/registro?q=' + encodeURIComponent(SEGNO) + query).expect(200)).body;
 
 describe('F5-A2 elenco del registro', () => {
-  it('filtri combinati, ordinamento e pagine sul server (50 righe)', async () => {
+  it('filtri combinati, ordinamento e pagine sul server', async () => {
     const tutti = await elenco();
     expect(tutti.totale).toBe(63);
-    expect(tutti.per_pagina).toBe(50);
-    expect(tutti.pagine).toBe(2);
-    expect(tutti.righe).toHaveLength(50);
+    expect(tutti.per_pagina).toBe(25); // conservazione del seed, §7.15
+    expect(tutti.pagine).toBe(3);
+    expect(tutti.righe).toHaveLength(25);
     expect(tutti.conteggi).toEqual({ tutto: 63, aperte: 1, errori: 2 });
 
-    const seconda = await elenco('&pagina=1');
+    const seconda = await elenco('&pagina=2');
     expect(seconda.righe).toHaveLength(13);
 
     const eventi = await elenco('&genere=evento');

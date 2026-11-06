@@ -13,6 +13,7 @@ export interface Io {
   permessi: string[];
   cambia_password: boolean;
   csrf: string;
+  righe_pagina: number; // §7.15: righe per pagina nelle tabelle
 }
 
 export interface Risposta<T> {

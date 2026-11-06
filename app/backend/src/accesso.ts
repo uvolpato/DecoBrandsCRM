@@ -10,6 +10,7 @@ import type { Request } from 'express';
 import type { utenti } from '@prisma/client';
 import { cifra, MASSIMO, MINIMO, verifica } from './password';
 import { indirizzo, invia } from './posta';
+import { righePagina } from './impostazioni';
 import { PrismaService } from './prisma.service';
 import { Contesto, logEvent, logEventSicuro } from './registro';
 
@@ -192,11 +193,12 @@ export class AccessoController {
   @Get('io')
   @Richiede('collegato')
   @AncheProvvisoria()
-  io(@Req() req: Request) {
+  async io(@Req() req: Request) {
     const u = req.utente!;
     return {
       id: String(u.id), username: u.username, nome: u.nome, email: u.email, ruolo: u.ruolo, aree: req.livelli ?? {},
       permessi: permessiDi(u.ruolo, req.livelli ?? {}), cambia_password: u.deve_cambiare_password, csrf: req.session.csrf,
+      righe_pagina: await righePagina(this.db), // §7.15: righe per pagina nelle tabelle
     };
   }
 

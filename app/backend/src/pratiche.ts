@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Richiede } from './accesso';
+import { righePagina } from './impostazioni';
 import { CON_PRATICA, type Dati, caricaDatiPratica, giornoRoma, praticaDaDb } from './motore/dati';
 import { abbinamento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, statoIncasso, statoPratica } from './motore/motore';
 import { PrismaService } from './prisma.service';
@@ -147,7 +148,7 @@ export class PraticheController {
       stato: Prisma.sql`CASE stato WHEN 'scaduta' THEN 0 WHEN 'attesa' THEN 1 WHEN 'confermata' THEN 2 ELSE 3 END`,
     };
     const dir = q.dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
-    const perPagina = q.perPagina ?? 25;
+    const perPagina = q.perPagina ?? await righePagina(this.db); // §7.15: senza perPagina, la riga delle impostazioni
     const pagine = Math.max(1, Math.ceil(c.totale / perPagina));
     const pagina = Math.min(Math.max(q.pagina ?? 0, 0), pagine - 1);
     const righe = await this.db.$queryRaw<Riga[]>`${base}

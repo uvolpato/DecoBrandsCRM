@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import type { Request, Response } from 'express';
 import { Richiede, contesto } from './accesso';
+import { ragioneSociale } from './impostazioni';
 import { liquidazione } from './liquidazioni';
 import { giornoRoma } from './motore/dati';
 import { r2 } from './motore/motore';
@@ -77,7 +78,7 @@ function gruppi(b: B) {
   }).filter((g) => g.tutti.length);
 }
 
-function modello(b: B, contenuto: Contenuto, subagente?: string) {
+function modello(b: B, contenuto: Contenuto, subagente?: string, azienda = '') {
   const g = gruppi(b);
   const scelto = subagente == null ? null : g.find((x) => x.id === subagente);
   if (contenuto === 'subagente' && !scelto) throw new BadRequestException('Il subagente non ha documenti nel trimestre');
@@ -88,8 +89,9 @@ function modello(b: B, contenuto: Contenuto, subagente?: string) {
   const aperto = b.stato.chiave !== 'chiusa';
   const ctx = {
     aperto,
+    azienda, // ragione sociale, P.IVA, indirizzo ed email dalle Impostazioni (D-65)
     periodo: `${b.trimestre}° trimestre ${b.anno} · ${NOMI[b.trimestre - 1]}`,
-    contesto: `Decobrands SRL · ${b.stato.etichetta} · prospetto generato il ${dataIt(giornoRoma(new Date()))}`,
+    contesto: [azienda, b.stato.etichetta, `prospetto generato il ${dataIt(giornoRoma(new Date()))}`].filter(Boolean).join(' · '),
   };
   return { nome, contenuto, gruppi: contenuto === 'subagente' ? [scelto!] : g, scelto, ctx };
 }
@@ -254,7 +256,7 @@ function xlsxFoglio(wb: ExcelJS.Workbook, nome: string, titolo: string, ctx: Mod
     orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
     margins: { left: 0.5, right: 0.5, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 }, printTitlesRow: '5:5',
   };
-  ws.headerFooter = { oddFooter: 'Decobrands SRL · ' + nome + ' · pagina &P di &N' };
+  ws.headerFooter = { oddFooter: [ctx.azienda, nome, 'pagina &P di &N'].filter(Boolean).join(' · ') };
 }
 
 function excel(m: Modello): Promise<Buffer> {
@@ -376,7 +378,9 @@ export class LiquidazioneExportController {
     if (b.stato.chiave === 'futura') throw new BadRequestException('Il trimestre non è iniziato');
     const contenuto = q.contenuto ?? 'completa';
     const formato = q.formato ?? 'xlsx';
-    const m = modello(b, contenuto, q.subagente == null ? undefined : String(q.subagente));
+    const a = await ragioneSociale(this.db);
+    const azienda = [a.ragione_sociale, a.piva, a.indirizzo, a.email].filter(Boolean).join(' · ');
+    const m = modello(b, contenuto, q.subagente == null ? undefined : String(q.subagente), azienda);
     const dati = formato === 'csv' ? csv(m)
       : formato === 'pdf' ? await convertiPdf(await excel(m))
         : await excel(m);

@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { data as formatoData, euro, num, pct } from '@/lib/formati';
 import { useMemoria, useScorrimento } from '@/lib/memoria';
 import { Sagoma } from './Sagoma';
+import { useUtente } from './Utente';
 
 // Tabella come CRM.DataTable del prototipo (stesso markup .dt): riempie lo spazio, intestazione
 // fissa, intestazioni ordinabili, totali fissi, piede con conteggio, paginazione. L'ordinamento e i
@@ -56,8 +57,9 @@ const FORMATI: Record<TipoColonna, (v: unknown) => string> = {
 };
 const ordinale = (v: unknown) => (typeof v === 'number' ? v : String(v ?? '').toLowerCase());
 
-export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp = 25, filtro, naturale, piede, etichettaTotale, memoria, ordine, onOrdine, paginaServer, onPagina, caricando }: DataTableProps<R>) {
-  const perPagina = naturale || pp === false ? Number.MAX_SAFE_INTEGER : pp;
+export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp, filtro, naturale, piede, etichettaTotale, memoria, ordine, onOrdine, paginaServer, onPagina, caricando }: DataTableProps<R>) {
+  const io = useUtente();
+  const perPagina = naturale || pp === false ? Number.MAX_SAFE_INTEGER : (pp ?? io.righe_pagina ?? 25); // §7.15: righe per pagina dalle impostazioni
   const [ord, setOrd] = useMemoria(memoria && memoria + '|ord', ordinamentoIniziale ?? null);
   const [pag, setPag] = useMemoria(memoria && memoria + '|pagina', 0);
   const scorri = useScorrimento<HTMLDivElement>(memoria, righe.length > 0);

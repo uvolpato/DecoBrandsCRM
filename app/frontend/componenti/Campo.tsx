@@ -10,12 +10,16 @@ import { Icona } from './Icona';
 export interface CampoProps {
   nome: string;
   etichetta: string;
-  tipo?: 'testo' | 'password' | 'casella' | 'select' | 'livello' | 'ricerca' | 'data';
+  tipo?: 'testo' | 'numero' | 'email' | 'password' | 'casella' | 'select' | 'livello' | 'ricerca' | 'data';
   completa?: string;
-  valore?: string | string[] | boolean;
+  valore?: string | string[] | boolean | number;
   opzioni?: { value: string; label: string; disabilitato?: boolean; titolo?: string }[]; // select, livello
   aiuto?: string;
   largo?: boolean; // occupa tutta la riga nei moduli a due colonne
+  segnaposto?: string;
+  min?: number; // numero: limiti e passo
+  max?: number;
+  step?: number;
   disabilitato?: boolean;
   entita?: Entita; // ricerca: campo di ricerca su un'entità (D-22); con multipla il valore inviato è l'elenco JSON delle chiavi
   multipla?: boolean;
@@ -23,7 +27,7 @@ export interface CampoProps {
   onCambia?: (valore: string) => void; // per chi deve ricaricare altri campi della finestra (es. gli sconti del fornitore)
 }
 
-export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, disabilitato, entita, multipla, contesto, onCambia }: CampoProps) {
+export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, segnaposto, min, max, step, disabilitato, entita, multipla, contesto, onCambia }: CampoProps) {
   const [vedi, setVedi] = useState(false);
   const id = 'c-' + nome;
   const [ricerca, setRicerca] = useState<string | string[]>(multipla ? (Array.isArray(valore) ? valore : []) : typeof valore === 'string' ? valore : '');
@@ -48,6 +52,7 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
     );
   }
   const testo = typeof valore === 'string' ? valore : undefined;
+  const numero = typeof valore === 'number' ? valore : undefined;
   if (tipo === 'livello') {
     return (
       <fieldset className={'campo-livello' + (largo ? ' largo' : '')} disabled={disabilitato}>
@@ -68,7 +73,7 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
       <label htmlFor={id}>{etichetta}</label>
       {tipo === 'password' ? (
         <div className="campo-password">
-          <input id={id} name={nome} type={vedi ? 'text' : 'password'} autoComplete={completa ?? 'current-password'} spellCheck={false} disabled={disabilitato} />
+          <input id={id} name={nome} type={vedi ? 'text' : 'password'} autoComplete={completa ?? 'current-password'} placeholder={segnaposto} spellCheck={false} disabled={disabilitato} />
           <button type="button" className="mostra" aria-label={vedi ? 'Nascondi la password' : 'Mostra la password'} aria-pressed={vedi} onClick={() => setVedi(!vedi)}>
             <Icona nome={vedi ? 'occhio-chiuso' : 'occhio'} />
           </button>
@@ -77,8 +82,10 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
         <select id={id} name={nome} defaultValue={testo} disabled={disabilitato}>
           {opzioni.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+      ) : tipo === 'numero' ? (
+        <input id={id} name={nome} type="number" inputMode="decimal" min={min} max={max} step={step} placeholder={segnaposto} defaultValue={numero} disabled={disabilitato} />
       ) : (
-        <input id={id} name={nome} type={tipo === 'data' ? 'date' : 'text'} autoComplete={completa} defaultValue={testo} disabled={disabilitato} />
+        <input id={id} name={nome} type={tipo === 'data' ? 'date' : tipo === 'email' ? 'email' : 'text'} autoComplete={completa} placeholder={segnaposto} defaultValue={testo} disabled={disabilitato} />
       )}
       {aiuto && <span className="aiuto">{aiuto}</span>}
     </div>

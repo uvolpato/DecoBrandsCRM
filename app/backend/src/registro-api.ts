@@ -2,9 +2,10 @@ import { Controller, Get, Injectable, Logger, NotFoundException, Param, ParseInt
 import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 import type { Response } from 'express';
 import { Richiede } from './accesso';
+import { righePagina } from './impostazioni';
 import { PrismaService } from './prisma.service';
 import { pulisciRegistro } from './registro';
 
@@ -37,6 +38,7 @@ class Filtri {
   @IsOptional() @IsIn(ORDINI) ordina?: (typeof ORDINI)[number];
   @IsOptional() @IsIn(['asc', 'desc']) dir?: 'asc' | 'desc';
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) pagina?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) perPagina?: number; // §7.15: righe per pagina dalle impostazioni
 }
 
 type RigaDb = {
@@ -58,6 +60,11 @@ const periodoDi = (dettaglio: unknown) => (dettaglio as { periodo?: { anno?: unk
 /** Riferimento alla pagina vera (§7.11); per gli altri `href: null`. */
 function riferimento(entita: string | null, entitaId: bigint | null, messaggio: string | null, codice: string, dettaglio: unknown): Riferimento {
   const testo = etichettaDi(dettaglio) ?? messaggio ?? codice;
+  // l'evento sulle impostazioni non ha entita_id: la pagina è la sezione salvata (D-65)
+  if (entita === 'impostazione') {
+    const chiave = (dettaglio as { chiave?: unknown } | null)?.chiave;
+    return { testo, href: '/impostazioni/' + (typeof chiave === 'string' ? chiave : 'azienda') };
+  }
   if (entitaId == null) return { testo, href: null };
   const id = String(entitaId);
   const periodo = periodoDi(dettaglio);
@@ -158,14 +165,15 @@ export class RegistroController {
     const ordina = q.ordina ?? 'ts';
     const dir = q.dir ?? (ordina === 'ts' ? 'desc' : 'asc');
     const ordine = Prisma.sql`ORDER BY ${COLONNA[ordina]} ${dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`}, id DESC`;
-    const pagine = Math.max(1, Math.ceil(totale / 50));
+    const perPagina = q.perPagina ?? await righePagina(this.db); // §7.15: senza perPagina, la riga delle impostazioni
+    const pagine = Math.max(1, Math.ceil(totale / perPagina));
     const pagina = Math.min(Math.max(q.pagina ?? 0, 0), pagine - 1);
 
     const [righe, [voci]] = await Promise.all([
       this.db.$queryRaw<RigaDb[]>`${base}
         SELECT * FROM base WHERE ${scelta}
         ${ordine}
-        LIMIT 50 OFFSET ${pagina * 50}`,
+        LIMIT ${perPagina} OFFSET ${pagina * perPagina}`,
       this.db.$queryRaw<{ codici: string[]; servizi: string[]; entita: string[] }[]>`
         SELECT
           coalesce((SELECT array_agg(DISTINCT codice ORDER BY codice) FROM registro), '{}') AS codici,
@@ -187,7 +195,7 @@ export class RegistroController {
       pagina,
       pagine,
       totale,
-      per_pagina: 50,
+      per_pagina: perPagina,
     };
   }
 
@@ -263,7 +271,10 @@ export class PuliziaRegistro {
   @Cron('30 3 * * *')
   async esegui() {
     try {
-      await pulisciRegistro(this.db);
+      // §15.7: i mesi degli eventi vengono dalle Impostazioni (conservazione.eventi_mesi)
+      const v = await this.db.impostazioni.findUnique({ where: { chiave: 'conservazione' } });
+      const eventiMesi = Number((v?.valore as { eventi_mesi?: unknown } | null)?.eventi_mesi);
+      await pulisciRegistro(this.db, new Date(), Number.isInteger(eventiMesi) && eventiMesi >= 12 ? eventiMesi : 36);
     } catch (err) {
       this.log.error('pulizia del registro non riuscita', err instanceof Error ? err.stack : String(err));
     }

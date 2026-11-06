@@ -5,6 +5,7 @@ import { IsIn, IsOptional, Matches } from 'class-validator';
 import type { Response } from 'express';
 import { Richiede } from './accesso';
 import { convertiPdf } from './esporta-liquidazione';
+import { ragioneSociale } from './impostazioni';
 import { type Dati, caricaDati } from './motore/dati';
 import { fattiAnalisi, r2 } from './motore/motore';
 import { PrismaService } from './prisma.service';
@@ -289,11 +290,11 @@ function tabella(ws: ExcelJS.Worksheet, col: Col[], righe: (string | number | Da
   ws.autoFilter = { from: { row: prima - 1, column: 1 }, to: { row: prima - 1 + righe.length, column: col.length } };
 }
 
-function foglio(wb: ExcelJS.Workbook, nome: string, titolo: string, ctx: string) {
+function foglio(wb: ExcelJS.Workbook, nome: string, titolo: string, ctx: string, azienda = '') {
   const ws = wb.addWorksheet(nome, {
     views: [{ state: 'frozen', ySplit: 4 }],
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
-    headerFooter: { oddFooter: 'Decobrands SRL · ' + nome + ' · pagina &P di &N' },
+    headerFooter: { oddFooter: [azienda, nome, 'pagina &P di &N'].filter(Boolean).join(' · ') },
   });
   ws.addRow([titolo]).font = { bold: true, size: 14, color: { argb: BLU } };
   ws.addRow([ctx]);
@@ -308,7 +309,7 @@ const colGruppi = (voce: string): Col[] => [
 ];
 
 /** Il file Excel dell'analisi: riepilogo, un foglio per raggruppamento, i documenti. */
-async function excel(S: Dati, c: Calcolo, q: Filtri) {
+async function excel(S: Dati, c: Calcolo, q: Filtri, azienda = '') {
   const N = nomi(S);
   const { f, s } = N;
   const t = c.totale, p = c.totalePrec;
@@ -318,11 +319,11 @@ async function excel(S: Dati, c: Calcolo, q: Filtri) {
     ? (['fornitori', 'subagenti', 'clienti'] as Dimensione[]).filter((d) => scelte(q[d]).size).map((d) => d[0].toUpperCase() + d.slice(1) + ': ' + nomeVoci(d)).join(' · ')
     : 'tutti i fornitori, subagenti e clienti';
   const ctx = `Da ${meseT(c.periodo.da)} a ${meseT(c.periodo.a)} · ${testoFiltri}`;
-  const nota = `Decobrands SRL · importi per data del documento · generato il ${dataIt(S.oggi)}`;
+  const nota = [azienda, 'importi per data del documento', `generato il ${dataIt(S.oggi)}`].filter(Boolean).join(' · ');
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Decobrands CRM';
-  const r = foglio(wb, 'Riepilogo', 'Analisi provvigioni ' + meseT(c.periodo.da) + ' – ' + meseT(c.periodo.a), ctx + '\n' + nota);
+  const r = foglio(wb, 'Riepilogo', 'Analisi provvigioni ' + meseT(c.periodo.da) + ' – ' + meseT(c.periodo.a), ctx + '\n' + nota, azienda);
   const var_ = (v: Dec, x: Dec) => (x.abs().lt(new Dec('0.01')) ? '' : v.minus(x).div(x.abs()).toDecimalPlaces(4).toNumber());
   tabella(r, [
     { t: 'Voce', w: 34 }, { t: 'Periodo', w: 20, tipo: 'euro' }, { t: 'Periodo precedente', w: 20, tipo: 'euro' }, { t: 'Variazione', w: 14, tipo: 'pct' },
@@ -338,7 +339,7 @@ async function excel(S: Dati, c: Calcolo, q: Filtri) {
 
   const gruppi = (d: Dimensione, voce: string) => {
     const rr = [...c.tabelle[d]].sort(perFatturato);
-    const ws = foglio(wb, 'Per ' + voce.toLowerCase(), 'Analisi per ' + voce.toLowerCase(), ctx + '\n' + nota);
+    const ws = foglio(wb, 'Per ' + voce.toLowerCase(), 'Analisi per ' + voce.toLowerCase(), ctx + '\n' + nota, azienda);
     tabella(ws, colGruppi(voce), rr.map((x) => [
       x.nome, x.documenti, n(x.fatturato), n(x.prese), n(x.pagate), n(x.margine),
       t.fatturato.isZero() ? 0 : x.fatturato.div(t.fatturato).toDecimalPlaces(4).toNumber(),
@@ -348,7 +349,7 @@ async function excel(S: Dati, c: Calcolo, q: Filtri) {
   gruppi('fornitori', 'Fornitore');
   gruppi('clienti', 'Cliente');
   {
-    const ws = foglio(wb, 'Per mese', 'Analisi per mese', ctx + '\n' + nota);
+    const ws = foglio(wb, 'Per mese', 'Analisi per mese', ctx + '\n' + nota, azienda);
     tabella(ws, colGruppi('Mese'), c.perMese.map((m, i) => {
       const x = c.perMeseTot[i];
       return [m.nome, x.documenti, n(x.fatturato), n(x.prese), n(x.pagate), n(x.margine), t.fatturato.isZero() ? 0 : x.fatturato.div(t.fatturato).toDecimalPlaces(4).toNumber()];
@@ -360,7 +361,7 @@ async function excel(S: Dati, c: Calcolo, q: Filtri) {
       { t: 'Subagente', w: 20 }, { t: 'Fatturato', w: 16, tipo: 'euro' }, { t: 'Dai fornitori', w: 16, tipo: 'euro' },
       { t: 'Ai subagenti', w: 16, tipo: 'euro' }, { t: 'Margine', w: 16, tipo: 'euro' },
     ];
-    const ws = foglio(wb, 'Documenti', 'Documenti del periodo', ctx + '\n' + nota);
+    const ws = foglio(wb, 'Documenti', 'Documenti del periodo', ctx + '\n' + nota, azienda);
     tabella(ws, col, c.sel.map((x) => [
       new Date(Date.UTC(Number(x.data.slice(0, 4)), Number(x.data.slice(5, 7)) - 1, Number(x.data.slice(8, 10)))),
       (x.tipo === 'nota_credito' ? 'NC ' : '') + x.numero, f(x.fornitore_id), N.c(x.cliente_id), s(x.subagente_id),
@@ -411,7 +412,9 @@ export class AnalisiController {
     const formato = q.formato ?? 'xlsx';
     const filtro = (Object.keys(DIM) as Dimensione[]).some((d) => scelte(q[d]).size) ? '_filtrata' : '';
     const nome = `Analisi_${c.periodo.da}_${c.periodo.a}${filtro}.${formato}`;
-    const dati = formato === 'csv' ? csv(S, c) : await excel(S, c, q);
+    const a = await ragioneSociale(this.db);
+    const azienda = [a.ragione_sociale, a.piva, a.indirizzo, a.email].filter(Boolean).join(' · ');
+    const dati = formato === 'csv' ? csv(S, c) : await excel(S, c, q, azienda);
     res.set({
       'Content-Type': formato === 'csv' ? 'text/csv; charset=utf-8'
         : formato === 'pdf' ? 'application/pdf'

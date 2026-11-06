@@ -3,6 +3,7 @@ import { type Prisma, type PrismaClient } from '@prisma/client';
 import type { Request } from 'express';
 import { Pool } from 'pg';
 import { Richiede, contesto } from './accesso';
+import { integraConfig } from './impostazioni';
 import { PrismaService } from './prisma.service';
 import { apriAnomalia, chiudiAnomalia } from './registro';
 
@@ -15,7 +16,7 @@ type Tipo = 'cliente' | 'fornitore';
 type Vista = 'clienti' | 'fornitori';
 
 export const OGNI_MS = 60_000; // un giro ogni minuto (§4.5)
-const SCHEMA = 'crm_viste'; // ponytail: poi arriverà dalle impostazioni (§7.15)
+const SCHEMA = 'crm_viste'; // schema di riserva: con le Impostazioni arriva da integraConfig (D-65)
 const GIORNO_MS = 24 * 60 * 60 * 1000; // margine: Integra non ha i secondi (§4.5)
 const SECONDI_LENTI = 30; // oltre il giro è "lento" (§7.14.3)
 
@@ -154,9 +155,9 @@ async function daQuando(db: Db): Promise<Date> {
   return righe ? new Date(Math.min(base.getTime(), righe.ts.getTime() - GIORNO_MS)) : base;
 }
 
-async function leggi(ponte: Pool, vista: Vista, dal: Date): Promise<Riga[]> {
+async function leggi(ponte: Pool, vista: Vista, dal: Date, schema = SCHEMA): Promise<Riga[]> {
   const v = VISTE[vista];
-  const sql = `SELECT ${v.colonne.join(', ')} FROM ${SCHEMA}.${v.vista} WHERE modificato_il > $1 ORDER BY modificato_il`;
+  const sql = `SELECT ${v.colonne.join(', ')} FROM ${schema}.${v.vista} WHERE modificato_il > $1 ORDER BY modificato_il`;
   return (await ponte.query<Riga>(sql, [dal])).rows;
 }
 
@@ -281,7 +282,7 @@ async function controllaConnessione(db: Db, ora: Date) {
 }
 
 /** Un giro: legge le due viste, scrive in una transazione per riga, registra l'esecuzione. */
-export async function sincronizzaGiro(db: PrismaService, ponte: Pool, ora = new Date(), avviatoDa?: bigint): Promise<Conteggi> {
+export async function sincronizzaGiro(db: PrismaService, ponte: Pool, ora = new Date(), avviatoDa?: bigint, schema = SCHEMA): Promise<Conteggi> {
   const conteggi: Conteggi = { clienti: vuoto(), fornitori: vuoto() };
   const inizioMs = Date.now();
   const esecuzione = await db.servizi_esecuzioni.create({
@@ -295,7 +296,7 @@ export async function sincronizzaGiro(db: PrismaService, ponte: Pool, ora = new 
     for (const vista of ['clienti', 'fornitori'] as const) {
       let righe: Riga[];
       try {
-        righe = await leggi(ponte, vista, dal);
+        righe = await leggi(ponte, vista, dal, schema);
       } catch (e) {
         if (!erroreVista(e)) {
           ponteKo = true;
@@ -366,29 +367,53 @@ export function creaPonte(url: string): Pool {
   return new Pool({ connectionString: url, max: 2, options: '-c default_transaction_read_only=on' });
 }
 
-/** Un pool solo, creato alla prima richiesta: le prove importano il file senza `PONTE_URL`. */
+/** Un pool solo, ricreato quando la configurazione cambia: le prove importano il file senza `PONTE_URL`. */
 @Injectable()
 export class IntegraService implements OnModuleInit, OnModuleDestroy {
   private pool: Pool | null = null;
+  private url: string | null = null;
   private timer: NodeJS.Timeout | null = null;
   private inCorso = false;
+  private ultimoGiro = 0;
 
   constructor(private readonly db: PrismaService) {}
 
-  private ponte(): Pool | null {
-    if (!this.pool && process.env.PONTE_URL) this.pool = creaPonte(process.env.PONTE_URL);
-    return this.pool;
+  /** Pool e schema dalla configurazione delle Impostazioni (D-65), o dal PONTE_URL (sviluppo/prove). */
+  private async connessione(): Promise<{ pool: Pool; schema: string; secondi: number } | null> {
+    const cfg = await integraConfig(this.db);
+    let url: string | null = null;
+    let schema = SCHEMA;
+    if (cfg) {
+      url = `postgresql://${encodeURIComponent(cfg.utente)}:${encodeURIComponent(cfg.password)}@${cfg.server}:5432/${encodeURIComponent(cfg.database)}`;
+      schema = cfg.schema;
+    } else if (process.env.PONTE_URL) {
+      url = process.env.PONTE_URL;
+    }
+    if (!url) {
+      await this.chiudiPool();
+      return null;
+    }
+    if (url !== this.url) {
+      await this.chiudiPool();
+      this.pool = creaPonte(url);
+      this.url = url;
+    }
+    return { pool: this.pool!, schema, secondi: cfg?.secondi ?? 60 };
+  }
+
+  private async chiudiPool() {
+    if (this.pool) { await this.pool.end(); this.pool = null; this.url = null; }
   }
 
   /** Prova la connessione: { ok, ms, clienti, fornitori } oppure { ok:false, ms, messaggio }. */
   async prova(): Promise<{ ok: boolean; ms: number; clienti?: number; fornitori?: number; messaggio?: string }> {
     const inizio = Date.now();
-    const ponte = this.ponte();
-    if (!ponte) return { ok: false, ms: 0, messaggio: 'Sincronizzazione non configurata' };
+    const c = await this.connessione();
+    if (!c) return { ok: false, ms: 0, messaggio: 'Sincronizzazione non configurata' };
     try {
       const [clienti, fornitori] = await Promise.all([
-        ponte.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${SCHEMA}.v_clienti`),
-        ponte.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${SCHEMA}.v_fornitori`),
+        c.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.v_clienti`),
+        c.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.v_fornitori`),
       ]);
       return { ok: true, ms: Date.now() - inizio, clienti: clienti.rows[0].n, fornitori: fornitori.rows[0].n };
     } catch (e) {
@@ -399,29 +424,35 @@ export class IntegraService implements OnModuleInit, OnModuleDestroy {
   /** Giro a mano (rotta): se il ponte non risponde, messaggio pulito per il chiamante. */
   async sincronizza(avviatoDa?: bigint): Promise<Conteggi> {
     if (this.inCorso) throw new ConflictException('Sincronizzazione già in corso');
-    const ponte = this.ponte();
-    if (!ponte) throw new BadGatewayException('Sincronizzazione non configurata');
-    this.inCorso = true; // vale sia per la rotta sia per il timer
+    this.inCorso = true; // prima di ogni await: due chiamate insieme non passano entrambe
     try {
-      return await sincronizzaGiro(this.db, ponte, new Date(), avviatoDa);
+      const c = await this.connessione();
+      if (!c) throw new BadGatewayException('Sincronizzazione non configurata');
+      return await sincronizzaGiro(this.db, c.pool, new Date(), avviatoDa, c.schema);
     } catch (e) {
+      if (e instanceof BadGatewayException) throw e;
       throw new BadGatewayException(pulisci(e));
     } finally {
       this.inCorso = false;
     }
   }
 
-  /** setInterval di 60 s: non parte nelle prove né senza PONTE_URL; un giro alla volta. */
+  /** Tick di 60 s: esegue il giro solo quando sono passati `secondi` (in memoria; al riavvio un giro subito). */
   avvia(): void {
-    if (process.env.NODE_ENV === 'test' || !process.env.PONTE_URL || this.timer) return;
+    if (process.env.NODE_ENV === 'test' || this.timer) return;
+    void this.giro();
     this.timer = setInterval(() => void this.giro(), OGNI_MS);
   }
 
   private async giro() {
+    const cfg = await integraConfig(this.db);
+    const secondi = cfg?.secondi ?? 60;
+    if (Date.now() - this.ultimoGiro < secondi * 1000) return;
+    this.ultimoGiro = Date.now();
     try {
       await this.sincronizza();
     } catch (e) {
-      if (!(e instanceof ConflictException)) log.warn(`giro non riuscito: ${pulisci(e)}`);
+      if (!(e instanceof ConflictException) && !(e instanceof BadGatewayException)) log.warn(`giro non riuscito: ${pulisci(e)}`);
     }
   }
 
@@ -432,8 +463,7 @@ export class IntegraService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
-    if (this.pool) await this.pool.end();
-    this.pool = null;
+    await this.chiudiPool();
   }
 }
 

@@ -607,13 +607,14 @@ export const GUIDA: Argomento[] = [
   { id: 'impostazioni', titolo: 'Impostazioni', gruppo: 'Gestione', vai: '/impostazioni',
     sintesi: 'Parametri validi per tutti: dati dell’azienda, casella dei documenti, server di lettura e soglie, posta in uscita, sincronizzazione da Integra (database ponte), conservazione dei dati.',
     pulsanti: [
-      ['Sezioni a sinistra', 'Una per area.'],
-      ['Salva …', 'Salva la sezione.'],
-      ['Prova la connessione', 'Verifica casella, server di lettura, posta o database ponte di Integra.'],
+      ['Sezioni a sinistra', 'Dati dell’azienda, Casella dei documenti, Server di lettura, Posta in uscita, Sincronizzazione da Integra, Conservazione dei dati.'],
+      ['Salva …', 'Salva la sezione; i controlli (numeri nei limiti, email, soglie) li fa il server e l’errore dice quale campo e quale limite.'],
+      ['Prova la connessione', 'Sulla casella, il server di lettura, la posta e la sincronizzazione da Integra: prova i valori salvati, non quelli ancora digitati. Una prova fallita dice il motivo, senza mai mostrare le password.'],
     ],
     sapere: [
-      'Password e segreti non si rileggono: si sostituiscono.',
+      'Password e segreti non si rileggono: il campo dice «impostata» e si scrive solo per sostituirla; il valore cifrato non esce mai dal server e non finisce nel registro eventi.',
       'Righe per pagina: quante righe mostrano le tabelle prima di andare a pagina successiva.',
+      'Le impostazioni si usano davvero: la posta in uscita, la sincronizzazione da Integra, la conservazione del registro, le righe per pagina e l’intestazione delle esportazioni.',
     ],
     modifica: 'Superutente e Amministratore.',
   },

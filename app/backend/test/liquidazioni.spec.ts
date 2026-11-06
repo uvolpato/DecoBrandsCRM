@@ -252,7 +252,9 @@ describe('GET /api/liquidazione/export', () => {
     expect(rip.getRow(5).getCell(1).fill).toMatchObject({ fgColor: { argb: 'FFE9F0FD' } });
     expect(rip.views[0]).toMatchObject({ state: 'frozen', ySplit: 5, showGridLines: false });
     expect(rip.pageSetup).toMatchObject({ orientation: 'landscape', fitToPage: true, fitToWidth: 1, printTitlesRow: '5:5' });
-    expect(rip.headerFooter!.oddFooter).toContain('Decobrands SRL · Riepilogo · pagina &P di &N');
+    expect(rip.headerFooter!.oddFooter).toContain('Decobrands SRL');
+    expect(rip.headerFooter!.oddFooter).toContain('IT03589740163'); // intestazione dalle Impostazioni (D-65)
+    expect(rip.headerFooter!.oddFooter).toContain('Riepilogo · pagina &P di &N');
     expect(rip.autoFilter).toBeTruthy();
 
     b.subagenti.forEach((s: any, i: number) => {
