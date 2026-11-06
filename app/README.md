@@ -53,6 +53,18 @@ tabelle `v_clienti` e `v_fornitori` riempite con i dati di prova. Poi in `backen
 PONTE_URL=postgresql://crm_lettura:PASSWORD@localhost:5432/decobrands_ponte_prova
 ```
 
+**Prova del lettore LlamaCloud** (F6-A2, D-67): in `backend/.env` serve `SEGRETI_CHIAVE` (una
+stringa lunga e casuale); in *Impostazioni → Server di lettura* si salva la chiave API. Poi, da
+`backend/` dopo `npm run build`:
+
+```bash
+npm run lettura:prova -- "C:\...\fattura.pdf" [schema.json]
+```
+
+Stampa i campi con affidabilità e pagina/riquadro, i crediti usati e cancella il file dal cloud.
+Senza `schema.json` usa uno schema generico di prova; gli schemi per tipo documento arrivano con
+F6-A2.
+
 Senza `PONTE_URL` la sincronizzazione non parte. Il ponte vero (F0-A8) si prepara con
 `strumenti/integra/viste-crm.sql`; il CRM legge solo le viste, mai Integra.
 

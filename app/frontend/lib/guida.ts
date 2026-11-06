@@ -613,6 +613,7 @@ export const GUIDA: Argomento[] = [
     ],
     sapere: [
       'Password e segreti non si rileggono: il campo dice «impostata» e si scrive solo per sostituirla; il valore cifrato non esce mai dal server e non finisce nel registro eventi.',
+      'Server di lettura: il connettore è LlamaCloud nella regione UE; la chiave API si salva qui e non si rilegge. Il file si cancella dal cloud dopo la lettura.',
       'Righe per pagina: quante righe mostrano le tabelle prima di andare a pagina successiva.',
       'Le impostazioni si usano davvero: la posta in uscita, la sincronizzazione da Integra, la conservazione del registro, le righe per pagina e l’intestazione delle esportazioni.',
     ],

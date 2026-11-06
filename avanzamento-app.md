@@ -93,9 +93,9 @@ piccole correzioni, ovunque.
 | | F5-A8 Guida (fatta da sola, fuori gruppo): `/guida/:argomento` con i 17 argomenti del prototipo (senza *Vendita diretta*), ricerca in tutto il testo (anche nomi di pulsanti e finestre), schemi del ciclo, degli stati e degli incassi, argomenti di *Gestione* solo con il permesso, link alle pagine vere, contenuti in `lib/guida.ts`; `app_guida.py` 26 OK, schermate 1440/768. Resta il pulsante *Guida* nelle testate, da aggiungere con ogni pagina | 1 | Sonnet | [x] |
 | | F5-A5 Stato del sistema (dopo F6-A1) e F5-A7 Scartati (dopo F6-A4) | blocco 8 | Sonnet | [ ] |
 | 8 · F6 Documenti | F6-A1 Ricezione e coda (DeepSeek V4 Pro, sostituto di Sonnet): `imapflow` + `mailparser` ogni N minuti da Impostazioni, allegati PDF/JPEG/PNG a `riceviDocumento`, doppioni ignorati, email lette spostate, anomalie `casella.*`; `prelevaDocumento` (`SKIP LOCKED`) e `letturaFallita` (3 tentativi, `lettura.fallita`) per F6-A2; al riavvio i documenti `in_lettura` tornano in coda (D-66); prove 373, `casella.spec.ts` 7 e `coda.spec.ts` 5 | 1 | DeepSeek V4 Pro | [x] |
-| | F6-A2 Lettura con GLM-OCR | 1 | **Opus** | [ ] |
+| | F6-A2 Lettura con connettore: `llamacloud_eu` pronto (D-67) con chiave cifrata, confidenza e citazioni, CLI `lettura:prova`; restano schemi per tipo, unione righe multipagina e consumo della coda; il connettore locale GLM-OCR si accende con la macchina | 1 | DeepSeek V4 Pro | [~] |
 | | F6-A3 Controlli e proposta di abbinamento | 2 | **Opus** | [ ] |
 | | F6-A4 Pagina Documenti e finestra di correzione | 3 | Sonnet | [ ] |
 | | F5-A5, F5-A7 | 3 | Sonnet | [ ] |
-| | F6-A5 Installazione e taratura | 4 | Sonnet | [ ] |
+| | F6-A5 Installazione e taratura (quando arriva la macchina del cliente) | 4 | Sonnet | [ ] |
 | 9 · F7 Collaudo | F7-A1 Verifica e prove complete, poi F7-A2 rilascio | 1 | Sonnet | [ ] |

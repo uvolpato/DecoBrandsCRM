@@ -9,7 +9,7 @@ import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra as cifraPassword } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
-import { casellaConfig, integraConfig, postaConfig } from '../src/impostazioni';
+import { casellaConfig, integraConfig, letturaConfig, postaConfig } from '../src/impostazioni';
 import { pulisciRegistro } from '../src/registro';
 import { cifra, decifra } from '../src/segreto';
 import { invia } from '../src/posta';
@@ -95,6 +95,9 @@ describe('F5-A6 rotte delle impostazioni', () => {
     expect(password).toMatchObject({ tipo: 'password', valore: null, impostata: true });
     const minuti = casella.campi.find((c) => c.nome === 'minuti')!;
     expect(minuti).toMatchObject({ tipo: 'numero', min: 1, max: 60 });
+    const lettura = sezioni.find((s) => s.chiave === 'lettura')!;
+    expect(lettura.campi.find((c) => c.nome === 'connettore')).toMatchObject({ tipo: 'select', valore: 'llamacloud_eu' });
+    expect(lettura.campi.find((c) => c.nome === 'chiave')).toMatchObject({ tipo: 'password', valore: null, impostata: false });
     expect(JSON.stringify(r.body)).not.toContain('v1:'); // mai il valore cifrato nella risposta
   });
 
@@ -120,6 +123,8 @@ describe('F5-A6 rotte delle impostazioni', () => {
     await put('integra', { secondi: 5 }).expect(400);
     await put('lettura', { soglia_ok: 1.5 }).expect(400);
     await put('lettura', { soglia_bassa: 0.9, soglia_ok: 0.7 }).expect(400); // bassa < affidabile
+    await put('lettura', { connettore: 'altro' }).expect(400); // elenco chiuso
+    await put('lettura', { modo: 'premium' }).expect(400);
     await put('conservazione', { righe_pagina: 500 }).expect(400);
     await put('conservazione', { eventi_mesi: 6 }).expect(400); // min 12 (§15.7)
     await put('azienda', { email: 'senza-chiocciola' }).expect(400);
@@ -164,6 +169,21 @@ describe('F5-A6 rotte delle impostazioni', () => {
     const r = await ammi.post('/api/impostazioni/integra/prova').set('x-csrf-token', csrf).send({}).expect(200);
     expect(r.body.ok).toBe(false);
     expect(r.body.testo).toContain('non configurata');
+    // lettura senza chiave: non tenta nessuna connessione
+    const l = await ammi.post('/api/impostazioni/lettura/prova').set('x-csrf-token', csrf).send({}).expect(200);
+    expect(l.body.ok).toBe(false);
+    expect(l.body.testo).toContain('non configurato');
+  });
+
+  it('lettura: la chiave si salva cifrata, si rilegge solo per il servizio e non esce dalle API', async () => {
+    const r = await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf)
+      .send({ valori: { chiave: 'llx-di-prova', progetto: 'p1', modo: 'agentic', connettore: 'llamacloud_eu' } }).expect(200);
+    const chiave = (r.body.campi as { nome: string; valore: unknown; impostata?: boolean }[]).find((c) => c.nome === 'chiave')!;
+    expect(chiave).toMatchObject({ valore: null, impostata: true });
+    expect(JSON.stringify(r.body)).not.toContain('llx-di-prova');
+    expect(await letturaConfig(db)).toMatchObject({ connettore: 'llamacloud_eu', chiave: 'llx-di-prova', progetto: 'p1', modo: 'agentic' });
+    await db.impostazioni.delete({ where: { chiave: 'lettura' } });
+    expect(await letturaConfig(db)).toBeNull();
   });
 
   it('GET e prova non scrivono eventi (§15.1)', async () => {

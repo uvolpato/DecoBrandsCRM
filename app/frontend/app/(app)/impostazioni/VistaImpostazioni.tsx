@@ -13,7 +13,7 @@ import { api } from '@/lib/api';
 // arrivano dal server (niente riscritti qui); le password non si rileggono: si scrivono solo per
 // sostituirle. I controlli veri li fa il server (V12).
 
-interface CampoRisposta { nome: string; etichetta: string; tipo: string; aiuto?: string; largo?: boolean; min?: number; max?: number; step?: number; valore?: unknown; impostata?: boolean }
+interface CampoRisposta { nome: string; etichetta: string; tipo: string; aiuto?: string; largo?: boolean; min?: number; max?: number; step?: number; opzioni?: { value: string; label: string }[]; valore?: unknown; impostata?: boolean }
 interface Sezione { chiave: string; titolo: string; sotto: string; campi: CampoRisposta[] }
 
 const PROVABILE = ['casella', 'lettura', 'posta', 'integra'];
@@ -82,14 +82,14 @@ export function VistaImpostazioni() {
             voci={sezioni!.map((s) => ({ id: s.chiave, href: '/impostazioni/' + s.chiave, titolo: s.titolo, sotto: s.sotto }))} />
         </Pannello>
         <Pannello titolo={sez.titolo} nota={sez.sotto} riempi>
-          <form className="modulo modulo-2" onSubmit={salva} noValidate>
+          <form key={sez.chiave} className="modulo modulo-2" onSubmit={salva} noValidate>
             {sez.campi.map((c) => c.tipo === 'password' ? (
               <Campo key={c.nome} nome={c.nome} etichetta={c.etichetta} tipo="password" completa="new-password" valore=""
                 segnaposto={c.impostata ? '•••••••• impostata · scrivi per sostituirla' : 'non impostata'} aiuto="Lascia vuoto per non cambiarla." />
             ) : (
-              <Campo key={c.nome} nome={c.nome} etichetta={c.etichetta} tipo={c.tipo as 'testo' | 'numero' | 'email'}
+              <Campo key={c.nome} nome={c.nome} etichetta={c.etichetta} tipo={c.tipo as 'testo' | 'numero' | 'email' | 'select'}
                 valore={typeof c.valore === 'number' || typeof c.valore === 'string' ? c.valore : undefined}
-                aiuto={c.aiuto} largo={c.largo} min={c.min} max={c.max} step={c.step} />
+                opzioni={c.opzioni} aiuto={c.aiuto} largo={c.largo} min={c.min} max={c.max} step={c.step} />
             ))}
             <div className="modulo-errore" style={{ gridColumn: '1 / -1' }}>
               <div className="azioni-riga">

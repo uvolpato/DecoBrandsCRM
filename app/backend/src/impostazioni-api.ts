@@ -9,6 +9,7 @@ import {
   applica, casellaConfig, integraConfig, letturaConfig, postaConfig, sezionePubblica, sezioneDi,
 } from './impostazioni';
 import { creaTrasporto } from './posta';
+import { provaConnettore } from './lettore';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -24,7 +25,7 @@ class Salva {
 const TESTO_PROVA: Record<string, string> = {
   casella: 'Casella non configurata: completa server, utente e password.',
   posta: 'Posta non configurata: completa server, utente e password.',
-  lettura: 'Server di lettura non configurato: completa l’indirizzo.',
+  lettura: 'Server di lettura non configurato: scegli il connettore e imposta la chiave API.',
   integra: 'Sincronizzazione non configurata: completa server, database, utente e password.',
 };
 
@@ -111,21 +112,8 @@ export class ImpostazioniController {
   private async provaLettura(ms: () => number) {
     const c = await letturaConfig(this.db);
     if (!c) return { ok: false, ms: ms(), testo: TESTO_PROVA.lettura };
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10_000);
-    try {
-      const r = await fetch(c.indirizzo.replace(/\/$/, '') + '/models', { signal: ctrl.signal });
-      const dati = await r.json().catch(() => null);
-      const modelli = dati && (Array.isArray(dati.data) ? dati.data : Array.isArray(dati) ? dati : null);
-      if (r.ok && Array.isArray(modelli) && modelli.length) {
-        return { ok: true, ms: ms(), testo: 'Server di lettura raggiungibile · modello ' + (c.modello || '') };
-      }
-      return { ok: false, ms: ms(), testo: 'Server di lettura non raggiungibile' + (r.ok ? ': nessun modello nella risposta' : ` (${r.status})`) };
-    } catch (e) {
-      return { ok: false, ms: ms(), testo: 'Server di lettura non raggiungibile: ' + pulisci(e) };
-    } finally {
-      clearTimeout(timer);
-    }
+    const r = await provaConnettore(c);
+    return { ok: r.ok, ms: ms(), testo: r.testo };
   }
 
   private async provaIntegra(ms: () => number) {
