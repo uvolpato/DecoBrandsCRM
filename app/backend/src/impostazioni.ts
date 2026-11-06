@@ -18,6 +18,7 @@ export interface Campo {
   max?: number;
   step?: number;
   opzioni?: { value: string; label: string }[]; // select
+  gruppo?: string; // campo mostrato solo quando il modello scelto è questo
   obbligatorio?: boolean; // testo che non può restare vuoto
   opzionale?: boolean; // numero che si può lasciare vuoto (porta)
   segreto?: boolean;
@@ -55,21 +56,25 @@ const SEZIONI: Sezione[] = [
     ],
   },
   {
-    chiave: 'lettura', titolo: 'Server di lettura', sotto: 'il connettore che legge i documenti e le soglie di affidabilità',
+    chiave: 'lettura', titolo: 'Server di lettura', sotto: 'il modello che legge i documenti e le soglie di affidabilità',
     campi: [
-      { nome: 'connettore', etichetta: 'Connettore', tipo: 'select', obbligatorio: true,
-        opzioni: [{ value: 'llamacloud_eu', label: 'LlamaCloud (Unione Europea)' }] },
-      { nome: 'chiave', etichetta: 'Chiave API', tipo: 'password', segreto: true, aiuto: 'Di LlamaCloud, regione UE. Non si rilegge: si sostituisce.' },
-      { nome: 'modo', etichetta: 'Modo di lettura', tipo: 'select', obbligatorio: true,
+      { nome: 'connettore', etichetta: 'Modello di lettura', tipo: 'select', obbligatorio: true,
+        opzioni: [
+          { value: 'llamacloud_eu', label: 'LlamaCloud (Unione Europea)' },
+          { value: 'glm_ocr_locale', label: 'GLM-OCR locale (quando c’è la macchina)' },
+        ] },
+      { nome: 'llamacloud_chiave', etichetta: 'Chiave API LlamaCloud', tipo: 'password', segreto: true, gruppo: 'llamacloud_eu', aiuto: 'Non si rilegge: si sostituisce.' },
+      { nome: 'llamacloud_modo', etichetta: 'Modo di lettura', tipo: 'select', obbligatorio: true, gruppo: 'llamacloud_eu',
         opzioni: [
           { value: 'cost_effective', label: 'Economico' },
           { value: 'agentic', label: 'Agentico (consigliato)' },
           { value: 'agentic_plus', label: 'Agentico Plus' },
         ] },
-      { nome: 'progetto', etichetta: 'Progetto', tipo: 'testo', aiuto: 'Vuoto: il primo progetto dell’account.' },
-      { nome: 'indirizzo', etichetta: 'Indirizzo del servizio (connettore locale)', tipo: 'testo', largo: true, aiuto: 'Solo per GLM-OCR, quando la macchina sarà disponibile. LlamaCloud usa l’indirizzo fisso della regione UE.' },
-      { nome: 'modello', etichetta: 'Modello (connettore locale)', tipo: 'testo', aiuto: 'Per GLM-OCR, quando la macchina sarà disponibile.' },
-      { nome: 'attesa_s', etichetta: 'Tempo massimo per documento (s)', tipo: 'numero', min: 10, max: 600, aiuto: 'Con confidenza e citazioni LlamaCloud può richiedere qualche minuto.' },
+      { nome: 'llamacloud_progetto', etichetta: 'Progetto', tipo: 'testo', gruppo: 'llamacloud_eu', aiuto: 'Vuoto: il primo progetto dell’account.' },
+      { nome: 'llamacloud_attesa_s', etichetta: 'Tempo massimo per documento (s)', tipo: 'numero', min: 10, max: 600, gruppo: 'llamacloud_eu', aiuto: 'Con confidenza e citazioni può richiedere qualche minuto.' },
+      { nome: 'locale_indirizzo', etichetta: 'Indirizzo del server (vLLM)', tipo: 'testo', largo: true, gruppo: 'glm_ocr_locale', aiuto: 'Il server GPU quando arriva la macchina.' },
+      { nome: 'locale_modello', etichetta: 'Modello', tipo: 'testo', gruppo: 'glm_ocr_locale' },
+      { nome: 'locale_attesa_s', etichetta: 'Tempo massimo per documento (s)', tipo: 'numero', min: 10, max: 600, gruppo: 'glm_ocr_locale' },
       { nome: 'soglia_ok', etichetta: 'Affidabile da', tipo: 'numero', min: 0, max: 1, step: 0.01, aiuto: 'Campi sopra questa soglia: nessun controllo (spec §6.5).' },
       { nome: 'soglia_bassa', etichetta: 'Affidabilità bassa sotto', tipo: 'numero', min: 0, max: 1, step: 0.01, aiuto: 'Fra le due soglie: da controllare; sotto: bassa.' },
     ],
@@ -116,7 +121,12 @@ export const sezioneDi = (chiave: string): Sezione => {
 const INIZIALI: Record<string, Record<string, unknown>> = {
   azienda: { ragione_sociale: 'Decobrands SRL', piva: 'IT03589740163', email: 'amministrazione@decobrands.it', indirizzo: 'Via dell’Industria 12, 24040 Bergamo' },
   casella: { server: '', porta: null, utente: '', password: null, cartella: 'Fornitori', cartella_lette: 'Fornitori/Letti', minuti: 2 },
-  lettura: { connettore: 'llamacloud_eu', chiave: null, modo: 'agentic', progetto: '', indirizzo: '', modello: 'zai-org/GLM-OCR', attesa_s: 300, soglia_ok: 0.9, soglia_bassa: 0.7 },
+  lettura: {
+    connettore: 'llamacloud_eu',
+    llamacloud_chiave: null, llamacloud_modo: 'agentic', llamacloud_progetto: '', llamacloud_attesa_s: 300,
+    locale_indirizzo: '', locale_modello: 'zai-org/GLM-OCR', locale_attesa_s: 300,
+    soglia_ok: 0.9, soglia_bassa: 0.7,
+  },
   posta: { server: '', porta: null, utente: '', password: null, mittente: '' },
   integra: { server: '', database: '', utente: '', password: null, schema: 'crm_viste', secondi: 60 },
   conservazione: { eventi_mesi: 36, scartati_giorni: 90, righe_pagina: 25 },
@@ -171,21 +181,33 @@ export async function integraConfig(db: Db) {
 
 export async function letturaConfig(db: Db) {
   const v = await valoriSezione(db, 'lettura');
-  if (v.connettore !== 'llamacloud_eu') return null;
-  const chiave = await segretoDi(v.chiave);
-  if (chiave === null) return null;
-  const modo = ['cost_effective', 'agentic', 'agentic_plus'].includes(String(v.modo)) ? String(v.modo) : 'agentic';
-  return {
-    connettore: 'llamacloud_eu' as const,
-    // l'indirizzo di LlamaCloud è fisso: la chiave non va mai a un indirizzo scelto dall'utente
-    indirizzo: 'https://api.cloud.eu.llamaindex.ai',
-    chiave,
-    modo,
-    progetto: String(v.progetto || ''),
-    attesa_s: Number(v.attesa_s) || 300,
-    soglia_ok: Number(v.soglia_ok),
-    soglia_bassa: Number(v.soglia_bassa),
-  };
+  if (v.connettore === 'llamacloud_eu') {
+    const chiave = await segretoDi(v.llamacloud_chiave);
+    if (chiave === null) return null;
+    const modo = ['cost_effective', 'agentic', 'agentic_plus'].includes(String(v.llamacloud_modo)) ? String(v.llamacloud_modo) : 'agentic';
+    return {
+      connettore: 'llamacloud_eu' as const,
+      // l'indirizzo di LlamaCloud è fisso: la chiave non va mai a un indirizzo scelto dall'utente
+      indirizzo: 'https://api.cloud.eu.llamaindex.ai',
+      chiave,
+      modo,
+      progetto: String(v.llamacloud_progetto || ''),
+      attesa_s: Number(v.llamacloud_attesa_s) || 300,
+      soglia_ok: Number(v.soglia_ok),
+      soglia_bassa: Number(v.soglia_bassa),
+    };
+  }
+  if (v.connettore === 'glm_ocr_locale') {
+    return {
+      connettore: 'glm_ocr_locale' as const,
+      indirizzo: String(v.locale_indirizzo || ''),
+      modello: String(v.locale_modello || ''),
+      attesa_s: Number(v.locale_attesa_s) || 300,
+      soglia_ok: Number(v.soglia_ok),
+      soglia_bassa: Number(v.soglia_bassa),
+    };
+  }
+  return null;
 }
 
 /** Righe per pagina dalle impostazioni, 25 se la riga non c'è. */
@@ -276,7 +298,7 @@ export async function sezionePubblica(db: Db, chiave: string) {
   return {
     chiave: sezione.chiave, titolo: sezione.titolo, sotto: sezione.sotto,
     campi: sezione.campi.map((c) => {
-      const base = { nome: c.nome, etichetta: c.etichetta, tipo: c.tipo, aiuto: c.aiuto, largo: c.largo, min: c.min, max: c.max, step: c.step, opzioni: c.opzioni };
+      const base = { nome: c.nome, etichetta: c.etichetta, tipo: c.tipo, aiuto: c.aiuto, largo: c.largo, min: c.min, max: c.max, step: c.step, opzioni: c.opzioni, gruppo: c.gruppo };
       return c.segreto
         ? { ...base, valore: null, impostata: !!v[c.nome] }
         : { ...base, valore: v[c.nome] ?? null };

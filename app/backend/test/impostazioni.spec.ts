@@ -97,7 +97,7 @@ describe('F5-A6 rotte delle impostazioni', () => {
     expect(minuti).toMatchObject({ tipo: 'numero', min: 1, max: 60 });
     const lettura = sezioni.find((s) => s.chiave === 'lettura')!;
     expect(lettura.campi.find((c) => c.nome === 'connettore')).toMatchObject({ tipo: 'select', valore: 'llamacloud_eu' });
-    expect(lettura.campi.find((c) => c.nome === 'chiave')).toMatchObject({ tipo: 'password', valore: null, impostata: false });
+    expect(lettura.campi.find((c) => c.nome === 'llamacloud_chiave')).toMatchObject({ tipo: 'password', valore: null, impostata: false });
     expect(JSON.stringify(r.body)).not.toContain('v1:'); // mai il valore cifrato nella risposta
   });
 
@@ -124,7 +124,7 @@ describe('F5-A6 rotte delle impostazioni', () => {
     await put('lettura', { soglia_ok: 1.5 }).expect(400);
     await put('lettura', { soglia_bassa: 0.9, soglia_ok: 0.7 }).expect(400); // bassa < affidabile
     await put('lettura', { connettore: 'altro' }).expect(400); // elenco chiuso
-    await put('lettura', { modo: 'premium' }).expect(400);
+    await put('lettura', { llamacloud_modo: 'premium' }).expect(400);
     await put('conservazione', { righe_pagina: 500 }).expect(400);
     await put('conservazione', { eventi_mesi: 6 }).expect(400); // min 12 (§15.7)
     await put('azienda', { email: 'senza-chiocciola' }).expect(400);
@@ -177,11 +177,21 @@ describe('F5-A6 rotte delle impostazioni', () => {
 
   it('lettura: la chiave si salva cifrata, si rilegge solo per il servizio e non esce dalle API', async () => {
     const r = await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf)
-      .send({ valori: { chiave: 'llx-di-prova', progetto: 'p1', modo: 'agentic', connettore: 'llamacloud_eu' } }).expect(200);
-    const chiave = (r.body.campi as { nome: string; valore: unknown; impostata?: boolean }[]).find((c) => c.nome === 'chiave')!;
+      .send({ valori: { llamacloud_chiave: 'llx-di-prova', llamacloud_progetto: 'p1', llamacloud_modo: 'agentic', connettore: 'llamacloud_eu' } }).expect(200);
+    const chiave = (r.body.campi as { nome: string; valore: unknown; impostata?: boolean }[]).find((c) => c.nome === 'llamacloud_chiave')!;
     expect(chiave).toMatchObject({ valore: null, impostata: true });
     expect(JSON.stringify(r.body)).not.toContain('llx-di-prova');
     expect(await letturaConfig(db)).toMatchObject({ connettore: 'llamacloud_eu', chiave: 'llx-di-prova', progetto: 'p1', modo: 'agentic' });
+    // il modello locale ha i suoi parametri, separati, e la prova dice che non è ancora disponibile
+    await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf)
+      .send({ valori: { connettore: 'glm_ocr_locale', locale_indirizzo: 'http://gpu:8080/v1', locale_modello: 'zai-org/GLM-OCR' } }).expect(200);
+    expect(await letturaConfig(db)).toMatchObject({ connettore: 'glm_ocr_locale', indirizzo: 'http://gpu:8080/v1', modello: 'zai-org/GLM-OCR' });
+    const prova = await ammi.post('/api/impostazioni/lettura/prova').set('x-csrf-token', csrf).send({}).expect(200);
+    expect(prova.body.ok).toBe(false);
+    expect(prova.body.testo).toContain('locale non è ancora disponibile');
+    // tornando al cloud la chiave salvata c'è ancora
+    await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf).send({ valori: { connettore: 'llamacloud_eu' } }).expect(200);
+    expect((await letturaConfig(db)) as { chiave?: string }).toMatchObject({ connettore: 'llamacloud_eu', chiave: 'llx-di-prova' });
     await db.impostazioni.delete({ where: { chiave: 'lettura' } });
     expect(await letturaConfig(db)).toBeNull();
   });

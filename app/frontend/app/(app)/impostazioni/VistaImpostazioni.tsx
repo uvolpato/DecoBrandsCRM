@@ -13,7 +13,7 @@ import { api } from '@/lib/api';
 // arrivano dal server (niente riscritti qui); le password non si rileggono: si scrivono solo per
 // sostituirle. I controlli veri li fa il server (V12).
 
-interface CampoRisposta { nome: string; etichetta: string; tipo: string; aiuto?: string; largo?: boolean; min?: number; max?: number; step?: number; opzioni?: { value: string; label: string }[]; valore?: unknown; impostata?: boolean }
+interface CampoRisposta { nome: string; etichetta: string; tipo: string; aiuto?: string; largo?: boolean; min?: number; max?: number; step?: number; opzioni?: { value: string; label: string }[]; gruppo?: string; valore?: unknown; impostata?: boolean }
 interface Sezione { chiave: string; titolo: string; sotto: string; campi: CampoRisposta[] }
 
 const PROVABILE = ['casella', 'lettura', 'posta', 'integra'];
@@ -24,6 +24,7 @@ export function VistaImpostazioni() {
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
   const [prova, setProva] = useState<{ ok: boolean; testo: string } | null>(null);
+  const [connettore, setConnettore] = useState('');
   const sagome = useSagome(!sezioni);
 
   const carica = useCallback(async () => {
@@ -36,12 +37,19 @@ export function VistaImpostazioni() {
 
   const sez = sezioni?.find((s) => s.chiave === sezione) ?? sezioni?.[0];
 
+  // il modello scelto decide quali parametri si vedono e si salvano (D-68)
+  useEffect(() => {
+    const scelto = sez?.campi.find((c) => c.nome === 'connettore')?.valore;
+    setConnettore(typeof scelto === 'string' ? scelto : '');
+  }, [sez?.chiave]); // eslint-disable-line react-hooks/exhaustive-deps -- solo al cambio sezione
+  const visibili = sez ? sez.campi.filter((c) => !c.gruppo || c.gruppo === connettore) : [];
+
   const salva = async (ev: FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
     if (!sez) return;
     const fd = new FormData(ev.currentTarget);
     const valori: Record<string, unknown> = {};
-    for (const c of sez.campi) {
+    for (const c of visibili) {
       const v = fd.get(c.nome);
       if (c.tipo === 'password') { const t = String(v ?? '').trim(); if (t) valori[c.nome] = t; }
       else if (c.tipo === 'numero') { const t = String(v ?? '').trim(); valori[c.nome] = t === '' ? '' : Number(t); }
@@ -83,13 +91,14 @@ export function VistaImpostazioni() {
         </Pannello>
         <Pannello titolo={sez.titolo} nota={sez.sotto} riempi>
           <form key={sez.chiave} className="modulo modulo-2" onSubmit={salva} noValidate>
-            {sez.campi.map((c) => c.tipo === 'password' ? (
+            {visibili.map((c) => c.tipo === 'password' ? (
               <Campo key={c.nome} nome={c.nome} etichetta={c.etichetta} tipo="password" completa="new-password" valore=""
                 segnaposto={c.impostata ? '•••••••• impostata · scrivi per sostituirla' : 'non impostata'} aiuto="Lascia vuoto per non cambiarla." />
             ) : (
               <Campo key={c.nome} nome={c.nome} etichetta={c.etichetta} tipo={c.tipo as 'testo' | 'numero' | 'email' | 'select'}
                 valore={typeof c.valore === 'number' || typeof c.valore === 'string' ? c.valore : undefined}
-                opzioni={c.opzioni} aiuto={c.aiuto} largo={c.largo} min={c.min} max={c.max} step={c.step} />
+                opzioni={c.opzioni} aiuto={c.aiuto} largo={c.largo} min={c.min} max={c.max} step={c.step}
+                onCambia={c.nome === 'connettore' ? setConnettore : undefined} />
             ))}
             <div className="modulo-errore" style={{ gridColumn: '1 / -1' }}>
               <div className="azioni-riga">

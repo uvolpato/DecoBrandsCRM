@@ -613,7 +613,7 @@ export const GUIDA: Argomento[] = [
     ],
     sapere: [
       'Password e segreti non si rileggono: il campo dice «impostata» e si scrive solo per sostituirla; il valore cifrato non esce mai dal server e non finisce nel registro eventi.',
-      'Server di lettura: il connettore è LlamaCloud nella regione UE; la chiave API si salva qui e non si rilegge. Il file si cancella dal cloud dopo la lettura.',
+      'Server di lettura: scegli il modello dal menu (LlamaCloud UE o GLM-OCR locale quando c’è la macchina); ognuno ha i suoi parametri e la pagina mostra quelli del modello scelto, che è quello usato per leggere i documenti. La chiave non si rilegge e il file si cancella dal cloud dopo la lettura.',
       'Righe per pagina: quante righe mostrano le tabelle prima di andare a pagina successiva.',
       'Le impostazioni si usano davvero: la posta in uscita, la sincronizzazione da Integra, la conservazione del registro, le righe per pagina e l’intestazione delle esportazioni.',
     ],

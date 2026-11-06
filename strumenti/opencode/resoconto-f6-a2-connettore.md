@@ -24,10 +24,16 @@ schemi per tipo documento, unione righe e `documenti_campi` restano il resto di 
 
 ## Come funziona
 
-1. `PUT /api/impostazioni/lettura` salva la chiave cifrata (AES-256-GCM) e il resto.
-2. `leggiDocumento` carica il file su `https://api.cloud.eu.llamaindex.ai`
-   (`/api/v1/beta/files`, `purpose=extract`), prende il primo progetto (o quello indicato) e avvia
-   l'estrazione (`/api/v2/extract`, `version 2.5`, `agentic`, `cite_sources`, `confidence_scores`).
+1. `PUT /api/impostazioni/lettura` salva il **modello scelto** (`connettore`) e i parametri di quel
+   modello: `llamacloud_chiave` (cifrata), `llamacloud_modo`, `llamacloud_progetto`,
+   `llamacloud_attesa_s` oppure `locale_indirizzo`, `locale_modello`, `locale_attesa_s`; le soglie
+   sono comuni. La pagina mostra solo i campi del modello scelto (`gruppo`) e salva solo quelli:
+   un salvataggio del modello locale non azzera la chiave del cloud.
+2. `leggiDocumento` sceglie il ramo dal modello: con `llamacloud_eu` carica il file su
+   `https://api.cloud.eu.llamaindex.ai` (`/api/v1/beta/files`, `purpose=extract`), prende il primo
+   progetto (o quello indicato) e avvia l'estrazione (`/api/v2/extract`, `version 2.5`, `agentic`,
+   `cite_sources`, `confidence_scores`). Con `glm_ocr_locale` risponde che il connettore non è
+   ancora disponibile.
 3. Aspetta fino a `attesa_s` (poll ogni 2 s), legge `extract_result` e
    `extract_metadata.field_metadata.document_metadata`, e restituisce:
    - `campo`: percorso nello schema (es. `righe[0].prezzo`);

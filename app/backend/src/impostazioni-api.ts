@@ -25,7 +25,7 @@ class Salva {
 const TESTO_PROVA: Record<string, string> = {
   casella: 'Casella non configurata: completa server, utente e password.',
   posta: 'Posta non configurata: completa server, utente e password.',
-  lettura: 'Server di lettura non configurato: scegli il connettore e imposta la chiave API.',
+  lettura: 'Server di lettura non configurato: scegli il modello e imposta i suoi parametri.',
   integra: 'Sincronizzazione non configurata: completa server, database, utente e password.',
 };
 
@@ -112,6 +112,9 @@ export class ImpostazioniController {
   private async provaLettura(ms: () => number) {
     const c = await letturaConfig(this.db);
     if (!c) return { ok: false, ms: ms(), testo: TESTO_PROVA.lettura };
+    if (c.connettore !== 'llamacloud_eu') {
+      return { ok: false, ms: ms(), testo: 'Il connettore locale non è ancora disponibile: si accende quando arriva la macchina.' };
+    }
     const r = await provaConnettore(c);
     return { ok: r.ok, ms: ms(), testo: r.testo };
   }

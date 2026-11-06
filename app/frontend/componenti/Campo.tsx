@@ -79,7 +79,7 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
           </button>
         </div>
       ) : tipo === 'select' ? (
-        <select id={id} name={nome} defaultValue={testo} disabled={disabilitato}>
+        <select id={id} name={nome} defaultValue={testo} disabled={disabilitato} onChange={(e) => onCambia?.(e.target.value)}>
           {opzioni.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       ) : tipo === 'numero' ? (

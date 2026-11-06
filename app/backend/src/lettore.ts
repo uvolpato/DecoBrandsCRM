@@ -11,6 +11,7 @@ const log = new Logger('Lettore');
 const ATTESA_POLL_MS = 2000;
 
 type Config = NonNullable<Awaited<ReturnType<typeof letturaConfig>>>;
+type ConfigCloud = Extract<Config, { connettore: 'llamacloud_eu' }>;
 
 export class LetturaNonConfigurata extends Error {}
 export class LetturaFallita extends Error {}
@@ -45,8 +46,8 @@ interface MetaCampo {
   citation?: Citazione[];
 }
 
-const base = (c: Config) => c.indirizzo.replace(/\/$/, '');
-const intestazioni = (c: Config) => ({ Authorization: `Bearer ${c.chiave}` });
+const base = (c: ConfigCloud) => c.indirizzo.replace(/\/$/, '');
+const intestazioni = (c: ConfigCloud) => ({ Authorization: `Bearer ${c.chiave}` });
 const pulisci = (s: unknown) => String(s instanceof Error ? s.message : s).replace(/\s+/g, ' ').slice(0, 300);
 
 async function leggiErrore(r: Response): Promise<string> {
@@ -60,7 +61,7 @@ async function leggiErrore(r: Response): Promise<string> {
 }
 
 /** Elenco dei progetti: il primo se le Impostazioni non ne indicano uno. */
-async function progetto(c: Config, f: typeof fetch): Promise<string> {
+async function progetto(c: ConfigCloud, f: typeof fetch): Promise<string> {
   if (c.progetto) return c.progetto;
   const r = await f(`${base(c)}/api/v1/projects`, { headers: intestazioni(c), signal: AbortSignal.timeout(15_000) });
   if (!r.ok) throw new LetturaFallita(`LlamaCloud non ha restituito i progetti (${r.status}): ${await leggiErrore(r)}`);
@@ -114,7 +115,7 @@ function foglie(valore: unknown, percorso: string, meta: unknown, out: CampoLett
 }
 
 /** Un documento letto da LlamaCloud EU (D-67): file → estrazione con schema → campi con confidenza e citazione. */
-async function leggiConLlamaCloud(c: Config, nome: string, dati: Buffer, schema: object, prompt: string | undefined, f: typeof fetch, pollMs: number): Promise<Lettura> {
+async function leggiConLlamaCloud(c: ConfigCloud, nome: string, dati: Buffer, schema: object, prompt: string | undefined, f: typeof fetch, pollMs: number): Promise<Lettura> {
   const inizio = Date.now();
   let fileId: string | null = null;
   try {
@@ -189,11 +190,11 @@ async function leggiConLlamaCloud(c: Config, nome: string, dati: Buffer, schema:
 /** Legge un documento col connettore scelto. `f` e `pollMs` sono per le prove. */
 export async function leggiDocumento(c: Config, nome: string, dati: Buffer, schema: object, prompt?: string, f: typeof fetch = fetch, pollMs = ATTESA_POLL_MS): Promise<Lettura> {
   if (c.connettore === 'llamacloud_eu') return leggiConLlamaCloud(c, nome, dati, schema, prompt, f, pollMs);
-  throw new LetturaNonConfigurata('Connettore di lettura non riconosciuto');
+  throw new LetturaNonConfigurata('Il connettore locale non è ancora disponibile: si accende quando arriva la macchina');
 }
 
 /** Prova la chiave e l’indirizzo senza caricare documenti. */
-export async function provaConnettore(c: Config, f: typeof fetch = fetch): Promise<{ ok: boolean; testo: string }> {
+export async function provaConnettore(c: ConfigCloud, f: typeof fetch = fetch): Promise<{ ok: boolean; testo: string }> {
   try {
     const r = await f(`${base(c)}/api/v1/projects`, { headers: intestazioni(c), signal: AbortSignal.timeout(15_000) });
     if (!r.ok) {
