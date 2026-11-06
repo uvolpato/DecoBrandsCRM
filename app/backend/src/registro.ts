@@ -51,6 +51,7 @@ export const SCHEMI: Record<string, string[]> = {
   'documento.move': ['documento_id', 'tipo', 'prima', 'dopo'], // documento spostato in un'altra pratica (D-60)
   'documento.export': ['fatture', 'importo_totale', 'solleciti'], // sollecito di pagamento copiato al cliente (§5.14)
   'export.export': ['etichetta', 'periodo', 'scelta', 'formato', 'n_righe', 'importo_totale'], // esportazione di un prospetto (§15.2.6); `subagente` quando è di uno solo
+  'export.sollecito': ['pratiche'], // sollecito di conferma copiato per un fornitore (§7.1): etichetta = fornitore, `pratiche` = numeri
   // sincronizzazione da Integra (§7.14.3): anomalie, non eventi
   'integra.connessione': ['errore'],
   'integra.vista': ['vista', 'errore'],

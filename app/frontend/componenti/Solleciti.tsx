@@ -117,6 +117,7 @@ export function SollecitiConferme({ onChiudi }: { onChiudi: () => void }) {
         ? `${dati.totale} ${dati.totale === 1 ? 'pratica in ritardo' : 'pratiche in ritardo'}, ${schede.length} ${schede.length === 1 ? 'fornitore' : 'fornitori'}: un testo per fornitore da copiare e inviare.`
         : 'Nessuna conferma in ritardo.'}
       schede={schede}
+      onCopia={(id) => { void api('solleciti/conferme', { fornitore_id: Number(id) }).then((r) => { if (!r.ok) avviso(r.messaggio, true); }); }}
       onChiudi={onChiudi}
     />
   );

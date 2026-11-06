@@ -167,4 +167,29 @@ describe('F5-A1 pagina Oggi', () => {
     const api = (await op.get('/api/solleciti/conferme').expect(200)).body;
     expect(api.totale).toBe(api.per_fornitore.reduce((n: number, f: any) => n + f.pratiche, 0));
   });
+
+  it('POST /api/solleciti/conferme: la copia lascia l\'evento export.sollecito', async () => {
+    const S = await caricaDati(db, OGGI);
+    const f = sollecitiConferme(S).per_fornitore[0];
+    const conToken = async (utente: string) => {
+      const agente = request.agent(app.getHttpServer());
+      const r = await agente.post('/api/accesso/entra').send({ utente, password: PW }).expect(200);
+      return { agente, csrf: r.body.csrf as string };
+    };
+    const { agente, csrf } = await conToken('op-oggi');
+    await agente.post('/api/solleciti/conferme').set('x-csrf-token', csrf)
+      .send({ fornitore_id: Number(f.fornitore_id) }).expect(204);
+    const ev = await db.registro.findFirstOrThrow({ where: { codice: 'export.sollecito' }, orderBy: { id: 'desc' } });
+    expect(ev.tipo).toBe('export');
+    expect(ev.entita).toBe('fornitore');
+    expect(String(ev.entita_id)).toBe(f.fornitore_id);
+    const d = ev.dettaglio as { etichetta: string; pratiche: string[] };
+    expect(d.etichetta).toBe(f.fornitore);
+    expect([...d.pratiche].sort()).toEqual(f.voci.map((v) => v.numero).sort());
+    await agente.post('/api/solleciti/conferme').set('x-csrf-token', csrf)
+      .send({ fornitore_id: 999999 }).expect(404);
+    const altro = await conToken('dati-oggi');
+    await altro.agente.post('/api/solleciti/conferme').set('x-csrf-token', altro.csrf)
+      .send({ fornitore_id: Number(f.fornitore_id) }).expect(403);
+  });
 });

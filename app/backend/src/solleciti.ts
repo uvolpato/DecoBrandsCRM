@@ -1,13 +1,17 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post, HttpCode, Body, NotFoundException, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { Prisma } from '@prisma/client';
-import { Richiede } from './accesso';
+import { Type } from 'class-transformer';
+import { IsInt, Min } from 'class-validator';
+import { Richiede, contesto } from './accesso';
 import { type Dati, caricaDati, giornoRoma } from './motore/dati';
 import { confermeInRitardo } from './oggi';
 import { PrismaService } from './prisma.service';
+import { logEvent } from './registro';
 
 // Solleciti di conferma (§7.1, §5.12): il testo lo compone il server, un fornitore per scheda, con le
-// sue pratiche in ritardo. La copia non scrive un evento: §15.2.3 non ha un codice per i solleciti di
-// conferma (non se ne inventa uno).
+// sue pratiche in ritardo. La copia lascia l'evento export.sollecito (chi e quali pratiche): così resta
+// traccia del sollecito anche quando la conferma non arriva.
 
 const euro = (n: Prisma.Decimal) => Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 const dataIt = (s: string) => s.split('-').reverse().join('/');
@@ -19,6 +23,10 @@ function testoFornitore(fornitore: string, voci: ReturnType<typeof confermeInRit
     '\n\nVi chiediamo di inviarcele appena possibile, indicando eventuali articoli non disponibili.\n\nGrazie,\nDecobrands SRL';
 }
 
+class SollecitoConferme {
+  @Type(() => Number) @IsInt() @Min(1) fornitore_id!: number;
+}
+
 @Controller('solleciti')
 export class SollecitiController {
   constructor(private readonly db: PrismaService) {}
@@ -28,6 +36,21 @@ export class SollecitiController {
   @Richiede('provvigioni.consulta')
   async conferme() {
     return sollecitiConferme(await caricaDati(this.db, giornoRoma(new Date())));
+  }
+
+  /** Il testo del sollecito di conferma per un fornitore è stato copiato (§7.1): resta nel registro
+   *  con le pratiche in ritardo di adesso (ricalcolate qui, non arrivate dal browser, V12). */
+  @Post('conferme')
+  @HttpCode(204)
+  @Richiede('provvigioni.consulta')
+  async copia(@Req() req: Request, @Body() b: SollecitoConferme) {
+    const S = await caricaDati(this.db, giornoRoma(new Date()));
+    const f = sollecitiConferme(S).per_fornitore.find((x) => x.fornitore_id === String(b.fornitore_id));
+    if (!f) throw new NotFoundException('Nessuna conferma in ritardo per questo fornitore');
+    await logEvent(this.db, {
+      tipo: 'export', azione: 'sollecito', entita: 'fornitore', entita_id: BigInt(b.fornitore_id), esito: 'successo',
+      dettaglio: { etichetta: f.fornitore, pratiche: f.voci.map((v) => v.numero) },
+    }, contesto(req));
   }
 }
 
