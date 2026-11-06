@@ -59,9 +59,9 @@ documento non più `in_lettura` al salvataggio → nessun campo.
   LlamaCloud UE, salvataggio dei campi con confidenza e citazione, tentativi e anomalia. Sulle prove
   il lettore è finto; la chiamata vera è coperta da `test/lettore.spec.ts` (sequenza HTTP simulata)
   e dalla prova a mano `npm run lettura:prova`.
-- **Non verificato su documenti reali in questa slice**: qualità dell'estrazione (campi giusti,
-  righe complete, tipo indovinato) e tempi/crediti per pagina. Serve un giro con PDF veri (Gries +
-  un importatore) prima di dire che la lettura è tarata: la taratura delle soglie è F6-A5/D-67.
+- **Qualità dell'estrazione**: verificata il 06/11/2026 sui documenti veri di
+  `Documenti Veri` (sezione in fondo): campi e imponibili corretti, ~25 crediti per pagina. La
+  taratura delle soglie resta F6-A5/D-67.
 - **Connettore locale GLM-OCR**: non implementato (`leggiDocumento` lancia
   `LetturaNonConfigurata` se scelto); con la configurazione locale attiva il documento consumerebbe
   i 3 tentativi e finirebbe `errore`. Si accende quando arriva la macchina (D-67/F6-A5).
@@ -84,3 +84,40 @@ documento non più `in_lettura` al salvataggio → nessun campo.
 - **`tipi` del tipo documento**: ammessi gli otto di §4.2.12 (compreso `bollettino`). Il valore letto
   dal modello è una stringa libera; se non è nell'elenco il `tipo` resta null e la persona lo sceglie
   nella correzione (F6-A4).
+
+## Prova sui documenti veri (06/11/2026)
+
+Fatta a mano con `npm run lettura:prova` su `C:\Progetti\Decobrands_CRM\Documenti Veri`
+(non scrive nel database). Il set tedesco è dello stesso lavoro: ordine → proforma → fattura,
+più una nota di credito, un bollettino provvigioni e una foto.
+
+| Documento | Tipo letto | Fornitore / cliente | Codice | Numero · data | Imponibile | Righe | Crediti |
+|---|---|---|---|---|---|---|---|
+| `Auftrag_AU278233.pdf` (2 pag.) | ordine | ARTE WOHNACCESSOIRES GMBH & CO.KG · Fiori e Foglie di Santin Cristina | 45263 | AU278233 · 08.07.2026 | 485,90 | 15 | 50 |
+| `Proforma_PR102904.pdf` (2 pag.) | proforma | idem | 45263 | PR102904 · 29.09.2026 | 523,70 | 14 | 50 |
+| `Rechnung_RE195521.pdf` (2 pag.) | fattura | idem | 45263 | RE195521 · 06.10.2026 | 523,70 | 14 | 50 |
+| `Gutschrift_GU913797.pdf` (1 pag.) | nota di credito | idem · Fioreria al Podere di Codutti | 45201 | GU913797 · 09.04.2026 | 19,60 | 1 | 25 |
+| `Provisionsabrechnung_20_Januar2026.pdf` | bollettino | idem · DECOBRANDS SRL | 44658 | 01/2026 · 03.02.2026 | 145,29 provvigioni | 0 | 25 |
+| `ordine.jpg` (foto) | ordine | LUIS SRL Import/Export · M'ANA NON M'ANA (sic) | — | — · 21.01.2026 | 297,89 | 9 | 25 |
+
+Esiti: tipo, fornitore, cliente, codice cliente, numero, data e imponibile corretti su tutti;
+posizioni `esatta` con pagina; affidabilità dei campi 0,84–0,99 e del tipo 0,47–0,86 (il livello di
+F6-A3 li segnala). Circa **25 crediti per pagina**: 10.000 crediti ≈ 400 pagine al mese, contro le
+100–150 previste.
+
+Correzioni fatte dopo la prova (`SCHEMA_DOCUMENTO` e `PROMPT_DOCUMENTO`):
+- **fornitore e cliente**: sui documenti scritti sulla carta del cliente il modello prendeva
+  l'intestatario come fornitore. Ora la regola dice di leggere la riga «Fornitore» e di non
+  scambiare i due (riprova sull'ordine Kasanova: GRIES / KASANOVA+, corretti).
+- **importo**: esplicitato che serve l'**imponibile senza IVA** (serve alle provvigioni).
+- **bollettino**: un `Provisionsabrechnung`/`Abrechnung` è di tipo bollettino, con mese e anno del
+  titolo (prima usciva `nota_credito`).
+
+Ancora aperto:
+- **Righe del bollettino**: restano 0, perché lo schema delle righe è quello degli articoli (codice,
+  quantità, prezzo). Le righe del bollettino sono le **fatture del mese** (numero, data, imponibile,
+  provvigione): schema a parte da fare con F6-A3 (o con F3 per i bollettini).
+- **Excel (`.xlsm`) e `.msg`**: non provati, D-60 li rifiuta nel canale comune.
+- **Pagamenti e bonifici** (PDF e foto): non provati.
+- Un `fetch failed` transitorio, una volta su 11 chiamate: la riprova è andata e i 3 tentativi della
+  coda coprono il caso; se capita spesso serve un ritardo fra i tentativi.
