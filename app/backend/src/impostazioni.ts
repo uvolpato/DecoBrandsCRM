@@ -17,6 +17,7 @@ export interface Campo {
   min?: number;
   max?: number;
   step?: number;
+  decimale?: boolean; // numero con decimali (soglie); gli altri sono interi
   opzioni?: { value: string; label: string }[]; // select
   gruppo?: string; // campo mostrato solo quando il modello scelto è questo
   obbligatorio?: boolean; // testo che non può restare vuoto
@@ -75,8 +76,8 @@ const SEZIONI: Sezione[] = [
       { nome: 'locale_indirizzo', etichetta: 'Indirizzo del server (vLLM)', tipo: 'testo', largo: true, gruppo: 'glm_ocr_locale', aiuto: 'Il server GPU quando arriva la macchina.' },
       { nome: 'locale_modello', etichetta: 'Modello', tipo: 'testo', gruppo: 'glm_ocr_locale' },
       { nome: 'locale_attesa_s', etichetta: 'Tempo massimo per documento (s)', tipo: 'numero', min: 10, max: 600, gruppo: 'glm_ocr_locale' },
-      { nome: 'soglia_ok', etichetta: 'Affidabile da', tipo: 'numero', min: 0, max: 1, step: 0.01, aiuto: 'Campi sopra questa soglia: nessun controllo (spec §6.5).' },
-      { nome: 'soglia_bassa', etichetta: 'Affidabilità bassa sotto', tipo: 'numero', min: 0, max: 1, step: 0.01, aiuto: 'Fra le due soglie: da controllare; sotto: bassa.' },
+      { nome: 'soglia_ok', etichetta: 'Affidabile da', tipo: 'numero', min: 0, max: 1, step: 0.01, decimale: true, aiuto: 'Campi sopra questa soglia: nessun controllo (spec §6.5).' },
+      { nome: 'soglia_bassa', etichetta: 'Affidabilità bassa sotto', tipo: 'numero', min: 0, max: 1, step: 0.01, decimale: true, aiuto: 'Fra le due soglie: da controllare; sotto: bassa.' },
     ],
   },
   {
@@ -263,7 +264,10 @@ export async function applica(db: Db, chiave: string, valori: Record<string, unk
         throw new BadRequestException(`${c.etichetta}: inserisci un numero.`);
       }
       const n = Number(v);
-      if (!Number.isFinite(n) || !Number.isInteger(n)) throw new BadRequestException(`${c.etichetta}: inserisci un numero intero.`);
+      const decimale = c.decimale ? Math.abs(n * 100 - Math.round(n * 100)) < 1e-9 : false;
+      if (!Number.isFinite(n) || (c.decimale ? !decimale : !Number.isInteger(n))) {
+        throw new BadRequestException(`${c.etichetta}: inserisci un ${c.decimale ? 'numero con al massimo due decimali' : 'numero intero'}.`);
+      }
       if (c.min != null && n < c.min) throw new BadRequestException(`${c.etichetta}: da ${c.min} a ${c.max}.`);
       if (c.max != null && n > c.max) throw new BadRequestException(`${c.etichetta}: da ${c.min} a ${c.max}.`);
       nuovo[c.nome] = n;

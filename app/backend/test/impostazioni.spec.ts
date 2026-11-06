@@ -123,6 +123,8 @@ describe('F5-A6 rotte delle impostazioni', () => {
     await put('integra', { secondi: 5 }).expect(400);
     await put('lettura', { soglia_ok: 1.5 }).expect(400);
     await put('lettura', { soglia_bassa: 0.9, soglia_ok: 0.7 }).expect(400); // bassa < affidabile
+    await put('lettura', { soglia_ok: 0.855 }).expect(400); // al massimo due decimali
+    await put('lettura', { soglia_ok: 0.85, soglia_bassa: 0.65 }).expect(200); // decimali validi
     await put('lettura', { connettore: 'altro' }).expect(400); // elenco chiuso
     await put('lettura', { llamacloud_modo: 'premium' }).expect(400);
     await put('conservazione', { righe_pagina: 500 }).expect(400);
