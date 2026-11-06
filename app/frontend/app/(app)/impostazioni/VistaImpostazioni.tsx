@@ -16,7 +16,7 @@ import { api } from '@/lib/api';
 interface CampoRisposta { nome: string; etichetta: string; tipo: string; aiuto?: string; largo?: boolean; min?: number; max?: number; step?: number; opzioni?: { value: string; label: string }[]; gruppo?: string; valore?: unknown; impostata?: boolean }
 interface Sezione { chiave: string; titolo: string; sotto: string; campi: CampoRisposta[] }
 // Parametri del .env del server (D-70): si mostrano in sola lettura, non si modificano da qui.
-interface ParametroServer { nome: string; uso: string; sezioni: string[]; impostato: boolean; valore: string | null }
+interface ParametroServer { nome: string; uso: string; sezioni: string[]; obbligatorio: boolean; impostato: boolean; valore: string | null }
 
 const PROVABILE = ['casella', 'lettura', 'posta', 'integra'];
 
@@ -126,9 +126,9 @@ export function VistaImpostazioni() {
                 {parametri.map((p) => (
                   <li key={p.nome}>
                     <code>{p.nome}</code> — {p.uso}{' '}
-                    <span style={p.impostato ? undefined : { color: 'var(--errore-testo, #842029)' }}>
-                      {p.impostato ? 'impostato' : 'mancante'}
-                    </span>
+                    {p.impostato ? 'impostato' : p.obbligatorio
+                      ? <span style={{ color: 'var(--errore-testo, #842029)' }}>mancante</span>
+                      : <span>non scritto, si usa il valore predefinito</span>}
                     {p.valore ? ' · ' + p.valore : ''}
                   </li>
                 ))}

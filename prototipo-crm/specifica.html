@@ -4186,9 +4186,9 @@ sola lettura); una prova fallita è <code>200 {ok:false}</code> con il motivo, n
 <p><strong>Parametri del server (<code>.env</code>).</strong> Alcuni valori non stanno nel database e non si modificano dalla
 pagina: <code>SEGRETI_CHIAVE</code> (senza, le password non si possono cifrare), <code>DOCUMENTI_DIR</code>,
 <code>DOCUMENTI_MAX_MB</code> e <code>APP_URL</code>. <code>GET /api/impostazioni</code> li restituisce in <code>ambiente</code> (nome, uso,
-sezioni che li usano, <code>impostato</code>, valore solo se non è un segreto) e la pagina li elenca sotto la
-sezione, con il file da modificare (<code>app/backend/.env</code> sul server) e l'avviso che il backend va
-riavviato (D-70). <em>Perché:</em> un parametro che blocca un salvataggio deve dire dove si cambia,
+sezioni che li usano, <code>obbligatorio</code>, <code>impostato</code>, valore solo se non è un segreto) e la pagina li
+elenca sotto la sezione, con il file da modificare (<code>app/backend/.env</code> sul server) e l'avviso che il
+backend va riavviato (D-70). <em>Perché:</em> un parametro che blocca un salvataggio deve dire dove si cambia,
 invece di lasciare l'operatore davanti a un errore senza sapere cosa fare.</p>
 <p><strong>Valori iniziali</strong> (un'installazione nuova): azienda, lettura (soglie 0,90/0,70, attesa 120,
 modello <code>zai-org/GLM-OCR</code>) e conservazione (36/90/25) come nel prototipo; <code>lettura.indirizzo</code> e i
@@ -4846,7 +4846,7 @@ pratiche).</p>
 <tr>
 <td>GET</td>
 <td><code>/api/impostazioni</code></td>
-<td>le sei sezioni (F5-A6, §7.15), <code>sistema.impostazioni</code>: <code>{sezioni: [{chiave, titolo, sotto, campi: [{nome, etichetta, tipo (testo\|numero\|email\|password), aiuto, largo, min, max, step, valore, impostata?}]}], ambiente: [{nome, uso, sezioni, impostato, valore}]}</code> in ordine fisso; i segreti come <code>{valore: null, impostata}</code>, mai il valore cifrato; <code>ambiente</code> sono i parametri del <code>.env</code> del server (D-70), in sola lettura, con <code>valore</code> null per i segreti</td>
+<td>le sei sezioni (F5-A6, §7.15), <code>sistema.impostazioni</code>: <code>{sezioni: [{chiave, titolo, sotto, campi: [{nome, etichetta, tipo (testo\|numero\|email\|password), aiuto, largo, min, max, step, valore, impostata?}]}], ambiente: [{nome, uso, sezioni, obbligatorio, impostato, valore}]}</code> in ordine fisso; i segreti come <code>{valore: null, impostata}</code>, mai il valore cifrato; <code>ambiente</code> sono i parametri del <code>.env</code> del server (D-70), in sola lettura, con <code>valore</code> null per i segreti</td>
 </tr>
 <tr>
 <td>PUT</td>

@@ -101,7 +101,7 @@ describe('F5-A6 rotte delle impostazioni', () => {
     expect(JSON.stringify(r.body)).not.toContain('v1:'); // mai il valore cifrato nella risposta
     // parametri del .env (D-70): in sola lettura, con lo stato; il segreto non esce
     const ambiente = r.body.ambiente as { nome: string; sezioni: string[]; impostato: boolean; valore: unknown }[];
-    expect(ambiente.find((p) => p.nome === 'SEGRETI_CHIAVE')).toMatchObject({ impostato: true, valore: null });
+    expect(ambiente.find((p) => p.nome === 'SEGRETI_CHIAVE')).toMatchObject({ impostato: true, valore: null, obbligatorio: true });
     expect(ambiente.find((p) => p.nome === 'SEGRETI_CHIAVE')!.sezioni).toEqual(expect.arrayContaining(['casella', 'lettura', 'posta', 'integra']));
     expect(JSON.stringify(r.body)).not.toContain('chiave-di-prova-impostazioni');
   });
