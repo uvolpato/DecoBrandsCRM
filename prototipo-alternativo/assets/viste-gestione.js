@@ -494,7 +494,7 @@
     const areeProfilo = areeVisibili().concat(puoGestione ? [{ id: 'gestione', nome: 'Gestione' }] : []);
     CRM.Dettagli(aree.corpo, areeVisibili().map(a => ({ etichetta: a.nome, valore: M.livello(io, a.id) ? e(M.LIVELLI[M.livello(io, a.id)].nome) : '<span class="testo-tenue">�?"</span>' }))
       .concat(puoGestione ? [{ etichetta: 'Gestione', valore: 'secondo il ruolo' }] : []), { inColonne: true });
-    CRM.Nota(aree.corpo, 'Nome, nome utente, email, ruolo e livelli li cambia chi amministra: da qui si leggono soltanto.');
+    CRM.Nota(aree.corpo, 'Nome, nome utente, email, ruolo e livelli li cambia chi amministra: da qui si leggono soltanto.').style.marginTop = '14px';
 
     const dx = CRM.blocco(col, 'pila');
     const prefs = CRM.Pannello(dx, { titolo: 'Pagina di ingresso per area', nota: 'quando scegli l’area nel menu' });
