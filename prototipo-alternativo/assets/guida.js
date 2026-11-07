@@ -41,7 +41,7 @@
         ['Schede', 'Contenuti diversi nello stesso spazio (es. Agenzie · Pratiche); il numero dice quanti elementi ci sono. Frecce ← → per passare da una all’altra.'],
         ['Intestazione di colonna', 'Clic: ordina crescente ▲, di nuovo decrescente ▼. L’ordinamento vale su tutto l’elenco, non solo sulla pagina.'],
         ['‹ 1 2 … ›', 'In fondo alle tabelle lunghe: cambia pagina. Le righe per pagina si fissano nelle Impostazioni.'],
-        ['Menu dell’utente', 'In fondo alla barra, clic sul tuo nome: cambia area (Provvigioni, Dati, Gestione), Cambia la password, Guida, Esci.'],
+        ['Menu dell’utente', 'In fondo alla barra, clic sul tuo nome: cambia area (Provvigioni, Dati, Gestione), Il mio profilo, Cambia la password, Guida, Esci.'],
         ['Campo con lente', 'Scrivi: compaiono le prime 5 corrispondenze (↑ ↓ Invio). La lente o F4 apre la ricerca completa. Pallino verde = trovato in anagrafica, rosso = non trovato.'],
         ['× / Esc', 'Chiudono la finestra in primo piano senza salvare.']
       ],
@@ -49,6 +49,20 @@
         'I numeri (segmenti, riquadri, contatori della barra) seguono i filtri senza ricaricare la pagina. Nell’applicazione, se altri o i servizi cambiano i dati, i contatori si aggiornano da soli; le tabelle no: compare “Ci sono aggiornamenti · Aggiorna”, così le righe non si spostano mentre lavori.',
         'Con il profilo <b>sola lettura</b> compare una fascia in alto: si consulta e si esporta, i pulsanti che modificano sono spenti.',
         '<b>Prova come</b> (in fondo alla barra, solo nel prototipo) cambia utente per vedere cosa vede ogni ruolo.'
+      ] },
+
+    { id: 'profilo', titolo: 'Il mio profilo', gruppo: 'Inizia qui', vai: '#/profilo',
+      sintesi: 'I tuoi dati, le aree che puoi aprire e la pagina con cui entri in ognuna. Si apre dal menu dell’utente, in fondo alla barra.',
+      pulsanti: [
+        ['Il mio profilo', 'Nel menu dell’utente: nome, nome utente, email, ruolo di Sistema, aree con il livello e ultimo accesso.'],
+        ['Pagina di ingresso per area', 'Una scelta per area (Provvigioni, Dati, Gestione): è la pagina che si apre quando scegli quell’area nel menu. Ci sono solo le pagine a cui hai accesso.'],
+        ['Salva le preferenze', 'Salva le scelte. Senza scelta si apre la prima pagina dell’area; in Gestione la prima a cui hai accesso.'],
+        ['Cambia la password', 'Porta al cambio della password e chiude le sessioni aperte sugli altri computer.']
+      ],
+      sapere: [
+        'Nome, nome utente, email, ruolo e livelli nelle aree sono in sola lettura: li cambia chi amministra.',
+        'La pagina di ingresso vale solo per te: ogni utente sceglie la sua.',
+        'Se la pagina scelta non è più fra quelle che puoi aprire, si apre la prima dell’area.'
       ] },
 
     /* ---------------- Lavoro ---------------- */

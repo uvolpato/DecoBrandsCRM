@@ -447,9 +447,10 @@
     }
     disegna();
     const ruoli = (() => {
-      const mappa = { utenti: 'gestione', impostazioni: 'gestione', sistema: 'sistema', scartati: 'scartati', 'alias-kit': 'magazzino' };
-      const perm = M.PERMESSI.find(p => p.id === (mappa[g.id] || (g.gruppo === 'Anagrafiche' ? 'anagrafiche' : 'modifica')));
-      return perm.ruoli.map(r => M.RUOLI[r].nome).join(', ');
+      const mappa = { utenti: 'sistema.utenti', impostazioni: 'sistema.impostazioni', sistema: 'sistema.stato', scartati: 'provvigioni.scartati', 'alias-kit': 'vendite.magazzino' };
+      const perm = M.PERMESSI.find(p => p.id === (mappa[g.id] || (g.gruppo === 'Anagrafiche' ? 'anagrafiche.consulta' : 'provvigioni.modifica')));
+      if (!perm) return '';
+      return perm.ruoli ? perm.ruoli.map(r => M.RUOLI[r].nome).join(', ') : M.LIVELLI[perm.minimo].nome + ' o superiore';
     })();
     const p = CRM.Pannello(col, { titolo: g.titolo, nota: e(g.gruppo), riempi: true, azioni: g.gruppo === 'Inizia qui' ? [] : [{ etichetta: 'Apri la pagina', href: g.vai, consentito: true }] });
     const sez = (titolo, html) => '<section class="guida-sez"><h3>' + titolo + '</h3>' + html + '</section>';
@@ -466,4 +467,60 @@
   }
   CRM.rotta(/^\/guida$/, () => vistaGuida(null));
   CRM.rotta(/^\/guida\/([\w-]+)$/, id => vistaGuida(id));
+
+  /* =========================================================
+     Il mio profilo (proposta D-87): dati dell'utente, aree e pagina di ingresso
+     Si apre dal menu dell'utente. Nome, email, ruolo e livelli sono in sola lettura:
+     li cambia chi amministra (��7.13).
+     ========================================================= */
+  CRM.rotta(/^\/profilo$/, function () {
+    const io = M.utente();
+    const corpo = CRM.Pagina({ voce: 'profilo', titolo: 'Il mio profilo', pieno: true,
+      sottotitolo: 'I tuoi dati, le aree che puoi aprire e la pagina con cui entri in ognuna.' });
+    const col = CRM.blocco(corpo, 'colonne', '--colonne:minmax(0,1fr) minmax(0,1fr)');
+
+    const sx = CRM.blocco(col, 'pila');
+    const dati = CRM.Pannello(sx, { titolo: 'I tuoi dati' });
+    CRM.Dettagli(dati.corpo, [
+      { etichetta: 'Nome e cognome', valore: e(io.nome) },
+      { etichetta: 'Nome utente', valore: e(io.username) },
+      { etichetta: 'Email', valore: e(io.email) },
+      { etichetta: 'Ruolo di Sistema', valore: e(M.RUOLI[io.ruolo].nome) },
+      { etichetta: 'Stato', valore: io.attivo ? CRM.stato('ok', 'Attivo') + (io.deve_cambiare_password ? ' ' + CRM.stato('attesa', 'Password provvisoria') : '') : CRM.stato('neutro', 'Disattivato') },
+      { etichetta: 'Ultimo accesso', valore: quando(io.ultimo_accesso) }
+    ], { inColonne: true });
+    const aree = CRM.Pannello(sx, { titolo: 'Aree che puoi aprire', nota: 'livello' });
+    const puoGestione = M.puo('sistema.utenti') || M.puo('sistema.stato') || M.puo('sistema.impostazioni');
+    const areeProfilo = areeVisibili().concat(puoGestione ? [{ id: 'gestione', nome: 'Gestione' }] : []);
+    CRM.Dettagli(aree.corpo, areeVisibili().map(a => ({ etichetta: a.nome, valore: M.livello(io, a.id) ? e(M.LIVELLI[M.livello(io, a.id)].nome) : '<span class="testo-tenue">�?"</span>' }))
+      .concat(puoGestione ? [{ etichetta: 'Gestione', valore: 'secondo il ruolo' }] : []), { inColonne: true });
+    CRM.Nota(aree.corpo, 'Nome, nome utente, email, ruolo e livelli li cambia chi amministra: da qui si leggono soltanto.');
+
+    const dx = CRM.blocco(col, 'pila');
+    const prefs = CRM.Pannello(dx, { titolo: 'Pagina di ingresso per area', nota: 'quando scegli l’area nel menu' });
+    const campi = areeProfilo.map(a => {
+      const voci = CRM.vociArea(a.id);
+      return { nome: 'ingresso_' + a.id, etichetta: a.nome, tipo: 'select',
+        valore: CRM.ingresso(a.id) || (voci[0] || {}).href || '',
+        opzioni: voci.map(v => ({ value: v.href, label: v.t })),
+        aiuto: a.id === 'gestione' ? 'Ci sono solo le voci a cui hai accesso.' : null };
+    });
+    const form = CRM.Form(prefs.corpo, { campi: campi, colonne: 1 });
+    const az = CRM.blocco(prefs.corpo, 'azioni-riga');
+    const salva = document.createElement('button'); salva.type = 'button'; salva.className = 'btn'; salva.textContent = 'Salva le preferenze';
+    az.appendChild(salva);
+    salva.addEventListener('click', () => {
+      const v = form.valori();
+      io.ingresso = {};
+      areeProfilo.forEach(a => { io.ingresso[a.id] = v['ingresso_' + a.id]; });
+      M.annota('Pagina di ingresso delle aree aggiornata'); M.salva();
+      CRM.Avviso('Preferenze salvate: entrando in un’area si apre la pagina scelta'); CRM.naviga();
+    });
+    CRM.Nota(prefs.corpo, 'Senza scelta si apre la prima pagina dell’area; in Gestione la prima a cui hai accesso. La scelta vale solo per te.');
+
+    const sic = CRM.Pannello(dx, { titolo: 'Sicurezza',
+      azioni: [{ etichetta: 'Cambia la password', icona: 'chiave', href: '#/accesso/cambia', consentito: true }] });
+    CRM.Nota(sic.corpo, 'Cambiare la password chiude le sessioni aperte sugli altri computer. Per uscire, il menu dell’utente in fondo alla barra.');
+    return corpo;
+  });
 })();

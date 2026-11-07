@@ -29,7 +29,9 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 
 **Accesso (D-39):** *Esci* (nel menu dell'utente, in fondo alla barra: clic sul nome) porta alla pagina di accesso: pagina scura con il logo, il modulo si apre premendo un tasto o toccando la pagina, Esc, un clic fuori o 2 minuti fermi tornano al logo e il modulo riparte vuoto (D-42); in fondo licenza e copyright con la finestra *Licenza d'uso* (D-43); si entra con `ugo`, `matteo`, `giulia` o `superutente` e la password `decobrands`. Un utente creato con *Nuovo utente* ha la password provvisoria: al primo accesso si apre solo *Scegli la tua password*. *Password dimenticata?* mostra il flusso del link (`#/accesso/password/scaduto` per l'errore).
 
-**Aree e utente (D-53):** in cima alla barra c'è il nome dell'area aperta; cliccando sul proprio nome in fondo si apre il menu con le aree, *Cambia la password*, *Guida* ed *Esci*.
+**Aree e utente (D-53):** in cima alla barra c'è il nome dell'area aperta; cliccando sul proprio nome in fondo si apre il menu con le aree, *Il mio profilo*, *Cambia la password*, *Guida* ed *Esci*.
+
+**Il mio profilo (proposta, da approvare):** dal menu dell'utente *Il mio profilo* (`#/profilo`) apre una pagina con i tuoi dati (nome, nome utente, email, ruolo di Sistema, aree con il livello, stato, ultimo accesso) in **sola lettura**, la **pagina di ingresso di ogni area** (Provvigioni, Dati, Gestione) e *Cambia la password*. La pagina di ingresso si sceglie da un menu con le sole pagine a cui hai accesso; *Salva le preferenze* memorizza la scelta e, da quel momento, scegliendo l'area nel menu dell'utente si apre quella pagina. Senza scelta si apre la prima pagina dell'area (in Gestione la prima a cui hai accesso); la scelta vale per il singolo utente. Nome, ruolo e livelli li cambia chi amministra: qui si leggono soltanto.
 
 **Prova i ruoli:** in fondo alla barra *Prova come* cambia utente. Con *Giulia Ferri · Lettura* la gestione sparisce, compare la fascia "Profilo in sola lettura", i pulsanti che modificano sono spenti e l'esportazione resta attiva; con *Matteo Caironi · Operatore* restano Stato del sistema, Scartati e Guida.
 

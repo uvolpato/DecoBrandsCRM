@@ -1416,6 +1416,13 @@
   // voce della barra per id, e il permesso che la apre: quello dichiarato o, per le voci di un'area, *.consulta (D-45)
   const voceDi = id => VOCI.reduce((t, g) => t.concat(g.voci), []).find(v => v.id === id);
   const permessoDi = v => v.permesso || (v.area ? v.area + '.consulta' : null);
+  // D-87: le pagine di un'area a cui l'utente pu� accedere, e quella scelta come ingresso
+  CRM.vociArea = id => VOCI.filter(g => g.area === id).reduce((t, g) => t.concat(g.voci), []).filter(v => !permessoDi(v) || M.puo(permessoDi(v)));
+  CRM.ingresso = area => {
+    const scelta = (M.utente().ingresso || {})[area];
+    const v = CRM.vociArea(area).find(x => x.href === scelta);
+    return v ? v.href : null;
+  };
   CRM.Barra = function (attiva) {
     pulisciBarra();
     document.body.classList.remove('in-accesso');
@@ -1432,7 +1439,7 @@
     };
     const io = M.utente();
     const primaGestione = M.puo('sistema.utenti') ? '#/utenti' : M.puo('sistema.stato') ? '#/sistema' : '#/impostazioni';
-    const hrefArea = a => a.id === 'gestione' ? primaGestione : a.href;
+    const hrefArea = a => CRM.ingresso(a.id) || (a.id === 'gestione' ? primaGestione : a.href);
     // D-53: aree visibili nel menu dell'utente; Gestione dipende dai permessi di Sistema
     const areeVisibili = AREE_MENU.filter(a => (!a.ampliamento || CRM.AMPLIAMENTI[a.ampliamento]) &&
       (a.id === 'gestione' ? (M.puo('sistema.utenti') || M.puo('sistema.stato') || M.puo('sistema.impostazioni')) : !!M.livello(io, a.id)));
@@ -1464,6 +1471,7 @@
       }).join('') + (g.richiudibile ? '</details>' : '</nav>'); }).join('') + '</div>' +
       '<div class="barra-piede" id="barra-piede"><div class="menu-utente" id="menu-utente" role="menu" aria-label="Utente" hidden>' +
       '<div class="menu-utente-mail">' + esc(io.email || io.nome) + '</div>' + vociArea +
+      '<a class="menu-utente-voce" role="menuitem" href="#/profilo">' + CRM.icona('subagenti') + '<span>Il mio profilo</span></a>' +
       '<a class="menu-utente-voce" role="menuitem" href="#/accesso/cambia">' + CRM.icona('chiave') + '<span>Cambia la password</span></a>' +
       '<a class="menu-utente-voce" role="menuitem" href="#/guida">' + CRM.icona('guida') + '<span>Guida</span></a>' +
       '<div class="menu-sep"></div>' +
@@ -1475,7 +1483,12 @@
     if ($('#carica-barra')) $('#carica-barra').addEventListener('click', () => CRM.scegliFile({ accetta: '.pdf,.xlsx,.xls,.csv', onFile: f => CRM.alCaricamento && CRM.alCaricamento(f) }));
     // menu dell'utente (D-53): si apre verso l'alto; frecce, Esc, clic fuori; il fuoco torna al pulsante
     const piede = $('#barra-piede'), btn = $('#io-btn'), menu = $('#menu-utente');
-    const chiudi = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); piede.classList.remove('aperta'); btn.focus(); };
+    // se il menu è già chiuso non si tocca niente: altrimenti ogni clic nella pagina ruba il fuoco
+    // al campo toccato (le tendine native si chiudono subito, D-53)
+    const chiudi = () => {
+      if (menu.hidden) return;
+      menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); piede.classList.remove('aperta'); btn.focus();
+    };
     const apri = () => { menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); piede.classList.add('aperta'); const primo = menu.querySelector('[role=menuitem]'); if (primo) primo.focus(); };
     const fuori = ev => { if (!piede.contains(ev.target)) chiudi(); };
     const tasto = ev => {
