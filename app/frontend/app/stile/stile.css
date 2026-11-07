@@ -284,11 +284,9 @@ button.kpi[aria-pressed="true"] { background: var(--primario-tenue); outline: 2p
 .tappa h3 { font-size: 13px; color: var(--testo-tenue); font-weight: 600; margin: 10px 0 2px; }
 .tappa .num { font-weight: 600; }
 /* pi�� documenti nella stessa fase (D-89): numeri affiancati, la riga scorre se non ci stanno */
-.tappa .numeri { display: flex; gap: 6px; overflow-x: auto; white-space: nowrap; padding-bottom: 2px; }
+.tappa .numeri { display: flex; gap: 6px; overflow-x: auto; white-space: nowrap; padding-bottom: 2px; scrollbar-width: none; -ms-overflow-style: none; }
 .tappa .numeri > span { flex: none; font-weight: 600; }
-.tappa .numeri::-webkit-scrollbar { height: 6px; }
-.tappa .numeri::-webkit-scrollbar-thumb { background: var(--bordo); border-radius: 3px; }
-.tappa .numeri::-webkit-scrollbar-track { background: transparent; }
+.tappa .numeri::-webkit-scrollbar { display: none; }
 .tappa .imp { font-size: 17px; font-weight: 700; margin-top: 2px; }
 .tappa .delta { display: inline-block; font-size: 12.5px; font-weight: 600; margin-top: 4px; padding: 1px 7px; border-radius: 999px; background: var(--attesa-tenue); color: var(--attesa-testo); }
 
@@ -505,11 +503,12 @@ a.m-cella:hover { background: #f1f6ff; }
 .conferma-campo:hover { background: var(--ok-tenue); border-color: var(--ok); }
 .righe-testa { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
 .righe-testa h3 { margin: 12px 0 8px; }
-.tab-righe-box { border: 1px solid var(--bordo); border-radius: var(--r-piccolo); overflow: auto; }
+.aff-dx .tab-righe-box { border: 1px solid var(--bordo); border-radius: var(--r-piccolo); overflow: auto; flex: 1 1 auto; min-height: 10rem; }
 .tab-righe { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .tab-righe th { position: sticky; top: 0; z-index: 1; background: var(--bordo-tenue); color: var(--testo-intest); font-weight: 600; font-size: 12px; text-align: left; padding: 7px 6px; white-space: nowrap; }
 .tab-righe th.dx, .tab-righe td.dx { text-align: right; }
 .tab-righe td { padding: 3px 4px; border-bottom: 1px solid var(--bordo-tenue); vertical-align: middle; }
+.tab-righe tfoot td { position: sticky; bottom: 0; z-index: 1; background: var(--bordo-tenue); font-weight: 600; padding: 7px 6px; border-top: 1px solid var(--bordo); }
 .tab-righe td.largo { min-width: 11rem; }
 .tab-righe td.col-codice { min-width: 11rem; }
 .tab-righe input { width: 100%; min-width: 3.5rem; font: inherit; padding: 4px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; }
