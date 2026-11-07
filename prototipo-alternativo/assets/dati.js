@@ -1034,7 +1034,13 @@ window.DATI_DEMO = {
       { codice: 'XMAS-GHO', descrizione: 'Ghirlanda natalizia 150 cm', qta: 20, prezzo: 25.375 },
       { codice: 'XMAS-PV607', descrizione: 'Palline in vetro Ø 60 mm, conf. 12', qta: 24, prezzo: 10.80 },
       { codice: 'XMAS-FL107', descrizione: 'Filo luminoso LED 10 m', qta: 30, prezzo: 14.00 },
-      { codice: 'XMAS-AL1501', descrizione: 'Albero artificiale 150 cm', qta: 3, prezzo: 82.50 } ] }
+      { codice: 'XMAS-AL1501', descrizione: 'Albero artificiale 150 cm', qta: 3, prezzo: 82.50 } ] },
+    /* Ordine senza agenzia (D-87 §19): codice cliente non presente fra gli abbinamenti di Gries.
+       Resta in coda «da configurare» e non apre la pratica finché non si aggiunge l'agenzia. */
+    { id: 9012, tipo: 'ordine', fornitore_id: 1, numero: 'OF/2026/061', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'K-99999', file: 'ordine_OF-2026-061.pdf', righe: [
+      { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 24, prezzo: 6.40 },
+      { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 12, prezzo: 15.00 },
+      { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] }
   ],
 
   /* Bollettini: quello che il fornitore ci riconosce, mese per mese.
