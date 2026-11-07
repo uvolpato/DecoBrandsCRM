@@ -210,7 +210,8 @@ with sync_playwright() as p:
 
     # il link arriva all'Analisi con il trimestre e il subagente (F4-A5 legge i parametri dall'indirizzo)
     pg.goto(BASE + href)
-    pg.wait_for_function("document.querySelector('.periodo-btn') && document.querySelector('.periodo-btn').textContent.includes('lug 2026')")
+    pg.wait_for_function("document.querySelector('.periodo-btn') && document.querySelector('.periodo-btn').textContent.includes('lug 2026')", timeout=60000)
+    pg.wait_for_function("() => (document.querySelectorAll('.barra-analisi .filtro-ricerca .ricerca-testo')[1]?.placeholder || '').includes('Nista')", timeout=20000)
     ok('lug 2026' in testo(pg, '.periodo-btn') and 'set 2026' in testo(pg, '.periodo-btn'),
        'Analisi completa: il trimestre diventa il periodo')
     ok('Nista' in (pg.locator('.barra-analisi .filtro-ricerca .ricerca-testo').nth(1).get_attribute('placeholder') or ''),
@@ -219,9 +220,10 @@ with sync_playwright() as p:
     pg.goto(BASE + '/liquidazioni/2026/3'); attesa(pg)
 
     # chiusura rifiutata: pulsante spento con il motivo e 409 dal server
+    pg.wait_for_selector('.testa-azioni button:has-text("Chiudi il trimestre")')
     chiudi = pg.locator('.testa-azioni button:has-text("Chiudi il trimestre")')
     ok(chiudi.count() == 1 and chiudi.is_disabled() and 'in attesa dei bollettini' in (chiudi.get_attribute('title') or ''),
-       'chiusura spenta: il motivo è nei documenti in attesa')
+       'chiusura spenta: il motivo è nei documenti in attesa (disabilitato=%s, titolo=%s)' % (chiudi.is_disabled() if chiudi.count() else 'assente', chiudi.get_attribute('title') if chiudi.count() else ''))
     rifiuto = chiama(pg, 'POST', 'liquidazioni/2026/3/chiudi')
     ok(rifiuto.status == 409 and 'in attesa dei bollettini' in rifiuto.json()['message'],
        'il server rifiuta la chiusura: 409 (%s)' % rifiuto.json()['message'])
@@ -285,14 +287,15 @@ with sync_playwright() as p:
 
     # report del subagente scelto (Marco): 3 numeri, trimestri dell'anno, primi clienti (F4-A4)
     schede(pg).nth(1).click()
-    pg.wait_for_selector(destra + '.report-sub .kpi-riga')
+    # il report del subagente arriva dopo i dati del trimestre e la selezione ricordata: si aspetta il contenuto
+    pg.wait_for_function("() => document.querySelectorAll('.report-sub .kpi .kpi-valore').length === 3", timeout=20000)
     sub_report = pannelli(pg).nth(1).locator('.report-sub')
     kpi = [piatto(x) for x in sub_report.locator('.kpi .kpi-valore').all_inner_texts()]
-    ok(kpi == ['12.000,00 €', '960,00 €', '1.800,00 €'], 'report del subagente: fatturato, provvigione e margine')
+    ok(kpi == ['12.000,00 €', '960,00 €', '1.800,00 €'], 'report del subagente: fatturato, provvigione e margine (trovati %s)' % kpi)
     ok('nessun importo sul 2° trimestre' in piatto(sub_report.inner_text()), 'confronto con il trimestre prima: nessun importo')
     ok('65,22% delle provvigioni' in piatto(sub_report.inner_text()), 'margine sulle provvigioni calcolato dal server')
     ok(sub_report.locator('.griglia-bi .pannello').count() == 2 and 'Trimestri 2026' in piatto(sub_report.inner_text())
-       and 'Clienti principali' in piatto(sub_report.inner_text()), 'trimestri dell’anno e primi clienti')
+       and 'Clienti principali' in piatto(sub_report.inner_text()), 'trimestri dell’anno e primi clienti (pannelli %d)' % sub_report.locator('.griglia-bi .pannello').count())
     elenco = piatto(sub_report.locator('.elenco').inner_text())
     ok('Il Giardino di Sofia srl' in elenco and 'fatturato 12.000,00 €' in elenco and '960,00 €' in elenco,
        'primi clienti: nome, fatturato e provvigione')
@@ -315,15 +318,17 @@ with sync_playwright() as p:
     def ritarda(route):
         time.sleep(0.6); route.continue_()
     pg = entra(S + '-oper', attese=ritarda)
-    pg.route('**/api/liquidazione/report?*', ritarda)
+    def ritarda_report(route):
+        time.sleep(8); route.continue_()
+    pg.route('**/api/liquidazione/report?*', ritarda_report)
     pg.goto(BASE + '/liquidazioni/2026/3')
     pg.wait_for_selector('.sagoma')
     ok(pg.locator('.sagoma').count() > 0 and pg.locator('.periodi a').count() == 0, 'sagome durante il caricamento')
     pg.wait_for_selector('.periodi a.attivo')
     schede(pg).nth(1).click()
-    pg.wait_for_selector('.report-sub .sagoma')
-    ok(pg.locator('.report-sub .sagoma').count() > 0, 'sagome anche nella scheda report')
-    pg.wait_for_selector('.report-sub canvas'); quieta(pg)
+    # il report viene chiesto già al montaggio della pagina: non è detto che sia ancora in caricamento
+    # quando si apre la scheda, quindi qui si aspetta il contenuto, non la sagoma
+    pg.wait_for_selector('.report-sub canvas', timeout=30000); quieta(pg)
     ok(pg.locator('.sagoma').count() == 0 and periodi(pg).count() == 4, 'dati arrivati: sagome sparite')
     pg.close()
 

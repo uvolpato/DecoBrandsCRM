@@ -11,7 +11,7 @@ BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8001'
 PW = 'password-di-prova'
 esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
-voci = lambda pg: [x.strip() for x in pg.locator('.barra .voce span').all_text_contents()]  # le voci dell'area aperta
+voci = lambda pg: [x.strip() for x in pg.locator('.barra .voce span').all_text_contents() if x.strip() and not x.strip().isdigit()]  # le voci dell'area aperta (senza i contatori)
 def apri_utente(pg):
     pg.click('.io-btn'); pg.wait_for_selector('.menu-utente')
 def aree(pg):
@@ -51,7 +51,7 @@ with sync_playwright() as p:
     ok(True, 'senza sessione: accesso e ritorno alla pagina chiesta (/pratiche)')
     ok(aree(pg) == ['Provvigioni', 'Dati', 'Gestione'] and attiva(pg) == 'Provvigioni', 'amministratore: tre aree, aperta quella della pagina')
     ok('Bollettini' in voci(pg) and 'Fornitori' not in voci(pg) and 'Utenti e ruoli' not in voci(pg) and 'Guida' not in voci(pg), 'si vedono solo le voci dell’area aperta')
-    ok(pg.locator('.voce.attiva').inner_text() == 'Pratiche', 'voce attiva = pagina corrente')
+    ok(pg.locator('.voce.attiva').inner_text().startswith('Pratiche'), 'voce attiva = pagina corrente')
     ok(pg.locator('.barra-piede .io b').inner_text() == 'Prova Ammi' and 'Amministratore' in pg.locator('.barra-piede .io').inner_text(), 'utente e ruolo in fondo alla barra')
     ok(not pg.evaluate("document.body.classList.contains('sola-lettura')"), 'amministratore: niente fascia di sola lettura')
     scegli(pg, 'Dati'); pg.wait_for_function("location.pathname === '/fornitori'")

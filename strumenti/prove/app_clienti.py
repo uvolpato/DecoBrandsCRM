@@ -89,7 +89,12 @@ with sync_playwright() as p:
     ok('Scaglioni in vigore' in testo(pg, '.velo .campo:has(#c-sconto) .aiuto') and 'Gries' in testo(pg, '.velo .campo:has(#c-sconto) .aiuto'), 'sconto: aiuto con gli scaglioni dei fornitori')
     ok(pg.locator('#c-pct_subagente:not([disabled])').count() == 1 and pg.locator('#c-regola_mensile:not([disabled])').count() == 1, 'responsabile: percentuale e regola del subagente attive')
     pg.fill('#c-codice_cliente_fornitore', 'T' + RUN); pg.fill('#c-sconto', '5'); pg.fill('#c-valido_dal', D1); pg.fill('#c-valido_al', A1)
-    pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached')
+    pg.click('.modale-piede button[type=submit]')
+    try:
+        finestra(pg).wait_for(state='detached', timeout=15000)
+    except Exception:
+        errore = pg.locator('.modulo-errore').inner_text() if pg.locator('.modulo-errore').count() else 'finestra ancora aperta'
+        raise AssertionError('creazione agenzia non riuscita: ' + errore)
     pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
     riga = pg.locator('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
     ok('Gries' in riga.inner_text() and 'Nista' in riga.inner_text() and '5 %' in riga.inner_text() and A1 in riga.inner_text(), 'agenzia creata: fornitore, subagente, sconto e periodo in tabella')

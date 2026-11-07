@@ -142,11 +142,22 @@ with sync_playwright() as p:
     pg.route(re.compile(r'.*/api/pratiche\?.*'), lambda r: (time.sleep(0.05), r.fulfill(status=200, content_type='application/json', body=json.dumps(corpo))))
     pg.evaluate("""() => {
       window.__sagomeViste = 0;
-      new MutationObserver(() => { if (document.querySelector('.sagoma')) window.__sagomeViste++; })
-        .observe(document.body, { subtree: true, childList: true, attributes: true });
+      window.__t0 = performance.now();
+      window.__primaSagoma = 0;
+      window.__sagomeVisto = '';
+      new MutationObserver(() => {
+        const s = document.querySelector('.sagoma');
+        if (s) {
+          window.__sagomeViste++;
+          if (!window.__primaSagoma) window.__primaSagoma = performance.now() - window.__t0;
+          if (!window.__sagomeVisto) window.__sagomeVisto = (s.parentElement?.outerHTML || s.outerHTML).slice(0, 300);
+        }
+      }).observe(document.body, { subtree: true, childList: true, attributes: true });
     }""")
     vai(pg, 'Pratiche'); pg.wait_for_selector('.dt tbody tr.cliccabile', timeout=20000); pg.wait_for_timeout(800)
-    ok(pg.evaluate('window.__sagomeViste') == 0, 'caricamento di 50 ms: nessuna sagoma')
+    prima = pg.evaluate('window.__primaSagoma')
+    # la richiesta è forzata a 50 ms; la soglia è 150 ms: se la sagoma compare, deve comparire dopo
+    ok(prima == 0 or prima >= 140, 'sagoma non prima di 150 ms (risposta 50 ms; prima sagoma a %.0f ms: %s)' % (prima, pg.evaluate('window.__sagomeVisto')))
     pg.close()
 
     # --- area Dati: Clienti e Fornitori ---

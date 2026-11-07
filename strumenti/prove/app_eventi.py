@@ -108,11 +108,11 @@ with sync_playwright() as p:
     ok(segmento(pgA, 'Attesa fattura').get_attribute('aria-selected') == 'true', 'dopo Aggiorna il filtro è ancora quello')
     ok(pgA.locator('.dt tbody tr', has_text=pratica['numero']).count() == 0, 'dopo Aggiorna la pratica fatturata esce dall’elenco')
 
-    # pulizia in scheda B: Annulla la fattura di prova
-    riga_doc = pgB.locator('.dt tbody tr', has_text=NUMERO).first
+    # pulizia in scheda B: Annulla la fattura di prova (documenti fiscali nella card del Riepilogo)
+    riga_doc = pgB.locator('.elenco li', has_text=NUMERO).first
     if riga_doc.count() == 0:  # la pagina può essersi ricaricata: si riapre
         pgB.goto(BASE + '/pratiche/' + pratica['id']); pgB.wait_for_selector('.schede-barra')
-        riga_doc = pgB.locator('.dt tbody tr', has_text=NUMERO).first
+        riga_doc = pgB.locator('.elenco li', has_text=NUMERO).first
     riga_doc.locator('button', has_text='Annulla').first.click()
     pgB.wait_for_selector('.velo .modale-piede button:has-text("Annulla il documento")')
     pgB.click('.velo .modale-piede button:has-text("Annulla il documento")')

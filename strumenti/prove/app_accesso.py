@@ -7,7 +7,7 @@ import re, sys, time, pathlib
 from playwright.sync_api import sync_playwright
 
 PROVVISORIA, LOG, USCITA, U = sys.argv[1], pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3]), sys.argv[4]
-BASE = 'http://localhost:8001'
+BASE = sys.argv[5] if len(sys.argv) > 5 else 'http://localhost:8001'
 esiti, errori = [], []
 # D-42: su Accedi e Password dimenticata prima c'è il logo; un tasto apre la finestra
 def apri(pg):

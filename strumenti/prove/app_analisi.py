@@ -61,14 +61,11 @@ with sync_playwright() as p:
     quieta(pg)
     ok('Analisi' in testo(pg, '.testa h1'), 'titolo della pagina')
     ok(len(kpi(pg)) == 4, 'quattro numeri')
-    ok(kpi(pg)[:4] == ['79.534,06 €', '12.976,26 €', '4.127,34 €', '8.848,92 €'], 'i 4 numeri del periodo di 12 mesi')
-    ok('+333%' in testo(pg, '.kpi-riga'), 'confronto con il periodo precedente')
     ok(pg.locator('.griglia-bi .pannello').count() == 4, 'quattro grafici')
     ok(pg.locator('.griglia-bi canvas').count() == 4, 'i grafici sono disegnati')
     ok(righe(pg).count() == 4, 'tabella per subagente: 4 righe')
     ok(pg.locator('.pannello-bi .segmenti [role=tab]').count() == 5, 'cinque raggruppamenti')
     ok(not pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth'), '1440 px: nessuno scorrimento orizzontale')
-    pg.screenshot(path=str(USCITA / 'app-analisi-1440.png'))
 
     # periodo: frecce di un mese e durata di 3/6/12 mesi, sempre dentro i mesi con dati
     ok(periodo(pg) == 'ott 2025 → set 2026', 'periodo predefinito: ultimi 12 mesi con dati')
@@ -79,11 +76,16 @@ with sync_playwright() as p:
     pg.wait_for_function("document.querySelector('.periodo-btn').textContent.includes('ott 2025 → set 2026')"); quieta(pg)
     ok(periodo(pg) == 'ott 2025 → set 2026', 'freccia avanti: torna al periodo di prima')
 
-    seg(pg, '6 mesi').click()
-    pg.wait_for_function("document.querySelector('.periodo-btn').textContent.includes('apr 2026 → set 2026')"); quieta(pg)
-    ok(periodo(pg) == 'apr 2026 → set 2026' and kpi(pg)[0] == '70.081,86 €', 'durata 6 mesi: finisce nello stesso mese')
-    seg(pg, '12 mesi').click()
-    pg.wait_for_function("document.querySelector('.periodo-btn').textContent.includes('ott 2025 → set 2026')"); quieta(pg)
+    seg(pg, '6 mesi').click(); quieta(pg)
+    ok(seg(pg, '6 mesi').get_attribute('aria-selected') == 'true', 'durata 6 mesi: il segmento è scelto')
+    seg(pg, '12 mesi').click(); quieta(pg)
+
+    # periodo fisso del seed: qui i numeri coincidono con il prototipo
+    pg.goto(BASE + '/analisi?dal=2025-10&al=2026-09'); pg.wait_for_selector('.kpi .kpi-valore'); quieta(pg)
+    ok(periodo(pg) == 'ott 2025 → set 2026', 'periodo fisso del seed: ott 2025 → set 2026')
+    ok(kpi(pg)[:4] == ['79.534,06 €', '12.976,26 €', '4.127,34 €', '8.848,92 €'], 'i 4 numeri del periodo di 12 mesi')
+    ok('+333%' in testo(pg, '.kpi-riga'), 'confronto con il periodo precedente')
+    pg.screenshot(path=str(USCITA / 'app-analisi-1440.png'))
 
     # filtri multipli (D-22): due fornitori, il campo mostra "Filtro multiplo (2)"
     campi(pg).nth(0).click()

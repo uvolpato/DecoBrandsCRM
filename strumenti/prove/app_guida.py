@@ -34,7 +34,7 @@ with sync_playwright() as p:
     pg = entra(S + '-ammi')
     pg.wait_for_selector('.selezionabile a')
     ok(pg.locator('.testa h1').inner_text().strip() == 'Guida', 'titolo della pagina')
-    ok(argomenti(pg) == 17, '17 argomenti, senza la Vendita diretta (D-08)')
+    ok(argomenti(pg) == 18, '18 argomenti, senza la Vendita diretta (D-08) e con il Registro (F5-A2)')
     ok(titolo(pg) == 'Come funziona il CRM', '/guida senza argomento: il primo argomento')
     ok(pg.title() == 'Guida · Decobrands', 'titolo della scheda del browser')
     ok(not pg.evaluate('document.documentElement.scrollWidth > innerWidth'), '1440 px: niente scorrimento orizzontale')

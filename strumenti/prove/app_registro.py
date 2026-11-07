@@ -46,7 +46,8 @@ with sync_playwright() as p:
     ok(str(dati['conteggi']['errori']) in seg.nth(2).inner_text(), 'Errori conta %d' % dati['conteggi']['errori'])
     ok(pg.locator('.dt thead th').count() == 6, 'sei colonne: quando, livello, messaggio, utente, riferimento, volte')
     ok(str(dati['totale']) in piede(pg), 'la tabella mostra il totale del server: %d' % dati['totale'])
-    ok(pg.locator('.dt tbody tr').count() == min(50, dati['totale']), 'righe della prima pagina: %d' % min(50, dati['totale']))
+    per_pagina = dati.get('per_pagina', 25)  # Impostazioni · righe per pagina (iniziale 25)
+    ok(pg.locator('.dt tbody tr').count() == min(per_pagina, dati['totale']), 'righe della prima pagina: %d' % min(per_pagina, dati['totale']))
 
     # D-64: il fuoco dei filtri è un bordo INTERNO, così il menu aperto non lo copre
     for nome, sel in [('tendina', '.filtri select'), ('data', '.filtri input[type=date]'),
@@ -59,9 +60,10 @@ with sync_playwright() as p:
 
     # segmento Errori: righe e totale dal server (D-23)
     errori_api = api(pg, '?vista=errori')
-    seg.nth(2).click(); pg.wait_for_timeout(1200)
+    seg.nth(2).click()
+    pg.wait_for_function("(n) => { const t = document.querySelector('.dt-piede')?.textContent || ''; return t.includes(n + ' elementi') || t.includes('di ' + n + ' elementi'); }", arg=str(errori_api['totale']))
     ok(str(errori_api['totale']) in piede(pg), 'segmento Errori: %d righe (piede: %s)' % (errori_api['totale'], piede(pg)))
-    ok(pg.locator('.dt tbody tr').count() == min(50, errori_api['totale']), 'il segmento restringe davvero le righe')
+    ok(pg.locator('.dt tbody tr').count() == min(dati.get('per_pagina', 25), errori_api['totale']), 'il segmento restringe davvero le righe')
 
     # filtro Codice con una tendina (i valori vengono dal server)
     seg.nth(0).click(); pg.wait_for_timeout(500)

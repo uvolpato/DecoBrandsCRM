@@ -36,7 +36,9 @@ with sync_playwright() as p:
     seg = lambda pg, t: pg.locator('.segmenti [role=tab]:has-text("%s")' % t)
     nseg = lambda pg, t: int(seg(pg, t).locator('.n').inner_text())
     sovr = lambda pg: pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth')
-    def cerca(pg, t): pg.fill('.filtri input[type=search]', t); pg.wait_for_timeout(1200)
+    def cerca(pg, t):
+        pg.fill('.filtri input[type=search]', t); pg.wait_for_timeout(600)
+        pg.wait_for_function("() => !document.querySelector('.dt[aria-busy=true]')"); pg.wait_for_timeout(600)
     def vai(pg, voce):
         pg.click('.barra a.voce:has-text("%s")' % voce); pg.wait_for_function("location.pathname.startsWith('/%s')" % voce.lower()); pg.wait_for_load_state('networkidle')
     def totali_piede(pg):
@@ -84,7 +86,8 @@ with sync_playwright() as p:
     prima_dec = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
 
     # pagina successiva, sempre sull'ordinamento scelto
-    pg.click('.dt-pagine button[title="Pagina successiva"]'); pg.wait_for_timeout(1200)
+    pg.click('.dt-pagine button[title="Pagina successiva"]')
+    pg.wait_for_function("() => document.querySelector('.dt-piede > span')?.textContent.startsWith('26–')")
     inizio = testo(pg, '.dt-piede > span:first-child')
     ok(inizio.startswith('26–') and 'di %d elementi' % n in inizio and pg.locator('.dt tbody tr.cliccabile b').first.inner_text() != prima_dec,
        'pagina successiva: «%s»' % inizio)

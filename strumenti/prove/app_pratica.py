@@ -145,11 +145,11 @@ with sync_playwright() as p:
     ok(riga_ft.locator('button:has-text("PDF")').count() == 1, 'la fattura ha il PDF')
 
     # il PDF si apre: stessa origine, application/pdf, byte del file caricato
-    riga_ft.locator('button:has-text("PDF")').click(); pg.wait_for_selector('.modale object')
-    src = pg.locator('.modale object').get_attribute('data')
+    riga_ft.locator('button:has-text("PDF")').click(); pg.wait_for_selector('.affiancata object')
+    src = pg.locator('.affiancata object').get_attribute('data')
     stato, tipo, inizio = pg.evaluate("async u => { const r = await fetch(u); const t = await r.text(); return [r.status, r.headers.get('content-type'), t.slice(0, 5)] }", src)
     ok(stato == 200 and tipo == 'application/pdf' and inizio == '%PDF-', 'PDF affiancato: %s, %s, inizia con %s' % (stato, tipo, inizio))
-    ok(numero_ft in testo(pg, '.modale') and 'Importo' in testo(pg, '.modale'), 'accanto al PDF i dati del documento')
+    ok(numero_ft in testo(pg, '.affiancata') and 'Importo' in testo(pg, '.affiancata'), 'accanto al PDF i dati del documento')
     pg.screenshot(path=str(USCITA / 'app-pratica-pdf-1440.png'))
     pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
 
@@ -251,9 +251,9 @@ with sync_playwright() as p:
     ok('+ 1' in testo(pg, '.binario .tappa .num'), 'più ordini: numero del primo + quanti altri («%s»)' % testo(pg, '.binario .tappa .num'))
     riga_ord = pannello_esatto(pg, 'Documenti').locator('.elenco li', has_text='PROVA-OF-' + marca)
     ok(riga_ord.count() == 1 and riga_ord.locator('button:has-text("PDF")').count() == 1, 'il secondo ordine ha il PDF')
-    riga_ord.locator('button:has-text("PDF")').click(); pg.wait_for_selector('.modale object')
-    ok('Ordine' in testo(pg, '.modale .aff-schede'), 'il visualizzatore mostra la scheda del documento ordine')
-    src_ord = pg.locator('.modale object').get_attribute('data')
+    riga_ord.locator('button:has-text("PDF")').click(); pg.wait_for_selector('.affiancata object')
+    ok('Ordine' in testo(pg, '.affiancata .aff-schede'), 'il visualizzatore mostra la scheda del documento ordine')
+    src_ord = pg.locator('.affiancata object').get_attribute('data')
     stato_o, tipo_o = pg.evaluate("async u => { const r = await fetch(u); return [r.status, r.headers.get('content-type')] }", src_ord)
     ok(stato_o == 200 and tipo_o == 'application/pdf', 'PDF di un ordine nel visualizzatore: %s, %s' % (stato_o, tipo_o))
     pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
