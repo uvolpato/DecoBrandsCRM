@@ -501,6 +501,7 @@ a.m-cella:hover { background: #f1f6ff; }
 .incerto-errore .aff { color: var(--errore-testo); }
 .campo-verificato input, .campo-verificato select { border-color: var(--ok); }
 .conferma-campo { flex: none; width: 26px; height: 26px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; color: var(--ok); font-weight: 700; cursor: pointer; padding: 0; }
+.spunta-verde { flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; color: var(--ok); font-weight: 700; }
 .conferma-campo:hover { background: var(--ok-tenue); border-color: var(--ok); }
 .righe-testa { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
 .righe-testa h3 { margin: 12px 0 8px; }

@@ -8,7 +8,7 @@ import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { PrismaService } from '../src/prisma.service';
 import {
-  controlliFissi, lettoDaCampi, normalizzaNome, propostaDocumento, risolviFornitore, valutaLettura,
+  controlliFissi, lettoDaCampi, normalizzaNome, propostaDocumento, riconosciCliente, risolviFornitore, valutaLettura,
   type Letto, type RigaLetta, type Soglie,
 } from '../src/proposta';
 import { svuota } from './svuota';
@@ -27,7 +27,7 @@ let c1: { id: bigint; versione_id: bigint };
 let c2: { id: bigint; versione_id: bigint };
 
 const L = (over: Partial<Letto>): Letto => ({
-  tipo: null, fornitore_id: null, numero: null, data: null, codice_cliente: null, cliente: null,
+  tipo: null, fornitore_id: null, numero: null, data: null, codice_cliente: null, cliente: null, piva_cliente: null,
   importo: null, mese: null, anno: null, riferimento_fattura: null, righe: [],
   ...over,
 });
@@ -145,6 +145,29 @@ describe('normalizzaNome e risolviFornitore', () => {
     // un secondo nome che comincia con la stessa parola: ambiguo, si sceglie a mano
     await creaFornitore('Arte della Casa SRL');
     expect(await risolviFornitore(db, 'ARTE GmbH')).toBeNull();
+  });
+});
+
+describe('riconosciCliente (D-92)', () => {
+  it('P.IVA riconosciuta', async () => {
+    expect(await riconosciCliente(db, L({ piva_cliente: 'IT00000000001' }))).toEqual({ cliente_id: c1.id, ragione: 'Verde Vita snc' });
+  });
+
+  it('ragione sociale riconosciuta senza P.IVA', async () => {
+    expect(await riconosciCliente(db, L({ cliente: 'Verde Vita snc' }))).toEqual({ cliente_id: c1.id, ragione: 'Verde Vita snc' });
+  });
+
+  it('ragione sociale normalizzata (spazi e punteggiatura)', async () => {
+    expect(await riconosciCliente(db, L({ cliente: '  Verde   Vita snc ' }))).toEqual({ cliente_id: c1.id, ragione: 'Verde Vita snc' });
+  });
+
+  it('P.IVA non in anagrafica: null', async () => {
+    expect(await riconosciCliente(db, L({ piva_cliente: 'IT99999999999' }))).toBeNull();
+  });
+
+  it('ragione sociale ambigua (due clienti uguali): null', async () => {
+    await creaCliente('Verde Vita snc', 'IT00000000003');
+    expect(await riconosciCliente(db, L({ cliente: 'Verde Vita snc' }))).toBeNull();
   });
 });
 

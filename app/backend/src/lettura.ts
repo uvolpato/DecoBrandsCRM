@@ -38,6 +38,7 @@ export const SCHEMA_DOCUMENTO = {
     fornitore: { type: 'string', description: 'Chi vende la merce: la riga «Fornitore», oppure chi emette la fattura o la conferma' },
     codice_cliente: { type: 'string', description: 'Codice con cui il fornitore identifica il cliente (es. «Codice cliente», «Kunden-Nr.»)' },
     cliente: { type: 'string', description: 'Chi compra: intestatario dell’ordine o insegna di consegna' },
+    piva_cliente: { type: 'string', description: 'Partita IVA o codice fiscale dell’intestatario (es. «P.IVA», «USt-IdNr.», «C.F.»): solo se scritta sul documento' },
     importo_totale: { type: 'number', description: 'Imponibile del documento (netto), senza IVA' },
     mese: { type: 'number', description: 'Mese del bollettino (1–12)' },
     anno: { type: 'number', description: 'Anno del bollettino' },
@@ -75,6 +76,7 @@ export const PROMPT_DOCUMENTO = [
   'Il fornitore è chi vende la merce: quello indicato nella riga «Fornitore», oppure chi emette la fattura o la conferma.',
   'Il cliente è chi compra: l’intestatario dell’ordine o l’insegna di consegna. Non scambiare i due: un ordine scritto sulla carta del cliente ha il cliente in testata e il fornitore nella riga «Fornitore».',
   'Il codice cliente è il codice con cui il fornitore identifica il cliente (spesso «Codice cliente» o «Kunden-Nr.»).',
+  'La partita IVA del cliente è quella dell’intestatario (P.IVA, USt-IdNr., codice fiscale): se non è scritta, lascia il campo vuoto.',
   'Per il bollettino compila mese e anno; le sue righe sono le fatture del mese: numero_fattura, data_fattura, importo (imponibile) e provvigione, non gli articoli.',
   'Per la nota di credito compila riferimento_fattura con il numero della fattura stornata.',
 ].join(' ');

@@ -49,6 +49,7 @@ export interface Letto {
   data: string | null;
   codice_cliente: string | null;
   cliente: string | null;
+  piva_cliente: string | null;
   importo: number | null; // importo_totale letto (imponibile stampato)
   mese: number | null;
   anno: number | null;
@@ -76,6 +77,8 @@ export interface Proposta {
   candidati: Candidato[];
   importo: number;
   abbinamento: Abbinamento | null;
+  /** Cliente riconosciuto per P.IVA o ragione sociale (D-92) quando il codice del fornitore non è abbinato. */
+  cliente_riconosciuto: { cliente_id: bigint; ragione: string | null } | null;
 }
 
 export interface Controllo {
@@ -124,7 +127,7 @@ function componiLetto(tipo: string | null, fornitore_id: bigint | null, m: Map<s
   }
   return {
     tipo, fornitore_id,
-    numero: valore('numero'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'),
+    numero: valore('numero'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'), piva_cliente: valore('piva_cliente'),
     importo: num(valore('importo_totale')),
     mese: intero(valore('mese')), anno: intero(valore('anno')), riferimento_fattura: valore('riferimento_fattura'),
     righe,
@@ -192,6 +195,29 @@ async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | nul
   return { cliente_id: a.cliente_id, cliente: a.cliente.corrente?.ragione_sociale ?? null, codice: a.codice_cliente_fornitore };
 }
 
+/* ---------- Cliente per P.IVA o ragione sociale (D-92) ---------- */
+/** P.IVA normalizzata: solo cifre e lettere, maiuscole (spazi e prefissi ignorati). */
+const normalizzaPiva = (s: string) => (s || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+
+/** Riconosce il cliente del documento quando il codice del fornitore non è abbinato (D-92):
+ *  vince la P.IVA (univoca), poi la ragione sociale normalizzata accettata solo con un solo
+ *  candidato. null = cliente non riconosciuto (nuovo o non leggibile). */
+export async function riconosciCliente(db: Db, l: Letto): Promise<{ cliente_id: bigint; ragione: string | null } | null> {
+  // una sola lettura dei clienti con la versione corrente (P.IVA e ragione sociale stanno sulla versione, §4.6)
+  const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
+  const piva = normalizzaPiva(l.piva_cliente ?? '');
+  if (piva.length >= 11) {
+    const c = clienti.find((x) => x.corrente?.piva != null && normalizzaPiva(x.corrente.piva) === piva);
+    if (c) return { cliente_id: c.id, ragione: c.corrente!.ragione_sociale };
+  }
+  const nome = normalizzaNome(l.cliente ?? '');
+  if (nome) {
+    const cc = clienti.filter((x) => x.corrente && normalizzaNome(x.corrente.ragione_sociale) === nome);
+    if (cc.length === 1) return { cliente_id: cc[0].id, ragione: cc[0].corrente!.ragione_sociale };
+  }
+  return null;
+}
+
 /* ---------- Proposta di abbinamento (M.proposta, §6.5) ---------- */
 const CON_PROP = {
   righe: { orderBy: { numero_riga: 'asc' as const } },
@@ -205,7 +231,7 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
     const gia = l.fornitore_id != null && l.mese != null && l.anno != null
       ? await db.bollettini_testata.findFirst({ where: { fornitore_id: l.fornitore_id, mese: l.mese, anno: l.anno }, select: { id: true } })
       : null;
-    return { esito: gia ? 'doppio' : 'bollettino', candidati: [], importo: imp, abbinamento: null };
+    return { esito: gia ? 'doppio' : 'bollettino', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null };
   }
   const ab = await abbinamentoPerCodice(db, l);
   if (l.tipo === 'ordine') {
@@ -214,15 +240,16 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
     const gia = l.fornitore_id != null && l.numero
       ? await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'ordine', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } })
       : null;
-    return { esito: gia ? 'doppio' : ab ? 'nuova' : 'nessuno', candidati: [], importo: imp, abbinamento: ab };
+    const cliente_riconosciuto = ab ? null : await riconosciCliente(db, l); // D-92: codice non abbinato, si prova P.IVA/ragione sociale
+    return { esito: gia ? 'doppio' : ab ? 'nuova' : 'nessuno', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto };
   }
   if (l.tipo !== 'conferma' && l.tipo !== 'fattura' && l.tipo !== 'nota_credito') {
-    return { esito: 'nessuno', candidati: [], importo: imp, abbinamento: ab }; // proforma, pagamento, altro o tipo non letto
+    return { esito: 'nessuno', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto: null }; // proforma, pagamento, altro o tipo non letto
   }
   // una fattura già registrata in una pratica è un doppione
   if (l.tipo === 'fattura' && l.fornitore_id != null && l.numero) {
     const gia = await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'fattura', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } });
-    if (gia) return { esito: 'doppio', candidati: [], importo: imp, abbinamento: ab };
+    if (gia) return { esito: 'doppio', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto: null };
   }
 
   const codiciDoc = l.righe.map((r) => r.codice).filter((c): c is string => !!c);
@@ -270,7 +297,7 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
       const c = candidati.splice(k, 1)[0];
       c.motivi.unshift(`storna la fattura ${l.riferimento_fattura} di questa pratica`);
       candidati.unshift(c);
-      return { esito: 'certo', candidati, importo: imp, abbinamento: ab };
+      return { esito: 'certo', candidati, importo: imp, abbinamento: ab, cliente_riconosciuto: null };
     }
   }
 
@@ -278,7 +305,7 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
   if (candidati.length && !ab) esito = candidati[0].punteggio > 0 ? 'probabile' : 'nessuno';
   else if (candidati.length === 1) esito = 'certo';
   else if (candidati.length > 1) esito = candidati[0].punteggio - candidati[1].punteggio >= 0.5 ? 'probabile' : 'ambiguo';
-  return { esito, candidati, importo: imp, abbinamento: ab };
+  return { esito, candidati, importo: imp, abbinamento: ab, cliente_riconosciuto: null };
 }
 
 /* ---------- Controlli fissi (§6.5 punto 5) ---------- */

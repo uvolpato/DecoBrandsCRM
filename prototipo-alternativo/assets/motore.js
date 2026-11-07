@@ -104,13 +104,32 @@
   M.fornitore = id => M.S.fornitori.find(f => f.id === Number(id));
   M.cliente = piva => M.S.clienti.find(c => c.piva === piva);
   M.nomeCliente = piva => (M.cliente(piva) || { nome: piva || '—' }).nome;
+  /* Nome normalizzato (D-91/D-92): minuscole, senza accenti, punteggiatura e spazi;
+     le sigle societarie finali non contano (come il fornitore, §6.5 punto 5). */
+  M.normalizzaNome = t => (t || '').toLowerCase()
+    .replace(/[àáä]/g, 'a').replace(/[èéë]/g, 'e').replace(/[ìíï]/g, 'i')
+    .replace(/[òóö]/g, 'o').replace(/[ùúü]/g, 'u')
+    .replace(/[^a-z0-9]+/g, '')
+    .replace(/(srl|snc|spa|ss|sas|scarl|srls)$/, '');
+  /* Riconosce il cliente di un documento dalla P.IVA e dalla ragione sociale lette (D-91/D-92).
+     Vince la P.IVA (univoca); se manca o non combacia, la ragione sociale con un solo candidato.
+     null = cliente non riconosciuto (nuovo o non leggibile). */
+  M.riconosciCliente = function (d) {
+    const piva = (d.cliente_piva || '').replace(/[^0-9a-z]/gi, '').toUpperCase();
+    if (piva) { const c = M.S.clienti.find(x => (x.piva || '').replace(/[^0-9a-z]/gi, '').toUpperCase() === piva); if (c) return c; }
+    const nome = M.normalizzaNome(d.cliente);
+    if (nome) { const cc = M.S.clienti.filter(x => M.normalizzaNome(x.nome) === nome); if (cc.length === 1) return cc[0]; }
+    return null;
+  };
   M.subagente = id => M.S.subagenti.find(s => s.id === Number(id));
   M.abbinamento = (piva, fid) => M.S.abbinamenti.find(a => a.cliente_piva === piva && a.fornitore_id === Number(fid));
   M.abbinamentoPerCodice = (fid, codice) => M.S.abbinamenti.find(a => a.fornitore_id === Number(fid) && (a.codice || '').toUpperCase() === String(codice || '').toUpperCase());
   /* Cosa manca per aprire la pratica di un ordine (D-87 §19): null = si può aprire,
+     'fornitore' = fornitore non riconosciuto (non in anagrafica),
      'agenzia' = nessun abbinamento (subagente + sconto) per il codice cliente,
      'scaglione' = abbinamento presente ma nessuno scaglione del fornitore per quello sconto. */
   M.mancaPratica = function (d) {
+    if (d.fornitore_id == null) return 'fornitore';
     const ab = M.abbinamentoPerCodice(d.fornitore_id, d.codice_cliente);
     if (!ab) return 'agenzia';
     if (!M.scaglione(d.fornitore_id, ab.sconto, d.data)) return 'scaglione';
@@ -537,7 +556,9 @@
     const ab = M.abbinamentoPerCodice(doc.fornitore_id, doc.codice_cliente);
     if (doc.tipo === 'ordine') {
       const gia = M.S.pratiche.find(p => p.numero === doc.numero);
-      return { abbinamento: ab, candidati: [], esito: gia ? 'doppio' : ab ? 'nuova' : 'nessuno', importo: M.importoDoc(doc), esistente: gia };
+      const manca = M.mancaPratica(doc);   // D-87: fornitore/agenzia/scaglione mancanti → non apribile
+      const esito = gia ? 'doppio' : manca === 'fornitore' ? 'fornitore' : manca === 'agenzia' ? 'nessuno' : manca === 'scaglione' ? 'configurare' : 'nuova';
+      return { abbinamento: ab, candidati: [], esito: esito, importo: M.importoDoc(doc), esistente: gia };
     }
     const imp = M.importoDoc(doc);
     const codiciDoc = doc.righe.map(r => r.codice);
@@ -687,7 +708,7 @@
     const out = [];
     M.S.in_arrivo.forEach(d => {
       const pr = M.proposta(d);
-      const f = M.fornitore(d.fornitore_id).breve;
+      const f = d.fornitore_id == null ? 'fornitore non riconosciuto' : M.fornitore(d.fornitore_id).breve;
       const liv = M.statoLettura(d).livello;
       // pronto: abbinamento sicuro e lettura affidabile; altrimenti serve una decisione dell'operatore
       const base = { gruppo: 'documenti', doc: d.id, fornitore_id: d.fornitore_id, lettura: liv,
@@ -700,7 +721,7 @@
       if (d.tipo === 'ordine') return push({ peso: 2, tipo: 'documento', titolo: 'Apri la pratica dell’ordine ' + d.numero,
         dettaglio: f + ' · ' + (pr.abbinamento ? M.nomeCliente(pr.abbinamento.cliente_piva) : 'codice cliente ' + d.codice_cliente + ' non riconosciuto'), link: '#/documenti/' + d.id, azione: 'Apri' });
       push({ peso: pr.esito === 'certo' ? 2 : 3, tipo: 'documento', esito: pr.esito, titolo: 'Abbina ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero,
-        dettaglio: M.fornitore(d.fornitore_id).breve + ' · ' + (pr.esito === 'certo' || pr.esito === 'probabile' ? 'proposta: ' + pr.candidati[0].pratica.numero : pr.esito === 'nessuno' ? 'codice cliente ' + d.codice_cliente + ' non riconosciuto' : 'da scegliere fra ' + pr.candidati.length + ' pratiche'),
+        dettaglio: f + ' · ' + (pr.esito === 'certo' || pr.esito === 'probabile' ? 'proposta: ' + pr.candidati[0].pratica.numero : pr.esito === 'nessuno' ? 'codice cliente ' + d.codice_cliente + ' non riconosciuto' : 'da scegliere fra ' + pr.candidati.length + ' pratiche'),
         link: '#/documenti/' + d.id, azione: 'Abbina' });
     });
     M.S.pratiche.forEach(p => {

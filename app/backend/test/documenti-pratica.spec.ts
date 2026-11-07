@@ -290,6 +290,19 @@ describe('correzioni dopo la revisione (D-60)', () => {
     expect(nuova.agente_id).not.toBeNull();
   });
 
+  it('pratica nuova solo se il fornitore ha uno scaglione per lo sconto dell agenzia (D-87)', async () => {
+    // fornitore senza scaglioni: l'agenzia c'è ma la provvigione sarebbe 0% → il documento non apre la pratica
+    const f = await db.fornitori.create({ data: {} });
+    const fv = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'Fornitore Senza Scaglioni' } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: fv.id } });
+    const sub = await db.subagenti.findFirstOrThrow();
+    const cliente = await db.clienti.findFirstOrThrow();
+    await db.interscambio.create({ data: { subagente_id: sub.id, cliente_id: cliente.id, fornitore_id: f.id, sconto: 0, codice_cliente_fornitore: 'FS-1', valido_dal: new Date('2025-01-01') } });
+    const a = (await op.carica(pdf('ordine senza scaglione'), 'ordine-no-scaglione.pdf').expect(201)).body;
+    const r = await op.post(`/documenti/${a.id}/abbina`, { tipo: 'ordine', numero: 'O-SC-1', data: '2026-09-01', cliente_id: Number(cliente.id), fornitore_id: Number(f.id) }).expect(409);
+    expect(r.body.message).toMatch(/scaglione/);
+  });
+
   it('spostare una fattura con la correzione del subagente: 409 come per l annullamento', async () => {
     const c = await db.provvigioni_correzioni.findFirst({ include: { documento: { include: { testata: true } } } });
     if (!c) return; // il seed non ha correzioni: la regola è la stessa funzione di elimina (togliibile)

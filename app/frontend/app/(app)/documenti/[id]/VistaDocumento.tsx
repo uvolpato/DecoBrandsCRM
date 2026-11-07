@@ -14,6 +14,7 @@ import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { Schede, type Scheda } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
 import { Visualizzatore, type DocFile } from '@/componenti/Visualizzatore';
+import { PdfEvidenziato } from '@/componenti/PdfEvidenziato';
 import { api } from '@/lib/api';
 import { cliente as entitaCliente, fornitore as entitaFornitore, type Entita } from '@/lib/entita';
 import { data, euro, euroSegno } from '@/lib/formati';
@@ -60,7 +61,7 @@ const PRATICA: Entita = {
   ],
 };
 
-interface Posizione { tipo?: string; pagina?: number }
+interface Posizione { tipo?: string; pagina?: number; x0?: number; y0?: number; x1?: number; y1?: number }
 interface Campo {
   campo: string; valore_letto: string | null; valore_finale: string | null;
   affidabilita: number | null; posizione: Posizione | null; precisione: string | null; verificato: boolean;
@@ -82,6 +83,7 @@ interface Candidato {
 interface Proposta {
   esito: string; candidati: Candidato[]; importo: number;
   abbinamento: { cliente_id: string; cliente: string | null; codice: string | null } | null;
+  cliente_riconosciuto: { cliente_id: string; ragione: string | null } | null;
 }
 interface Dettaglio {
   id: string; file_nome: string; file_tipo: 'pdf' | 'jpg' | 'png'; stato: string; tipo: string | null;
@@ -239,7 +241,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         testo="La pratica nasce dall’ordine. Cliente e fornitore servono per l’agenzia e la provvigione."
         campi={[
           { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: t.fornitore_id ?? '' },
-          { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: ab?.cliente_id ?? '' },
+          { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? '' },
         ]}
         onChiudi={chiudi}
         onConferma={async (v) => {
@@ -372,7 +374,9 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
               <Nota>Questo ordine risulta già registrato: controlla il numero letto o scarta il documento.</Nota>
             ) : (
               <>
-                {!ab && <Nota>Il codice {t.codice_cliente ?? '—'} non corrisponde a nessun cliente di {nomeFornitore}. Correggi il codice letto oppure scegli cliente e fornitore qui sotto.</Nota>}
+                {!ab && (doc.proposta.cliente_riconosciuto
+                  ? <Nota>Il codice {t.codice_cliente ?? '—'} non è abbinato a {nomeFornitore}, ma il cliente è <b>{doc.proposta.cliente_riconosciuto.ragione ?? ''}</b>. Aggiungi l’agenzia nella <Link href={'/clienti/' + doc.proposta.cliente_riconosciuto.cliente_id}>scheda del cliente</Link>, oppure scegli cliente e fornitore qui sotto.</Nota>
+                  : <Nota>Il codice {t.codice_cliente ?? '—'} non corrisponde a nessun cliente di {nomeFornitore}. Correggi il codice letto oppure scegli cliente e fornitore qui sotto.</Nota>)}
                 <Scelte voci={[{
                   titolo: (t.numero ?? 'Ordine') + ' · ' + (ab?.cliente ?? 'cliente da scegliere'),
                   sottotitolo: <Stato v="attesa">Nuova pratica</Stato>,
@@ -477,18 +481,16 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
 }
 
 /** PDF o foto come nel prototipo, a tutta altezza nel pannello di sinistra: il PDF alla pagina del campo. */
-function FileDocumento({ d, pagina }: { d: Dettaglio; pagina?: number }) {
+function FileDocumento({ d, pagina, posizione }: { d: Dettaglio; pagina?: number; posizione?: Posizione | null }) {
   const src = '/api/documenti/' + d.id + '/file';
   if (d.file_tipo !== 'pdf') {
     return <img src={src} alt={'Foto del documento ' + d.file_nome} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />;
   }
-  return (
-    <object key={pagina ?? 1} data={src + (pagina && pagina > 1 ? '#page=' + pagina : '')} type="application/pdf"
-      aria-label={'PDF del documento ' + d.file_nome}
-      style={{ width: '100%', height: '100%', border: 0, background: '#525659' }}>
-      <p style={{ padding: 16, color: '#fff' }}>Il browser non mostra il PDF qui. <a href={src} target="_blank" rel="noreferrer" style={{ color: '#fff' }}>Apri il PDF in una scheda</a>.</p>
-    </object>
-  );
+  // il rettangolo (§6.6) si disegna solo se la posizione ha davvero le coordinate
+  const p = posizione && posizione.x0 != null && posizione.x1 != null
+    ? { x0: posizione.x0, y0: posizione.y0 ?? 0, x1: posizione.x1, y1: posizione.y1 ?? 0 }
+    : null;
+  return <PdfEvidenziato src={src} pagina={pagina ?? 1} posizione={p} />;
 }
 
 /* ---------- Correggi i dati letti (F6-A4b, §6.5 punto 7) ---------- */
@@ -515,6 +517,7 @@ function CampoLetto({ x, etichetta, verificato, onConferma, children }: {
       <label>{etichetta}{incerto && <span className="aff">{Math.round(a * 100)}%</span>}</label>
       <div className="campo-riga">
         {children}
+        {verificato && <span className="spunta-verde" title="Campo verificato" aria-label={'Verificato: ' + etichetta}>✓</span>}
         {incerto && <button type="button" className="conferma-campo" title="Il valore è giusto: confermalo" aria-label={'Conferma ' + etichetta} onClick={onConferma}>✓</button>}
       </div>
     </div>
@@ -603,13 +606,9 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
         </div>
         <div className="aff-corpo">
           <div className="aff-sx aff-pdf">
-            <FileDocumento d={d} pagina={pagina} />
+            <FileDocumento d={d} pagina={pagina} posizione={pos?.posizione ?? null} />
           </div>
           <div className="aff-dx">
-            <p className="avviso-verifica">
-              <Icona nome="avviso" />
-              <span><b>Funzione da verificare.</b> Il rettangolo sul valore letto non si disegna ancora (D-06, prova F0-A7): la finestra apre il PDF alla pagina del campo e dice quanto è precisa la posizione. La correzione funziona comunque.</span>
-            </p>
             <p className="testo-tenue" style={{ fontSize: 12.5, margin: '0 0 10px' }}>
               {d.file_tipo === 'pdf'
                 ? pos
@@ -692,6 +691,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                           <div className="campo-riga">
                             <input data-campo={c} type={tipo} step={tipo === 'number' ? 'any' : undefined} value={String(x[k] ?? '')}
                               onFocus={() => setCampo(keyAff)} onChange={(e) => { r(idx, k, e.target.value); conferma(keyAff); }} />
+                            {ver && <span className="spunta-verde" title="Campo verificato" aria-label={'Verificato: riga ' + (idx + 1)}>✓</span>}
                             {aff != null && !ver && aff < SOGLIA_OK && (
                               <button type="button" className="conferma-campo" title="Il valore è giusto: confermalo"
                                 aria-label={'Conferma la riga ' + (idx + 1)} onClick={() => conferma(keyAff)}>✓</button>

@@ -89,7 +89,7 @@
   /* ---------- Documenti: Caricamento + ElencoSelezionabile + Dettagli + DataTable + Scelte ----------
      Tutti i documenti entrano da qui: caricamento → lettura automatica → controllo dei dati letti → abbinamento. */
   const ESITO = { certo: ['ok', 'Abbinamento sicuro'], probabile: ['attesa', 'Abbinamento da confermare'], ambiguo: ['attesa', 'Da scegliere'], nessuno: ['errore', 'Cliente non riconosciuto'],
-    nuova: ['info', 'Nuova pratica'], bollettino: ['info', 'Bollettino da registrare'], doppio: ['errore', 'Già registrato'] };
+    nuova: ['info', 'Nuova pratica'], bollettino: ['info', 'Bollettino da registrare'], doppio: ['errore', 'Già registrato'], configurare: ['attesa', 'Da configurare'], fornitore: ['errore', 'Fornitore non riconosciuto'] };
   const ACCETTA = '.pdf,.xlsx,.xls,.csv';
   function carica(files, preferenza) {
     let primo = null, letti = 0;
@@ -128,11 +128,11 @@
     CRM.ElencoSelezionabile(sx.corpo, docs.map(d => {
       const pr = M.proposta(d);
       return { id: d.id, href: '#/documenti/' + d.id, titolo: M.TIPI[d.tipo] + ' ' + d.numero, valore: M.euro(pr.importo),
-        sotto: M.fornitore(d.fornitore_id).breve + ' · caricato il ' + M.data(d.ricevuto), stato: CRM.stato(ESITO[pr.esito][0], ESITO[pr.esito][1]) + statoLetturaHtml(d) };
+        sotto: (d.fornitore_id == null ? 'fornitore non riconosciuto' : M.fornitore(d.fornitore_id).breve) + ' · caricato il ' + M.data(d.ricevuto), stato: CRM.stato(ESITO[pr.esito][0], ESITO[pr.esito][1]) + statoLetturaHtml(d) };
     }), sel.id);
 
     const pr = M.proposta(sel);
-    const f = M.fornitore(sel.fornitore_id);
+    const f = M.fornitore(sel.fornitore_id) || { id: null, nome: 'Fornitore non riconosciuto', breve: 'non riconosciuto', giorni_conferma: 0 };
     const ab = pr.abbinamento;
     const boll = sel.tipo === 'bollettino';
     const stl = M.statoLettura(sel);
@@ -199,10 +199,15 @@
       }]);
     } else if (sel.tipo === 'ordine') {
       if (pr.esito === 'doppio') CRM.Nota(h, 'Esiste già la pratica <a href="#/pratiche/' + pr.esistente.id + '">' + e(pr.esistente.numero) + '</a>: controlla il numero letto o scarta il documento.');
-      else if (M.mancaPratica(sel) === 'agenzia') CRM.Nota(h, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
-        '. Aggiungi l’agenzia (subagente, sconto e codice cliente) nella scheda del cliente in <a href="#/clienti">Clienti</a>, poi torna qui: senza agenzia il documento non entra nelle provvigioni.');   // D-87 §19
+      else if (M.mancaPratica(sel) === 'fornitore') CRM.Nota(h, 'Il fornitore <b>' + e(sel.fornitore_letto || 'sconosciuto') + '</b> non è in anagrafica. Registralo in Integra (si sincronizza da solo), poi configurane scaglioni e agenzie: senza fornitore il documento non entra nelle provvigioni.');   // D-87 §19
+      else if (M.mancaPratica(sel) === 'agenzia') {
+        const cli = M.riconosciCliente(sel);   // D-91/D-92: P.IVA poi ragione sociale
+        if (cli) CRM.Nota(h, 'Il codice ' + e(sel.codice_cliente) + ' non è abbinato a ' + e(f.breve) + ', ma il cliente è <b>' + e(cli.nome) + '</b>. Aggiungi l’agenzia (subagente, sconto e codice cliente) nella <a href="#/clienti/' + cli.piva + '">scheda del cliente</a>: senza agenzia il documento non entra nelle provvigioni.');   // D-87/D-91 §19
+        else if (sel.cliente_piva || sel.cliente) CRM.Nota(h, 'Il cliente <b>' + e(sel.cliente || sel.cliente_piva) + '</b>' + (sel.cliente_piva ? ' (P.IVA ' + e(sel.cliente_piva) + ')' : '') + ' non è in anagrafica: è un cliente nuovo. Registralo in Integra (si sincronizza da solo), poi aggiungi l’agenzia. Senza agenzia il documento non entra nelle provvigioni.');   // D-91 §19
+        else CRM.Nota(h, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) + '. Se il cliente è nuovo registralo prima in Integra, poi aggiungi l’agenzia in <a href="#/clienti">Clienti</a>; se esiste già aggiungi solo l’agenzia. Senza agenzia il documento non entra nelle provvigioni.');   // D-87 §19
+      }
       else if (M.mancaPratica(sel) === 'scaglione') CRM.Nota(h, 'Manca lo scaglione di ' + e(f.breve) + ' per lo sconto ' + M.pct(ab.sconto) +
-        '. Configuralo in <a href="#/fornitori">Fornitori</a>, poi torna qui: senza scaglione il documento non entra nelle provvigioni.');   // D-87 §19
+        '. Configuralo in <a href="#/fornitori/' + f.id + '">Fornitori</a>, poi torna qui: senza scaglione il documento non entra nelle provvigioni.');   // D-87 §19
       else {
         const sub = M.subagente(ab.subagente_id);
         CRM.Scelte(h, [{
@@ -443,7 +448,7 @@
       const incerto = a < M.SOGLIA_OK && !ver;
       return '<div class="campo-letto ' + classeAff(a, ver && a < M.SOGLIA_OK) + '" data-box="' + c + '"><label>' + e(ETICHETTE[c] || c) +
         (incerto ? ' <span class="aff" title="Affidabilità della lettura">' + Math.round(a * 100) + '%</span>' : '') + '</label><div class="campo-riga">' + ctl +
-        (incerto ? '<button type="button" class="conferma-campo" data-conferma="' + c + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>' + (extra && extra !== 'sola' ? extra : '') + '</div>';
+        (incerto ? '<button type="button" class="conferma-campo" data-conferma="' + c + '" title="Il valore è giusto: confermalo">✓</button>' : ver ? '<span class="spunta-verde" title="Campo verificato">✓</span>' : '') + '</div>' + (extra && extra !== 'sola' ? extra : '') + '</div>';
     };
     const destra = host => {
       const st = M.statoLettura(comeDoc());
@@ -470,13 +475,13 @@
         const a = affR(r, c.k), incerto = a < M.SOGLIA_OK && !r._ver[c.k], v = r[c.k];
         const val = v == null ? '' : (c.n && c.k !== 'qta' && v !== '' ? Number(v).toFixed(2) : v);
         if (!boll && c.k === 'codice') return '<div class="campo-riga">' + CRM.campoRicercaHtml({ entita: 'articolo', campo: 'righe.' + r._i + '.codice', valore: v, contesto: { fornitore_id: b.fornitore_id } }) +
-          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.codice" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.codice" title="Il valore è giusto: confermalo">✓</button>' : r._ver[c.k] ? '<span class="spunta-verde" title="Campo verificato">✓</span>' : '') + '</div>';
         if (boll && c.k === 'numero') return '<div class="campo-riga">' + CRM.campoRicercaHtml({ entita: 'documentoFiscale', campo: 'righe.' + r._i + '.numero', valore: v, contesto: { fornitore_id: b.fornitore_id } }) +
-          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.numero" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.numero" title="Il valore è giusto: confermalo">✓</button>' : r._ver[c.k] ? '<span class="spunta-verde" title="Campo verificato">✓</span>' : '') + '</div>';
         return '<div class="campo-riga">' +
           '<input data-campo="righe.' + r._i + '.' + c.k + '"' + (c.largo ? ' title="' + e(v || '') + '"' : '') + ' type="' + (c.data ? 'date' : c.n ? 'number' : 'text') + '"' + (c.n ? ' step="any"' : '') + ' value="' + e(val) + '"' +
           (incerto ? ' title="Affidabilità della lettura ' + Math.round(a * 100) + '%"' : '') + '>' +
-          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.' + c.k + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.' + c.k + '" title="Il valore è giusto: confermalo">✓</button>' : r._ver[c.k] ? '<span class="spunta-verde" title="Campo verificato">✓</span>' : '') + '</div>';
       };
       CRM.DataTable(CRM.blocco(host, 'riempi aff-righe tab-righe'), {
         compatta: true, righe: b.righe, etichettaTotale: 'Totale righe', rowClass: r => r._nuova ? 'nuova' : '',

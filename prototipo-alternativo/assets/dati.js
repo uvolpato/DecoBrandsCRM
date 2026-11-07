@@ -41,7 +41,9 @@ window.DATI_DEMO = {
     { id: 7, nome: 'Orto Facile srl', breve: 'Orto Facile', piva: 'IT09876540151', codice_integra: 'F00070', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, giorni_incasso: 60, maturazione: 'fatturato', attivo: true },
     { id: 8, nome: 'Ceramiche Valdera spa', breve: 'Valdera', piva: 'IT05432100506', codice_integra: 'F00073', paese: 'Italia', giorni_conferma: 30, giorno_bollettino: 10, giorni_incasso: 60, maturazione: 'fatturato', attivo: true },
     { id: 9, nome: 'GreenLine BV', breve: 'GreenLine', piva: 'NL812345678B01', codice_integra: 'F00076', paese: 'Paesi Bassi', giorni_conferma: 28, giorno_bollettino: 10, giorni_incasso: 60, maturazione: 'fatturato', attivo: true },
-    { id: 10, nome: 'Ferro & Fiori srl', breve: 'Ferro & Fiori', piva: 'IT03344550165', codice_integra: 'F00079', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, giorni_incasso: 60, maturazione: 'maturato', attivo: true }
+    { id: 10, nome: 'Ferro & Fiori srl', breve: 'Ferro & Fiori', piva: 'IT03344550165', codice_integra: 'F00079', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, giorni_incasso: 60, maturazione: 'maturato', attivo: true },
+    /* Fornitore nuovo, senza scaglioni configurati: dimostra il caso "scaglione mancante" (D-87 §19). */
+    { id: 11, nome: 'Nuovo Fornitore Demo SRL', breve: 'Nuovo', piva: 'IT09999990151', codice_integra: 'F00090', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, giorni_incasso: 60, maturazione: 'fatturato', attivo: true }
   ],
 
   /* Scaglioni: per sconto concesso al cliente, con data di validità (le percentuali possono
@@ -115,7 +117,9 @@ window.DATI_DEMO = {
     { id: 15, cliente_piva: '03987650157', fornitore_id: 7, subagente_id: 1, sconto: 0, codice: 'OFA-4149' },
     { id: 16, cliente_piva: '03987650157', fornitore_id: 8, subagente_id: 4, sconto: 5, codice: 'CV-4156' },
     { id: 17, cliente_piva: '03987650157', fornitore_id: 9, subagente_id: 1, sconto: 0, codice: '' },
-    { id: 18, cliente_piva: '03987650157', fornitore_id: 10, subagente_id: 1, sconto: 5, codice: 'FF-4170' }
+    { id: 18, cliente_piva: '03987650157', fornitore_id: 10, subagente_id: 1, sconto: 5, codice: 'FF-4170' },
+    /* Abbinamento a un fornitore senza scaglioni: dimostra il caso "scaglione mancante" (D-87 §19). */
+    { id: 19, cliente_piva: '04235980161', fornitore_id: 11, subagente_id: 1, sconto: 0, codice: 'NU-1000' }
   ],
 
   /* Pratiche: fascicoli di documenti. Importi dei documenti = somma delle righe. */
@@ -1035,12 +1039,23 @@ window.DATI_DEMO = {
       { codice: 'XMAS-PV607', descrizione: 'Palline in vetro Ø 60 mm, conf. 12', qta: 24, prezzo: 10.80 },
       { codice: 'XMAS-FL107', descrizione: 'Filo luminoso LED 10 m', qta: 30, prezzo: 14.00 },
       { codice: 'XMAS-AL1501', descrizione: 'Albero artificiale 150 cm', qta: 3, prezzo: 82.50 } ] },
-    /* Ordine senza agenzia (D-87 §19): codice cliente non presente fra gli abbinamenti di Gries.
-       Resta in coda «da configurare» e non apre la pratica finché non si aggiunge l'agenzia. */
-    { id: 9012, tipo: 'ordine', fornitore_id: 1, numero: 'OF/2026/061', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'K-99999', file: 'ordine_OF-2026-061.pdf', righe: [
+    /* Ordine senza agenzia (D-87 §19): il cliente esiste (P.IVA e ragione sociale lette) ma non è
+       associato a Gries. Resta in coda «da configurare»: il link porta alla scheda del cliente. */
+    { id: 9012, tipo: 'ordine', fornitore_id: 1, numero: 'OF/2026/061', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'K-99999', cliente_piva: '02457160341', cliente: 'Il Giardino di Sofia srl', file: 'ordine_OF-2026-061.pdf', righe: [
       { codice: 'VASA-2210', descrizione: 'Vaso in terracotta Ø 22 cm', qta: 24, prezzo: 6.40 },
       { codice: 'CACH-306', descrizione: 'Coprivaso smaltato Ø 30 cm', qta: 12, prezzo: 15.00 },
-      { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] }
+      { codice: 'BALC-601', descrizione: 'Balconetta in terracotta 60 cm', qta: 20, prezzo: 13.80 } ] },
+    /* Ordine con abbinamento valido ma fornitore senza scaglioni: "scaglione mancante" (D-87 §19). */
+    { id: 9013, tipo: 'ordine', fornitore_id: 11, numero: 'OF/2026/062', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'NU-1000', file: 'ordine_OF-2026-062.pdf', righe: [
+      { codice: 'DEMO-A1', descrizione: 'Articolo dimostrativo A', qta: 10, prezzo: 12.00 },
+      { codice: 'DEMO-B2', descrizione: 'Articolo dimostrativo B', qta: 4, prezzo: 30.00 } ] },
+    /* Cliente nuovo (D-91 §19): P.IVA e ragione sociale lette ma non in anagrafica → registrarlo in Integra. */
+    { id: 9014, tipo: 'ordine', fornitore_id: 1, numero: 'OF/2026/063', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'K-77777', cliente_piva: '09999999999', cliente: 'Fioreria Nuova di Test', file: 'ordine_OF-2026-063.pdf', righe: [
+      { codice: 'VASA-3050', descrizione: 'Vaso in terracotta Ø 30 cm', qta: 40, prezzo: 12.30 } ] },
+    /* Fornitore non riconosciuto (D-87 §19): fornitore e cliente nuovi, non in anagrafica.
+       Il primo blocco è il fornitore: registrarlo in Integra, poi il resto. */
+    { id: 9015, tipo: 'ordine', fornitore_id: null, fornitore_letto: 'Vivaio Nuovo Sconosciuto GmbH', numero: 'OF/2026/064', data: '2026-09-04', ricevuto: '2026-09-04', codice_cliente: 'VN-0001', cliente_piva: '09999999998', cliente: 'Serra Nuova di Test', file: 'ordine_OF-2026-064.pdf', righe: [
+      { codice: 'VASA-3050', descrizione: 'Vaso in terracotta Ø 30 cm', qta: 20, prezzo: 12.30 } ] }
   ],
 
   /* Bollettini: quello che il fornitore ci riconosce, mese per mese.

@@ -275,7 +275,11 @@ async function dettaglioDocumento(db: DbLetto, id: bigint) {
   const letto = await lettoDaCampi(db, id);
   const p = await propostaDocumento(db, letto);
   // il cliente dell'abbinamento è un BigInt: nella risposta va come stringa (come gli altri id)
-  const proposta = { ...p, abbinamento: p.abbinamento ? { ...p.abbinamento, cliente_id: String(p.abbinamento.cliente_id) } : null };
+  const proposta = {
+    ...p,
+    abbinamento: p.abbinamento ? { ...p.abbinamento, cliente_id: String(p.abbinamento.cliente_id) } : null,
+    cliente_riconosciuto: p.cliente_riconosciuto ? { ...p.cliente_riconosciuto, cliente_id: String(p.cliente_riconosciuto.cliente_id) } : null,
+  };
   const controlli = (d.controlli as { falliti?: Controllo[] } | null)?.falliti ?? [];
   // solo il bollettino ha un omonimo da cercare (D-71): «esiste» dice se è già registrato
   const bollettino = letto.tipo === 'bollettino'
@@ -1083,9 +1087,15 @@ async function nuovaPratica(tx: Tx, b: AbbinaDocumento, ctx: Contesto) {
   // l'agenzia cliente × fornitore alla data dell'ordine dà il subagente e l'agente (D-60): senza, la pratica non si apre
   const ag = await tx.interscambio.findFirst({
     where: { cliente_id: cid, fornitore_id: fid, valido_dal: { lte: new Date(b.data) }, OR: [{ valido_al: null }, { valido_al: { gt: new Date(b.data) } }] },
-    select: { subagente: { select: { agente_id: true } } },
+    select: { sconto: true, subagente: { select: { agente_id: true } } },
   });
   if (!ag) throw new ConflictException("Il cliente non ha un'agenzia con questo fornitore alla data dell'ordine: aggiungila in Clienti");
+  // D-87: serve anche lo scaglione del fornitore per lo sconto dell'agenzia, altrimenti la provvigione sarebbe 0% in silenzio
+  const sc = await tx.provvigioni_scaglioni.findFirst({
+    where: { fornitore_id: fid, sconto_min: { lte: ag.sconto }, valido_dal: { lte: new Date(b.data) } },
+    select: { id: true },
+  });
+  if (!sc) throw new ConflictException(`Il fornitore non ha uno scaglione per lo sconto ${Number(ag.sconto)}% alla data dell'ordine: configuralo in Fornitori`);
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ordini_fornitore_testata.numero_ordine'))`;
   const anno = b.data.slice(0, 4);
   const [m] = await tx.$queryRaw<{ n: number | null }[]>`
