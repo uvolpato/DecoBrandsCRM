@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Barra, primaPagina, voceDi } from '@/componenti/Barra';
 import { ClasseBody } from '@/componenti/ClasseBody';
 import { Riservata } from '@/componenti/Pagina';
-import { UtenteCtx } from '@/componenti/Utente';
+import { UtenteCtx, AggiornaUtenteCtx } from '@/componenti/Utente';
 import { api, type Io } from '@/lib/api';
 import { EventiProvider } from '@/lib/eventi';
 
@@ -21,8 +21,8 @@ export default function Guscio({ children }: { children: ReactNode }) {
     let vivo = true;
     void api<Io>('accesso/io').then((r) => {
       if (!vivo) return;
-      if (r.stato === 401) router.replace('/accesso?dopo=' + encodeURIComponent(percorso));
-      else if (r.ok && r.dati.cambia_password) router.replace('/accesso/cambia?dopo=' + encodeURIComponent(percorso));
+      // il 401 lo porta all'accesso lib/api.ts (sessione scaduta o assente)
+      if (r.ok && r.dati.cambia_password) router.replace('/accesso/cambia?dopo=' + encodeURIComponent(percorso));
       // Oggi (pagina d'arrivo) è di Provvigioni: chi non ha l'area va alla prima pagina che può aprire
       else if (r.ok && percorso === '/' && !r.dati.permessi.includes('provvigioni.consulta')) router.replace(primaPagina((p) => r.dati.permessi.includes(p)));
       else if (r.ok) setIo(r.dati);
@@ -36,14 +36,16 @@ export default function Guscio({ children }: { children: ReactNode }) {
   const solaLettura = !!voce?.area && io.aree[voce.area] === 'lettura';
   return (
     <UtenteCtx.Provider value={io}>
-      <EventiProvider>
-        {/* stile.css: body.sola-lettura mostra la fascia e spegne i pulsanti che modificano (§8.3) */}
-        {solaLettura && <ClasseBody classe="sola-lettura" />}
-        <Barra />
-        <main className="principale" id="principale">
-          {voce?.permesso ? <Riservata permesso={voce.permesso} titolo={voce.t}>{children}</Riservata> : children}
-        </main>
-      </EventiProvider>
+      <AggiornaUtenteCtx.Provider value={setIo}>
+        <EventiProvider>
+          {/* stile.css: body.sola-lettura mostra la fascia e spegne i pulsanti che modificano (§8.3) */}
+          {solaLettura && <ClasseBody classe="sola-lettura" />}
+          <Barra />
+          <main className="principale" id="principale">
+            {voce?.permesso ? <Riservata permesso={voce.permesso} titolo={voce.t}>{children}</Riservata> : children}
+          </main>
+        </EventiProvider>
+      </AggiornaUtenteCtx.Provider>
     </UtenteCtx.Provider>
   );
 }

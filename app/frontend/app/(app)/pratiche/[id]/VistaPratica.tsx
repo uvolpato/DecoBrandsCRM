@@ -26,7 +26,7 @@ import { data as dataIt, euro, euroSegno, pct } from '@/lib/formati';
 type Chiave = 'scaduta' | 'attesa' | 'confermata' | 'fatturata';
 type Tipo = 'ordine' | 'conferma' | 'proforma' | 'fattura' | 'nota_credito' | 'pagamento' | 'altro';
 interface Tappa {
-  titolo: string; fatta?: boolean; ritardo?: boolean; numero?: string; data?: string;
+  titolo: string; fatta?: boolean; ritardo?: boolean; numero?: string; numeri?: string[]; data?: string;
   importo?: number; delta?: number; testo?: string; assente?: boolean;
 }
 interface FaseRiga { tipo: 'ordine' | 'conferma' | 'fattura'; etichetta: string; numero: string; data: string }

@@ -14,6 +14,8 @@ export interface Io {
   cambia_password: boolean;
   csrf: string;
   righe_pagina: number; // §7.15: righe per pagina nelle tabelle
+  ingressi: Record<string, string>; // pagina di ingresso per area (D-88), solo quelle ammesse adesso
+  timeout_minuti: number;
 }
 
 export interface Risposta<T> {
@@ -27,6 +29,12 @@ const MESSAGGI: Record<number, string> = {
   429: 'Troppi tentativi: riprova tra 15 minuti.',
   500: 'Qualcosa non ha funzionato. Riprova; se succede ancora, avvisa l’amministratore.',
 };
+
+/** Sessione scaduta (timeout o chiusa altrove): si torna all'accesso con il ritorno alla pagina (D-89). */
+function allAccesso() {
+  if (typeof window === 'undefined' || window.location.pathname.startsWith('/accesso')) return;
+  window.location.assign('/accesso?dopo=' + encodeURIComponent(window.location.pathname));
+}
 
 /** GET senza corpo, POST con il corpo; PUT e DELETE si chiedono con `metodo`. */
 export async function api<T = unknown>(percorso: string, corpo?: object, metodo?: 'PUT' | 'DELETE'): Promise<Risposta<T>> {
@@ -46,6 +54,7 @@ export async function api<T = unknown>(percorso: string, corpo?: object, metodo?
   }
   const dati = r.status === 204 ? null : await r.json().catch(() => null);
   if (dati && typeof dati.csrf === 'string') csrf = dati.csrf;
+  if (r.status === 401) allAccesso();
   // i messaggi del server sono già in italiano; dalla validazione dei DTO arriva una lista: il primo
   const m = dati?.message;
   const testo = typeof m === 'string' ? m : Array.isArray(m) && typeof m[0] === 'string' ? m[0] : '';
@@ -65,6 +74,7 @@ export async function caricaPdf(file: File): Promise<Risposta<{ id: string; file
   }
   const dati = await r.json().catch(() => null);
   if (dati && typeof dati.csrf === 'string') csrf = dati.csrf;
+  if (r.status === 401) allAccesso();
   const m = dati?.message;
   const testo = typeof m === 'string' ? m : Array.isArray(m) && typeof m[0] === 'string' ? m[0] : '';
   return { ok: r.ok, stato: r.status, dati: dati as never, messaggio: r.ok ? '' : MESSAGGI[r.status] ?? (testo || MESSAGGI[500]) };

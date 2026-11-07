@@ -1,13 +1,13 @@
 import {
-  BadRequestException, Body, CanActivate, Logger, Controller, ExecutionContext, ForbiddenException, Get, HttpCode, Injectable, Post, Req,
+  BadRequestException, Body, CanActivate, Logger, Controller, ExecutionContext, ForbiddenException, Get, HttpCode, Injectable, Post, Put, Req,
   SetMetadata, UnauthorizedException, UseGuards,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Request } from 'express';
-import type { utenti } from '@prisma/client';
+import type { Prisma, utenti } from '@prisma/client';
 import { cifra, MASSIMO, MINIMO, verifica } from './password';
 import { indirizzo, invia } from './posta';
 import { righePagina } from './impostazioni';
@@ -20,6 +20,7 @@ declare module 'express-session' {
   interface SessionData {
     utente_id: string; // solo l'id: ruolo e stato si rileggono a ogni richiesta (D-38)
     csrf: string;
+    ultimo?: number; // ultima richiesta dell'utente, per il timeout di inattività (D-89)
   }
 }
 declare module 'express' {
@@ -82,6 +83,55 @@ export function permessiDi(ruolo: string, livelli: Livelli): Permesso[] {
 export const livelliDi = (righe: { area: string; livello: string }[]): Livelli =>
   Object.fromEntries(righe.map((r) => [r.area, r.livello]));
 
+/** Pagine di ingresso ammesse per area (D-88): elenco chiuso, uguale al menu della barra. `*` richiede
+ *  il permesso della voce; il server valida qui percorso e permesso, mai fidarsi del browser (V12). */
+export const PAGINE: Record<string, { percorso: string; permesso: Permesso }[]> = {
+  provvigioni: [
+    { percorso: '/', permesso: 'provvigioni.consulta' },
+    { percorso: '/documenti', permesso: 'provvigioni.consulta' },
+    { percorso: '/pratiche', permesso: 'provvigioni.consulta' },
+    { percorso: '/scartati', permesso: 'provvigioni.scartati' },
+    { percorso: '/bollettini', permesso: 'provvigioni.consulta' },
+    { percorso: '/liquidazioni', permesso: 'provvigioni.consulta' },
+    { percorso: '/analisi', permesso: 'provvigioni.consulta' },
+  ],
+  dati: [
+    { percorso: '/fornitori', permesso: 'dati.consulta' },
+    { percorso: '/subagenti', permesso: 'dati.consulta' },
+    { percorso: '/clienti', permesso: 'dati.consulta' },
+  ],
+  gestione: [
+    { percorso: '/utenti', permesso: 'sistema.utenti' },
+    { percorso: '/sistema', permesso: 'sistema.stato' },
+    { percorso: '/registro', permesso: 'sistema.registro' },
+    { percorso: '/impostazioni', permesso: 'sistema.impostazioni' },
+    { percorso: '/componenti', permesso: 'sistema.amministratori' },
+  ],
+};
+
+/** Timeout di inattività in minuti (D-89): da SESSION_TIMEOUT_MINUTI, 30 se assente o non valido. */
+export const timeoutMinuti = (env = process.env) => {
+  const n = Number(env.SESSION_TIMEOUT_MINUTI);
+  return Number.isInteger(n) && n > 0 ? n : 30;
+};
+
+/** La sessione è scaduta se l'ultima richiesta è oltre `minuti` fa. */
+export const scaduta = (ultimo: number | undefined, ora: number, minuti: number) =>
+  ultimo != null && ora - ultimo > minuti * 60_000;
+
+/** Le pagine di ingresso salvate, solo quelle ancora ammesse per l'utente adesso (percorso e permesso). */
+export function ingressiDi(ingressi: unknown, ruolo: string, livelli: Livelli) {
+  const salvati = (ingressi ?? {}) as Record<string, unknown>;
+  const permessi = permessiDi(ruolo, livelli);
+  const fuori: Record<string, string> = {};
+  for (const area of Object.keys(PAGINE)) {
+    const v = salvati[area];
+    if (typeof v !== 'string') continue;
+    if (PAGINE[area].some((p) => p.percorso === v && permessi.includes(p.permesso))) fuori[area] = v;
+  }
+  return fuori;
+}
+
 // Ogni rotta dichiara cosa serve: un permesso, oppure che è pubblica. Senza dichiarazione: negata.
 export const Richiede = (permesso: Permesso) => SetMetadata('permesso', permesso);
 export const Pubblica = () => SetMetadata('permesso', 'pubblica');
@@ -103,6 +153,7 @@ export function apriSessione(req: Request, utente_id: bigint, resta = true) {
       if (err) return ko(err);
       req.session.utente_id = String(utente_id);
       req.session.csrf = randomBytes(32).toString('hex');
+      req.session.ultimo = Date.now(); // timeout di inattività: si parte da adesso (D-89)
       // senza "Resta collegato" il cookie non ha scadenza e finisce con il browser (null: i tipi non lo prevedono)
       (req.session.cookie as { maxAge: number | null }).maxAge = resta ? TRENTA_GIORNI : null;
       req.session.save((e) => (e ? ko(e) : ok()));
@@ -130,6 +181,14 @@ export class AccessoGuard implements CanActivate {
     }
     req.utente = utente as utenti;
     req.livelli = livelliDi(aree);
+    // timeout di inattività (D-89): dopo N minuti senza richieste la sessione si chiude. La SSE
+    // degli aggiornamenti non conta come attività: una scheda aperta da sola non tiene viva la sessione.
+    const ora = Date.now();
+    if (scaduta(req.session.ultimo, ora, timeoutMinuti())) {
+      await new Promise((ok) => req.session.destroy(ok));
+      throw new UnauthorizedException('Sessione scaduta per inattività: entra di nuovo');
+    }
+    if (req.method !== 'GET' || req.path !== '/api/eventi/flusso') req.session.ultimo = ora;
     if (trovato.deve_cambiare_password && !this.reflector.getAllAndOverride<boolean>('provvisoria', dove)) {
       throw new ForbiddenException('cambia_password'); // prima il cambio della password provvisoria
     }
@@ -161,6 +220,10 @@ class Dimenticata {
 class Reimposta {
   @IsString() @MaxLength(100) codice!: string;
   @IsString() @MaxLength(MASSIMO) nuova!: string;
+}
+
+class Profilo {
+  @IsOptional() @IsObject() ingressi?: Record<string, unknown>;
 }
 
 const NON_VALIDE = 'Credenziali non valide';
@@ -200,7 +263,35 @@ export class AccessoController {
       id: String(u.id), username: u.username, nome: u.nome, email: u.email, ruolo: u.ruolo, aree: req.livelli ?? {},
       permessi: permessiDi(u.ruolo, req.livelli ?? {}), cambia_password: u.deve_cambiare_password, csrf: req.session.csrf,
       righe_pagina: await righePagina(this.db), // §7.15: righe per pagina nelle tabelle
+      ingressi: ingressiDi(u.ingressi, u.ruolo, req.livelli ?? {}), // D-88: solo quelle ancora ammesse
+      timeout_minuti: timeoutMinuti(),
     };
+  }
+
+  /** Pagina di ingresso per area (D-88): il server valida area e percorso, mai si fida del browser (V12). */
+  @Put('profilo')
+  @Richiede('collegato')
+  async profilo(@Req() req: Request, @Body() b: Profilo) {
+    const u = req.utente!;
+    const permessi = permessiDi(u.ruolo, req.livelli ?? {});
+    const attuali = (u.ingressi ?? {}) as Record<string, unknown>;
+    const nuovo: Record<string, unknown> = { ...attuali };
+    for (const [area, v] of Object.entries(b.ingressi ?? {})) {
+      const pagine = PAGINE[area];
+      if (!pagine) throw new BadRequestException('Area sconosciuta: ' + area);
+      if (v === null) { delete nuovo[area]; continue; } // null toglie la scelta
+      if (typeof v !== 'string') throw new BadRequestException('Percorso non valido per l’area ' + area);
+      const voce = pagine.find((p) => p.percorso === v);
+      if (!voce) throw new BadRequestException('Percorso non valido per l’area ' + area);
+      if (!permessi.includes(voce.permesso)) throw new BadRequestException('Percorso non permesso: ' + v);
+      nuovo[area] = v;
+    }
+    await this.db.$transaction(async (tx) => {
+      await tx.utenti.update({ where: { id: u.id }, data: { ingressi: nuovo as Prisma.InputJsonValue } });
+      await logEvent(tx, { tipo: 'crud', azione: 'update', entita: 'utente', entita_id: u.id, esito: 'successo',
+        dettaglio: { etichetta: u.username, prima: { ingressi: attuali }, dopo: { ingressi: nuovo } } }, contesto(req));
+    });
+    return { ingressi: ingressiDi(nuovo, u.ruolo, req.livelli ?? {}) };
   }
 
   /** Nome utente (o email) e password, come nella Gestione Ordini (D-39). Un solo messaggio per ogni errore. */

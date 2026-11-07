@@ -6,6 +6,8 @@ import type { Io } from '@/lib/api';
 // vengono dal server; qui si usano solo per mostrare o nascondere (il server ricontrolla, V12).
 export const UtenteCtx = createContext<Io | null>(null);
 export const useUtente = () => use(UtenteCtx)!; // React 19: use() al posto di useContext()
+export const AggiornaUtenteCtx = createContext<(io: Io) => void>(() => {});
+export const useAggiornaUtente = () => use(AggiornaUtenteCtx);
 export const usePuo = () => {
   const io = useUtente();
   return (permesso: string) => io.permessi.includes(permesso);

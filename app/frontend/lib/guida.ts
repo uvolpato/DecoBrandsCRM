@@ -258,6 +258,7 @@ export const GUIDA: Argomento[] = [
       'La nota di credito non può superare quello che resta della fattura: il server rifiuta e la finestra resta aperta per correggere l’importo.',
       'Un documento che è in un bollettino non si cambia (importo, numero, data): si corregge con una nota di credito.',
       'Ordini, conferme, proforma, pagamenti e allegati sono solo tracciati: il netto e la provvigione restano su fatture e note di credito. Il segno <b>Pagato</b> arriva da un documento di pagamento.',
+      '<b>Più ordini, conferme e fatture.</b> In una pratica possono esserci <b>più ordini</b> (il primo la apre, gli altri si sommano) e <b>più conferme o proforme</b>, facoltative: una delle due porta a <b>Confermata</b>. Anche le <b>fatture</b> possono essere più di una — un ordine fatturato in due tranche, o una fattura che copre più ordini — e lo stesso numero non si ripete. «Una fattura al mese» vale solo per i clienti con sconto o agenzia e riguarda il calcolo della provvigione, non quante fatture si possono registrare.',
       'Numero e data valgono per tutte le pratiche della stessa fattura (una fattura su più ordini): correggendoli si aggiornano tutte.',
       'Stati d’incasso: <b>Pagata</b> · <b>Non pagata</b> (stornata o segnalata) · <b>Incasso da verificare</b> (maturato, oltre i giorni d’incasso) · <b>In attesa di incasso</b> · <b>Nessuna segnalazione</b>. Vedi <a href="/guida/incassi">Incassi dei clienti</a>.',
     ],

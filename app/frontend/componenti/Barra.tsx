@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, type Io } from '@/lib/api';
 import { Icona } from './Icona';
 import { ruoloBreve, usePuo, useUtente } from './Utente';
 
@@ -48,13 +48,27 @@ export const primaPagina = (puo: (p: string) => boolean) =>
 /** Titolo della voce di una pagina (per "In costruzione" e per il titolo della scheda del browser). */
 export const titoloDi = (percorso: string) => voceDi(percorso)?.t ?? 'Decobrands';
 
+/** Una voce si apre se il suo permesso c'è (le voci di un'area con *.consulta e le altre con il loro). */
+const libera = (io: Io) => (v: Voce) => !permessoDi(v) || io.permessi.includes(permessoDi(v)!);
+
+/** Le aree che l'utente può aprire, con le sole voci permesse (menu dell'utente e profilo). */
+export const areeAperte = (io: Io) =>
+  AREE_MENU.map((a) => ({ ...a, gruppi: a.gruppi.map((g) => ({ ...g, voci: g.voci.filter(libera(io)) })).filter((g) => g.voci.length) }))
+    .filter((a) => a.gruppi.length);
+
+/** Pagina di atterraggio dopo l'accesso senza `dopo` (D-88): la pagina di ingresso della prima area
+ *  che l'utente può aprire (Provvigioni → Dati → Gestione), altrimenti `/`. */
+export const atterraggio = (io: Io) => {
+  for (const a of areeAperte(io)) return io.ingressi?.[a.id] ?? a.gruppi[0].voci[0].href;
+  return '/';
+};
+
 export function Barra() {
   const io = useUtente();
   const puo = usePuo();
   const percorso = usePathname();
   const router = useRouter();
   const sigla = io.nome.split(' ').map((x) => x[0]).join('').slice(0, 2);
-  const libera = (v: Voce) => !permessoDi(v) || puo(permessoDi(v)!);
   // contatori delle voci (§7.1, come il prototipo): numeri letti dal server a ogni cambio pagina.
   // Oggi, Documenti, Pratiche e Bollettini; Documenti e Pratiche sono urgenti (gialli) quando c'è
   // qualcosa da fare. Il browser non calcola niente (V12).
@@ -84,8 +98,7 @@ export function Barra() {
     return null;
   };
   // per ogni area le voci che l'utente può aprire; un'area senza voci non compare
-  const aree = AREE_MENU.map((a) => ({ ...a, gruppi: a.gruppi.map((g) => ({ ...g, voci: g.voci.filter(libera) })).filter((g) => g.voci.length) }))
-    .filter((a) => a.gruppi.length);
+  const aree = areeAperte(io);
   // l'area della pagina; sulle pagine comuni (Guida) resta l'ultima aperta
   const [ultima, setUltima] = useState<string>();
   const dellaPagina = areaDi(percorso)?.id;
@@ -154,7 +167,7 @@ export function Barra() {
             {aree.length > 1 && (
               <>
                 {aree.map((a) => (
-                  <Link key={a.id} href={a.gruppi[0].voci[0].href} role="menuitem" aria-current={a === qui ? 'true' : undefined}
+                  <Link key={a.id} href={io.ingressi?.[a.id] ?? a.gruppi[0].voci[0].href} role="menuitem" aria-current={a === qui ? 'true' : undefined}
                     className={'menu-utente-voce' + (a === qui ? ' attiva' : '')} onClick={() => setMenuUtente(false)}>
                     <Icona nome={a.icona} /><span>{a.t}</span>
                     {a === qui && <span className="menu-utente-spunta"><Icona nome="spunta" /></span>}
@@ -163,6 +176,7 @@ export function Barra() {
                 <div className="menu-sep" />
               </>
             )}
+            <Link href="/profilo" role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="subagenti" /><span>Il mio profilo</span></Link>
             <Link href="/accesso/cambia" role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="chiave" /><span>Cambia la password</span></Link>
             <Link href={GUIDA.href} role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="guida" /><span>Guida</span></Link>
             <div className="menu-sep" />

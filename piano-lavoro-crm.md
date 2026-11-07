@@ -286,7 +286,14 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 #### F7-A2 · Responsive + collaudo dati + rilascio — 2 h
 - **Dipende da:** F7-A1 · **Riferimenti:** V6 (desktop/tablet/mobile), §3.2, §14
 - **Output:** rifiniture responsive (nessun overflow orizzontale), collaudo con seed §12 e dati reali di prova, build di produzione, pubblicazione **senza Docker** (Caddy + Next.js 8001 + NestJS 8002), nota di rilascio.
+- **Prima del rilascio (Ugo, 07/11/2026):** l'app si prova **con dati veri**; la pubblicazione viene **dopo** questa prova. Il deploy è **solo di `app/`**, non di tutta la repository (sparse checkout `app`): la radice con specifica, prototipo e strumenti non va sul server.
 - **DoD:** app avviata in produzione; elenco attendibile del backlog §13 non toccato.
+
+#### F7-A3 · Profilo, pagina di ingresso e timeout — 4 h **da approvare**
+- **Dipende da:** F7-A1 · **Riferimenti:** §3.3, §7.23, D-88, D-89
+- **Output:** pagina `/profilo` (dati in sola lettura, aree con il livello, pagina di ingresso per area, sicurezza); `utenti.ingressi` con migrazione; `GET /api/accesso/io` e `PUT /api/accesso/profilo` che validano area, percorso e permesso; menu dell'utente e atterraggio dopo l'accesso sulla pagina scelta; timeout di inattività di 30 minuti (`SESSION_TIMEOUT_MINUTI`), SSE esclusa, 401 che riporta all'accesso.
+- **DoD:** `test/profilo.spec.ts` e `app_profilo.py` 0 KO; 1440 e 768 px; documenti allineati.
+- **Ore:** 4 h **fuori preventivo** (1,5 server + 1,5 pagina + 1 prove e documenti): non entrano nel totale di §4 finché non sono approvate.
 
 ---
 

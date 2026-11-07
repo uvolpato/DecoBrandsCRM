@@ -199,15 +199,17 @@
       }]);
     } else if (sel.tipo === 'ordine') {
       if (pr.esito === 'doppio') CRM.Nota(h, 'Esiste già la pratica <a href="#/pratiche/' + pr.esistente.id + '">' + e(pr.esistente.numero) + '</a>: controlla il numero letto o scarta il documento.');
-      else if (pr.esito === 'nessuno') CRM.Nota(h, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
-        '. Correggi il codice letto oppure, se è un cliente nuovo, aggiungi l’agenzia nella scheda del cliente in <a href="#/clienti">Clienti</a>.');
+      else if (M.mancaPratica(sel) === 'agenzia') CRM.Nota(h, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
+        '. Aggiungi l’agenzia (subagente, sconto e codice cliente) nella scheda del cliente in <a href="#/clienti">Clienti</a>, poi torna qui: senza agenzia il documento non entra nelle provvigioni.');   // D-87 §19
+      else if (M.mancaPratica(sel) === 'scaglione') CRM.Nota(h, 'Manca lo scaglione di ' + e(f.breve) + ' per lo sconto ' + M.pct(ab.sconto) +
+        '. Configuralo in <a href="#/fornitori">Fornitori</a>, poi torna qui: senza scaglione il documento non entra nelle provvigioni.');   // D-87 §19
       else {
         const sub = M.subagente(ab.subagente_id);
         CRM.Scelte(h, [{
           titolo: sel.numero + ' · ' + M.nomeCliente(ab.cliente_piva), sottotitolo: CRM.stato('attesa', 'Attesa conferma'), consigliata: true,
           punti: ['codice cliente ' + e(ab.codice) + ' = ' + e(M.nomeCliente(ab.cliente_piva)), 'seguita da ' + e(sub.nome) + ', sconto ' + M.pct(ab.sconto),
             'conferma attesa entro ' + f.giorni_conferma + ' giorni, poi parte il sollecito'],
-          azione: { etichetta: 'Apri la pratica', onClick: () => seAffidabile(sel, () => { const p = M.apriPratica(sel.id); M.salva(); CRM.Avviso('Aperta la pratica ' + p.numero); location.hash = '#/pratiche/' + p.id; }) }
+          azione: { etichetta: 'Apri la pratica', onClick: () => seAffidabile(sel, () => { const p = M.apriPratica(sel.id); if (!p) return; M.salva(); CRM.Avviso('Aperta la pratica ' + p.numero); location.hash = '#/pratiche/' + p.id; }) }
         }]);
       }
     } else {
@@ -683,12 +685,12 @@
     const impOrd = M.importoDoc(ordine), impConf = conf ? M.importoDoc(conf) : null;
     const pan = CRM.Pannello(corpo, { senzaMargine: true });
     CRM.Binario(pan.corpo, [
-      { titolo: 'Ordine', fatta: true, numero: ordine.numero, data: ordine.data, importo: impOrd },
-      conf ? { titolo: 'Conferma', fatta: true, numero: conf.numero, data: conf.data, importo: impConf, delta: M.r2(impConf - impOrd) }
+      { titolo: 'Ordine', fatta: true, numero: ordine.numero, numeri: [ordine.numero], data: ordine.data, importo: impOrd },
+      conf ? { titolo: 'Conferma', fatta: true, numero: conf.numero, numeri: [conf.numero], data: conf.data, importo: impConf, delta: M.r2(impConf - impOrd) }
         : { titolo: 'Conferma', ritardo: s.chiave === 'scaduta', testo: s.chiave === 'scaduta' ? 'In ritardo ' + s.nota + ' (attesa entro il ' + M.data(s.scadenza) + ')' : s.scadenza ? 'Attesa entro il ' + M.data(s.scadenza) : 'Attesa' },
-      fatture.length ? { titolo: fatture.length > 1 ? 'Fatture' : 'Fattura', fatta: true, numero: fatture[0].numero + (fatture.length > 1 ? ' + ' + (fatture.length - 1) : ''), data: fatture[0].data,
+      fatture.length ? { titolo: fatture.length > 1 ? 'Fatture' : 'Fattura', fatta: true, numero: fatture[0].numero + (fatture.length > 1 ? ' + ' + (fatture.length - 1) : ''), numeri: fatture.map(d => d.numero), data: fatture[0].data,
         importo: imp(fatture), delta: M.r2(imp(fatture) - (impConf != null ? impConf : impOrd)) } : { titolo: 'Fattura', testo: 'In attesa' },
-      nc.length ? { titolo: 'Nota di credito', fatta: true, numero: nc[0].numero, data: nc[0].data, importo: imp(nc) } : { titolo: 'Nota di credito', assente: true, testo: 'Nessuna' }
+      nc.length ? { titolo: 'Nota di credito', fatta: true, numero: nc[0].numero, numeri: nc.map(d => d.numero), data: nc[0].data, importo: imp(nc) } : { titolo: 'Nota di credito', assente: true, testo: 'Nessuna' }
     ]);
 
     // Riepilogo (provvigione, incasso, documenti) e righe a confronto in due schede (§7.3):

@@ -1292,7 +1292,9 @@
     b.style.setProperty('--n', tappe.length);
     b.innerHTML = tappe.map(t => {
       if (!t.fatta) return '<div class="tappa' + (t.ritardo ? ' ritardo' : '') + (t.assente ? ' assente' : '') + '"><span class="nodo"></span><h3>' + esc(t.titolo) + '</h3><div class="' + (t.ritardo ? 'negativo' : 'testo-tenue') + '">' + esc(t.testo || '') + '</div></div>';
-      return '<div class="tappa fatta"><span class="nodo">' + CRM.icona('spunta') + '</span><h3>' + esc(t.titolo) + '</h3><div class="num">' + esc(t.numero) + '</div>' +
+      // pi�� documenti nella stessa fase: tutti i numeri di fianco, la riga scorre se non ci stanno (D-89)
+      const numeri = (t.numeri && t.numeri.length ? t.numeri : [t.numero]).map(n => '<span>' + esc(n) + '</span>').join('');
+      return '<div class="tappa fatta"><span class="nodo">' + CRM.icona('spunta') + '</span><h3>' + esc(t.titolo) + '</h3><div class="numeri">' + numeri + '</div>' +
         '<div class="testo-tenue piccolo">' + M.data(t.data) + '</div><div class="imp ' + CRM.classeSegno(Math.min(0, t.importo)) + '">' + M.euro(t.importo) + '</div>' +
         (t.delta && Math.abs(t.delta) >= 0.01 ? '<span class="delta">' + CRM.euroSegno(t.delta) + ' rispetto alla fase prima</span>' : '') + '</div>';
     }).join('');

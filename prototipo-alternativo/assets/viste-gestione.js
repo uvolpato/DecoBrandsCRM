@@ -469,7 +469,7 @@
   CRM.rotta(/^\/guida\/([\w-]+)$/, id => vistaGuida(id));
 
   /* =========================================================
-     Il mio profilo (proposta D-87): dati dell'utente, aree e pagina di ingresso
+     Il mio profilo (proposta D-88): dati dell'utente, aree e pagina di ingresso
      Si apre dal menu dell'utente. Nome, email, ruolo e livelli sono in sola lettura:
      li cambia chi amministra (��7.13).
      ========================================================= */

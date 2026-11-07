@@ -122,14 +122,16 @@ export function Scelte({ voci, vuoto = 'Nessuna opzione disponibile.' }: { voci:
   );
 }
 
-export interface Tappa { titolo: string; fatta?: boolean; ritardo?: boolean; numero?: string; data?: string; importo?: number; delta?: number; testo?: string; assente?: boolean }
+export interface Tappa { titolo: string; fatta?: boolean; ritardo?: boolean; numero?: string; numeri?: string[]; data?: string; importo?: number; delta?: number; testo?: string; assente?: boolean }
 /** Le fasi documentali di una pratica, con le differenze fra una fase e la precedente. */
 export function Binario({ tappe }: { tappe: Tappa[] }) {
   return (
     <div className="binario" style={{ '--n': tappe.length } as React.CSSProperties}>
       {tappe.map((t) => t.fatta ? (
         <div key={t.titolo} className="tappa fatta">
-          <span className="nodo"><Icona nome="spunta" /></span><h3>{t.titolo}</h3><div className="num">{t.numero}</div>
+          <span className="nodo"><Icona nome="spunta" /></span><h3>{t.titolo}</h3>
+          {/* più documenti nella stessa fase (D-90): numeri affiancati, la riga scorre se non ci stanno */}
+          <div className="numeri">{(t.numeri?.length ? t.numeri : [t.numero]).map((n) => <span key={n}>{n}</span>)}</div>
           <div className="testo-tenue piccolo">{data(t.data)}</div><div className={'imp ' + classeSegno(Math.min(0, t.importo ?? 0))}>{euro(t.importo)}</div>
           {t.delta != null && Math.abs(t.delta) >= 0.01 && <span className="delta">{euroSegno(t.delta)} rispetto alla fase prima</span>}
         </div>

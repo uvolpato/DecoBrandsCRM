@@ -482,6 +482,7 @@ model utenti {
   creato_il              DateTime  @default(now()) @db.Timestamptz(6)
   ultimo_accesso         DateTime? @db.Timestamptz(6)
   ultimo_invio           Json? // {quando, tipo: benvenuto | password | reset, errore}
+  ingressi               Json?  @default("{}") // pagine di ingresso per area (D-87): {provvigioni?, dati?, gestione?}
 
   link               accessi_link[]
   aree               utenti_aree[]

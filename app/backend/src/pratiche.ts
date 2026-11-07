@@ -215,16 +215,17 @@ export function dettaglioPratica(S: Dati, id: string) {
   const somma = (ds: { importo: Prisma.Decimal }[]) => r2(ds.reduce((x, d) => x.plus(d.importo), new Prisma.Decimal(0)));
   // più documenti dello stesso tipo: il primo numero + quanti altri (D-60)
   const numeri = (ds: { numero: string }[]) => ds[0].numero + (ds.length > 1 ? ` + ${ds.length - 1}` : '');
+  const tutti = (ds: { numero: string }[]) => ds.map((d) => d.numero); // elenco per il binario (D-90)
   // una conferma registrata senza importo è arrivata, ma non dà un importo né una differenza (D-60)
   const impOrdine = somma(p.ordini), impConferma = somma(p.conferme), confermaConImporto = !impConferma.isZero();
 
   const fasi = [
-    { titolo: p.ordini.length > 1 ? 'Ordini' : 'Ordine', fatta: true, numero: p.ordini.length ? numeri(p.ordini) : p.numero, data: p.data, importo: Number(impOrdine) },
+    { titolo: p.ordini.length > 1 ? 'Ordini' : 'Ordine', fatta: true, numero: p.ordini.length ? numeri(p.ordini) : p.numero, numeri: p.ordini.length ? tutti(p.ordini) : [p.numero], data: p.data, importo: Number(impOrdine) },
     p.conferme.length
-      ? { titolo: p.conferme.length > 1 ? 'Conferme' : 'Conferma', fatta: true, numero: numeri(p.conferme), data: p.conferme[0].data,
+      ? { titolo: p.conferme.length > 1 ? 'Conferme' : 'Conferma', fatta: true, numero: numeri(p.conferme), numeri: tutti(p.conferme), data: p.conferme[0].data,
           ...(confermaConImporto ? { importo: Number(impConferma), delta: Number(r2(impConferma.minus(impOrdine))) } : {}) }
       // conferma e proforma facoltative (D-60 §19): la proforma o la fattura fanno avanzare la pratica
-      : p.proforma.length ? { titolo: 'Proforma', fatta: true, numero: numeri(p.proforma), data: p.proforma[0].data, importo: Number(somma(p.proforma)) }
+      : p.proforma.length ? { titolo: 'Proforma', fatta: true, numero: numeri(p.proforma), numeri: tutti(p.proforma), data: p.proforma[0].data, importo: Number(somma(p.proforma)) }
         : s.chiave === 'fatturata' ? { titolo: 'Conferma', assente: true, testo: 'Non arrivata' }
           : {
             titolo: 'Conferma', ritardo: s.chiave === 'scaduta',
@@ -234,12 +235,12 @@ export function dettaglioPratica(S: Dati, id: string) {
     fatture.length
       ? {
         titolo: fatture.length > 1 ? 'Fatture' : 'Fattura', fatta: true,
-        numero: numeri(fatture), data: fatture[0].data,
+        numero: numeri(fatture), numeri: tutti(fatture), data: fatture[0].data,
         importo: Number(somma(fatture)), delta: Number(r2(somma(fatture).minus(confermaConImporto ? impConferma : impOrdine))),
       }
       : { titolo: 'Fattura', testo: 'In attesa' },
     note.length
-      ? { titolo: 'Nota di credito', fatta: true, numero: numeri(note), data: note[0].data, importo: Number(somma(note)) }
+      ? { titolo: 'Nota di credito', fatta: true, numero: numeri(note), numeri: tutti(note), data: note[0].data, importo: Number(somma(note)) }
       : { titolo: 'Nota di credito', assente: true, testo: 'Nessuna' },
   ];
 

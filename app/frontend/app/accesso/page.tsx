@@ -2,6 +2,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect } from 'react';
 import { Accesso } from '@/componenti/Accesso';
+import { atterraggio } from '@/componenti/Barra';
 import { Campo } from '@/componenti/Campo';
 import { api, dopo, type Io } from '@/lib/api';
 
@@ -9,10 +10,13 @@ import { api, dopo, type Io } from '@/lib/api';
 function Accedi() {
   const router = useRouter();
   const q = useSearchParams();
-  const ritorno = dopo(q.get('dopo'));
+  const chiesto = q.get('dopo');
+  const ritorno = dopo(chiesto);
+  // senza `dopo` si atterra sulla pagina di ingresso della prima area aperta (D-88), non su Oggi
+  const arrivo = (io: Io) => (chiesto ? ritorno : atterraggio(io));
   useEffect(() => { // già dentro: niente pagina di accesso
-    void api('accesso/io').then((r) => r.ok && router.replace(ritorno));
-  }, [router, ritorno]);
+    void api<Io>('accesso/io').then((r) => r.ok && router.replace(arrivo(r.dati)));
+  }, [router, ritorno, chiesto]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Accesso
       titolo="Accedi"
@@ -27,7 +31,7 @@ function Accedi() {
         if (r.stato === 401) return 'Credenziali non valide.';
         if (!r.ok) return r.messaggio;
         // replace: la pagina di accesso non resta nella cronologia
-        router.replace(r.dati.cambia_password ? '/accesso/cambia?dopo=' + encodeURIComponent(ritorno) : ritorno);
+        router.replace(r.dati.cambia_password ? '/accesso/cambia?dopo=' + encodeURIComponent(ritorno) : arrivo(r.dati));
       }}
     >
       <Campo nome="utente" etichetta="Nome utente o email" completa="username" />

@@ -107,6 +107,15 @@
   M.subagente = id => M.S.subagenti.find(s => s.id === Number(id));
   M.abbinamento = (piva, fid) => M.S.abbinamenti.find(a => a.cliente_piva === piva && a.fornitore_id === Number(fid));
   M.abbinamentoPerCodice = (fid, codice) => M.S.abbinamenti.find(a => a.fornitore_id === Number(fid) && (a.codice || '').toUpperCase() === String(codice || '').toUpperCase());
+  /* Cosa manca per aprire la pratica di un ordine (D-87 §19): null = si può aprire,
+     'agenzia' = nessun abbinamento (subagente + sconto) per il codice cliente,
+     'scaglione' = abbinamento presente ma nessuno scaglione del fornitore per quello sconto. */
+  M.mancaPratica = function (d) {
+    const ab = M.abbinamentoPerCodice(d.fornitore_id, d.codice_cliente);
+    if (!ab) return 'agenzia';
+    if (!M.scaglione(d.fornitore_id, ab.sconto, d.data)) return 'scaglione';
+    return null;
+  };
   M.pratica = id => M.S.pratiche.find(p => p.id === Number(id));
   M.praticaPerDocumento = numero => M.S.pratiche.find(p => p.documenti.some(d => d.numero === numero && (d.tipo === 'fattura' || d.tipo === 'nota_credito')));
 
@@ -597,6 +606,7 @@
   M.apriPratica = function (docId) {
     const i = M.S.in_arrivo.findIndex(d => d.id === docId);
     const doc = M.S.in_arrivo[i];
+    if (M.mancaPratica(doc)) return null;   // D-87: senza agenzia o scaglione la pratica non si apre
     const ab = M.abbinamentoPerCodice(doc.fornitore_id, doc.codice_cliente);
     const p = { id: Math.max.apply(null, M.S.pratiche.map(x => x.id)) + 1, numero: doc.numero, fornitore_id: doc.fornitore_id, cliente_piva: ab.cliente_piva, data: doc.data,
       documenti: [{ id: doc.id, tipo: 'ordine', numero: doc.numero, data: doc.data, file: doc.file, righe: doc.righe }] };

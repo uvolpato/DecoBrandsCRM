@@ -272,7 +272,7 @@ button.kpi[aria-pressed="true"] { background: var(--primario-tenue); outline: 2p
 
 /* ---------- Binario ---------- */
 .binario { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); padding: 18px; }
-.tappa { position: relative; padding-right: 18px; }
+.tappa { position: relative; padding-right: 18px; min-width: 0; }
 .tappa::before { content: ''; position: absolute; top: 11px; left: 26px; right: 0; height: 2px; background: var(--bordo); }
 .tappa:last-child::before { display: none; }
 .tappa.fatta::before { background: var(--primario); }
@@ -283,6 +283,12 @@ button.kpi[aria-pressed="true"] { background: var(--primario-tenue); outline: 2p
 .tappa .nodo .icona { width: 14px; height: 14px; stroke-width: 2.6; vertical-align: 0; }
 .tappa h3 { font-size: 13px; color: var(--testo-tenue); font-weight: 600; margin: 10px 0 2px; }
 .tappa .num { font-weight: 600; }
+/* pi�� documenti nella stessa fase (D-89): numeri affiancati, la riga scorre se non ci stanno */
+.tappa .numeri { display: flex; gap: 6px; overflow-x: auto; white-space: nowrap; padding-bottom: 2px; }
+.tappa .numeri > span { flex: none; font-weight: 600; }
+.tappa .numeri::-webkit-scrollbar { height: 6px; }
+.tappa .numeri::-webkit-scrollbar-thumb { background: var(--bordo); border-radius: 3px; }
+.tappa .numeri::-webkit-scrollbar-track { background: transparent; }
 .tappa .imp { font-size: 17px; font-weight: 700; margin-top: 2px; }
 .tappa .delta { display: inline-block; font-size: 12.5px; font-weight: 600; margin-top: 4px; padding: 1px 7px; border-radius: 999px; background: var(--attesa-tenue); color: var(--attesa-testo); }
 
