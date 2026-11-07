@@ -5,6 +5,7 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 import type { Response } from 'express';
 import { Richiede } from './accesso';
+import { cella } from './csv';
 import { righePagina } from './impostazioni';
 import { PrismaService } from './prisma.service';
 import { pulisciRegistro } from './registro';
@@ -208,10 +209,6 @@ export class RegistroController {
     const righe = await this.db.$queryRaw<RigaDb[]>`${base}
       SELECT * FROM base WHERE ${scelta}
       ORDER BY ts DESC, id DESC`;
-    const escaper = (v: unknown) => {
-      const x = String(v ?? '');
-      return /[;"\n\r]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x;
-    };
     const csv = [
       ['ts', 'genere', 'livello', 'codice', 'utente', 'servizio', 'entita', 'entita_id', 'esito', 'messaggio', 'dettaglio'],
       ...righe.map((r) => [
@@ -225,7 +222,7 @@ export class RegistroController {
       'Content-Disposition': `attachment; filename="Registro_${oggiRoma()}.csv"`,
       'X-Content-Type-Options': 'nosniff',
     });
-    return new StreamableFile(Buffer.from('\ufeff' + csv.map((r) => r.map(escaper).join(';')).join('\r\n'), 'utf8'));
+    return new StreamableFile(Buffer.from('\ufeff' + csv.map((r) => r.map(cella).join(';')).join('\r\n'), 'utf8'));
   }
 
   /** Dettaglio in finestra (§7.11): tutti i campi e il `dettaglio` JSON. */
@@ -244,7 +241,7 @@ export class RegistroController {
       dettaglio: r.dettaglio,
       utente: r.utente ? { id: String(r.utente.id), nome: r.utente.nome, email: r.utente.email } : null,
       operazione_id: r.operazione_id,
-      sessione_id: r.sessione_id, ip: r.ip, volte: r.volte, stato: r.stato, chiave: r.chiave,
+      ip: r.ip, volte: r.volte, stato: r.stato, chiave: r.chiave,
       ultimo: r.ultimo?.toISOString() ?? null, visto_il: r.visto_il?.toISOString() ?? null,
       chiusa_il: r.chiusa_il?.toISOString() ?? null,
       riferimento: riferimento(r.entita, r.entita_id, r.messaggio, r.codice, r.dettaglio),

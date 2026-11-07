@@ -31,6 +31,10 @@ app/
 4. `avvia.bat` apre backend (8002) e frontend (8001): http://localhost:8001
    Un solo processo per porta: se `start:dev` dice `EADDRINUSE`, c'è un backend vecchio acceso.
 
+Il backend parte solo con `NODE_ENV` esplicito (`development`, `test` o `production`): senza, si ferma
+all'avvio. `avvia.bat` lo imposta già a `development`; in `.env` c'è `NODE_ENV=development` (per
+l'esercizio: `production`).
+
 **Prove nel browser** (Playwright, fuori da `app/`, in `strumenti/prove/`), con i due processi
 accesi, da `backend/` dopo `npm run build`:
 

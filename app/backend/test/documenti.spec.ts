@@ -374,3 +374,22 @@ describe('GET /api/documenti/:id/file', () => {
     await lett.get('/documenti/999999999/file').expect(404);
   });
 });
+
+describe('documenti scartati: serve provvigioni.scartati', () => {
+  let scartato: bigint;
+  beforeAll(async () => {
+    const r = await op.carica(pdf('scartato-permesso')).expect(201);
+    scartato = BigInt(r.body.id);
+    await db.documenti_in_arrivo.update({ where: { id: scartato }, data: { stato: 'scartato', scartato_il: new Date(), motivo_scarto: 'Altro' } });
+  });
+
+  it('la sola lettura non legge né il file né il dettaglio di uno scartato (403)', async () => {
+    await lett.get(`/documenti/${scartato}/file`).expect(403);
+    await lett.get(`/documenti/${scartato}`).expect(403);
+  });
+
+  it("l'operatore (provvigioni.scartati) legge file e dettaglio (200)", async () => {
+    await op.get(`/documenti/${scartato}/file`).buffer(true).parse(raccogli).expect(200);
+    await op.get(`/documenti/${scartato}`).expect(200);
+  });
+});

@@ -48,7 +48,16 @@ export function configura(app: NestExpressApplication) {
   return app;
 }
 
+// L'ambiente deve essere esplicito: senza NODE_ENV il cookie non è `Secure` e le password
+// provvisorie finiscono nel log della posta. Valori ammessi: sviluppo, prove, esercizio.
+export function controllaAmbiente(env = process.env) {
+  const v = env.NODE_ENV;
+  if (v === 'development' || v === 'test' || v === 'production') return v;
+  throw new Error('NODE_ENV non impostato: metti NODE_ENV=development (sviluppo), test (prove) o production (esercizio) in backend/.env');
+}
+
 async function avvia() {
+  controllaAmbiente();
   const app = configura(await NestFactory.create<NestExpressApplication>(AppModule));
   const porta = Number(process.env.PORT ?? 8002);
   await app.listen(porta, '127.0.0.1'); // solo locale: dall'esterno si passa da Caddy

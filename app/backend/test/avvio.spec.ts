@@ -7,7 +7,7 @@ import { IsString } from 'class-validator';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Pubblica } from '../src/accesso';
-import { configura } from '../src/main';
+import { configura, controllaAmbiente } from '../src/main';
 import { PrismaService } from '../src/prisma.service';
 
 class Prova {
@@ -57,6 +57,7 @@ it("l'errore interno non esce verso il browser", async () => {
   const ev = await db.registro.findFirstOrThrow({ where: { operazione_id: r.body.codice } });
   expect(ev).toMatchObject({ codice: 'errore.error', esito: 'errore', ip: null });
   expect(ev.dettaglio).toMatchObject({ rotta: '/api/prova/rotto', http_status: 500, errore: { classe: 'Error' } });
+  expect(JSON.stringify(ev.dettaglio)).not.toContain('segreta'); // il testo dell'errore non va nel registro
   await db.$transaction([
     db.$executeRaw`SET LOCAL decobrands.pulizia_registro = 'si'`,
     db.registro.delete({ where: { id: ev.id } }),
@@ -64,3 +65,13 @@ it("l'errore interno non esce verso il browser", async () => {
 });
 
 it('rotta sconosciuta: 404', () => request(app.getHttpServer()).get('/api/niente').expect(404));
+
+describe('controllaAmbiente', () => {
+  it('sviluppo, prove ed esercizio passano; gli altri valori fermano l\'avvio', () => {
+    expect(controllaAmbiente({ NODE_ENV: 'development' })).toBe('development');
+    expect(controllaAmbiente({ NODE_ENV: 'test' })).toBe('test');
+    expect(controllaAmbiente({ NODE_ENV: 'production' })).toBe('production');
+    expect(() => controllaAmbiente({})).toThrow(/NODE_ENV/);
+    expect(() => controllaAmbiente({ NODE_ENV: 'staging' })).toThrow(/NODE_ENV/);
+  });
+});

@@ -50,8 +50,8 @@ export async function invia(db: Db, utente_id: bigint, tipo: 'benvenuto' | 'pass
       await chiudiAnomalia(db, 'posta', 'posta.respinta', m.a);
       await chiudiAnomalia(db, 'posta', 'posta.connessione', '');
     } else {
-      // il testo (password provvisorie, link) va nel log solo in sviluppo: in produzione mai le credenziali
-      log.log(`a ${m.a} · ${m.oggetto}` + (process.env.NODE_ENV === 'production' ? '' : `\n${m.testo}`));
+      // il testo (password provvisorie, link) va nel log solo in sviluppo: mai le credenziali altrove
+      log.log(`a ${m.a} · ${m.oggetto}` + (process.env.NODE_ENV === 'development' ? `\n${m.testo}` : ''));
     }
     await db.utenti.update({ where: { id: utente_id }, data: { ultimo_invio: esito } }).catch((e: unknown) => log.error(`ultimo_invio non scritto: ${String(e)}`));
   } catch (e) {

@@ -27,7 +27,7 @@ it("l'evento nasce con l'operazione e sparisce con il suo rollback", async () =>
   await inTransazione(async (tx) => {
     id = (await logEvent(tx, login, { ip: '10.0.0.1', sessione_id: 's1' })).id;
     const r = await tx.registro.findUniqueOrThrow({ where: { id } });
-    expect(r).toMatchObject({ genere: 'evento', codice: 'auth.login', livello: 'info', ip: '10.0.0.1', sessione_id: 's1' });
+    expect(r).toMatchObject({ genere: 'evento', codice: 'auth.login', livello: 'info', ip: '10.0.0.1', sessione_id: null });
   });
   expect(await db.registro.findUnique({ where: { id } })).toBeNull();
 });

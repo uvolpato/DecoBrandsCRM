@@ -92,6 +92,18 @@ describe('F6-A1 un giro della casella', () => {
     expect(await anomalia('casella.vuota', 'aperta')).toBe(1);
   });
 
+  it('email oltre il limite: non scaricata, casella.allegato e si sposta', async () => {
+    const { apri, sposta } = apriFinto([
+      { uid: 1, da: '', oggetto: '', allegati: [], troppoGrande: 123456789 },
+      msg(2, 'Fattura', 'fornitore@x.it', [{ nome: 'fattura.pdf', dati: pdf('fattura 1') }]),
+    ]);
+    const r = await giroCasella(db, config, apri, ora);
+    expect(r).toMatchObject({ email: 2, presi: 1, ignorati: 0, esito: 'attenzione' });
+    expect(await anomalia('casella.allegato', 'aperta')).toBe(1);
+    expect(await db.documenti_in_arrivo.count()).toBe(1);
+    expect(sposta).toHaveBeenCalledTimes(2); // anche l'email troppo grande va spostata
+  });
+
   it('connessione fallita 3 volte: casella.connessione aperta; al primo giro riuscito si chiude', async () => {
     const apriKo: ApriCasella = async () => { throw new Error('ECONNREFUSED'); };
     for (let i = 0; i < 3; i++) {

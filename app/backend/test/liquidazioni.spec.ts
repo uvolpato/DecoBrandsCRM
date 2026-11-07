@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import ExcelJS from 'exceljs';
 import request from 'supertest';
 import { sofficeDisponibile } from '../src/esporta-liquidazione';
+import { cella as cellaCsv } from '../src/csv';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { caricaDati, giornoRoma, ultimaChiusura } from '../src/motore/dati';
@@ -326,6 +327,16 @@ describe('GET /api/liquidazione/export', () => {
     expect(righeRip[0]).toBe('Subagente;Documenti;Imponibile;Provvigione da liquidare;In attesa dei bollettini');
     expect(righeRip.length - 1).toBe(b.subagenti.length);
     expect(righeRip[1].split(';')[0]).toBe(b.subagenti[0].nome);
+  });
+
+  it('CSV: formula injection neutralizzata (apice davanti a =, +, @, tab e - non seguito da cifra)', () => {
+    expect(cellaCsv('=1+1')).toBe("'=1+1");
+    expect(cellaCsv('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(cellaCsv('+123')).toBe("'+123");
+    expect(cellaCsv('\tX')).toBe("'\tX");
+    expect(cellaCsv('-abc')).toBe("'-abc");
+    expect(cellaCsv('-12,50')).toBe('-12,50'); // numero negativo: resta numero
+    expect(cellaCsv('nome;')).toBe('"nome;"');
   });
 
   (sofficeDisponibile() ? it : it.skip)('PDF: il medesimo .xlsx convertito, inizia con %PDF-', async () => {

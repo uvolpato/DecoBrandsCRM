@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import type { Request, Response } from 'express';
 import { Richiede, contesto } from './accesso';
+import { cella } from './csv';
 import { ragioneSociale } from './impostazioni';
 import { liquidazione } from './liquidazioni';
 import { giornoRoma } from './motore/dati';
@@ -278,7 +279,6 @@ function excel(m: Modello): Promise<Buffer> {
 
 /* ---------- CSV (solo dati, §11) ---------- */
 
-const q = (v: unknown) => { const x = String(v ?? ''); return /[;"\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
 const num = (v: number) => (Math.round(v * 100) / 100).toFixed(2).replace('.', ',');
 
 function csv(m: Modello): Buffer {
@@ -297,7 +297,7 @@ function csv(m: Modello): Buffer {
         num(x.imponibile), num(x.pct), num(x.provvigione), x.liquidabile ? 'liquidabile' : 'in attesa del bollettino']);
     }
   }
-  return Buffer.from('\ufeff' + righe.map((r) => r.map(q).join(';')).join('\r\n'), 'utf8');
+  return Buffer.from('\ufeff' + righe.map((r) => r.map(cella).join(';')).join('\r\n'), 'utf8');
 }
 
 /* ---------- PDF: conversione del medesimo .xlsx con LibreOffice (§11) ---------- */

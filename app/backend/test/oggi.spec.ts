@@ -207,4 +207,16 @@ describe('F5-A1 pagina Oggi', () => {
     await altro.agente.post('/api/solleciti/conferme').set('x-csrf-token', altro.csrf)
       .send({ fornitore_id: Number(f.fornitore_id) }).expect(403);
   });
+
+  it('POST /api/solleciti/conferme: scrive nel registro, la sola lettura è 403', async () => {
+    const S = await caricaDati(db, OGGI);
+    const f = sollecitiConferme(S).per_fornitore[0];
+    const le = await (async () => {
+      const agente = request.agent(app.getHttpServer());
+      const r = await agente.post('/api/accesso/entra').send({ utente: 'lett-oggi', password: PW }).expect(200);
+      return { agente, csrf: r.body.csrf as string };
+    })();
+    await le.agente.post('/api/solleciti/conferme').set('x-csrf-token', le.csrf)
+      .send({ fornitore_id: Number(f.fornitore_id) }).expect(403);
+  });
 });

@@ -114,6 +114,14 @@ describe('entra', () => {
     expect(r.headers['set-cookie']?.[0].split(';')[0]).not.toBe(prima);
     expect((await a.get('/api/accesso/io')).body.ruolo).toBe('amministratore');
   });
+
+  it("l'evento auth.login non salva la sessione: basta utente e IP", async () => {
+    await entra('oper');
+    const ev = await db.registro.findFirstOrThrow({ where: { codice: 'auth.login', esito: 'successo' }, orderBy: { id: 'desc' } });
+    expect(ev.sessione_id).toBeNull();
+    expect(ev.ip).toBeTruthy();
+    expect(JSON.stringify(ev.dettaglio)).not.toContain('sessione_id');
+  });
 });
 
 describe('password provvisoria e cambio', () => {
@@ -285,7 +293,22 @@ describe('limite ai tentativi', () => {
 
   it('valori dal .env, con quelli predefiniti se mancano o non sono numeri', () => {
     expect(limiti({ TENTATIVI: '5', TENTATIVI_IP: '300', TENTATIVI_MINUTI: '1' }).map((l) => [l.name, l.limit, l.ttl]))
-      .toEqual([['persona', 5, 60_000], ['ip', 300, 60_000]]);
-    expect(limiti({ TENTATIVI: 'x', TENTATIVI_IP: '0.5', TENTATIVI_MINUTI: 'Infinity' }).map((l) => [l.limit, l.ttl])).toEqual([[10, 900_000], [100, 900_000]]);
+      .toEqual([['persona', 5, 60_000], ['ip', 300, 60_000], ['caricamenti', 100, 60_000]]);
+    expect(limiti({ TENTATIVI: 'x', TENTATIVI_IP: '0.5', TENTATIVI_MINUTI: 'Infinity' }).map((l) => [l.limit, l.ttl])).toEqual([[10, 900_000], [100, 900_000], [100, 900_000]]);
+    expect(limiti({ TENTATIVI_CARICAMENTI: '7' })[2].limit).toBe(7);
+  });
+
+  it('il contatore della persona non dipende dall\'IP: 11 tentativi con X-Forwarded-For diversi, l\'11° è 429', async () => {
+    const codici: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      codici.push((await request(app.getHttpServer()).post('/api/accesso/entra')
+        .set('X-Forwarded-For', `10.0.0.${i + 1}`)
+        .send({ utente: 'bersaglio-ip', password: 'x' })).status);
+    }
+    expect(codici.slice(0, 10).every((c) => c === 401)).toBe(true);
+    expect(codici[10]).toBe(429);
+    const oltre = await request(app.getHttpServer()).post('/api/accesso/entra')
+      .set('X-Forwarded-For', '10.0.0.99').send({ utente: 'bersaglio-ip', password: 'x' });
+    expect(oltre.body.message).toMatch(/Troppi tentativi/);
   });
 });

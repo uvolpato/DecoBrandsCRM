@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { sofficeDisponibile } from '../src/esporta-liquidazione';
+import { cella as cellaCsv } from '../src/csv';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
@@ -281,6 +282,16 @@ describe('GET /api/analisi/esporta', () => {
     const totale = righe.slice(1).reduce((s, x) => s + Number(x.split(';')[7].replace(',', '.')), 0);
     expect(M.r2(totale)).toBe(b.numeri.fatturato);
     expect(righe[1]).toMatch(/^\d{2}\/\d{2}\/\d{4};/);
+  });
+
+  it('CSV: formula injection neutralizzata (apice davanti a =, +, @, tab e - non seguito da cifra)', () => {
+    expect(cellaCsv('=1+1')).toBe("'=1+1");
+    expect(cellaCsv('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(cellaCsv('+123')).toBe("'+123");
+    expect(cellaCsv('\tX')).toBe("'\tX");
+    expect(cellaCsv('-abc')).toBe("'-abc");
+    expect(cellaCsv('-12,50')).toBe('-12,50'); // numero negativo: resta numero
+    expect(cellaCsv('nome;')).toBe('"nome;"');
   });
 
   (sofficeDisponibile() ? it : it.skip)('PDF: il medesimo .xlsx convertito, inizia con %PDF-', async () => {

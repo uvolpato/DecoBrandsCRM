@@ -95,7 +95,7 @@ function controlla(codice: string, dettaglio: Record<string, unknown>) {
 export async function logEvent(db: Db, e: Evento, ctx: Contesto = {}) {
   const codice = `${e.tipo}.${e.azione}`;
   controlla(codice, e.dettaglio);
-  const conRete = e.tipo === 'auth' || e.esito === 'negato'; // IP e sessione solo qui (§15.1)
+  const conIp = e.tipo === 'auth' || e.esito === 'negato'; // solo l'IP qui (§15.1); la sessione non si salva più
   return db.registro.create({
     data: {
       genere: 'evento',
@@ -109,8 +109,8 @@ export async function logEvent(db: Db, e: Evento, ctx: Contesto = {}) {
       dettaglio: e.dettaglio as Prisma.InputJsonValue,
       utente_id: ctx.utente_id ?? null,
       operazione_id: e.operazione_id,
-      sessione_id: conRete ? ctx.sessione_id : null,
-      ip: conRete ? ctx.ip : null,
+      sessione_id: null,
+      ip: conIp ? ctx.ip : null,
     },
   });
 }

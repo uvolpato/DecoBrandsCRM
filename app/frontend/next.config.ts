@@ -8,7 +8,11 @@ const config: NextConfig = {
   // deve chiudere la richiesta prima (F4-A3, §11).
   experimental: { proxyTimeout: 180_000 },
   // Le intestazioni di sicurezza delle pagine; /api le mette Helmet nel backend.
+  // `unsafe-eval` solo in sviluppo: lo usano Next e le prove Playwright; in esercizio resta fuori.
   async headers() {
+    const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'" +
+      (process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'") +
+      "; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'";
     return [
       {
         source: '/((?!api/).*)',
@@ -16,7 +20,7 @@ const config: NextConfig = {
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+          { key: 'Content-Security-Policy', value: csp },
         ],
       },
     ];

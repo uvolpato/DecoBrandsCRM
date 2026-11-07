@@ -10,6 +10,7 @@ import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
 import { pulisciRegistro } from '../src/registro';
+import { cella as escaper } from '../src/csv';
 import { seed } from '../prisma/seed';
 import { svuota } from './svuota';
 
@@ -207,7 +208,7 @@ describe('F5-A2 elenco del registro', () => {
       dettaglio: { etichetta: 'OF in errore', rotta: '/api/x' },
       utente: { id: String(ammiId), nome: 'Prova ammi-api', email: 'ammi-api' + DOMINIO },
     });
-    expect(d.sessione_id).toBeNull();
+    expect(d.sessione_id).toBeUndefined();
     expect(d.ip).toBeNull();
     expect(d.visto_il).toBeNull();
     expect(d.chiusa_il).toBeNull();
@@ -271,5 +272,17 @@ describe('F5-A2 pulizia notturna', () => {
     expect(await db.registro.count({ where: { messaggio: PULIZIA + ' errore vecchio' } })).toBe(1);
     expect(await db.registro.count({ where: { messaggio: PULIZIA + ' anomalia chiusa' } })).toBe(0);
     expect(await db.registro.count({ where: { messaggio: PULIZIA + ' anomalia aperta' } })).toBe(1);
+  });
+});
+
+describe('CSV del registro: formula injection', () => {
+  it('un valore che comincia con =, +, @, tab o - non seguito da cifra è preceduto dall\'apice', () => {
+    expect(escaper('=1+1')).toBe("'=1+1");
+    expect(escaper('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(escaper('+testo')).toBe("'+testo");
+    expect(escaper('\tX')).toBe("'\tX");
+    expect(escaper('-abc')).toBe("'-abc");
+    expect(escaper('-12,50')).toBe('-12,50'); // numero negativo: resta numero
+    expect(escaper('normale')).toBe('normale');
   });
 });

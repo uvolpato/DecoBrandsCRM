@@ -167,19 +167,20 @@ const NON_VALIDE = 'Credenziali non valide';
 const UN_ORA = 3600 * 1000;
 const impronta = (codice: string) => createHash('sha256').update(codice).digest('hex');
 
-/** Limite ai tentativi (D-41): ogni persona ha il suo contatore (IP e nome utente, email, link o
+/** Limite ai tentativi (D-41): ogni persona ha il suo contatore (nome utente, email, link o
  *  sessione), perché in ufficio tutti escono con lo stesso IP; il tetto largo per solo IP (in
  *  app.module) ferma chi prova tanti nomi o email diversi. Valori nel .env, si azzerano da soli. */
 const CAMPO: Record<string, 'utente' | 'email' | 'codice'> = { entra: 'utente', dimenticata: 'email', reimposta: 'codice' };
 
 @Injectable()
-class TentativiGuard extends ThrottlerGuard {
+export class TentativiGuard extends ThrottlerGuard {
   protected getTracker(req: Request, ctx?: ExecutionContext) { // la libreria passa anche il contesto
     // il campo lo decide la rotta, non chi scrive il corpo; cambio password: la sessione
     const campo = ctx && CAMPO[ctx.getHandler().name];
     const v = campo && (req.body as Record<string, unknown> | undefined)?.[campo];
     const chi = typeof v === 'string' ? v.trim().toLowerCase() : req.session?.utente_id;
-    return Promise.resolve(`${req.ip}|${chi ?? ''}`);
+    // solo la persona: il tetto largo per IP sta nel throttler `ip` (D-41); se manca, l'IP
+    return Promise.resolve(chi || String(req.ip));
   }
 }
 
@@ -222,8 +223,8 @@ export class AccessoController {
     await this.db.utenti.update({ where: { id: u.id }, data: { ultimo_accesso: new Date() } });
     await logEventSicuro(this.db, {
       tipo: 'auth', azione: 'login', entita: 'utente', entita_id: u.id, esito: 'successo',
-      dettaglio: { etichetta: u.username, modo: 'password', sessione_id: req.sessionID },
-    }, { utente_id: u.id, sessione_id: req.sessionID, ip: req.ip });
+      dettaglio: { etichetta: u.username, modo: 'password' },
+    }, { utente_id: u.id, ip: req.ip });
     req.utente = u;
     return this.io(req);
   }
@@ -236,7 +237,7 @@ export class AccessoController {
     const u = req.utente!;
     await logEventSicuro(this.db, {
       tipo: 'auth', azione: 'logout', entita: 'utente', entita_id: u.id, esito: 'successo',
-      dettaglio: { etichetta: u.username, sessione_id: req.sessionID },
+      dettaglio: { etichetta: u.username },
     }, contesto(req));
     await new Promise((ok) => req.session.destroy(ok)); // cancella anche la riga in sessioni
   }

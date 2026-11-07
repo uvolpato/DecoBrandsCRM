@@ -1,8 +1,9 @@
 import {
-  BadRequestException, Body, applyDecorators, ConflictException, Controller, Delete, Get, HttpCode, Logger, NotFoundException, Param, ParseIntPipe,
-  PayloadTooLargeException, Post, Put, Query, Req, Res, StreamableFile, UnsupportedMediaTypeException, UploadedFile, UseInterceptors,
+  BadRequestException, Body, applyDecorators, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, NotFoundException, Param, ParseIntPipe,
+  PayloadTooLargeException, Post, Put, Query, Req, Res, StreamableFile, UnsupportedMediaTypeException, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
@@ -11,7 +12,7 @@ import { constants } from 'node:fs';
 import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import type { Request, Response } from 'express';
-import { Richiede, contesto } from './accesso';
+import { permessiDi, Richiede, TentativiGuard, contesto } from './accesso';
 import { Data, Facoltativo } from './fornitori';
 import { righePagina } from './impostazioni';
 import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
@@ -472,9 +473,12 @@ export class DocumentiController {
     }));
   }
 
-  /** Caricamento manuale (§8.1): multipart, campo `file`, un PDF o una foto (D-60). Va in coda "da leggere". */
+  /** Caricamento manuale (§8.1): multipart, campo `file`, un PDF o una foto (D-60). Va in coda "da leggere".
+   *  Tetto dedicato per utente (TENTATIVI_CARICAMENTI): persona e ip qui non valgono (§3.3, D-41). */
   @Post('carica')
   @Richiede('provvigioni.modifica')
+  @UseGuards(TentativiGuard)
+  @SkipThrottle({ persona: true, ip: true })
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_BYTE, files: 1 } }))
   async carica(@Req() req: Request, @UploadedFile() file?: { originalname: string; buffer: Buffer }) {
     if (!file) throw new BadRequestException('Manca il file');
@@ -485,9 +489,11 @@ export class DocumentiController {
    *  (D-60), mai dal browser; la risposta è in linea e chiusa in una sandbox. */
   @Get(':id/file')
   @Richiede('provvigioni.consulta')
-  async file(@Param('id', ParseIntPipe) id: number, @Res({ passthrough: true }) res: Response) {
-    const d = await this.db.documenti_in_arrivo.findUnique({ where: { id: BigInt(id) }, select: { file_percorso: true, file_nome: true } });
+  async file(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Res({ passthrough: true }) res: Response) {
+    const d = await this.db.documenti_in_arrivo.findUnique({ where: { id: BigInt(id) }, select: { file_percorso: true, file_nome: true, stato: true } });
     if (!d) throw new NotFoundException('Documento non trovato');
+    // uno scartato si vede solo con il permesso provvigioni.scartati, non con la sola consulta (§7.16)
+    if (d.stato === 'scartato' && !permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('provvigioni.scartati')) throw new ForbiddenException();
     const radice = resolve(process.env.DOCUMENTI_DIR ?? '');
     if (!process.env.DOCUMENTI_DIR) throw new Error('DOCUMENTI_DIR non definita in .env');
     const percorso = resolve(radice, d.file_percorso);
@@ -514,8 +520,13 @@ export class DocumentiController {
    *  testata e righe dai valori finali, proposta di abbinamento ricalcolata. */
   @Get(':id')
   @Richiede('provvigioni.consulta')
-  async dettaglio(@Param('id', ParseIntPipe) id: number) {
-    return dettaglioDocumento(this.db, BigInt(id));
+  async dettaglio(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
+    const did = BigInt(id);
+    const d = await this.db.documenti_in_arrivo.findUnique({ where: { id: did }, select: { stato: true } });
+    if (!d) throw new NotFoundException('Documento non trovato');
+    // uno scartato si apre solo con il permesso provvigioni.scartati, non con la sola consulta (§7.16)
+    if (d.stato === 'scartato' && !permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('provvigioni.scartati')) throw new ForbiddenException();
+    return dettaglioDocumento(this.db, did);
   }
 
   /** Correzione dei dati letti (F6-A4a, §6.5 punto 7, D-72). Una transazione con la riga bloccata

@@ -43,13 +43,15 @@ class SaluteController {
 
 /** Limite ai tentativi, solo dove c'è TentativiGuard (D-41): per persona e, più largo, per IP;
  *  ogni operazione (entra, dimenticata, …) ha i suoi contatori, così chi riempie una pagina non
- *  blocca le altre. Finestra in minuti; finita la finestra il contatore riparte da zero. */
+ *  blocca le altre. `caricamenti` è il tetto dedicato di POST /documenti/carica, per utente.
+ *  Finestra in minuti; finita la finestra il contatore riparte da zero. */
 export function limiti(env = process.env) {
   const n = (v: string | undefined, d: number) => (Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : d);
   const ttl = n(env.TENTATIVI_MINUTI, 15) * 60_000;
   return [
     { name: 'persona', ttl, limit: n(env.TENTATIVI, 10) },
     { name: 'ip', ttl, limit: n(env.TENTATIVI_IP, 100), getTracker: (req: Record<string, unknown>) => String(req.ip) },
+    { name: 'caricamenti', ttl, limit: n(env.TENTATIVI_CARICAMENTI, 100), getTracker: (req: { session?: { utente_id?: string }; ip?: string }) => String(req.session?.utente_id ?? req.ip) },
   ];
 }
 

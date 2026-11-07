@@ -274,6 +274,11 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 ## 11. Fase 7 — Collaudo e rilascio (5 h)
 
+#### F7-A0 · Correzioni di sicurezza dopo l'audit OWASP — 3 h **da approvare**
+- **Dipende da:** merge F1–F6 · **Output:** le correzioni di D-80…D-86 con le loro prove: formula injection nei CSV (liquidazione, Analisi, Registro con un solo `cella`), limite ai tentativi davvero per persona e tetto ai caricamenti (`TENTATIVI_CARICAMENTI`), casella che legge la dimensione prima del download, permessi di solleciti e documenti scartati, `NODE_ENV` obbligatorio con il testo delle email nel log solo in sviluppo, registro senza identificativo di sessione e senza messaggio delle eccezioni, CSP completa delle pagine.
+- **DoD:** `npm test` 0 KO (35 suite, 487 prove); prove browser del collaudo 0 KO; documenti allineati nello stesso commit.
+- **Ore:** 3 h **fuori preventivo**: non entrano nel totale di §4 finché Ugo non le approva.
+
 #### F7-A1 · Verifica replicazione + E2E — 3 h
 - **Dipende da:** merge F1–F6 · **Output:** report checklist §1.1 per **tutte** le schermate (una riga per criterio), test E2E su flussi critici (stati pratica, NC → netto, multifiltro, export, eventi)
 - **DoD:** 6/6 criteri su ogni schermata; numeri seed §12 identici al prototipo; zero divergenze aperte.

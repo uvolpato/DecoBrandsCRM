@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import { IsIn, IsOptional, Matches } from 'class-validator';
 import type { Response } from 'express';
 import { Richiede } from './accesso';
+import { cella } from './csv';
 import { convertiPdf } from './esporta-liquidazione';
 import { ragioneSociale } from './impostazioni';
 import { type Dati, caricaDati } from './motore/dati';
@@ -375,14 +376,13 @@ async function excel(S: Dati, c: Calcolo, q: Filtri, azienda = '') {
 function csv(S: Dati, c: Calcolo) {
   const N = nomi(S);
   const { f, s } = N;
-  const q = (v: unknown) => { const x = String(v ?? ''); return /[;"\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
   const num = (v: number) => v.toFixed(2).replace('.', ',');
   const righe = [['Data', 'Documento', 'Tipo', 'Fornitore', 'Partita IVA cliente', 'Cliente', 'Subagente', 'Fatturato', 'Dai fornitori', 'Ai subagenti', 'Margine']];
   for (const x of c.sel) {
     righe.push([dataIt(x.data), x.numero, x.tipo === 'nota_credito' ? 'nota di credito' : 'fattura', f(x.fornitore_id),
       S.clienti.get(x.cliente_id)?.piva ?? '', N.c(x.cliente_id), s(x.subagente_id), num(n(x.importo)), num(n(x.prese)), num(n(x.pagate)), num(n(x.margine))]);
   }
-  return Buffer.from('\ufeff' + righe.map((r) => r.map(q).join(';')).join('\r\n'), 'utf8');
+  return Buffer.from('\ufeff' + righe.map((r) => r.map(cella).join(';')).join('\r\n'), 'utf8');
 }
 
 /* ---------- Rotte ---------- */

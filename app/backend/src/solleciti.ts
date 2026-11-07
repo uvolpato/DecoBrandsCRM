@@ -42,7 +42,7 @@ export class SollecitiController {
    *  con le pratiche in ritardo di adesso (ricalcolate qui, non arrivate dal browser, V12). */
   @Post('conferme')
   @HttpCode(204)
-  @Richiede('provvigioni.consulta')
+  @Richiede('provvigioni.modifica')
   async copia(@Req() req: Request, @Body() b: SollecitoConferme) {
     const S = await caricaDati(this.db, giornoRoma(new Date()));
     const f = sollecitiConferme(S).per_fornitore.find((x) => x.fornitore_id === String(b.fornitore_id));

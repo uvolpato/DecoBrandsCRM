@@ -20,6 +20,11 @@ export class ErroriFilter implements ExceptionFilter {
     const res = host.switchToHttp().getResponse<Response>();
 
     if (errore instanceof HttpException) {
+      // il 429 del throttler porta un testo in inglese: la finestra parla italiano (§3.3, D-41)
+      if (errore.getStatus() === 429) {
+        res.status(429).json({ statusCode: 429, message: 'Troppi tentativi ravvicinati: riprova fra qualche minuto.' });
+        return;
+      }
       res.status(errore.getStatus()).json(errore.getResponse());
       return;
     }
@@ -37,7 +42,8 @@ export class ErroriFilter implements ExceptionFilter {
         rotta: req.path, // senza query: niente parametri nel log (§15.8)
         metodo: req.method,
         http_status: 500,
-        errore: { classe: e.constructor.name, messaggio: e.message.slice(0, 300) },
+        // mai il testo dell'errore (può contenere valori di riga): classe e, per Prisma, il codice
+        errore: { classe: e.constructor.name, ...(typeof (e as { code?: string }).code === 'string' ? { codice: (e as { code?: string }).code } : {}) },
       },
     });
     res.status(500).json({ statusCode: 500, message: 'Errore interno', codice });

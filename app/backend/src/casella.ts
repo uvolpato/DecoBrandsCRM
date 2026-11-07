@@ -2,7 +2,7 @@ import { ConflictException, Injectable, Logger, OnModuleDestroy, OnModuleInit, P
 import { Prisma } from '@prisma/client';
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
-import { riceviDocumento } from './documenti';
+import { riceviDocumento, MAX_BYTE } from './documenti';
 import { pulisci } from './integra';
 import { casellaConfig } from './impostazioni';
 import { PrismaService } from './prisma.service';
@@ -31,6 +31,7 @@ export interface MessaggioEmail {
   da: string;
   oggetto: string;
   allegati: AllegatoEmail[]; // solo allegati veri, non immagini incorporate
+  troppoGrande?: number; // dimensione oltre DOCUMENTI_MAX_MB: non scaricata, solo l'anomalia
 }
 export interface CasellaAperta {
   messaggi: AsyncIterable<MessaggioEmail>;
@@ -51,6 +52,7 @@ const TESTO = {
   connessione: 'La casella dei documenti non risponde da 3 giri di fila: verificare server, utente e password in Impostazioni → Casella.',
   cartella: (nome: string) => `La cartella ${nome} non esiste nella casella: crearla o correggere il nome in Impostazioni → Casella.`,
   allegato: (nome: string) => `L'allegato ${nome} non è un PDF né una foto (JPEG, PNG): si scarta; aprire l'email e caricare il documento a mano da Documenti.`,
+  troppoGrande: 'Un\'email della casella supera il limite dei documenti: non si scarica; aprire l\'email e caricare il documento a mano da Documenti.',
   vuota: 'Un\'email della casella dei fornitori è arrivata senza allegati: verificare se il documento era nel corpo dell\'email.',
 };
 
@@ -62,11 +64,22 @@ class ErroreCartella extends Error {
   }
 }
 
-/** I messaggi della cartella, letti uno alla volta e già trasformati in MessaggioEmail. */
+/** I messaggi della cartella, letti uno alla volta e già trasformati in MessaggioEmail. Prima si
+ *  legge solo uid e dimensione (niente corpo), poi si scarica (fetchOne) solo l'email sotto il
+ *  limite: un allegato enorme da un mittente qualsiasi non finisce in memoria. */
 async function* leggiMessaggi(client: ImapFlow): AsyncIterable<MessaggioEmail> {
-  for await (const m of client.fetch('1:*', { uid: true, source: true })) {
-    if (!m.source) continue;
-    const parsed = await simpleParser(m.source);
+  const elenco: { uid: number; size?: number }[] = [];
+  for await (const m of client.fetch('1:*', { uid: true, size: true })) {
+    elenco.push({ uid: m.uid, size: m.size });
+  }
+  for (const m of elenco) {
+    if ((m.size ?? 0) > MAX_BYTE) {
+      yield { uid: m.uid, da: '', oggetto: '', allegati: [], troppoGrande: m.size ?? 0 };
+      continue;
+    }
+    const msg = await client.fetchOne(String(m.uid), { source: true }, { uid: true });
+    if (!msg || !msg.source) continue;
+    const parsed = await simpleParser(msg.source);
     const allegati: AllegatoEmail[] = [];
     for (const a of parsed.attachments ?? []) {
       if (!a.filename || a.cid || a.related) continue; // le immagini incorporate nei loghi non sono documenti
@@ -83,8 +96,9 @@ async function* leggiMessaggi(client: ImapFlow): AsyncIterable<MessaggioEmail> {
 }
 
 /** Unico punto che conosce imapflow: apre la cartella e la restituisce da scorrere (§6.5 punto 1).
- *  shortcut: un'email intera sta in memoria (`source`); con allegati molto grandi o tante email
- *  insieme si passerà al download del singolo allegato via `bodyStructure`. */
+ *  shortcut: si leggono prima solo uid e dimensione e si scarica (fetchOne) solo l'email sotto il
+ *  limite; l'email sotto soglia sta comunque tutta in memoria (`source`), per il download del
+ *  singolo allegato si passerà a `bodyStructure`. */
 export async function apriImap(config: ConfigCasella): Promise<CasellaAperta> {
   const client = new ImapFlow({
     host: config.server, port: config.porta, secure: config.porta === 993,
@@ -157,6 +171,16 @@ export async function giroCasella(db: PrismaService, config: ConfigCasella, apri
     try {
       for await (const msg of casella.messaggi) {
         email++;
+        // email oltre il limite: non scaricata, resta solo l'anomalia casella.allegato e si sposta
+        if (msg.troppoGrande) {
+          esito = 'attenzione';
+          await apriAnomalia(db, {
+            servizio: 'casella', codice: 'casella.allegato', chiave: String(msg.uid), livello: 'attenzione',
+            messaggio: TESTO.troppoGrande, dettaglio: { nome: String(msg.uid), errore: `dimensione ${msg.troppoGrande} byte` },
+          }, ora);
+          await casella.sposta(msg.uid).catch((e) => log.warn(`email ${msg.uid} non spostata: ${pulisci(e)}`));
+          continue;
+        }
         let vuota = msg.allegati.length === 0;
         for (const a of msg.allegati) {
           try {
