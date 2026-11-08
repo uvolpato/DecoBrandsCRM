@@ -51,12 +51,17 @@ function mappaAgente(a: agenti & { _count?: { subagenti: number } }) {
   };
 }
 
-function mappaSubagente(s: subagenti & { agente?: { id: bigint; codice: string; nome: string; cognome: string } | null }) {
+function mappaSubagente(s: subagenti & {
+  agente?: { id: bigint; codice: string; nome: string; cognome: string } | null;
+  soggetto?: { id: bigint; codice: string } | null;
+}) {
   return {
     id: String(s.id),
     agente_id: String(s.agente_id),
     agente: s.agente ? `${s.agente.cognome} ${s.agente.nome}` : null,
     agente_codice: s.agente?.codice ?? null,
+    soggetto_id: s.soggetto ? String(s.soggetto.id) : null, // D-102: l'anagrafica unica
+    soggetto_codice: s.soggetto?.codice ?? null,
     codice: s.codice,
     nome: s.nome,
     cognome: s.cognome,
@@ -84,7 +89,7 @@ export class AgentiController {
   async dettaglio(@Param('id', ParseIntPipe) id: number) {
     const a = await this.db.agenti.findUnique({
       where: { id: BigInt(id) },
-      include: { subagenti: { orderBy: [{ cognome: 'asc' }, { nome: 'asc' }] } },
+      include: { subagenti: { orderBy: [{ cognome: 'asc' }, { nome: 'asc' }], include: { soggetto: { select: { id: true, codice: true } } } } },
     });
     if (!a) throw new NotFoundException('Agente non trovato');
     return {
@@ -102,7 +107,7 @@ export class SubagentiController {
   @Richiede('dati.consulta')
   async elenco() {
     const s = await this.db.subagenti.findMany({
-      include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } } },
+      include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } }, soggetto: { select: { id: true, codice: true } } },
       orderBy: [{ cognome: 'asc' }, { nome: 'asc' }],
     });
     return s.map((x) => mappaSubagente(x as never));
@@ -113,7 +118,7 @@ export class SubagentiController {
   async scheda(@Param('id', ParseIntPipe) id: number) {
     const s = await this.db.subagenti.findUnique({
       where: { id: BigInt(id) },
-      include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } } },
+      include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } }, soggetto: { select: { id: true, codice: true } } },
     });
     if (!s) throw new NotFoundException('Subagente non trovato');
     return mappaSubagente(s as never);
@@ -134,7 +139,7 @@ export class SubagentiController {
           email: b.email ? b.email.trim().toLowerCase() : null,
           attivo: b.attivo ?? true,
         },
-        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } } },
+        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } }, soggetto: { select: { id: true, codice: true } } },
       });
       await logEvent(tx, {
         tipo: 'crud', azione: 'create', entita: 'subagente', entita_id: creato.id, esito: 'successo',
@@ -152,7 +157,7 @@ export class SubagentiController {
       await tx.$queryRaw`SELECT id FROM subagenti WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
       const prima = await tx.subagenti.findUnique({
         where: { id: BigInt(id) },
-        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } } },
+        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } }, soggetto: { select: { id: true, codice: true } } },
       });
       if (!prima) throw new NotFoundException('Subagente non trovato');
       if (b.agente_id !== undefined) {
@@ -187,7 +192,7 @@ export class SubagentiController {
           email: dopoData.email,
           agente_id: dopoData.agente_id,
         },
-        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } } },
+        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } }, soggetto: { select: { id: true, codice: true } } },
       });
       await logEvent(tx, {
         tipo: 'crud', azione: 'update', entita: 'subagente', entita_id: prima.id, esito: 'successo',
@@ -205,14 +210,14 @@ export class SubagentiController {
       await tx.$queryRaw`SELECT id FROM subagenti WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
       const s = await tx.subagenti.findUnique({
         where: { id: BigInt(id) },
-        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } } },
+        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } }, soggetto: { select: { id: true, codice: true } } },
       });
       if (!s) throw new NotFoundException('Subagente non trovato');
       if (s.attivo === b.attivo) return mappaSubagente(s as never);
       const dopo = await tx.subagenti.update({
         where: { id: s.id },
         data: { attivo: b.attivo },
-        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } } },
+        include: { agente: { select: { id: true, codice: true, nome: true, cognome: true } }, soggetto: { select: { id: true, codice: true } } },
       });
       await logEvent(tx, {
         tipo: 'stato', azione: 'change_state', entita: 'subagente', entita_id: s.id, esito: 'successo',

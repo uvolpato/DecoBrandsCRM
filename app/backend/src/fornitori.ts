@@ -185,13 +185,15 @@ const perEvento = (scaglioni: { sconto_min: number | Prisma.Decimal; pct_agente:
 
 const CAMPI_REGOLE =['giorni_attesa_conferma', 'giorno_bollettino', 'tipo_provvigione', 'giorni_incasso', 'note'] as const;
 
-function mappaFornitore(f: fornitori & { corrente?: { ragione_sociale: string; piva: string | null; paese: string | null } | null }, codice: string | null) {
+function mappaFornitore(f: fornitori & { corrente?: { ragione_sociale: string; piva: string | null; paese: string | null } | null; soggetto?: { id: bigint; codice: string } | null }, codice: string | null) {
   return {
     id: String(f.id),
     ragione_sociale: f.corrente?.ragione_sociale ?? null,
     piva: f.corrente?.piva ?? null,
     paese: f.corrente?.paese ?? null,
     codice_integra: codice,
+    soggetto_id: f.soggetto ? String(f.soggetto.id) : null, // D-102: l'anagrafica unica
+    soggetto_codice: f.soggetto?.codice ?? null,
     giorni_attesa_conferma: f.giorni_attesa_conferma,
     giorno_bollettino: f.giorno_bollettino,
     tipo_provvigione: f.tipo_provvigione,
@@ -220,7 +222,10 @@ export class FornitoriController {
   async elenco() {
     const [fornitori, codici, conti] = await Promise.all([
       this.db.fornitori.findMany({
-        include: { corrente: { select: { ragione_sociale: true, piva: true, paese: true } } },
+        include: {
+          corrente: { select: { ragione_sociale: true, piva: true, paese: true } },
+          soggetto: { select: { id: true, codice: true } },
+        },
         orderBy: { id: 'asc' },
       }),
       this.db.codici_esterni.findMany({ where: { sistema: 'integra', tipo: 'fornitore' } }),
@@ -244,6 +249,7 @@ export class FornitoriController {
       where: { id: BigInt(id) },
       include: {
         corrente: { select: { ragione_sociale: true, piva: true, paese: true } },
+        soggetto: { select: { id: true, codice: true } },
         scaglioni: { orderBy: { sconto_min: 'asc' } },
         agenzie: { include: { cliente: { include: { corrente: { select: { ragione_sociale: true, piva: true } } } }, subagente: { select: { id: true, codice: true, nome: true, cognome: true } } } },
       },

@@ -24,11 +24,11 @@ describe('seed §12', () => {
   });
 
   it('conteggi principali', async () => {
-    expect(await db.fornitori.count()).toBe(11);
-    expect(await db.fornitori_versioni.count()).toBe(11);
-    expect(await db.clienti.count()).toBe(11);
-    expect(await db.clienti_versioni.count()).toBe(11);
-    expect(await db.codici_esterni.count()).toBe(22);
+    expect(await db.fornitori.count()).toBe(12); // 11 del prototipo + MCL (D-101)
+    expect(await db.fornitori_versioni.count()).toBe(12);
+    expect(await db.clienti.count()).toBe(13); // 11 del prototipo + MCL e Consorzio Agrario
+    expect(await db.clienti_versioni.count()).toBe(13);
+    expect(await db.codici_esterni.count()).toBe(25); // 22 + i due codici di MCL e quello del Consorzio
     expect(await db.subagenti.count()).toBe(4);
     expect(await db.interscambio.count()).toBe(18);
     expect(await db.provvigioni_scaglioni.count()).toBe(33);
@@ -44,6 +44,23 @@ describe('seed §12', () => {
     expect(await db.utenti.count({ where: { username: { in: USERNAME } } })).toBe(5);
     expect(await db.registro.count({ where: { genere: 'anomalia' } })).toBe(6);
     expect(await db.registro.count({ where: { genere: 'evento', codice: 'errore.error' } })).toBe(1);
+  });
+
+  it('anagrafica a soggetti: un soggetto per ruolo, MCL con due ruoli (D-101, D-102)', async () => {
+    expect(await db.soggetti.count()).toBe(28); // 12 fornitori + 13 clienti − MCL condivisa + 4 subagenti persone
+    expect(await db.sedi.count()).toBe(8); // MCL 4, Consorzio 4
+    expect(await db.recapiti.count()).toBe(5);
+    expect(await db.persone.count()).toBe(1);
+    expect(await db.persone_contatti.count()).toBe(2); // la stessa persona referente di due aziende
+    expect(await db.fatturazione.count()).toBe(2);
+
+    const mcl = await db.soggetti.findFirstOrThrow({ where: { piva_norm: '08943010155' }, include: { clienti: true, fornitori: true } });
+    expect(mcl.codice).toMatch(/^C\d{6}$/);
+    expect(mcl.clienti).toHaveLength(1);
+    expect(mcl.fornitori).toHaveLength(1);
+    const codici = await db.codici_esterni.findMany({ where: { OR: [{ tipo: 'cliente', entita_id: mcl.clienti[0].id }, { tipo: 'fornitore', entita_id: mcl.fornitori[0].id }] } });
+    expect(codici.map((c) => c.codice).sort()).toEqual(['C02477', 'F90012']);
+    expect(await db.subagenti.count({ where: { soggetto_id: { not: null } } })).toBe(4);
   });
 
   it('ogni pratica punta alla versione corrente dei suoi fornitore e cliente', async () => {

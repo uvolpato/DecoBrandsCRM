@@ -38,7 +38,7 @@ function iso(d: Date | null | undefined): string | null {
   return d ? d.toISOString().slice(0, 10) : null;
 }
 
-function mappaCliente(c: clienti & { corrente?: clienti_versioni | null }, codice: string | null) {
+function mappaCliente(c: clienti & { corrente?: clienti_versioni | null; soggetto?: { id: bigint; codice: string } | null }, codice: string | null) {
   const v = c.corrente;
   return {
     id: String(c.id),
@@ -50,6 +50,8 @@ function mappaCliente(c: clienti & { corrente?: clienti_versioni | null }, codic
     provincia: v?.provincia ?? null,
     email: v?.email ?? null,
     codice_integra: codice,
+    soggetto_id: c.soggetto ? String(c.soggetto.id) : null, // D-102: l'anagrafica unica
+    soggetto_codice: c.soggetto?.codice ?? null,
     attivo: c.attivo,
   };
 }
@@ -82,7 +84,10 @@ export class ClientiController {
   @Richiede('dati.consulta')
   async elenco() {
     const clienti = await this.db.clienti.findMany({
-      include: { corrente: { select: { ragione_sociale: true, piva: true, citta: true } } },
+      include: {
+        corrente: { select: { ragione_sociale: true, piva: true, citta: true } },
+        soggetto: { select: { id: true, codice: true } },
+      },
       orderBy: { id: 'asc' },
     });
     const codici = await this.db.codici_esterni.findMany({ where: { sistema: 'integra', tipo: 'cliente' } });
@@ -105,6 +110,8 @@ export class ClientiController {
       piva: c.corrente?.piva ?? null,
       citta: c.corrente?.citta ?? null,
       codice_integra: codicePer.get(String(c.id)) ?? null,
+      soggetto_id: c.soggetto ? String(c.soggetto.id) : null, // D-102: l'anagrafica unica
+      soggetto_codice: c.soggetto?.codice ?? null,
       attivo: c.attivo,
       agenzie: agenziePer.get(String(c.id)) ?? 0,
       fornitori_ids: [...(fornPer.get(String(c.id)) ?? [])],
@@ -120,6 +127,7 @@ export class ClientiController {
       where: { id: BigInt(id) },
       include: {
         corrente: true,
+        soggetto: { select: { id: true, codice: true } },
         agenzie: {
           include: {
             subagente: { select: { id: true, codice: true, nome: true, cognome: true } },

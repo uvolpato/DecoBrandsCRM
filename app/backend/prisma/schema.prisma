@@ -18,6 +18,7 @@ datasource db {
 model fornitori {
   id                     BigInt    @id @default(autoincrement())
   versione_corrente_id   BigInt? // versione in vigore; sempre una versione di questo fornitore (FK composta)
+  soggetto_id            BigInt?   @unique // anagrafica unica a soggetti (D-102)
   giorni_attesa_conferma Int       @default(30)
   giorno_bollettino      Int       @default(10) @db.SmallInt // CHECK 1–28 (§5.6, D-03)
   tipo_provvigione       String    @default("fatturato") @db.VarChar(20) // maturato | fatturato (§5.5)
@@ -29,6 +30,7 @@ model fornitori {
   sincronizzato_il       DateTime? @db.Timestamptz(6)
 
   corrente  fornitori_versioni?     @relation("corrente", fields: [id, versione_corrente_id], references: [fornitore_id, id], onDelete: Restrict, map: "fornitori_versione_corrente_fkey")
+  soggetto  soggetti?               @relation(fields: [soggetto_id], references: [id], onDelete: Restrict)
   versioni  fornitori_versioni[]    @relation("versioni")
   scaglioni provvigioni_scaglioni[]
   eccezioni provvigioni_eccezioni[]
@@ -62,11 +64,13 @@ model fornitori_versioni {
 model clienti {
   id                   BigInt    @id @default(autoincrement())
   versione_corrente_id BigInt? // versione in vigore; sempre una versione di questo cliente (FK composta)
+  soggetto_id          BigInt?   @unique // anagrafica unica a soggetti (D-102)
   attivo               Boolean   @default(true)
   modificato_il        DateTime? @db.Timestamptz(6) // data di modifica in Integra
   sincronizzato_il     DateTime? @db.Timestamptz(6)
 
   corrente clienti_versioni?  @relation("corrente", fields: [id, versione_corrente_id], references: [cliente_id, id], onDelete: Restrict, map: "clienti_versione_corrente_fkey")
+  soggetto soggetti?          @relation(fields: [soggetto_id], references: [id], onDelete: Restrict)
   versioni clienti_versioni[] @relation("versioni")
   agenzie  interscambio[]
 }
@@ -100,9 +104,10 @@ model clienti_versioni {
 /// entità (fusione o cambio di codice). entita_id punta a clienti o fornitori secondo il tipo: niente FK.
 model codici_esterni {
   id        BigInt   @id @default(autoincrement())
-  sistema   String   @db.VarChar(20) // integra (CHECK)
-  tipo      String   @db.VarChar(20) // cliente | fornitore (CHECK)
+  sistema   String   @db.VarChar(20) // integra | vecchio_crm (CHECK)
+  tipo      String   @db.VarChar(20) // cliente | fornitore | subagente | soggetto | sede | interscambio (CHECK)
   codice    String   @db.VarChar(50)
+  etichetta String?  @db.VarChar(50) // codice leggibile dell'anagrafica, accanto a quello del ruolo (§5.4)
   entita_id BigInt
   creato_il DateTime @default(now()) @db.Timestamptz(6)
 
@@ -144,29 +149,33 @@ model provvigioni_eccezioni {
 }
 
 model agenti {
-  id        BigInt   @id @default(autoincrement())
-  codice    String   @unique @db.VarChar(50)
-  nome      String   @db.VarChar(100)
-  cognome   String   @db.VarChar(100)
-  email     String?  @db.VarChar(255)
-  telefono  String?  @db.VarChar(50)
-  attivo    Boolean  @default(true)
-  creato_il DateTime @default(now()) @db.Timestamptz(6)
+  id          BigInt   @id @default(autoincrement())
+  codice      String   @unique @db.VarChar(50)
+  nome        String   @db.VarChar(100)
+  cognome     String   @db.VarChar(100)
+  email       String?  @db.VarChar(255)
+  telefono    String?  @db.VarChar(50)
+  attivo      Boolean  @default(true)
+  soggetto_id BigInt?  @unique // anagrafica unica a soggetti (D-102)
+  creato_il   DateTime @default(now()) @db.Timestamptz(6)
 
+  soggetto  soggetti?               @relation(fields: [soggetto_id], references: [id], onDelete: Restrict)
   subagenti subagenti[]
   pratiche  ordini_fornitore_testata[]
 }
 
 model subagenti {
-  id        BigInt  @id @default(autoincrement())
-  agente_id BigInt
-  codice    String  @unique @db.VarChar(50)
-  nome      String  @db.VarChar(100)
-  cognome   String  @db.VarChar(100)
-  email     String? @db.VarChar(255)
-  attivo    Boolean @default(true)
+  id          BigInt  @id @default(autoincrement())
+  agente_id   BigInt
+  codice      String  @unique @db.VarChar(50)
+  nome        String  @db.VarChar(100)
+  cognome     String  @db.VarChar(100)
+  email       String? @db.VarChar(255)
+  attivo      Boolean @default(true)
+  soggetto_id BigInt? @unique // anagrafica unica a soggetti (D-102)
 
   agente    agenti                  @relation(fields: [agente_id], references: [id], onDelete: Cascade)
+  soggetto  soggetti?               @relation(fields: [soggetto_id], references: [id], onDelete: Restrict)
   eccezioni provvigioni_eccezioni[]
   agenzie   interscambio[]
 }
@@ -188,6 +197,7 @@ model interscambio {
   subagente subagenti @relation(fields: [subagente_id], references: [id], onDelete: Restrict)
   cliente   clienti   @relation(fields: [cliente_id], references: [id], onDelete: Restrict)
   fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Restrict)
+  sconti    sconti[]
 
   // periodi senza sovrapposizioni per cliente e per codice: EXCLUDE nella migrazione iniziale (D-35 §19): vale anche per il codice, quindi niente UNIQUE semplice
   @@index([subagente_id])
@@ -500,6 +510,7 @@ model utenti {
   campi_corretti     documenti_campi[]
   esecuzioni         servizi_esecuzioni[]
   impostazioni       impostazioni[]
+  modifiche          modifiche[]
 }
 
 /// Livello di un utente in un'area (D-45): lettura < operatore < responsabile; nessuna riga = area chiusa.
@@ -606,4 +617,189 @@ model servizi_esecuzioni {
   autore utenti? @relation(fields: [avviato_da], references: [id], onDelete: SetNull)
 
   @@index([servizio, inizio(sort: Desc)])
+}
+
+// ---------- Anagrafica unica a soggetti (D-100, D-101, D-102; specifica-anagrafica-soggetti.md §4) ----------
+// Additiva: il master si aggiunge sopra clienti/fornitori/agenti/subagenti, che restano quelli che il
+// codice Prisma scrive e legge. I ruoli si collegano con `soggetto_id` nullable; nessuna FK dello
+// strato 0 cambia. Vincoli che Prisma non esprime (P.IVA corta, unicità parziali) stanno nella
+// migrazione 20261108090000_anagrafica_soggetti.
+
+/// Master dell'identità: solo chiavi di riconoscimento. I dati descrittivi restano nelle *_versioni.
+model soggetti {
+  id                       BigInt    @id @default(autoincrement())
+  codice                   String    @unique @default(dbgenerated("('C' || lpad(nextval('soggetti_codice_seq')::text, 6, '0'))")) @db.VarChar(20)
+  natura                   String    @db.VarChar(10) // azienda | persona (CHECK)
+  paese                    String    @default("IT") @db.Char(2)
+  piva                     String?   @db.VarChar(30) // come scritta in origine
+  piva_norm                String    @default("") @db.VarChar(20) // maiuscolo, senza spazi né punti (§1.6)
+  codice_fiscale           String?   @db.VarChar(30)
+  cf_norm                  String    @default("") @db.VarChar(20)
+  sorgente                 String    @default("crm") @db.VarChar(20) // integra | vecchio_crm | crm (CHECK)
+  attivo                   Boolean   @default(true)
+  note                     String?
+  creato_il                DateTime  @default(now()) @db.Timestamptz(6)
+  modificato_il            DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  modificato_in_origine_il DateTime? @db.Timestamptz(6) // modificato_il della vista Integra (lettura incrementale)
+  sincronizzato_il         DateTime? @db.Timestamptz(6)
+
+  clienti      clienti[]
+  fornitori    fornitori[]
+  agenti       agenti[]
+  subagenti    subagenti[]
+  sedi         sedi[]
+  recapiti     recapiti[]
+  contatti     persone_contatti[]
+  fatturazione fatturazione?
+}
+
+/// Sede del soggetto: una catena = un soggetto con N punti vendita (§4.2). Il settore è della sede.
+model sedi {
+  id          BigInt    @id @default(autoincrement())
+  soggetto_id BigInt
+  tipo        String    @db.VarChar(20) // legale | operativa | punto_vendita | magazzino | fatturazione (CHECK)
+  insegna     String?   @db.VarChar(255)
+  indirizzo   String?   @db.VarChar(255)
+  cap         String?   @db.VarChar(10)
+  citta       String?   @db.VarChar(100)
+  provincia   String?   @db.Char(2)
+  paese       String    @default("IT") @db.Char(2)
+  settore_id  BigInt?
+  gruppo_id   BigInt?
+  predefinita Boolean   @default(false) // una sola per tipo: indice parziale nella migrazione
+  attivo      Boolean   @default(true)
+  valido_dal  DateTime? @db.Date
+  valido_al   DateTime? @db.Date // escluso, NULL = in vigore
+
+  soggetto soggetti            @relation(fields: [soggetto_id], references: [id], onDelete: Restrict)
+  settore  settori?            @relation(fields: [settore_id], references: [id], onDelete: Restrict)
+  gruppo   gruppi?             @relation(fields: [gruppo_id], references: [id], onDelete: Restrict)
+  recapiti recapiti[]
+  contatti persone_contatti[]
+
+  @@index([soggetto_id])
+  @@index([citta, provincia])
+}
+
+/// Recapito del soggetto, di una sua sede o di una persona (§4.3): uno solo dei tre collegamenti.
+/// Non ha `attivo`: si chiude con `valido_al`.
+model recapiti {
+  id          BigInt    @id @default(autoincrement())
+  soggetto_id BigInt?
+  sede_id     BigInt?
+  persona_id  BigInt?
+  tipo        String    @db.VarChar(20) // email | pec | telefono | cellulare | fax | sito (CHECK)
+  valore      String    @db.VarChar(255) // email in minuscolo; telefono in +39…
+  etichetta   String?   @db.VarChar(30) // ordini | amministrazione | magazzino | direzione
+  predefinito Boolean   @default(false)
+  valido_dal  DateTime? @db.Date
+  valido_al   DateTime? @db.Date
+
+  soggetto soggetti? @relation(fields: [soggetto_id], references: [id], onDelete: Restrict)
+  sede     sedi?     @relation(fields: [sede_id], references: [id], onDelete: Restrict)
+  persona  persone?  @relation(fields: [persona_id], references: [id], onDelete: Restrict)
+
+  @@index([soggetto_id])
+  @@index([sede_id])
+}
+
+/// Persona fisica (§4.4): può essere referente di più soggetti.
+model persone {
+  id      BigInt  @id @default(autoincrement())
+  nome    String  @db.VarChar(100)
+  cognome String  @db.VarChar(100)
+  titolo  String? @db.VarChar(100)
+  note    String?
+  attivo  Boolean @default(true)
+
+  contatti persone_contatti[]
+  recapiti recapiti[]
+}
+
+/// Legame persona × soggetto (× sede facoltativa) con il suo periodo (§4.4).
+model persone_contatti {
+  id          BigInt    @id @default(autoincrement())
+  persona_id  BigInt
+  soggetto_id BigInt
+  sede_id     BigInt?
+  ruolo       String?   @db.VarChar(20) // titolare | acquisti | amministrazione | magazzino | referente (CHECK)
+  referente   Boolean   @default(false)
+  valido_dal  DateTime? @db.Date
+  valido_al   DateTime? @db.Date
+
+  persona  persone  @relation(fields: [persona_id], references: [id], onDelete: Restrict)
+  soggetto soggetti @relation(fields: [soggetto_id], references: [id], onDelete: Restrict)
+  sede     sedi?    @relation(fields: [sede_id], references: [id], onDelete: Restrict)
+
+  @@index([persona_id, soggetto_id])
+}
+
+/// Fatturazione elettronica del soggetto fiscale, non del ruolo (§4.5). 1:1.
+model fatturazione {
+  soggetto_id            BigInt  @id
+  codice_destinatario    String? @db.Char(7) // [A-Z0-9]{7}; 0000000 solo con identificativo estero (CHECK)
+  pec_destinatario       String? @db.VarChar(255)
+  codice_univoco_ufficio String? @db.Char(6) // solo Pubblica Amministrazione (IPA)
+  id_paese_estero        String? @db.Char(2)
+  id_codice_estero       String? @db.VarChar(28)
+  regime_fiscale         String? @db.Char(4) // RF01…RF19
+  split_payment          Boolean @default(false)
+  reverse_charge         Boolean @default(false)
+  esigibilita_iva        String? @db.Char(1) // I | D | S
+  attiva                 Boolean @default(false)
+  note                   String?
+
+  soggetto soggetti @relation(fields: [soggetto_id], references: [id], onDelete: Restrict)
+}
+
+/// Sconti per legame cliente × fornitore (§4.6): dettagliano `interscambio.sconto`, che resta il canonico.
+/// Solo tabella: nessuna API finché la regola dello sconto canonico è aperta (§8.2).
+model sconti {
+  id              BigInt    @id @default(autoincrement())
+  interscambio_id BigInt
+  ordine          Int       @db.SmallInt
+  tipo            String    @db.VarChar(20) // commerciale | promozionale | speciale (CHECK)
+  percentuale     Decimal   @db.Decimal(5, 2)
+  valido_dal      DateTime? @db.Date
+  valido_al       DateTime? @db.Date
+  note            String?
+
+  interscambio interscambio @relation(fields: [interscambio_id], references: [id], onDelete: Cascade)
+
+  @@unique([interscambio_id, ordine, valido_dal])
+}
+
+/// Audit per campo (§4.7): chi ha cambiato la P.IVA di chi. Il registro (D-31) resta per gli eventi.
+model modifiche {
+  id           BigInt   @id @default(autoincrement())
+  entita       String   @db.VarChar(40)
+  entita_id    BigInt
+  campo        String   @db.VarChar(60)
+  valore_prima String?
+  valore_dopo  String?
+  utente_id    BigInt?
+  quando       DateTime @default(now()) @db.Timestamptz(6)
+
+  utente utenti? @relation(fields: [utente_id], references: [id], onDelete: SetNull)
+
+  @@index([entita, entita_id])
+}
+
+/// Tabelle di riferimento appese alle sedi (§4.8).
+model gruppi {
+  id          BigInt  @id @default(autoincrement())
+  codice      String  @unique @db.VarChar(50)
+  descrizione String  @db.VarChar(255)
+  attivo      Boolean @default(true)
+
+  sedi sedi[]
+}
+
+model settori {
+  id          BigInt  @id @default(autoincrement())
+  codice      String  @unique @db.VarChar(50)
+  descrizione String  @db.VarChar(255)
+  attivo      Boolean @default(true)
+
+  sedi sedi[]
 }

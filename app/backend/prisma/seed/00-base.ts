@@ -28,6 +28,28 @@ export async function base(tx: Tx) {
     clienti: {} as Record<string, bigint>, versioniC: {} as Record<string, bigint>,
     scaglioni: {} as Record<number, bigint>, subagenti: {} as Record<number, bigint>, utenti: {} as Record<string, bigint> };
 
+  // ---------- Anagrafica unica a soggetti (D-100…D-102, specifica-anagrafica-soggetti.md) ----------
+  // Un soggetto per ogni ruolo del seed; stessi dati fiscali = stesso soggetto (§7.2). MCL è cliente
+  // e fornitore sullo stesso soggetto con due codici di ruolo diversi (D-101).
+  const normalizza = (v: string) => v.replace(/[\s.]/g, '').toUpperCase();
+  const normPiva = (v: string) => { const s = normalizza(v); return /^IT\d{11}$/.test(s) ? s.slice(2) : s; };
+  const paeseDi = (pn: string) => (/^[A-Z]{2}/.test(pn) ? pn.slice(0, 2) : 'IT');
+  const soggettoPer = new Map<string, bigint>();
+  async function nuovoSoggetto(natura: string, piva: string, cf: string, sorgente = 'integra', note: string | null = null) {
+    const pn = normPiva(piva), cn = normalizza(cf);
+    const chiave = pn ? `p:${pn}` : `c:${cn}`;
+    const gia = soggettoPer.get(chiave);
+    if (gia) return gia;
+    const s = await tx.soggetti.create({ data: {
+      natura, paese: paeseDi(pn), piva: piva || null, piva_norm: pn, codice_fiscale: cf || null, cf_norm: cn, sorgente, note } });
+    soggettoPer.set(chiave, s.id);
+    return s.id;
+  }
+  // Il CF dei subagenti sta solo nel master: la tabella `subagenti` non ha la colonna (§5.3)
+  const CF_SUBAGENTI: Record<number, string> = {
+    1: 'BSTSFN72M05H501X', 2: 'NSTMRC70A01F205Z', 3: 'RVLLSE75B45F205X', 4: 'PNTGGR68C10F205W',
+  };
+
   // ---------- Utenti (§4.2.18, D-45): se il nome utente c'è già si salta ----------
   const hash = await cifra(PASSWORD_PROVA);
   for (const u of D.utenti.filter((x: any) => x.ruolo !== 'superutente')) { // il superutente nasce con `npm run superutente`
@@ -51,14 +73,16 @@ export async function base(tx: Tx) {
       giorni_attesa_conferma: f.giorni_conferma, giorno_bollettino: f.giorno_bollettino, giorni_incasso: f.giorni_incasso,
       tipo_provvigione: f.maturazione === 'maturato' ? 'maturato' : 'fatturato', attivo: f.attivo, sincronizzato_il: sincronizzato } })).id; // D-34
     const v = await tx.fornitori_versioni.create({ data: { fornitore_id: id, fonte: 'integra', piva: f.piva, ragione_sociale: f.nome, paese: f.paese, valido_dal: data('2025-01-01') } });
-    await tx.fornitori.update({ where: { id }, data: { versione_corrente_id: v.id } });
+    const soggetto_id = await nuovoSoggetto('azienda', f.piva, '');
+    await tx.fornitori.update({ where: { id }, data: { versione_corrente_id: v.id, soggetto_id } });
     await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'fornitore', codice: f.codice_integra, entita_id: id } });
     ids.fornitori[f.id] = id; ids.versioniF[f.id] = v.id;
   }
   for (const c of D.clienti) {
     const id = (await tx.clienti.create({ data: { attivo: true, sincronizzato_il: sincronizzato } })).id;
     const v = await tx.clienti_versioni.create({ data: { cliente_id: id, fonte: 'integra', piva: c.piva, ragione_sociale: c.nome, indirizzo: c.indirizzo, citta: c.citta, valido_dal: data('2025-01-01') } });
-    await tx.clienti.update({ where: { id }, data: { versione_corrente_id: v.id } });
+    const soggetto_id = await nuovoSoggetto('azienda', c.piva, '');
+    await tx.clienti.update({ where: { id }, data: { versione_corrente_id: v.id, soggetto_id } });
     await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'cliente', codice: c.codice_integra, entita_id: id } });
     ids.clienti[c.piva] = id; ids.versioniC[c.piva] = v.id;
   }
@@ -71,7 +95,8 @@ export async function base(tx: Tx) {
   const agente = await tx.agenti.create({ data: { codice: 'DECO', nome: 'Decobrands', cognome: 'SRL' } });
   for (const s of D.subagenti) {
     const [nome, cognome] = nomeCognome(s.nome);
-    ids.subagenti[s.id] = (await tx.subagenti.create({ data: { agente_id: agente.id, codice: 'SUB' + String(s.id).padStart(2, '0'), nome, cognome, email: s.email, attivo: s.attivo } })).id;
+    const soggetto_id = await nuovoSoggetto('persona', '', CF_SUBAGENTI[s.id] ?? '');
+    ids.subagenti[s.id] = (await tx.subagenti.create({ data: { agente_id: agente.id, codice: 'SUB' + String(s.id).padStart(2, '0'), nome, cognome, email: s.email, attivo: s.attivo, soggetto_id } })).id;
   }
   for (const e of D.eccezioni) {
     // il prototipo lega l'eccezione allo scaglione: fornitore, sconto e data vengono da lì (D-51)
@@ -85,6 +110,61 @@ export async function base(tx: Tx) {
       subagente_id: ids.subagenti[a.subagente_id], cliente_id: ids.clienti[a.cliente_piva], fornitore_id: ids.fornitori[a.fornitore_id],
       codice_cliente_fornitore: a.codice || null, sconto: a.sconto, valido_dal: data('2025-01-01') } });
   }
+
+  // ---------- Casi dell'anagrafica a soggetti (§12, dati-soggetti.js) ----------
+  // MCL: cliente e fornitore sullo stesso soggetto, due codici di ruolo (D-101). Entra nello strato 0
+  // come entrerebbe da Integra; la stessa P.IVA non fa due soggetti.
+  const mclFornitore = await tx.fornitori.create({ data: {
+    giorni_attesa_conferma: 21, giorno_bollettino: 10, giorni_incasso: 60, tipo_provvigione: 'fatturato', attivo: true, sincronizzato_il: sincronizzato } });
+  const mclFv = await tx.fornitori_versioni.create({ data: { fornitore_id: mclFornitore.id, fonte: 'integra', piva: 'IT08943010155', ragione_sociale: 'MCL SRL', paese: 'Italia', valido_dal: data('2025-01-01') } });
+  await tx.fornitori.update({ where: { id: mclFornitore.id }, data: { versione_corrente_id: mclFv.id } });
+  await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'fornitore', codice: 'F90012', entita_id: mclFornitore.id } });
+  const mclCliente = await tx.clienti.create({ data: { attivo: true, sincronizzato_il: sincronizzato } });
+  const mclCv = await tx.clienti_versioni.create({ data: { cliente_id: mclCliente.id, fonte: 'integra', piva: '08943010155', ragione_sociale: 'MCL SRL', indirizzo: 'Via Emilia 200', citta: 'Piacenza', valido_dal: data('2025-01-01') } });
+  await tx.clienti.update({ where: { id: mclCliente.id }, data: { versione_corrente_id: mclCv.id } });
+  await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'cliente', codice: 'C02477', entita_id: mclCliente.id } });
+  // Consorzio Agrario: catena del vecchio CRM, un soggetto con N punti vendita
+  const consorzio = await tx.clienti.create({ data: { attivo: true, sincronizzato_il: sincronizzato } });
+  const consorzioV = await tx.clienti_versioni.create({ data: {
+    cliente_id: consorzio.id, fonte: 'integra', piva: '03567890123', ragione_sociale: 'Consorzio Agrario Lombardo',
+    indirizzo: 'Via Garibaldi 12', citta: 'Cremona', valido_dal: data('2025-01-01') } });
+  await tx.clienti.update({ where: { id: consorzio.id }, data: { versione_corrente_id: consorzioV.id } });
+  await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'cliente', codice: 'C01104', entita_id: consorzio.id } });
+
+  const mcl = await nuovoSoggetto('azienda', 'IT08943010155', '02238370638', 'integra', 'Cliente e fornitore: due codici di ruolo diversi (D-101).');
+  await tx.fornitori.update({ where: { id: mclFornitore.id }, data: { soggetto_id: mcl } });
+  await tx.clienti.update({ where: { id: mclCliente.id }, data: { soggetto_id: mcl } });
+  const consorzioSoggetto = await nuovoSoggetto('azienda', 'IT03567890123', '', 'vecchio_crm', 'Catena: 34 schede del vecchio CRM fondono in un soggetto con N sedi.');
+  await tx.clienti.update({ where: { id: consorzio.id }, data: { soggetto_id: consorzioSoggetto } });
+
+  for (const sede of [
+    { soggetto_id: mcl, tipo: 'punto_vendita', insegna: 'MCL Brescello', indirizzo: 'Via Roma 44', cap: '42049', citta: 'Brescello', provincia: 'RE', predefinita: true, valido_dal: '2015-03-01' },
+    { soggetto_id: mcl, tipo: 'punto_vendita', insegna: 'MCL Piacenza', indirizzo: 'Via Caorsana 98', cap: '29121', citta: 'Piacenza', provincia: 'PC', predefinita: false, valido_dal: '2019-01-15' },
+    { soggetto_id: mcl, tipo: 'punto_vendita', insegna: 'MCL Fornace', indirizzo: 'Strada Provinciale 7', cap: '29014', citta: 'Fornace', provincia: 'PC', predefinita: false, valido_dal: '2023-09-01' },
+    { soggetto_id: mcl, tipo: 'fatturazione', insegna: '', indirizzo: 'Via Emilia 200', cap: '29121', citta: 'Piacenza', provincia: 'PC', predefinita: false, valido_dal: '2015-03-01' },
+    { soggetto_id: consorzioSoggetto, tipo: 'legale', insegna: '', indirizzo: 'Via Garibaldi 12', cap: '26100', citta: 'Cremona', provincia: 'CR', predefinita: true, valido_dal: '1998-01-01' },
+    { soggetto_id: consorzioSoggetto, tipo: 'punto_vendita', insegna: 'Punto vendita Cremona', indirizzo: 'Via Persico 8', cap: '26100', citta: 'Cremona', provincia: 'CR', predefinita: false, valido_dal: '2010-01-01' },
+    { soggetto_id: consorzioSoggetto, tipo: 'punto_vendita', insegna: 'Punto vendita Manerbio', indirizzo: 'Via Rovato 31', cap: '25025', citta: 'Manerbio', provincia: 'BS', predefinita: false, valido_dal: '2014-05-01' },
+    { soggetto_id: consorzioSoggetto, tipo: 'punto_vendita', insegna: 'Punto vendita Codogno', indirizzo: 'Via Dante 120', cap: '26877', citta: 'Codogno', provincia: 'LO', predefinita: false, valido_dal: '2018-10-01' },
+  ]) {
+    await tx.sedi.create({ data: { ...sede, valido_dal: data(sede.valido_dal) } });
+  }
+  for (const recapito of [
+    { soggetto_id: mcl, tipo: 'email', valore: 'ordini@mclsrl.it', etichetta: 'ordini', predefinito: true },
+    { soggetto_id: mcl, tipo: 'pec', valore: 'mclsrl@pec.im.it', etichetta: '', predefinito: false },
+    { soggetto_id: mcl, tipo: 'telefono', valore: '+39 0523 880100', etichetta: '', predefinito: false },
+    { soggetto_id: consorzioSoggetto, tipo: 'email', valore: 'acquisti@consorzioagrario.it', etichetta: 'acquisti', predefinito: true },
+    { soggetto_id: consorzioSoggetto, tipo: 'telefono', valore: '+39 0372 123456', etichetta: '', predefinito: false },
+  ]) {
+    await tx.recapiti.create({ data: { ...recapito, valido_dal: data('2015-03-01') } });
+  }
+  // La stessa persona referente di due aziende: due righe in persone_contatti (§4.4)
+  const rinaldi = await tx.persone.create({ data: { nome: 'Paolo', cognome: 'Rinaldi', titolo: 'Direttore acquisti' } });
+  for (const soggetto_id of [mcl, consorzioSoggetto]) {
+    await tx.persone_contatti.create({ data: { persona_id: rinaldi.id, soggetto_id, ruolo: 'acquisti', referente: true, valido_dal: data('2020-01-01') } });
+  }
+  await tx.fatturazione.create({ data: { soggetto_id: mcl, codice_destinatario: 'M5E2RC4', regime_fiscale: 'RF01', esigibilita_iva: 'I', attiva: true } });
+  await tx.fatturazione.create({ data: { soggetto_id: consorzioSoggetto, attiva: false } });
 
   // ---------- Pratiche, righe e documenti fiscali ----------
   const fatturaId: Record<string, bigint> = {};
