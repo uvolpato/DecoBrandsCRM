@@ -258,7 +258,7 @@ describe('api soggetti', () => {
     expect(c.body).toMatchObject({ tipo: 'cliente', codice: 'C99999', attivo: true });
     const cliente = await db.clienti.findFirstOrThrow({ where: { soggetto_id: BigInt(nuovo) }, include: { corrente: true } });
     expect(cliente.corrente?.fonte).toBe('crm');
-    expect(cliente.corrente!.valido_dal.toISOString().slice(0, 10) <= new Date().toISOString().slice(0, 10)).toBe(true);
+    expect(cliente.corrente!.valido_dal.toISOString().slice(0, 10)).toBe(new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(new Date())); // la data di Roma, non UTC (a cavallo della mezzanotte differiscono)
     expect(await db.codici_esterni.count({ where: { tipo: 'cliente', codice: 'C99999', entita_id: cliente.id } })).toBe(1);
     await a.post(`/soggetti/${nuovo}/ruoli`, { tipo: 'cliente', ragione_sociale: 'Doppione' }).expect(409);
     await a.post(`/soggetti/${nuovo}/ruoli`, { tipo: 'fornitore', ragione_sociale: 'Nuovo Cliente SRL' }).expect(201);
