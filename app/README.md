@@ -49,6 +49,12 @@ node ../../strumenti/prove/utenti_prova.js togli      # toglie utenti, eventi e 
 Il registro del backend serve ad `app_accesso.py` per leggere il link di *password dimenticata*
 (in sviluppo la posta va nel registro).
 
+**Demo con i PDF veri** (`strumenti/prove/pdf_veri.js`): da `backend/`, dopo `npm run build` e con
+`demo-ammi` creato con `utenti_prova.js`, ricostruisce il flusso ordine → proforma → fattura di
+Agri Aggio/Gries dai file di `Documenti Veri/` (ordine `AU276839`, proforma `PR102813`, fattura
+`RE193071`) e stampa l'indirizzo della pratica. È idempotente: se ci sono già non duplica. Serve al
+database di **sviluppo** (crea il cliente Agri Aggio come farebbe Integra).
+
 **Ponte finto per la sincronizzazione da Integra** (F1-A4, spec §4.5): in `backend/`,
 `npm run ponte:prova` crea il database `decobrands_ponte_prova` con lo schema `crm_viste` e le
 tabelle `v_clienti` e `v_fornitori` riempite con i dati di prova. Poi in `backend/.env`:
