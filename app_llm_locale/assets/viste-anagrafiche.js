@@ -1,0 +1,400 @@
+/* ============================================================
+   Viste "Anagrafiche": Fornitori, Subagenti, Clienti.
+   Clienti e fornitori arrivano da Integra (sola lettura); il CRM gestisce solo i suoi dati:
+   condizioni e percentuali dei fornitori, agenzie dei clienti, subagenti.
+   Solo composizione di componenti CRM.*
+   ============================================================ */
+(function () {
+  'use strict';
+  const e = CRM.esc;
+
+  /* ---------- Fornitori: DataTable + Pannello (Dettagli, DataTable percentuali) + FormModal ---------- */
+  let schedaFornitore = 'percentuali';
+  function vistaFornitori(idSel) {
+    const corpo = CRM.Pagina({ voce: 'fornitori', titolo: 'Fornitori', pieno: true, sottotitolo: 'Condizioni di ogni fornitore e percentuali di provvigione per sconto, con la data da cui valgono.' });
+    const f = M.fornitore(Number(idSel)) || M.S.fornitori[0];
+    const col = CRM.blocco(corpo, 'colonne pari riempi');
+    CRM.DataTable(CRM.blocco(col, 'riempi'), {
+      colonne: [
+        { key: 'nome', header: 'Fornitore', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === f.id ? ' ' + CRM.stato('primario', 'aperto') : '') },
+        { key: 'giorni_conferma', header: 'Attesa conferma', tipo: 'numero', cell: x => x.giorni_conferma + ' giorni' },
+        { key: 'giorno_bollettino', header: 'Bollettino entro', tipo: 'numero', cell: x => 'il ' + (x.giorno_bollettino || 10) },
+        { key: 'maturazione', header: 'Paga sul' },
+        { key: 'pratiche', header: 'Pratiche aperte', tipo: 'numero', valore: x => M.S.pratiche.filter(p => p.fornitore_id === x.id && M.statoPratica(p).chiave !== 'fatturata').length }
+      ],
+      righe: M.S.fornitori, rowClass: x => x.id === f.id ? 'selezionata' : '',
+      onRowClick: x => { location.hash = '#/fornitori/' + x.id; }
+    });
+
+    const versioni = Array.from(new Set(M.S.scaglioni.filter(s => s.fornitore_id === f.id).map(s => s.valido_dal))).sort().reverse();
+    const vigente = versioni.find(v => v <= M.oggi()) || versioni[versioni.length - 1];
+    const sc = M.S.scaglioni.filter(s => s.fornitore_id === f.id && s.valido_dal === vigente).sort((x, y) => x.sconto - y.sconto);
+    const dx = CRM.Pannello(col, { titolo: f.nome, riempi: true, azioni: [{ etichetta: 'Modifica condizioni', onClick: () => modificaCondizioni(f) }] });
+    CRM.Nota(dx.corpo, 'Anagrafica da Integra (sola lettura). Qui si gestiscono solo condizioni e percentuali di provvigione.').style.marginBottom = '10px';
+    CRM.Dettagli(dx.corpo, [
+      { etichetta: 'Partita IVA', valore: e(f.piva) + ' <span class="testo-tenue">· ' + e(f.paese || '') + '</span>' },
+      { etichetta: 'Codice Integra', valore: e(f.codice_integra || '—') },
+      { etichetta: 'Attesa della conferma', valore: f.giorni_conferma + ' giorni dall’ordine, poi parte il sollecito' },
+      { etichetta: 'Bollettino mensile', valore: 'atteso entro il ' + (f.giorno_bollettino || 10) + ' del mese successivo, poi parte il sollecito' },
+      { etichetta: 'Pagamento provvigioni', valore: 'sul ' + f.maturazione + (f.maturazione === 'maturato' ? ' (riconosciute nel mese in cui il cliente paga; incasso da verificare dopo ' + (f.giorni_incasso || 60) + ' giorni)' : ' (all’emissione della fattura; se il cliente non paga le storna e le riaccredita al pagamento)') }
+    ]);
+    // percentuali e clienti seguiti in due schede: la scheda resta compatta e non scorre
+    const clienti = M.S.abbinamenti.filter(a => a.fornitore_id === f.id);
+    CRM.Schede(dx.corpo, { riempi: true, attiva: schedaFornitore, onCambia: id => { schedaFornitore = id; }, schede: [
+      { id: 'percentuali', etichetta: 'Percentuali', conta: sc.length, disegna: c => {
+        const t = CRM.blocco(c, 'strumenti-scheda');
+        t.innerHTML = '<h3>In vigore dal ' + M.data(vigente) + '</h3><span class="spazio"></span>';
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.innerHTML = CRM.icona('piu') + 'Nuove percentuali da una data';
+        b.addEventListener('click', () => nuovePercentuali(f, sc)); t.appendChild(b);
+        CRM.DataTable(CRM.blocco(c, 'riempi'), {
+          compatta: true, righe: sc, ordinamentoIniziale: { key: 'sconto', dir: 'asc' },
+          colonne: [
+            { key: 'sconto', header: 'Sconto al cliente', tipo: 'pct' },
+            { key: 'pct_agente', header: 'A Decobrands', tipo: 'pct' },
+            { key: 'pct_sub', header: 'Al subagente', tipo: 'pct', cell: s => { const ecc = M.S.eccezioni.filter(x => x.scaglione_id === s.id); return M.pct(s.pct_sub) + (ecc.length ? '<span class="sec-riga">' + ecc.map(x => e(M.subagente(x.subagente_id).nome) + ' ' + M.pct(x.pct_sub)).join(', ') + '</span>' : ''); } },
+            { key: 'tot', header: 'Totale dal fornitore', tipo: 'pct', valore: s => s.pct_agente + s.pct_sub },
+            { key: 'clienti', header: 'Clienti', tipo: 'numero', valore: s => clienti.filter(a => a.sconto === s.sconto).length }
+          ]
+        });
+        CRM.Nota(c, versioni.length > 1 ? 'Versioni: ' + versioni.map(v => 'dal ' + M.data(v)).join(', ') + '. I documenti si calcolano con le percentuali in vigore alla loro data.'
+          : 'Se ' + e(f.breve) + ' rivede le condizioni, inserisci le nuove percentuali con la data da cui valgono: i documenti precedenti restano calcolati con quelle di allora.');
+      } },
+      // vista inversa delle agenzie: i clienti seguiti per questo fornitore (si modificano dal cliente)
+      { id: 'clienti', etichetta: 'Clienti seguiti', conta: clienti.length, disegna: c => {
+        CRM.DataTable(CRM.blocco(c, 'riempi'), {
+          compatta: true, righe: clienti, ordinamentoIniziale: { key: 'cliente', dir: 'asc' },
+          colonne: [
+            { key: 'cliente', header: 'Cliente', grow: true, valore: a => M.nomeCliente(a.cliente_piva) },
+            { key: 'codice', header: 'Codice', cell: a => a.codice ? e(a.codice) : CRM.stato('attesa', 'manca') },
+            { key: 'sub', header: 'Seguito da', valore: a => M.subagente(a.subagente_id).nome },
+            { key: 'sconto', header: 'Sconto', tipo: 'pct' }
+          ],
+          onRowClick: a => { location.hash = '#/clienti/' + a.cliente_piva; },
+          emptyText: 'Nessun cliente', emptyHint: 'Le agenzie si aggiungono dalla scheda del cliente.'
+        });
+        CRM.Nota(c, 'Codice, subagente e sconto si modificano dalla scheda del cliente.');
+      } }
+    ] });
+  }
+  function modificaCondizioni(f) {
+    CRM.FormModal({
+      titolo: 'Condizioni di ' + f.breve, conferma: 'Salva condizioni', colonne: 2,
+      campi: [
+        { nome: 'giorni_conferma', etichetta: 'Giorni di attesa della conferma', tipo: 'numero', valore: f.giorni_conferma },
+        { nome: 'giorno_bollettino', etichetta: 'Bollettino atteso entro il giorno', tipo: 'numero', valore: f.giorno_bollettino || 10, aiuto: 'del mese successivo (1–28); dopo questa data in Oggi compare il sollecito' },
+        { nome: 'maturazione', etichetta: 'Pagamento provvigioni', tipo: 'select', valore: f.maturazione, opzioni: [{ value: 'maturato', label: 'Sul maturato (incassi)' }, { value: 'fatturato', label: 'Sul fatturato' }] },
+        { nome: 'giorni_incasso', etichetta: 'Giorni per l’incasso dal cliente', tipo: 'numero', valore: f.giorni_incasso || 60, aiuto: 'sul maturato: dopo questi giorni dalla fattura non ancora riconosciuta l’incasso va verificato (§5.14)' }
+      ],
+      onConferma: v => {
+        f.giorni_conferma = Number(v.giorni_conferma) || f.giorni_conferma; f.maturazione = v.maturazione;
+        f.giorni_incasso = Math.max(1, Number(v.giorni_incasso) || 60);
+        f.giorno_bollettino = Math.min(28, Math.max(1, Number(v.giorno_bollettino) || 10));
+        M.annota('Condizioni di ' + f.breve + ' aggiornate'); M.salva(); CRM.Avviso('Condizioni salvate'); CRM.naviga();
+      }
+    });
+  }
+  function nuovePercentuali(f, sc) {
+    const campi = [{ nome: 'valido_dal', etichetta: 'Valide dal', tipo: 'data', valore: M.oggi(), largo: true }];
+    sc.forEach(s => campi.push(
+      { nome: 'a' + s.sconto, etichetta: 'Sconto ' + M.pct(s.sconto) + ' · a Decobrands %', tipo: 'numero', passo: '0.5', valore: s.pct_agente },
+      { nome: 's' + s.sconto, etichetta: 'Sconto ' + M.pct(s.sconto) + ' · al subagente %', tipo: 'numero', passo: '0.5', valore: s.pct_sub }));
+    CRM.FormModal({
+      titolo: 'Nuove percentuali di ' + f.breve, testo: 'Valgono per i documenti con data uguale o successiva a quella indicata.',
+      conferma: 'Salva le nuove percentuali', colonne: 2, campi: campi,
+      onConferma: (v, form) => {
+        if (!v.valido_dal) { form.aiuto('valido_dal', 'Indica la data da cui valgono.', true); return false; }
+        let id = Math.max.apply(null, M.S.scaglioni.map(s => s.id)) + 1;
+        let idE = Math.max.apply(null, M.S.eccezioni.map(x => x.id).concat([0])) + 1;
+        sc.forEach(s => {
+          const nuovoId = id++;
+          M.S.scaglioni.push({ id: nuovoId, fornitore_id: f.id, valido_dal: v.valido_dal, sconto: s.sconto, pct_agente: Number(v['a' + s.sconto]), pct_sub: Number(v['s' + s.sconto]) });
+          // le eccezioni personali passano alla nuova versione: si tolgono o cambiano dal subagente (D-26 §19)
+          M.S.eccezioni.filter(x => x.scaglione_id === s.id).forEach(x => M.S.eccezioni.push({ id: idE++, scaglione_id: nuovoId, subagente_id: x.subagente_id, pct_sub: x.pct_sub }));
+        });
+        M.annota('Nuove percentuali di ' + f.breve + ' dal ' + M.data(v.valido_dal)); M.salva(); CRM.Avviso('Percentuali salvate: valgono dal ' + M.data(v.valido_dal)); CRM.naviga();
+      }
+    });
+  }
+  CRM.rotta(/^\/fornitori$/, () => vistaFornitori(null));
+  CRM.rotta(/^\/fornitori\/(\d+)$/, id => vistaFornitori(id));
+
+  /* ---------- Subagenti: DataTable + Pannello (DataTable clienti, Elenco eccezioni) ---------- */
+  const pctSub = (a, s) => { if (a.pct_sub != null) return a.pct_sub; const sc = M.scaglione(a.fornitore_id, a.sconto, M.oggi()); const ex = sc && M.S.eccezioni.find(x => x.scaglione_id === sc.id && x.subagente_id === s.id); return ex ? ex.pct_sub : sc ? sc.pct_sub : 0; };
+  function vistaSubagenti(idSel) {
+    const corpo = CRM.Pagina({ voce: 'subagenti', titolo: 'Subagenti', pieno: true, sottotitolo: 'Chi segue quali clienti e quanto ha maturato nel trimestre in corso. L’agente è uno solo: Decobrands SRL.',
+      azioni: [{ etichetta: 'Nuovo subagente', icona: 'piu', onClick: () => modificaSubagente(null) }] });
+    const t = M.trimestre(M.oggi());
+    const righe = M.righeLiquidazione(2026, t);
+    const s = M.subagente(Number(idSel)) || M.S.subagenti[0];
+    const col = CRM.blocco(corpo, 'colonne pari riempi');
+    CRM.DataTable(CRM.blocco(col, 'riempi'), {
+      colonne: [
+        { key: 'nome', header: 'Subagente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.attivo === false ? ' ' + CRM.stato('neutro', 'non attivo') : '') + (x.id === s.id ? ' ' + CRM.stato('primario', 'aperto') : '') + '<span class="sec-riga">' + e(x.email || '') + (x.telefono ? ' · ' + e(x.telefono) : '') + '</span>' },
+        { key: 'clienti', header: 'Clienti seguiti', tipo: 'numero', valore: x => M.S.abbinamenti.filter(a => a.subagente_id === x.id).length },
+        { key: 'liq', header: t + '° trim. liquidabile', tipo: 'euro', totale: 'somma', valore: x => righe.filter(r => r.subagente_id === x.id && r.liquidabile).reduce((a, r) => a + r.provvigione, 0) },
+        { key: 'att', header: 'In attesa', tipo: 'euro', totale: 'somma', valore: x => righe.filter(r => r.subagente_id === x.id && !r.liquidabile).reduce((a, r) => a + r.provvigione, 0) }
+      ],
+      righe: M.S.subagenti, rowClass: x => x.id === s.id ? 'selezionata' : '',
+      onRowClick: x => { location.hash = '#/subagenti/' + x.id; }
+    });
+    const dx = CRM.Pannello(col, { titolo: s.nome, riempi: true, azioni: [{ etichetta: 'Vedi la liquidazione', variante: 'testo', href: '#/liquidazioni/2026/' + t },
+      { etichetta: 'Modifica', onClick: () => modificaSubagente(s) }, { etichetta: 'Elimina', variante: 'pericolo', onClick: () => eliminaSubagente(s) }] });
+    CRM.Dettagli(dx.corpo, [
+      { etichetta: 'Email', valore: s.email ? e(s.email) : '<span class="testo-tenue">—</span>' },
+      { etichetta: 'Telefono', valore: s.telefono ? e(s.telefono) : '<span class="testo-tenue">—</span>' },
+      { etichetta: 'Codice fiscale / P.IVA', valore: s.cf ? e(s.cf) : '<span class="testo-tenue">—</span>' },
+      { etichetta: 'Stato', valore: s.attivo === false ? CRM.stato('neutro', 'Non attivo: non si può assegnare a nuovi clienti') : CRM.stato('ok', 'Attivo') }
+    ], { inColonne: true });
+    CRM.blocco(dx.corpo, '', 'height:8px;flex:none');
+    dx.corpo.insertAdjacentHTML('beforeend', '<h3>Clienti seguiti</h3>');
+    CRM.DataTable(dx.corpo, {
+      compatta: true, naturale: true, righe: M.S.abbinamenti.filter(a => a.subagente_id === s.id),
+      colonne: [
+        { key: 'cliente', header: 'Cliente', grow: true, valore: a => M.nomeCliente(a.cliente_piva) },
+        { key: 'fornitore', header: 'Fornitore', valore: a => M.fornitore(a.fornitore_id).breve },
+        { key: 'sconto', header: 'Sconto', tipo: 'pct' },
+        { key: 'pct', header: 'Sua %', tipo: 'pct', valore: a => pctSub(a, s) }
+      ],
+      emptyText: 'Nessun cliente', emptyHint: 'I clienti si assegnano dalla scheda del cliente (Clienti).'
+    });
+    // D-26 §19: le eccezioni si inseriscono nel CRM; valgono sulla versione delle percentuali in vigore
+    const te = CRM.blocco(dx.corpo, 'strumenti-scheda');
+    te.innerHTML = '<h3>Eccezioni personali</h3><span class="spazio"></span>';
+    const be = document.createElement('button'); be.type = 'button'; be.className = 'btn sec piccolo'; be.innerHTML = CRM.icona('piu') + 'Aggiungi eccezione';
+    be.addEventListener('click', () => modificaEccezione(s, null)); te.appendChild(be);
+    CRM.Elenco(dx.corpo, M.S.eccezioni.filter(x => x.subagente_id === s.id).map(x => {
+      const sc = M.S.scaglioni.find(y => y.id === x.scaglione_id);
+      return { testo: e(M.fornitore(sc.fornitore_id).breve) + ', sconto ' + M.pct(sc.sconto) + ' <span class="testo-tenue">· percentuali dal ' + M.data(sc.valido_dal) + '</span>',
+        destra: M.pct(x.pct_sub) + ' <span class="testo-tenue">invece di ' + M.pct(sc.pct_sub) + '</span>', onClick: () => modificaEccezione(s, x) };
+    }), 'Nessuna: valgono le percentuali standard dei fornitori.');
+  }
+  /* Eccezione personale: percentuale del subagente che vince su quella dello scaglione (spec §5.2). */
+  function modificaEccezione(s, x) {
+    const nuovo = !x;
+    const sc0 = x && M.S.scaglioni.find(y => y.id === x.scaglione_id);
+    const v0 = sc0 ? { fornitore_id: sc0.fornitore_id, sconto: sc0.sconto, pct_sub: x.pct_sub } : { fornitore_id: '', sconto: 0, pct_sub: '' };
+    const sconti = fid => { const y = M.S.scaglioni.filter(q => q.fornitore_id === Number(fid)).map(q => q.sconto).filter((z, i, arr) => arr.indexOf(z) === i).sort((p, q) => p - q); return y.length ? y : [0]; };
+    CRM.FormModal({
+      titolo: (nuovo ? 'Nuova eccezione · ' : 'Eccezione · ') + s.nome, testo: 'La percentuale indicata vale per ' + s.nome + ' al posto di quella dello scaglione, sulle percentuali in vigore oggi.',
+      conferma: nuovo ? 'Aggiungi eccezione' : 'Salva', colonne: 2,
+      campi: [
+        { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: 'fornitore', valore: v0.fornitore_id, placeholder: 'Nome del fornitore' },
+        { nome: 'sconto', etichetta: 'Sconto al cliente %', tipo: 'select', valore: v0.sconto, opzioni: sconti(v0.fornitore_id || 1).map(y => ({ value: y, label: M.pct(y) })) },
+        { nome: 'pct_sub', etichetta: 'Al subagente %', tipo: 'numero', passo: '0.5', valore: v0.pct_sub, aiuto: '0 = nessuna provvigione per questo subagente su questo scaglione.' }
+      ],
+      dopo: form => form.el.addEventListener('change', ev => {   // gli sconti dipendono dalle percentuali del fornitore
+        if (ev.target.name !== 'fornitore_id' || !M.fornitore(Number(ev.target.value))) return;
+        const sel = form.campo('sconto'), prima = sel.value;
+        sel.innerHTML = sconti(ev.target.value).map(y => '<option value="' + y + '"' + (String(y) === prima ? ' selected' : '') + '>' + M.pct(y) + '</option>').join('');
+      }),
+      azioniExtra: nuovo ? [] : [{ etichetta: 'Elimina', variante: 'pericolo', onClick: () => {
+        CRM.Conferma('Eliminare l’eccezione?', 'Per ' + s.nome + ' tornerà a valere la percentuale standard dello scaglione.', 'Elimina', true).then(ok => {
+          if (!ok) return; M.S.eccezioni.splice(M.S.eccezioni.indexOf(x), 1); M.annota('Eccezione di ' + s.nome + ' eliminata'); M.salva(); CRM.Avviso('Eccezione eliminata'); CRM.naviga();
+        });
+      } }],
+      onConferma: (v, form) => {
+        if (!v.fornitore_id || !M.fornitore(Number(v.fornitore_id))) { form.errore('Scegli il fornitore dall’elenco.'); return false; }
+        const pct = Number(v.pct_sub);
+        if (v.pct_sub === '' || isNaN(pct) || pct < 0 || pct > 100) { form.errore('Indica una percentuale fra 0 e 100.'); return false; }
+        const sc = M.scaglione(Number(v.fornitore_id), Number(v.sconto), M.oggi());
+        if (!sc) { form.errore('Il fornitore non ha percentuali in vigore per questo sconto.'); return false; }
+        const dup = M.S.eccezioni.find(y => y !== x && y.subagente_id === s.id && y.scaglione_id === sc.id);
+        if (dup) { form.errore(s.nome + ' ha già un’eccezione su questo scaglione: modificala dall’elenco.'); return false; }
+        const rec = x || { id: Math.max.apply(null, M.S.eccezioni.map(y => y.id).concat([0])) + 1, subagente_id: s.id };
+        Object.assign(rec, { scaglione_id: sc.id, pct_sub: pct });
+        if (nuovo) M.S.eccezioni.push(rec);
+        M.annota('Eccezione di ' + s.nome + ': ' + M.fornitore(sc.fornitore_id).breve + ' sconto ' + M.pct(sc.sconto) + ' → ' + M.pct(pct)); M.salva();
+        CRM.Avviso(nuovo ? 'Eccezione aggiunta' : 'Eccezione salvata'); CRM.naviga();
+      }
+    });
+  }
+  function modificaSubagente(sa) {
+    const nuovo = !sa;
+    CRM.FormModal({
+      titolo: nuovo ? 'Nuovo subagente' : 'Modifica ' + sa.nome, conferma: nuovo ? 'Crea subagente' : 'Salva', colonne: 2,
+      campi: [
+        { nome: 'nome', etichetta: 'Nome e cognome', valore: sa ? sa.nome : '', largo: true },
+        { nome: 'email', etichetta: 'Email', valore: sa ? sa.email : '', aiuto: 'Riceve il prospetto della liquidazione.' },
+        { nome: 'telefono', etichetta: 'Telefono', valore: sa ? sa.telefono : '' },
+        { nome: 'cf', etichetta: 'Codice fiscale / P.IVA', valore: sa ? sa.cf : '' },
+        { nome: 'attivo', etichetta: 'Stato', tipo: 'select', valore: sa && sa.attivo === false ? 'no' : 'si', opzioni: [{ value: 'si', label: 'Attivo' }, { value: 'no', label: 'Non attivo' }] }
+      ],
+      onConferma: (v, form) => {
+        if (!v.nome) { form.errore('Il nome è obbligatorio.'); return false; }
+        if (v.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { form.errore('L’email non è valida.'); return false; }
+        const dup = M.S.subagenti.find(x => x !== sa && x.nome.toLowerCase() === v.nome.toLowerCase());
+        if (dup) { form.errore('Esiste già un subagente con questo nome.'); return false; }
+        const rec = sa || { id: Math.max.apply(null, M.S.subagenti.map(x => x.id)) + 1 };
+        Object.assign(rec, { nome: v.nome, email: v.email, telefono: v.telefono, cf: v.cf, attivo: v.attivo !== 'no' });
+        if (nuovo) M.S.subagenti.push(rec);
+        M.annota((nuovo ? 'Nuovo subagente ' : 'Subagente aggiornato ') + rec.nome); M.salva();
+        CRM.Avviso(nuovo ? 'Subagente creato' : 'Subagente salvato'); location.hash = '#/subagenti/' + rec.id; CRM.naviga();
+      }
+    });
+  }
+  async function eliminaSubagente(sa) {
+    const clienti = M.S.abbinamenti.filter(a => a.subagente_id === sa.id).length;
+    const liquidato = M.S.liquidazioni_chiuse.length && [1, 2, 3, 4].some(t => M.righeLiquidazione(2026, t).some(r => r.subagente_id === sa.id));
+    if (clienti || liquidato) {
+      CRM.Modale({ titolo: 'Non si può eliminare ' + sa.nome,
+        testo: (clienti ? 'Segue ' + clienti + (clienti === 1 ? ' cliente' : ' clienti') + ': riassegnali prima dalla scheda dei clienti. ' : '') +
+          (liquidato ? 'Ha provvigioni nei trimestri: lo storico delle liquidazioni deve restare. ' : '') + 'Puoi renderlo non attivo: resta nello storico ma non si assegna a nuovi clienti.',
+        azioni: [{ etichetta: 'Chiudi', variante: 'sec' }].concat(sa.attivo === false ? [] : [{ etichetta: 'Rendi non attivo', onClick: () => { sa.attivo = false; M.annota('Subagente ' + sa.nome + ' reso non attivo'); M.salva(); CRM.Avviso('Subagente reso non attivo'); CRM.naviga(); } }]) });
+      return;
+    }
+    if (!(await CRM.Conferma('Eliminare ' + sa.nome + '?', 'Non segue clienti e non ha provvigioni: l’eliminazione è definitiva.', 'Elimina', true))) return;
+    M.S.subagenti.splice(M.S.subagenti.indexOf(sa), 1); M.annota('Subagente ' + sa.nome + ' eliminato'); M.salva(); CRM.Avviso('Subagente eliminato'); location.hash = '#/subagenti';
+  }
+  CRM.rotta(/^\/subagenti$/, () => vistaSubagenti(null));
+  CRM.rotta(/^\/subagenti\/(\d+)$/, id => vistaSubagenti(id));
+
+  /* ---------- Clienti: elenco + scheda del cliente con le sue agenzie ----------
+     Il cliente è anagrafica Decobrands importata da Integra (sola lettura).
+     Agenzie = fornitori per cui Decobrands fa da agente verso il cliente (tabella interscambio):
+     codice con cui il fornitore indica il cliente, subagente, sconto. */
+  let filtroClienti = { vista: 'tutti', q: '' };
+  const agenzie = piva => M.S.abbinamenti.filter(a => a.cliente_piva === piva);
+  const praticheAperte = piva => M.S.pratiche.filter(p => p.cliente_piva === piva && M.statoPratica(p).chiave !== 'fatturata');
+  let schedaCliente = 'agenzie', filtroAgenzie = '', filtroPratiche = { vista: 'aperte', f: [], q: '' };
+  function vistaClienti(pivaSel) {
+    const corpo = CRM.Pagina({ voce: 'clienti', titolo: 'Clienti', pieno: true,
+      sottotitolo: 'Anagrafica da Integra. Per ogni cliente: le agenzie (fornitori per cui Decobrands fa da agente), chi lo segue e con quale sconto.' });
+    const c = M.cliente(pivaSel) || M.S.clienti.slice().sort((x, y) => x.nome.localeCompare(y.nome))[0];
+    const col = CRM.blocco(corpo, 'colonne riempi', 'grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)');
+    const sx = CRM.blocco(col, 'pila riempi');
+    const VISTE = { tutti: () => true, agenzie: x => agenzie(x.piva).length > 0, senza: x => !agenzie(x.piva).length, diretta: x => x.vendita_diretta };
+    CRM.FilterBar(sx, { campi: [
+      { nome: 'q', tipo: 'cerca', valore: filtroClienti.q, placeholder: 'Nome, P.IVA o codice' },
+      { nome: 'vista', tipo: 'segmenti', valore: filtroClienti.vista, opzioni: [
+        { value: 'tutti', label: 'Tutti', n: M.S.clienti.length }, { value: 'agenzie', label: 'Con agenzie', n: M.S.clienti.filter(VISTE.agenzie).length },
+        { value: 'senza', label: 'Senza agenzie', n: M.S.clienti.filter(VISTE.senza).length }, { value: 'diretta', label: 'Diretta', n: M.S.clienti.filter(VISTE.diretta).length }] }
+    ], onChange: v => { filtroClienti = v; tab.aggiorna(filtra()); } });
+    const filtra = () => {
+      const q = (filtroClienti.q || '').trim().toLowerCase();
+      return M.S.clienti.filter(VISTE[filtroClienti.vista]).filter(x => !q || [x.nome, x.piva, x.citta, x.codice_integra].concat(agenzie(x.piva).map(a => a.codice || '')).some(t => String(t || '').toLowerCase().indexOf(q) >= 0));
+    };
+    const tab = CRM.DataTable(CRM.blocco(sx, 'riempi'), {
+      colonne: [
+        { key: 'nome', header: 'Cliente', grow: true, cell: x => '<b>' + e(x.nome) + '</b><span class="sec-riga">' + e(x.citta || '') + ' · ' + e(x.codice_integra || '') + '</span>' },
+        { key: 'agenzie', header: 'Agenzie', tipo: 'numero', valore: x => agenzie(x.piva).length },
+        { key: 'aperte', header: 'Pratiche aperte', tipo: 'numero', valore: x => praticheAperte(x.piva).length }
+      ],
+      righe: filtra(), ordinamentoIniziale: { key: 'nome', dir: 'asc' }, rowClass: x => x.piva === c.piva ? 'selezionata' : '',
+      onRowClick: x => { location.hash = '#/clienti/' + x.piva; },
+      emptyText: 'Nessun cliente', emptyHint: 'Cambia la ricerca o il filtro. I clienti nuovi si creano in Integra.'
+    });
+
+    const dx = CRM.Pannello(col, { titolo: c.nome, nota: 'anagrafica da Integra', riempi: true });
+    CRM.Dettagli(dx.corpo, [
+      { etichetta: 'Partita IVA', valore: e(c.piva) },
+      { etichetta: 'Indirizzo', valore: e((c.indirizzo ? c.indirizzo + ', ' : '') + (c.citta || '')) },
+      { etichetta: 'Codice Integra', valore: e(c.codice_integra || '—') },
+      { etichetta: 'Vendita diretta', valore: c.vendita_diretta ? CRM.stato('info', 'Sì') : '<span class="testo-tenue">No</span>' }
+    ], { inColonne: true });
+
+    // agenzie e pratiche in due schede: possono essere molte; le agenzie sono il lavoro principale
+    const ags = agenzie(c.piva), pr = M.S.pratiche.filter(p => p.cliente_piva === c.piva);
+    const tr = M.trimestre(M.oggi()), prov = M.righeLiquidazione(2026, tr).filter(r => r.cliente === c.piva);
+    CRM.Schede(dx.corpo, { riempi: true, attiva: schedaCliente, onCambia: id => { schedaCliente = id; }, schede: [
+      { id: 'agenzie', etichetta: 'Agenzie', conta: ags.length, contaVariante: ags.some(a => !a.codice) ? 'attesa' : 'neutro', disegna: h => {
+        const t = CRM.blocco(h, 'strumenti-scheda');
+        t.innerHTML = '<label class="cerca">' + CRM.icona('cerca') + '<input type="search" placeholder="Fornitore, codice o subagente" aria-label="Cerca fra le agenzie" value="' + e(filtroAgenzie) + '"></label><span class="spazio"></span>';
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.innerHTML = CRM.icona('piu') + 'Aggiungi agenzia';
+        b.addEventListener('click', () => modificaAgenzia(c, null)); t.appendChild(b);
+        const filtra = () => { const q = filtroAgenzie.trim().toLowerCase(); return ags.filter(a => !q || [M.fornitore(a.fornitore_id).nome, a.codice, M.subagente(a.subagente_id).nome].some(x => String(x || '').toLowerCase().indexOf(q) >= 0)); };
+        const tab = CRM.DataTable(CRM.blocco(h, 'riempi'), {
+          compatta: true, righe: filtra(), ordinamentoIniziale: { key: 'fornitore', dir: 'asc' },
+          colonne: [
+            { key: 'fornitore', header: 'Fornitore', valore: a => M.fornitore(a.fornitore_id).breve },
+            { key: 'codice', header: 'Codice cliente', cell: a => a.codice ? '<b>' + e(a.codice) + '</b>' : CRM.stato('attesa', 'manca') },
+            { key: 'sub', header: 'Seguito da', valore: a => M.subagente(a.subagente_id).nome },
+            { key: 'perc', header: 'Provvigione', align: 'right', sortValue: a => { const sc = M.scaglione(a.fornitore_id, a.sconto, M.oggi()); return sc ? sc.pct_agente + sc.pct_sub : 0; },
+              cell: a => { const sc = M.scaglione(a.fornitore_id, a.sconto, M.oggi()); return (sc ? M.pct(sc.pct_agente + sc.pct_sub) + '<span class="sec-riga">' + M.pct(a.pct_sub != null ? a.pct_sub : sc.pct_sub) + ' sub.' + (a.pct_sub != null ? ' (del cliente)' : '') + ' · sconto ' + M.pct(a.sconto) + (a.mensile ? ' · una fattura al mese' : '') + '</span>' : '—'); } },
+            { key: 'aperte', header: 'Aperte', tipo: 'numero', valore: a => pr.filter(p => p.fornitore_id === a.fornitore_id && M.statoPratica(p).chiave !== 'fatturata').length }
+          ],
+          onRowClick: a => modificaAgenzia(c, a),
+          emptyText: ags.length ? 'Nessuna agenzia con questa ricerca' : 'Nessuna agenzia',
+          emptyHint: ags.length ? '' : c.vendita_diretta ? 'Cliente di sola vendita diretta. Aggiungi un’agenzia se Decobrands lo segue anche per un fornitore.' : 'Aggiungi il fornitore per cui Decobrands segue questo cliente.'
+        });
+        CRM.$('input', t).addEventListener('input', ev => { filtroAgenzie = ev.target.value; tab.aggiorna(filtra()); });
+        CRM.Nota(h, 'Un solo subagente per cliente e fornitore; il codice è unico per fornitore. Clic su una riga per modificarla.');
+      } },
+      { id: 'pratiche', etichetta: 'Pratiche', conta: pr.length, disegna: h => {
+        const nonPagata = p => p.documenti.some(d => { const st = M.statoIncasso(p, d); return st && (st.stato === 'insoluta' || st.stato === 'da_verificare'); });
+        const ST = { aperte: p => M.statoPratica(p).chiave !== 'fatturata', ritardo: p => M.statoPratica(p).chiave === 'scaduta', fatturate: p => M.statoPratica(p).chiave === 'fatturata', nonpagate: nonPagata, tutte: () => true };
+        const forn = pr.map(p => p.fornitore_id).filter((x, i, arr) => arr.indexOf(x) === i);
+        // base = tutti i filtri tranne la vista: serve anche per i numeri dei segmenti, aggiornati dal vivo (D-23)
+        const base = () => { const q = (filtroPratiche.q || '').trim().toLowerCase(); return pr.filter(p => !filtroPratiche.f.length || filtroPratiche.f.indexOf(String(p.fornitore_id)) >= 0).filter(p => !q || p.numero.toLowerCase().indexOf(q) >= 0); };
+        const filtra = () => base().filter(ST[filtroPratiche.vista]);
+        const conteggi = () => { const b = base(), n = {}; Object.keys(ST).forEach(k => { n[k] = b.filter(ST[k]).length; }); return n; };
+        const fbp = CRM.FilterBar(h, { campi: [
+          { nome: 'vista', tipo: 'segmenti', etichetta: 'Stato', valore: filtroPratiche.vista, opzioni: [{ value: 'aperte', label: 'Aperte', n: pr.filter(ST.aperte).length }, { value: 'ritardo', label: 'In ritardo', n: pr.filter(ST.ritardo).length }, { value: 'fatturate', label: 'Fatturate', n: pr.filter(ST.fatturate).length }, { value: 'nonpagate', label: 'Non pagate', n: pr.filter(ST.nonpagate).length }, { value: 'tutte', label: 'Tutte', n: pr.length }] },
+          { nome: 'f', tipo: 'ricerca', entita: 'fornitore', multipla: true, etichetta: 'Fornitore', valore: filtroPratiche.f, placeholder: 'Tutti i fornitori', contesto: { limita: forn.map(String) } },
+          { nome: 'q', tipo: 'cerca', etichetta: 'Numero', valore: filtroPratiche.q, placeholder: 'Numero' }
+        ], riepilogo: true, onChange: v => { filtroPratiche = v; fbp.conta('vista', conteggi()); tab.aggiorna(filtra()); } });
+        const tab = CRM.DataTable(CRM.blocco(h, 'riempi'), {
+          compatta: true, righe: filtra(), ordinamentoIniziale: { key: 'data', dir: 'desc' },
+          colonne: [
+            { key: 'numero', header: 'Pratica', cell: p => '<b>' + e(p.numero) + '</b>' },
+            { key: 'fornitore', header: 'Fornitore', valore: p => M.fornitore(p.fornitore_id).breve },
+            { key: 'data', header: 'Data', tipo: 'data' },
+            { key: 'importo', header: 'Importo', tipo: 'euro', valore: p => M.importoPratica(p) },
+            { key: 'stato', header: 'Stato', sortValue: p => ['scaduta', 'attesa', 'confermata', 'fatturata'].indexOf(M.statoPratica(p).chiave), cell: p => CRM.statoPratica(p) }
+          ],
+          onRowClick: p => { location.hash = '#/pratiche/' + p.id; },
+          emptyText: 'Nessuna pratica con questi filtri', emptyHint: pr.length ? 'Prova "Tutte".' : 'Le pratiche nascono dagli ordini caricati in Documenti.',
+          piede: 'Provvigioni ai subagenti nel ' + tr + '° trimestre: <b>' + M.euro(prov.reduce((x, r) => x + r.provvigione, 0)) + '</b>'
+        });
+      } }
+    ] });
+  }
+  CRM.rotta(/^\/clienti$/, () => vistaClienti(null));
+  CRM.rotta(/^\/clienti\/(\w+)$/, piva => vistaClienti(piva));
+  CRM.rotta(/^\/abbinamenti$/, () => { location.replace('#/clienti'); });
+
+  /* Agenzia del cliente: il cliente è fisso, si sceglie fornitore e subagente con i campi di ricerca. */
+  function modificaAgenzia(c, a) {
+    const nuovo = !a;
+    const v0 = a || { fornitore_id: '', subagente_id: '', sconto: 0, codice: '', pct_sub: null, mensile: '' };
+    const sconti = fid => { const x = M.S.scaglioni.filter(s => s.fornitore_id === Number(fid)).map(s => s.sconto).filter((y, i, arr) => arr.indexOf(y) === i).sort((p, q) => p - q); return x.length ? x : [0]; };
+    CRM.FormModal({
+      titolo: (nuovo ? 'Nuova agenzia · ' : 'Agenzia · ') + c.nome, testo: nuovo ? 'Fornitore per cui Decobrands segue questo cliente.' : null,
+      conferma: nuovo ? 'Aggiungi agenzia' : 'Salva', colonne: 2,
+      campi: [
+        { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: 'fornitore', valore: v0.fornitore_id, placeholder: 'Nome del fornitore' },
+        { nome: 'codice', etichetta: 'Codice cliente del fornitore', valore: v0.codice, placeholder: 'es. GA-2271', aiuto: 'Come il fornitore chiama il cliente su conferme e fatture: serve ad abbinare i documenti in automatico.' },
+        { nome: 'subagente_id', etichetta: 'Seguito da', tipo: 'ricerca', entita: 'subagente', valore: v0.subagente_id, placeholder: 'Nome del subagente' },
+        { nome: 'sconto', etichetta: 'Sconto al cliente %', tipo: 'select', valore: v0.sconto, opzioni: sconti(v0.fornitore_id || 1).map(x => ({ value: x, label: M.pct(x) })) },
+        // D-27 §19: regole del subagente su questo cliente, al posto dello sconto fittizio
+        { nome: 'pct_sub', etichetta: 'Al subagente per questo cliente %', tipo: 'numero', passo: '0.5', valore: v0.pct_sub == null ? '' : v0.pct_sub, placeholder: 'quella dello scaglione', aiuto: 'Vuoto = la percentuale dello scaglione (o l’eccezione del subagente).' },
+        { nome: 'mensile', etichetta: 'Provvigione al subagente', tipo: 'select', valore: v0.mensile || '', opzioni: [{ value: '', label: 'Su ogni fattura' }, { value: 'prima', label: 'Una fattura al mese: la prima' }, { value: 'piu_alta', label: 'Una fattura al mese: la più alta' }], aiuto: 'Con una fattura al mese le altre del mese non danno provvigione al subagente; ogni documento si può comunque correggere in Liquidazioni.' }
+      ],
+      dopo: form => form.el.addEventListener('change', ev => {   // gli sconti dipendono dalle percentuali del fornitore
+        if (ev.target.name !== 'fornitore_id' || !M.fornitore(Number(ev.target.value))) return;
+        const sel = form.campo('sconto'), prima = sel.value;
+        sel.innerHTML = sconti(ev.target.value).map(x => '<option value="' + x + '"' + (String(x) === prima ? ' selected' : '') + '>' + M.pct(x) + '</option>').join('');
+      }),
+      azioniExtra: nuovo ? [] : [{ etichetta: 'Elimina', variante: 'pericolo', onClick: () => {
+        CRM.Conferma('Eliminare l’agenzia ' + M.fornitore(a.fornitore_id).breve + '?', 'Le pratiche di questo cliente con ' + M.fornitore(a.fornitore_id).breve + ' non genereranno più provvigioni.', 'Elimina', true).then(ok => {
+          if (!ok) return; M.S.abbinamenti.splice(M.S.abbinamenti.indexOf(a), 1); M.annota('Agenzia ' + M.fornitore(a.fornitore_id).breve + ' eliminata per ' + c.nome); M.salva(); CRM.Avviso('Agenzia eliminata'); CRM.naviga();
+        });
+      } }],
+      onConferma: (v, form) => {
+        if (!v.fornitore_id || !v.subagente_id) { form.errore('Scegli fornitore e subagente.'); return false; }
+        if (!M.fornitore(Number(v.fornitore_id)) || !M.subagente(Number(v.subagente_id))) { form.errore('Scegli fornitore e subagente dall’elenco: i valori con il pallino rosso non esistono in anagrafica.'); return false; }
+        const fid = Number(v.fornitore_id);
+        const dup = M.S.abbinamenti.find(x => x !== a && x.cliente_piva === c.piva && x.fornitore_id === fid);
+        if (dup) { form.errore(c.nome + ' con ' + M.fornitore(fid).breve + ' è già seguito da ' + M.subagente(dup.subagente_id).nome + '.'); return false; }
+        const dupC = v.codice && M.S.abbinamenti.find(x => x !== a && x.fornitore_id === fid && (x.codice || '').toUpperCase() === v.codice.toUpperCase());
+        if (dupC) { form.errore('Il codice ' + v.codice + ' è già di ' + M.nomeCliente(dupC.cliente_piva) + '.'); return false; }
+        const pctSub = v.pct_sub === '' || v.pct_sub == null ? null : Number(v.pct_sub);
+        if (pctSub != null && (isNaN(pctSub) || pctSub < 0 || pctSub > 100)) { form.errore('La percentuale al subagente va fra 0 e 100, oppure vuota.'); return false; }
+        const rec = a || {};
+        Object.assign(rec, { cliente_piva: c.piva, fornitore_id: fid, subagente_id: Number(v.subagente_id), sconto: Number(v.sconto), codice: v.codice || null, pct_sub: pctSub, mensile: v.mensile || null });
+        if (nuovo) { rec.id = Math.max.apply(null, M.S.abbinamenti.map(x => x.id)) + 1; M.S.abbinamenti.push(rec); }
+        M.annota((nuovo ? 'Nuova agenzia ' : 'Agenzia aggiornata ') + M.fornitore(fid).breve + ' per ' + c.nome);
+        M.salva(); CRM.Avviso(nuovo ? 'Agenzia aggiunta' : 'Agenzia salvata'); CRM.naviga();
+      }
+    });
+  }
+})();

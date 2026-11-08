@@ -1,0 +1,52 @@
+- [ ] Utenti e Ruoli:
+  - Scheda utente: informazioni confuse, necessita di ristrutturazione
+  - Permessi: stato "tutti aperti" non permette filtraggio efficace
+  - Tablet: elenco e dettaglio utente devono essere disposti verticalmente (modalità stack)
+  - Suggerimento tablet: clic su utente apre modale con dettaglio (chiusura in basso)
+- [ ] Nuovo utente:
+  - Selezione credenziali per area: lista ingestibile con molte aree
+  - Suggerimento: implementare wizard per selezione aree in momento specifico
+- [ ] Accesso:
+  - Gestione menu a sinistra diversa per ogni area (provvigionario, Dati, gestione)
+  - Area "Dati": comprende tutte le tabelle con CRUD integrato (anagrafiche, testata, righe ordini, altre tabelle), con sistema di navigazione basato su chiavi per scorciare facilmente lungo la base dati
+  - UI/UX: Indicatori di caricamento:
+    - Implementare skeleton screen durante il primo rendering della pagina (es. usando `useEffect` e stato locale)
+    - Esempio con Tailwind: `<div className="animate-pulse bg-gray-200 h-6 rounded w-full"></div>` per placeholder
+    - Sincronizzare l'indicatore con il tempo di ritardo tra titolo e contenuto
+  - Area "provvigioni": sottosezioni "ogni giorno", "ogni mese", "ogni trimestre"
+  - Area "gestione": sempre presente per amministratori
+  - Considerazioni:
+  - Access Management Avanzato:
+    - Permesso granulare sui record (es. modificare solo alcuni campi di una tabella)
+    - Audit sessioni attive con log dettagliati (IP, dispositivo, timestamp)
+    - Controllo accesso basato su ruoli dinamici (es. ruoli temporanei per task specifici)
+    - Integrazione MFA (Multi-Factor Authentication) obbligatorio per amministratori
+    - Gestione delle chiavi API con scadenza e limiti di richieste
+- [ ] Documenti:
+  - Coda email per ingresso documenti (con allegati)
+  - Lettura GLM-OCR per estrazione dati testuali
+  - Controlli automatici di formato e completezza
+  - Abbinamento automatico a pratiche/fatture/bollettini
+  - Correzione guidata per errori di classificazione
+  - Classificazione tramite modello JEV in locale:
+    - Decisione deterministica: allegare a pratica, considerare come bollettino o scartare
+    - Integrazione con workflow esistenti (es. trigger su classificazione "bollettino" per generazione automatica di report)
+    - Backup locale del modello JEV per garanzia di disponibilità anche in assenza di connessione
+  - Classificazione tramite modello JEV in locale:
+    - Decisione deterministica: allegare a pratica, considerare come bollettino o scartare
+    - Integrazione con workflow esistenti (es. trigger su classificazione "bollettino" per generazione automatica di report)
+    - Backup locale del modello JEV per garanzia di disponibilità anche in assenza di connessione
+  - Chatbot Agentico:
+    - Architettura a subagenti con skill specializzate (es. accesso dati, generazione SQL deterministica)
+    - Ogni subagente: capacità di interpretare query utente e tradurle in operazioni su DB
+    - Separazione tra logica deterministica (SQL generato da regole) e agenti autonomi per compiti complessi
+    - Esempio: subagente "Dati Anagrafici" genera SQL predefinito per query su tabelle specifiche
+    - **Punti di forza:**
+      - Separazione per aree semplifica la navigazione
+      - Dashboard personalizzabili migliorano l'esperienza utente
+      - Accesso diretto post-login riduce i passaggi
+    - **Possibili miglioramenti:**
+      1. Configurazione dashboard: opzioni predefinite intuitive e flessibili
+      2. Menu per aree: evitare lunghezza eccessiva su dispositivi mobili
+      3. Priorità aree: design distinto per l'area "gestione"
+  - Note: ti sembra un buon sistema? sinceramente

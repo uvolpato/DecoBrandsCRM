@@ -1,0 +1,870 @@
+/* ============================================================
+   Viste "Ogni giorno": Oggi, Documenti in arrivo, Pratiche, Pratica
+   Solo composizione di componenti CRM.*
+   ============================================================ */
+(function () {
+  'use strict';
+  const e = CRM.esc;
+  const VARIANTE_FARE = { ritardo: 'errore', mancante: 'errore', documento: 'primario', bollettino: 'attesa', pagamento: 'errore' };
+
+  /* ---------- Oggi: ListaDaFare + Cifre del trimestre + Elenco operazioni ---------- */
+  let schedaOggi = 'scadenze';
+  CRM.rotta(/^\/$/, function () {
+    const fare = M.daFare();
+    const corpo = CRM.Pagina({ voce: 'oggi', titolo: 'Oggi', pieno: true,
+      sottotitolo: M.dataLunga(M.oggi()) + ' · ' + (fare.length ? fare.length + (fare.length === 1 ? ' cosa da fare' : ' cose da fare') : 'niente in sospeso') });
+    // gruppi di lavoro: conferme in ritardo, documenti da decidere, bollettini
+    const conferme = fare.filter(x => x.gruppo === 'conferme').sort((a, b) => b.giorni - a.giorni);
+    const documenti = fare.filter(x => x.gruppo === 'documenti');
+    const daDecidere = documenti.filter(x => x.stato !== 'pronto');
+    const bollettini = fare.filter(x => x.gruppo === 'bollettini');
+    const pagamenti = fare.filter(x => x.gruppo === 'pagamenti').sort((a, b) => b.giorni - a.giorni);
+    const conta = st => documenti.filter(x => x.stato === st).length;
+    const voce = x => ({ tipo: VARIANTE_FARE[x.tipo], titolo: x.titolo, dettaglio: x.dettaglio, href: x.link, azione: x.azione });
+    const fornConf = conferme.map(x => x.fornitore_id).filter((v, i, a) => a.indexOf(v) === i);
+
+    // 1. riquadri in testa: quanto lavoro c'è per tipo; un clic filtra la lista
+    let gruppi;
+    const kpi = CRM.KpiRow(corpo, [
+      { id: 'conferme', etichetta: 'Conferme in ritardo', valore: String(conferme.length), variante: conferme.length ? 'errore' : 'ok',
+        dettagli: conferme.length ? [{ testo: 'la più vecchia da ' + conferme[0].giorni + ' giorni' }, { testo: fornConf.length + (fornConf.length === 1 ? ' fornitore da sollecitare' : ' fornitori da sollecitare') }] : [{ testo: 'nessuna' }] },
+      { id: 'documenti', etichetta: 'Documenti in coda', valore: String(documenti.length), variante: 'primario',
+        dettagli: [{ testo: daDecidere.length + ' chiedono una decisione' }, { testo: conta('pronto') + ' pronti da abbinare' }] },
+      { id: 'bollettini', etichetta: 'Bollettini', valore: String(bollettini.length), variante: bollettini.length ? 'attesa' : 'ok',
+        dettagli: [{ testo: bollettini.filter(x => x.tipo === 'bollettino').length + ' da verificare o chiudere' }, { testo: bollettini.filter(x => x.tipo === 'mancante').length + ' da sollecitare' }] },
+      { id: 'pagamenti', etichetta: 'Pagamenti dei clienti', valore: String(pagamenti.length), variante: pagamenti.length ? 'errore' : 'ok',
+        dettagli: pagamenti.length ? [{ testo: new Set(pagamenti.map(x => x.cliente)).size + ' clienti da sollecitare' }, { testo: 'il più vecchio da ' + pagamenti[0].giorni + ' giorni' }] : [{ testo: 'nessuna fattura non pagata' }] }
+    ], { onSeleziona: id => gruppi.filtra(id) });
+
+    const col = CRM.blocco(corpo, 'colonne riempi');
+    const daFare = CRM.Pannello(col, { titolo: 'Da fare', nota: 'clic sul gruppo per aprirlo o chiuderlo', senzaMargine: true, riempi: true });
+    // 2–3. gruppi richiudibili, ordinati per anzianità, con azioni sul gruppo intero
+    gruppi = CRM.GruppiDaFare(daFare.corpo, [
+      { id: 'conferme', titolo: 'Conferme in ritardo', variante: 'errore', conta: conferme.length,
+        azioni: conferme.length ? [{ etichetta: 'Prepara i solleciti', icona: 'posta', variante: 'primario', onClick: () => solleciti(conferme.map(x => M.pratica(x.pratica))) }] : [],
+        voci: conferme.map(x => Object.assign(voce(x), { extra: '<span class="giorni">' + x.giorni + ' gg</span>' })), vuoto: 'Nessuna conferma in ritardo.' },
+      { id: 'documenti', titolo: 'Documenti da decidere', variante: 'primario', conta: daDecidere.length,
+        azioni: [{ etichetta: 'Apri la coda', href: '#/documenti' }],
+        sommario: documenti.length ? '<b>' + documenti.length + '</b> in coda: <b>' + conta('pronto') + '</b> pronti da abbinare, <b>' + conta('controllare') + '</b> con dati letti da controllare, <b>' + conta('scegliere') + '</b> da scegliere o verificare. Qui sotto solo quelli che chiedono una decisione.' : '',
+        voci: daDecidere.map(x => Object.assign(voce(x), { dettaglio: x.dettaglio + (x.stato === 'controllare' ? ' · dati letti da controllare' : '') })), vuoto: 'Nessun documento richiede una decisione.' },
+      { id: 'bollettini', titolo: 'Bollettini', variante: 'attesa', conta: bollettini.length,
+        azioni: [{ etichetta: 'Apri bollettini', href: '#/bollettini' }],
+        voci: bollettini.map(voce), vuoto: 'Nessun bollettino da verificare.' },
+      { id: 'pagamenti', titolo: 'Pagamenti da sollecitare', variante: 'errore', conta: pagamenti.length,
+        azioni: pagamenti.length ? [{ etichetta: 'Prepara i solleciti', icona: 'posta', onClick: () => CRM.sollecitiPagamento(M.pagamentiDaSollecitare()) }] : [],
+        voci: pagamenti.map(x => Object.assign(voce(x), { extra: '<span class="giorni">' + x.giorni + ' gg</span>' })), vuoto: 'Nessuna fattura non pagata.' }
+    ], { titolo: 'Tutto in ordine', testo: 'Nessun documento da abbinare, nessuna conferma in ritardo, nessun bollettino da verificare.' });
+
+    const destra = CRM.blocco(col, 'pila', 'overflow:auto;min-height:0');
+    // 4. colonna rivolta al futuro: cosa arriva nei prossimi giorni
+    const sc = M.scadenze(15);
+    const htmlScadenze = sc.length ? '<ul class="scadenze">' + sc.map(x => '<li><span class="sc-data">' + M.data(x.data).slice(0, 5) + '<small>' + (M.giorni(M.oggi(), x.data) === 0 ? 'oggi' : 'fra ' + M.giorni(M.oggi(), x.data) + ' gg') + '</small></span>' +
+      '<div><a href="' + x.link + '">' + e(x.testo) + '</a><span>' + e(x.dettaglio) + '</span></div></li>').join('') + '</ul>' : '<p class="testo-tenue" style="margin:0">Nessuna scadenza nei prossimi 15 giorni.</p>';
+    // scadenze e ultime operazioni in due schede dello stesso riquadro: il trimestre resta sempre visibile
+    const fut = CRM.Pannello(destra, {});
+    fut.el.classList.add('compatto');
+    CRM.Schede(fut.corpo, { attiva: schedaOggi, onCambia: id => { schedaOggi = id; }, schede: [
+      { id: 'scadenze', etichetta: 'Prossime scadenze', conta: sc.length, disegna: c => { c.insertAdjacentHTML('beforeend', htmlScadenze + '<p class="nota">Prossimi 15 giorni.</p>'); } },
+      { id: 'operazioni', etichetta: 'Ultime operazioni', disegna: c => { CRM.Elenco(c, M.S.registro.slice(0, 6).map(x => ({ testo: e(x.testo) })), 'Qui compaiono le operazioni fatte: abbinamenti, verifiche, liquidazioni.'); } }
+    ] });
+    const a = 2026, t = M.trimestre(M.oggi());
+    const st = M.statoTrimestre(a, t);
+    const righe = M.righeLiquidazione(a, t);
+    const somma = f => righe.filter(f).reduce((s, r) => s + r.provvigione, 0);
+    let atteso = 0, riconosciuto = 0;
+    righe.forEach(r => { atteso += r.importo * M.percentuali(r.pratica, r.doc.data).dal_fornitore / 100; });
+    M.S.bollettini.filter(b => b.anno === a && Math.floor((b.mese - 1) / 3) + 1 === t).forEach(b => b.righe.forEach(r => { riconosciuto += r.importo; }));
+    const lim = M.limiti(a, t);
+    const trim = CRM.Pannello(destra, { titolo: t + '° trimestre ' + a, azioni: [{ etichetta: 'Apri liquidazione', variante: 'testo', href: '#/liquidazioni/' + a + '/' + t }] });
+    CRM.Periodi(trim.corpo, [{ href: '#/liquidazioni/' + a + '/' + t, titolo: M.nomeTrimestre(t), sotto: st.etichetta, stato: st.giorni != null ? 'mancano ' + st.giorni + ' giorni' : '',
+      avanzamento: Math.round(100 * M.giorni(lim.da, M.oggi()) / M.giorni(lim.da, lim.a)) }], 'Trimestre in corso').style.boxShadow = 'none';
+    CRM.Cifre(trim.corpo, [
+      { etichetta: 'Atteso dai fornitori', valore: atteso },
+      { etichetta: 'Già riconosciuto nei bollettini', valore: riconosciuto },
+      { etichetta: 'Da liquidare ai subagenti', valore: somma(r => r.liquidabile) },
+      { etichetta: 'Bloccato in attesa dei bollettini', valore: somma(r => !r.liquidabile), variante: somma(r => !r.liquidabile) ? 'attesa' : '' }
+    ]);
+  });
+
+  /* ---------- Documenti: Caricamento + ElencoSelezionabile + Dettagli + DataTable + Scelte ----------
+     Tutti i documenti entrano da qui: caricamento → lettura automatica → controllo dei dati letti → abbinamento. */
+  const ESITO = { certo: ['ok', 'Abbinamento sicuro'], probabile: ['attesa', 'Abbinamento da confermare'], ambiguo: ['attesa', 'Da scegliere'], nessuno: ['errore', 'Cliente non riconosciuto'],
+    nuova: ['info', 'Nuova pratica'], bollettino: ['info', 'Bollettino da registrare'], doppio: ['errore', 'Già registrato'] };
+  const ACCETTA = '.pdf,.xlsx,.xls,.csv';
+  function carica(files, preferenza) {
+    let primo = null, letti = 0;
+    files.forEach(f => { const d = M.leggiDocumento(f.name, preferenza); if (d) { letti++; primo = primo || d; } });
+    M.salva();
+    if (!primo) { CRM.Avviso('Nel prototipo la lettura è simulata e i documenti di esempio sono finiti: ripristina i dati di prova per ricominciare.'); return; }
+    CRM.Avviso(letti === 1 ? 'Letto ' + M.TIPI[primo.tipo].toLowerCase() + ' ' + primo.numero + ' di ' + M.fornitore(primo.fornitore_id).breve + ': controlla i dati e abbinalo.' : letti + ' documenti letti: controllali e abbinali.');
+    location.hash = '#/documenti/' + primo.id;
+  }
+  CRM.caricaDocumenti = carica;
+  CRM.alCaricamento = files => carica(files);
+
+  function vistaDocumenti(idSel) {
+    const docs = M.S.in_arrivo;
+    const corpo = CRM.Pagina({
+      voce: 'documenti', titolo: 'Documenti', pieno: true,
+      sottotitolo: 'Qui entrano tutti i documenti dei fornitori: ordini, conferme, fatture, note di credito e bollettini. Caricali, controlla i dati letti e abbinali: la pratica avanza da sola.'
+    });
+    const col = CRM.blocco(corpo, 'colonne posta riempi');
+    const sx = CRM.Pannello(col, { titolo: 'Da controllare', nota: String(docs.length) + (M.puo('scartati') && M.S.scartati.length ? ' · <a href="#/scartati">' + M.S.scartati.length + ' scartati</a>' : ''), riempi: true });
+    CRM.Caricamento(sx.corpo, { titolo: 'Trascina qui i documenti', testo: 'PDF di ordini, conferme, fatture e note di credito; bollettini in PDF o Excel', accetta: ACCETTA, onFile: f => carica(f) });
+    if (!docs.length) {
+      CRM.Nota(sx.corpo, 'Nessun documento da controllare.').style.marginTop = '12px';
+      const dx = CRM.Pannello(col, { titolo: 'Come entrano i documenti', riempi: true });
+      CRM.Elenco(dx.corpo, [
+        { testo: '<b>Carica</b> il file qui o con <b>Carica documenti</b> nella barra a sinistra, da qualsiasi pagina.' },
+        { testo: '<b>Lettura automatica</b>: il sistema riconosce fornitore, tipo, numero, data, codice cliente e righe.' },
+        { testo: '<b>Controlla</b> i dati letti e correggili se serve.' },
+        { testo: '<b>Abbina</b>: un ordine apre una nuova pratica; conferme, fatture e note di credito si agganciano alla pratica proposta; un bollettino si registra e si verifica riga per riga.' }
+      ]);
+      CRM.Nota(dx.corpo, 'Nel prototipo la lettura è simulata: qualsiasi file produce uno dei documenti di esempio.').style.marginTop = '12px';
+      return;
+    }
+    const sel = docs.find(d => d.id === Number(idSel)) || docs[0];
+    CRM.blocco(sx.corpo, '', 'height:12px');
+    CRM.ElencoSelezionabile(sx.corpo, docs.map(d => {
+      const pr = M.proposta(d);
+      return { id: d.id, href: '#/documenti/' + d.id, titolo: M.TIPI[d.tipo] + ' ' + d.numero, valore: M.euro(pr.importo),
+        sotto: M.fornitore(d.fornitore_id).breve + ' · caricato il ' + M.data(d.ricevuto), stato: CRM.stato(ESITO[pr.esito][0], ESITO[pr.esito][1]) + statoLetturaHtml(d) };
+    }), sel.id);
+
+    const pr = M.proposta(sel);
+    const f = M.fornitore(sel.fornitore_id);
+    const ab = pr.abbinamento;
+    const boll = sel.tipo === 'bollettino';
+    const stl = M.statoLettura(sel);
+    const dx = CRM.Pannello(col, { titolo: M.TIPI[sel.tipo] + ' ' + sel.numero + ' · ' + f.breve, riempi: true, nota: CRM.icona('file') + ' ' + e(sel.file),
+      azioni: [{ etichetta: 'Correggi i dati letti', onClick: () => correggi(sel), conta: stl.n || null, contaVariante: stl.livello === 'bassa' ? 'errore' : 'attesa',
+        contaTitolo: stl.n + (stl.n === 1 ? ' punto da controllare' : ' punti da controllare') }, { etichetta: 'Scarta il documento', variante: 'pericolo', onClick: () => scarta(sel) }] });
+    CRM.Dettagli(dx.corpo, (boll ? [
+      { etichetta: 'Fornitore', valore: e(f.nome) },
+      { etichetta: 'Mese', valore: M.mese(sel.mese, sel.anno) },
+      { etichetta: 'Totale riconosciuto', valore: M.euro(pr.importo) }
+    ] : [
+      { etichetta: 'Fornitore', valore: e(f.nome) },
+      { etichetta: 'Tipo', valore: M.TIPI[sel.tipo] },
+      { etichetta: 'Data del documento', valore: M.data(sel.data) },
+      { etichetta: 'Codice cliente', valore: e(sel.codice_cliente) + (ab ? '<span class="sec-riga">' + e(M.nomeCliente(ab.cliente_piva)) + '</span>' : ' ' + CRM.stato('errore', 'non trovato fra i clienti ' + f.breve)) },
+      { etichetta: 'Importo', valore: M.euro(pr.importo) }
+    ]), { inColonne: true });
+    // Cosa farne (proposta e azioni) e righe lette in due schede, come nella pratica (D-15 §19):
+    // le righe servono solo quando la lettura è incerta, e allora il titolo della scheda lo dice
+    const righeDubbie = new Set(stl.campi.map(c => /^righe\.(\d+)\./.exec(c)).filter(Boolean).map(m => Number(m[1])));
+    const sk = CRM.Schede(dx.corpo, { riempi: true, attiva: 'azioni', schede: [
+      { id: 'azioni', etichetta: boll ? 'Cosa farne' : sel.tipo === 'ordine' ? 'Nuova pratica' : pr.esito === 'nessuno' ? 'Scegli la pratica' : 'Pratica proposta', disegna: h => cosaFarne(h) },
+      { id: 'righe', etichetta: 'Righe lette', conta: righeDubbie.size ? righeDubbie.size + ' da controllare' : sel.righe.length,
+        contaVariante: righeDubbie.size ? (stl.livello === 'bassa' ? 'errore' : 'attesa') : 'neutro', disegna: h => righeLette(h) }
+    ] });
+    dx.corpo.querySelector('.schede').style.marginTop = '14px';
+    function righeLette(h) {
+      CRM.Nota(h, righeDubbie.size ? 'Le righe evidenziate hanno valori letti con poca sicurezza: correggili o confermali con <b>Correggi i dati letti</b>.' : 'Righe come lette dal documento. Per cambiarle usa <b>Correggi i dati letti</b>.');
+      CRM.DataTable(CRM.blocco(h, 'riempi'), boll ? {
+      compatta: true, righe: sel.righe, etichettaTotale: 'Totale', rowClass: (r, i) => righeDubbie.has(sel.righe.indexOf(r)) ? 'evidenzia' : '',
+      colonne: [
+        { key: 'numero', header: 'Documento', grow: true },
+        { key: 'data', header: 'Data', tipo: 'data' },
+        { key: 'imponibile', header: 'Imponibile', tipo: 'euro' },
+        { key: 'pct', header: '%', tipo: 'pct' },
+        { key: 'importo', header: 'Provvigione', tipo: 'euro', totale: 'somma' }
+      ]
+    } : {
+      compatta: true, righe: sel.righe, etichettaTotale: 'Totale', rowClass: r => righeDubbie.has(sel.righe.indexOf(r)) ? 'evidenzia' : '',
+      colonne: [
+        { key: 'codice', header: 'Articolo' },
+        { key: 'descrizione', header: 'Descrizione', grow: true },
+        { key: 'qta', header: 'Quantità', tipo: 'numero' },
+        { key: 'prezzo', header: 'Prezzo', tipo: 'euro' },
+        { key: 'importo', header: 'Importo', tipo: 'euro', valore: r => M.importoRiga(r), totale: 'somma' }
+      ]
+    });
+
+    }
+    function cosaFarne(h) {
+      if (righeDubbie.size) {
+        const av = CRM.blocco(h, 'avviso-variazioni');
+        av.innerHTML = CRM.icona('avviso') + '<span><b>' + righeDubbie.size + (righeDubbie.size === 1 ? ' riga letta' : ' righe lette') + ' con valori incerti</b>: controllale prima di decidere.</span>';
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.textContent = 'Vedi le righe';
+        b.addEventListener('click', () => sk.vai('righe')); av.appendChild(b);
+      }
+    if (boll) {
+      if (pr.esito === 'doppio') CRM.Nota(h, 'Il bollettino di ' + M.meseMin(sel.mese) + ' di ' + e(f.breve) + ' è già registrato: <a href="#/bollettini/' + pr.esistente.id + '">aprilo</a>. Se questo è la versione rettificata, correggi il mese o scartalo.');
+      else CRM.Scelte(h, [{
+        titolo: 'Registra il bollettino di ' + M.mese(sel.mese, sel.anno), consigliata: true,
+        punti: [sel.righe.length + (sel.righe.length === 1 ? ' riga letta' : ' righe lette') + ', totale ' + M.euro(pr.importo),
+          'dopo la registrazione lo confronti riga per riga con le nostre pratiche'],
+        azione: { etichetta: 'Registra e verifica', onClick: () => seAffidabile(sel, () => { const b = M.registraBollettino(sel.id); M.salva(); CRM.Avviso('Bollettino registrato: ora verificalo'); location.hash = '#/bollettini/' + b.id; }) }
+      }]);
+    } else if (sel.tipo === 'ordine') {
+      if (pr.esito === 'doppio') CRM.Nota(h, 'Esiste già la pratica <a href="#/pratiche/' + pr.esistente.id + '">' + e(pr.esistente.numero) + '</a>: controlla il numero letto o scarta il documento.');
+      else if (pr.esito === 'nessuno') CRM.Nota(h, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
+        '. Correggi il codice letto oppure, se è un cliente nuovo, aggiungi l’agenzia nella scheda del cliente in <a href="#/clienti">Clienti</a>.');
+      else {
+        const sub = M.subagente(ab.subagente_id);
+        CRM.Scelte(h, [{
+          titolo: sel.numero + ' · ' + M.nomeCliente(ab.cliente_piva), sottotitolo: CRM.stato('attesa', 'Attesa conferma'), consigliata: true,
+          punti: ['codice cliente ' + e(ab.codice) + ' = ' + e(M.nomeCliente(ab.cliente_piva)), 'seguita da ' + e(sub.nome) + ', sconto ' + M.pct(ab.sconto),
+            'conferma attesa entro ' + f.giorni_conferma + ' giorni, poi parte il sollecito'],
+          azione: { etichetta: 'Apri la pratica', onClick: () => seAffidabile(sel, () => { const p = M.apriPratica(sel.id); M.salva(); CRM.Avviso('Aperta la pratica ' + p.numero); location.hash = '#/pratiche/' + p.id; }) }
+        }]);
+      }
+    } else {
+      if (pr.esito === 'nessuno') h.insertAdjacentHTML('beforeend', '<h3>A quale pratica appartiene?</h3>');
+      if (pr.esito === 'nessuno') CRM.Nota(h, 'Il codice ' + e(sel.codice_cliente) + ' non corrisponde a nessun cliente di ' + e(f.breve) +
+        '. Scegli la pratica a mano oppure, se è un cliente nuovo, aggiungi il codice nella scheda del cliente in <a href="#/clienti">Clienti</a>.').style.marginBottom = '12px';
+      let candidati = pr.candidati;
+      if (pr.esito === 'nessuno') candidati = M.S.pratiche.filter(p => p.fornitore_id === sel.fornitore_id && (sel.tipo === 'conferma' ? !M.doc(p, 'conferma') : !M.fiscali(p).some(d => d.tipo === 'fattura')))
+        .map(p => ({ pratica: p, motivi: ['pratica ' + f.breve + ' ancora aperta'], delta: M.r2(pr.importo - M.importoDoc(M.doc(p, 'conferma') || M.doc(p, 'ordine'))) }));
+      CRM.Scelte(h, candidati.map((c, i) => {
+        const p = c.pratica;
+        const prima = M.statoPratica(p).etichetta;
+        const dopo = sel.tipo === 'conferma' ? 'Confermata' : sel.tipo === 'fattura' ? 'Fatturata' : prima;
+        const rif = M.doc(p, 'conferma') ? 'alla conferma' : 'all’ordine';
+        return {
+          titolo: p.numero + ' · ' + M.nomeCliente(p.cliente_piva),
+          sottotitolo: CRM.statoPratica(p) + (prima !== dopo ? ' › ' + CRM.stato(dopo === 'Fatturata' ? 'ok' : 'info', dopo) : ''),
+          punti: c.motivi.map(e).concat(sel.tipo === 'nota_credito' ? ['riduce il fatturato della pratica di <b class="negativo">' + M.euro(Math.abs(pr.importo)) + '</b>'] : [Math.abs(c.delta) < 0.01 ? 'importo uguale ' + rif : '<span class="' + CRM.classeSegno(c.delta) + '">' + CRM.euroSegno(c.delta) + '</span> rispetto ' + rif]),
+          consigliata: i === 0 && pr.esito !== 'nessuno',
+          azione: { etichetta: 'Abbina a ' + p.numero, onClick: () => seAffidabile(sel, () => abbina(sel, p)) }
+        };
+      }), 'Nessuna pratica aperta di ' + f.breve + ' a cui abbinarlo.');
+      const altra = CRM.blocco(h, 'abbina-altra');
+      altra.innerHTML = '<span class="testo-tenue">Oppure abbina a un’altra pratica di ' + e(f.breve) + ':</span>' + CRM.campoRicercaHtml({ entita: 'pratica', placeholder: 'Numero pratica o cliente', contesto: { fornitore_id: sel.fornitore_id } }) +
+        '<button type="button" class="btn sec" disabled>Abbina</button>';
+      CRM.attivaRicerche(altra, () => ({ fornitore_id: sel.fornitore_id }));
+      let scelta = null;
+      const btn = CRM.$('.btn', altra);
+      altra.addEventListener('ricerca-scelta', ev => { scelta = ev.detail.voce; btn.disabled = false; btn.textContent = 'Abbina a ' + scelta.numero; });
+      altra.addEventListener('change', () => { if (!CRM.$('input[type=hidden]', altra).value || !M.pratica(Number(CRM.$('input[type=hidden]', altra).value))) { scelta = null; btn.disabled = true; btn.textContent = 'Abbina'; } });
+      btn.addEventListener('click', () => { if (scelta) seAffidabile(sel, () => abbina(sel, scelta)); });
+    }
+  
+    }
+  }
+  /* Stato della lettura per l'elenco e conferma prima di usare dati poco affidabili. */
+  function statoLetturaHtml(d) {
+    const st = M.statoLettura(d);
+    return st.n ? ' ' + CRM.stato(st.livello === 'bassa' ? 'errore' : 'attesa', st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare')) : '';
+  }
+  async function seAffidabile(d, fn) {
+    const st = M.statoLettura(d);
+    if (st.livello === 'bassa' && !(await CRM.Conferma('Lettura con affidabilità bassa',
+      'Ci sono ' + st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') + ' nei dati letti. Conviene correggerli prima: vuoi procedere comunque?', 'Procedi comunque'))) return;
+    fn();
+  }
+  function scarta(sel) {
+    const giorni = M.S.impostazioni.conservazione.scartati_giorni;
+    CRM.FormModal({
+      titolo: 'Scartare ' + M.TIPI[sel.tipo].toLowerCase() + ' ' + sel.numero + '?', conferma: 'Scarta', pericolo: true,
+      testo: 'Il documento esce dall’elenco e non viene registrato. Resta fra i <a href="#/scartati">documenti scartati</a> per ' + giorni + ' giorni e si può recuperare.',
+      campi: [
+        { nome: 'motivo', etichetta: 'Motivo', tipo: 'select', valore: 'Doppione', opzioni: ['Doppione', 'Non riguarda Decobrands', 'Documento illeggibile', 'Altro'].map(x => ({ value: x, label: x })) },
+        { nome: 'nota', etichetta: 'Nota (facoltativa)', placeholder: 'es. arrivato due volte' }
+      ],
+      onConferma: v => { M.scarta(sel.id, v.motivo, v.nota); M.salva(); CRM.Avviso('Documento ' + sel.numero + ' scartato: lo trovi fra gli scartati'); location.hash = '#/documenti'; }
+    });
+  }
+
+  /* ---------- Correggi i dati letti: FinestraAffiancata (spec §6.5 punto 7) ----------
+     A sinistra il documento com'è stampato, a destra testata e righe modificabili.
+     Campi incerti bordati (giallo 0,70–0,90 · rosso < 0,70); selezionando un campo
+     si evidenzia nel documento il punto da cui è stato letto. */
+  const COLONNE_RIGHE = {
+    articoli: [{ k: 'codice', t: 'Articolo' }, { k: 'descrizione', t: 'Descrizione', largo: true }, { k: 'qta', t: 'Quantità', n: true }, { k: 'prezzo', t: 'Prezzo', n: true }],
+    bollettino: [{ k: 'numero', t: 'Documento' }, { k: 'data', t: 'Data', data: true }, { k: 'imponibile', t: 'Imponibile', n: true }, { k: 'pct', t: '%', n: true }, { k: 'importo', t: 'Provvigione', n: true }]
+  };
+  const ETICHETTE = { tipo: 'Tipo', numero: 'Numero', data: 'Data', fornitore_id: 'Fornitore', codice_cliente: 'Codice cliente', totale: 'Totale del documento', mese: 'Mese', anno: 'Anno' };
+  const nomeCampo = (c, boll) => {
+    const m = /^righe\.(\d+)\.(\w+)$/.exec(c);
+    if (!m) return ETICHETTE[c] || c;
+    const col = COLONNE_RIGHE[boll ? 'bollettino' : 'articoli'].find(x => x.k === m[2]);
+    return (col ? col.t : m[2]) + ' riga ' + (Number(m[1]) + 1);
+  };
+  const classeAff = (a, ver) => ver ? 'campo-verificato' : a < M.SOGLIA_BASSA ? 'incerto-errore' : a < M.SOGLIA_OK ? 'incerto-attesa' : '';
+
+  /* Pagina del documento com'è stampato (anteprima simulata del PDF): ogni valore porta
+     data-campo, così chi la usa può evidenziare il punto letto o la riga confrontata. */
+  function paginaDocumento(d, fid, codiceCliente) {
+    const boll = d.tipo === 'bollettino', cols = COLONNE_RIGHE[boll ? 'bollettino' : 'articoli'];
+    const f = M.fornitore(fid);
+    const o = (c, v) => M.originale(d, c, v);
+    const intest = boll
+      ? '<div class="doc-titolo">Provisionsabrechnung · Bollettino provvigioni</div><div class="doc-meta"><span>Periodo <b data-campo="mese">' + M.mese(d.mese, d.anno) + '</b></span><span>Agente: Decobrands SRL</span></div>'
+      : '<div class="doc-titolo">' + e(M.TIPI[d.tipo]).toUpperCase() + ' N. <b data-campo="numero">' + e(o('numero', d.numero)) + '</b></div>' +
+        '<div class="doc-meta"><span>Data <b data-campo="data">' + M.data(o('data', d.data)) + '</b></span>' +
+        ((d.codice_cliente || codiceCliente) ? '<span>Cod. cliente <b data-campo="codice_cliente">' + e(o('codice_cliente', d.codice_cliente || codiceCliente)) + '</b></span>' : '') +
+        (d.riferimento ? '<span>Rif. <b>' + e(d.riferimento) + '</b></span>' : '') + '<span>Agente: Decobrands SRL</span></div>';
+    const th = cols.map(c => '<th' + (c.n ? ' class="dx"' : '') + '>' + e(c.t) + '</th>').join('') + (boll ? '' : '<th class="dx">Importo</th>');
+    const fmt = (c, v) => c.data ? M.data(v) : c.k === 'pct' ? M.num(v) + '%' : c.k === 'qta' ? M.num(v) : c.n ? M.dec(v) : e(v);
+    const righe = d.righe.map((r, i) => '<tr data-riga="' + i + '" data-codice="' + e(r.codice || r.numero || '') + '">' + cols.map(c => '<td' + (c.n ? ' class="dx"' : '') + ' data-campo="righe.' + i + '.' + c.k + '">' + fmt(c, o('righe.' + i + '.' + c.k, r[c.k])) + '</td>').join('') +
+      (boll ? '' : '<td class="dx">' + M.dec(o('righe.' + i + '.qta', r.qta) * o('righe.' + i + '.prezzo', r.prezzo)) + '</td>') + '</tr>').join('');
+    return '<p class="avviso-verifica">' + CRM.icona('avviso') + '<span><b>Funzione da verificare.</b> L’evidenziazione nel documento dipende dal file: sui PDF da gestionale e sugli Excel è attesa precisa, sugli scansionati può essere approssimata o mancare. La fattibilità si misura su documenti reali prima di confermarla (specifica §6.6).</span></p>' +
+      '<div class="doc-pagina" aria-label="Anteprima del documento originale"><div class="doc-intest"><div><b class="doc-marchio">' + e(f.nome) + '</b><span>' + e(f.piva ? 'P.IVA ' + f.piva : '') + '</span></div><span class="doc-file">' + CRM.icona('file') + ' ' + e(d.file || '') + '</span></div>' +
+      intest + (d.nota ? '<p class="doc-meta">' + e(d.nota) + '</p>' : '') + '<table class="doc-tab"><thead><tr>' + th + '</tr></thead><tbody>' + righe + '</tbody>' +
+      '<tfoot><tr><td colspan="' + (cols.length + (boll ? 0 : 1) - 1) + '">Totale' + (boll ? ' provvigioni' : ' documento') + '</td><td class="dx" data-campo="totale"><b>' + M.dec(M.totaleStampato(d)) + '</b></td></tr></tfoot></table>' +
+      '<p class="doc-nota">Anteprima simulata del PDF. Nell\'app qui c\'è il file originale (PDF.js) con l\'evidenziazione disegnata sopra, se la posizione del valore è stata trovata.</p></div>';
+  }
+
+  /* ---------- Consulta i documenti di una pratica: FinestraAffiancata in sola lettura ----------
+     A sinistra il documento com'è stampato; a destra i suoi dati confrontati riga per riga con
+     un altro documento della pratica (di norma la fase precedente: conferma ↔ ordine,
+     fattura ↔ conferma, nota di credito ↔ fattura stornata). Selezionando una riga la si vede
+     evidenziata nel documento. Si passa da un documento all'altro senza chiudere la finestra. */
+  function consultaDocumenti(p, idIniziale, codiceIniziale) {
+    const docs = p.documenti, ab = M.abbinamento(p.cliente_piva, p.fornitore_id);
+    const ORD = ['ordine', 'conferma', 'fattura', 'nota_credito'];
+    const precedente = d => {
+      if (d.riferimento) { const x = docs.find(y => y.numero === d.riferimento); if (x) return x; }
+      const k = ORD.indexOf(d.tipo);
+      for (let i = k - 1; i >= 0; i--) { const x = docs.filter(y => y.tipo === ORD[i]); if (x.length) return x[x.length - 1]; }
+      return null;
+    };
+    let cur = docs.find(d => d.id === Number(idIniziale)) || docs[0], rif = precedente(cur), vista = 'variate', segnata = codiceIniziale || null;
+    const fin = CRM.FinestraAffiancata({
+      titolo: 'Documenti della pratica ' + p.numero,
+      sottotitolo: e(M.nomeCliente(p.cliente_piva)) + ' · ' + e(M.fornitore(p.fornitore_id).nome) + '. A sinistra il documento, a destra il confronto con un altro documento della pratica: selezionando una riga la vedi nel documento.',
+      larghezza: 46, azioni: [{ etichetta: 'Chiudi', variante: 'sec' }]
+    });
+    // nota di credito: storna solo le righe che contiene; quelle assenti non sono "tolte",
+    // semplicemente non stornate, quindi non si confrontano
+    const soloNC = () => cur.tipo === 'nota_credito' || (rif && rif.tipo === 'nota_credito');
+    const confronta = () => {
+      const codici = [];
+      (soloNC() ? [[rif, cur].find(d => d && d.tipo === 'nota_credito')] : [rif, cur].filter(Boolean)).forEach(d => d.righe.forEach(r => { if (codici.indexOf(r.codice) < 0) codici.push(r.codice); }));
+      return codici.map(c => {
+        const a = rif ? rif.righe.find(r => r.codice === c) || null : null, b = cur.righe.find(r => r.codice === c) || null;
+        const varia = !!rif && (!a || !b || a.qta !== b.qta || a.prezzo !== b.prezzo);
+        // con la nota di credito la differenza è lo storno della riga (importo della nota), non nota − fattura
+        if (soloNC()) { const nc = cur.tipo === 'nota_credito' ? b : a; return { codice: c, descrizione: (b || a).descrizione, a: a, b: b, varia: !!rif, delta: M.r2(nc ? M.importoRiga(nc) : 0) }; }
+        return { codice: c, descrizione: (b || a).descrizione, a: a, b: b, varia: varia, delta: M.r2((b ? M.importoRiga(b) : 0) - (a ? M.importoRiga(a) : 0)) };
+      });
+    };
+    const evidenzia = codice => {
+      const pag = CRM.$('.doc-pagina', fin.sinistra);
+      CRM.$$('.evidenziato', pag).forEach(x => x.classList.remove('evidenziato'));
+      const t = codice && CRM.$('tr[data-codice="' + codice.replace(/"/g, '') + '"]', pag);
+      if (t) { t.classList.add('evidenziato'); t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    };
+    function disegna() {
+      fin.sinistra.innerHTML = '<div class="aff-schede" role="tablist" aria-label="Documenti della pratica">' + docs.map(d =>
+        '<button type="button" role="tab" data-id="' + d.id + '" aria-selected="' + (d === cur) + '">' + e(M.TIPI[d.tipo]) + '<span>' + e(d.numero) + '</span></button>').join('') + '</div>' +
+        paginaDocumento(cur, p.fornitore_id, ab && ab.codice);
+      CRM.$$('.aff-schede button', fin.sinistra).forEach(b => b.addEventListener('click', () => {
+        cur = docs.find(d => d.id === Number(b.dataset.id)); rif = precedente(cur); disegna();
+      }));
+      const dx = fin.destra; dx.innerHTML = '';
+      const righe = confronta(), variate = righe.filter(r => r.varia);
+      const imp = M.importoDoc(cur), impR = rif ? M.importoDoc(rif) : null;
+      // nota di credito: la differenza è quanto storna (il suo importo), non la differenza fra i totali
+      const diff = !rif ? 0 : soloNC() ? M.importoDoc(cur.tipo === 'nota_credito' ? cur : rif) : imp - impR;
+      CRM.Dettagli(dx, [
+        { etichetta: M.TIPI[cur.tipo], valore: '<b>' + e(cur.numero) + '</b><span class="sec-riga">del ' + M.data(cur.data) + '</span>' },
+        { etichetta: 'Importo', valore: M.euro(imp) },
+        { etichetta: 'Confrontato con', valore: '<select class="filtro-select aff-rif" aria-label="Documento con cui confrontare"><option value="">Nessun confronto</option>' +
+          docs.filter(d => d !== cur).map(d => '<option value="' + d.id + '"' + (d === rif ? ' selected' : '') + '>' + e(M.TIPI[d.tipo] + ' ' + d.numero) + '</option>').join('') + '</select>' },
+        { etichetta: 'Differenza', valore: rif ? (Math.abs(diff) < 0.01 ? '<span class="testo-tenue">nessuna</span>' : '<b class="' + CRM.classeSegno(diff) + '">' + CRM.euroSegno(diff) + '</b><span class="sec-riga">' + variate.length + (variate.length === 1 ? ' riga ' + (soloNC() ? 'stornata' : 'cambia') : ' righe ' + (soloNC() ? 'stornate' : 'cambiano')) + '</span>') : '—' }
+      ], { inColonne: true });
+      CRM.$('.aff-rif', dx).addEventListener('change', ev => { rif = docs.find(d => d.id === Number(ev.target.value)) || null; disegna(); });
+      if (rif && variate.length) {
+        const fb = CRM.FilterBar(dx, { campi: [{ nome: 'vista', tipo: 'segmenti', valore: vista, opzioni: [
+          { value: 'variate', label: 'Solo righe che cambiano', n: variate.length }, { value: 'tutte', label: 'Tutte le righe', n: righe.length }] }],
+          onChange: v => { vista = v.vista; tab.aggiorna(vista === 'variate' ? variate : righe); } });
+        fb.el.style.cssText = 'margin:14px 0 8px';
+      } else CRM.blocco(dx, '', 'height:14px;flex:none');
+      const qp = r => r ? M.num(r.qta) + ' × ' + M.euro(r.prezzo) + '<span class="sec-riga">' + M.euro(M.importoRiga(r)) + '</span>' : '<span class="testo-tenue">assente</span>';
+      const tab = CRM.DataTable(CRM.blocco(dx, 'riempi aff-righe'), {
+        compatta: true, righe: rif && vista === 'variate' && variate.length ? variate : righe, rowClass: r => (r.varia ? 'evidenzia' : '') + (r.codice === segnata ? ' selezionata' : ''),
+        colonne: [{ key: 'codice', header: 'Articolo', grow: true, cell: r => '<b>' + e(r.codice) + '</b><span class="sec-riga">' + e(r.descrizione) + '</span>' }]
+          .concat(rif ? [{ key: 'a', header: M.TIPI[rif.tipo] + ' ' + rif.numero, align: 'right', sortValue: r => r.a ? M.importoRiga(r.a) : -1, cell: r => qp(r.a) }] : [])
+          .concat([{ key: 'b', header: M.TIPI[cur.tipo] + ' ' + cur.numero, align: 'right', sortValue: r => r.b ? M.importoRiga(r.b) : -1, cell: r => qp(r.b) }])
+          .concat(rif ? [{ key: 'delta', header: 'Differenza', tipo: 'euro', cell: r => Math.abs(r.delta) < 0.01 ? '<span class="testo-tenue">—</span>' : '<b class="' + CRM.classeSegno(r.delta) + '">' + CRM.euroSegno(r.delta) + '</b>' }] : []),
+        onRowClick: r => { segnata = r.codice; CRM.$$('tbody tr', tab.el).forEach(x => x.classList.remove('selezionata')); evidenzia(r.codice); }
+      });
+      tab.el.addEventListener('click', ev => { const tr = ev.target.closest('tbody tr'); if (tr) tr.classList.add('selezionata'); });
+      if (segnata) { evidenzia(segnata); const t = CRM.$('tbody tr.selezionata', tab.el); if (t) t.scrollIntoView({ block: 'nearest' }); }
+      fin.piede.textContent = docs.length + (docs.length === 1 ? ' documento' : ' documenti') + ' nella pratica · ← → per scorrere i documenti';
+    }
+    fin.sinistra.closest('.affiancata').addEventListener('keydown', ev => {
+      if ((ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') || ev.target.closest('input, select, textarea, .aff-divisore')) return;
+      const i = docs.indexOf(cur) + (ev.key === 'ArrowRight' ? 1 : -1);
+      if (i < 0 || i >= docs.length) return;
+      cur = docs[i]; rif = precedente(cur); disegna(); CRM.$('.aff-schede [aria-selected=true]', fin.sinistra).focus();
+    });
+    disegna();
+  }
+  CRM.consultaDocumenti = consultaDocumenti;
+
+  function correggi(d) {
+    const boll = d.tipo === 'bollettino';
+    const cols = COLONNE_RIGHE[boll ? 'bollettino' : 'articoli'];
+    const l = d.lettura || {};
+    // bozza di lavoro: le righe portano con sé affidabilità e verifiche, così aggiunte ed eliminazioni non le confondono
+    const b = { tipo: d.tipo, numero: d.numero, data: d.data, fornitore_id: d.fornitore_id, codice_cliente: d.codice_cliente, mese: d.mese, anno: d.anno,
+      totale: M.totaleStampato(d).toFixed(2), aff: {}, ver: {}, toccati: {} };
+    Object.keys(l.campi || {}).filter(c => !/^righe\./.test(c)).forEach(c => { b.aff[c] = l.campi[c]; });
+    Object.keys(l.verificati || {}).filter(c => !/^righe\./.test(c)).forEach(c => { b.ver[c] = true; });
+    b.righe = d.righe.map((r, i) => {
+      const x = Object.assign({}, r, { _aff: {}, _ver: {} });
+      cols.forEach(c => { const k = 'righe.' + i + '.' + c.k; if (l.campi && l.campi[k] != null) x._aff[c.k] = l.campi[k]; if (M.verificato(d, k)) x._ver[c.k] = true; });
+      return x;
+    });
+    const affT = c => b.aff[c] != null ? b.aff[c] : M.affidabilita(d, c);
+    // documento "virtuale" dalla bozza per ricalcolare controlli e livello
+    const comeDoc = () => {
+      const campi = {}, verificati = {};
+      Object.keys(b.aff).forEach(c => { campi[c] = b.aff[c]; });
+      Object.keys(b.ver).forEach(c => { verificati[c] = true; });
+      b.righe.forEach((r, i) => { Object.keys(r._aff).forEach(k => { campi['righe.' + i + '.' + k] = r._aff[k]; }); Object.keys(r._ver).forEach(k => { verificati['righe.' + i + '.' + k] = true; }); });
+      return { id: d.id, tipo: b.tipo, fornitore_id: Number(b.fornitore_id), codice_cliente: b.codice_cliente, mese: Number(b.mese), anno: Number(b.anno),
+        righe: b.righe.map(r => { const x = Object.assign({}, r); cols.filter(c => c.n).forEach(c => { x[c.k] = Number(x[c.k]) || 0; }); return x; }),
+        lettura: { campi: campi, verificati: verificati, totale: Number(b.totale) || 0 } };
+    };
+
+    let fin, riepAperto = false;   // elenco dei punti da controllare: chiuso, si apre sopra il contenuto
+    const anteprima = host => { host.innerHTML = paginaDocumento(d, d.fornitore_id); };
+    const evidenzia = campo => {
+      const pag = CRM.$('.doc-pagina', fin.sinistra);
+      CRM.$$('.evidenziato', pag).forEach(x => x.classList.remove('evidenziato'));
+      const t = campo && CRM.$('[data-campo="' + campo + '"]', pag);
+      if (t) { t.classList.add('evidenziato'); const r = t.closest('tr'); if (r) r.classList.add('evidenziato'); t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    };
+
+    const campoTestata = (c, tipoInput, valore, opzioni, extra) => {
+      const a = affT(c), ver = !!b.ver[c];
+      const ctl = tipoInput === 'ricerca'
+        ? CRM.campoRicercaHtml({ entita: opzioni, campo: c, valore: valore, contesto: { fornitore_id: b.fornitore_id } })
+        : tipoInput === 'select'
+        ? '<select data-campo="' + c + '">' + opzioni.map(x => '<option value="' + e(x.value) + '"' + (String(x.value) === String(valore) ? ' selected' : '') + '>' + e(x.label) + '</option>').join('') + '</select>'
+        : '<input data-campo="' + c + '" type="' + (tipoInput || 'text') + '"' + (tipoInput === 'number' ? ' step="0.01"' : '') + ' value="' + e(valore == null ? '' : valore) + '"' + (extra === 'sola' ? ' readonly tabindex="-1"' : '') + '>';
+      const incerto = a < M.SOGLIA_OK && !ver;
+      return '<div class="campo-letto ' + classeAff(a, ver && a < M.SOGLIA_OK) + '" data-box="' + c + '"><label>' + e(ETICHETTE[c] || c) +
+        (incerto ? ' <span class="aff" title="Affidabilità della lettura">' + Math.round(a * 100) + '%</span>' : '') + '</label><div class="campo-riga">' + ctl +
+        (incerto ? '<button type="button" class="conferma-campo" data-conferma="' + c + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>' + (extra && extra !== 'sola' ? extra : '') + '</div>';
+    };
+    const destra = host => {
+      const st = M.statoLettura(comeDoc());
+      const opF = M.S.fornitori.map(f => ({ value: f.id, label: f.nome }));
+      const ab = !boll && M.abbinamentoPerCodice(Number(b.fornitore_id), b.codice_cliente);
+      const somma = M.importoLetto(comeDoc());
+      host.innerHTML = '<div class="aff-riepilogo" id="aff-riep"></div>' +
+        '<h3>Testata</h3><div class="griglia-letti">' + (boll
+          ? campoTestata('fornitore_id', 'ricerca', b.fornitore_id, 'fornitore') +
+            campoTestata('mese', 'select', b.mese, M.MESI.map((m, i) => ({ value: i + 1, label: m[0].toUpperCase() + m.slice(1) }))) +
+            campoTestata('anno', 'number', b.anno)
+          : campoTestata('tipo', 'select', b.tipo, ['ordine', 'conferma', 'fattura', 'nota_credito'].map(t => ({ value: t, label: M.TIPI[t] }))) +
+            campoTestata('numero', 'text', b.numero) +
+            campoTestata('data', 'date', b.data) +
+            campoTestata('fornitore_id', 'ricerca', b.fornitore_id, 'fornitore') +
+            campoTestata('codice_cliente', 'ricerca', b.codice_cliente, 'codiceCliente', '<span class="esito-campo">' + (ab ? '<span class="pallino ok"></span>' + e(M.nomeCliente(ab.cliente_piva)) : '<span class="pallino ko"></span>non trovato fra i clienti del fornitore') + '</span>') +
+            campoTestata('totale', 'number', b.totale, null, '<span class="esito-campo">' + (Math.abs((Number(b.totale) || 0) - somma) < 0.01
+              ? '<span class="pallino ok"></span>uguale alla somma delle righe' : '<span class="pallino ko"></span>somma delle righe ' + M.euro(somma)) + '</span>')) +
+        '</div><div class="righe-testa"><h3>Righe <span class="testo-tenue">' + b.righe.length + '</span></h3><button type="button" class="btn sec piccolo" data-aggiungi="1">' + CRM.icona('piu') + 'Aggiungi riga</button></div>';
+      // righe: DataTable standard con celle modificabili; ogni riga ricorda la sua posizione (_i) anche se si ordina
+      b.righe.forEach((r, i) => { r._i = i; });
+      const affR = (r, k) => r._aff[k] != null ? r._aff[k] : 0.97;
+      const cella = c => r => {
+        const a = affR(r, c.k), incerto = a < M.SOGLIA_OK && !r._ver[c.k], v = r[c.k];
+        const val = v == null ? '' : (c.n && c.k !== 'qta' && v !== '' ? Number(v).toFixed(2) : v);
+        if (!boll && c.k === 'codice') return '<div class="campo-riga">' + CRM.campoRicercaHtml({ entita: 'articolo', campo: 'righe.' + r._i + '.codice', valore: v, contesto: { fornitore_id: b.fornitore_id } }) +
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.codice" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
+        if (boll && c.k === 'numero') return '<div class="campo-riga">' + CRM.campoRicercaHtml({ entita: 'documentoFiscale', campo: 'righe.' + r._i + '.numero', valore: v, contesto: { fornitore_id: b.fornitore_id } }) +
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.numero" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
+        return '<div class="campo-riga">' +
+          '<input data-campo="righe.' + r._i + '.' + c.k + '"' + (c.largo ? ' title="' + e(v || '') + '"' : '') + ' type="' + (c.data ? 'date' : c.n ? 'number' : 'text') + '"' + (c.n ? ' step="any"' : '') + ' value="' + e(val) + '"' +
+          (incerto ? ' title="Affidabilità della lettura ' + Math.round(a * 100) + '%"' : '') + '>' +
+          (incerto ? '<button type="button" class="conferma-campo" data-conferma="righe.' + r._i + '.' + c.k + '" title="Il valore è giusto: confermalo">✓</button>' : '') + '</div>';
+      };
+      CRM.DataTable(CRM.blocco(host, 'riempi aff-righe tab-righe'), {
+        compatta: true, righe: b.righe, etichettaTotale: 'Totale righe', rowClass: r => r._nuova ? 'nuova' : '',
+        emptyText: 'Nessuna riga', emptyHint: 'Aggiungi le righe del documento.',
+        colonne: [{ key: '_i', header: '#', tipo: 'numero', valore: r => r._i + 1, classe: 'testo-tenue' }]
+          .concat(cols.map(c => ({
+            key: c.k, header: c.t, tipo: c.n ? 'numero' : 'testo', grow: !!c.largo, cell: cella(c),
+            sortValue: r => c.n ? Number(r[c.k]) || 0 : String(r[c.k] || '').toLowerCase(),
+            classe: r => [classeAff(affR(r, c.k), !!r._ver[c.k] && affR(r, c.k) < M.SOGLIA_OK), c.largo ? 'largo' : c.k === 'codice' || c.k === 'numero' ? 'col-codice' : ''].join(' '),
+            totale: boll && c.k === 'importo' ? 'somma' : undefined, valore: c.n ? (r => Number(r[c.k]) || 0) : undefined
+          })))
+          .concat(boll ? [] : [{ key: 'importo', header: 'Importo', tipo: 'euro', valore: r => M.r2((Number(r.qta) || 0) * (Number(r.prezzo) || 0)), totale: 'somma', classe: 'calcolato' }])
+          .concat([{ key: 'elimina', header: '', sortable: false, cell: r => '<button type="button" class="btn testo piccolo" data-elimina="' + r._i + '" title="Elimina la riga" aria-label="Elimina la riga ' + (r._i + 1) + '">✕</button>' }])
+      });
+      // riepilogo: livello, controlli falliti e campi incerti, con salto al campo
+      const riep = CRM.$('#aff-riep', host);
+      const LIV = { affidabile: ['ok', 'Lettura affidabile'], da_controllare: ['attesa', 'Da controllare'], bassa: ['errore', 'Affidabilità bassa'] }[st.livello];
+      if (!st.n) riepAperto = false;
+      riep.innerHTML = '<button type="button" class="riep-testa"' + (st.n ? ' aria-expanded="' + riepAperto + '" aria-controls="aff-riep-elenco" data-riep' : ' disabled') + '>' + CRM.stato(LIV[0], LIV[1]) +
+        ' <span>' + (st.n ? st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') : 'tutti i campi sono controllati') + '</span>' + (st.n ? '<span class="riep-freccia">' + CRM.icona('indietro') + '</span>' : '') + '</button>' +
+        (st.n ? '<ul id="aff-riep-elenco"' + (riepAperto ? '' : ' hidden') + '>' + st.controlli.map(c => '<li class="' + (c.grave ? 'grave' : '') + '"><button type="button" class="btn testo piccolo" data-vai="' + c.campo + '">' + e(c.testo) + '</button></li>').join('') +
+          st.campi.map(c => '<li><button type="button" class="btn testo piccolo" data-vai="' + c + '">' + e(nomeCampo(c, boll)) + ': letto con affidabilità ' + Math.round(M.affidabilita(comeDoc(), c) * 100) + '%</button></li>').join('') + '</ul>' : '');
+      fin.piede.innerHTML = st.n ? '<b>' + st.n + '</b> ' + (st.n === 1 ? 'punto da controllare' : 'punti da controllare') : '<span style="color:var(--ok-testo)">Tutto controllato</span>';
+    };
+    const ridisegna = () => { const y = fin.destra.scrollTop; destra(fin.destra); fin.destra.scrollTop = y; };
+    const valoreDa = (campo, v) => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) { b.righe[m[1]][m[2]] = v; b.righe[m[1]]._ver[m[2]] = true; } else { b[campo] = v; b.ver[campo] = true; } b.toccati[campo] = true; };
+    const conferma = campo => { const m = /^righe\.(\d+)\.(\w+)$/.exec(campo); if (m) b.righe[m[1]]._ver[m[2]] = true; else b.ver[campo] = true; };
+    // eventi delegati sul pannello destro: restano validi anche quando la DataTable si ridisegna (ordinamento)
+    const trovaCampo = c => CRM.$('[data-evidenzia="' + c + '"]', fin.destra) || CRM.$('[data-campo="' + c + '"]', fin.destra);
+    const vai = c => { const n = trovaCampo(c); if (n) { n.focus(); n.scrollIntoView({ block: 'center', behavior: 'smooth' }); } };
+    function collega(host) {
+      CRM.attivaRicerche(host, () => ({ fornitore_id: b.fornitore_id, mese: b.mese, anno: b.anno }));
+      host.addEventListener('focusin', ev => { const x = ev.target.closest('[data-campo], [data-evidenzia]'); if (x) evidenzia(x.dataset.campo || x.dataset.evidenzia); });
+      host.addEventListener('ricerca-scelta', ev => {
+        const ma = /^righe\.(\d+)\.codice$/.exec(ev.detail.campo || '');
+        if (ma && !boll) { const r = b.righe[ma[1]]; if (!r.descrizione) r.descrizione = ev.detail.voce.descrizione; return; }
+        const m = /^righe\.(\d+)\.numero$/.exec(ev.detail.campo || ''); if (!m || !boll) return;
+        const r = b.righe[m[1]], x = ev.detail.voce;
+        r.data = x.doc.data; r.imponibile = M.importoDoc(x.doc); r._ver.data = true; r._ver.imponibile = true;
+      });
+      host.addEventListener('change', ev => {
+        const x = ev.target.closest('[data-campo]'); if (!x) return;
+        valoreDa(x.dataset.campo, x.value); ridisegna(); const n = trovaCampo(x.dataset.campo); if (n) n.focus();
+      });
+      const apriRiep = si => {
+        riepAperto = si;
+        const r = CRM.$('#aff-riep', host), ul = r && CRM.$('ul', r), bt = r && CRM.$('[data-riep]', r);
+        if (ul) ul.hidden = !si; if (bt) bt.setAttribute('aria-expanded', String(si));
+      };
+      host.addEventListener('keydown', ev => { if (ev.key === 'Escape' && riepAperto) { ev.stopPropagation(); apriRiep(false); CRM.$('[data-riep]', host).focus(); } });
+      host.addEventListener('click', ev => {
+        if (!ev.target.closest('#aff-riep') && riepAperto) apriRiep(false);   // clic fuori: si chiude
+        const t = ev.target.closest('[data-riep], [data-conferma], [data-vai], [data-elimina], [data-aggiungi]'); if (!t) return;
+        if (t.hasAttribute('data-riep')) apriRiep(!riepAperto);
+        else if (t.dataset.conferma) { conferma(t.dataset.conferma); ridisegna(); }
+        else if (t.dataset.vai) { apriRiep(false); vai(t.dataset.vai); }
+        else if (t.dataset.elimina != null) { b.righe.splice(Number(t.dataset.elimina), 1); b.toccati.righe = true; ridisegna(); }
+        else nuovaRiga();
+      });
+    }
+    /* Nuova riga in una finestra modale: articolo con ricerca (anche non in anagrafica, pallino rosso),
+       la scelta di un articolo noto propone descrizione e ultimo prezzo. */
+    function nuovaRiga() {
+      const campi = boll ? [
+        { nome: 'numero', etichetta: 'Documento', tipo: 'ricerca', entita: 'documentoFiscale', largo: true, placeholder: 'Numero fattura o nota di credito' },
+        { nome: 'data', etichetta: 'Data', tipo: 'data' },
+        { nome: 'imponibile', etichetta: 'Imponibile', tipo: 'numero', passo: '0.01' },
+        { nome: 'pct', etichetta: 'Provvigione %', tipo: 'numero', passo: '0.01' },
+        { nome: 'importo', etichetta: 'Provvigione', tipo: 'numero', passo: '0.01' }
+      ] : [
+        { nome: 'codice', etichetta: 'Articolo', tipo: 'ricerca', entita: 'articolo', placeholder: 'Codice o descrizione', aiuto: 'Pallino verde: articolo già usato da questo fornitore. Rosso: articolo nuovo, si può inserire lo stesso.' },
+        { nome: 'descrizione', etichetta: 'Descrizione' },
+        { nome: 'qta', etichetta: 'Quantità', tipo: 'numero', passo: '1' },
+        { nome: 'prezzo', etichetta: 'Prezzo', tipo: 'numero', passo: '0.01' }
+      ];
+      CRM.FormModal({
+        titolo: 'Aggiungi riga', testo: boll ? 'Riga del bollettino come riportata dal fornitore.' : 'Riga del documento come stampata sul PDF.', conferma: 'Aggiungi riga', colonne: 2, campi: campi,
+        contesto: () => ({ fornitore_id: b.fornitore_id, mese: b.mese, anno: b.anno }),
+        dopo: form => form.el.addEventListener('ricerca-scelta', ev => {
+          const x = ev.detail.voce;
+          if (boll) { form.campo('data').value = x.doc.data; form.campo('imponibile').value = M.importoDoc(x.doc).toFixed(2); }
+          else { if (!form.campo('descrizione').value) form.campo('descrizione').value = x.descrizione; if (!form.campo('prezzo').value) form.campo('prezzo').value = Number(x.prezzo).toFixed(2); form.campo('qta').focus(); }
+        }),
+        onConferma: (v, form) => {
+          if (boll) {
+            if (!v.numero) { form.errore('Indica il documento.'); return false; }
+            b.righe.push({ numero: v.numero, data: v.data, imponibile: Number(v.imponibile) || 0, pct: Number(v.pct) || 0, importo: Number(v.importo) || 0, _aff: {}, _ver: {}, _nuova: true });
+          } else {
+            if (!v.codice) { form.errore('Indica l’articolo.'); return false; }
+            if (!(Number(v.qta) > 0)) { form.errore('La quantità deve essere maggiore di zero.'); return false; }
+            b.righe.push({ codice: v.codice, descrizione: v.descrizione, qta: Number(v.qta), prezzo: Number(v.prezzo) || 0, _aff: {}, _ver: {}, _nuova: true });
+          }
+          b.toccati.righe = true; ridisegna();
+          setTimeout(() => vai('righe.' + (b.righe.length - 1) + '.' + cols[0].k), 0);
+        }
+      });
+    }
+    const salva = () => {
+      const v = comeDoc();
+      if (!boll && !String(b.numero || '').trim()) { CRM.Avviso('Il numero del documento è obbligatorio'); return false; }
+      Object.assign(d, { tipo: v.tipo, fornitore_id: v.fornitore_id, righe: v.righe.map(r => { const x = Object.assign({}, r); delete x._aff; delete x._ver; delete x._nuova; delete x._i; return x; }) });
+      if (boll) { d.mese = v.mese; d.anno = v.anno || d.anno; d.numero = M.MESI[d.mese - 1] + ' ' + d.anno; }
+      else Object.assign(d, { numero: String(b.numero).trim(), data: b.data || d.data, codice_cliente: String(b.codice_cliente || '').trim() });
+      d.lettura = Object.assign({}, d.lettura || {}, { campi: v.lettura.campi, verificati: v.lettura.verificati, totale: v.lettura.totale });
+      const st = M.statoLettura(d), n = Object.keys(b.toccati).length;
+      M.annota('Controllati i dati letti di ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero + (n ? ' · ' + n + (n === 1 ? ' correzione' : ' correzioni') : ''));
+      M.salva();
+      CRM.Avviso(st.n ? 'Dati salvati: restano ' + st.n + (st.n === 1 ? ' punto da controllare' : ' punti da controllare') : 'Dati salvati: lettura controllata, l’abbinamento è ricalcolato');
+      CRM.naviga();
+    };
+    fin = CRM.FinestraAffiancata({
+      titolo: 'Correggi i dati letti · ' + M.TIPI[d.tipo] + ' ' + d.numero,
+      sottotitolo: 'A sinistra il documento, a destra i dati letti. Correggi o conferma i campi bordati: selezionandone uno lo vedi evidenziato nel documento.',
+      sinistra: anteprima, larghezza: 42, azioni: [{ etichetta: 'Annulla', variante: 'sec' }, { etichetta: 'Salva e ricalcola l’abbinamento', onClick: salva }]
+    });
+    collega(fin.destra);
+    destra(fin.destra);
+    const primo = CRM.$('.incerto-errore .ricerca-testo, .incerto-errore [data-campo]:not([type=hidden]), .incerto-attesa .ricerca-testo, .incerto-attesa [data-campo]:not([type=hidden])', fin.destra);
+    if (primo) primo.focus();
+  }
+
+  function abbina(doc, p) {
+    const esito = M.abbina(doc.id, p.id);
+    let extra = '';
+    if (doc.tipo === 'fattura') {
+      const b = M.S.bollettini.find(x => x.fornitore_id === doc.fornitore_id && x.righe.some(r => r.numero === doc.numero));
+      if (b) { const r = M.riconcilia(b).righe.find(x => x.numero === doc.numero); if (r && r.categoria === 'quadra') extra = ' Nel bollettino di ' + M.meseMin(b.mese) + ' ora la riga quadra.'; }
+    }
+    M.salva();
+    CRM.Avviso(M.TIPI[doc.tipo] + ' ' + doc.numero + ' abbinata a ' + p.numero + (esito.prima !== esito.dopo ? ': ora ' + esito.dopo.toLowerCase() + '.' : '.') + extra);
+    location.hash = M.S.in_arrivo.length ? '#/documenti/' + M.S.in_arrivo[0].id : '#/documenti';
+  }
+  CRM.rotta(/^\/documenti$/, () => vistaDocumenti(null));
+  CRM.rotta(/^\/documenti\/(\d+)$/, id => vistaDocumenti(id));
+
+  /* ---------- Pratiche: FilterBar + DataTable ---------- */
+  let filtri = { stato: 'tutte', q: '', f: [], s: [], c: [] };
+  let apriRighe = false;   // pratica aperta dal filtro "Con variazioni": parte dalla scheda Righe
+  CRM.rotta(/^\/pratiche$/, function () {
+    const corpo = CRM.Pagina({ voce: 'pratiche', titolo: 'Pratiche', pieno: true, sottotitolo: 'Ogni ordine a fornitore con i suoi documenti. Lo stato avanza quando arrivano conferma e fattura.' });
+    const tutte = M.S.pratiche;
+    const subDi = p => { const a = M.abbinamento(p.cliente_piva, p.fornitore_id); return a ? a.subagente_id : null; };
+    const REGOLE = {
+      tutte: () => true, scaduta: p => M.statoPratica(p).chiave === 'scaduta', attesa: p => M.statoPratica(p).chiave === 'attesa',
+      confermata: p => M.statoPratica(p).chiave === 'confermata', fatturata: p => M.statoPratica(p).chiave === 'fatturata', variazioni: p => M.haVariazioni(p)
+    };
+    const ETICH = { tutte: 'Tutte', scaduta: 'Conferma in ritardo', attesa: 'Attesa conferma', confermata: 'Attesa fattura', fatturata: 'Fatturate', variazioni: 'Con variazioni' };
+    const fb = CRM.FilterBar(corpo, {
+      campi: [
+        { nome: 'stato', tipo: 'segmenti', etichetta: 'Stato', valore: filtri.stato, opzioni: Object.keys(REGOLE).map(k => ({ value: k, label: ETICH[k], n: tutte.filter(REGOLE[k]).length })) },
+        { nome: 'q', tipo: 'cerca', etichetta: 'Ricerca', valore: filtri.q, placeholder: 'Cerca pratica, cliente, documento' },
+        // filtri standard sulle entità (D-22): ricerca a selezione multipla, solo le voci presenti fra le pratiche
+        { nome: 'f', tipo: 'ricerca', entita: 'fornitore', multipla: true, etichetta: 'Fornitore', valore: filtri.f, placeholder: 'Tutti i fornitori', contesto: { limita: tutte.map(p => String(p.fornitore_id)) } },
+        { nome: 'c', tipo: 'ricerca', entita: 'cliente', multipla: true, etichetta: 'Cliente', valore: filtri.c, placeholder: 'Tutti i clienti', contesto: { limita: tutte.map(p => p.cliente_piva) } },
+        { nome: 's', tipo: 'ricerca', entita: 'subagente', multipla: true, etichetta: 'Subagente', valore: filtri.s, placeholder: 'Tutti i subagenti', contesto: { limita: tutte.map(subDi).filter(Boolean).map(String), tutti: true } }
+      ],
+      riepilogo: true,
+      onChange: v => { filtri = v; aggiorna(); }
+    });
+    const tab = CRM.DataTable(CRM.blocco(corpo, 'riempi'), {
+      colonne: [
+        { key: 'numero', header: 'Pratica', cell: p => '<a href="#/pratiche/' + p.id + '"><b>' + e(p.numero) + '</b></a>' },
+        { key: 'cliente', header: 'Cliente', grow: true, valore: p => M.nomeCliente(p.cliente_piva) },
+        { key: 'fornitore', header: 'Fornitore', valore: p => M.fornitore(p.fornitore_id).breve },
+        { key: 'data', header: 'Data ordine', tipo: 'data' },
+        { key: 'importo', header: 'Importo', tipo: 'euro', valore: p => M.importoPratica(p) },
+        { key: 'stato', header: 'Stato', sortValue: p => ['scaduta', 'attesa', 'confermata', 'fatturata'].indexOf(M.statoPratica(p).chiave),
+          cell: p => { const s = M.statoPratica(p); return CRM.statoPratica(p) + (s.nota ? '<span class="sec-riga">' + e(s.nota) + '</span>' : '') + (M.haVariazioni(p) ? '<span class="sec-riga" style="color:var(--attesa-testo)">variazioni fra le fasi</span>' : ''); } },
+        { key: 'sub', header: 'Subagente', valore: p => { const a = M.abbinamento(p.cliente_piva, p.fornitore_id); return a ? M.subagente(a.subagente_id).nome : '—'; } }
+      ],
+      ordinamentoIniziale: { key: 'stato', dir: 'asc' },
+      onRowClick: p => { apriRighe = filtri.stato === 'variazioni'; location.hash = '#/pratiche/' + p.id; },
+      emptyText: 'Nessuna pratica', emptyHint: 'Prova a togliere il filtro o a cambiare la ricerca.'
+    });
+    tab.el.addEventListener('click', ev => { if (ev.target.closest('a[href^="#/pratiche/"]')) apriRighe = filtri.stato === 'variazioni'; });
+    function aggiorna() {
+      const q = filtri.q.trim().toLowerCase();
+      const in_ = (arr, v) => !arr.length || arr.indexOf(String(v)) >= 0;
+      // tutti i filtri tranne lo stato: base dei conteggi dei segmenti (D-23), poi lo stato
+      const base = tutte.filter(p => in_(filtri.f, p.fornitore_id) && in_(filtri.c, p.cliente_piva) && in_(filtri.s, subDi(p))).filter(p => !q || [p.numero, M.nomeCliente(p.cliente_piva), M.fornitore(p.fornitore_id).nome].concat(p.documenti.map(d => d.numero)).some(x => x.toLowerCase().indexOf(q) >= 0));
+      const n = {}; Object.keys(REGOLE).forEach(k => { n[k] = base.filter(REGOLE[k]).length; });
+      fb.conta('stato', n);
+      tab.aggiorna(base.filter(REGOLE[filtri.stato]));
+    }
+    aggiorna();
+  });
+
+  /* ---------- Pratica: Binario + DataTable confronto + Cifre provvigione + Elenco documenti ---------- */
+  CRM.rotta(/^\/pratiche\/(\d+)$/, function (id) {
+    const p = M.pratica(id);
+    if (!p) { location.hash = '#/pratiche'; return; }
+    const f = M.fornitore(p.fornitore_id);
+    const ab = M.abbinamento(p.cliente_piva, p.fornitore_id);
+    const sub = ab ? M.subagente(ab.subagente_id) : null;
+    const s = M.statoPratica(p);
+    const corpo = CRM.Pagina({
+      voce: 'pratiche', pieno: true, titolo: p.numero, badge: CRM.statoPratica(p),
+      sottotitolo: e(M.nomeCliente(p.cliente_piva)) + ' · ' + e(f.nome) + (sub ? ' · seguita da ' + e(sub.nome) : ' · nessun subagente abbinato'),
+      azioni: [{ etichetta: 'Carica un documento', icona: 'carica', variante: 'sec', onClick: () => CRM.scegliFile({ accetta: ACCETTA, onFile: f => carica(f) }) }]
+        .concat(s.chiave === 'scaduta' || s.chiave === 'attesa' ? [{ etichetta: 'Prepara il sollecito', icona: 'posta', variante: s.chiave === 'scaduta' ? 'primario' : 'sec', onClick: () => sollecito(p) }] : [])
+    });
+
+    const ordine = M.doc(p, 'ordine'), conf = M.doc(p, 'conferma');
+    const fatture = M.fiscali(p).filter(d => d.tipo === 'fattura'), nc = M.fiscali(p).filter(d => d.tipo === 'nota_credito');
+    const imp = docs => docs.reduce((x, d) => x + M.importoDoc(d), 0);
+    const impOrd = M.importoDoc(ordine), impConf = conf ? M.importoDoc(conf) : null;
+    const pan = CRM.Pannello(corpo, { senzaMargine: true });
+    CRM.Binario(pan.corpo, [
+      { titolo: 'Ordine', fatta: true, numero: ordine.numero, data: ordine.data, importo: impOrd },
+      conf ? { titolo: 'Conferma', fatta: true, numero: conf.numero, data: conf.data, importo: impConf, delta: M.r2(impConf - impOrd) }
+        : { titolo: 'Conferma', ritardo: s.chiave === 'scaduta', testo: s.chiave === 'scaduta' ? 'In ritardo ' + s.nota + ' (attesa entro il ' + M.data(s.scadenza) + ')' : s.scadenza ? 'Attesa entro il ' + M.data(s.scadenza) : 'Attesa' },
+      fatture.length ? { titolo: fatture.length > 1 ? 'Fatture' : 'Fattura', fatta: true, numero: fatture[0].numero + (fatture.length > 1 ? ' + ' + (fatture.length - 1) : ''), data: fatture[0].data,
+        importo: imp(fatture), delta: M.r2(imp(fatture) - (impConf != null ? impConf : impOrd)) } : { titolo: 'Fattura', testo: 'In attesa' },
+      nc.length ? { titolo: 'Nota di credito', fatta: true, numero: nc[0].numero, data: nc[0].data, importo: imp(nc) } : { titolo: 'Nota di credito', assente: true, testo: 'Nessuna' }
+    ]);
+
+    // Riepilogo (provvigione, incasso, documenti) e righe a confronto in due schede (§7.3):
+    // le righe contano solo quando qualcosa non torna, e allora il titolo della scheda lo dice
+    const fasi = M.fasi(p);
+    const tutte = M.confronto(p), variate = tutte.filter(r => r.varia);
+    const deltaTot = M.r2(variate.reduce((x, r) => x + r.delta, 0));
+    const iniziale = apriRighe && variate.length ? 'righe' : 'riepilogo';
+    apriRighe = false;
+    const sk = CRM.Schede(corpo, { riempi: true, attiva: iniziale, schede: [
+      { id: 'riepilogo', etichetta: 'Riepilogo', disegna: c => riepilogo(c) },
+      { id: 'righe', etichetta: 'Righe a confronto', conta: variate.length ? variate.length + (variate.length === 1 ? ' variazione' : ' variazioni') : tutte.length,
+        contaVariante: variate.length ? 'errore' : 'neutro', disegna: c => righe(c) }
+    ] });
+
+    function righe(c) {
+      CRM.Nota(c, fasi.length > 1 ? (variate.length ? 'Le righe evidenziate cambiano fra le fasi. Clic su una riga per vederla nel documento.' : 'Nessuna variazione fra le fasi. Clic su una riga per vederla nel documento.') : 'Il confronto parte quando arriva la conferma.');
+      let tabConf;
+      if (variate.length) CRM.FilterBar(c, { campi: [{ nome: 'vista', tipo: 'segmenti', valore: 'variate', opzioni: [
+        { value: 'variate', label: 'Solo righe che cambiano', n: variate.length }, { value: 'tutte', label: 'Tutte le righe', n: tutte.length }] }],
+        onChange: v => tabConf.aggiorna(v.vista === 'tutte' ? tutte : variate) });
+      tabConf = CRM.DataTable(CRM.blocco(c, 'riempi'), {
+        compatta: true, righe: variate.length ? variate : tutte, rowClass: r => r.varia ? 'evidenzia' : '',
+        onRowClick: r => { const ult = fasi[fasi.length - 1]; consultaDocumenti(p, ult.id, r.codice); },
+        colonne: [{ key: 'codice', header: 'Articolo', grow: true, cell: r => '<b>' + e(r.codice) + '</b><span class="sec-riga">' + e(r.descrizione) + '</span>' }]
+          .concat(fasi.map((d, i) => ({ key: 'f' + i, header: M.TIPI[d.tipo], align: 'right', sortValue: r => r.per[i] ? M.importoRiga(r.per[i]) : -1,
+            cell: r => r.per[i] ? M.num(r.per[i].qta) + ' × ' + M.euro(r.per[i].prezzo) + '<span class="sec-riga">' + M.euro(M.importoRiga(r.per[i])) + '</span>' : '<span class="testo-tenue">assente</span>' })))
+          .concat(fasi.length > 1 ? [{ key: 'delta', header: 'Differenza', tipo: 'euro', cell: r => Math.abs(r.delta) < 0.01 ? '<span class="testo-tenue">—</span>' : '<b class="' + CRM.classeSegno(r.delta) + '">' + CRM.euroSegno(r.delta) + '</b>' }] : [])
+      });
+    }
+
+    function riepilogo(c) {
+      // le variazioni non devono passare inosservate: avviso con collegamento alla seconda scheda
+      if (variate.length) {
+        const av = CRM.blocco(c, 'avviso-variazioni');
+        av.innerHTML = CRM.icona('avviso') + '<span><b>' + (fasi.length > 2 ? 'Le fasi cambiano ' : 'La ' + M.TIPI[fasi[fasi.length - 1].tipo].toLowerCase() + ' cambia ') + variate.length + (variate.length === 1 ? ' riga' : ' righe') + '</b> rispetto all’ordine, in totale <b>' +
+          CRM.euroSegno(deltaTot) + '</b>.</span>';
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sec piccolo'; b.textContent = 'Vedi le righe';
+        b.addEventListener('click', () => sk.vai('righe')); av.appendChild(b);
+      }
+      const col = CRM.blocco(c, 'colonne riepilogo-pratica');
+      const sx = CRM.blocco(col, 'pila'), dx = CRM.blocco(col, 'pila');
+      const perc = M.percentuali(p, (fatture[0] || ordine).data);
+      const base = M.importoPratica(p);
+      const prov = CRM.Pannello(sx, { titolo: 'Provvigione', nota: M.fiscali(p).length ? 'sul netto fatturato' : 'prevista' });
+      if (!perc) CRM.Nota(prov.corpo, 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni. <a href="#/clienti/' + p.cliente_piva + '">Aggiungi l’agenzia nella scheda del cliente</a>.');
+      else {
+        CRM.Cifre(prov.corpo, [
+          { etichetta: 'Imponibile', valore: base },
+          { etichetta: 'Sconto al cliente', valore: M.pct(perc.sconto), nota: 'percentuali in vigore dal ' + M.data(perc.scaglione.valido_dal) },
+          { etichetta: 'Da ' + f.breve + ' a Decobrands: ' + M.pct(perc.agente) + ' + ' + M.pct(perc.sub_standard), valore: base * perc.dal_fornitore / 100 },
+          // quota del subagente con le regole di D-27 (agenzia, una fattura al mese, correzioni); senza fatture: prevista
+          (() => { const qq = M.fiscali(p).map(d => M.quotaSub(p, d)), note = qq.map(q => q.nota).filter((x, i, a) => x && a.indexOf(x) === i);
+            return qq.length ? { etichetta: 'A ' + sub.nome + (note.length ? ' (' + note.join('; ') + ')' : ': ' + M.pct(qq[0].pct)), valore: qq.reduce((x, q) => x + q.provvigione, 0) }
+              : { etichetta: 'A ' + sub.nome + ': ' + M.pct(perc.sub) + (perc.eccezione ? ' (eccezione personale)' : ''), valore: base * perc.sub / 100 }; })()
+        ]);
+        CRM.Nota(prov.corpo, e(f.breve) + (f.maturazione === 'maturato' ? ' paga sul maturato: la provvigione del subagente si sblocca quando ' + e(f.breve) + ' la riconosce in un bollettino verificato.' : ' paga sul fatturato: la provvigione del subagente entra nel trimestre della fattura.')).style.marginTop = '10px';
+        if (f.maturazione === 'maturato' && M.fiscali(p).length) CRM.Elenco(prov.corpo, M.fiscali(p).map(d => {
+          const b = M.riconosciutoIn(d.numero), bb = M.S.bollettini.find(x => x.righe.some(r => r.numero === d.numero));
+          return { testo: e(d.numero), destra: b ? CRM.stato('ok', 'riconosciuta da ' + f.breve) : bb ? CRM.stato('attesa', 'nel bollettino di ' + M.meseMin(bb.mese) + ', da verificare') : CRM.stato('neutro', 'non ancora nei bollettini') };
+        }));
+      }
+      // incasso del cliente (§5.14): Decobrands non incassa; il fornitore segnala chi non paga
+      const fattureInc = p.documenti.filter(d => d.tipo === 'fattura');
+      if (fattureInc.length) {
+        const VAR = { insoluta: 'errore', da_verificare: 'attesa', pagata: 'ok', da_incassare: 'neutro' };
+        const inc = CRM.Pannello(dx, { titolo: 'Incasso del cliente', nota: f.maturazione === 'maturato' ? 'sul maturato' : 'sul fatturato' });
+        fattureInc.forEach(d => {
+          const st = M.statoIncasso(p, d), riga = CRM.blocco(inc.corpo, 'incasso-riga');
+          riga.innerHTML = '<div><b>' + e(d.numero) + '</b> ' + CRM.stato(VAR[st.stato], st.etichetta) + '<span class="sec-riga">' + e(st.nota || '') +
+            (st.solleciti ? ' · sollecitata ' + st.solleciti + (st.solleciti === 1 ? ' volta' : ' volte') + ', ultima il ' + M.data(st.sollecitata_il) : '') + '</span></div><div class="azioni-cella"></div>';
+          const az = CRM.$('.azioni-cella', riga);
+          const btn = (t, v, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn piccolo ' + v; b.textContent = t; b.addEventListener('click', fn); az.appendChild(b); };
+          if (st.stato === 'insoluta' || st.stato === 'da_verificare') {
+            btn('Sollecita il cliente', 'sec', () => CRM.sollecitiPagamento(M.pagamentiDaSollecitare().filter(x => x.doc === d)));
+            btn('Segna come pagata', 'testo', () => { M.segnaIncasso(p, d, 'pagata', 'segnalazione del fornitore'); M.salva(); CRM.Avviso('Fattura ' + d.numero + ' segnata come pagata'); CRM.naviga(); });
+          } else if (st.stato !== 'pagata') btn('Segna come non pagata', 'testo', () => CRM.FormModal({
+            titolo: 'Fattura ' + d.numero + ' non pagata', testo: 'Il fornitore segnala che il cliente non ha pagato. La fattura passa fra i pagamenti da sollecitare.', conferma: 'Segna come non pagata',
+            campi: [{ nome: 'nota', etichetta: 'Nota', tipo: 'area', valore: '', placeholder: 'es. email di ' + f.breve + ' del …' }],
+            onConferma: v => { M.segnaIncasso(p, d, 'insoluta', v.nota); M.salva(); CRM.Avviso('Fattura ' + d.numero + ' fra i pagamenti da sollecitare'); CRM.naviga(); }
+          }));
+        });
+      }
+      const docs = CRM.Pannello(dx, { titolo: 'Documenti', nota: String(p.documenti.length),
+        azioni: [{ etichetta: 'Consulta affiancati', icona: 'file', onClick: () => consultaDocumenti(p) }] });
+      CRM.Elenco(docs.corpo, p.documenti.map(d => ({
+        onClick: () => consultaDocumenti(p, d.id), titolo: 'Apri ' + M.TIPI[d.tipo].toLowerCase() + ' ' + d.numero + ' accanto al confronto',
+        testo: CRM.icona('file') + ' ' + e(M.TIPI[d.tipo]) + ' <b>' + e(d.numero) + '</b> <span class="testo-tenue">del ' + M.data(d.data) + '</span>' + (d.riferimento ? '<span class="sec-riga">storna ' + e(d.riferimento) + (d.nota ? ' · ' + e(d.nota) : '') + '</span>' : ''),
+        destra: '<span class="' + CRM.classeSegno(Math.min(0, M.importoDoc(d))) + '">' + M.euro(M.importoDoc(d)) + '</span>'
+      })));
+    }
+  });
+
+  /* Solleciti di conferma raggruppati per fornitore: un testo per fornitore con tutte le sue pratiche in ritardo. */
+  function solleciti(pratiche) {
+    const per = {};
+    pratiche.forEach(p => { (per[p.fornitore_id] = per[p.fornitore_id] || []).push(p); });
+    const ids = Object.keys(per).map(Number);
+    const testo = fid => {
+      const f = M.fornitore(fid), ps = per[fid];
+      return 'Gentili colleghi di ' + f.nome + ',\n\nnon abbiamo ancora ricevuto la conferma ' + (ps.length === 1 ? 'del seguente ordine' : 'dei seguenti ordini') + ':\n\n' +
+        ps.map(p => '- ' + p.numero + ' del ' + M.data(p.data) + ' · ' + M.nomeCliente(p.cliente_piva) + ' (vostro codice ' + ((M.abbinamento(p.cliente_piva, p.fornitore_id) || {}).codice || '—') + ') · ' +
+          M.euro(M.importoDoc(M.doc(p, 'ordine'))) + ' · attesa entro il ' + M.data(M.scadenzaConferma(p))).join('\n') +
+        '\n\nVi chiediamo di inviarcele appena possibile, indicando eventuali articoli non disponibili.\n\nGrazie,\nDecobrands SRL';
+    };
+    let cur = ids[0];
+    const copiati = {};
+    CRM.Modale({
+      titolo: 'Solleciti di conferma', testo: pratiche.length + ' pratiche in ritardo, ' + ids.length + (ids.length === 1 ? ' fornitore' : ' fornitori') + ': un testo per fornitore da copiare e inviare.',
+      corpo: c => {
+        const disegna = () => {
+          c.innerHTML = '<div class="segmenti solleciti-schede" role="tablist">' + ids.map(fid => '<button type="button" role="tab" data-f="' + fid + '" aria-selected="' + (fid === cur) + '">' +
+            e(M.fornitore(fid).breve) + '<span class="n">' + per[fid].length + '</span>' + (copiati[fid] ? ' ✓' : '') + '</button>').join('') + '</div>' +
+            '<p class="testo-tenue" style="margin:0 0 6px">A: ' + e(M.fornitore(cur).nome) + '</p><textarea class="testo-email" aria-label="Testo da inviare">' + e(testo(cur)) + '</textarea>';
+          CRM.$$('[data-f]', c).forEach(b => b.addEventListener('click', () => { cur = Number(b.dataset.f); disegna(); }));
+        };
+        disegna();
+      },
+      azioni: [{ etichetta: 'Chiudi', variante: 'sec' }, { etichetta: 'Copia il testo', onClick: (chiudi, corpo) => {
+        const t = CRM.$('textarea', corpo); t.select();
+        try { navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy')); } catch (x) { document.execCommand('copy'); }
+        M.annota('Sollecito conferme preparato per ' + M.fornitore(cur).breve + ' (' + per[cur].map(p => p.numero).join(', ') + ')'); M.salva();
+        copiati[cur] = true;
+        const prossimo = ids.find(fid => !copiati[fid]);
+        CRM.Avviso('Testo per ' + M.fornitore(cur).breve + ' copiato' + (prossimo ? ': ora ' + M.fornitore(prossimo).breve : ''));
+        if (prossimo) { cur = prossimo; CRM.$('[data-f="' + prossimo + '"]', corpo).click(); CRM.$$('[data-f]', corpo).forEach(b => { if (copiati[b.dataset.f] && b.textContent.indexOf('✓') < 0) b.insertAdjacentText('beforeend', ' ✓'); }); return false; }
+      } }]
+    });
+  }
+
+  /* Solleciti di pagamento ai clienti (§5.14): un testo per cliente con le fatture non pagate. */
+  CRM.sollecitiPagamento = function (voci) {
+    if (!voci.length) { CRM.Avviso('Nessuna fattura da sollecitare'); return; }
+    const per = {};
+    voci.forEach(x => { (per[x.cliente] = per[x.cliente] || []).push(x); });
+    const ids = Object.keys(per);
+    const testo = piva => {
+      const vv = per[piva], tot = vv.reduce((s, x) => s + x.importo, 0);
+      return 'Gentile ' + M.nomeCliente(piva) + ',\n\nci risulta ancora da saldare ' + (vv.length === 1 ? 'la seguente fattura' : 'le seguenti fatture') + ':\n\n' +
+        vv.map(x => '- ' + x.doc.numero + ' del ' + M.data(x.doc.data) + ' · ' + M.fornitore(x.pratica.fornitore_id).nome + ' · ' + M.euro(x.importo) + ' (' + x.stato.giorni + ' giorni)').join('\n') +
+        '\n\nTotale: ' + M.euro(tot) + '.\nVi chiediamo di provvedere al pagamento o di comunicarci eventuali contestazioni. Se avete già pagato, ignorate questo messaggio.\n\nGrazie,\nDecobrands SRL';
+    };
+    let cur = ids[0];
+    const copiati = {};
+    CRM.Modale({
+      titolo: 'Solleciti di pagamento', testo: voci.length + (voci.length === 1 ? ' fattura non pagata, ' : ' fatture non pagate, ') + ids.length + (ids.length === 1 ? ' cliente' : ' clienti') + ': un testo per cliente da copiare e inviare. Il fornitore incassa, Decobrands sollecita.',
+      corpo: c => {
+        const disegna = () => {
+          c.innerHTML = '<div class="segmenti solleciti-schede" role="tablist">' + ids.map(piva => '<button type="button" role="tab" data-c="' + piva + '" aria-selected="' + (piva === cur) + '">' +
+            e(M.nomeCliente(piva)) + '<span class="n">' + per[piva].length + '</span>' + (copiati[piva] ? ' ✓' : '') + '</button>').join('') + '</div>' +
+            '<p class="testo-tenue" style="margin:0 0 6px">A: ' + e(M.nomeCliente(cur)) + '</p><textarea class="testo-email" aria-label="Testo da inviare">' + e(testo(cur)) + '</textarea>';
+          CRM.$$('[data-c]', c).forEach(b => b.addEventListener('click', () => { cur = b.dataset.c; disegna(); }));
+        };
+        disegna();
+      },
+      azioni: [{ etichetta: 'Chiudi', variante: 'sec' }, { etichetta: 'Copia il testo', onClick: (chiudi, corpo) => {
+        const t = CRM.$('textarea', corpo); t.select();
+        try { navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy')); } catch (x) { document.execCommand('copy'); }
+        M.registraSollecitoPagamento(per[cur]); M.salva();
+        copiati[cur] = true;
+        const prossimo = ids.find(piva => !copiati[piva]);
+        CRM.Avviso('Sollecito per ' + M.nomeCliente(cur) + ' copiato' + (prossimo ? ': ora ' + M.nomeCliente(prossimo) : ''));
+        if (prossimo) { cur = prossimo; CRM.$('[data-c="' + prossimo + '"]', corpo).click(); return false; }
+        CRM.naviga();
+      } }]
+    });
+  };
+
+  function sollecito(p) {
+    const f = M.fornitore(p.fornitore_id);
+    CRM.TestoDaInviare({
+      titolo: 'Sollecito di conferma · ' + p.numero, destinatario: f.nome,
+      testo: 'Gentili colleghi di ' + f.nome + ',\n\nnon abbiamo ancora ricevuto la conferma del nostro ordine ' + p.numero + ' del ' + M.data(p.data) + ' per il cliente ' + M.nomeCliente(p.cliente_piva) +
+        ' (vostro codice ' + ((M.abbinamento(p.cliente_piva, p.fornitore_id) || {}).codice || '—') + '), di ' + M.euro(M.importoDoc(M.doc(p, 'ordine'))) + '.\n\n' +
+        'Vi chiediamo di inviarcela appena possibile, indicando eventuali articoli non disponibili.\n\nGrazie,\nDecobrands SRL',
+      onCopia: () => { M.annota('Sollecito conferma preparato per ' + p.numero); M.salva(); }
+    });
+  }
+})();
