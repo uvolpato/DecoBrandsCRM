@@ -330,6 +330,22 @@
         '<b>Una fattura al mese</b> (la prima o la più alta): le altre fatture del mese non danno provvigione al subagente. Il fornitore non cambia: si controlla nel bollettino.',
         'Per un caso singolo si corregge il documento in Liquidazioni (<b>Correggi</b>), con il motivo. Lo sconto fittizio non serve più: lo sconto resta quello vero.'] },
 
+    /* ---------------- Anagrafica unica a soggetti (proposta D-102) ---------------- */
+    { id: 'soggetti', titolo: 'Soggetti', gruppo: 'Anagrafiche', vai: '#/soggetti',
+      sintesi: 'Anagrafica unica a soggetti (proposta in specifica-anagrafica-soggetti.md, D-102): un soggetto = un’identità fiscale con i suoi ruoli (cliente, fornitore, subagente), le sedi e i recapiti.',
+      pulsanti: [
+        ['Segmenti', 'Tutti · Clienti · Fornitori · Subagenti · Non attivi; i numeri si aggiornano con la ricerca.'],
+        ['Nuovo soggetto', 'Solo identità: natura, paese, P.IVA e codice fiscale; la P.IVA doppia viene rifiutata (la fusione decide la deduplica, non si inventa).'],
+        ['Scheda Ruoli', 'I ruoli del soggetto con i loro codici; Aggiungi ruolo crea il ruolo; il clic porta alla pagina del ruolo (Condizioni, Agenzie o clienti seguiti).'],
+        ['Scheda Sedi', 'Le sedi del soggetto: una sola predefinita per tipo; una catena è un soggetto con N punti vendita.'],
+        ['Scheda Recapiti', 'Email, PEC, telefoni… allegabili a soggetto, sede o persona referente; Disattiva chiude il singolo recapito.'],
+        ['Scheda Fatturazione', 'Dati della fatturazione elettronica del soggetto: codice SDI, PEC, identificativo estero, regime, esigibilità.'],
+        ['Modifica identità · Disattiva', 'Il master non si cancella: attivo = false, e solo senza ruoli attivi.']
+      ],
+      sapere: ['Il nome visibile arriva dal suo ruolo attivo: un soggetto nuovo, senza ruoli, si mostra con il suo codice CNNNNNN.',
+        'Il codice CRM è quello che si cita al telefono; i codici di Integra stanno sui ruoli (D-101: cliente e fornitore possono avere due codici diversi).',
+        'Niente cancellazioni: ruoli e soggetti chiudono con attivo = false/valido_al; i documenti restano appesi alle loro versioni.'] },
+
     /* ---------------- Vendita diretta (ampliamento) ---------------- */
     { id: 'ordini-cliente', titolo: 'Ordini cliente', gruppo: 'Vendita diretta', vai: '#/ordini-cliente',
       sintesi: 'Gli ordini dei clienti in vendita diretta, da controllare ed esportare per Integra.',

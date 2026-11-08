@@ -20,7 +20,7 @@ Il lavoro vero è **quadrare i conti** con un ritmo preciso: ogni giorno arrivan
 | Vendita diretta · **spenta** (ampliamento futuro, spec §17; si accende con `index.html?vendita=1`) | **Ordini cliente** | Come la Gestione Ordini: ordini dei clienti con controllo degli articoli (pallino), disponibile per riga, *Esporta per Integra* a schede (alias con casi A/B/C, ricerca, filtri e quantità modificabili; kit; file e controlli con l'anteprima delle righe) e riepilogo sempre visibile, file **Ordine cliente (OC)** e/o **Ordine fornitore (OF)** nel tracciato di Integra; le quantità esportate restano impegnate finché Integra non registra l'ordine; *Annulla esportazione* le rilascia |
 | | **Articoli**, **Giacenze** | Da Integra in sola lettura (viste sul database, sincronizzazione ogni 15–60 secondi). Disponibile = giacenza di Integra − impegni; riquadri esauriti, negativi, con impegni aperti |
 | | **Alias e kit** | Codici vecchio → nuovo (con "chiede conferma") e kit (articolo → componenti × quantità, acceso/spento); modifiche solo all'amministratore |
-| Anagrafiche | Fornitori, Subagenti, Clienti | Clienti e fornitori da Integra in **sola lettura**; nel CRM condizioni, percentuali **datate**, eccezioni, subagenti e **agenzie del cliente** (fornitore, codice, subagente, sconto) |
+| Anagrafiche | **Soggetti (proposta D-102)** · Fornitori, Subagenti, Clienti | La pagina *Soggetti* prova l'anagrafica unica della `specifica-anagrafica-soggetti.md` (CRUD del master, ruoli cliente/fornitore/subagente, sedi, recapiti, fatturazione elettronica; dati in `assets/dati-soggetti.js`); le altre pagine restano come prima: clienti e fornitori da Integra in **sola lettura**; nel CRM condizioni, percentuali **datate**, eccezioni, subagenti e **agenzie del cliente** (fornitore, codice, subagente, sconto) |
 | Gestione (gruppo richiudibile) | **Utenti e ruoli** | Utenti propri del CRM (D-29): si entra con **nome utente (o email) e password**, come nella Gestione Ordini (D-39); ruoli *Superutente* (uno solo, crea gli amministratori), *Amministratore*, *Operatore*, *Sola lettura*; password provvisoria per email, *Reimposta la password*, esito dell'ultima email; tabella *Cosa può fare ogni ruolo* |
 | | **Stato del sistema** | Casella dei documenti, server di lettura, sincronizzazione da Integra, posta in uscita: stato, problemi da vedere (contatore nella barra), ultime esecuzioni. Nell'app è una vista del registro unico di eventi e anomalie (D-31) |
 | | **Impostazioni** | Dati azienda, casella IMAP, server di lettura e soglie, posta in uscita, sincronizzazione da Integra (database ponte, viste, ogni quanti secondi, D-32), conservazione; password e segreti mai riletti |
@@ -124,6 +124,8 @@ assets/viste-giorno.js        Oggi, Documenti in arrivo, Pratiche, Pratica
 assets/viste-periodo.js       Bollettini, Bollettino, Liquidazioni (con Report subagenti)
 assets/viste-analisi.js       Analisi: BI con filtri, filtro incrociato, grafici ed esportazione
 assets/viste-anagrafiche.js   Fornitori, Subagenti, Clienti (con agenzie)
+assets/dati-soggetti.js       dati di prova dell'anagrafica unica a soggetti (proposta D-102)
+assets/viste-soggetti.js      Soggetti: CRUD del master (identità, ruoli, sedi, recapiti, fatturazione)
 assets/viste-componenti.js    catalogo dei componenti
 assets/stile.css              palette Decobrands e stile dei componenti
 assets/logo-decobrands.png    logo

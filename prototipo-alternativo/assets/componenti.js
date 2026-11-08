@@ -60,7 +60,8 @@
     carrello: '<path d="M3 4h2l2.4 11h11l2-8H6.2"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/>',
     scatola: '<path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>',
     magazzino: '<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
-    catena: '<rect x="3" y="9" width="8" height="6" rx="3"/><rect x="13" y="9" width="8" height="6" rx="3"/><path d="M9 12h6"/>'
+    catena: '<rect x="3" y="9" width="8" height="6" rx="3"/><rect x="13" y="9" width="8" height="6" rx="3"/><path d="M9 12h6"/>',
+    soggetti: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="12" r="2"/><path d="M4 16.5a4.5 4.5 0 0 1 9 0M13 10.5h5M13 14h5"/>'
   };
   CRM.icona = (nome, classe) => '<svg class="icona' + (classe ? ' ' + classe : '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (PERCORSI[nome] || '') + '</svg>';
 
@@ -1397,6 +1398,7 @@
       { id: 'giacenze', href: '#/giacenze', t: 'Giacenze', icona: 'magazzino', area: 'vendite' },
       { id: 'alias-kit', href: '#/alias-kit', t: 'Alias e kit', icona: 'catena', area: 'vendite' }] },
     { gruppo: 'Anagrafiche', area: 'anagrafiche', voci: [
+      { id: 'soggetti', href: '#/soggetti', t: 'Soggetti', icona: 'soggetti', area: 'anagrafiche' },   // anagrafica unica: proposta D-102 (dati-soggetti.js)
       { id: 'fornitori', href: '#/fornitori', t: 'Fornitori', icona: 'fornitori', area: 'anagrafiche' },
       { id: 'subagenti', href: '#/subagenti', t: 'Subagenti', icona: 'subagenti', area: 'anagrafiche' },
       { id: 'clienti', href: '#/clienti', t: 'Clienti', icona: 'abbinamenti', area: 'anagrafiche' }] },
