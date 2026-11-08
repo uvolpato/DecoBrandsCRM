@@ -141,7 +141,7 @@ describe('GET /api/bollettini', () => {
     expect(scelti.fornitori.map((f) => f.id).sort()).toEqual([String(gries), String(gasper)].sort());
     expect(scelti.conteggi.tutti).toBe(2);
     expect(scelti.conteggi.dafare).toBeLessThanOrEqual(2);
-    expect(tutti.conteggi.tutti).toBe(10);
+    expect(tutti.conteggi.tutti).toBe(11);
 
     // il segmento sceglie le righe ma non cambia i numeri
     const daFare = (await op.get(`/bollettini?al=2026-09&fornitori=${gries},${gasper}&vista=dafare`).expect(200)).body as Matrice;

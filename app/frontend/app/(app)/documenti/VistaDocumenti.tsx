@@ -8,6 +8,7 @@ import { avviso, quando, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
+import { useEventi } from '@/lib/eventi';
 import { euro } from '@/lib/formati';
 import { VistaDocumento } from './[id]/VistaDocumento';
 
@@ -38,7 +39,7 @@ interface Risposta {
 }
 
 export function VistaDocumenti() {
-  const { id } = useParams<{ id?: string }>();
+  const { id } = useParams<{ id?: string[] }>();
   const puo = usePuo();
   const puoModifica = puo('provvigioni.modifica');
   const [dati, setDati] = useState<Risposta | null>(null);
@@ -48,6 +49,9 @@ export function VistaDocumenti() {
   const [scartati, setScartati] = useState<number | null>(null); // il link «N scartati» (§7.16)
   const sagome = useSagome(caricando);
   const attesaLettura = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const eventi = useEventi();
+  const vEventi = eventi.documenti ?? 0;
+  const vVista = useRef(vEventi);
 
   const ricarica = useCallback(() => setVersione((v) => v + 1), []);
 
@@ -71,6 +75,17 @@ export function VistaDocumenti() {
     return () => { vivo = false; };
   }, [versione]);
 
+  // nuovi documenti dal server (SSE, §16.4.2): aggiorna solo elenco e conteggi, senza sagome
+  useEffect(() => {
+    if (vEventi === vVista.current) return;
+    vVista.current = vEventi;
+    let vivo = true;
+    void api<Risposta>('documenti?stato=da_controllare&pagina=1&per_pagina=200').then((r) => {
+      if (vivo && r.ok) setDati(r.dati);
+    });
+    return () => { vivo = false; };
+  }, [vEventi]);
+
   useEffect(() => () => { if (attesaLettura.current) clearTimeout(attesaLettura.current); }, []);
 
   async function carica(files: File[]) {
@@ -89,7 +104,7 @@ export function VistaDocumenti() {
   }
 
   const documenti = dati?.documenti ?? [];
-  const selezionato = id ?? documenti[0]?.id ?? null;
+  const selezionato = id?.[0] ?? documenti[0]?.id ?? null;
   const c = dati?.conteggi;
   const inAttesa = c ? (c.in_coda ?? 0) + (c.in_lettura ?? 0) : 0;
 

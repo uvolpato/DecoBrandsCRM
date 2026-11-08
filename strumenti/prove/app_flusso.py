@@ -30,7 +30,10 @@ def prova_documento(comando):
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
-    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
+    for _ in range(24):
+        if pg.locator('.accesso-scena.aperta').count(): break
+        pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
 def esci(pg):
@@ -226,7 +229,7 @@ try:
     ok(pg.locator('.dt tbody tr').count() == 2, 'righe lette: due righe')
     ok('da controllare' in testo(pg, '.schede-barra [role=tab]:has-text("Righe lette")'), 'righe incerte contate nella scheda')
     pg.click('.pannello-testa button:has-text("Correggi i dati letti")'); pg.wait_for_selector('.affiancata')
-    ok(pg.locator('.aff-sx object[type="application/pdf"]').count() == 1, 'correzione: PDF originale a sinistra')
+    ok(pg.locator('.aff-sx canvas').count() == 1, 'correzione: PDF originale a sinistra')
     ok(pg.locator('.aff-dx .incerto-errore').count() >= 1 and pg.locator('.aff-dx .incerto-attesa').count() >= 1, 'correzione: campi bordati giallo e rosso')
     pg.click('.aff-piede button:has-text("Annulla")'); pg.wait_for_timeout(300)
     ok(pg.locator('.affiancata').count() == 0, 'correzione annullata: la finestra si chiude')
@@ -253,7 +256,7 @@ try:
     prova = next((d for d in docs if d['numero'] == 'PROVA-' + S.upper()), None)
     ok(prova is not None, 'la fattura di prova è fra i documenti della pratica')
     pg.goto(BASE + '/pratiche/' + pratica['id']); pg.wait_for_selector('.binario'); pg.wait_for_timeout(800)
-    pg.locator('.pannello', has=pg.locator('h2', has_text='Documenti fiscali')).locator('button:has-text("PDF")').first.click()
+    pg.locator('.pannello', has=pg.locator('h2', has_text='Documenti fiscali')).locator('.elenco li', has_text='PROVA-' + S.upper()).first.click()
     pg.wait_for_selector('.affiancata object')
     ok(pg.locator('.affiancata object[type="application/pdf"]').count() == 1, 'pratica: PDF del documento affiancato')
     ok('PROVA-' + S.upper() in testo(pg, '.affiancata'), 'visualizzatore: il documento di prova è nella scheda')
@@ -283,8 +286,8 @@ try:
     pg.locator('.riepilogo-filtri .btn-icona').first.click(); pg.wait_for_timeout(200)
     ok('Periodo' in testo(pg, '.riepilogo-pop') and 'Gasper' in testo(pg, '.riepilogo-pop'), 'riepilogo: periodo e fornitore')
     pg.click('.riepilogo-pop >> text=Togli tutti i filtri')
-    pg.wait_for_function("() => document.querySelectorAll('.matrice .m-riga').length === 10")
-    ok(pg.locator('.matrice .m-riga').count() == 10, 'tolti i filtri: dieci fornitori in matrice')
+    pg.wait_for_function("() => document.querySelectorAll('.matrice .m-riga').length === 11")
+    ok(pg.locator('.matrice .m-riga').count() == 11, 'tolti i filtri: undici fornitori in matrice')
 
     # bollettino da riconciliare: il primo ancora «arrivato» (di norma Gasper agosto)
     celle = json(pg, 'bollettini?al=2026-09')['fornitori']
@@ -482,7 +485,7 @@ try:
     # ---------- 12. Anagrafiche ----------
     pg.goto(BASE + '/fornitori'); pg.wait_for_selector('.dt tbody tr'); quieta(pg)
     ok(testo(pg, '.testa h1') == 'Fornitori', 'Fornitori: elenco')
-    ok(pg.locator('.dt tbody tr.cliccabile').count() == 10, 'Fornitori: dieci righe dal seed')
+    ok(pg.locator('.dt tbody tr.cliccabile').count() == 11, 'Fornitori: undici righe dal seed')
     pg.fill('.filtri input[type=search]', 'Gries')
     pg.wait_for_function("() => document.querySelectorAll('.dt tbody tr.cliccabile').length === 1"); quieta(pg)
     ok(pg.locator('.dt tbody tr.cliccabile').count() == 1 and 'Gries' in testo(pg, '.dt tbody'), 'Fornitori: ricerca Gries')

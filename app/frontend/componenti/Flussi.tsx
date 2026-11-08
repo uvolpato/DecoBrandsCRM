@@ -52,7 +52,7 @@ export function ListaDaFare({ voci, vuoto }: { voci: DaFare[]; vuoto: { titolo: 
   return (
     <ul className="da-fare">
       {voci.length ? voci.map((x) => (
-        <li key={x.titolo} className={'t-' + x.tipo}>
+        <li key={x.titolo + '|' + x.href} className={'t-' + x.tipo}>
           <span className="segno" aria-hidden="true" />
           <div><b>{x.titolo}{x.extra}</b><span>{x.dettaglio}</span></div>
           <Link className="btn sec piccolo" href={x.href}>{x.azione}</Link>

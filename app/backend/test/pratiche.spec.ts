@@ -258,8 +258,8 @@ describe('GET /api/pratiche/cerca (D-60: il campo di ricerca dello Sposta)', () 
     expect(b.every((x) => x.cliente !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(x.data) && ['attesa', 'confermata', 'fatturata'].includes(x.stato))).toBe(true);
   });
 
-  it('senza fornitore_id: 400; senza l\'area Provvigioni: 403', async () => {
-    await resp.get('/pratiche/cerca').expect(400);
+  it('senza fornitore_id: elenco vuoto, non un errore; senza l\'area Provvigioni: 403', async () => {
+    expect((await resp.get('/pratiche/cerca').expect(200)).body).toEqual([]);
     await senzaPermesso.get('/pratiche/cerca?fornitore_id=1').expect(403);
   });
 });

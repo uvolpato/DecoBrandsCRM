@@ -38,7 +38,7 @@ class FiltroPratiche {
 
 /** Campo di ricerca delle pratiche per fornitore (D-60, §7.3: lo *Sposta*). */
 class CercaPratiche {
-  @Type(() => Number) @IsInt() @Min(1) fornitore_id!: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) fornitore_id?: number;
 }
 
 const idElenco = (s: string | undefined) => (s ? s.split(',').map((x) => BigInt(x)) : []);
@@ -180,6 +180,7 @@ export class PraticheController {
   @Get('cerca')
   @Richiede('provvigioni.consulta')
   async cerca(@Query() q: CercaPratiche) {
+    if (!q.fornitore_id) return [];
     const righe = await this.db.$queryRaw<{ id: bigint; numero: string; cliente: string; data: string; stato: string }[]>`
       SELECT t.id, t.numero_ordine AS numero, coalesce(cv.ragione_sociale, '') AS cliente,
              to_char(t.data_ordine, 'YYYY-MM-DD') AS data,

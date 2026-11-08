@@ -13,7 +13,6 @@ import { avviso, Dettagli, quando, Stato, type Variante } from '@/componenti/Pic
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { Schede, type Scheda } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
-import { Visualizzatore, type DocFile } from '@/componenti/Visualizzatore';
 import { PdfEvidenziato } from '@/componenti/PdfEvidenziato';
 import { api } from '@/lib/api';
 import { cliente as entitaCliente, fornitore as entitaFornitore, type Entita } from '@/lib/entita';
@@ -28,6 +27,7 @@ const TIPO: Record<string, string> = {
   nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento', bollettino: 'Bollettino',
 };
 const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+const NOME_CAMPO: Record<string, string> = { numero: 'Numero', data: 'Data', codice_cliente: 'Codice cliente', cliente: 'Cliente', importo_totale: 'Importo', mese: 'Mese', anno: 'Anno', riferimento_fattura: 'Fattura stornata' };
 const STATO_PRATICA: Record<string, { testo: string; v: Variante }> = {
   inviato: { testo: 'Attesa conferma', v: 'attesa' },
   confermato: { testo: 'Confermata', v: 'info' },
@@ -46,7 +46,8 @@ const SOGLIA_BASSA = 0.7;
 const PRATICA: Entita = {
   titolo: 'Pratica',
   voci: async (ctx) => {
-    const r = await api<Record<string, unknown>[]>('pratiche/cerca?fornitore_id=' + String(ctx.fornitore_id ?? ''));
+    if (!ctx.fornitore_id) return [];
+    const r = await api<Record<string, unknown>[]>('pratiche/cerca?fornitore_id=' + String(ctx.fornitore_id));
     return r.ok ? r.dati : [];
   },
   chiave: (p) => p.id,
@@ -133,6 +134,8 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     const r = await api<Dettaglio>('documenti/' + id);
     if (r.ok) { setD(r.dati); setErrore(''); } else setErrore(r.messaggio);
   }, [id]);
+  // al cambio di documento si azzera il dettaglio, così ricompare il caricamento (sagome)
+  useEffect(() => { setD(null); setErrore(''); }, [id]);
   useEffect(() => { void carica(); }, [carica]);
 
   // il bollettino già registrato: serve solo il collegamento alla verifica (D-71)
@@ -299,20 +302,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         }} />);
   }
 
-  /** Riapre il file originale accanto ai dati letti, senza passare dalla correzione. */
-  function apriPdf() {
-    const f: DocFile = {
-      id: doc.id, arrivo_id: doc.id, file_nome: doc.file_nome, tipo: t.tipo ?? 'altro', numero: t.numero,
-      data: t.data ?? doc.ricevuto_il.slice(0, 10), importo: t.importo,
-    };
-    setFinestra(<Visualizzatore docs={[f]} iniziale={f} onChiudi={chiudi}
-      titolo="Il documento originale" testo="A sinistra il file, a destra i dati letti." />);
-  }
-
   const azioni: Azione[] = [
-    ...(doc.file_nome ? [{
-      etichetta: 'PDF', variante: 'sec' as const, onClick: apriPdf, titolo: 'Riapri il documento originale',
-    }] : []),
     ...(puoModifica && d.stato === 'da_controllare' ? [{
       etichetta: 'Correggi i dati letti', onClick: () => setFinestra(<FinestraCorreggi d={d} onChiudi={chiudi} onSalvato={salvato} />),
       conta: n || undefined, contaVariante: d.livello === 'bassa' ? 'errore' as const : 'attesa' as const,
@@ -541,6 +531,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
     })),
   }));
   const [campo, setCampo] = useState<string | null>(null);
+  const [riepAperto, setRiepAperto] = useState(true);
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
   // campi già validati (dal server o con il ✓ in questa finestra): non sono più punti da controllare
@@ -549,8 +540,8 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
   const boll = b.testata.tipo === 'bollettino';
   const verificato = (k: string) => verificati.has(k);
   const conferma = (k: string) => setVerificati((s) => s.has(k) ? s : new Set(s).add(k));
-  const campoSi = (k: string, etichetta: string, children: ReactNode) => (
-    <CampoLetto x={af.get(k)} etichetta={etichetta} verificato={verificato(k)} onConferma={() => conferma(k)}>{children}</CampoLetto>
+  const campoSi = (k: string, etichetta: string, children: ReactNode, senzaAff = false) => (
+    <CampoLetto x={senzaAff ? undefined : af.get(k)} etichetta={etichetta} verificato={verificato(k)} onConferma={() => conferma(k)}>{children}</CampoLetto>
   );
 
   useEffect(() => {
@@ -569,6 +560,15 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
     && c.affidabilita < SOGLIA_OK && (c.valore_finale ?? c.valore_letto) != null);
   const nPunti = d.controlli.length + restanti.length;
   const bassa = d.controlli.some((c) => c.grave) || restanti.some((c) => (c.affidabilita ?? 1) < SOGLIA_BASSA);
+
+  // porta l'attenzione sul campo di un punto (controllo o campo incerto) selezionato dall'elenco
+  const saltaAl = (nome: string) => {
+    setCampo(nome);
+    const mappa: Record<string, string> = { importo_totale: 'importo', totale: 'importo' };
+    const el = document.querySelector<HTMLElement>(`[data-campo="${mappa[nome] ?? nome}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+    el?.focus();
+  };
 
   async function salva() {
     if (!boll && !b.testata.numero.trim()) { setErrore('Il numero del documento è obbligatorio.'); return; }
@@ -617,12 +617,24 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                 : 'La foto resta ferma: la posizione del valore non si evidenzia.'}
             </p>
             <div className="aff-riepilogo">
-              <div className="riep-testa" style={{ cursor: 'default' }}>
+              <button type="button" className="riep-testa" aria-expanded={riepAperto} aria-controls="aff-riep-elenco" onClick={() => setRiepAperto((v) => !v)}>
                 <Stato v={bassa ? 'errore' : nPunti ? 'attesa' : 'ok'}>
                   {bassa ? 'Affidabilità bassa' : nPunti ? 'Da controllare' : 'Lettura affidabile'}
                 </Stato>
                 <span>{nPunti ? nPunti + (nPunti === 1 ? ' punto da controllare' : ' punti da controllare') : 'tutti i campi sono controllati'}</span>
-              </div>
+              </button>
+              <ul id="aff-riep-elenco" hidden={!riepAperto}>
+                {d.controlli.map((c) => (
+                  <li key={c.codice + c.campo} className={c.grave ? 'grave' : ''}>
+                    <button type="button" className="btn testo" onClick={() => saltaAl(c.campo)}>{c.testo}</button>
+                  </li>
+                ))}
+                {restanti.map((c) => (
+                  <li key={c.campo}>
+                    <button type="button" className="btn testo" onClick={() => saltaAl(c.campo)}>{NOME_CAMPO[c.campo] ?? c.campo} · {Math.round((c.affidabilita ?? 0) * 100)}%</button>
+                  </li>
+                ))}
+              </ul>
             </div>
             <h3>Testata</h3>
             <div className="griglia-letti">
@@ -642,7 +654,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                   {campoSi('tipo', 'Tipo',
                     <select data-campo="tipo" value={b.testata.tipo} onFocus={() => setCampo('tipo')} onChange={(e) => t('tipo', e.target.value)}>
                       {Object.entries(TIPO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>)}
+                    </select>, true)}
                   {campoSi('numero', 'Numero',
                     <input data-campo="numero" value={b.testata.numero} onFocus={() => setCampo('numero')} onChange={(e) => t('numero', e.target.value)} />)}
                   {campoSi('data', 'Data',
@@ -711,6 +723,13 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                     );
                   })}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={boll ? 4 : 5} className="testo-tenue">Totale</td>
+                    <td className="dx">{euro(boll ? b.righe.reduce((s, r) => s + (Number(r.provvigione) || 0), 0) : b.righe.reduce((s, r) => s + (Number(r.importo) || 0), 0))}</td>
+                    <td />
+                  </tr>
+                </tfoot>
               </table>
             </div>
             <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>

@@ -45,7 +45,7 @@ export function areeDelleRighe(righe: { codice: string; entita: string | null }[
 }
 
 /** Un ciclo di lettura: righe con id > ultimo, il nuovo ultimo e le aree toccate. */
-export async function nuoveAree(db: Pick<PrismaService, 'registro'>, ultimo: bigint) {
+export async function nuoveAree(db: Pick<PrismaService, 'registro' | '$queryRaw'>, ultimo: bigint) {
   // take: un giro non deve portarsi dietro un registro cresciuto di colpo; il resto arriva al giro dopo
   const righe = await db.registro.findMany({
     where: { id: { gt: ultimo } },
@@ -53,7 +53,14 @@ export async function nuoveAree(db: Pick<PrismaService, 'registro'>, ultimo: big
     take: 1000,
     select: { id: true, codice: true, entita: true },
   });
-  return { ultimo: righe.length ? righe[righe.length - 1].id : ultimo, aree: areeDelleRighe(righe) };
+  if (!righe.length) {
+    // registro riportato indietro (ripristino di un backup, dati di prova ricaricati): si riparte
+    // dall'ultimo id, altrimenti il flusso resterebbe zitto per sempre
+    const [r] = await db.$queryRaw<{ id: bigint | null }[]>`SELECT max(id) AS id FROM registro`;
+    const max = r.id ?? 0n;
+    return { ultimo: max < ultimo ? max : ultimo, aree: [] as string[] };
+  }
+  return { ultimo: righe[righe.length - 1].id, aree: areeDelleRighe(righe) };
 }
 
 @Injectable()

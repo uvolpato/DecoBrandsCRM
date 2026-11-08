@@ -7,6 +7,7 @@ import { Caricamento, Matrice } from '@/componenti/Flussi';
 import { Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { PeriodoMesi } from '@/componenti/PeriodoMesi';
+import { SollecitiBollettino } from '@/componenti/Solleciti';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, SagomaMatrice, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
@@ -40,12 +41,14 @@ const BADGE: Record<string, { testo: string; v: Variante }> = {
 
 export function VistaBollettini() {
   const puo = usePuo();
+  const puoModifica = puo('provvigioni.modifica');
   const [valori, setValori] = useMemoria<Valori>('filtri', { fornitori: [], vista: 'tutti' });
   const [periodo, setPeriodo] = useMemoria<{ da: string; a: string }>('periodo', { da: '', a: '' });
   const [dati, setDati] = useState<Risposta | null>(null);
   const [inAttesa, setInAttesa] = useState<Risposta | null>(null);
   const [errore, setErrore] = useState('');
   const [carica, setCarica] = useState(false);
+  const [sollecito, setSollecito] = useState<{ fornitoreId: string; anno: number; mese: number } | null>(null);
   const [versione, setVersione] = useState(0);
   const [caricando, setCaricando] = useState(true);
   const sagome = useSagome(caricando);
@@ -105,12 +108,22 @@ export function VistaBollettini() {
   const primo = dati?.primo ?? a, ultimo = dati?.ultimo ?? a;
   const sposta = (n: number) => setPeriodo({ da: mpiu(da, n), a: mpiu(a, n) });
 
-  const cella = (c: Cella) => {
+  const cella = (c: Cella, fornitoreId: string) => {
     const b = BADGE[c.stato];
     if (b && c.bollettino_id) {
       return { href: '/bollettini/' + c.bollettino_id, stato: <Stato v={b.v}>{b.testo}</Stato>, valore: euro(c.importo ?? 0) };
     }
-    if (c.stato === 'ritardo') return { stato: <Stato v="errore">Non arrivato</Stato> };
+    if (c.stato === 'ritardo') {
+      return {
+        stato: <Stato v="errore">Non arrivato</Stato>,
+        ...(puoModifica ? {
+          azione: {
+            etichetta: 'Sollecita',
+            onClick: () => setSollecito({ fornitoreId, anno: Number(c.mese.slice(0, 4)), mese: Number(c.mese.slice(5, 7)) }),
+          },
+        } : {}),
+      };
+    }
     if (c.stato === 'atteso') return { stato: <Stato v="neutro">Atteso entro il {data(c.entro).slice(0, 5)}</Stato> };
     if (c.stato === 'in_corso') return { vuota: 'Mese in corso' };
     return { vuota: 'Nessuna fattura' };
@@ -145,12 +158,14 @@ export function VistaBollettini() {
             : !dati.fornitori.length
               ? <Pannello><div className="vuoto"><b>Nessun fornitore con qualcosa da fare in questo periodo</b>Scegli “Tutti” o cambia i mesi.</div></Pannello>
               : <Matrice angolo="Fornitore" colonne={dati.colonne.map(etichetta)}
-                  righe={dati.fornitori.map((f) => ({ titolo: f.fornitore, sotto: 'paga sul ' + f.maturazione, celle: f.celle.map(cella) }))} />}
+                  righe={dati.fornitori.map((f) => ({ titolo: f.fornitore, sotto: 'paga sul ' + f.maturazione, celle: f.celle.map((c) => cella(c, f.id)) }))} />}
 
         <Nota>Un bollettino è atteso per ogni mese chiuso in cui il fornitore ci ha fatturato qualcosa. Le righe si confrontano con quanto calcoliamo dalle pratiche: le differenze vanno accettate o contestate prima di chiudere il bollettino. Si vedono al massimo 6 mesi alla volta.</Nota>
       </div>
 
       {carica && <FinestraCarica onChiudi={() => setCarica(false)} onCaricato={() => { setCarica(false); setVersione((v) => v + 1); }} />}
+      {sollecito && <SollecitiBollettino fornitoreId={sollecito.fornitoreId} anno={sollecito.anno} mese={sollecito.mese}
+        onChiudi={() => setSollecito(null)} onCopiato={() => { setSollecito(null); setVersione((v) => v + 1); }} />}
     </Pagina>
   );
 }

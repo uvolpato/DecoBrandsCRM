@@ -17,7 +17,7 @@ def apri_utente(pg):
 def aree(pg):
     """Le aree del menu dell'utente (D-53): apre il riquadro, legge le voci e lo chiude."""
     apri_utente(pg)
-    v = [x.strip() for x in pg.locator('.menu-utente-voce').all_inner_texts() if x.strip() not in ('Cambia la password', 'Guida', 'Esci')]
+    v = [x.strip() for x in pg.locator('.menu-utente-voce').all_inner_texts() if x.strip() not in ('Il mio profilo', 'Cambia la password', 'Guida', 'Esci')]
     pg.keyboard.press('Escape'); pg.wait_for_timeout(150)
     return v
 def attiva(pg):
@@ -31,7 +31,10 @@ def scegli(pg, area):
 # D-42: su Accedi e Password dimenticata prima c'è il logo; un tasto apre la finestra
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
-    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
+    for _ in range(24):
+        if pg.locator('.accesso-scena.aperta').count(): break
+        pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
 with sync_playwright() as p:

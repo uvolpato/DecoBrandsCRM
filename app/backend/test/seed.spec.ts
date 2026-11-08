@@ -24,11 +24,11 @@ describe('seed §12', () => {
   });
 
   it('conteggi principali', async () => {
-    expect(await db.fornitori.count()).toBe(10);
-    expect(await db.fornitori_versioni.count()).toBe(10);
+    expect(await db.fornitori.count()).toBe(11);
+    expect(await db.fornitori_versioni.count()).toBe(11);
     expect(await db.clienti.count()).toBe(11);
     expect(await db.clienti_versioni.count()).toBe(11);
-    expect(await db.codici_esterni.count()).toBe(21);
+    expect(await db.codici_esterni.count()).toBe(22);
     expect(await db.subagenti.count()).toBe(4);
     expect(await db.interscambio.count()).toBe(18);
     expect(await db.provvigioni_scaglioni.count()).toBe(33);
@@ -40,7 +40,7 @@ describe('seed §12', () => {
     expect(await db.bollettini_testata.count()).toBe(7);
     expect(await db.bollettini_righe.count()).toBe(10);
     expect(await db.liquidazioni.count()).toBe(2);
-    expect(await db.documenti_in_arrivo.count()).toBe(13);
+    expect(await db.documenti_in_arrivo.count()).toBe(17);
     expect(await db.utenti.count({ where: { username: { in: USERNAME } } })).toBe(5);
     expect(await db.registro.count({ where: { genere: 'anomalia' } })).toBe(6);
     expect(await db.registro.count({ where: { genere: 'evento', codice: 'errore.error' } })).toBe(1);

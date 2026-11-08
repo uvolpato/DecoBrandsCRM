@@ -159,7 +159,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
     <Pagina titolo="Liquidazioni" pieno sottotitolo="Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre."
       azioni={[
         {
-          etichetta: 'Esporta', icona: 'scarica', variante: 'sec', consentito: puoEsportare,
+          etichetta: 'Esporta in Excel', icona: 'scarica', variante: 'sec', consentito: puoEsportare,
           disabilitato: !puoEsportare || !b.documenti.length,
           titolo: !puoEsportare ? 'Non hai il permesso di esportare' : b.documenti.length ? '' : 'Nessun documento nel trimestre',
           onClick: () => setEsporta(true),
@@ -247,7 +247,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
                         </>,
                       },
                       {
-                        key: 'stato', header: 'Stato', sortValue: (d) => (d.liquidabile ? 1 : 0), classe: () => 'avvolgi',
+                        key: 'stato', header: 'Stato', grow: true, sortValue: (d) => (d.liquidabile ? 1 : 0), classe: () => 'avvolgi',
                         cell: (d) => <><Stato v={d.stato.variante}>{d.stato.etichetta}</Stato>{d.motivo_testo && <span className="sec-riga">{d.motivo_testo}</span>}</>,
                       },
                     ]}

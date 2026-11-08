@@ -16,7 +16,10 @@ def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
-    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
+    for _ in range(24):
+        if pg.locator('.accesso-scena.aperta').count(): break
+        pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
 with sync_playwright() as p:
@@ -57,9 +60,9 @@ with sync_playwright() as p:
 
     pg = entra(S + '-ammi')
     ok('Bollettini' in testo(pg, '.testa h1'), 'titolo della pagina')
-    ok(righe_m(pg) == 10 and celle_max(pg) == 60, 'matrice: 10 fornitori x 6 mesi')
+    ok(righe_m(pg) == 11 and celle_max(pg) == 66, 'matrice: 11 fornitori x 6 mesi')
     ok(pg.locator('.matrice .m-intest').count() == 7, 'intestazione: fornitore + 6 mesi')
-    ok('Tutti' in testo(pg, '.segmenti') and nseg(pg, 'Tutti') == 10, 'segmento Tutti: 10 fornitori')
+    ok('Tutti' in testo(pg, '.segmenti') and nseg(pg, 'Tutti') == 11, 'segmento Tutti: 11 fornitori')
     ok(cella(pg, indice_riga(pg, 'Gasper'), 3).inner_text().startswith('Non arrivato'), 'cella senza bollettino passato il giorno: Non arrivato')
     pg.screenshot(path=str(USCITA / 'app-bollettini-1440.png'))
 
@@ -67,9 +70,9 @@ with sync_playwright() as p:
     da_fare = nseg(pg, 'Con qualcosa da fare')
     seg(pg, 'Con qualcosa da fare').click()
     pg.wait_for_function("n => document.querySelectorAll('.matrice .m-riga').length === n", arg=da_fare)
-    ok(righe_m(pg) == da_fare and nseg(pg, 'Tutti') == 10, 'vista Da fare: %d fornitori, i numeri non cambiano' % da_fare)
-    seg(pg, 'Tutti').click(); pg.wait_for_function("document.querySelectorAll('.matrice .m-riga').length === 10")
-    ok(righe_m(pg) == 10, 'vista Tutti: tornano 10 fornitori')
+    ok(righe_m(pg) == da_fare and nseg(pg, 'Tutti') == 11, 'vista Da fare: %d fornitori, i numeri non cambiano' % da_fare)
+    seg(pg, 'Tutti').click(); pg.wait_for_function("document.querySelectorAll('.matrice .m-riga').length === 11")
+    ok(righe_m(pg) == 11, 'vista Tutti: tornano 11 fornitori')
 
     # filtro multiplo (D-22), riepilogo dei filtri e conteggi che seguono
     fb = pg.locator('.barra-periodo')
@@ -85,8 +88,8 @@ with sync_playwright() as p:
     pg.screenshot(path=str(USCITA / 'app-bollettini-filtro-1440.png'))
     pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
     pg.locator('.riepilogo-filtri .btn-icona').nth(1).click()
-    pg.wait_for_function("document.querySelectorAll('.matrice .m-riga').length === 10")
-    ok(righe_m(pg) == 10, 'tolti i filtri dal riepilogo: tornano 10 fornitori')
+    pg.wait_for_function("document.querySelectorAll('.matrice .m-riga').length === 11")
+    ok(righe_m(pg) == 11, 'tolti i filtri dal riepilogo: tornano 11 fornitori')
 
     # periodo: selettore a mesi (D-16), sempre 6 colonne; le frecce spostano di un mese
     pg.click('.periodo-btn'); pg.wait_for_selector('.pm-mesi')
@@ -134,7 +137,7 @@ with sync_playwright() as p:
 
     # sola lettura: consulta la matrice, niente pulsante di caricamento
     pg = entra(S + '-lett'); pg.wait_for_timeout(500)
-    ok(righe_m(pg) == 10 and pg.locator('button:has-text("Carica un bollettino")').count() == 0, 'sola lettura: matrice senza pulsanti di modifica')
+    ok(righe_m(pg) == 11 and pg.locator('button:has-text("Carica un bollettino")').count() == 0 and pg.locator('button:has-text("Sollecita")').count() == 0, 'sola lettura: matrice senza pulsanti di modifica')
     pg.close()
     b.close()
 

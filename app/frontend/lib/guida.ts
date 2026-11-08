@@ -120,7 +120,6 @@ export const GUIDA: Argomento[] = [
       ['Trascina qui i documenti · Scegli i file', 'Carica PDF e foto; la lettura parte da sola.'],
       ['Da controllare', 'A sinistra i documenti da controllare, con fornitore, importo e livello; clic su un documento per vederlo a destra senza cambiare pagina.'],
       ['Correggi i dati letti', 'Apre la finestra di correzione; il numero sul pulsante sono i punti da controllare.'],
-      ['PDF', 'Riapre il file originale accanto ai dati letti, senza passare dalla correzione.'],
       ['Schede del documento', 'Prima l’azione proposta (Pratica proposta · Nuova pratica · Scegli la pratica · Cosa farne), poi Righe lette: il contatore dice quante righe sono incerte.'],
       ['Vedi le righe', 'Nell’avviso giallo: apre la scheda Righe lette con le righe incerte evidenziate.'],
       ['Abbina a …', 'Abbina il documento alla pratica proposta (codice cliente + articoli in comune).'],
@@ -180,7 +179,6 @@ export const GUIDA: Argomento[] = [
       ['Registra un documento', 'Nella card Documenti: ordine, conferma, proforma, pagamento o allegato. Restano fuori dal netto e dalla provvigione.'],
       ['Sposta', 'Su una riga di una delle due card: porta il documento, con righe e file, in un’altra pratica dello stesso fornitore.'],
       ['Pagamento del cliente', 'Riquadro in alto a destra quando c’è un documento di pagamento: il segno Pagato, senza effetto sulla provvigione.'],
-      ['PDF', 'Apre il PDF originale accanto ai dati del documento.'],
       ['Carica un documento', 'Nella scheda: carica un documento già destinato a questa pratica.'],
       ['Consulta affiancati', 'Apre i documenti della pratica affiancati al confronto.'],
       ['Clic su documento o riga a confronto', 'Apre la stessa finestra su quel documento o su quella riga.'],
@@ -188,7 +186,7 @@ export const GUIDA: Argomento[] = [
       ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Nel riquadro Incasso: sollecito al cliente, o segnalazione del fornitore ricevuta per email o telefono.'],
     ],
     finestre: [
-      { nome: 'Documenti della pratica', da: 'PDF · Consulta affiancati · clic su un documento o su una riga a confronto', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra i dati e il confronto riga per riga con un altro documento. Se il file originale non c’è, a sinistra c’è l’anteprima costruita dai dati. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato.',
+      { nome: 'Documenti della pratica', da: 'Consulta affiancati · clic su un documento o su una riga a confronto', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra i dati e il confronto riga per riga con un altro documento. Se il file originale non c’è, a sinistra c’è l’anteprima costruita dai dati. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato.',
         campi: [
           ['Confrontato con', 'Sceglie il documento di confronto.'],
           ['Solo righe che cambiano · Tutte', 'Filtra il confronto.'],
@@ -280,7 +278,7 @@ export const GUIDA: Argomento[] = [
       ['Imbuto · Imbuto barrato', 'Riepilogo dei filtri (con il periodo) · togli tutti i filtri.'],
       ['Tutti · Con qualcosa da fare', 'Solo i fornitori con un bollettino arrivato da verificare, contestato o non arrivato nel periodo.'],
       ['Cella della matrice', 'Fornitore × mese: verificato, arrivato, contestato, atteso, non arrivato, mese in corso. Clic su una cella con il bollettino: si apre il dettaglio.'],
-      ['Sollecita', 'Cella non arrivato: prepara il testo di sollecito con i documenti del mese (dalla pagina Oggi, F5).'],
+      ['Sollecita', 'Cella non arrivato: apre il testo del sollecito con i documenti del mese e i loro importi; Copia il testo lo copia e lo registra.'],
       ['Accetta il loro importo', 'Sulla riga: accetti quanto dice il fornitore, con motivo.'],
       ['Contesta', 'Sulla riga: contesti, con motivo obbligatorio.'],
       ['Attendi il prossimo', 'Documento assente dal bollettino: lo aspetti nel mese successivo.'],

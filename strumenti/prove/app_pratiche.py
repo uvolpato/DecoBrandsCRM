@@ -18,7 +18,10 @@ def numero(testo):
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
-    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
+    for _ in range(24):
+        if pg.locator('.accesso-scena.aperta').count(): break
+        pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
 with sync_playwright() as p:
@@ -75,7 +78,8 @@ with sync_playwright() as p:
     ok('Gries' in testo(pg, '.riepilogo-pop'), 'riepilogo dei filtri: mostra Gries')
     pg.screenshot(path=str(USCITA / 'app-pratiche-filtro-1440.png'))
     pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
-    pg.locator('.riepilogo-filtri .btn-icona').nth(1).click(); pg.wait_for_timeout(1200)
+    pg.locator('.riepilogo-filtri .btn-icona').nth(1).click()
+    pg.wait_for_function("n => (document.querySelector('.dt-piede > span:first-child')?.textContent || '').includes('di ' + n + ' element')", arg=n, timeout=20000)
     ok(totali_piede(pg) == n, 'tolti i filtri dal riepilogo: tornano %d pratiche' % n)
 
     # ordinamento sul server: clic su Importo = crescente, secondo clic = decrescente

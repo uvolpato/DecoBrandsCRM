@@ -141,7 +141,6 @@
         ['Registra un documento', 'Nella card Documenti: ordine, conferma, proforma, pagamento o allegato. Restano fuori dal netto e dalla provvigione.'],
         ['Sposta', 'Su una riga di una delle due card: porta il documento, con righe e file, in un’altra pratica dello stesso fornitore.'],
         ['Pagamento del cliente', 'Riquadro in alto a destra quando c’è un documento di pagamento: il segno Pagato, senza effetto sulla provvigione.'],
-        ['PDF', 'Apre il PDF originale accanto ai dati del documento.'],
         ['Carica un documento', 'Nella scheda: carica un documento già destinato a questa pratica.'],
         ['Consulta affiancati', 'Apre i documenti della pratica affiancati al confronto.'],
         ['Clic su documento o riga a confronto', 'Apre la stessa finestra su quel documento o su quella riga.'],
@@ -149,7 +148,7 @@
         ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Nel riquadro Incasso: sollecito al cliente, o segnalazione del fornitore ricevuta per email o telefono.']
       ],
       finestre: [
-        { nome: 'Documenti della pratica', da: 'PDF · Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato. Nell’app, per ora, a destra ci sono i dati del documento.',
+        { nome: 'Documenti della pratica', da: 'Consulta affiancati', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra il confronto riga per riga con un altro documento. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato. Nell’app, per ora, a destra ci sono i dati del documento.',
           campi: [['Confrontato con', 'Sceglie il documento di confronto.'], ['Solo righe che cambiano · Tutte', 'Filtra il confronto.']],
           azioni: [['Clic su una riga', 'La evidenzia nel documento a sinistra.'], ['Esc', 'Chiude.']] },
         { nome: 'Registra la fattura', da: 'Registra fattura', cosa: 'Registra la fattura del fornitore sulla pratica; da lì la pratica passa a Fatturata e il netto si aggiorna.',
@@ -185,7 +184,7 @@
         ['Imbuto · Imbuto barrato', 'Riepilogo dei filtri (con il periodo) · togli tutti i filtri.'],
         ['Tutti · Con qualcosa da fare', 'Solo i fornitori con un bollettino arrivato da verificare, contestato o non arrivato nel periodo.'],
         ['Cella della matrice', 'Fornitore × mese: verificato, arrivato, contestato, atteso, non arrivato, mese in corso. Clic su una cella con il bollettino: si apre il dettaglio.'],
-        ['Sollecita', 'Cella non arrivato: prepara il testo di sollecito con i documenti del mese (dalla pagina Oggi, F5).'],
+        ['Sollecita', 'Cella non arrivato: apre il testo del sollecito con i documenti del mese e i loro importi; Copia il testo lo copia e lo registra.'],
         ['Accetta il loro importo', 'Sulla riga: accetti quanto dice il fornitore, con motivo.'],
         ['Contesta', 'Sulla riga: contesti, con motivo obbligatorio.'],
         ['Attendi il prossimo', 'Documento assente dal bollettino: lo aspetti nel mese successivo.'],

@@ -19,7 +19,10 @@ def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
-    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
+    for _ in range(24):
+        if pg.locator('.accesso-scena.aperta').count(): break
+        pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
 # un PDF diverso a ogni giro e per ogni caricamento: il server rifiuta un file già arrivato (impronta)
@@ -142,10 +145,10 @@ with sync_playwright() as p:
     riga_ft = pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text=numero_ft)
     ok(riga_ft.count() == 1, 'la fattura %s è nella card' % numero_ft)
     ok('Netto 1.000,00' in pannello(pg, 'Documenti fiscali').inner_text(), 'il netto è fatture - note di credito')
-    ok(riga_ft.locator('button:has-text("PDF")').count() == 1, 'la fattura ha il PDF')
+    ok(riga_ft.locator('button:has-text("PDF")').count() == 0, 'la riga non ha il pulsante PDF: si apre con il clic')
 
-    # il PDF si apre: stessa origine, application/pdf, byte del file caricato
-    riga_ft.locator('button:has-text("PDF")').click(); pg.wait_for_selector('.affiancata object')
+    # il PDF si apre dal clic sulla riga: stessa origine, application/pdf, byte del file caricato
+    riga_ft.click(); pg.wait_for_selector('.affiancata object')
     src = pg.locator('.affiancata object').get_attribute('data')
     stato, tipo, inizio = pg.evaluate("async u => { const r = await fetch(u); const t = await r.text(); return [r.status, r.headers.get('content-type'), t.slice(0, 5)] }", src)
     ok(stato == 200 and tipo == 'application/pdf' and inizio == '%PDF-', 'PDF affiancato: %s, %s, inizia con %s' % (stato, tipo, inizio))
@@ -248,10 +251,11 @@ with sync_playwright() as p:
     pg.click('.modale-piede button[type=submit]')
     pg.wait_for_function("document.querySelector('.velo') === null"); pg.wait_for_timeout(2000)
     ok(pg.locator('.binario .tappa').first.locator('h3').inner_text() == 'Ordini', 'con più ordini la fase diventa Ordini')
-    ok('+ 1' in testo(pg, '.binario .tappa .num'), 'più ordini: numero del primo + quanti altri («%s»)' % testo(pg, '.binario .tappa .num'))
+    numeri = pg.locator('.binario .tappa').first.locator('.numeri span').all_inner_texts()
+    ok(len(numeri) == 2, 'più ordini: i due numeri affiancati (%s)' % ' + '.join(numeri))
     riga_ord = pannello_esatto(pg, 'Documenti').locator('.elenco li', has_text='PROVA-OF-' + marca)
-    ok(riga_ord.count() == 1 and riga_ord.locator('button:has-text("PDF")').count() == 1, 'il secondo ordine ha il PDF')
-    riga_ord.locator('button:has-text("PDF")').click(); pg.wait_for_selector('.affiancata object')
+    ok(riga_ord.count() == 1 and riga_ord.locator('button:has-text("PDF")').count() == 0, 'il secondo ordine non ha il pulsante PDF: si apre con il clic')
+    riga_ord.click(); pg.wait_for_selector('.affiancata object')
     ok('Ordine' in testo(pg, '.affiancata .aff-schede'), 'il visualizzatore mostra la scheda del documento ordine')
     src_ord = pg.locator('.affiancata object').get_attribute('data')
     stato_o, tipo_o = pg.evaluate("async u => { const r = await fetch(u); return [r.status, r.headers.get('content-type')] }", src_ord)

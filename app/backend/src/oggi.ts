@@ -107,9 +107,16 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
     const r = b ? riconcilia(S, b) : null;
     return { mese: m.mese, fornitore: m.fornitore, id: String(m.bollettino_id), aperte: r?.aperte ?? null };
   });
-  const documenti = await db.documenti_in_arrivo.count({
+  const daDecidere = await db.documenti_in_arrivo.findMany({
     where: { stato: { not: 'scartato' }, abbinato_pratica_id: null, abbinato_bollettino_id: null },
+    orderBy: { ricevuto_il: 'asc' },
+    select: {
+      id: true, tipo: true, livello: true,
+      fornitore: { select: { ragione_sociale: true } },
+      campi: { where: { campo: { in: ['numero', 'mese', 'anno'] } }, select: { campo: true, valore_finale: true, valore_letto: true } },
+    },
   });
+  const documenti = daDecidere.length;
 
   const fornitoriConferme = new Set(conferme.map((c) => c.fornitore_id)).size;
   const clientiPagamenti = new Set(pagamenti.map((p) => p.cliente_id)).size;
@@ -124,7 +131,7 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
     .flatMap((b) => b.righe)
     .reduce((s, r) => s.plus(r.importo), new Prisma.Decimal(0));
 
-  const fare = conferme.length + aperti.length + mancanti.length + pagamenti.length;
+  const fare = conferme.length + documenti + aperti.length + mancanti.length + pagamenti.length;
   const fino = piuGiorni(oggi, 15);
   const scadenze: { data: string; testo: string; dettaglio: string; href: string; giorni: number }[] = [];
   for (const p of S.pratiche) {
@@ -176,9 +183,9 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
         : [{ testo: 'nessuna' }],
     },
     {
-      id: 'documenti', etichetta: 'Documenti in coda', valore: String(documenti), variante: 'primario',
-      dettagli: [{ testo: documenti ? 'la coda si apre con l’ingresso dei documenti' : 'nessun documento in coda' }],
-      disponibile: false,
+      id: 'documenti', etichetta: 'Documenti in coda', valore: String(documenti), variante: documenti ? 'primario' : 'ok',
+      dettagli: [{ testo: documenti ? 'da controllare e abbinare' : 'nessun documento in coda' }],
+      disponibile: true,
     },
     {
       id: 'bollettini', etichetta: 'Bollettini', valore: String(aperti.length + mancanti.length),
@@ -194,6 +201,33 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
     },
   ];
 
+  const TIPO_DOC: Record<string, string> = {
+    ordine: 'ordine', conferma: 'conferma', proforma: 'proforma', fattura: 'fattura',
+    nota_credito: 'nota di credito', pagamento: 'pagamento', bollettino: 'bollettino', altro: 'documento',
+  };
+  const valore = (d: (typeof daDecidere)[number], campo: string) => {
+    const c = d.campi.find((x) => x.campo === campo);
+    return c?.valore_finale ?? c?.valore_letto ?? null;
+  };
+  const vociDocumenti = daDecidere.map((d) => {
+    const numero = valore(d, 'numero');
+    const mese = Number(valore(d, 'mese'));
+    const nomeMese = Number.isInteger(mese) && mese >= 1 && mese <= 12 ? MESI[mese - 1] : '';
+    const fornitore = d.fornitore?.ragione_sociale ?? 'fornitore non riconosciuto';
+    const titolo = d.tipo === 'bollettino'
+      ? `Registra il bollettino di ${nomeMese} di ${fornitore}`.replace('  ', ' ')
+      : d.tipo === 'ordine'
+        ? `Apri la pratica dell’ordine ${numero ?? ''}`.trim()
+        : `Abbina ${TIPO_DOC[d.tipo ?? 'altro'] ?? 'documento'} ${numero ?? ''}`.trim();
+    return {
+      tipo: (d.livello === 'bassa' ? 'errore' : 'primario') as 'errore' | 'primario',
+      titolo,
+      dettaglio: `${fornitore} · ${d.livello === 'bassa' ? 'affidabilità bassa' : 'da controllare'}`,
+      href: '/documenti/' + d.id,
+      azione: d.tipo === 'ordine' || d.tipo === 'bollettino' ? 'Apri' : 'Abbina',
+    };
+  });
+
   const gruppi = [
     {
       id: 'conferme', titolo: 'Conferme in ritardo', variante: 'errore', tipo: 'errore', disponibile: true, conta: conferme.length,
@@ -205,9 +239,8 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
       })),
     },
     {
-      id: 'documenti', titolo: 'Documenti da decidere', variante: 'primario', tipo: 'primario', disponibile: false, conta: 0,
-      sommario: 'L’ingresso dei documenti arriva con la lettura automatica: qui compariranno quelli che chiedono una decisione.',
-      voci: [], vuoto: 'Nessun documento richiede una decisione.',
+      id: 'documenti', titolo: 'Documenti da decidere', variante: 'primario', tipo: 'primario', disponibile: true, conta: vociDocumenti.length,
+      voci: vociDocumenti, vuoto: 'Nessun documento richiede una decisione.',
     },
     {
       id: 'bollettini', titolo: 'Bollettini', variante: 'attesa', tipo: 'attesa', disponibile: true, conta: aperti.length + mancanti.length,

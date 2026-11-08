@@ -29,6 +29,17 @@ const { cifra } = req('./dist/src/password');
     await c.query("SET LOCAL decobrands.pulizia_registro = 'si'");
     const ids = (await c.query("SELECT id FROM utenti WHERE email LIKE '%@prova-e2e.it'")).rows.map((r) => r.id);
     const ev = await c.query("DELETE FROM registro WHERE utente_id = ANY($1) OR (entita = 'utente' AND entita_id = ANY($1)) OR dettaglio->>'etichetta' LIKE '%@prova-e2e.it'", [ids]);
+    // chiusure fatte dagli utenti di prova: i bollettini e i trimestri chiusi dalle prove si tolgono
+    // (il CHECK vuole chiuso_da quando chiuso_il c'è, quindi non si può azzerare il riferimento)
+    const { rows: liq } = await c.query('SELECT id FROM liquidazioni WHERE chiusa_da = ANY($1)', [ids]);
+    if (liq.length) {
+      const l = liq.map((x) => x.id);
+      await c.query('UPDATE bollettini_righe SET liquidazione_id = NULL WHERE liquidazione_id = ANY($1)', [l]);
+      await c.query('DELETE FROM liquidazioni WHERE id = ANY($1)', [l]);
+    }
+    await c.query('DELETE FROM bollettini_testata WHERE chiuso_da = ANY($1)', [ids]);
+    await c.query('UPDATE bollettini_righe SET deciso_da = NULL WHERE deciso_da = ANY($1)', [ids]);
+    await c.query('UPDATE bollettini_attese SET deciso_da = NULL WHERE deciso_da = ANY($1)', [ids]);
     await c.query('DELETE FROM sessioni WHERE utente_id = ANY($1)', [ids]);
     const u = await c.query('DELETE FROM utenti WHERE id = ANY($1)', [ids]);
     await c.query('COMMIT');

@@ -49,7 +49,7 @@ const righe = (testata_id: bigint, documento_id: string, fase: string, rr: [stri
     testata_id, documento_id: BigInt(documento_id), fase, numero_riga: i + 1, codice, descrizione: codice, quantita: q, prezzo_unitario: p, importo: q * p })) });
 
 // cliente e fornitore di una pratica del seed con agenzia: le percentuali ci sono
-let base: { cliente_id: bigint; fornitore_id: bigint };
+let base: { id: bigint; cliente_id: bigint; fornitore_id: bigint };
 let pid: string; // la pratica aperta dall'ordine
 let numero: string;
 

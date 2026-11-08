@@ -21,7 +21,10 @@ def prova_documento(comando):
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
-    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
+    for _ in range(24):
+        if pg.locator('.accesso-scena.aperta').count(): break
+        pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
 prova_documento('crea')
@@ -64,7 +67,7 @@ try:
         pg.screenshot(path=str(USCITA / 'app-documento-1440.png'), full_page=True)
 
         pg.click('.pannello-testa button:has-text("Correggi i dati letti")'); pg.wait_for_selector('.affiancata')
-        ok(pg.locator('.aff-sx object[type="application/pdf"]').count() == 1, 'finestra di correzione: PDF originale a sinistra')
+        ok(pg.locator('.aff-sx canvas').count() == 1, 'finestra di correzione: PDF originale a sinistra')
         ok(pg.input_value('input[data-campo="numero"]') == 'PROVA-' + S.upper(), 'finestra di correzione: numero letto')
         ok(pg.locator('.aff-dx .incerto-errore').count() >= 1 and pg.locator('.aff-dx .incerto-attesa').count() >= 1, 'campi bordati giallo e rosso')
         ok('pagina' in testo(pg, '.aff-dx') or 'Seleziona un campo' in testo(pg, '.aff-dx'), 'posizione del campo accanto ai dati')

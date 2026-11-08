@@ -96,7 +96,35 @@ interface Conferme {
   per_fornitore: { fornitore_id: string; fornitore: string; pratiche: number; testo: string }[];
 }
 
-/** Solleciti di conferma (§5.12): un testo per fornitore con le sue pratiche in ritardo. */
+/** Sollecito del bollettino di un mese (§7.7): un testo per fornitore, composto dal server sui
+ *  documenti del mese; copiandolo il server scrive l'evento. */
+export function SollecitiBollettino({ fornitoreId, anno, mese, onChiudi, onCopiato }: {
+  fornitoreId: string; anno: number; mese: number; onChiudi: () => void; onCopiato?: () => void;
+}) {
+  const [dati, setDati] = useState<{ fornitore: string; documenti: number; testo: string } | null>(null);
+  const [errore, setErrore] = useState('');
+  useEffect(() => {
+    void api<{ fornitore: string; documenti: number; testo: string }>(
+      `solleciti/bollettini?fornitore_id=${fornitoreId}&anno=${anno}&mese=${mese}`,
+    ).then((r) => (r.ok ? setDati(r.dati) : setErrore(r.messaggio)));
+  }, [fornitoreId, anno, mese]);
+  if (!dati) {
+    return <Modale titolo="Sollecito del bollettino" onChiudi={onChiudi}>
+      <p className={errore ? 'modulo-errore' : 'testo-tenue'}>{errore || 'Carico il testo.'}</p>
+    </Modale>;
+  }
+  return (
+    <FinestraSolleciti
+      titolo="Sollecito del bollettino"
+      testo={`${dati.documenti} ${dati.documenti === 1 ? 'documento del mese' : 'documenti del mese'}: il testo è pronto da copiare e inviare al fornitore.`}
+      schede={[{ id: fornitoreId, titolo: dati.fornitore, testo: dati.testo, conta: dati.documenti }]}
+      onCopia={() => { void api('solleciti/bollettini', { fornitore_id: Number(fornitoreId), anno, mese }).then((r) => {
+        if (!r.ok) avviso(r.messaggio, true); else onCopiato?.();
+      }); }}
+      onChiudi={onChiudi}
+    />
+  );
+}
 export function SollecitiConferme({ onChiudi }: { onChiudi: () => void }) {
   const [dati, setDati] = useState<Conferme | null>(null);
   const [errore, setErrore] = useState('');

@@ -79,7 +79,8 @@ interface Fiscali {
 const PRATICA: Entita = {
   titolo: 'Pratica',
   voci: async (ctx) => {
-    const r = await api<Record<string, unknown>[]>('pratiche/cerca?fornitore_id=' + String(ctx.fornitore_id ?? ''));
+    if (!ctx.fornitore_id) return [];
+    const r = await api<Record<string, unknown>[]>('pratiche/cerca?fornitore_id=' + String(ctx.fornitore_id));
     return r.ok ? r.dati : [];
   },
   chiave: (p) => p.id,
@@ -301,7 +302,6 @@ export function VistaPratica({ id }: { id: string }) {
       destra: <span className="azioni-cella">
         {euro(x.importo)}
         {x.liquidato ? <Stato v="neutro">liquidato</Stato> : <>
-          {x.arrivo_id && <button type="button" className="btn testo piccolo" onClick={() => apriDoc(x)}>PDF</button>}
           {puoModifica && <button type="button" className="btn testo piccolo" onClick={() => correggi(x)}>Correggi</button>}
           {puoModifica && <button type="button" className="btn testo piccolo" onClick={() => void annulla(x)}>Annulla</button>}
           {puoModifica && <button type="button" className="btn testo piccolo" onClick={() => sposta(x)}>Sposta</button>}
@@ -323,7 +323,6 @@ export function VistaPratica({ id }: { id: string }) {
       </>,
       destra: <span className="azioni-cella">
         {euro(x.importo)}
-        {x.arrivo_id && <button type="button" className="btn testo piccolo" onClick={() => apriDoc(x)}>PDF</button>}
         {puoModifica && <button type="button" className="btn testo piccolo" onClick={() => sposta(x)}>Sposta</button>}
       </span>,
     }))} vuoto="Nessun altro documento" />
@@ -486,7 +485,7 @@ export function VistaPratica({ id }: { id: string }) {
   );
 }
 
-/* ---------- Documenti affiancati: componente condiviso con Documenti (componenti/Visualizzatore) ---------- */
+/* ---------- Documenti affiancati: componente condiviso con la pagina Documenti (componenti/ConsultaDocumenti) ---------- */
 
 /* ---------- Registra un documento (D-60) / fattura e nota di credito (F2-A3, §4.2.7.1) ---------- */
 

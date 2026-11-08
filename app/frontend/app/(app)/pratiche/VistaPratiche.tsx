@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Aggiornamenti } from '@/componenti/Aggiornamenti';
@@ -123,7 +124,7 @@ export function VistaPratiche() {
   };
 
   const colonne: Colonna<Pratica>[] = [
-    { key: 'numero', header: 'Pratica', cell: (p) => <b>{p.numero}</b> },
+    { key: 'numero', header: 'Pratica', cell: (p) => <Link href={'/pratiche/' + p.id}><b>{p.numero}</b></Link> },
     { key: 'cliente', header: 'Cliente', grow: true, cell: (p) => p.cliente || '—' },
     { key: 'fornitore', header: 'Fornitore', cell: (p) => p.fornitore || '—' },
     { key: 'data', header: 'Data ordine', tipo: 'data' },

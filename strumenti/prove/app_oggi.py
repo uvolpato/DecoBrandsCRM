@@ -16,7 +16,10 @@ def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
-    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
+    for _ in range(24):
+        if pg.locator('.accesso-scena.aperta').count(): break
+        pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
 with sync_playwright() as p:
@@ -46,11 +49,11 @@ with sync_playwright() as p:
     for i, r in enumerate(api['riquadri']):
         ok(r['valore'] in kpi.nth(i).inner_text(), 'riquadro %s: %s' % (r['etichetta'], r['valore']))
 
-    # gruppi: quelli con contenuto (i documenti restano vuoti, nota di F6)
+    # gruppi: quelli con contenuto (i documenti ci sono, F6/D-75)
     gruppi = pg.locator('.gruppo-fare')
     ok(gruppi.count() >= 3, 'gruppi Da fare: %d' % gruppi.count())
-    ok('Documenti da decidere' in testo(pg, '.gruppi-fare'), 'gruppo Documenti presente con la sua nota (F6)')
-    ok('ingresso dei documenti' in testo(pg, '.gruppi-fare'), 'nota: la coda arriva con l’ingresso dei documenti')
+    gdoc = gruppo(pg, 'Documenti da decidere')
+    ok(gdoc.count() == 1 and gdoc.locator('a[href^="/documenti/"]').count() >= 1, 'gruppo Documenti da decidere: le voci aprono il documento')
     gconf = gruppo(pg, 'Conferme in ritardo')
     ok(gconf.count() == 1 and gconf.locator('.giorni').count() >= 1, 'conferme in ritardo con i giorni in evidenza')
 

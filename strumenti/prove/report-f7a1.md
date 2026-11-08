@@ -161,3 +161,12 @@ Screenshots: `strumenti/prove/schermate-f7a1/` (1440 e 768 px; la prova continua
   per le due pratiche aggiunte, +99,65 €, spiegato).
 - **Nessun difetto dell'app da assegnare alle slice**: i 6 KO erano corse o assunzioni delle prove e sono stati
   chiusi in `strumenti/prove/**`. Le correzioni di sicurezza F7-A0 non hanno rotto le prove.
+
+## 8. Aggiornamento 08/11/2026 (secondo giro, OpenCode)
+
+- **Seed allineato a `assets/dati.js`** (D-98): una prova indipendente ha trovato due numeri del §12 non
+  allineati al prototipo, corretti nel seed: **Fornitori 10 → 11** (c'è anche *Nuovo Fornitore Demo SRL*,
+  senza scaglioni, per D-87) e **Documenti in arrivo 11 → 15** (i quattro ordini OF/2026/061–064 del 04/09).
+  Tutti gli altri numeri di questa tabella restano validi (Oggi, pratiche, bollettini, liquidazioni, analisi).
+- Un secondo giro completo dà **505 prove backend / 0 KO** e **1.142 controlli browser / 0 KO** (seed pulito
+  prima di ogni script); dettagli e difetti chiusi in `strumenti/opencode/resoconto-f7-a2.md` (D-95…D-99).

@@ -85,11 +85,11 @@ describe('F5-A1 pagina Oggi', () => {
     expect(riquadro('conferme').valore).toBe(String(conf.length));
     expect(riquadro('bollettini').valore).toBe(String(bol.length));
     expect(riquadro('pagamenti').valore).toBe(String(pag.length));
-    // il riquadro documenti conta i file in coda, ma il gruppo non è ancora disponibile (F6)
-    expect(riquadro('documenti').disponibile).toBe(false);
-    expect(gruppo('documenti').disponibile).toBe(false);
-    expect(gruppo('documenti').voci).toEqual([]);
-    expect(gruppo('documenti').conta).toBe(0);
+    // il gruppo Documenti ora è disponibile (F6, D-75): 15 documenti in coda dal seed
+    expect(riquadro('documenti').disponibile).toBe(true);
+    expect(gruppo('documenti').disponibile).toBe(true);
+    expect(gruppo('documenti').voci).toHaveLength(15);
+    expect(gruppo('documenti').conta).toBe(15);
 
     // conferme: 5, 3 fornitori, la più vecchia da 17 giorni
     expect(conf).toHaveLength(5);
@@ -112,7 +112,7 @@ describe('F5-A1 pagina Oggi', () => {
     expect(r.oggi).toBe(fare.length);
     expect(r.pratiche).toBe(M.S.pratiche.filter((p: any) => M.statoPratica(p).chiave === 'scaduta').length);
     expect(r.bollettini).toBe(fare.filter((x: any) => x.gruppo === 'bollettini').length);
-    expect(r.documenti).toBe(11); // i documenti in arrivo del seed, tutti da controllare
+    expect(r.documenti).toBe(15); // i documenti in arrivo del seed, tutti da controllare
     const api = (await op.get('/api/oggi/conteggi').expect(200)).body;
     expect(Object.keys(api).sort()).toEqual(['bollettini', 'documenti', 'oggi', 'pratiche']);
     expect(Object.values(api).every((n) => typeof n === 'number')).toBe(true);
@@ -181,6 +181,25 @@ describe('F5-A1 pagina Oggi', () => {
     // l'endpoint oggi risponde la stessa forma
     const api = (await op.get('/api/solleciti/conferme').expect(200)).body;
     expect(api.totale).toBe(api.per_fornitore.reduce((n: number, f: any) => n + f.pratiche, 0));
+  });
+
+  it('GET/POST /api/solleciti/bollettini: testo dai documenti del mese ed evento', async () => {
+    const gries = await db.fornitori.findFirstOrThrow({ where: { corrente: { ragione_sociale: { startsWith: 'Gries' } } }, include: { corrente: true } });
+    const r = (await op.get(`/api/solleciti/bollettini?fornitore_id=${gries.id}&anno=2026&mese=8`).expect(200)).body;
+    expect(r.fornitore).toBe(gries.corrente!.ragione_sociale);
+    expect(r.documenti).toBeGreaterThan(0);
+    expect(r.testo).toContain('bollettino provvigioni di agosto 2026');
+    expect(r.testo).toContain('Grazie,\nDecobrands SRL');
+    const conToken = async () => {
+      const agente = request.agent(app.getHttpServer());
+      const x = await agente.post('/api/accesso/entra').send({ utente: 'op-oggi', password: PW }).expect(200);
+      return { agente, csrf: x.body.csrf as string };
+    };
+    const { agente, csrf } = await conToken();
+    await agente.post('/api/solleciti/bollettini').set('x-csrf-token', csrf)
+      .send({ fornitore_id: Number(gries.id), anno: 2026, mese: 8 }).expect(204);
+    const ev = await db.registro.findFirstOrThrow({ where: { codice: 'export.sollecito' }, orderBy: { id: 'desc' } });
+    expect(ev.dettaglio).toMatchObject({ etichetta: r.fornitore + ' · agosto 2026', pratiche: r.numeri });
   });
 
   it('POST /api/solleciti/conferme: la copia lascia l\'evento export.sollecito', async () => {

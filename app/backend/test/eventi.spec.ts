@@ -86,6 +86,9 @@ describe('aree degli eventi', () => {
     expect(a.ultimo).toBeGreaterThan(prima);
     const b = await nuoveAree(db, a.ultimo);
     expect(b).toEqual({ ultimo: a.ultimo, aree: [] });
+    // registro riportato indietro (ripristino di un backup): il flusso riparte dall'ultimo id, non resta zitto
+    const c = await nuoveAree(db, a.ultimo + 1000n);
+    expect(c).toEqual({ ultimo: a.ultimo, aree: [] });
   });
 });
 

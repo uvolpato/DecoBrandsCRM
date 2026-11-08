@@ -12,7 +12,10 @@ esiti, errori = [], []
 # D-42: su Accedi e Password dimenticata prima c'è il logo; un tasto apre la finestra
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
-    if pg.locator('.accesso-scena.aperta').count() == 0: pg.keyboard.press('Enter')
+    # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
+    for _ in range(24):
+        if pg.locator('.accesso-scena.aperta').count(): break
+        pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
