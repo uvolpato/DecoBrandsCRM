@@ -30,17 +30,27 @@
     { id: 11, codice: 'C000011', natura: 'persona', paese: 'IT', piva: '', piva_norm: '', codice_fiscale: 'MRARSS62A01F205Z', cf_norm: 'MRARSS62A01F205Z', sorgente: 'vecchio_crm', attivo: false, note: 'Contatto storico senza ruoli: resta, non si cancella (§1.4).' }
   ];
 
-  /* RUOLI — link alle entità di strato 0 già presenti nei dati (colonne soggetto_id nullable). */
-  D.fornitori.forEach(f => { f.soggetto_id = ({ 1: 1, 2: 2, 3: 3, 4: 4 })[f.id] || null; });
-  D.clienti.forEach(c => { c.soggetto_id = ({ '04235980161': 6, '03152770962': 7, '04120990983': 8 })[c.piva] || null; });
-  D.subagenti.forEach(sa => { if (sa.id === 1) sa.soggetto_id = 9; });   // gli altri subagenti: ancora senza soggetto, come righe da migrare
+  /* RUOLI — link alle entità di strato 0 già presenti nei dati (colonne soggetto_id nullable).
+     La funzione si usa anche sullo stato salvato nel browser (localStorage), che può risalire
+     a prima del master: così le FK restano coerenti in ogni demo. Idempotente.
+     Nota: è su window, NON su DATI_DEMO — motore.js copia ogni chiave dei dati nel salvataggio
+     e una funzione lì dentro romperebbe JSON.stringify alla riga di avvio. */
+  window.applicaSoggettiDemo = function (clienti, fornitori, subagenti) {
+    fornitori.forEach(f => { if (f.soggetto_id == null) f.soggetto_id = ({ 1: 1, 2: 2, 3: 3, 4: 4 })[f.id] || null; });
+    clienti.forEach(c => { if (c.soggetto_id == null) c.soggetto_id = ({ '04235980161': 6, '03152770962': 7, '04120990983': 8 })[c.piva] || null; });
+    subagenti.forEach(sa => { if (sa.id === 1 && sa.soggetto_id == null) sa.soggetto_id = 9; });   // gli altri subagenti: ancora senza soggetto, come righe da migrare
 
-  /* MCL: cliente e fornitore sullo stesso soggetto. Il fornitore entra nello strato 0
-     come sarebbe entrato in Integra; senza scaglioni, dimostra anche lo scaglione mancante. */
-  D.clienti.push({ piva: '08943010155', nome: 'MCL SRL', citta: 'Piacenza', indirizzo: 'Via Emilia 200', codice_integra: 'C02477', vendita_diretta: false, soggetto_id: 5 });
-  D.fornitori.push({ id: 12, nome: 'MCL SRL', breve: 'MCL', piva: 'IT08943010155', codice_integra: 'F90012', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, giorni_incasso: 60, maturazione: 'fatturato', attivo: true, soggetto_id: 5 });
-  /* Il Consorzio Agrario: cliente importato dal vecchio CRM (prima 34 schede, ora 1 soggetto). */
-  D.clienti.push({ piva: '03567890123', nome: 'Consorzio Agrario Lombardo', citta: 'Cremona', indirizzo: 'Via Garibaldi 12', codice_integra: 'C01104', vendita_diretta: false, soggetto_id: 10 });
+    /* MCL: cliente e fornitore sullo stesso soggetto. Il fornitore entra nello strato 0
+       come sarebbe entrato in Integra; senza scaglioni, dimostra anche lo scaglione mancante. */
+    if (!clienti.some(c => c.piva === '08943010155'))
+      clienti.push({ piva: '08943010155', nome: 'MCL SRL', citta: 'Piacenza', indirizzo: 'Via Emilia 200', codice_integra: 'C02477', vendita_diretta: false, soggetto_id: 5 });
+    if (!fornitori.some(f => f.piva === 'IT08943010155'))
+      fornitori.push({ id: Math.max.apply(null, fornitori.map(x => x.id).concat([0])) + 1, nome: 'MCL SRL', breve: 'MCL', piva: 'IT08943010155', codice_integra: 'F90012', paese: 'Italia', giorni_conferma: 21, giorno_bollettino: 10, giorni_incasso: 60, maturazione: 'fatturato', attivo: true, soggetto_id: 5 });
+    /* Il Consorzio Agrario: cliente importato dal vecchio CRM (prima 34 schede, ora 1 soggetto). */
+    if (!clienti.some(c => c.piva === '03567890123'))
+      clienti.push({ piva: '03567890123', nome: 'Consorzio Agrario Lombardo', citta: 'Cremona', indirizzo: 'Via Garibaldi 12', codice_integra: 'C01104', vendita_diretta: false, soggetto_id: 10 });
+  };
+  window.applicaSoggettiDemo(D.clienti, D.fornitori, D.subagenti);
 
   D.sedi = [
     /* MCL: catena di punti vendita + sede di fatturazione */

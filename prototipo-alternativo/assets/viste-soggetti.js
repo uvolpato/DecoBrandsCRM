@@ -10,9 +10,11 @@
   'use strict';
   const e = CRM.esc;
 
-  /* chi apre una pagina vecchia nello storage: porta i dati demo del master (come M.salva in sola lettura) */
+  /* chi apre una pagina vecchia nello storage: porta i dati demo del master (come M.salva in sola lettura);
+     e sui ruoli già salvati dall'utente riapplica i link ai soggetti (dati di prima del master → FK coerenti) */
   if (!M.S.soggetti) ['soggetti', 'sedi', 'recapiti', 'persone', 'persone_contatti', 'fatturazioni']
     .forEach(k => { if (!M.S[k]) M.S[k] = JSON.parse(JSON.stringify(window.DATI_DEMO[k])); });
+  window.applicaSoggettiDemo(M.S.clienti, M.S.fornitori, M.S.subagenti);
 
   /* ---------- normalizzazione al confine: si salva il valore com'è scritto + quello normalizzato (§1.6) ---------- */
   const normPiva = v => { let s = String(v || '').toUpperCase().replace(/[\s.]/g, ''); if (/^IT\d{11}$/.test(s)) s = s.slice(2); return s; };
@@ -90,7 +92,7 @@
                            : { etichetta: 'Disattiva', variante: 'pericolo', onClick: () => disattivaSoggetto(s) }
       ] : [] });
     CRM.Dettagli(dx.corpo, [
-      { etichetta: 'Codice CRM', valore: '<b>' + e(s.codice) + '</b> <span class="testo-tenue">· come si cita al telefono</span>' },
+      { etichetta: 'Codice', valore: '<b>' + e(s.codice) + '</b> <span class="testo-tenue">· come si cita al telefono</span>' },
       { etichetta: 'Natura', valore: s.natura === 'persona' ? 'Persona' : 'Azienda' },
       { etichetta: 'Partita IVA', valore: s.piva ? e(s.piva) + '<span class="testo-tenue"> · normalizzata ' + e(s.piva_norm) + '</span>' : '<span class="testo-tenue">—</span>' },
       { etichetta: 'Codice fiscale', valore: s.codice_fiscale ? e(s.codice_fiscale) : '<span class="testo-tenue">—</span>' },

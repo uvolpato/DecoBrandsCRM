@@ -260,11 +260,11 @@
     const corpo = CRM.Pagina({ voce: 'clienti', titolo: 'Clienti', pieno: true,
       sottotitolo: 'Anagrafica da Integra. Per ogni cliente: le agenzie (fornitori per cui Decobrands fa da agente), chi lo segue e con quale sconto.' });
     const c = M.cliente(pivaSel) || M.S.clienti.slice().sort((x, y) => x.nome.localeCompare(y.nome))[0];
-    const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(0,1fr) minmax(0,1.3fr)');
-    const sx = CRM.blocco(col, 'pila riempi');
+    const col = CRM.blocco(corpo, 'colonne riempi', '--colonne:minmax(0,1.12fr) minmax(0,1.3fr)');
+    const sx = CRM.blocco(col, 'pila riempi clienti-filtri');
     const VISTE = { tutti: () => true, agenzie: x => agenzie(x.piva).length > 0, senza: x => !agenzie(x.piva).length, diretta: x => x.vendita_diretta };
     CRM.FilterBar(sx, { campi: [
-      { nome: 'q', tipo: 'cerca', valore: filtroClienti.q, placeholder: 'Nome, P.IVA o codice' },
+      { nome: 'q', tipo: 'cerca', valore: filtroClienti.q, placeholder: 'Nome, P.IVA' },
       { nome: 'vista', tipo: 'segmenti', valore: filtroClienti.vista, opzioni: [
         { value: 'tutti', label: 'Tutti', n: M.S.clienti.length }, { value: 'agenzie', label: 'Con agenzie', n: M.S.clienti.filter(VISTE.agenzie).length },
         { value: 'senza', label: 'Senza agenzie', n: M.S.clienti.filter(VISTE.senza).length }, { value: 'diretta', label: 'Diretta', n: M.S.clienti.filter(VISTE.diretta).length }] }
