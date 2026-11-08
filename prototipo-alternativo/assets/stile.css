@@ -176,6 +176,10 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 .segmenti button[aria-selected="true"] { background: var(--primario); color: #fff; }
 .segmenti button[aria-selected="true"] .n { color: rgba(255,255,255,.8); }
 .cerca { position: relative; flex: 0 1 280px; }
+/* Soggetti (anagrafica unica): la ricerca di testo cresce e i segmenti si spingono in fondo */
+.soggetti-filtri .filtri .cerca { flex: 1 1 320px; max-width: 480px; }
+.soggetti-filtri .filtri .segmenti { margin-left: auto; }
+.soggetti-filtri .filtri { margin-bottom: 14px; }
 .cerca input { width: 100%; padding: 7px 12px 7px 34px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: var(--superficie); }
 /* Contorno DENTRO il bordo (Ugo, 06/11/2026): l'outline fuori finisce sotto il menu aperto
    (tendina nativa o menu della ricerca) e viene tagliato dai contenitori che non scorrono.

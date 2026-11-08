@@ -51,7 +51,7 @@
     const col = CRM.blocco(corpo, 'colonne pari riempi');
 
     /* elenco */
-    const sx = CRM.blocco(col, 'riempi');
+    const sx = CRM.blocco(col, 'riempi soggetti-filtri');
     const VISTE = {
       tutti: () => true, cliente: x => ruoliDi(x).some(r => r.tipo === 'cliente'), fornitore: x => ruoliDi(x).some(r => r.tipo === 'fornitore'),
       subagente: x => ruoliDi(x).some(r => r.tipo === 'subagente'), nonattivi: x => x.attivo === false
