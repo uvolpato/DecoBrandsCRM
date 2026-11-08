@@ -82,6 +82,23 @@ Senza `PONTE_URL` la sincronizzazione non parte. Il ponte vero (F0-A8) si prepar
 `stile.css` e `public-sans.css` in `frontend/app/stile/` sono **copie** del prototipo
 (D-24): si cambiano nel prototipo e si ricopiano, mai qui.
 
+## Avvio in esercizio (senza Docker, F7-A2)
+
+Serve PostgreSQL, Node 24, LibreOffice (PDF delle liquidazioni) e Caddy davanti all'app; backend e
+frontend ascoltano **solo su 127.0.0.1** (8002 e 8001) e dall'esterno si passa da Caddy.
+
+1. In `backend/.env`: `NODE_ENV=production`, `DATABASE_URL` del database di esercizio, `DOCUMENTI_DIR`
+   su una cartella che sta fuori dal repository, `SOFFICE`, `SEGRETI_CHIAVE` (le chiavi si leggono solo
+   da lì) e `SESSION_SECRET`. La prima volta: `npx prisma migrate deploy` e `npm run superutente -- …`.
+2. `npm ci` (o `npm install`), `npm run build` in `backend/` e in `frontend/`.
+3. `avvia-esercizio.bat` apre backend (`npm run start:prod`), frontend (`npm start`) e Caddy
+   (`deploy/Caddyfile`). Aprire l'indirizzo del server: la porta 80 la prende Caddy.
+4. Aggiornamento: `git pull`, `npm ci`, `npm run build` nei due progetti, `npx prisma migrate deploy`
+   in `backend/`, poi riavvio dei tre processi.
+
+`NODE_ENV=production` toglie `'unsafe-eval'` dalla CSP (D-86): le prove Playwright che usano
+`wait_for_function` girano solo in sviluppo, non contro l'istanza di esercizio.
+
 ## Pubblicazione: solo la cartella `app/`
 
 Primo scaricamento sul server (scarica solo i file di `app/`):

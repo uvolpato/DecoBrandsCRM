@@ -1,0 +1,7 @@
+# Caddy davanti all'app (F7-A2, spec §3.2): tutto al frontend Next, che inoltra /api al backend.
+# In esercizio si sostituisce :80 con il nome del server, es. crm.decobrands.it (Caddy prende il
+# certificato da solo). Backend (8002) e frontend (8001) ascoltano solo su 127.0.0.1.
+:80 {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8001
+}
