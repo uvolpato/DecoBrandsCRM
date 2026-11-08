@@ -182,6 +182,10 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
    Vale per ogni campo di un filtro: ricerca, tendine e date. */
 .cerca input:focus, .cerca input:focus-visible { outline: 0; border-color: var(--primario); box-shadow: inset 0 0 0 1px var(--primario); }
 .cerca .icona { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--testo-tenue); width: 16px; height: 16px; }
+/* Soggetti: ricerca più larga e segmenti in fondo, sulla stessa riga (viste-soggetti.js) */
+.soggetti-filtri .filtri .cerca { flex: 1 1 320px; max-width: 480px; }
+.soggetti-filtri .filtri .segmenti { margin-left: auto; }
+.soggetti-filtri .filtri { margin-bottom: 14px; }
 .filtro-select { padding: 7px 10px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: var(--superficie); }
 .filtro-select:focus, .filtro-select:focus-visible { outline: 0; border-color: var(--primario); box-shadow: inset 0 0 0 1px var(--primario); }
 

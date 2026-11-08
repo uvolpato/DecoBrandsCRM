@@ -37,7 +37,7 @@ with sync_playwright() as p:
     pg = entra(S + '-ammi')
     pg.wait_for_selector('.selezionabile a')
     ok(pg.locator('.testa h1').inner_text().strip() == 'Guida', 'titolo della pagina')
-    ok(argomenti(pg) == 18, '18 argomenti, senza la Vendita diretta (D-08) e con il Registro (F5-A2)')
+    ok(argomenti(pg) == 19, '19 argomenti, senza la Vendita diretta (D-08) e con il Registro (F5-A2)')
     ok(titolo(pg) == 'Come funziona il CRM', '/guida senza argomento: il primo argomento')
     ok(pg.title() == 'Guida · Decobrands', 'titolo della scheda del browser')
     ok(not pg.evaluate('document.documentElement.scrollWidth > innerWidth'), '1440 px: niente scorrimento orizzontale')
@@ -77,7 +77,7 @@ with sync_playwright() as p:
     pg = entra(S + '-lett')
     pg.wait_for_selector('.selezionabile a')
     testo = pg.locator('.selezionabile').inner_text()
-    ok(not any(g in testo for g in ('Utenti e ruoli', 'Stato del sistema', 'Impostazioni', 'Documenti scartati', 'Accesso')) and argomenti(pg) == 12,
+    ok(not any(g in testo for g in ('Utenti e ruoli', 'Stato del sistema', 'Impostazioni', 'Documenti scartati', 'Accesso')) and argomenti(pg) == 13,
        'lettura: i cinque argomenti di Gestione non ci sono')
     pg.goto(BASE + '/guida/utenti'); pg.wait_for_selector('.guida')
     ok(titolo(pg) == 'Come funziona il CRM', 'lettura: /guida/utenti non aprire l’argomento riservato')

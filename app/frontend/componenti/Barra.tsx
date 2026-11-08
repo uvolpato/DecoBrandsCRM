@@ -20,7 +20,7 @@ const AREE_MENU: { id: string; t: string; icona: string; gruppi: { gruppo: strin
     { gruppo: 'Ogni trimestre', voci: [{ href: '/liquidazioni', t: 'Liquidazioni', icona: 'liquidazioni', area: 'provvigioni' }, { href: '/analisi', t: 'Analisi', icona: 'analisi', area: 'provvigioni' }] },
   ] },
   { id: 'dati', t: 'Dati', icona: 'fornitori', gruppi: [
-    { gruppo: 'Anagrafiche', voci: [{ href: '/fornitori', t: 'Fornitori', icona: 'fornitori', area: 'dati' }, { href: '/subagenti', t: 'Subagenti', icona: 'subagenti', area: 'dati' }, { href: '/clienti', t: 'Clienti', icona: 'abbinamenti', area: 'dati' }] },
+    { gruppo: 'Anagrafiche', voci: [{ href: '/soggetti', t: 'Soggetti', icona: 'subagenti', area: 'dati' }, { href: '/fornitori', t: 'Fornitori', icona: 'fornitori', area: 'dati' }, { href: '/subagenti', t: 'Subagenti', icona: 'subagenti', area: 'dati' }, { href: '/clienti', t: 'Clienti', icona: 'abbinamenti', area: 'dati' }] },
   ] },
   { id: 'gestione', t: 'Gestione', icona: 'impostazioni', gruppi: [
     { gruppo: 'Portale', voci: [

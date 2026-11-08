@@ -12,7 +12,7 @@ import { AREE, usePuo, useUtente } from './Utente';
 // "Torna a…" con la memoria della schermata (§7.12); il link Guida c'è in ogni testata (F5-A8).
 const GUIDA_ROTTE: [string, string][] = [
   ['/documenti', 'documenti'], ['/pratiche', 'pratiche'], ['/bollettini', 'bollettini'], ['/liquidazioni', 'liquidazioni'],
-  ['/analisi', 'analisi'], ['/fornitori', 'fornitori'], ['/subagenti', 'subagenti'], ['/clienti', 'clienti'],
+  ['/analisi', 'analisi'], ['/soggetti', 'soggetti'], ['/fornitori', 'fornitori'], ['/subagenti', 'subagenti'], ['/clienti', 'clienti'],
   ['/registro', 'registro'], ['/sistema', 'sistema'], ['/scartati', 'scartati'], ['/impostazioni', 'impostazioni'], ['/utenti', 'utenti'],
 ];
 /** L'argomento della Guida per la pagina corrente: la rotta più lunga che la contiene. */
@@ -24,7 +24,7 @@ function argomentoGuida(percorso: string): string | null {
 /** "Torna a …" con l'articolo giusto per la voce (D-47, §7.12). */
 const ARTICOLO: Record<string, string> = {
   Oggi: 'a Oggi', Documenti: 'ai Documenti', Pratiche: 'alle Pratiche', 'Documenti scartati': 'ai Documenti scartati',
-  Bollettini: 'ai Bollettini', Liquidazioni: 'alle Liquidazioni', Analisi: "all'Analisi", Fornitori: 'ai Fornitori',
+  Bollettini: 'ai Bollettini', Liquidazioni: 'alle Liquidazioni', Analisi: "all'Analisi", Soggetti: 'ai Soggetti', Fornitori: 'ai Fornitori',
   Subagenti: 'ai Subagenti', Clienti: 'ai Clienti', 'Utenti e ruoli': 'a Utenti e ruoli',
   'Stato del sistema': 'allo Stato del sistema', Registro: 'al Registro', Impostazioni: 'alle Impostazioni',
   Componenti: 'ai Componenti', Guida: 'alla Guida',

@@ -13,11 +13,13 @@ export interface FormModalProps {
   colonne?: 1 | 2;
   conferma?: string;
   pericolo?: boolean;
+  // azioni oltre ad Annulla e Salva (es. Disattiva nel recapito), come `azioniExtra` del prototipo
+  azioniExtra?: { etichetta: string; variante?: 'sec' | 'pericolo'; onClick: () => void }[];
   onConferma: (valori: Record<string, string>) => Promise<string | void>;
   onChiudi: () => void;
 }
 
-export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva', pericolo, onConferma, onChiudi }: FormModalProps) {
+export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva', pericolo, azioniExtra, onConferma, onChiudi }: FormModalProps) {
   const id = useId();
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
@@ -39,6 +41,7 @@ export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva
 
   return (
     <Modale titolo={titolo} testo={testo} onChiudi={() => { if (!attesa) onChiudi(); }} piede={<>
+      {azioniExtra?.map((a) => <button key={a.etichetta} type="button" className={'btn ' + (a.variante ?? 'sec')} onClick={a.onClick} disabled={attesa}>{a.etichetta}</button>)}
       <button type="button" className="btn sec" onClick={onChiudi} disabled={attesa}>Annulla</button>
       <button type="submit" form={id} className={'btn' + (pericolo ? ' pericolo' : '')} disabled={attesa}>{attesa ? 'Attendi…' : conferma}</button>
     </>}>

@@ -22,6 +22,7 @@ interface Cliente {
   piva: string | null;
   citta: string | null;
   codice_integra: string | null;
+  soggetto_codice: string | null;
   attivo: boolean;
   agenzie: number;
   fornitori_ids: string[];
@@ -64,6 +65,7 @@ interface Dettaglio {
   provincia: string | null;
   email: string | null;
   codice_integra: string | null;
+  soggetto_codice: string | null;
   attivo: boolean;
   agenzie: Agenzia[];
 }
@@ -251,7 +253,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   }
 
   const colonneClienti: Colonna<Cliente>[] = [
-    { key: 'ragione_sociale', header: 'Cliente', grow: true, cell: (x) => <><b>{x.ragione_sociale ?? '—'}</b><span className="sec-riga">{x.piva ?? ''}{x.codice_integra ? ' · ' + x.codice_integra : ''}{x.citta ? ' · ' + x.citta : ''}</span></> },
+    { key: 'ragione_sociale', header: 'Cliente', grow: true, cell: (x) => <><b>{x.ragione_sociale ?? '—'}</b><span className="sec-riga">{[x.soggetto_codice, x.piva, x.codice_integra, x.citta].filter(Boolean).join(' · ')}</span></> },
     { key: 'agenzie', header: 'Agenzie', align: 'center', cell: (x) => String(x.agenzie) },
     { key: 'pratiche_aperte', header: 'Pratiche aperte', align: 'center', cell: (x) => String(x.pratiche_aperte) },
   ];
@@ -328,6 +330,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
               { etichetta: 'P.IVA', valore: u.piva ?? '—' },
               { etichetta: 'Indirizzo', valore: [u.indirizzo, u.cap, u.citta, u.provincia].filter(Boolean).join(' ') || '—' },
               { etichetta: 'Email', valore: u.email ?? '—' },
+              { etichetta: 'Codice soggetto', valore: u.soggetto_codice ?? '—' },
               { etichetta: 'Codice Integra', valore: u.codice_integra ?? '—' },
             ]} />
             <Nota>Anagrafica da Integra (sola lettura).</Nota>

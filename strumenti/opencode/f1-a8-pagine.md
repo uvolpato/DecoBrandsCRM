@@ -115,6 +115,9 @@ Modifica:
    `p1-*` creati con `node strumenti/prove/utenti_prova.js crea p1`; scrivi
    `strumenti/prove/app_soggetti.py` con lo scenario qui sopra e chiudilo con **0 KO**; nessun
    errore JavaScript in pagina.
+   - Database dei processi avviati per la prova: `decobrands_test` (già migrato) o
+     `decobrands_test_f1a8`, con i dati di prova caricati da `npm run db:seed` dal `backend/`.
+     Non puntare mai i server di prova a `decobrands_db`.
 4. Rilancia anche `app_clienti.py`, `app_fornitori.py` e `app_subagenti.py`: le tre pagine
    cambiate devono restare 0 KO (aggiorna le prove solo se il testo aggiunto le rompe davvero).
 5. Schermate a 1440 e 768 in `%TEMP%\f1-a8` e **guardale** prima di consegnare.

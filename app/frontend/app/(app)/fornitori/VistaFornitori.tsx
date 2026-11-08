@@ -22,6 +22,7 @@ interface Fornitore {
   piva: string | null;
   paese: string | null;
   codice_integra: string | null;
+  soggetto_codice: string | null;
   giorni_attesa_conferma: number;
   giorno_bollettino: number;
   tipo_provvigione: string;
@@ -275,7 +276,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   }
 
   const colonneFornitori: Colonna<Fornitore>[] = [
-    { key: 'ragione_sociale', header: 'Fornitore', grow: true, cell: (x) => <><b>{x.ragione_sociale ?? '—'}</b><span className="sec-riga">{x.piva ?? ''}{x.codice_integra ? ' · ' + x.codice_integra : ''}</span></> },
+    { key: 'ragione_sociale', header: 'Fornitore', grow: true, cell: (x) => <><b>{x.ragione_sociale ?? '—'}</b><span className="sec-riga">{[x.soggetto_codice, x.piva, x.codice_integra].filter(Boolean).join(' · ')}</span></> },
     { key: 'scaglioni', header: 'Scaglioni', align: 'center', cell: (x) => String(x.scaglioni) },
     { key: 'giorni_attesa_conferma', header: 'Attesa conferma', align: 'center', cell: (x) => x.giorni_attesa_conferma + ' gg' },
   ];
@@ -343,6 +344,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               { etichetta: 'Ragione sociale', valore: u.ragione_sociale ?? '—' },
               { etichetta: 'P.IVA', valore: u.piva ?? '—' },
               { etichetta: 'Paese', valore: u.paese ?? '—' },
+              { etichetta: 'Codice soggetto', valore: u.soggetto_codice ?? '—' },
               { etichetta: 'Codice Integra', valore: u.codice_integra ?? '—' },
               { etichetta: 'Giorni attesa conferma', valore: u.giorni_attesa_conferma },
               { etichetta: 'Giorno del bollettino', valore: u.giorno_bollettino },

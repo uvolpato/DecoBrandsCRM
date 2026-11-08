@@ -36,6 +36,7 @@ interface Subagente {
   nome: string;
   cognome: string;
   email: string | null;
+  soggetto_codice: string | null;
   attivo: boolean;
 }
 
@@ -336,7 +337,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   }
 
   const colonne: Colonna<Subagente>[] = [
-    { key: 'nome', header: 'Subagente', grow: true, cell: (x) => <><b>{x.cognome} {x.nome}</b>{x.attivo === false && <> <Stato v="neutro">non attivo</Stato></>}<span className="sec-riga">{x.codice}{x.email ? ' · ' + x.email : ''}</span></> },
+    { key: 'nome', header: 'Subagente', grow: true, cell: (x) => <><b>{x.cognome} {x.nome}</b>{x.attivo === false && <> <Stato v="neutro">non attivo</Stato></>}<span className="sec-riga">{[x.soggetto_codice, x.codice, x.email].filter(Boolean).join(' · ')}</span></> },
     { key: 'agente', header: 'Agente', valore: (x) => x.agente ?? '', cell: (x) => x.agente ?? <span className="testo-tenue">—</span> },
     { key: 'stato', header: 'Stato', valore: (x) => (x.attivo ? 'Attivo' : 'Non attivo'), cell: (x) => x.attivo ? <Stato v="ok">Attivo</Stato> : <Stato v="neutro">Non attivo</Stato> },
   ];
@@ -388,6 +389,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
     return (
       <>
         <Dettagli inColonne voci={[
+          { etichetta: 'Codice soggetto', valore: u.soggetto_codice ?? '—' },
           { etichetta: 'Codice', valore: u.codice },
           { etichetta: 'Nome', valore: u.nome },
           { etichetta: 'Cognome', valore: u.cognome },

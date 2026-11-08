@@ -449,6 +449,51 @@ export const GUIDA: Argomento[] = [
     ],
     modifica: 'Operatore o superiore nell’area Provvigioni, per sollecitare e segnare gli incassi.',
   },
+  { id: 'soggetti', titolo: 'Soggetti', gruppo: 'Anagrafiche', vai: '/soggetti',
+    sintesi: 'Anagrafica unica a soggetti (D-102): un soggetto = un’identità fiscale con i suoi ruoli (cliente, fornitore, subagente), le sedi e i recapiti. Clienti e fornitori arrivano da Integra in sola lettura; i dati nuovi si censano qui.',
+    pulsanti: [
+      ['Segmenti', 'Tutti · Clienti · Fornitori · Subagenti · Non attivi; i numeri si aggiornano con la ricerca (li conta il server).'],
+      ['Nuovo soggetto', 'Solo identità: natura, paese, P.IVA e codice fiscale. La P.IVA doppia viene rifiutata con il codice e il nome dell’esistente; le P.IVA corte (9–10 cifre) vanno in scarto (§7.4); senza P.IVA né codice fiscale non è un soggetto.'],
+      ['Scheda Ruoli', 'I ruoli del soggetto con i loro codici; Aggiungi ruolo crea il ruolo cliente o fornitore; il clic porta alla pagina del ruolo.'],
+      ['Scheda Sedi', 'Le sedi del soggetto: una sola predefinita per tipo; una catena è un soggetto con N punti vendita.'],
+      ['Scheda Recapiti', 'Email, PEC, telefoni, allegabili a soggetto, sede o persona referente; Disattiva chiude il singolo recapito.'],
+      ['Scheda Fatturazione', 'Dati della fatturazione elettronica del soggetto: codice SDI, PEC, identificativo estero, regime, esigibilità.'],
+      ['Modifica identità · Disattiva', 'Il master non si cancella: attivo = false, e solo senza ruoli attivi.'],
+    ],
+    finestre: [
+      { nome: 'Soggetto', da: 'Nuovo soggetto · Modifica identità', cosa: 'Solo identità e chiavi di riconoscimento: il nome arriva dai ruoli, sedi e recapiti restano sul soggetto.',
+        campi: [
+          ['Natura', 'Azienda o persona.'],
+          ['Paese', 'Due lettere (ISO 3166-1).'],
+          ['Partita IVA e codice fiscale', 'La versione normalizzata (maiuscolo, senza spazi e punti) la calcola il server; i doppioni sono rifiutati.'],
+        ],
+        azioni: [['Crea soggetto · Salva', 'Il codice C000000 lo assegna il server.']] },
+      { nome: 'Aggiungi ruolo', da: 'Aggiungi ruolo', cosa: 'Cliente o fornitore; il codice di Integra lo scrive chi carica l’export (D-101: un codice per ruolo).',
+        azioni: [['Aggiungi ruolo', 'Il ruolo nuovo nasce con la sua versione e il suo codice.']] },
+      { nome: 'Sede', da: 'Nuova sede · clic su una sede', cosa: 'Il soggetto è fisso.',
+        campi: [
+          ['Tipo', 'Legale, operativa, punto vendita, magazzino, fatturazione.'],
+          ['Predefinita di questo tipo', 'Una sola per tipo: mettendola, l’altra si spegne.'],
+        ] },
+      { nome: 'Recapito', da: 'Nuovo recapito · clic su un recapito', cosa: 'Allegabile a soggetto, sede o persona referente; dopo la creazione non si sposta.',
+        campi: [
+          ['Tipo e valore', 'Le email in minuscolo; il server rifiuta un formato sbagliato e un duplicato identico già attivo.'],
+          ['Disattiva', 'Chiude il recapito con valido_al: resta nei dati e nei documenti passati.'],
+        ] },
+      { nome: 'Fatturazione elettronica', da: 'Modifica fatturazione', cosa: 'Dati del soggetto fiscale, non del ruolo.',
+        campi: [
+          ['Codice destinatario SDI', 'Sette lettere o cifre; in alternativa la PEC o l’identificativo estero.'],
+          ['Configurata', 'Se sì serve almeno un modo di ricevere la fattura: il server rifiuta il resto.'],
+        ] },
+    ],
+    sapere: [
+      'Il nome visibile arriva dal suo ruolo attivo: un soggetto nuovo, senza ruoli, si mostra con il suo codice C000000.',
+      'Il codice CRM è quello che si cita al telefono; i codici di Integra stanno sui ruoli (D-101: cliente e fornitore possono avere due codici diversi).',
+      'Niente cancellazioni: ruoli e soggetti chiudono con attivo = false o valido_al; i documenti restano appesi alle loro versioni.',
+      'Un soggetto con ruoli attivi non si disattiva: prima si chiudono i ruoli. La fusione dei doppioni la decide la deduplica (§7.5), non si inventa un soggetto nuovo.',
+    ],
+    modifica: 'Operatore o superiore nell’area Dati.',
+  },
   { id: 'fornitori', titolo: 'Fornitori', gruppo: 'Anagrafiche', vai: '/fornitori',
     sintesi: 'Anagrafica da Integra in sola lettura; nel CRM si gestiscono le condizioni e le percentuali di provvigione per sconto, con la data da cui valgono.',
     pulsanti: [
@@ -478,6 +523,9 @@ export const GUIDA: Argomento[] = [
           ['Salva le nuove percentuali', 'Crea la nuova versione.'],
           ['Salva la correzione', 'Con Correggi: sostituisce le percentuali di quella versione.'],
         ] }
+    ],
+    sapere: [
+      'Il codice <b>C000001</b> sotto il nome è quello del soggetto nella pagina <b>Soggetti</b> (anagrafica unica, D-102); il codice Integra è del singolo ruolo, quindi lo stesso soggetto può averne due diversi.',
     ],
     modifica: 'Responsabile nell’area Dati, per condizioni e percentuali; operatore per il resto.',
   },
@@ -513,6 +561,7 @@ export const GUIDA: Argomento[] = [
         ] }
     ],
     sapere: [
+      'Il codice <b>C000009</b> sotto il nome è quello del soggetto nella pagina <b>Soggetti</b> (anagrafica unica, D-102): è l’identità fiscale della persona, che può avere anche altri ruoli.',
       'Le eccezioni sono rare: di norma tutti i subagenti hanno la percentuale dello scaglione.',
       'L’eccezione non è legata a una versione delle percentuali: vale nei giorni del suo periodo e con <b>Nuove percentuali</b> del fornitore continua da sola, senza copie.',
     ],
@@ -541,6 +590,7 @@ export const GUIDA: Argomento[] = [
         ] }
     ],
     sapere: [
+      'Il codice <b>C000123</b> sotto il nome è quello del soggetto nella pagina <b>Soggetti</b> (anagrafica unica, D-102); il codice Integra è del singolo ruolo.',
       'Un solo subagente per cliente e fornitore; il codice cliente è unico per fornitore.',
       '<b>Al subagente per questo cliente %</b> e <b>Provvigione al subagente</b> li cambia solo un responsabile, come le eccezioni personali. La percentuale vale solo per questo cliente e fornitore; vuoto = la percentuale dello scaglione o l’eccezione del subagente.',
       '<b>Una fattura al mese</b> (la prima o la più alta): le altre fatture del mese non danno provvigione al subagente. Il fornitore non cambia: si controlla nel bollettino.',
