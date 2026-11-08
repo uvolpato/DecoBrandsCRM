@@ -129,7 +129,7 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
           <button type="button" className="btn-chiudi" onClick={onChiudi} aria-label="Chiudi"><Icona nome="chiudi" /></button>
         </div>
         <div className="aff-corpo">
-          <div className="aff-sx" style={{ display: 'flex', flexDirection: 'column', padding: 0, background: '#525659' }}>
+          <div className={'aff-sx' + (src && !foto ? ' aff-pdf' : '')} style={{ display: 'flex', flexDirection: 'column', padding: 0, background: '#525659' }}>
             <div className="aff-schede" role="tablist" aria-label="Documenti della pratica" style={{ padding: '12px 14px 0', marginBottom: 10 }}>
               {docs.map((d) => (
                 <button key={d.id} type="button" role="tab" aria-selected={d.id === cur.id} onClick={() => scegli(d)}>
@@ -137,7 +137,7 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
                 </button>
               ))}
             </div>
-            <div style={{ flex: '1 1 auto', minHeight: 0, padding: src && !foto ? 0 : 16 }}>
+            <div style={{ flex: '1 1 0', minHeight: 0, minWidth: 0, padding: src && !foto ? 0 : 16, overflow: src && !foto ? 'hidden' : 'auto' }}>
               {src
                 ? foto
                   ? <img src={src} alt={'Foto del documento ' + nome}
