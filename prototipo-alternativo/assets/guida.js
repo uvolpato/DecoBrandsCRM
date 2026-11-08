@@ -304,7 +304,8 @@
         { nome: 'Condizioni del fornitore', da: 'Modifica condizioni', cosa: 'Regole che fanno scattare solleciti e liquidazioni.',
           campi: [['Giorni attesa conferma', 'Dopo, la pratica è in ritardo.'], ['Bollettino atteso entro il giorno', 'Del mese successivo (1–28); dopo, compare il sollecito.'], ['Pagamento provvigioni', 'Maturato o fatturato.'], ['Giorni per l’incasso dal cliente', 'Sul maturato: dopo questi giorni dalla fattura non ancora riconosciuta, l’incasso è da verificare (iniziale 60).']], azioni: [['Salva condizioni', 'Applica subito.']] },
         { nome: 'Nuove percentuali', da: 'Nuove percentuali', cosa: 'Per ogni sconto: % a Decobrands e % al subagente.', campi: [['Valide dal', 'Deve venire dopo l’ultima chiusura del fornitore; può cadere fra due versioni. I documenti precedenti restano calcolati con le percentuali di allora.'], ['Aggiungi uno sconto', 'Facoltativo: le soglie esistenti non si tolgono.']], azioni: [['Salva le nuove percentuali', 'Crea la nuova versione.'], ['Salva la correzione', 'Con Correggi: sostituisce le percentuali di quella versione.']] }
-      ] },
+      ],
+      sapere: ['Il codice <b>C000001</b> sotto il nome è quello del soggetto nella pagina <b>Soggetti</b> (anagrafica unica, D-102); il codice Integra è del singolo ruolo, quindi lo stesso soggetto può averne due diversi.'] },
     { id: 'subagenti', titolo: 'Subagenti', gruppo: 'Anagrafiche', vai: '#/subagenti',
       sintesi: 'Chi segue i clienti per conto di Decobrands. Non sono in Integra: si gestiscono per intero nel CRM.',
       pulsanti: [['Nuovo subagente', 'Nome, email, codice fiscale o P.IVA, telefono.'], ['Modifica', 'Cambia i dati.'], ['Rendi non attivo', 'Un subagente con clienti o provvigioni non si elimina: si disattiva.'], ['Vedi la liquidazione', 'Apre la liquidazione filtrata sul subagente.'],
@@ -313,7 +314,7 @@
         { nome: 'Eccezione', da: 'Aggiungi eccezione · clic su un’eccezione', cosa: 'Il subagente è fisso.',
           campi: [['Fornitore', 'Campo con ricerca.'], ['Sconto al cliente', 'Gli sconti proposti sono quelli in vigore del fornitore.'], ['Al subagente %', 'Da 0 a 100; 0 = nessuna provvigione su quello sconto.'], ['Dal', 'La data deve venire dopo l’ultima chiusura del fornitore.']],
           azioni: [['Aggiungi eccezione · Salva', 'Apre il periodo dell’eccezione.'], ['Cambia la %', 'Chiude il periodo alla data indicata e ne apre uno nuovo con la nuova percentuale.'], ['Termina', 'Dal giorno indicato non vale più (quel giorno è escluso).'], ['Modifica · Elimina', 'Solo se il periodo è tutto dopo l’ultima chiusura.'], ['Elimina', 'Con conferma: torna a valere la percentuale standard.']] }],
-      sapere: ['Le eccezioni sono rare: di norma tutti i subagenti hanno la percentuale dello scaglione.', 'L’eccezione non è legata a una versione delle percentuali: vale nei giorni del suo periodo e con <b>Nuove percentuali</b> del fornitore continua da sola, senza copie.'] },
+      sapere: ['Il codice <b>C000009</b> sotto il nome è quello del soggetto nella pagina <b>Soggetti</b> (anagrafica unica, D-102): è l’identità fiscale della persona, che può avere anche altri ruoli.', 'Le eccezioni sono rare: di norma tutti i subagenti hanno la percentuale dello scaglione.', 'L’eccezione non è legata a una versione delle percentuali: vale nei giorni del suo periodo e con <b>Nuove percentuali</b> del fornitore continua da sola, senza copie.'] },
     { id: 'clienti', titolo: 'Clienti', gruppo: 'Anagrafiche', vai: '#/clienti',
       sintesi: 'Anagrafica da Integra in sola lettura. Per ogni cliente le <b>agenzie</b>: i fornitori per cui Decobrands fa da agente, con codice cliente del fornitore, subagente e sconto.',
       pulsanti: [
@@ -325,7 +326,8 @@
       finestre: [{ nome: 'Agenzia', da: 'Aggiungi agenzia · clic su una riga', cosa: 'Il cliente è fisso.',
         campi: [['Fornitore', 'Campo con ricerca.'], ['Codice cliente del fornitore', 'Come il fornitore chiama il cliente: serve ad abbinare i documenti in automatico.'], ['Seguito da', 'Subagente, campo con ricerca.'], ['Sconto al cliente', 'Sotto il campo compaiono gli sconti degli scaglioni in vigore dei fornitori; un altro valore va bene lo stesso.'], ['Al subagente per questo cliente % · Provvigione al subagente', 'Riservati al responsabile: per l’operatore sono spenti (cambiano i soldi del subagente).']],
         azioni: [['Aggiungi agenzia · Salva', 'Registra.'], ['Elimina', 'Con conferma: le pratiche con quel fornitore non generano più provvigioni.']] }],
-      sapere: ['Un solo subagente per cliente e fornitore; il codice cliente è unico per fornitore.',
+      sapere: ['Il codice <b>C000006</b> sotto il nome è quello del soggetto nella pagina <b>Soggetti</b> (anagrafica unica, D-102); un soggetto cliente e fornitore insieme ha due codici Integra diversi.',
+        'Un solo subagente per cliente e fornitore; il codice cliente è unico per fornitore.',
         '<b>Al subagente per questo cliente %</b> e <b>Provvigione al subagente</b> li cambia solo un responsabile, come le eccezioni personali. La percentuale vale solo per questo cliente e fornitore; vuoto = la percentuale dello scaglione o l’eccezione del subagente.',
         '<b>Una fattura al mese</b> (la prima o la più alta): le altre fatture del mese non danno provvigione al subagente. Il fornitore non cambia: si controlla nel bollettino.',
         'Per un caso singolo si corregge il documento in Liquidazioni (<b>Correggi</b>), con il motivo. Lo sconto fittizio non serve più: lo sconto resta quello vero.'] },

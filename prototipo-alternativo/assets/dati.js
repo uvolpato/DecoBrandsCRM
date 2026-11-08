@@ -92,10 +92,10 @@ window.DATI_DEMO = {
   agente: { nome: 'Decobrands SRL' },
 
   subagenti: [
-    { id: 1, nome: 'Stefano Bastasin',  email: 'stefano.bastasin@example.it',  attivo: true },
-    { id: 2, nome: 'Marco Nista',       email: 'marco.nista@example.it',       attivo: true },
-    { id: 3, nome: 'Elisa Ravelli',     email: 'elisa.ravelli@example.it',     attivo: true },
-    { id: 4, nome: 'Giorgio Pontoglio', email: 'giorgio.pontoglio@example.it', attivo: true }
+    { id: 1, nome: 'Stefano Bastasin',  email: 'stefano.bastasin@example.it',  cf: 'BSTSFN72M05H501X', attivo: true },
+    { id: 2, nome: 'Marco Nista',       email: 'marco.nista@example.it',       cf: 'NSTMRC75C15F205R', attivo: true },
+    { id: 3, nome: 'Elisa Ravelli',     email: 'elisa.ravelli@example.it',     cf: 'RVLLSE82H45L219K', attivo: true },
+    { id: 4, nome: 'Giorgio Pontoglio', email: 'giorgio.pontoglio@example.it', cf: 'PNTGRG68P10G388N', attivo: true }
   ],
 
   /* Abbinamenti cliente × fornitore: chi lo segue, con che sconto, e come lo chiama il fornitore. */

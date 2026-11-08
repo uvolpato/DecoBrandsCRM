@@ -7,6 +7,11 @@
 (function () {
   'use strict';
   const e = CRM.esc;
+  /* il codice del soggetto master (C000001…): lega la riga del ruolo al suo soggetto */
+  const codiceSoggetto = rec => {
+    const s = rec && rec.soggetto_id != null ? M.S.soggetti.find(x => x.id === rec.soggetto_id) : null;
+    return s ? s.codice : '';
+  };
 
   /* ---------- Fornitori: DataTable + Pannello (Dettagli, DataTable percentuali) + FormModal ---------- */
   let schedaFornitore = 'percentuali';
@@ -16,7 +21,7 @@
     const col = CRM.blocco(corpo, 'colonne pari riempi');
     CRM.DataTable(CRM.blocco(col, 'riempi'), {
       colonne: [
-        { key: 'nome', header: 'Fornitore', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === f.id ? ' ' + CRM.stato('primario', 'aperto') : '') },
+        { key: 'nome', header: 'Fornitore', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.id === f.id ? ' ' + CRM.stato('primario', 'aperto') : '') + '<span class="sec-riga">' + e([codiceSoggetto(x), x.codice_integra].filter(Boolean).join(' · ')) + '</span>' },
         { key: 'giorni_conferma', header: 'Attesa conferma', tipo: 'numero', cell: x => x.giorni_conferma + ' giorni' },
         { key: 'giorno_bollettino', header: 'Bollettino entro', tipo: 'numero', cell: x => 'il ' + (x.giorno_bollettino || 10) },
         { key: 'maturazione', header: 'Paga sul' },
@@ -33,6 +38,7 @@
     CRM.Nota(dx.corpo, 'Anagrafica da Integra (sola lettura). Qui si gestiscono solo condizioni e percentuali di provvigione.').style.marginBottom = '10px';
     CRM.Dettagli(dx.corpo, [
       { etichetta: 'Partita IVA', valore: e(f.piva) + ' <span class="testo-tenue">· ' + e(f.paese || '') + '</span>' },
+      { etichetta: 'Codice soggetto', valore: e(codiceSoggetto(f) || '—') },
       { etichetta: 'Codice Integra', valore: e(f.codice_integra || '—') },
       { etichetta: 'Attesa della conferma', valore: f.giorni_conferma + ' giorni dall’ordine, poi parte il sollecito' },
       { etichetta: 'Bollettino mensile', valore: 'atteso entro il ' + (f.giorno_bollettino || 10) + ' del mese successivo, poi parte il sollecito' },
@@ -129,7 +135,7 @@
     const col = CRM.blocco(corpo, 'colonne pari riempi');
     CRM.DataTable(CRM.blocco(col, 'riempi'), {
       colonne: [
-        { key: 'nome', header: 'Subagente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.attivo === false ? ' ' + CRM.stato('neutro', 'non attivo') : '') + (x.id === s.id ? ' ' + CRM.stato('primario', 'aperto') : '') + '<span class="sec-riga">' + e(x.email || '') + (x.telefono ? ' · ' + e(x.telefono) : '') + '</span>' },
+        { key: 'nome', header: 'Subagente', grow: true, cell: x => '<b>' + e(x.nome) + '</b>' + (x.attivo === false ? ' ' + CRM.stato('neutro', 'non attivo') : '') + (x.id === s.id ? ' ' + CRM.stato('primario', 'aperto') : '') + '<span class="sec-riga">' + e([codiceSoggetto(x), x.email, x.telefono].filter(Boolean).join(' · ')) + '</span>' },
         { key: 'clienti', header: 'Clienti seguiti', tipo: 'numero', valore: x => M.S.abbinamenti.filter(a => a.subagente_id === x.id).length },
         { key: 'liq', header: t + '° trim. liquidabile', tipo: 'euro', totale: 'somma', valore: x => righe.filter(r => r.subagente_id === x.id && r.liquidabile).reduce((a, r) => a + r.provvigione, 0) },
         { key: 'att', header: 'In attesa', tipo: 'euro', totale: 'somma', valore: x => righe.filter(r => r.subagente_id === x.id && !r.liquidabile).reduce((a, r) => a + r.provvigione, 0) }
@@ -140,6 +146,7 @@
     const dx = CRM.Pannello(col, { titolo: s.nome, riempi: true, azioni: [{ etichetta: 'Vedi la liquidazione', variante: 'testo', href: '#/liquidazioni/2026/' + t },
       { etichetta: 'Modifica', onClick: () => modificaSubagente(s) }, { etichetta: 'Elimina', variante: 'pericolo', onClick: () => eliminaSubagente(s) }] });
     CRM.Dettagli(dx.corpo, [
+      { etichetta: 'Codice soggetto', valore: e(codiceSoggetto(s) || '—') },
       { etichetta: 'Email', valore: s.email ? e(s.email) : '<span class="testo-tenue">—</span>' },
       { etichetta: 'Telefono', valore: s.telefono ? e(s.telefono) : '<span class="testo-tenue">—</span>' },
       { etichetta: 'Codice fiscale / P.IVA', valore: s.cf ? e(s.cf) : '<span class="testo-tenue">—</span>' },
@@ -275,7 +282,7 @@
     };
     const tab = CRM.DataTable(CRM.blocco(sx, 'riempi'), {
       colonne: [
-        { key: 'nome', header: 'Cliente', grow: true, cell: x => '<b>' + e(x.nome) + '</b><span class="sec-riga">' + e(x.citta || '') + ' · ' + e(x.codice_integra || '') + '</span>' },
+        { key: 'nome', header: 'Cliente', grow: true, cell: x => '<b>' + e(x.nome) + '</b><span class="sec-riga">' + e([codiceSoggetto(x), x.citta, x.codice_integra].filter(Boolean).join(' · ')) + '</span>' },
         { key: 'agenzie', header: 'Agenzie', tipo: 'numero', valore: x => agenzie(x.piva).length },
         { key: 'aperte', header: 'Pratiche aperte', tipo: 'numero', valore: x => praticheAperte(x.piva).length }
       ],
@@ -288,6 +295,7 @@
     CRM.Dettagli(dx.corpo, [
       { etichetta: 'Partita IVA', valore: e(c.piva) },
       { etichetta: 'Indirizzo', valore: e((c.indirizzo ? c.indirizzo + ', ' : '') + (c.citta || '')) },
+      { etichetta: 'Codice soggetto', valore: e(codiceSoggetto(c) || '—') },
       { etichetta: 'Codice Integra', valore: e(c.codice_integra || '—') },
       { etichetta: 'Vendita diretta', valore: c.vendita_diretta ? CRM.stato('info', 'Sì') : '<span class="testo-tenue">No</span>' }
     ], { inColonne: true });

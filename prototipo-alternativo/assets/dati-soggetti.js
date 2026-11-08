@@ -8,7 +8,9 @@
    - MCL SRL: un soggetto, due ruoli con due codici diversi (D-101);
    - Consorzio Agrario Lombardo: catena = 1 soggetto con N sedi punto_vendita;
    - Stefano Bastasin: persona naturale con ruolo subagente;
-   - contatto del vecchio CRM senza ruoli e non attivo (niente cancellazioni §1.4).
+   - contatto del vecchio CRM senza ruoli e non attivo (niente cancellazioni §1.4);
+   - migrazione completa: ogni cliente, fornitore e subagente ha il suo soggetto,
+     quindi il suo codice C… (applicaSoggettiDemo collega o crea, import unico §7).
    Nota: in produzione la ragione sociale resta in clienti_versioni /
    fornitori_versioni; qui il nome esiste già sulle tabelle di strato 0.
    ============================================================ */
@@ -35,10 +37,10 @@
      a prima del master: così le FK restano coerenti in ogni demo. Idempotente.
      Nota: è su window, NON su DATI_DEMO — motore.js copia ogni chiave dei dati nel salvataggio
      e una funzione lì dentro romperebbe JSON.stringify alla riga di avvio. */
-  window.applicaSoggettiDemo = function (clienti, fornitori, subagenti) {
+  window.applicaSoggettiDemo = function (clienti, fornitori, subagenti, soggetti) {
     fornitori.forEach(f => { if (f.soggetto_id == null) f.soggetto_id = ({ 1: 1, 2: 2, 3: 3, 4: 4 })[f.id] || null; });
     clienti.forEach(c => { if (c.soggetto_id == null) c.soggetto_id = ({ '04235980161': 6, '03152770962': 7, '04120990983': 8 })[c.piva] || null; });
-    subagenti.forEach(sa => { if (sa.id === 1 && sa.soggetto_id == null) sa.soggetto_id = 9; });   // gli altri subagenti: ancora senza soggetto, come righe da migrare
+    subagenti.forEach(sa => { if (sa.id === 1 && sa.soggetto_id == null) sa.soggetto_id = 9; });   // Bastasin: il suo soggetto c'è già (CF in comune)
 
     /* MCL: cliente e fornitore sullo stesso soggetto. Il fornitore entra nello strato 0
        come sarebbe entrato in Integra; senza scaglioni, dimostra anche lo scaglione mancante. */
@@ -49,8 +51,30 @@
     /* Il Consorzio Agrario: cliente importato dal vecchio CRM (prima 34 schede, ora 1 soggetto). */
     if (!clienti.some(c => c.piva === '03567890123'))
       clienti.push({ piva: '03567890123', nome: 'Consorzio Agrario Lombardo', citta: 'Cremona', indirizzo: 'Via Garibaldi 12', codice_integra: 'C01104', vendita_diretta: false, soggetto_id: 10 });
+
+    /* Migrazione (import unico §7): ogni ruolo ha il suo soggetto. Chi non ce l'ha si collega
+       a un soggetto già presente con la stessa P.IVA/CF, altrimenti se ne crea uno nuovo. */
+    const norm = v => String(v || '').toUpperCase().replace(/[\s.]/g, '');
+    const normPiva = v => { const s = norm(v); return /^IT\d{11}$/.test(s) ? s.slice(2) : s; };
+    const massimo = f => Math.max.apply(null, soggetti.map(f).concat([0]));
+    const collega = (rec, natura, piva, cf) => {
+      if (rec.soggetto_id != null) return;
+      const pn = normPiva(piva), cn = norm(cf);
+      let s = soggetti.find(x => (pn && x.piva_norm === pn) || (!pn && cn && x.cf_norm === cn));
+      if (!s) {
+        if (!pn && !cn) return;   // senza dati fiscali resta un contatto, non un soggetto (§1.6)
+        s = { id: massimo(x => x.id) + 1, codice: 'C' + String(massimo(x => Number(String(x.codice || '').slice(1)) || 0) + 1).padStart(6, '0'),
+              natura: natura, paese: /^[A-Z]{2}/.test(pn) ? pn.slice(0, 2) : 'IT', piva: norm(piva), piva_norm: pn,
+              codice_fiscale: cf || '', cf_norm: cn, sorgente: 'integra', attivo: true, note: '' };
+        soggetti.push(s);
+      }
+      rec.soggetto_id = s.id;
+    };
+    clienti.forEach(c => collega(c, 'azienda', c.piva, ''));
+    fornitori.forEach(f => collega(f, 'azienda', f.piva, ''));
+    subagenti.forEach(sa => collega(sa, 'persona', '', sa.cf));   // i subagenti sono persone: il CF è l'identità
   };
-  window.applicaSoggettiDemo(D.clienti, D.fornitori, D.subagenti);
+  window.applicaSoggettiDemo(D.clienti, D.fornitori, D.subagenti, D.soggetti);
 
   D.sedi = [
     /* MCL: catena di punti vendita + sede di fatturazione */

@@ -14,7 +14,7 @@
      e sui ruoli già salvati dall'utente riapplica i link ai soggetti (dati di prima del master → FK coerenti) */
   if (!M.S.soggetti) ['soggetti', 'sedi', 'recapiti', 'persone', 'persone_contatti', 'fatturazioni']
     .forEach(k => { if (!M.S[k]) M.S[k] = JSON.parse(JSON.stringify(window.DATI_DEMO[k])); });
-  window.applicaSoggettiDemo(M.S.clienti, M.S.fornitori, M.S.subagenti);
+  window.applicaSoggettiDemo(M.S.clienti, M.S.fornitori, M.S.subagenti, M.S.soggetti);
 
   /* ---------- normalizzazione al confine: si salva il valore com'è scritto + quello normalizzato (§1.6) ---------- */
   const normPiva = v => { let s = String(v || '').toUpperCase().replace(/[\s.]/g, ''); if (/^IT\d{11}$/.test(s)) s = s.slice(2); return s; };
