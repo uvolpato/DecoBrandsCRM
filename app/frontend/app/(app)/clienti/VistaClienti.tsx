@@ -1,15 +1,14 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
-import { FormModal } from '@/componenti/FormModal';
+import { FormAgenzia, type Agenzia } from '@/componenti/FormAgenzia';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, quando } from '@/componenti/Piccoli';
 import { SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
-import type { CampoProps } from '@/componenti/Campo';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
@@ -28,21 +27,6 @@ interface Cliente {
   fornitori_ids: string[];
   subagenti_ids: string[];
   pratiche_aperte: number;
-}
-
-interface Agenzia {
-  id: string;
-  subagente_id: string;
-  subagente: string | null;
-  subagente_codice: string | null;
-  fornitore_id: string;
-  fornitore: string | null;
-  codice_cliente_fornitore: string | null;
-  sconto: number;
-  pct_subagente: number | null;
-  regola_mensile: string | null;
-  valido_dal: string;
-  valido_al: string | null;
 }
 
 interface Pratica {
@@ -70,18 +54,6 @@ interface Dettaglio {
   agenzie: Agenzia[];
 }
 
-interface Fornitore { id: string; ragione_sociale: string | null; }
-interface Subagente { id: string; codice: string; nome: string; cognome: string; }
-
-interface Scaglione { sconto_min: number; valido_dal: string; }
-
-// Sconti degli scaglioni in vigore (ultima data non futura), per l'aiuto della finestra (§7.6)
-function scontiInVigore(sc: Scaglione[], oggi: string) {
-  const dal = sc.map((x) => x.valido_dal).filter((d) => d <= oggi).sort().pop();
-  return [...new Set(sc.filter((x) => x.valido_dal === dal).map((x) => x.sconto_min))].sort((a, b) => a - b);
-}
-
-const NOTA_RESP = 'Li cambia un responsabile.'; // D-50 §19
 let schedaCliente = 'agenzie';
 
 export function VistaClienti({ idSel }: { idSel?: string }) {
@@ -91,22 +63,15 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   const [clienti, setClienti] = useState<Cliente[] | null>(null);
   const [dettaglio, setDettaglio] = useState<Dettaglio | null>(null);
   const [pratiche, setPratiche] = useState<Pratica[] | null>(null);
-  const [fornitori, setFornitori] = useState<Fornitore[]>([]);
-  const [subagenti, setSubagenti] = useState<Subagente[]>([]);
   const [valori, setValori] = useMemoria<Valori>('filtri', { vista: 'tutti', q: '', fornitori: [], subagenti: [] });
   const [valoriAg, setValoriAg] = useMemoria<Valori>('filtri-agenzie', { fornitori: [], subagenti: [] });
   const [valoriPr, setValoriPr] = useMemoria<Valori>('filtri-pratiche', { vista: 'aperte', fornitori: [], q: '' });
-  const scaglioni = useRef<Record<string, Scaglione[]>>({});
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [errore, setErrore] = useState('');
 
   const carica = useCallback(async () => {
     const r = await api<Cliente[]>('clienti');
     if (r.ok) { setClienti(r.dati); setErrore(''); } else if (!clienti) setErrore(r.messaggio); else avviso(r.messaggio, true);
-    const f = await api<Fornitore[]>('fornitori');
-    if (f.ok) setFornitori(f.dati);
-    const s = await api<Subagente[]>('subagenti');
-    if (s.ok) setSubagenti(s.dati);
   }, [clienti]);
 
   const caricaDettaglio = useCallback(async (id: string) => {
@@ -152,97 +117,6 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
 
   const puoModificare = puo('dati.modifica');
   const sagome = useSagome(!clienti);
-
-  const oggi = new Date().toISOString().slice(0, 10);
-
-  // D-50 §19: percentuale e regola solo al responsabile; per gli altri i campi sono spenti e non si inviano
-  const resp = puo('dati.condizioni');
-  const conResp = (c: CampoProps[]) => c.map((x) => ((x.nome === 'pct_subagente' || x.nome === 'regola_mensile') && !resp ? { ...x, disabilitato: true, aiuto: NOTA_RESP } : x));
-
-  // §7.6: sconti proposti dagli scaglioni in vigore dei fornitori (aiuto sotto il campo; il fornitore scelto va per primo)
-  async function aiutoSconto(primo?: string) {
-    await Promise.all(fornitori.filter((f) => !scaglioni.current[f.id]).map(async (f) => {
-      const d = await api<{ scaglioni: Scaglione[] }>('fornitori/' + f.id);
-      if (d.ok) scaglioni.current[f.id] = d.dati.scaglioni;
-    }));
-    const voci = [...fornitori].sort((a, b) => (a.id === primo ? -1 : b.id === primo ? 1 : 0))
-      .filter((f) => scaglioni.current[f.id]?.length)
-      .map((f) => (f.ragione_sociale ?? f.id) + ': ' + scontiInVigore(scaglioni.current[f.id], oggi).join(' · '));
-    return voci.length ? 'Scaglioni in vigore, sconti in %. ' + voci.join(' — ') : undefined;
-  }
-
-  async function nuovaAgenzia(x: Dettaglio) {
-    const aiuto = await aiutoSconto(fornitori[0]?.id);
-    setFinestra(
-      <FormModal titolo={'Nuova agenzia per ' + (x.ragione_sociale ?? '')} conferma="Crea" colonne={2}
-        campi={conResp([
-          { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: fornitore, valore: fornitori[0]?.id ?? '' },
-          { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: subagenti[0]?.id ?? '' },
-          { nome: 'codice_cliente_fornitore', etichetta: 'Codice cliente presso il fornitore', tipo: 'testo', valore: '' },
-          { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: '0', aiuto },
-          { nome: 'pct_subagente', etichetta: 'Al subagente per questo cliente % (vuoto = scaglione)', tipo: 'testo', valore: '' },
-          { nome: 'regola_mensile', etichetta: 'Provvigione al subagente', tipo: 'select', valore: '', opzioni: [{ value: '', label: 'Su ogni fattura' }, { value: 'prima', label: 'Una fattura al mese: la prima' }, { value: 'piu_alta', label: 'Una fattura al mese: la più alta' }] },
-          { nome: 'valido_dal', etichetta: 'Valido dal', tipo: 'testo', valore: oggi },
-          { nome: 'valido_al', etichetta: 'Valido al (vuoto = oggi)', tipo: 'testo', valore: '' },
-        ])}
-        onChiudi={chiudi}
-        onConferma={async (v) => {
-          const corpo: Record<string, unknown> = {
-            fornitore_id: Number(v.fornitore_id),
-            subagente_id: Number(v.subagente_id),
-            codice_cliente_fornitore: v.codice_cliente_fornitore || null,
-            sconto: Number(v.sconto ?? 0),
-            valido_dal: v.valido_dal,
-            valido_al: v.valido_al || null,
-          };
-          if (v.pct_subagente !== undefined) corpo.pct_subagente = v.pct_subagente ? Number(v.pct_subagente) : null;
-          if (v.regola_mensile !== undefined) corpo.regola_mensile = v.regola_mensile || null;
-          const r = await api<Agenzia>('clienti/' + x.id + '/agenzie', corpo);
-          if (!r.ok) return r.messaggio;
-          avviso('Agenzia creata');
-          await carica();
-          await caricaDettaglio(x.id);
-          return undefined;
-        }}
-      />,
-    );
-  }
-
-  async function modificaAgenzia(x: Dettaglio, a: Agenzia) {
-    const aiuto = await aiutoSconto(a.fornitore_id);
-    setFinestra(
-      <FormModal titolo="Modifica agenzia" conferma="Salva" colonne={2}
-        campi={conResp([
-          { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: fornitore, valore: a.fornitore_id },
-          { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: a.subagente_id },
-          { nome: 'codice_cliente_fornitore', etichetta: 'Codice cliente presso il fornitore', tipo: 'testo', valore: a.codice_cliente_fornitore ?? '' },
-          { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: String(a.sconto), aiuto },
-          { nome: 'pct_subagente', etichetta: 'Al subagente per questo cliente % (vuoto = scaglione)', tipo: 'testo', valore: a.pct_subagente === null ? '' : String(a.pct_subagente) },
-          { nome: 'regola_mensile', etichetta: 'Provvigione al subagente', tipo: 'select', valore: a.regola_mensile ?? '', opzioni: [{ value: '', label: 'Su ogni fattura' }, { value: 'prima', label: 'Una fattura al mese: la prima' }, { value: 'piu_alta', label: 'Una fattura al mese: la più alta' }] },
-          { nome: 'valido_dal', etichetta: 'Valido dal', tipo: 'testo', valore: a.valido_dal },
-          { nome: 'valido_al', etichetta: 'Valido al (vuoto = oggi)', tipo: 'testo', valore: a.valido_al ?? '' },
-        ])}
-        onChiudi={chiudi}
-        onConferma={async (v) => {
-          const corpo: Record<string, unknown> = {
-            fornitore_id: Number(v.fornitore_id),
-            subagente_id: Number(v.subagente_id),
-            codice_cliente_fornitore: v.codice_cliente_fornitore || null,
-            sconto: Number(v.sconto ?? 0),
-            valido_dal: v.valido_dal,
-            valido_al: v.valido_al || null,
-          };
-          if (v.pct_subagente !== undefined) corpo.pct_subagente = v.pct_subagente ? Number(v.pct_subagente) : null;
-          if (v.regola_mensile !== undefined) corpo.regola_mensile = v.regola_mensile || null;
-          const r = await api<Agenzia>('clienti/' + x.id + '/agenzie/' + a.id, corpo, 'PUT');
-          if (!r.ok) return r.messaggio;
-          avviso('Agenzia salvata');
-          await caricaDettaglio(x.id);
-          return undefined;
-        }}
-      />,
-    );
-  }
 
   async function eliminaAgenzia(x: Dettaglio, a: Agenzia) {
     if (!(await chiedi('Eliminare questa agenzia?', 'L’agenzia verrà eliminata.', 'Elimina', true))) return;
@@ -338,7 +212,9 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
               {
                 id: 'agenzie', etichetta: 'Agenzie', contenuto: () => (
                   <div className="pila riempi">
-                    {puoModificare && <div className="azioni-riga"><button type="button" className="btn primario piccolo" onClick={() => void nuovaAgenzia(u)}><Icona nome="piu" /> Aggiungi agenzia</button></div>}
+                    {puoModificare && <div className="azioni-riga"><button type="button" className="btn primario piccolo"
+                      onClick={() => setFinestra(<FormAgenzia cliente={{ id: u.id, nome: u.ragione_sociale }} onSalvata={async () => { await carica(); await caricaDettaglio(u.id); }} onChiudi={chiudi} />)}>
+                      <Icona nome="piu" /> Aggiungi agenzia</button></div>}
                     <FilterBar valori={valoriAg} onChange={setValoriAg} riepilogo campi={[
                       { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, placeholder: 'Tutti i fornitori' },
                       { nome: 'subagenti', tipo: 'ricerca', entita: subagente, multipla: true, placeholder: 'Tutti i subagenti' },
@@ -348,7 +224,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
                         key: 'azioni', header: '', align: 'center' as const, sortable: false,
                         cell: (a: Agenzia) => (
                           <span className="azioni-riga">
-                            <button type="button" className="btn sec piccolo" onClick={(e) => { e.stopPropagation(); void modificaAgenzia(u, a); }}>Modifica</button>
+                            <button type="button" className="btn sec piccolo" onClick={(e) => { e.stopPropagation(); setFinestra(<FormAgenzia cliente={{ id: u.id, nome: u.ragione_sociale }} agenzia={a} onSalvata={async () => { await caricaDettaglio(u.id); }} onChiudi={chiudi} />); }}>Modifica</button>
                             <button type="button" className="btn pericolo piccolo" onClick={(e) => { e.stopPropagation(); void eliminaAgenzia(u, a); }}>Elimina</button>
                           </span>
                         ),

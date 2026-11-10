@@ -18,7 +18,7 @@ import { righePagina } from './impostazioni';
 import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
 import { netto, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
-import { type Controllo, lettoDaCampi, propostaDocumento, valutaLettura } from './proposta';
+import { type Controllo, lettoDaCampi, mancaAgenziaRighe, propostaDocumento, valutaLettura } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -279,6 +279,7 @@ async function dettaglioDocumento(db: DbLetto, id: bigint) {
     ...p,
     abbinamento: p.abbinamento ? { ...p.abbinamento, cliente_id: String(p.abbinamento.cliente_id) } : null,
     cliente_riconosciuto: p.cliente_riconosciuto ? { ...p.cliente_riconosciuto, cliente_id: String(p.cliente_riconosciuto.cliente_id) } : null,
+    agenzia_mancante: p.agenzia_mancante ? { ...p.agenzia_mancante, cliente_id: String(p.agenzia_mancante.cliente_id), fornitore_id: String(p.agenzia_mancante.fornitore_id) } : null,
   };
   const controlli = (d.controlli as { falliti?: Controllo[] } | null)?.falliti ?? [];
   // solo il bollettino ha un omonimo da cercare (D-71): «esiste» dice se è già registrato
@@ -386,7 +387,8 @@ export class DocumentiController {
         MAX(CASE WHEN campo = 'data' THEN COALESCE(valore_finale, valore_letto) END) AS data,
         MAX(CASE WHEN campo = 'codice_cliente' THEN COALESCE(valore_finale, valore_letto) END) AS codice_cliente,
         MAX(CASE WHEN campo = 'cliente' THEN COALESCE(valore_finale, valore_letto) END) AS cliente,
-        MAX(CASE WHEN campo = 'importo_totale' THEN COALESCE(valore_finale, valore_letto) END) AS importo
+        MAX(CASE WHEN campo = 'importo_totale' THEN COALESCE(valore_finale, valore_letto) END) AS importo,
+        MAX(CASE WHEN campo = 'piva_cliente' THEN COALESCE(valore_finale, valore_letto) END) AS piva_cliente
       FROM documenti_campi GROUP BY documento_id
     )`;
     const altro = Prisma.sql`
@@ -397,12 +399,12 @@ export class DocumentiController {
     const righe = await this.db.$queryRaw<{
       id: bigint; file_nome: string; file_percorso: string; tipo: string | null; fornitore_id: bigint | null;
       fornitore: string | null; numero: string | null; data: string | null; codice_cliente: string | null;
-      cliente: string | null; importo: string | null; livello: string | null; ricevuto_il: Date;
+      cliente: string | null; piva_cliente: string | null; importo: string | null; livello: string | null; ricevuto_il: Date;
       letto_il: Date | null; controlli: Prisma.JsonValue | null;
     }[]>`
       WITH ${campi}
       SELECT d.id, d.file_nome, d.file_percorso, d.tipo, d.fornitore_id, fv.ragione_sociale AS fornitore,
-             c.numero, c.data, c.codice_cliente, c.cliente, c.importo, d.livello, d.ricevuto_il, d.letto_il, d.controlli
+             c.numero, c.data, c.codice_cliente, c.cliente, c.piva_cliente, c.importo, d.livello, d.ricevuto_il, d.letto_il, d.controlli
       FROM documenti_in_arrivo d
       LEFT JOIN campi c ON c.documento_id = d.id
       LEFT JOIN fornitori_versioni fv ON fv.fornitore_id = d.fornitore_id AND fv.id = d.fornitore_versione_id
@@ -419,6 +421,8 @@ export class DocumentiController {
       GROUP BY d.stato`;
     const conteggi: Record<(typeof STATI_ELENCO)[number], number> = { da_controllare: 0, in_coda: 0, in_lettura: 0, errore: 0 };
     for (const c of conti) if (c.stato in conteggi) conteggi[c.stato as keyof typeof conteggi] = Number(c.n);
+    // D-106: manca_agenzia con la stessa risoluzione della proposta, una query per pagina (V12)
+    const manca = await mancaAgenziaRighe(this.db, righe);
     return {
       documenti: righe.map((r) => ({
         id: String(r.id), file_nome: r.file_nome, file_tipo: fileTipo(r.file_percorso), tipo: r.tipo,
@@ -426,7 +430,7 @@ export class DocumentiController {
         fornitore: r.fornitore, codice_cliente: r.codice_cliente, cliente: r.cliente,
         importo: r.importo == null ? null : Number(r.importo), livello: r.livello,
         ricevuto_il: r.ricevuto_il.toISOString(), letto_il: r.letto_il?.toISOString() ?? null,
-        controlli_n: controlliFalliti(r.controlli),
+        controlli_n: controlliFalliti(r.controlli), manca_agenzia: manca.has(r.id),
       })),
       conteggi, totale: conteggi[stato], pagina, per_pagina: perPagina,
     };
@@ -945,6 +949,7 @@ export class DocumentiPraticaController {
       const quale = `${nomeDi(d.tipo)} ${d.numero}`.trim();
       if (d.fattura_id) throw new ConflictException(`${quale} storna una fattura: si sposta con la sua fattura, non da sola`);
       await togliibile(tx, pid, d, quale, 'non si sposta');
+      await richiediAgenzia(tx, nid, iso(d.data)); // D-106: anche spostandolo serve l'agenzia alla data
       await controllaNumero(tx, fid, nid, d.tipo, d.numero, iso(d.data), [d.id]);
       await tx.ordini_fornitore_documenti.update({ where: { id: d.id }, data: { testata_id: nid } });
       await tx.ordini_fornitore_righe.updateMany({ where: { documento_id: d.id }, data: { testata_id: nid } });
@@ -1042,6 +1047,18 @@ export class DocumentiPraticaController {
   }
 }
 
+/** D-106: il documento entra in pratica solo se il cliente ha un'agenzia valida col fornitore alla data
+ *  del documento (una regola, non un pulsante). Stessa condizione di `nuovaPratica`. */
+async function richiediAgenzia(tx: Tx, pid: bigint, data: string) {
+  const t = await tx.ordini_fornitore_testata.findUnique({ where: { id: pid }, select: { cliente_id: true, fornitore_id: true } });
+  if (!t) throw new NotFoundException('Pratica non trovata');
+  const ag = await tx.interscambio.findFirst({
+    where: { cliente_id: t.cliente_id, fornitore_id: t.fornitore_id, valido_dal: { lte: new Date(data) }, OR: [{ valido_al: null }, { valido_al: { gt: new Date(data) } }] },
+    select: { id: true },
+  });
+  if (!ag) throw new ConflictException("Il cliente non ha un'agenzia con questo fornitore alla data del documento: aggiungila in Clienti o dal documento");
+}
+
 /** Registra un documento nella pratica già bloccata (D-60 §19): un posto solo per la registrazione a mano e
  *  l'abbinamento di un file in coda. Fattura e nota di credito con le regole di F2-A3 (numero unico, importo, storno);
  *  l'ordine con numero unico per fornitore; gli altri tipi solo tracciati. Evento documento.create. */
@@ -1049,6 +1066,7 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
   if ((fiscale(b.tipo) || b.tipo === 'ordine') && (!b.numero || !b.data)) throw new BadRequestException(`${nomeDi(b.tipo)}: numero e data sono obbligatori`);
   if (b.tipo !== 'nota_credito' && b.fattura_id) throw new BadRequestException('Solo la nota di credito storna una fattura');
   const numero = b.numero ?? '', data = b.data ?? giornoRoma(new Date());
+  await richiediAgenzia(tx, pid, data); // D-106
   const fattura_id = b.fattura_id ? BigInt(b.fattura_id) : null;
   const storno_totale = b.storno_totale ?? false;
   await controllaNumero(tx, fid, pid, b.tipo, numero, data);

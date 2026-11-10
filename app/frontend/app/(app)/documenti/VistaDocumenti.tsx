@@ -30,7 +30,7 @@ interface Documento {
   id: string; file_nome: string; file_tipo: string; tipo: string | null; numero: string | null;
   data: string | null; fornitore_id: string | null; fornitore: string | null; codice_cliente: string | null;
   cliente: string | null; importo: number | null; livello: string | null; ricevuto_il: string;
-  letto_il: string | null; controlli_n: number;
+  letto_il: string | null; controlli_n: number; manca_agenzia: boolean;
 }
 interface Risposta {
   documenti: Documento[];
@@ -152,7 +152,10 @@ export function VistaDocumenti() {
                   titolo: (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : ''),
                   valore: d.importo == null ? '' : euro(d.importo),
                   sotto: (d.fornitore ?? 'fornitore non riconosciuto') + ' · caricato il ' + quando(d.ricevuto_il),
-                  stato: l ? <Stato v={l.v}>{l.testo}</Stato> : undefined,
+                  stato: l || d.manca_agenzia ? <>
+                    {l ? <Stato v={l.v}>{l.testo}</Stato> : null}
+                    {d.manca_agenzia ? <Stato v="attesa">Manca l’agenzia</Stato> : null}
+                  </> : undefined,
                 };
               })} />
           ) : (

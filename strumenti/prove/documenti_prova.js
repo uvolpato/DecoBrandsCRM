@@ -17,27 +17,34 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2
 
 const fileDi = (percorso) => path.join(process.env.DOCUMENTI_DIR, percorso);
 
-async function pulisci(c, s) {
-  const { rows } = await c.query('SELECT id, file_percorso FROM documenti_in_arrivo WHERE file_nome = $1', [`Prova_${s}.pdf`]);
-  for (const d of rows) {
-    await c.query('DELETE FROM ordini_fornitore_documenti WHERE arrivo_id = $1', [d.id]);
-    await c.query("DELETE FROM registro WHERE entita = 'documento' AND entita_id = $1", [d.id]);
-    await c.query('DELETE FROM documenti_in_arrivo WHERE id = $1', [d.id]);
-    try { fs.unlinkSync(fileDi(d.file_percorso)); } catch { /* il file può essere già stato spostato */ }
+async function pulisci(c, nomi) {
+  let tot = 0;
+  for (const nome of nomi) {
+    const { rows } = await c.query('SELECT id, file_percorso FROM documenti_in_arrivo WHERE file_nome = $1', [nome]);
+    for (const d of rows) {
+      await c.query('DELETE FROM ordini_fornitore_documenti WHERE arrivo_id = $1', [d.id]);
+      await c.query("DELETE FROM registro WHERE entita = 'documento' AND entita_id = $1", [d.id]);
+      await c.query('DELETE FROM documenti_in_arrivo WHERE id = $1', [d.id]);
+      try { fs.unlinkSync(fileDi(d.file_percorso)); } catch { /* il file può essere già stato spostato */ }
+    }
+    tot += rows.length;
   }
-  return rows.length;
+  return tot;
 }
 
 (async () => {
   const comando = process.argv[2], s = process.argv[3];
-  if ((comando !== 'crea' && comando !== 'togli') || !/^[a-z0-9]+$/.test(s ?? '')) {
-    throw new Error('uso: crea <suffisso> | togli <suffisso> (minuscole e numeri)');
+  if ((comando !== 'crea' && comando !== 'crea-senza' && comando !== 'togli') || !/^[a-z0-9]+$/.test(s ?? '')) {
+    throw new Error('uso: crea <suffisso> | crea-senza <suffisso> | togli <suffisso> (minuscole e numeri)');
   }
   const c = new Client({ connectionString: process.env.DATABASE_URL.replace(/\?.*$/, '') });
   await c.connect();
   await c.query('BEGIN');
   await c.query("SET LOCAL decobrands.pulizia_registro = 'si'"); // la prova può togliere i suoi eventi (utenti_prova.js)
-  const tolti = await pulisci(c, s);
+  // ogni comando toglie solo il documento che crea; `togli` li toglie tutti e due
+  const nomi = comando === 'togli' ? [`Prova_${s}.pdf`, `Prova-senza_${s}.pdf`]
+    : [comando === 'crea' ? `Prova_${s}.pdf` : `Prova-senza_${s}.pdf`];
+  const tolti = await pulisci(c, nomi);
   if (comando === 'crea') {
     // un'agenzia del seed senza pratiche: la proposta resta "nessuno" e non aggiunge controlli articolo
     let { rows: [inter] } = await c.query(`
@@ -104,6 +111,43 @@ async function pulisci(c, s) {
     }
     await c.query('COMMIT');
     console.log('creato documento', doc.id, numero, 'su', inter.cliente, '/', inter.fornitore_id, '→', percorso);
+  } else if (comando === 'crea-senza') {
+    // D-106: ordine di un cliente SENZA agenzia con quel fornitore → proposta manca_agenzia
+    const { rows: [inter] } = await c.query(`
+      SELECT f.id AS fornitore_id, f.versione_corrente_id AS fv, c.id AS cliente_id,
+             cv.ragione_sociale AS cliente, cv.piva AS piva
+      FROM clienti c
+      JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
+      JOIN fornitori f ON f.versione_corrente_id IS NOT NULL
+      WHERE NOT EXISTS (SELECT 1 FROM interscambio i WHERE i.cliente_id = c.id AND i.fornitore_id = f.id)
+      ORDER BY c.id, f.id LIMIT 1`);
+    if (!inter) throw new Error('Nessuna coppia cliente×fornitore senza agenzia: carica i dati di prova (npm run db:seed)');
+
+    const numero = `PROVA-SENZA-${s.toUpperCase()}`, data = '2026-09-15';
+    const contenuto = Buffer.concat([PDF, Buffer.from('% senza ' + s + ' ' + Date.now() + '\n')]);
+    const hash = crypto.createHash('sha256').update(contenuto).digest('hex');
+    const giorno = new Date().toISOString().slice(0, 10);
+    const percorso = `in_arrivo/${giorno.slice(0, 4)}/${giorno.replace(/-/g, '')}/${hash}.pdf`;
+    fs.mkdirSync(path.dirname(fileDi(percorso)), { recursive: true });
+    fs.writeFileSync(fileDi(percorso), contenuto);
+
+    const { rows: [doc] } = await c.query(`
+      INSERT INTO documenti_in_arrivo
+        (origine, file_nome, file_hash, file_percorso, stato, tipo, fornitore_id, fornitore_versione_id,
+         livello, controlli, ricevuto_il, letto_il)
+      VALUES ('caricamento', $1, $2, $3, 'da_controllare', 'ordine', $4, $5, 'affidabile', $6, now(), now())
+      RETURNING id`, [`Prova-senza_${s}.pdf`, hash, percorso, inter.fornitore_id, inter.fv, { falliti: [] }]);
+    const campi = {
+      numero: [numero, 0.95], data: [data, 0.95], codice_cliente: [`SENZA-${s.toUpperCase()}`, 0.95],
+      cliente: [inter.cliente, 0.95], piva_cliente: [inter.piva, 0.95],
+    };
+    for (const [campo, [valore, aff]] of Object.entries(campi)) {
+      await c.query(`INSERT INTO documenti_campi
+        (documento_id, campo, valore_letto, valore_finale, affidabilita, posizione, precisione, verificato)
+        VALUES ($1, $2, $3, NULL, $4, NULL, 'assente', false)`, [doc.id, campo, valore, aff]);
+    }
+    await c.query('COMMIT');
+    console.log('creato documento senza agenzia', doc.id, numero, 'su', inter.cliente, '/', inter.fornitore_id, '→', percorso);
   } else {
     await c.query('COMMIT');
     console.log('tolti', tolti, 'documenti di prova', s);

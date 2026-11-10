@@ -126,6 +126,7 @@ export const GUIDA: Argomento[] = [
       ['Apri la pratica', 'Per un ordine: crea la pratica nuova, con cliente e fornitore.'],
       ['Registra e verifica', 'Per un bollettino: lo registra e apre la verifica.'],
       ['Scarta il documento', 'Per doppioni o documenti che non riguardano Decobrands.'],
+      ['Configura l’agenzia', 'Quando un documento è di un cliente che non ha l’agenzia con quel fornitore: apre il form dell’agenzia (cliente e fornitore già fissi). Senza, il documento non entra in una pratica.'],
     ],
     finestre: [
       { nome: 'Correggi i dati letti', da: 'Correggi i dati letti', cosa: 'A tutto schermo: a sinistra il documento originale (PDF o foto), a destra testata e righe modificabili. Il PDF si apre alla pagina del campo scelto. Sotto gli 860 px i due lati si impilano.',
@@ -154,6 +155,7 @@ export const GUIDA: Argomento[] = [
     ],
     sapere: [
       'Le righe stanno nella seconda scheda perché qui si decide cosa fare del documento; se sono incerte, l’avviso e il contatore lo dicono subito.',
+      'Un documento per un cliente che non ha l’agenzia con quel fornitore non entra in una pratica: nell’azione proposta compare «Configura l’agenzia» (è normale al primo ordine di quella coppia). L’elenco lo segnala con la pillola «Manca l’agenzia», che sparisce dopo la configurazione.',
       '⚠ L’evidenziazione del valore nel documento è da verificare sui file reali (D-06, prova F0-A7): il rettangolo sul valore non si disegna ancora. La finestra apre il PDF alla pagina del campo e dice quanto è precisa la posizione; sui documenti scansionati o fotografati può mancare.',
       'Gli Excel dei bollettini non entrano da qui: il canale comune accetta solo PDF e foto (D-60).',
     ],
@@ -595,6 +597,7 @@ export const GUIDA: Argomento[] = [
       '<b>Al subagente per questo cliente %</b> e <b>Provvigione al subagente</b> li cambia solo un responsabile, come le eccezioni personali. La percentuale vale solo per questo cliente e fornitore; vuoto = la percentuale dello scaglione o l’eccezione del subagente.',
       '<b>Una fattura al mese</b> (la prima o la più alta): le altre fatture del mese non danno provvigione al subagente. Il fornitore non cambia: si controlla nel bollettino.',
       'Per un caso singolo si corregge il documento in Liquidazioni (<b>Correggi</b>), con il motivo. Lo sconto fittizio non serve più: lo sconto resta quello vero.',
+      'L’agenzia si configura anche dal <b>Documento</b>: quando un documento è di un cliente che non ha l’agenzia con quel fornitore, l’azione proposta propone «Configura l’agenzia» (stesso form, con cliente e fornitore già fissi).',
     ],
     modifica: 'Operatore o superiore nell’area Dati; le percentuali al subagente sono del responsabile.',
   },

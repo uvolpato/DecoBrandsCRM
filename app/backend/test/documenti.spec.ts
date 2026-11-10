@@ -393,3 +393,77 @@ describe('documenti scartati: serve provvigioni.scartati', () => {
     await op.get(`/documenti/${scartato}`).expect(200);
   });
 });
+
+describe('agenzia mancante: il documento non entra in pratica (D-106)', () => {
+  let fornitore: { id: bigint; versione_id: bigint };
+  let senza: { id: bigint; versione_id: bigint; ragione: string; piva: string | null };
+  let praticaSenza: bigint;
+
+  beforeAll(async () => {
+    const fv = await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } });
+    const f = await db.fornitori.findUniqueOrThrow({ where: { id: fv.fornitore_id } });
+    fornitore = { id: fv.fornitore_id, versione_id: f.versione_corrente_id! };
+    const c = await db.clienti.findFirstOrThrow({ where: { agenzie: { none: { fornitore_id: fornitore.id } } }, include: { corrente: true } });
+    senza = { id: c.id, versione_id: c.versione_corrente_id!, ragione: c.corrente!.ragione_sociale, piva: c.corrente!.piva };
+    // pratica creata a mano senza agenzia, per provare registrazione e spostamento
+    const agente = await db.agenti.findFirstOrThrow();
+    const t = await db.ordini_fornitore_testata.create({ data: {
+      fornitore_id: fornitore.id, fornitore_versione_id: fornitore.versione_id,
+      cliente_id: c.id, cliente_versione_id: c.versione_corrente_id!,
+      numero_ordine: 'OF/2026/998', data_ordine: new Date('2026-09-01'), agente_id: agente.id,
+    } });
+    praticaSenza = t.id;
+  });
+
+  it('creazione (registrazione a mano): 409 senza agenzia', async () => {
+    const prima = await db.ordini_fornitore_documenti.count();
+    const r = await op.post(`/pratiche/${praticaSenza}/documenti`, { tipo: 'fattura', numero: 'AG-1', data: '2026-09-10', importo: 100 }).expect(409);
+    expect(r.body.message).toMatch(/agenzia/);
+    expect(await db.ordini_fornitore_documenti.count()).toBe(prima);
+  });
+
+  it('abbinamento di un file in coda (pratica nuova): 409 senza agenzia', async () => {
+    const b = (await op.carica(pdf('ordine senza agenzia'), 'ordine-no-ag.pdf').expect(201)).body;
+    const r = await op.post(`/documenti/${b.id}/abbina`, { tipo: 'ordine', numero: 'AG-ORD-1', data: '2026-09-01', cliente_id: Number(senza.id), fornitore_id: Number(fornitore.id) }).expect(409);
+    expect(r.body.message).toMatch(/agenzia/);
+  });
+
+  it('spostamento in una pratica senza agenzia: 409', async () => {
+    const con = await db.ordini_fornitore_testata.findFirstOrThrow({ where: { fornitore_id: fornitore.id, id: { not: praticaSenza } } });
+    const doc = await db.ordini_fornitore_documenti.create({ data: { testata_id: con.id, tipo: 'conferma', numero: 'AG-CONF-1', data: new Date('2026-09-01'), importo: 0 } });
+    const r = await op.post(`/pratiche/${con.id}/documenti/${doc.id}/sposta`, { pratica_id: Number(praticaSenza) }).expect(409);
+    expect(r.body.message).toMatch(/agenzia/);
+  });
+
+  it('GET /api/documenti: manca_agenzia vero, conteggi invariati', async () => {
+    const d = await db.documenti_in_arrivo.create({ data: {
+      origine: 'email', file_nome: 'ordine-senza-agenzia.pdf', stato: 'da_controllare',
+      file_hash: createHash('sha256').update('ordine-senza-agenzia').digest('hex'), file_percorso: 'in_arrivo/ordine-senza-agenzia.pdf',
+      tipo: 'ordine', fornitore_id: fornitore.id, fornitore_versione_id: fornitore.versione_id,
+    } });
+    await db.documenti_campi.createMany({ data: [
+      { documento_id: d.id, campo: 'numero', valore_letto: 'AG-ORD-LIST' },
+      { documento_id: d.id, campo: 'data', valore_letto: '2026-09-01' },
+      { documento_id: d.id, campo: 'codice_cliente', valore_letto: 'ZZZ-999' },
+      { documento_id: d.id, campo: 'cliente', valore_letto: senza.ragione },
+      { documento_id: d.id, campo: 'piva_cliente', valore_letto: senza.piva },
+    ] });
+    const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    const riga = r.documenti.find((x: any) => x.id === String(d.id));
+    expect(riga.manca_agenzia).toBe(true);
+    // i conteggi non cambiano: il campo è in più, non un filtro
+    expect(r.totale).toBe(r.documenti.length);
+    expect(r.documenti.every((x: any) => typeof x.manca_agenzia === 'boolean')).toBe(true);
+  });
+
+  it("creata l'agenzia via API, la registrazione riesce e la pillola sparisce", async () => {
+    const sub = await db.subagenti.findFirstOrThrow();
+    await senzaArea.post(`/clienti/${senza.id}/agenzie`, { subagente_id: Number(sub.id), fornitore_id: Number(fornitore.id), sconto: 5, valido_dal: '2026-01-01' }).expect(201);
+    const r = await op.post(`/pratiche/${praticaSenza}/documenti`, { tipo: 'fattura', numero: 'AG-2', data: '2026-09-10', importo:100 }).expect(201);
+    expect(r.body.totali.netto).toBe(100);
+    // il documento da controllare ora ha l'agenzia: manca_agenzia false
+    const el = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    const riga = el.documenti.find((x: any) => x.file_nome === 'ordine-senza-agenzia.pdf');
+    expect(riga.manca_agenzia).toBe(false);
+  });
+});

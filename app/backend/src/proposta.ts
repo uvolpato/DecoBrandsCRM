@@ -70,7 +70,17 @@ export interface Candidato {
   delta: number;
 }
 
-export type Esito = 'doppio' | 'bollettino' | 'nuova' | 'certo' | 'probabile' | 'ambiguo' | 'nessuno';
+export type Esito = 'doppio' | 'bollettino' | 'nuova' | 'certo' | 'probabile' | 'ambiguo' | 'nessuno' | 'manca_agenzia';
+
+/** D-106: cliente e fornitore riconosciuti ma senza agenzia valida alla data del documento. */
+export interface AgenziaMancante {
+  cliente_id: bigint;
+  fornitore_id: bigint;
+  cliente: string | null;
+  fornitore: string | null;
+  codice_cliente: string | null;
+  data: string | null;
+}
 
 export interface Proposta {
   esito: Esito;
@@ -79,6 +89,8 @@ export interface Proposta {
   abbinamento: Abbinamento | null;
   /** Cliente riconosciuto per P.IVA o ragione sociale (D-92) quando il codice del fornitore non è abbinato. */
   cliente_riconosciuto: { cliente_id: bigint; ragione: string | null } | null;
+  /** D-106: senza agenzia il documento non entra in pratica; porta i dati per configurarla dal documento. */
+  agenzia_mancante: AgenziaMancante | null;
 }
 
 export interface Controllo {
@@ -197,25 +209,105 @@ async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | nul
 
 /* ---------- Cliente per P.IVA o ragione sociale (D-92) ---------- */
 /** P.IVA normalizzata: solo cifre e lettere, maiuscole (spazi e prefissi ignorati). */
-const normalizzaPiva = (s: string) => (s || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+export const normalizzaPiva = (s: string) => (s || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
 
-/** Riconosce il cliente del documento quando il codice del fornitore non è abbinato (D-92):
- *  vince la P.IVA (univoca), poi la ragione sociale normalizzata accettata solo con un solo
- *  candidato. null = cliente non riconosciuto (nuovo o non leggibile). */
-export async function riconosciCliente(db: Db, l: Letto): Promise<{ cliente_id: bigint; ragione: string | null } | null> {
-  // una sola lettura dei clienti con la versione corrente (P.IVA e ragione sociale stanno sulla versione, §4.6)
-  const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
-  const piva = normalizzaPiva(l.piva_cliente ?? '');
+type ClienteConCorrente = { id: bigint; corrente: { piva: string | null; ragione_sociale: string } | null };
+
+/** Risolve il cliente per P.IVA o ragione sociale (D-92): vince la P.IVA (univoca), poi la ragione
+ *  sociale normalizzata accettata solo con un solo candidato. I clienti si passano già caricati, così
+ *  l'elenco li legge una volta sola per pagina (D-106). null = cliente non riconosciuto. */
+export function riconosciClienteDai(clienti: ClienteConCorrente[], piva_cliente: string | null, cliente: string | null): { cliente_id: bigint; ragione: string | null } | null {
+  const piva = normalizzaPiva(piva_cliente ?? '');
   if (piva.length >= 11) {
     const c = clienti.find((x) => x.corrente?.piva != null && normalizzaPiva(x.corrente.piva) === piva);
     if (c) return { cliente_id: c.id, ragione: c.corrente!.ragione_sociale };
   }
-  const nome = normalizzaNome(l.cliente ?? '');
+  const nome = normalizzaNome(cliente ?? '');
   if (nome) {
     const cc = clienti.filter((x) => x.corrente && normalizzaNome(x.corrente.ragione_sociale) === nome);
     if (cc.length === 1) return { cliente_id: cc[0].id, ragione: cc[0].corrente!.ragione_sociale };
   }
   return null;
+}
+
+/** Riconosce il cliente del documento quando il codice del fornitore non è abbinato (D-92). */
+export async function riconosciCliente(db: Db, l: Letto): Promise<{ cliente_id: bigint; ragione: string | null } | null> {
+  // una sola lettura dei clienti con la versione corrente (P.IVA e ragione sociale stanno sulla versione, §4.6)
+  const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
+  return riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
+}
+
+/* ---------- Agenzia mancante (D-106) ---------- */
+
+/** Tipi che entrano in una pratica: l'ordine la apre, gli altri si abbinano (§6.5). */
+const ENTRA_IN_PRATICA = new Set(['ordine', 'conferma', 'fattura', 'nota_credito']);
+
+/** Interscambio (agenzia) valido alla data del documento: lo stesso controllo di `documenti.ts` (D-106). */
+async function agenziaValida(db: Db, cliente_id: bigint, fornitore_id: bigint, data: string | null): Promise<boolean> {
+  const giorno = data ? new Date(data + 'T00:00:00Z') : new Date();
+  const a = await db.interscambio.findFirst({
+    where: { cliente_id, fornitore_id, valido_dal: { lte: giorno }, OR: [{ valido_al: null }, { valido_al: { gt: giorno } }] },
+    select: { id: true },
+  });
+  return !!a;
+}
+
+/** Se cliente e fornitore sono riconosciuti ma non c'è un'agenzia valida alla data, i dati per agire
+ *  (D-106); altrimenti null. `cliente` viene dall'abbinamento per codice o dalla P.IVA/ragione sociale. */
+async function agenziaMancante(db: Db, l: Letto, ab: Abbinamento | null, riconosciuto: { cliente_id: bigint; ragione: string | null } | null): Promise<AgenziaMancante | null> {
+  if (!ENTRA_IN_PRATICA.has(l.tipo ?? '') || l.fornitore_id == null) return null;
+  const cliente_id = ab?.cliente_id ?? riconosciuto?.cliente_id ?? null;
+  if (cliente_id == null) return null;
+  if (await agenziaValida(db, cliente_id, l.fornitore_id, l.data)) return null;
+  const f = await db.fornitori.findUnique({ where: { id: l.fornitore_id }, include: { corrente: true } });
+  return {
+    cliente_id, fornitore_id: l.fornitore_id,
+    cliente: ab?.cliente ?? riconosciuto?.ragione ?? null,
+    fornitore: f?.corrente?.ragione_sociale ?? null,
+    codice_cliente: l.codice_cliente, data: l.data,
+  };
+}
+
+/** Una riga dell'elenco Documenti per il calcolo di `manca_agenzia` (D-106). */
+export interface RigaAgenzia {
+  id: bigint;
+  tipo: string | null;
+  fornitore_id: bigint | null;
+  data: string | null;
+  codice_cliente: string | null;
+  cliente: string | null;
+  piva_cliente: string | null;
+}
+
+/** Dice quali righe dell'elenco hanno `manca_agenzia`, con la stessa risoluzione della proposta.
+ *  Una query di clienti e una di interscambio per pagina, niente query per riga (D-106, V12). */
+export async function mancaAgenziaRighe(db: Db, righe: RigaAgenzia[]): Promise<Set<bigint>> {
+  const manca = new Set<bigint>();
+  const rilevanti = righe.filter((r) => ENTRA_IN_PRATICA.has(r.tipo ?? '') && r.fornitore_id != null);
+  if (!rilevanti.length) return manca;
+  const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
+  const fornitori = [...new Set(rilevanti.map((r) => r.fornitore_id!))];
+  const interscambi = await db.interscambio.findMany({
+    where: { fornitore_id: { in: fornitori } },
+    select: { cliente_id: true, fornitore_id: true, codice_cliente_fornitore: true, valido_dal: true, valido_al: true },
+  });
+  const valida = (a: { valido_dal: Date; valido_al: Date | null }, giorno: Date) =>
+    a.valido_dal <= giorno && (a.valido_al == null || a.valido_al > giorno);
+  const giornoDi = (data: string | null) => (/^\d{4}-\d{2}-\d{2}$/.test(data ?? '') ? new Date(data + 'T00:00:00Z') : new Date());
+  for (const r of rilevanti) {
+    const f = r.fornitore_id!;
+    const giorno = giornoDi(r.data);
+    // via codice cliente (interscambio): se c'è, l'agenzia esiste → niente pillola
+    const perCodice = r.codice_cliente
+      ? interscambi.find((a) => a.fornitore_id === f && a.codice_cliente_fornitore != null
+          && a.codice_cliente_fornitore.toLowerCase() === r.codice_cliente!.toLowerCase() && valida(a, giorno))
+      : null;
+    if (perCodice) continue;
+    const cli = riconosciClienteDai(clienti as ClienteConCorrente[], r.piva_cliente, r.cliente);
+    if (!cli) continue; // cliente non riconosciuto: la proposta non è manca_agenzia
+    if (!interscambi.some((a) => a.cliente_id === cli.cliente_id && a.fornitore_id === f && valida(a, giorno))) manca.add(r.id);
+  }
+  return manca;
 }
 
 /* ---------- Proposta di abbinamento (M.proposta, §6.5) ---------- */
@@ -231,26 +323,32 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
     const gia = l.fornitore_id != null && l.mese != null && l.anno != null
       ? await db.bollettini_testata.findFirst({ where: { fornitore_id: l.fornitore_id, mese: l.mese, anno: l.anno }, select: { id: true } })
       : null;
-    return { esito: gia ? 'doppio' : 'bollettino', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null };
+    return { esito: gia ? 'doppio' : 'bollettino', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null };
   }
   const ab = await abbinamentoPerCodice(db, l);
+  // D-92 + D-106: cliente riconosciuto (codice del fornitore, altrimenti P.IVA/ragione sociale)
+  const cliente_riconosciuto = ab ? null : await riconosciCliente(db, l);
   if (l.tipo === 'ordine') {
     // il numero letto è quello del fornitore: il doppione si cerca fra i documenti della pratica,
     // non sul numero della pratica (che il CRM genera OF/AAAA/NNN, D-60)
     const gia = l.fornitore_id != null && l.numero
       ? await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'ordine', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } })
       : null;
-    const cliente_riconosciuto = ab ? null : await riconosciCliente(db, l); // D-92: codice non abbinato, si prova P.IVA/ragione sociale
-    return { esito: gia ? 'doppio' : ab ? 'nuova' : 'nessuno', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto };
+    const manca = await agenziaMancante(db, l, ab, cliente_riconosciuto);
+    return { esito: gia ? 'doppio' : manca ? 'manca_agenzia' : ab ? 'nuova' : 'nessuno', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto, agenzia_mancante: manca };
   }
   if (l.tipo !== 'conferma' && l.tipo !== 'fattura' && l.tipo !== 'nota_credito') {
-    return { esito: 'nessuno', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto: null }; // proforma, pagamento, altro o tipo non letto
+    return { esito: 'nessuno', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto: null, agenzia_mancante: null }; // proforma, pagamento, altro o tipo non letto
   }
   // una fattura già registrata in una pratica è un doppione
   if (l.tipo === 'fattura' && l.fornitore_id != null && l.numero) {
     const gia = await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'fattura', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } });
-    if (gia) return { esito: 'doppio', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto: null };
+    if (gia) return { esito: 'doppio', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto: null, agenzia_mancante: null };
   }
+
+  // D-106: cliente e fornitore riconosciuti ma senza agenzia valida alla data → non si abbina
+  const manca = await agenziaMancante(db, l, ab, cliente_riconosciuto);
+  if (manca) return { esito: 'manca_agenzia', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto, agenzia_mancante: manca };
 
   const codiciDoc = l.righe.map((r) => r.codice).filter((c): c is string => !!c);
   const testate = l.fornitore_id != null
@@ -297,7 +395,7 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
       const c = candidati.splice(k, 1)[0];
       c.motivi.unshift(`storna la fattura ${l.riferimento_fattura} di questa pratica`);
       candidati.unshift(c);
-      return { esito: 'certo', candidati, importo: imp, abbinamento: ab, cliente_riconosciuto: null };
+      return { esito: 'certo', candidati, importo: imp, abbinamento: ab, cliente_riconosciuto, agenzia_mancante: null };
     }
   }
 
@@ -305,7 +403,7 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
   if (candidati.length && !ab) esito = candidati[0].punteggio > 0 ? 'probabile' : 'nessuno';
   else if (candidati.length === 1) esito = 'certo';
   else if (candidati.length > 1) esito = candidati[0].punteggio - candidati[1].punteggio >= 0.5 ? 'probabile' : 'ambiguo';
-  return { esito, candidati, importo: imp, abbinamento: ab, cliente_riconosciuto: null };
+  return { esito, candidati, importo: imp, abbinamento: ab, cliente_riconosciuto, agenzia_mancante: null };
 }
 
 /* ---------- Controlli fissi (§6.5 punto 5) ---------- */

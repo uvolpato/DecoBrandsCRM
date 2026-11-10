@@ -6,6 +6,7 @@ import { CampoRicerca } from '@/componenti/CampoRicerca';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { Scelte } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
+import { FormAgenzia } from '@/componenti/FormAgenzia';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pannello, type Azione } from '@/componenti/Pagina';
@@ -85,6 +86,7 @@ interface Proposta {
   esito: string; candidati: Candidato[]; importo: number;
   abbinamento: { cliente_id: string; cliente: string | null; codice: string | null } | null;
   cliente_riconosciuto: { cliente_id: string; ragione: string | null } | null;
+  agenzia_mancante: { cliente_id: string; fornitore_id: string; cliente: string | null; fornitore: string | null; codice_cliente: string | null; data: string | null } | null;
 }
 interface Dettaglio {
   id: string; file_nome: string; file_tipo: 'pdf' | 'jpg' | 'png'; stato: string; tipo: string | null;
@@ -332,6 +334,21 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     ...(t.riferimento_fattura ? [{ etichetta: 'Fattura stornata', valore: t.riferimento_fattura }] : []),
   ];
 
+  /** D-106: senza agenzia il documento non entra in pratica; si configura qui, con cliente e fornitore fissi. */
+  function configuraAgenzia() {
+    const am = doc.proposta.agenzia_mancante;
+    if (!am) return;
+    setFinestra(
+      <FormAgenzia
+        cliente={{ id: am.cliente_id, nome: am.cliente }}
+        fornitoreFisso={{ id: am.fornitore_id, nome: am.fornitore ?? doc.fornitore?.nome ?? 'Fornitore' }}
+        iniziali={{ codice_cliente_fornitore: am.codice_cliente, valido_dal: am.data }}
+        onSalvata={async () => { await carica(); onFatto?.(); }}
+        onChiudi={chiudi}
+      />,
+    );
+  }
+
   function azione() {
     return (
       <>
@@ -342,7 +359,14 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
             <button type="button" className="btn sec piccolo" onClick={() => setScheda('righe')}>Vedi le righe</button>
           </div>
         )}
-        {boll ? (
+        {doc.proposta.esito === 'manca_agenzia' ? (
+          <div className="pila">
+            <Nota>Il cliente non ha un’agenzia con questo fornitore: senza, il documento non entra in una pratica. È normale al primo ordine.</Nota>
+            <div className="azioni-riga">
+              <button type="button" className="btn primario" onClick={configuraAgenzia}>Configura l’agenzia</button>
+            </div>
+          </div>
+        ) : boll ? (
           doc.bollettino?.esiste ? (
             <Nota>Il bollettino di {t.mese ? MESI[t.mese - 1] : ''} {t.anno ?? ''} di {nomeFornitore} è già registrato:
               {bollettinoId ? <> <Link href={'/bollettini/' + bollettinoId}>aprilo</Link></> : <> aprilo da <Link href="/bollettini">Bollettini</Link></>}.
@@ -402,7 +426,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
             })} />
           </>
         )}
-        {!boll && doc.stato === 'da_controllare' && (
+        {!boll && doc.stato === 'da_controllare' && doc.proposta.esito !== 'manca_agenzia' && (
           <div className="abbina-altra">
             <span className="testo-tenue">Oppure abbina a un’altra pratica di {nomeFornitore}:</span>
             <CampoRicerca entita={PRATICA} contesto={{ fornitore_id: t.fornitore_id }} valore={altra} onChange={setAltra} />

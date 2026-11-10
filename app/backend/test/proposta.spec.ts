@@ -259,6 +259,40 @@ describe('proposta — bollettino', () => {
   });
 });
 
+describe('proposta — agenzia mancante (D-106)', () => {
+  it('agenzia valida alla data: esito normale e agenzia_mancante null', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gries.id, numero: 'OF-901', codice_cliente: 'K-100' }));
+    expect(p.esito).toBe('nuova');
+    expect(p.agenzia_mancante).toBeNull();
+  });
+
+  it('agenzia assente (cliente riconosciuto per P.IVA): manca_agenzia con i dati giusti', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-902', codice_cliente: 'K-100', piva_cliente: 'IT00000000001', data: '2026-06-01' }));
+    expect(p.esito).toBe('manca_agenzia');
+    expect(p.agenzia_mancante).toMatchObject({ cliente_id: c1.id, fornitore_id: gasper.id, cliente: 'Verde Vita snc', fornitore: 'Gasper GmbH', codice_cliente: 'K-100', data: '2026-06-01' });
+  });
+
+  it('agenzia presente ma non valida alla data: manca_agenzia', async () => {
+    const sub = await db.subagenti.findFirstOrThrow();
+    await db.interscambio.create({ data: { subagente_id: sub.id, cliente_id: c1.id, fornitore_id: gasper.id, codice_cliente_fornitore: 'K-G', valido_dal: giorno('2026-01-01') } });
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-903', codice_cliente: 'K-G', cliente: 'Verde Vita snc', data: '2025-06-01' }));
+    expect(p.esito).toBe('manca_agenzia');
+    expect(p.agenzia_mancante).toMatchObject({ cliente_id: c1.id, fornitore_id: gasper.id, data: '2025-06-01' });
+  });
+
+  it('cliente non riconosciuto: esito attuale, senza agenzia_mancante', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-904', codice_cliente: 'ZZZ-9', cliente: 'Sconosciuto SRL' }));
+    expect(p.esito).toBe('nessuno');
+    expect(p.agenzia_mancante).toBeNull();
+  });
+
+  it('proforma/pagamento/altro: mai manca_agenzia', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'proforma', fornitore_id: gasper.id, codice_cliente: 'K-100', piva_cliente: 'IT00000000001' }));
+    expect(p.esito).toBe('nessuno');
+    expect(p.agenzia_mancante).toBeNull();
+  });
+});
+
 describe('controlliFissi', () => {
   it('totale diverso dalla somma delle righe: grave', async () => {
     const l = L({ tipo: 'fattura', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 523.7, righe: [R({ codice: 'A1', quantita: 1, prezzo: 471.7, importo: 471.7 })] });

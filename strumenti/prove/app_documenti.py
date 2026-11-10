@@ -28,6 +28,7 @@ def apri(pg):
     pg.wait_for_selector('.accesso-scena.aperta')
 
 prova_documento('crea')
+prova_documento('crea-senza')
 try:
     with sync_playwright() as p:
         b = p.chromium.launch(headless=True)
@@ -50,6 +51,7 @@ try:
         pg.wait_for_function("() => /\\d+ document/.test(document.querySelector('.pannello-nota')?.textContent ?? '')")
         ok('document' in nota.inner_text(), 'conteggio dei documenti nel pannello')
         pg.wait_for_selector(voce)
+        pg.click(voce); pg.wait_for_timeout(200)  # due documenti di prova: si sceglie quello normale
         ok('Fattura PROVA-' + S.upper() in testo(pg, voce), 'elenco: tipo e numero letti')
         ok(pg.locator(voce + ' .stato:has-text("Affidabilità bassa")').count() == 1, 'elenco: livello basso (rosso)')
         ok(pg.locator(voce + '[aria-current=true]').count() == 1, 'il primo documento è selezionato nella stessa pagina')
@@ -125,6 +127,32 @@ try:
         except Exception:
             pass
         ok(pg.locator(voce).count() == 0, 'scarto: il documento esce dall’elenco')
+
+        # D-106: documento senza agenzia → pillola in lista → Configura l'agenzia → il documento si registra
+        pg.reload(); pg.wait_for_selector('.selezionabile a')
+        voceSenza = '.selezionabile a:has-text("PROVA-SENZA-%s")' % S.upper()
+        pg.wait_for_selector(voceSenza)
+        ok(pg.locator(voceSenza + ' .stato:has-text("Manca l’agenzia")').count() == 1, 'lista: pillola Manca l’agenzia sul documento senza agenzia')
+        pg.click(voceSenza); pg.wait_for_timeout(300)
+        ok(pg.locator('button:has-text("Configura l’agenzia")').count() == 1, 'dettaglio: azione Configura l’agenzia')
+        pg.screenshot(path=str(USCITA / 'app-documento-manca-agenzia-1440.png'))
+        pg.click('button:has-text("Configura l’agenzia")'); pg.wait_for_selector('.velo .modale')
+        ok(pg.locator('.velo input[name=fornitore_id]').get_attribute('disabled') is not None, 'finestra: fornitore fisso (disabilitato)')
+        ok('Nuova agenzia per ' in testo(pg, '.velo .modale-testa'), 'finestra: cliente fisso nel titolo')
+        ok(pg.input_value('.velo input[name=valido_dal]') == '2026-09-15', 'finestra: «Valido dal» = data del documento')
+        pg.click('.velo .modale-piede button:has-text("Crea")')
+        pg.wait_for_selector('.avviso:has-text("Agenzia creata")')
+        try:
+            pg.wait_for_selector(voceSenza + ' .stato:has-text("Manca l’agenzia")', state='detached', timeout=8000)
+            senza_gone = True
+        except Exception:
+            senza_gone = False
+        ok(senza_gone, 'dopo il salvataggio la pillola sparisce')
+        ok(pg.locator('.scelte button:has-text("Apri la pratica")').count() == 1, 'dettaglio: ora si può aprire la pratica')
+        pg.click('.scelte button:has-text("Apri la pratica")'); pg.wait_for_selector('.velo .modale:has-text("Apri la pratica")')
+        pg.click('.velo .modale-piede button:has-text("Apri la pratica")')
+        pg.wait_for_function("location.pathname.startsWith('/pratiche/')")
+        ok(True, 'il documento senza agenzia si registra: aperta la pratica')
         pg.close()
         b.close()
 finally:
