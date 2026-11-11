@@ -803,3 +803,65 @@ model settori {
 
   sedi sedi[]
 }
+
+// ---------- Storico dei legami del vecchio CRM (D-112, §4.7.2–4.7.3) ----------
+// Solo lettura per l'app: propone subagente e sconto, non crea niente. Nessuna FK obbligatoria
+// verso clienti/fornitori/subagenti: è la ragione per cui l'import massivo era fermo (D-112).
+// I vincoli che Prisma non esprime (CHECK su fonte e stato) stanno nella migrazione 20261112090000.
+
+/// Fotografia dei 4022 legami del vecchio CRM, con testi e id legacy per proporre senza anagrafica.
+model interscambio_storico {
+  id                        BigInt    @id @default(autoincrement())
+  fonte                     String    @db.VarChar(20) // vecchio_crm (CHECK)
+  estratto_il               DateTime  @db.Date
+  cliente_legacy_id         BigInt
+  fornitore_legacy_id       BigInt
+  cliente_codice_fornitore  String?   @db.VarChar(50) // la chiave che portano i documenti
+  cliente_ragione_sociale   String?   @db.VarChar(255)
+  cliente_piva              String?   @db.VarChar(20)
+  cliente_piva_norm         String    @default("") @db.VarChar(20) // per l'indice e il confronto
+  cliente_cf                String?   @db.VarChar(30)
+  fornitore_ragione_sociale String?   @db.VarChar(255)
+  fornitore_piva            String?   @db.VarChar(20)
+  agente_nome               String?   @db.VarChar(200)
+  subagente_nome            String?   @db.VarChar(200) // NULL = fornitore senza rappresentanza (1625)
+  sconto_1                  Decimal   @default(0) @db.Decimal(5, 2)
+  sconto_2                  Decimal   @default(0) @db.Decimal(5, 2)
+  cliente_id                BigInt? // si riempiono quando i ruoli nascono; nessuna FK obbligatoria
+  fornitore_id              BigInt?
+  subagente_id              BigInt?
+  interscambio_id           BigInt?
+  stato                     String    @default("da_usare") @db.VarChar(12) // da_usare | usata | scartata (CHECK)
+  nota                      String?
+  creato_il                 DateTime  @default(now()) @db.Timestamptz(6)
+  usato_il                  DateTime? @db.Timestamptz(6)
+
+  @@unique([fonte, cliente_legacy_id, fornitore_legacy_id])
+  @@index([fornitore_piva, cliente_codice_fornitore])
+  @@index([cliente_codice_fornitore])
+  @@index([stato])
+  @@index([cliente_piva_norm])
+  @@index([subagente_nome])
+}
+
+/// Le 3403 schede del vecchio CRM: i campi per riconoscere e creare, senza ruoli né deduplica.
+model soggetti_storico {
+  id             BigInt    @id @default(autoincrement())
+  legacy_id      BigInt    @unique
+  ragione_sociale String?  @db.VarChar(255)
+  nome           String?   @db.VarChar(100)
+  cognome        String?   @db.VarChar(100)
+  piva           String?   @db.VarChar(20)
+  piva_norm      String    @default("") @db.VarChar(20)
+  codice_fiscale String?   @db.VarChar(30)
+  cf_norm        String    @default("") @db.VarChar(20)
+  indirizzo      String?   @db.VarChar(255)
+  cap            String?   @db.VarChar(10)
+  citta          String?   @db.VarChar(100)
+  provincia      String?   @db.Char(2)
+  paese          String?   @db.Char(2)
+  email          String?   @db.VarChar(200)
+  telefono       String?   @db.VarChar(50)
+  sorgente       String    @db.VarChar(20) // vecchio_crm (CHECK)
+  creato_il      DateTime  @default(now()) @db.Timestamptz(6)
+}

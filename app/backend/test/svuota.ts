@@ -11,7 +11,8 @@ export async function svuota(db: PrismaService) {
       TRUNCATE bollettini_righe, bollettini_testata, ordini_fornitore_righe, provvigioni_correzioni, ordini_fornitore_documenti, ordini_fornitore_testata,
         documenti_campi, documenti_in_arrivo, liquidazioni, interscambio, provvigioni_eccezioni, provvigioni_scaglioni, subagenti, agenti,
         codici_esterni, servizi_esecuzioni, impostazioni, registro, clienti, clienti_versioni, fornitori, fornitori_versioni,
-        modifiche, sconti, recapiti, persone_contatti, fatturazione, sedi, persone, soggetti, gruppi, settori RESTART IDENTITY CASCADE`);
+        modifiche, sconti, recapiti, persone_contatti, fatturazione, sedi, persone, soggetti, gruppi, settori,
+        interscambio_storico, soggetti_storico RESTART IDENTITY CASCADE`);
   } finally {
     await db.$executeRawUnsafe(`ALTER TABLE clienti_versioni ENABLE TRIGGER USER; ALTER TABLE fornitori_versioni ENABLE TRIGGER USER; ALTER TABLE registro ENABLE TRIGGER USER`);
   }

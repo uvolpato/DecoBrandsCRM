@@ -27,6 +27,7 @@ import { ImpostazioniController } from './impostazioni-api';
 import { PuliziaRegistro, RegistroController } from './registro-api';
 import { ScartatiController } from './scartati';
 import { PersoneController, SoggettiController } from './soggetti';
+import { StoricoController } from './storico';
 import { SistemaController, SistemaService } from './sistema';
 
 @Controller('salute')
@@ -61,7 +62,7 @@ export function limiti(env = process.env) {
   controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, SoggettiController, PersoneController, PraticheController, DocumentiController, DocumentiAbbinaController, DocumentiPraticaController, DocumentiFiscaliController, IntegraController,
     BollettiniController, // F3-A1: matrice e caricamento (rotte fisse) prima di GET /bollettini/:id
     BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, OggiController, SollecitiController, EventiController, RegistroController, ImpostazioniController,
-    ScartatiController, SistemaController],
+    ScartatiController, SistemaController, StoricoController],
   providers: [
     IntegraService,
     CasellaService,

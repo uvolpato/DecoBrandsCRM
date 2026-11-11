@@ -18,6 +18,7 @@
     "db:seed": "prisma db seed",
     "ponte:prova": "ts-node prisma/ponte-prova.ts",
     "import:vecchio-crm": "ts-node prisma/import-vecchio-crm.ts",
+    "import:storico": "ts-node prisma/import-storico.ts",
     "superutente": "node dist/src/superutente.js",
     "lettura:prova": "node dist/src/lettura-prova.js",
     "pratiche:ricalcola": "node dist/src/pratiche-ricalcola.js"
