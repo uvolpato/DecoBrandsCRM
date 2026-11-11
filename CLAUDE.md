@@ -53,6 +53,8 @@ cliente).
 | `piano-lavoro-crm.md` | Fasi e attività (ore, dipendenze, file del prototipo da replicare); le ore fuori preventivo sono segnate **da approvare** |
 | `PRD-crm-provvigioni.md` | PRD unico: problema, utenti, misure, storie con criteri, fuori ambito, rischi, domande e incoerenze fra i documenti (sintesi; vince la spec) |
 | `specifica-automazione-llm.md` | Specifica tecnica della fase LLM e agenti in locale (A1–A8, `suggerimenti`, ombra → attivazione, V12) |
+| `specifica-anagrafica-soggetti.md` | **Proposta** di anagrafica unica a soggetti, **additiva**: master nuovo sopra `clienti`/`fornitori` esistenti, senza rinominare tabelle né toccare le FK. Con DDL, compatibilità, import e decisioni aperte |
+| `doppioni-anagrafica-integra.md` | Possibili doppioni dell'anagrafica di Integra da correggere (stessa P.IVA su due master, agenti che sono anche fornitori, Decobrands, P.IVA estere), con le query per ritrovarli |
 | `PRD-supporto-decisioni-llm.md` | PRD della fase successiva: modelli linguistici e agenti in locale (proposte con probabilità, in ombra prima, V12) |
 | `preventivo-crm-provvigioni.md` | Preventivo |
 | `ANALISI_CRM_PROVVIGIONI.md` | Analisi iniziale |
@@ -185,8 +187,10 @@ Regole del codice del prototipo:
 
 ## 5. Decisioni chiave da non perdere (dettagli in spec §19)
 
-- Clienti e fornitori solo da Integra, in sola lettura; subagenti gestiti nel CRM (D-01,
-  D-07).
+- ⚠ **Il CRM è il centro di verità delle anagrafiche** (D-102): import unico da Integra e dal
+  vecchio CRM con deduplica, poi cliente e fornitore si censano nel CRM e verso Integra si esporta
+  un file quando serve. Integra resta **in sola lettura** (D-100): mai scritture dirette.
+  Subagenti gestiti nel CRM (D-07).
 - Bollettino atteso entro un giorno fissato per fornitore; il sollecito parte solo dopo
   (D-03).
 - Incassi:

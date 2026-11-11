@@ -129,7 +129,7 @@ const INIZIALI: Record<string, Record<string, unknown>> = {
     soglia_ok: 0.9, soglia_bassa: 0.7,
   },
   posta: { server: '', porta: null, utente: '', password: null, mittente: '' },
-  integra: { server: '', database: '', utente: '', password: null, schema: 'crm_viste', secondi: 60 },
+  integra: { server: '', database: '', utente: '', password: null, schema: 'public', secondi: 60 },
   conservazione: { eventi_mesi: 36, scartati_giorni: 90, righe_pagina: 25 },
 };
 
@@ -176,7 +176,7 @@ export async function integraConfig(db: Db) {
   const password = await segretoDi(v.password);
   if (password === null) return null;
   // lo schema è un identificativo: mai testo libero nella query (§4.5)
-  const schema = /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(v.schema)) ? String(v.schema) : 'crm_viste';
+  const schema = /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(v.schema)) ? String(v.schema) : 'public';
   return { server: String(v.server), database: String(v.database), utente: String(v.utente), password, schema, secondi: Number(v.secondi) || 60 };
 }
 

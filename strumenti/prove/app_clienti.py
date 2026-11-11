@@ -83,7 +83,7 @@ with sync_playwright() as p:
 
     # nuova agenzia con i campi di ricerca
     D1, A1, D2 = '2031-01-01', '2031-06-30', '2031-03-01'
-    pg.click('button:has-text("Aggiungi agenzia")'); finestra(pg).wait_for()
+    pg.click('button:has-text("Aggiungi agenzia")'); finestra(pg).wait_for(); pg.wait_for_selector('.velo .campo-ricerca')
     ok(pg.locator('.velo .campo-ricerca').count() == 2, 'nuova agenzia: Fornitore e Subagente sono campi di ricerca')
     f, fid = scegli(pg, 'fornitore_id', 'Gri')
     ok('Gries' in f and fid.isdigit(), 'fornitore scelto dal menu: %s (id %s)' % (f, fid))
@@ -171,7 +171,7 @@ with sync_playwright() as p:
     # operatore: percentuale e regola spente, il resto si salva (D-50)
     pg = entra(S + '-oper'); pg.wait_for_timeout(600)
     seg(pg, 'Tutti').click(); pg.click('.dt tbody tr.cliccabile'); pg.wait_for_timeout(600)
-    pg.click('button:has-text("Aggiungi agenzia")'); finestra(pg).wait_for()
+    pg.click('button:has-text("Aggiungi agenzia")'); finestra(pg).wait_for(); pg.wait_for_selector('#c-pct_subagente')
     ok(pg.locator('#c-pct_subagente[disabled]').count() == 1 and pg.locator('#c-regola_mensile[disabled]').count() == 1 and 'responsabile' in testo(pg, '.velo .campo:has(#c-pct_subagente) .aiuto'),
        'operatore: percentuale e regola spente, con la nota «li cambia un responsabile»')
     pg.screenshot(path=str(USCITA / 'app-clienti-operatore-1440.png'))

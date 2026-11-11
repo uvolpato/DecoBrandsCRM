@@ -183,7 +183,7 @@ describe('F5-A6 rotte delle impostazioni', () => {
   it('prova: azienda e conservazione 400, connessione non configurata 200 {ok:false}', async () => {
     await ammi.post('/api/impostazioni/azienda/prova').set('x-csrf-token', csrf).send({}).expect(400);
     // integra senza campi di connessione: la prova non tenta nulla e risponde 200 {ok:false}
-    await db.impostazioni.update({ where: { chiave: 'integra' }, data: { valore: { server: '', database: '', utente: '', password: null, schema: 'crm_viste', secondi: 60 } } });
+    await db.impostazioni.update({ where: { chiave: 'integra' }, data: { valore: { server: '', database: '', utente: '', password: null, schema: 'public', secondi: 60 } } });
     const r = await ammi.post('/api/impostazioni/integra/prova').set('x-csrf-token', csrf).send({}).expect(200);
     expect(r.body.ok).toBe(false);
     expect(r.body.testo).toContain('non configurata');
@@ -225,19 +225,19 @@ describe('F5-A6 rotte delle impostazioni', () => {
 describe('F5-A6 servizi e righe per pagina', () => {
   it('config null quando la password non è decifrabile o i campi mancano', async () => {
     // il seed scrive `password: true`, non un segreto cifrato: il servizio non si collega
-    await db.impostazioni.update({ where: { chiave: 'integra' }, data: { valore: { server: 'srv', database: 'db', utente: 'u', password: true, schema: 'crm_viste', secondi: 60 } } });
+    await db.impostazioni.update({ where: { chiave: 'integra' }, data: { valore: { server: 'srv', database: 'db', utente: 'u', password: true, schema: 'public', secondi: 60 } } });
     expect(await integraConfig(db)).toBeNull();
-    await db.impostazioni.update({ where: { chiave: 'integra' }, data: { valore: { server: '', database: '', utente: '', password: null, schema: 'crm_viste', secondi: 60 } } });
+    await db.impostazioni.update({ where: { chiave: 'integra' }, data: { valore: { server: '', database: '', utente: '', password: null, schema: 'public', secondi: 60 } } });
     expect(await integraConfig(db)).toBeNull();
   });
 
-  it('config con password cifrata: valori decifrati; schema non valido → crm_viste', async () => {
+  it('config con password cifrata: valori decifrati; schema non valido → public', async () => {
     await db.impostazioni.update({
       where: { chiave: 'integra' },
-      data: { valore: { server: 'srv', database: 'db', utente: 'u', password: cifra('segreta'), schema: 'crm_viste; DROP', secondi: 60 } },
+      data: { valore: { server: 'srv', database: 'db', utente: 'u', password: cifra('segreta'), schema: 'public; DROP', secondi: 60 } },
     });
     const c = await integraConfig(db);
-    expect(c).toMatchObject({ server: 'srv', password: 'segreta', schema: 'crm_viste' });
+    expect(c).toMatchObject({ server: 'srv', password: 'segreta', schema: 'public' });
   });
 
   it('righe_pagina in /api/accesso/io e per_pagina in pratiche e registro', async () => {

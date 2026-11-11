@@ -110,7 +110,7 @@ async function configurazioni(db: PrismaService) {
   // senza Impostazioni si usa il PONTE_URL dello sviluppo (§4.5)
   const ponte = integra
     ? { url: `postgresql://${encodeURIComponent(integra.utente)}:${encodeURIComponent(integra.password)}@${integra.server}:5432/${encodeURIComponent(integra.database)}`, schema: integra.schema, secondi: integra.secondi }
-    : process.env.PONTE_URL ? { url: process.env.PONTE_URL, schema: 'crm_viste', secondi: 60 } : null;
+    : process.env.PONTE_URL ? { url: process.env.PONTE_URL, schema: 'public', secondi: 60 } : null;
   return { casella, lettura, integra: ponte, posta };
 }
 
@@ -153,7 +153,7 @@ export const sondaIntegra: Sonda = async (db) => {
   const inizio = Date.now();
   const ponte = creaPonte(c.url);
   try {
-    for (const vista of ['v_clienti', 'v_fornitori']) {
+    for (const vista of ['integra_v_clienti', 'integra_v_fornitori']) {
       try {
         await ponte.query(`SELECT 1 FROM ${c.schema}.${vista} LIMIT 1`);
       } catch (e) {
@@ -161,7 +161,7 @@ export const sondaIntegra: Sonda = async (db) => {
         return { ok: false, vista, testo: `Manca la vista ${vista}`, misure: { secondi: secondiDa(inizio), errore: pulisci(e) } };
       }
     }
-    return { ok: true, testo: `Database ponte raggiungibile, viste ${c.schema}.v_clienti e ${c.schema}.v_fornitori lette`, misure: { secondi: secondiDa(inizio) } };
+    return { ok: true, testo: `Database ponte raggiungibile, viste ${c.schema}.integra_v_clienti e ${c.schema}.integra_v_fornitori lette`, misure: { secondi: secondiDa(inizio) } };
   } catch (e) {
     return { ok: false, testo: 'Il database ponte non risponde', misure: { secondi: secondiDa(inizio), errore: pulisci(e) } };
   } finally {

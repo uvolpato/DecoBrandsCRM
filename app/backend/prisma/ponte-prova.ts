@@ -46,9 +46,7 @@ async function creaRuolo(pool: Pool) {
   }
   try {
     await pool.query('GRANT CONNECT ON DATABASE decobrands_ponte_prova TO crm_lettura');
-    await pool.query('GRANT USAGE ON SCHEMA crm_viste TO crm_lettura');
-    await pool.query('GRANT SELECT ON ALL TABLES IN SCHEMA crm_viste TO crm_lettura');
-    await pool.query('ALTER DEFAULT PRIVILEGES IN SCHEMA crm_viste GRANT SELECT ON TABLES TO crm_lettura');
+    await pool.query('GRANT SELECT ON public.integra_v_clienti, public.integra_v_fornitori TO crm_lettura');
   } catch {
     console.log('avviso: privilegi non concessi al ruolo crm_lettura (permessi insufficienti)');
     return false;
@@ -60,7 +58,7 @@ async function main() {
   await ammin();
   const pool = new Pool({ connectionString: urlDatabase('decobrands_ponte_prova') });
   try {
-    await pool.query('DROP SCHEMA IF EXISTS crm_viste CASCADE');
+    await pool.query('DROP TABLE IF EXISTS public.integra_v_clienti, public.integra_v_fornitori CASCADE');
     await pool.query(sql);
     const ruoloOk = await creaRuolo(pool);
 
@@ -70,32 +68,32 @@ async function main() {
     const idc = new Set<number>();
     for (const c of clienti) {
       const id = idDaCodice(c.codice_integra);
-      if (idc.has(id)) throw new Error('id_integra duplicato in v_clienti');
+      if (idc.has(id)) throw new Error('id_integra duplicato in integra_v_clienti');
       idc.add(id);
     }
     const idf = new Set<number>();
     for (const f of fornitori) {
       const id = idDaCodice(f.codice_integra);
-      if (idf.has(id)) throw new Error('id_integra duplicato in v_fornitori');
+      if (idf.has(id)) throw new Error('id_integra duplicato in integra_v_fornitori');
       idf.add(id);
     }
 
     for (const c of clienti) {
       await pool.query(
-        `INSERT INTO crm_viste.v_clienti (id_integra, codice, ragione_sociale, piva, codice_fiscale, indirizzo, cap, citta, provincia, paese, email, pec, codice_agente, attivo, modificato_il)
+        `INSERT INTO public.integra_v_clienti (id_integra, codice, ragione_sociale, piva, codice_fiscale, indirizzo, cap, citta, provincia, paese, email, pec, codice_agente, attivo, modificato_il)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
         [idDaCodice(c.codice_integra), c.codice_integra, c.nome, c.piva, null, c.indirizzo || null, null, c.citta || null, null, 'Italia', null, null, null, true, '2026-09-04T09:00:00Z']
       );
     }
     for (const f of fornitori) {
       await pool.query(
-        `INSERT INTO crm_viste.v_fornitori (id_integra, codice, ragione_sociale, piva, codice_fiscale, indirizzo, cap, citta, provincia, paese, email, pec, attivo, modificato_il)
+        `INSERT INTO public.integra_v_fornitori (id_integra, codice, ragione_sociale, piva, codice_fiscale, indirizzo, cap, citta, provincia, paese, email, pec, attivo, modificato_il)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [idDaCodice(f.codice_integra), f.codice_integra, f.nome, f.piva, null, null, null, null, null, f.paese, null, null, f.attivo !== false, '2026-09-04T09:00:00Z']
       );
     }
 
-    console.log(`ponte-prova: ${clienti.length} clienti, ${fornitori.length} fornitori in decobrands_ponte_prova (schema crm_viste)`);
+    console.log(`ponte-prova: ${clienti.length} clienti, ${fornitori.length} fornitori in decobrands_ponte_prova (schema public)`);
     console.log(`ruolo crm_lettura: ${ruoloOk ? 'creato/privilegiati' : 'avviso: controlla permessi'}`);
   } catch (e) {
     console.error('errore:', (e instanceof Error ? e.message : String(e)).replace(/postgres(?:ql)?:\/\/\S+/gi, '[indirizzo rimosso]').replace(/password\s*=\s*\S+/gi, 'password=[rimossa]'));

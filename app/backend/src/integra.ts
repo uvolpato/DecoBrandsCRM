@@ -8,7 +8,7 @@ import { PrismaService } from './prisma.service';
 import { apriAnomalia, chiudiAnomalia } from './registro';
 
 // Sincronizzazione delle anagrafiche dal database ponte di Integra (F1-A4, §4.5, D-32, D-46).
-// Il CRM non si collega mai a Integra: legge solo le viste dello schema `crm_viste`, in sola lettura,
+// Il CRM non si collega mai a Integra: legge solo le viste dello schema `public`, in sola lettura,
 // con SELECT parametriche. Tutto si calcola e si scrive qui, mai dai dati del frontend (V12, D-28).
 
 type Db = Prisma.TransactionClient | PrismaClient;
@@ -16,7 +16,7 @@ type Tipo = 'cliente' | 'fornitore';
 type Vista = 'clienti' | 'fornitori';
 
 export const OGNI_MS = 60_000; // un giro ogni minuto (§4.5)
-const SCHEMA = 'crm_viste'; // schema di riserva: con le Impostazioni arriva da integraConfig (D-65)
+const SCHEMA = 'public'; // schema di riserva: con le Impostazioni arriva da integraConfig (D-65)
 const GIORNO_MS = 24 * 60 * 60 * 1000; // margine: Integra non ha i secondi (§4.5)
 const SECONDI_LENTI = 30; // oltre il giro è "lento" (§7.14.3)
 
@@ -45,12 +45,12 @@ interface Riga {
 // ponytail: colonne da confermare col ponte vero, F0-A8
 const VISTE: Record<Vista, { vista: string; colonne: string[] }> = {
   clienti: {
-    vista: 'v_clienti',
+    vista: 'integra_v_clienti',
     colonne: ['id_integra', 'codice', 'ragione_sociale', 'piva', 'codice_fiscale', 'indirizzo', 'cap', 'citta',
       'provincia', 'paese', 'email', 'pec', 'codice_agente', 'attivo', 'modificato_il'],
   },
   fornitori: {
-    vista: 'v_fornitori',
+    vista: 'integra_v_fornitori',
     colonne: ['id_integra', 'codice', 'ragione_sociale', 'piva', 'codice_fiscale', 'indirizzo', 'cap', 'citta',
       'provincia', 'paese', 'email', 'pec', 'attivo', 'modificato_il'],
   },
@@ -412,8 +412,8 @@ export class IntegraService implements OnModuleInit, OnModuleDestroy {
     if (!c) return { ok: false, ms: 0, messaggio: 'Sincronizzazione non configurata' };
     try {
       const [clienti, fornitori] = await Promise.all([
-        c.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.v_clienti`),
-        c.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.v_fornitori`),
+        c.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.integra_v_clienti`),
+        c.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.integra_v_fornitori`),
       ]);
       return { ok: true, ms: Date.now() - inizio, clienti: clienti.rows[0].n, fornitori: fornitori.rows[0].n };
     } catch (e) {

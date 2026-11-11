@@ -25,12 +25,11 @@ const sqlPonte = readFileSync(join(__dirname, '..', 'prisma', 'ponte-prova.sql')
 const data = (s: string) => new Date(s);
 
 async function tabelle() {
-  await ponte.query('DROP SCHEMA IF EXISTS crm_viste CASCADE');
   await ponte.query(sqlPonte);
 }
 
 async function pulisciPonte() {
-  await ponte.query('TRUNCATE crm_viste.v_clienti, crm_viste.v_fornitori');
+  await ponte.query('TRUNCATE public.integra_v_clienti, public.integra_v_fornitori');
 }
 
 async function mettiCliente(r: Record<string, unknown>) {
@@ -41,7 +40,7 @@ async function mettiCliente(r: Record<string, unknown>) {
   };
   const v = { ...base, ...r };
   await ponte.query(
-    `INSERT INTO crm_viste.v_clienti (id_integra, codice, ragione_sociale, piva, codice_fiscale, indirizzo, cap, citta, provincia, paese, email, pec, codice_agente, attivo, modificato_il)
+    `INSERT INTO public.integra_v_clienti (id_integra, codice, ragione_sociale, piva, codice_fiscale, indirizzo, cap, citta, provincia, paese, email, pec, codice_agente, attivo, modificato_il)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
     [v.id_integra, v.codice, v.ragione_sociale, v.piva, v.codice_fiscale, v.indirizzo, v.cap, v.citta, v.provincia, v.paese, v.email, v.pec, v.codice_agente, v.attivo, v.modificato_il],
   );
@@ -55,7 +54,7 @@ async function mettiFornitore(r: Record<string, unknown>) {
   };
   const v = { ...base, ...r };
   await ponte.query(
-    `INSERT INTO crm_viste.v_fornitori (id_integra, codice, ragione_sociale, piva, codice_fiscale, indirizzo, cap, citta, provincia, paese, email, pec, attivo, modificato_il)
+    `INSERT INTO public.integra_v_fornitori (id_integra, codice, ragione_sociale, piva, codice_fiscale, indirizzo, cap, citta, provincia, paese, email, pec, attivo, modificato_il)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
     [v.id_integra, v.codice, v.ragione_sociale, v.piva, v.codice_fiscale, v.indirizzo, v.cap, v.citta, v.provincia, v.paese, v.email, v.pec, v.attivo, v.modificato_il],
   );
@@ -126,7 +125,7 @@ describe('un giro', () => {
       },
     });
     const vecchia = cliente.corrente!.id;
-    await ponte.query("UPDATE crm_viste.v_clienti SET ragione_sociale = 'Cliente Due', modificato_il = now()");
+    await ponte.query("UPDATE public.integra_v_clienti SET ragione_sociale = 'Cliente Due', modificato_il = now()");
 
     const c = await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 120_000));
     expect(c.clienti.versioni).toBe(1);
@@ -140,7 +139,7 @@ describe('un giro', () => {
   it('cambia solo modificato_il o solo spazi e maiuscole della P.IVA: nessuna versione nuova', async () => {
     await mettiCliente({ piva: '12345678901' });
     await sincronizzaGiro(db, ponte, ora);
-    await ponte.query("UPDATE crm_viste.v_clienti SET piva = ' IT 123 456 789 01 ', modificato_il = now()");
+    await ponte.query("UPDATE public.integra_v_clienti SET piva = ' IT 123 456 789 01 ', modificato_il = now()");
     const c = await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
     expect(c.clienti.versioni).toBe(0);
     expect(await db.clienti_versioni.count()).toBe(1);
@@ -167,7 +166,7 @@ describe('un giro', () => {
         numero_ordine: 'OF/2026/901', data_ordine: new Date('2026-09-01'),
       },
     });
-    await ponte.query('UPDATE crm_viste.v_clienti SET attivo = false, modificato_il = now()');
+    await ponte.query('UPDATE public.integra_v_clienti SET attivo = false, modificato_il = now()');
     const c = await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
     expect(c.clienti.disattivati).toBe(1);
     expect((await db.clienti.findFirstOrThrow()).attivo).toBe(false);
@@ -181,7 +180,7 @@ describe('un giro', () => {
     const anomalia = await db.registro.findFirstOrThrow({ where: { codice: 'integra.piva_mancante', stato: 'aperta' } });
     expect(anomalia.messaggio).toContain('P.IVA valida');
 
-    await ponte.query("UPDATE crm_viste.v_clienti SET piva = '12345678901', modificato_il = now()");
+    await ponte.query("UPDATE public.integra_v_clienti SET piva = '12345678901', modificato_il = now()");
     await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
     expect(await db.clienti.count()).toBe(1);
     expect(await db.registro.count({ where: { codice: 'integra.piva_mancante', stato: 'aperta' } })).toBe(0);
@@ -214,10 +213,10 @@ describe('un giro', () => {
   });
 
   it('colonna mancante nella vista: anomalia integra.vista', async () => {
-    await ponte.query('ALTER TABLE crm_viste.v_clienti RENAME COLUMN email TO email_x');
+    await ponte.query('ALTER TABLE public.integra_v_clienti RENAME COLUMN email TO email_x');
     await sincronizzaGiro(db, ponte, ora);
     expect(await db.registro.count({ where: { codice: 'integra.vista', stato: 'aperta' } })).toBe(1);
-    await ponte.query('ALTER TABLE crm_viste.v_clienti RENAME COLUMN email_x TO email');
+    await ponte.query('ALTER TABLE public.integra_v_clienti RENAME COLUMN email_x TO email');
   });
 
   it('campi del CRM invariati dopo un giro', async () => {
@@ -279,10 +278,10 @@ describe('un giro', () => {
   });
 
   it('connessione: solo il ponte giù conta, non una vista mancante', async () => {
-    await ponte.query('ALTER TABLE crm_viste.v_clienti RENAME COLUMN email TO email_x');
+    await ponte.query('ALTER TABLE public.integra_v_clienti RENAME COLUMN email TO email_x');
     await sincronizzaGiro(db, ponte, ora);
     await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
-    await ponte.query('ALTER TABLE crm_viste.v_clienti RENAME COLUMN email_x TO email');
+    await ponte.query('ALTER TABLE public.integra_v_clienti RENAME COLUMN email_x TO email');
     expect(await db.registro.count({ where: { codice: 'integra.connessione' } })).toBe(0);
 
     const rotto = new Pool({ connectionString: 'postgresql://x:y@127.0.0.1:1/nope', connectionTimeoutMillis: 300, max: 1 });
@@ -308,7 +307,7 @@ describe('un giro', () => {
     const soloLettura = creaPonte(PONTE_URL);
     try {
       expect((await soloLettura.query('SHOW transaction_read_only')).rows[0].transaction_read_only).toBe('on');
-      await expect(soloLettura.query("INSERT INTO crm_viste.v_clienti (id_integra) VALUES (1)")).rejects.toMatchObject({ code: '25006' });
+      await expect(soloLettura.query("INSERT INTO public.integra_v_clienti (id_integra) VALUES (1)")).rejects.toMatchObject({ code: '25006' });
     } finally {
       await soloLettura.end();
     }

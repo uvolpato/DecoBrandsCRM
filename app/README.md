@@ -56,8 +56,8 @@ Agri Aggio/Gries dai file di `Documenti Veri/` (ordine `AU276839`, proforma `PR1
 database di **sviluppo** (crea il cliente Agri Aggio come farebbe Integra).
 
 **Ponte finto per la sincronizzazione da Integra** (F1-A4, spec §4.5): in `backend/`,
-`npm run ponte:prova` crea il database `decobrands_ponte_prova` con lo schema `crm_viste` e le
-tabelle `v_clienti` e `v_fornitori` riempite con i dati di prova. Poi in `backend/.env`:
+`npm run ponte:prova` crea il database `decobrands_ponte_prova` con lo schema `public` e le
+tabelle `integra_v_clienti` e `integra_v_fornitori` riempite con i dati di prova. Poi in `backend/.env`:
 
 ```
 PONTE_URL=postgresql://crm_lettura:PASSWORD@localhost:5432/decobrands_ponte_prova

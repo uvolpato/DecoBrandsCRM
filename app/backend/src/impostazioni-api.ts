@@ -140,8 +140,8 @@ export class ImpostazioniController {
     const ponte = creaPonte(url);
     try {
       const [clienti, fornitori] = await Promise.all([
-        ponte.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.v_clienti`),
-        ponte.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.v_fornitori`),
+        ponte.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.integra_v_clienti`),
+        ponte.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${c.schema}.integra_v_fornitori`),
       ]);
       return { ok: true, ms: ms(), testo: `Database ponte raggiungibile · ${clienti.rows[0].n} clienti, ${fornitori.rows[0].n} fornitori` };
     } catch (e) {

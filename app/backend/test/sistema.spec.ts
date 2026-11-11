@@ -97,7 +97,7 @@ afterAll(async () => {
 async function configuraServizi() {
   await imposta('casella', { server: 'imap.x', porta: 993, utente: 'u', password: await password(), cartella: 'Fornitori', cartella_lette: 'Fornitori/Letti', minuti: 2 });
   await imposta('posta', { server: 'smtp.x', porta: 587, utente: 'u', password: await password() });
-  await imposta('integra', { server: 'srv', database: 'ponte', utente: 'u', password: await password(), schema: 'crm_viste', secondi: 60 });
+  await imposta('integra', { server: 'srv', database: 'ponte', utente: 'u', password: await password(), schema: 'public', secondi: 60 });
 }
 
 beforeEach(async () => {
