@@ -304,7 +304,7 @@ Domande U1…U27 sui report A1…A9 (08/11) e domande 1–7 dell'R0 (11/11). Tut
 | R0-3 | Dopo *Importa* si apre la scheda o si resta nell'elenco? | **si apre la scheda** del nuovo cliente o fornitore | D-135 | 0b-05 |
 | R0-4 | Cerca in Integra nel prototipo? | **no**: nota in `prototipo-alternativo/LEGGIMI.md` | D-136 | 0b-doc |
 | R0-5 | Fatture dopo la chiusura dell'agenzia | per una pratica esistente basta l'agenzia alla **data dell'ordine**; `richiediAgenzia` alla data del documento solo per una pratica nuova | D-137 | 0b-02 |
-| R0-6 | Cambio della P.IVA del soggetto | **dati da Integra intoccabili** (409); solo CRM → nuova versione (D-46) dei ruoli nella stessa transazione; codice di Integra solo da Importa (Ugo 12/11) | D-138 | 0b-04 |
+| R0-6 | Cambio della P.IVA del soggetto | **dati da Integra intoccabili**: master di un soggetto da Integra tutto in sola lettura, per ora (409); solo CRM → nuova versione (D-46) dei ruoli nella stessa transazione; codice di Integra solo da Importa (Ugo 12/11) | D-138 | 0b-04 |
 | R0-7 | `sconti` CASCADE o RESTRICT? | **RESTRICT**, migrazione nell'onda 0 | D-139 | 0-05 |
 
 Non sono decisioni (chiuse nella versione 1): A5 *Da decidere* 1 (ore del blocco 744 px, approvate col piano v2.0); A5 *Da decidere* 4 (esempio di §16.4.3, lo scrive la documentazione dell'onda 3); A6 *Da decidere* 3 (collaudo su working tree che si muove: il lavoro f7 è committato).
