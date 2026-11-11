@@ -31,7 +31,10 @@ Si lancia **dopo** la chiusura dell'onda 0 (migrazioni 0-01 → 0-05) e **prima*
 
 Sono decise: applicale come scritte, non riaprirle. La riga del §19 la scrive il pacchetto documentazione dell'onda (0b-doc).
 
-- **D-138**: **Cambiare la P.IVA del soggetto crea una nuova versione (D-46) di ogni suo ruolo** (`clienti_versioni`, `fornitori_versioni`), nella stessa transazione della modifica.
+- **D-138** (Ugo, 12/11/2026): **la verità è su Integra: ciò che arriva da Integra non si tocca nel CRM.**
+  - Soggetto con almeno un ruolo da Integra (codice `integra` in `codici_esterni` o versione corrente con `fonte = 'integra'`): P.IVA, codice fiscale, paese e ragione sociale **non si modificano** → il server risponde 409 «Dati di Integra: si correggono in Integra». Il frontend mostra quei campi in sola lettura, ma il controllo vale sul server (V12).
+  - Soggetto solo del CRM (nessun ruolo da Integra): cambiare la P.IVA crea una nuova versione (D-46) di ogni suo ruolo (`clienti_versioni`, `fornitori_versioni`) nella stessa transazione della modifica.
+  - Il codice di Integra non si scrive mai a mano: il legame nasce solo da *Importa* (`POST /integra/importa`), che rilegge la riga dal ponte (R1-08, prima opzione).
 
 ## Rilievi da correggere (testo dei report R1/R2; i rilievi R0-D* nascono dalle domande dell'R0 decise da Ugo)
 
@@ -40,8 +43,8 @@ Sono decise: applicale come scritte, non riaprirle. La riga del §19 la scrive i
 - Dove: app/backend/src/soggetti.ts:450-484 (modifica dell'identità del soggetto)
 - Problema: la modifica cambia il master (`soggetti.piva`, `piva_norm`) ma non `clienti_versioni`/`fornitori_versioni` dei ruoli, che restano con la P.IVA vecchia; la proposta del documento riconosce il cliente su quella (report R1, *Da decidere* 2).
 - Scenario: soggetto «Rossi SRL» con ruolo cliente, P.IVA corretta da 01234567890 a 01234567891 → la scheda Soggetti mostra la nuova, il cliente ha ancora la vecchia; una fattura con la P.IVA nuova non riconosce il cliente.
-- Correzione puntuale (decisione di Ugo, D-138): nella stessa `prisma.$transaction` della modifica, per ogni ruolo del soggetto (cliente, fornitore) chiudere la versione corrente e crearne una nuova con la P.IVA nuova e gli altri campi uguali, come le altre modifiche datate (D-46: le versioni non si riscrivono sul posto); evento nel registro da `tx`. Se la P.IVA non cambia, nessuna versione nuova.
-- Prova che la verifica: test/soggetti.spec.ts: soggetto con ruolo cliente, PUT con P.IVA nuova → `clienti_versioni` ha una versione in più con la P.IVA nuova e la vecchia chiusa; stessa cosa per il fornitore; un errore a metà non lascia il master cambiato.
+- Correzione puntuale (decisione di Ugo, D-138): **prima** controllare se il soggetto ha un ruolo da Integra → 409 se cambia P.IVA, codice fiscale, paese o ragione sociale (nessuna scrittura). Altrimenti, nella stessa `prisma.$transaction` della modifica, per ogni ruolo del soggetto (cliente, fornitore) chiudere la versione corrente e crearne una nuova con la P.IVA nuova e gli altri campi uguali, come le altre modifiche datate (D-46: le versioni non si riscrivono sul posto); evento nel registro da `tx`. Se la P.IVA non cambia, nessuna versione nuova.
+- Prova che la verifica: test/soggetti.spec.ts: soggetto con ruolo cliente importato da Integra, PUT con P.IVA nuova → 409 e nulla cambia (master e versioni); soggetto solo CRM con ruolo cliente, PUT con P.IVA nuova → `clienti_versioni` ha una versione in più con la P.IVA nuova e la vecchia chiusa; stessa cosa per il fornitore; un errore a metà non lascia il master cambiato.
 - Esecutore: DeepSeek V4 — più tabelle in una transazione (V13), versioni D-46.
 - File toccati: app/backend/src/soggetti.ts, app/backend/test/soggetti.spec.ts
 - Dipende da / correlato a: D-46, D-102, D-138
@@ -53,7 +56,7 @@ Sono decise: applicale come scritte, non riaprirle. La riga del §19 la scrive i
 - Dove: app/backend/src/soggetti.ts:731, :745, :760 (`creaRuolo`)
 - Problema: il codice di Integra digitato diventa `codici_esterni(integra, …)` senza controllare che quel codice esista nella vista né che la sua P.IVA sia quella del soggetto. Da quel momento la sincronizzazione (integra.ts `applicaCliente`, che riconosce solo per codice) scrive su questo ruolo i dati della riga di Integra con quel codice (V12; D-111 vuole che il legame con Integra nasca dall'import, che rilegge dal ponte).
 - Scenario: l'operatore crea il ruolo cliente di «Verdi SNC» (P.IVA A) scrivendo per sbaglio `C0124`, che in Integra è «Neri SRL» (P.IVA B) → al giro successivo la versione corrente del cliente Verdi diventa ragione sociale «Neri SRL», P.IVA B: documenti, agenzie e liquidazioni di Verdi mostrano Neri.
-- Correzione puntuale: togliere `codice_integra` da `NuovoRuolo` (il codice si collega solo con `POST /integra/importa`), oppure, se resta, leggere la riga dal ponte per codice dentro la rotta e rifiutare (409) se la P.IVA normalizzata non coincide con `s.piva_norm`.
+- Correzione puntuale (D-138, decisa: niente codice a mano): togliere `codice_integra` da `NuovoRuolo` (il codice si collega solo con `POST /integra/importa`); campo in più → 400 (`forbidNonWhitelisted`). ~~Alternativa scartata:~~ se restasse, leggere la riga dal ponte per codice dentro la rotta e rifiutare (409) se la P.IVA normalizzata non coincide con `s.piva_norm`.
 - Prova che la verifica: test/soggetti.spec.ts: `POST /soggetti/:id/ruoli` con `codice_integra` → 400 (campo non ammesso), oppure 409 con P.IVA diversa dalla vista simulata.
 - Esecutore: DeepSeek V4 — tocca l'identità verso Integra.
 - File toccati: app/backend/src/soggetti.ts, app/backend/test/soggetti.spec.ts (e il form del frontend se manda il campo)
