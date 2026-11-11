@@ -1,5 +1,6 @@
-// Prova della sincronizzazione da Integra (F1-A4/F1-A7, §4.5, D-32, D-46). Il CRM sta su
+// Prova della sincronizzazione da Integra (F1-A4/F1-A7/F1-A11, §4.5, D-32, D-46, D-111). Il CRM sta su
 // decobrands_test; il ponte finto decobrands_ponte_prova lo riempie e lo svuota questa prova.
+// D-111: la sincronizzazione aggiorna e non crea più: i clienti/fornitori si pre-seedano con importa.
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,6 +13,7 @@ import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
 import { creaPonte, IntegraService, pulisci, sincronizzaGiro } from '../src/integra';
+import { importa } from '../src/anagrafica-integra';
 import { svuota } from './svuota';
 
 let app: NestExpressApplication;
@@ -60,6 +62,17 @@ async function mettiFornitore(r: Record<string, unknown>) {
   );
 }
 
+// D-111: l'identità nasce con l'import su richiesta, non con il giro (che aggiorna soltanto).
+async function importaCliente(r: Record<string, unknown> = {}) {
+  await mettiCliente(r);
+  return importa(db, ponte, 'public', 'cliente', (r.id_integra as number) ?? 1, {});
+}
+
+async function importaFornitore(r: Record<string, unknown> = {}) {
+  await mettiFornitore(r);
+  return importa(db, ponte, 'public', 'fornitore', (r.id_integra as number) ?? 1, {});
+}
+
 const ora = new Date('2026-09-04T10:00:00Z');
 
 beforeAll(async () => {
@@ -88,23 +101,31 @@ beforeEach(async () => {
 });
 
 describe('un giro', () => {
-  it('primo giro: identità, versione e codice; conteggi in servizi_esecuzioni', async () => {
+  it('non crea: righe in vista ma nessun cliente o fornitore (D-111)', async () => {
     await mettiCliente({});
     await mettiFornitore({});
     const c = await sincronizzaGiro(db, ponte, ora);
-    expect(c.clienti.nuovi).toBe(1);
-    expect(c.fornitori.nuovi).toBe(1);
-    expect(await db.clienti.count()).toBe(1);
-    expect(await db.fornitori.count()).toBe(1);
-    expect(await db.clienti_versioni.count()).toBe(1);
-    expect(await db.codici_esterni.count({ where: { tipo: 'cliente' } })).toBe(1);
+    expect(c.clienti.nuovi).toBe(0);
+    expect(c.fornitori.nuovi).toBe(0);
+    expect(c.clienti.letti).toBe(1);
+    expect(c.fornitori.letti).toBe(1);
+    expect(await db.clienti.count()).toBe(0);
+    expect(await db.fornitori.count()).toBe(0);
     const esecuzione = await db.servizi_esecuzioni.findFirstOrThrow({ where: { servizio: 'integra' }, orderBy: { id: 'desc' } });
     expect(esecuzione.esito).toBe('ok');
-    expect(esecuzione.testo).toMatch(/Clienti: 1 letti, 1 nuovi/);
+    expect(esecuzione.testo).toMatch(/Clienti: 1 letti, 0 versioni/);
+    expect(esecuzione.testo).not.toContain('nuovi');
+  });
+
+  it('cliente sconosciuto senza P.IVA valida: ignorato, nessuna anomalia (D-111)', async () => {
+    await mettiCliente({ piva: 'X' });
+    await sincronizzaGiro(db, ponte, ora);
+    expect(await db.clienti.count()).toBe(0);
+    expect(await db.registro.count({ where: { codice: 'integra.piva_mancante' } })).toBe(0);
   });
 
   it('secondo giro senza cambi: nessuna versione nuova', async () => {
-    await mettiCliente({});
+    await importaCliente({});
     await sincronizzaGiro(db, ponte, ora);
     const c = await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
     expect(c.clienti.versioni).toBe(0);
@@ -112,8 +133,8 @@ describe('un giro', () => {
   });
 
   it('cambia la ragione sociale: nuova versione, vecchia intatta, pratica ancora sulla vecchia', async () => {
-    await mettiCliente({});
-    await mettiFornitore({});
+    await importaCliente({});
+    await importaFornitore({});
     await sincronizzaGiro(db, ponte, ora);
     const cliente = await db.clienti.findFirstOrThrow({ include: { corrente: true } });
     const fornitore = await db.fornitori.findFirstOrThrow({ include: { corrente: true } });
@@ -137,7 +158,7 @@ describe('un giro', () => {
   });
 
   it('cambia solo modificato_il o solo spazi e maiuscole della P.IVA: nessuna versione nuova', async () => {
-    await mettiCliente({ piva: '12345678901' });
+    await importaCliente({ piva: '12345678901' });
     await sincronizzaGiro(db, ponte, ora);
     await ponte.query("UPDATE public.integra_v_clienti SET piva = ' IT 123 456 789 01 ', modificato_il = now()");
     const c = await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
@@ -145,17 +166,9 @@ describe('un giro', () => {
     expect(await db.clienti_versioni.count()).toBe(1);
   });
 
-  it('stesso soggetto cliente e fornitore: due identità e due codici esterni', async () => {
-    await mettiCliente({ id_integra: 900, codice: 'C00900' });
-    await mettiFornitore({ id_integra: 900, codice: 'F00900' });
-    await sincronizzaGiro(db, ponte, ora);
-    expect(await db.codici_esterni.count({ where: { entita_id: (await db.clienti.findFirstOrThrow()).id, tipo: 'cliente' } })).toBe(1);
-    expect(await db.codici_esterni.count({ where: { entita_id: (await db.fornitori.findFirstOrThrow()).id, tipo: 'fornitore' } })).toBe(1);
-  });
-
   it('disattivato in Integra: resta, attivo=false, pratiche ancora presenti', async () => {
-    await mettiCliente({});
-    await mettiFornitore({});
+    await importaCliente({});
+    await importaFornitore({});
     await sincronizzaGiro(db, ponte, ora);
     const cliente = await db.clienti.findFirstOrThrow({ include: { corrente: true } });
     const fornitore = await db.fornitori.findFirstOrThrow({ include: { corrente: true } });
@@ -173,29 +186,34 @@ describe('un giro', () => {
     expect(await db.ordini_fornitore_testata.count()).toBe(1);
   });
 
-  it('cliente senza P.IVA valida: non copiato, anomalia aperta; corretta → copiato e chiusa', async () => {
-    await mettiCliente({ piva: 'X' });
+  it('cliente già in anagrafica con P.IVA che diventa non valida: anomalia aperta e poi chiusa', async () => {
+    await importaCliente({});
     await sincronizzaGiro(db, ponte, ora);
-    expect(await db.clienti.count()).toBe(0);
-    const anomalia = await db.registro.findFirstOrThrow({ where: { codice: 'integra.piva_mancante', stato: 'aperta' } });
-    expect(anomalia.messaggio).toContain('P.IVA valida');
+    await ponte.query("UPDATE public.integra_v_clienti SET piva = 'X', modificato_il = now()");
+    await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
+    expect(await db.registro.count({ where: { codice: 'integra.piva_mancante', stato: 'aperta' } })).toBe(1);
 
     await ponte.query("UPDATE public.integra_v_clienti SET piva = '12345678901', modificato_il = now()");
-    await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
-    expect(await db.clienti.count()).toBe(1);
+    await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 120_000));
     expect(await db.registro.count({ where: { codice: 'integra.piva_mancante', stato: 'aperta' } })).toBe(0);
   });
 
   it('P.IVA estera di un fornitore: accettata', async () => {
-    await mettiFornitore({ piva: 'DE123456789' });
+    await importaFornitore({ piva: 'DE123456789' });
     await sincronizzaGiro(db, ponte, ora);
     expect(await db.fornitori.count()).toBe(1);
     expect((await db.fornitori_versioni.findFirstOrThrow()).piva).toBe('DE123456789');
   });
 
   it('P.IVA doppia: anomalia integra.piva_doppia', async () => {
-    await mettiCliente({ id_integra: 1, codice: 'C00001', piva: '12345678901' });
-    await mettiCliente({ id_integra: 2, codice: 'C00002', piva: '12345678901', ragione_sociale: 'Cliente Due' });
+    const crea = async (codice: string, piva: string, nome: string) => {
+      const c = await db.clienti.create({ data: {} });
+      const v = await db.clienti_versioni.create({ data: { cliente_id: c.id, fonte: 'integra', piva, ragione_sociale: nome } });
+      await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: v.id } });
+      await db.codici_esterni.create({ data: { sistema: 'integra', tipo: 'cliente', codice, entita_id: c.id } });
+    };
+    await crea('C00001', '12345678901', 'Cliente Uno');
+    await crea('C00002', '12345678901', 'Cliente Due');
     await sincronizzaGiro(db, ponte, ora);
     expect(await db.registro.count({ where: { codice: 'integra.piva_doppia', stato: 'aperta' } })).toBe(1);
   });
@@ -220,7 +238,7 @@ describe('un giro', () => {
   });
 
   it('campi del CRM invariati dopo un giro', async () => {
-    await mettiFornitore({});
+    await importaFornitore({});
     await sincronizzaGiro(db, ponte, ora);
     const f = await db.fornitori.findFirstOrThrow();
     await db.fornitori.update({ where: { id: f.id }, data: { giorni_incasso: 99, note: 'del CRM' } });
@@ -232,9 +250,9 @@ describe('un giro', () => {
 
   it('margine: una riga di poco prima dell\'ultimo giro viene letta', async () => {
     await db.servizi_esecuzioni.create({ data: { servizio: 'integra', tipo: 'lavoro', inizio: new Date(ora.getTime() - 60_000), fine: new Date(ora.getTime() - 50_000), esito: 'ok' } });
-    await mettiCliente({ id_integra: 77, codice: 'C00077', modificato_il: new Date(ora.getTime() - 2 * 3600_000) });
+    await importaCliente({ id_integra: 77, codice: 'C00077', modificato_il: new Date(ora.getTime() - 2 * 3600_000) });
     const c = await sincronizzaGiro(db, ponte, ora);
-    expect(c.clienti.nuovi).toBe(1);
+    expect(c.clienti.letti).toBe(1);
   });
 
   it('rotte: prova e sincronizza; 403 senza sistema.impostazioni; nessun PONTE_URL nella risposta', async () => {
@@ -261,7 +279,7 @@ describe('un giro', () => {
     expect(esiti.filter((e) => e.status === 'fulfilled')).toHaveLength(1);
     const ko = esiti.find((e) => e.status === 'rejected') as PromiseRejectedResult;
     expect(ko.reason.message).toBe('Sincronizzazione già in corso');
-    expect(await db.clienti.count()).toBe(1);
+    expect(await db.clienti.count()).toBe(0); // D-111: il giro non crea
   });
 
   it('una riga in errore resta in anomalia e si rilegge al giro dopo', async () => {
@@ -273,7 +291,7 @@ describe('un giro', () => {
 
     await db.codici_esterni.deleteMany({ where: { codice: 'C00005' } });
     await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 2 * 86_400_000));
-    expect(await db.clienti.count()).toBe(1);
+    expect(await db.clienti.count()).toBe(0); // D-111: il giro non crea, la riga ora si ignora
     expect(await db.registro.count({ where: { codice: 'integra.riga', stato: 'aperta' } })).toBe(0);
   });
 
@@ -291,16 +309,6 @@ describe('un giro', () => {
     await expect(sincronizzaGiro(db, rotto, new Date(ora.getTime() + 240_000))).rejects.toThrow();
     await rotto.end();
     expect(await db.registro.count({ where: { codice: 'integra.connessione', stato: 'aperta' } })).toBe(1);
-  });
-
-  it('chiave solo dal codice: id_integra uguale non unisce due soggetti', async () => {
-    await mettiCliente({ id_integra: 1, codice: '500', ragione_sociale: 'Soggetto A' });
-    await sincronizzaGiro(db, ponte, ora);
-    const a = await db.clienti.findFirstOrThrow({ include: { corrente: true } });
-    await mettiCliente({ id_integra: 500, codice: 'C00500', ragione_sociale: 'Soggetto B' });
-    await sincronizzaGiro(db, ponte, new Date(ora.getTime() + 60_000));
-    expect(await db.clienti.count()).toBe(2);
-    expect((await db.clienti.findUniqueOrThrow({ where: { id: a.id }, include: { corrente: true } })).corrente?.ragione_sociale).toBe('Soggetto A');
   });
 
   it('ponte in sola lettura anche per il CRM', async () => {

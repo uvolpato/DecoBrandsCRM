@@ -25,7 +25,8 @@ const VISTE = ['tutti', 'cliente', 'fornitore', 'subagente', 'nonattivi'];
 // ---------- Normalizzazione al confine (§1.6): si salva com'è scritto e normalizzato ----------
 const testo = (v: unknown) => String(v ?? '').trim().replace(/\s+/g, ' ');
 const normalizzaCF = (v: string) => v.replace(/\s/g, '').toUpperCase();
-function normalizzaPiva(v: string) {
+/** P.IVA normalizzata, riusata dall'import su richiesta da Integra (D-111). */
+export function normalizzaPiva(v: string) {
   const s = v.replace(/[\s.]/g, '').toUpperCase();
   return /^IT\d{11}$/.test(s) ? s.slice(2) : s;
 }
@@ -38,8 +39,9 @@ const soloData = (s: string) => new Date(`${s}T00:00:00Z`);
 // Campo facoltativo che può arrivare vuoto: @IsOptional lascerebbe passare '' e farebbe fallire i @Matches
 const Facoltativo = () => ValidateIf((_o, v) => v !== undefined && v !== null && v !== '');
 
-/** P.IVA e CF normalizzati con i controlli del master: senza dati fiscali non è un soggetto (§7.4). */
-function datiFiscali(piva: string | null, codice_fiscale: string | null, paese: string) {
+/** P.IVA e CF normalizzati con i controlli del master: senza dati fiscali non è un soggetto (§7.4).
+ *  Riusata dall'import su richiesta da Integra (D-111). */
+export function datiFiscali(piva: string | null, codice_fiscale: string | null, paese: string) {
   const pn = normalizzaPiva(piva ?? '');
   const cn = normalizzaCF(codice_fiscale ?? '');
   const p = paese.toUpperCase().slice(0, 2) || 'IT';

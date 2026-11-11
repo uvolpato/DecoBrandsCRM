@@ -2453,8 +2453,8 @@ senza P.IVA) si prendono quando il primo documento le tocca.</p>
    legge le viste e aggiunge una versione solo se cambia un campo che conta (D-46); i <code>nuovi</code>
    restano a 0. I disattivati e le anomalie restano come oggi (§4.5).</li>
 <li><strong>La ricerca sulle viste è mirata</strong>: <code>GET /api/integra/cerca?tipo=fornitore|cliente&amp;q=</code>
-   (<code>dati.importa</code>), <strong>massimo 10 righe</strong>, per codice esatto (<code>codice</code>/<code>codice_master</code>), P.IVA o
-   ragione sociale; nessun conteggio e nessuna scansione completa. Si interroga <strong>solo su richiesta
+   (<code>dati.importa</code>), <strong>massimo 10 righe</strong>, per codice del ruolo (<code>codice</code>) esatto, P.IVA o ragione
+   sociale; nessun conteggio e nessuna scansione completa. Si interroga <strong>solo su richiesta
    esplicita</strong> (pulsante <em>Cerca in Integra</em>), mai a ogni tasto e mai per popolare una lista.
    <em>Perché:</em> una query con <code>exists</code> correlato sulle viste ha superato i 120 secondi attraverso
    <code>postgres_fdw</code> (11/11/2026); il ponte regge la ricerca puntuale, non quella di massa.</li>
@@ -4935,7 +4935,7 @@ pratiche).</p>
 <tr>
 <td>GET</td>
 <td><code>/api/integra/cerca?tipo=fornitore\|cliente&amp;q=</code></td>
-<td>righe delle viste di Integra non ancora in anagrafica, <strong>massimo 10</strong>: per codice esatto, P.IVA o ragione sociale; <code>dati.importa</code>; solo su richiesta esplicita (D-111, §4.7.1)</td>
+<td>righe delle viste di Integra non ancora in anagrafica, <strong>massimo 10</strong>: per codice del ruolo, P.IVA o ragione sociale; <code>dati.importa</code>; solo su richiesta esplicita (D-111, §4.7.1)</td>
 </tr>
 <tr>
 <td>POST</td>

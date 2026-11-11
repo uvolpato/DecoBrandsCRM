@@ -10,6 +10,7 @@ import { EccezioniController, FornitoriController } from './fornitori';
 import { AgentiController, SubagentiController } from './subagenti';
 import { ClientiController } from './clienti';
 import { IntegraController, IntegraService } from './integra';
+import { AnagraficaIntegraController } from './anagrafica-integra';
 import { CasellaService } from './casella';
 import { LetturaService } from './lettura';
 import { PraticheController } from './pratiche';
@@ -62,7 +63,7 @@ export function limiti(env = process.env) {
   controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, SoggettiController, PersoneController, PraticheController, DocumentiController, DocumentiAbbinaController, DocumentiPraticaController, DocumentiFiscaliController, IntegraController,
     BollettiniController, // F3-A1: matrice e caricamento (rotte fisse) prima di GET /bollettini/:id
     BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, OggiController, SollecitiController, EventiController, RegistroController, ImpostazioniController,
-    ScartatiController, SistemaController, StoricoController],
+    ScartatiController, SistemaController, StoricoController, AnagraficaIntegraController],
   providers: [
     IntegraService,
     CasellaService,

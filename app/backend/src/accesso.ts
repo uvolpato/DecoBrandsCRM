@@ -54,6 +54,7 @@ export const PERMESSI = {
   'sistema.registro': { area: 'sistema', testo: 'Registro di eventi e anomalie: consultare ed esportare', ruoli: ['superutente', 'amministratore'] },
   'dati.consulta': { area: 'dati', testo: 'Consultare fornitori, clienti, subagenti', minimo: 'lettura' },
   'dati.modifica': { area: 'dati', testo: 'Subagenti, agenzie dei clienti (interscambio)', minimo: 'operatore' },
+  'dati.importa': { area: 'dati', testo: 'Importare un\'anagrafica da Integra', minimo: 'operatore' },
   'dati.condizioni': { area: 'dati', testo: 'Condizioni, scaglioni e percentuali dei fornitori; eccezioni personali', minimo: 'responsabile' },
   'provvigioni.consulta': { area: 'provvigioni', testo: 'Consultare pratiche, documenti, bollettini, liquidazioni, analisi', minimo: 'lettura' },
   'provvigioni.esporta': { area: 'provvigioni', testo: 'Esportare liquidazioni e analisi (Excel, PDF, CSV)', minimo: 'lettura' },

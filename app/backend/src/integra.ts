@@ -23,7 +23,7 @@ const SECONDI_LENTI = 30; // oltre il giro è "lento" (§7.14.3)
 export interface ConteggioVista { letti: number; nuovi: number; versioni: number; disattivati: number; scartati: number }
 export interface Conteggi { clienti: ConteggioVista; fornitori: ConteggioVista }
 
-interface Riga {
+export interface Riga {
   id_integra: number;
   codice: string | null;
   ragione_sociale: string | null;
@@ -43,7 +43,7 @@ interface Riga {
 
 // Colonne in un punto solo: col ponte vero si cambia solo qui.
 // ponytail: colonne da confermare col ponte vero, F0-A8
-const VISTE: Record<Vista, { vista: string; colonne: string[] }> = {
+export const VISTE: Record<Vista, { vista: string; colonne: string[] }> = {
   clienti: {
     vista: 'integra_v_clienti',
     colonne: ['id_integra', 'codice', 'ragione_sociale', 'piva', 'codice_fiscale', 'indirizzo', 'cap', 'citta',
@@ -100,7 +100,7 @@ function cambia(nuovi: Record<string, string | null>, vecchia: Record<string, un
 }
 
 /** Alcune colonne restano fuori dalle versioni (codice_fiscale, pec, codice_agente, indirizzo/email del fornitore). */
-function datiCliente(r: Riga) {
+export function datiCliente(r: Riga) {
   return {
     piva: piva(r.piva) || null,
     ragione_sociale: testo(r.ragione_sociale),
@@ -112,7 +112,7 @@ function datiCliente(r: Riga) {
   };
 }
 
-function datiFornitore(r: Riga) {
+export function datiFornitore(r: Riga) {
   return {
     piva: piva(r.piva) || null,
     ragione_sociale: testo(r.ragione_sociale),
@@ -120,7 +120,7 @@ function datiFornitore(r: Riga) {
   };
 }
 
-const codiceDi = (r: Riga) => testo(r.codice) || String(r.id_integra);
+export const codiceDi = (r: Riga) => testo(r.codice) || String(r.id_integra);
 
 /** Mai indirizzo o password nei testi, nei log, nelle risposte, nel registro. */
 export function pulisci(errore: unknown): string {
@@ -168,9 +168,11 @@ async function identita(db: Db, tipo: Tipo, r: Riga) {
   return db.codici_esterni.findFirst({ where: { sistema: 'integra', tipo, codice: codiceDi(r) } });
 }
 
-/** Una riga della vista diventa (o aggiorna) cliente o fornitore; la sua transazione (§4.6, V13). */
+/** Una riga della vista aggiorna il cliente se già in anagrafica; altrimenti si ignora (D-111, §4.7.1). */
 async function applicaCliente(db: PrismaService, r: Riga, ora: Date, c: ConteggioVista) {
   const codice = codiceDi(r);
+  const trovato = await identita(db, 'cliente', r);
+  if (!trovato) return; // D-111: chi non è in anagrafica lo importa chi ha il documento
   const valida = piva(r.piva);
   if (!pivaValida(valida)) {
     c.scartati++;
@@ -180,18 +182,9 @@ async function applicaCliente(db: PrismaService, r: Riga, ora: Date, c: Conteggi
     }, ora);
     return;
   }
-  const trovato = await identita(db, 'cliente', r);
   const dati = datiCliente(r);
   const tecnici = { attivo: r.attivo ?? true, modificato_il: r.modificato_il ?? ora, sincronizzato_il: ora };
   await db.$transaction(async (tx) => {
-    if (!trovato) {
-      const nuovo = await tx.clienti.create({ data: tecnici });
-      const versione = await tx.clienti_versioni.create({ data: { cliente_id: nuovo.id, fonte: 'integra', valido_dal: ora, ...dati } });
-      await tx.clienti.update({ where: { id: nuovo.id }, data: { versione_corrente_id: versione.id } });
-      await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'cliente', codice, entita_id: nuovo.id } });
-      c.nuovi++;
-      return;
-    }
     const attuale = await tx.clienti.findUnique({ where: { id: trovato.entita_id }, include: { corrente: true } });
     if (!attuale) throw new Error(`codice ${codice} punta a un cliente che non c'è`);
     const versione = !attuale.corrente || cambia(dati, attuale.corrente)
@@ -209,6 +202,8 @@ async function applicaCliente(db: PrismaService, r: Riga, ora: Date, c: Conteggi
 
 async function applicaFornitore(db: PrismaService, r: Riga, ora: Date, c: ConteggioVista) {
   const codice = codiceDi(r);
+  const trovato = await identita(db, 'fornitore', r);
+  if (!trovato) return; // D-111: chi non è in anagrafica lo importa chi ha il documento
   const valida = piva(r.piva);
   if (!pivaValida(valida)) {
     c.scartati++;
@@ -218,18 +213,9 @@ async function applicaFornitore(db: PrismaService, r: Riga, ora: Date, c: Conteg
     }, ora);
     return;
   }
-  const trovato = await identita(db, 'fornitore', r);
   const dati = datiFornitore(r);
   const tecnici = { attivo: r.attivo ?? true, modificato_il: r.modificato_il ?? ora, sincronizzato_il: ora };
   await db.$transaction(async (tx) => {
-    if (!trovato) {
-      const nuovo = await tx.fornitori.create({ data: tecnici });
-      const versione = await tx.fornitori_versioni.create({ data: { fornitore_id: nuovo.id, fonte: 'integra', valido_dal: ora, ...dati } });
-      await tx.fornitori.update({ where: { id: nuovo.id }, data: { versione_corrente_id: versione.id } });
-      await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'fornitore', codice, entita_id: nuovo.id } });
-      c.nuovi++;
-      return;
-    }
     const attuale = await tx.fornitori.findUnique({ where: { id: trovato.entita_id }, include: { corrente: true } });
     if (!attuale) throw new Error(`codice ${codice} punta a un fornitore che non c'è`);
     const versione = !attuale.corrente || cambia(dati, attuale.corrente)
@@ -348,7 +334,7 @@ export async function sincronizzaGiro(db: PrismaService, ponte: Pool, ora = new 
   }
   const c = conteggi;
   const misure = { clienti: c.clienti, fornitori: c.fornitori, secondi, ponte: !ponteKo };
-  const testoGiro = `Clienti: ${c.clienti.letti} letti, ${c.clienti.nuovi} nuovi, ${c.clienti.versioni} versioni; fornitori: ${c.fornitori.letti} letti, ${c.fornitori.nuovi} nuovi, ${c.fornitori.versioni} versioni`
+  const testoGiro = `Clienti: ${c.clienti.letti} letti, ${c.clienti.versioni} versioni; fornitori: ${c.fornitori.letti} letti, ${c.fornitori.versioni} versioni`
     + (nota ? `; errore: ${nota}` : '') + (esito === 'attenzione' ? `; lento: ${secondi} s` : '');
   await db.servizi_esecuzioni.update({
     where: { id: esecuzione.id },
@@ -403,6 +389,12 @@ export class IntegraService implements OnModuleInit, OnModuleDestroy {
 
   private async chiudiPool() {
     if (this.pool) { await this.pool.end(); this.pool = null; this.url = null; }
+  }
+
+  /** Pool e schema del ponte per la ricerca e l'import su richiesta (D-111); null se non configurato. */
+  async ponte(): Promise<{ pool: Pool; schema: string } | null> {
+    const c = await this.connessione();
+    return c ? { pool: c.pool, schema: c.schema } : null;
   }
 
   /** Prova la connessione: { ok, ms, clienti, fornitori } oppure { ok:false, ms, messaggio }. */

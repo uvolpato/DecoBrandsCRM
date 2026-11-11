@@ -1126,8 +1126,8 @@ senza P.IVA) si prendono quando il primo documento le tocca.
    legge le viste e aggiunge una versione solo se cambia un campo che conta (D-46); i `nuovi`
    restano a 0. I disattivati e le anomalie restano come oggi (§4.5).
 2. **La ricerca sulle viste è mirata**: `GET /api/integra/cerca?tipo=fornitore|cliente&q=`
-   (`dati.importa`), **massimo 10 righe**, per codice esatto (`codice`/`codice_master`), P.IVA o
-   ragione sociale; nessun conteggio e nessuna scansione completa. Si interroga **solo su richiesta
+   (`dati.importa`), **massimo 10 righe**, per codice del ruolo (`codice`) esatto, P.IVA o ragione
+   sociale; nessun conteggio e nessuna scansione completa. Si interroga **solo su richiesta
    esplicita** (pulsante *Cerca in Integra*), mai a ogni tasto e mai per popolare una lista.
    *Perché:* una query con `exists` correlato sulle viste ha superato i 120 secondi attraverso
    `postgres_fdw` (11/11/2026); il ponte regge la ricerca puntuale, non quella di massa.
@@ -3158,7 +3158,7 @@ pratiche).
 | POST | `/api/eccezioni/:id/termina` | `{al}`: primo giorno in cui non vale più (escluso) |
 | PUT · DELETE | `/api/eccezioni/:id` | corregge `{pct_personale, valido_dal?}` · elimina, solo se tutto il periodo è dopo l'ultima chiusura (409) |
 | GET | `/api/fornitori-lista` | dropdown fornitori attivi |
-| GET | `/api/integra/cerca?tipo=fornitore\|cliente&q=` | righe delle viste di Integra non ancora in anagrafica, **massimo 10**: per codice esatto, P.IVA o ragione sociale; `dati.importa`; solo su richiesta esplicita (D-111, §4.7.1) |
+| GET | `/api/integra/cerca?tipo=fornitore\|cliente&q=` | righe delle viste di Integra non ancora in anagrafica, **massimo 10**: per codice del ruolo, P.IVA o ragione sociale; `dati.importa`; solo su richiesta esplicita (D-111, §4.7.1) |
 | POST | `/api/integra/importa` | `{tipo, id_integra}`: soggetto + ruolo + `codici_esterni` + versione in una transazione; idempotente (`{gia_presente, id}`); evento `crud.create` su `cliente`/`fornitore`; `dati.importa` (D-111) |
 | GET | `/api/interscambio/storico?fornitore_id=&cliente_id=&codice=` | righe di `interscambio_storico` per proporre subagente, sconto e lo stato «non rappresentato»; `dati.consulta` (D-112) |
 | GET | `/subagenti` · `/subagenti/:id` · `/api/subagenti` | subagenti con clienti seguiti ed eccezioni |
