@@ -2,7 +2,7 @@
 
 Data: 08/11/2026 · **Esecutore: DeepSeek V4** · Gravità del pacchetto: **P2** · Rilievi: A7-20, A7-22 · Piano: `strumenti/collaudo/piano-correzioni.md`.
 
-Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: 1-01 (`collaudo-1-01-motore-storni-mese.md`), 1-05 (`collaudo-1-05-oggi-bollettini-documenti.md`), 2-03 (`collaudo-2-03-eventi-dal-vivo.md`).
+Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: 1-01 (`collaudo-1-01-motore-storni-mese.md`), 1-06 (`collaudo-1-06-oggi-bollettini-documenti.md`), 2-04 (`collaudo-2-04-eventi-dal-vivo.md`).
 
 ## Contesto e regole del progetto
 
@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A7-20 — Ogni cambio di pagina carica tutto il database per i numeri della barra
 - Gravità: P2 (ipotesi)
@@ -41,7 +41,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - File toccati: `app/frontend/componenti/Barra.tsx`, `app/backend/src/oggi.ts`
 - Dipende da / correlato a: A7-21, A7-22; commento `ponytail:` in `motore/dati.ts:6-7` (debito noto, A8)
 
-> **Per questo pacchetto:** Solo la **parte 2 (backend)**: conteggi `pratiche`/`conferme` di `conteggiBarra` in SQL (stessa condizione di `pratiche.ts:113-118`), `pagamenti` con la cache su `max(registro.id)`. La parte 1 (Barra che si rilegge solo all'evento) aspetta la decisione U20: **non toccare `Barra.tsx`**.
+> **Per questo pacchetto:** Solo la **parte 2 (backend)**: conteggi `pratiche`/`conferme` di `conteggiBarra` in SQL (stessa condizione di `pratiche.ts:113-118`), `pagamenti` con la cache su `max(registro.id)`. La parte 1 (Barra che si rilegge solo all'evento) **non si fa** (decisione U20): non toccare `Barra.tsx`.
 
 ### A7-22 — Oggi si ricarica intero a ogni evento in ogni scheda aperta; Liquidazioni fa 3 caricamenti completi
 - Gravità: P2 (ipotesi)
@@ -72,8 +72,17 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 Li modificano altri pacchetti della **stessa onda**, in parallelo:
 
+- `app/backend/src/accesso.ts`
+- `app/backend/src/app.module.ts`
+- `app/backend/src/casella.ts`
 - `app/backend/src/documenti.ts`
+- `app/backend/src/impostazioni.ts`
+- `app/backend/src/motore/motore.ts`
+- `app/backend/test/accesso.spec.ts`
+- `app/backend/test/casella.spec.ts`
 - `app/backend/test/documenti.spec.ts`
+- `app/backend/test/impostazioni.spec.ts`
+- `app/backend/test/motore.spec.ts`
 - `app/frontend/app/(app)/[...resto]/page.tsx`
 - `app/frontend/app/(app)/bollettini/VistaBollettini.tsx`
 - `app/frontend/app/(app)/clienti/VistaClienti.tsx`
@@ -81,6 +90,7 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/frontend/app/(app)/documenti/VistaDocumenti.tsx`
 - `app/frontend/app/(app)/documenti/[id]/VistaDocumento.tsx`
 - `app/frontend/app/(app)/fornitori/VistaFornitori.tsx`
+- `app/frontend/app/(app)/impostazioni/*`
 - `app/frontend/app/(app)/not-found.tsx`
 - `app/frontend/app/(app)/pratiche/VistaPratiche.tsx`
 - `app/frontend/app/(app)/pratiche/[id]/VistaPratica.tsx`
@@ -93,12 +103,14 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/frontend/componenti/InCostruzione.tsx`
 - `app/frontend/componenti/Modale.tsx`
 - `app/frontend/lib/formati.ts`
+- `prototipo-alternativo/assets/motore.js`
 - `prototipo-alternativo/assets/stile.css`
 - `strumenti/prove/app_caricamento.py`
 - `strumenti/prove/app_clienti.py`
 - `strumenti/prove/app_componenti.py`
 - `strumenti/prove/app_documenti.py`
 - `strumenti/prove/app_guscio.py`
+- `strumenti/prove/app_impostazioni.py`
 - `strumenti/prove/app_pratica.py`
 
 Documentazione (la scrive il **pacchetto documentazione** dell'onda, dopo di te: tu metti il testo pronto nel resoconto, sezione *Da documentare*):

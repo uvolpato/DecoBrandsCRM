@@ -1,8 +1,8 @@
-# Collaudo · Onda 3 · Pacchetto 3-01 — Arrivo dello stesso file e annullo di un documento letto
+# Collaudo · Onda 3 · Pacchetto 3-01 — Arrivo dello stesso file, scartati che tornano solo a mano, annullo di un documento letto
 
-Data: 08/11/2026 · **Esecutore: DeepSeek V4** · Gravità del pacchetto: **P2** · Rilievi: A3-05, A4-03, A4-14, A4-06 · Piano: `strumenti/collaudo/piano-correzioni.md`.
+Data: 08/11/2026 · **Esecutore: DeepSeek V4** · Gravità del pacchetto: **P2** · Rilievi: A3-05, A4-03, A4-14, A4-06, U10 · Piano: `strumenti/collaudo/piano-correzioni.md`.
 
-Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: —.
+Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: 0b-02 (`collaudo-0b-02-documenti-righe-agenzia.md`: rileggi il codice di `documenti.ts`, `documenti.spec.ts`, cambiato dall'onda 0 bis).
 
 ## Contesto e regole del progetto
 
@@ -26,7 +26,13 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Decisioni di Ugo per questo pacchetto (08/11/2026)
+
+Sono decise: applicale come scritte, non riaprirle. La riga del §19 la scrive il pacchetto documentazione dell'onda.
+
+- **U10 → D-122**: **Uno scartato torna in coda solo se lo si ricarica a mano.** Lo stesso file (stessa impronta) di un documento scartato lo rimette in coda solo con `origine = caricamento`; se arriva dalla casella il giro lo conta fra gli ignorati e lo scarto resta. Precisa D-54.
+
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A3-05 — Eliminazione di uno scartato e nuovo arrivo dello stesso file: riga in coda senza file
 - Gravità: P2
@@ -74,21 +80,41 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 > **Per questo pacchetto:** Il testo «torna in coda» di guida/spec lo cambia il pacchetto documentazione: scrivi la frase nuova nel resoconto.
 
+### U10 — Lo scartato torna in coda solo se ricaricato a mano (D-122)
+- Gravità: P2
+- Dove: `app/backend/src/documenti.ts` (`riceviDocumento`, ramo «stessa impronta di uno scartato»), `app/backend/src/casella.ts` (conteggio degli ignorati del giro)
+- Problema: lo stesso PDF rimandato dal fornitore per email rimette in coda in automatico un documento scartato.
+- Scenario: fattura scartata come «Non riguarda Decobrands»; il fornitore manda un promemoria con lo stesso PDF → il documento torna `in_coda` e va riletto e riscartato (A4, *Da decidere* 1).
+- Correzione puntuale: in `riceviDocumento`, se la riga con la stessa impronta è `scartato` e `origine !== 'caricamento'` → non rianimarla: restituire un esito «ignorato» che `giroCasella` conta fra gli ignorati (l'email si sposta come le altre). Con `origine = 'caricamento'` resta il comportamento di oggi (D-54).
+- Prova che la verifica: `app/backend/test/documenti.spec.ts` (scartato + stesso file da casella → resta scartato; da caricamento → torna in coda) e `app/backend/test/casella.spec.ts` (ignorati + 1).
+- Esecutore: DeepSeek V4 — stessa funzione di A3-05/A4-03/A4-14.
+- File toccati: `app/backend/src/documenti.ts`, `app/backend/src/casella.ts`, `app/backend/test/documenti.spec.ts`, `app/backend/test/casella.spec.ts`
+- Dipende da / correlato a: D-54 → D-122
+
 **Nota del pacchetto.** I tre rilievi A3-05, A4-03 e A4-14 toccano la stessa funzione `riceviDocumento`: una sola scrittura del file (temporaneo + `link`, A4-03) che copre anche la riscrittura dopo il commit (A3-05). Niente due meccanismi diversi.
 
 ## File ammessi (solo questi)
 
 - `app/backend/src/documenti.ts`
 - `app/backend/test/documenti.spec.ts`
+- `app/backend/src/casella.ts`
+- `app/backend/test/casella.spec.ts`
 - `strumenti/opencode/resoconto-collaudo-3-01.md`
 
 ## File vietati
 
 Li modificano altri pacchetti della **stessa onda**, in parallelo:
 
+- `app/backend/src/accesso.ts`
+- `app/backend/src/app.module.ts`
+- `app/backend/src/impostazioni.ts`
 - `app/backend/src/liquidazioni.ts`
+- `app/backend/src/motore/motore.ts`
 - `app/backend/src/oggi.ts`
+- `app/backend/test/accesso.spec.ts`
+- `app/backend/test/impostazioni.spec.ts`
 - `app/backend/test/liquidazioni.spec.ts`
+- `app/backend/test/motore.spec.ts`
 - `app/backend/test/oggi.spec.ts`
 - `app/frontend/app/(app)/[...resto]/page.tsx`
 - `app/frontend/app/(app)/bollettini/VistaBollettini.tsx`
@@ -97,6 +123,7 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/frontend/app/(app)/documenti/VistaDocumenti.tsx`
 - `app/frontend/app/(app)/documenti/[id]/VistaDocumento.tsx`
 - `app/frontend/app/(app)/fornitori/VistaFornitori.tsx`
+- `app/frontend/app/(app)/impostazioni/*`
 - `app/frontend/app/(app)/liquidazioni/VistaLiquidazioni.tsx`
 - `app/frontend/app/(app)/not-found.tsx`
 - `app/frontend/app/(app)/oggi/VistaOggi.tsx`
@@ -111,12 +138,14 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/frontend/componenti/InCostruzione.tsx`
 - `app/frontend/componenti/Modale.tsx`
 - `app/frontend/lib/formati.ts`
+- `prototipo-alternativo/assets/motore.js`
 - `prototipo-alternativo/assets/stile.css`
 - `strumenti/prove/app_caricamento.py`
 - `strumenti/prove/app_clienti.py`
 - `strumenti/prove/app_componenti.py`
 - `strumenti/prove/app_documenti.py`
 - `strumenti/prove/app_guscio.py`
+- `strumenti/prove/app_impostazioni.py`
 - `strumenti/prove/app_pratica.py`
 
 Documentazione (la scrive il **pacchetto documentazione** dell'onda, dopo di te: tu metti il testo pronto nel resoconto, sezione *Da documentare*):
@@ -155,7 +184,7 @@ database `decobrands_test` condiviso, mai Integra (192.168.239.49: non si contat
 
 Prove da far passare:
 
-- backend: `cd app/backend && npx jest test/documenti.spec.ts test/documenti-pratica.spec.ts test/scartati.spec.ts test/coda.spec.ts` (con le variabili sopra) → **0 KO**;
+- backend: `cd app/backend && npx jest test/documenti.spec.ts test/documenti-pratica.spec.ts test/scartati.spec.ts test/coda.spec.ts test/casella.spec.ts` (con le variabili sopra) → **0 KO**;
 - `cd app/backend && npx tsc --noEmit` → 0 errori;
 - `git diff --name-only` e `git status --short`: nessun file fuori dagli ammessi.
 

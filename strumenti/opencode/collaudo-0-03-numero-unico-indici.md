@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A3-10 — Numero della pratica senza vincolo UNIQUE
 - Gravità: P3
@@ -54,15 +54,15 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 ## File ammessi (solo questi)
 
-- `app/backend/prisma/migrations/20261109110000_numero_pratica_unico/migration.sql`
-- `app/backend/prisma/migrations/20261109120000_indici_fk/migration.sql`
+- `app/backend/prisma/migrations/20261113110000_numero_pratica_unico/migration.sql`
+- `app/backend/prisma/migrations/20261113120000_indici_fk/migration.sql`
 - `app/backend/prisma/schema.prisma`
 - `app/backend/test/vincoli.spec.ts`
 - `strumenti/opencode/resoconto-collaudo-0-03.md`
 
 ## File vietati
 
-Onda 0: i pacchetti vanno **in serie**, uno per volta, nell'ordine 0-01 → 0-04. Non toccare le migrazioni degli altri pacchetti dell'onda 0.
+Onda 0: i pacchetti vanno **in serie**, uno per volta, nell'ordine 0-01 → 0-05. Non toccare le migrazioni degli altri pacchetti dell'onda 0.
 
 Documentazione (la scrive il **pacchetto documentazione** dell'onda, dopo di te: tu metti il testo pronto nel resoconto, sezione *Da documentare*):
 

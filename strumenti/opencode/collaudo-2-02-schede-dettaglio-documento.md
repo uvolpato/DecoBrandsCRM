@@ -2,7 +2,7 @@
 
 Data: 08/11/2026 · **Esecutore: DeepSeek V4 Flash** · Gravità del pacchetto: **P1** · Rilievi: A5-01, A5-04, A6-16, A5-10 · Piano: `strumenti/collaudo/piano-correzioni.md`.
 
-Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: —.
+Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: 0b-01 (`collaudo-0b-01-import-integra-documento.md`: rileggi il codice di `VistaDocumento.tsx`, `app_documenti.py`, cambiato dall'onda 0 bis); 0b-06 (`collaudo-0b-06-lista-documenti-cliente.md`: rileggi il codice di `VistaDocumenti.tsx`, cambiato dall'onda 0 bis).
 
 ## Contesto e regole del progetto
 
@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A5-01 — "Vedi le righe" in Documenti non cambia scheda (Schede ignora `attiva` dopo il primo disegno)
 - Gravità: P1
@@ -92,24 +92,33 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/backend/package-lock.json`
 - `app/backend/package.json`
 - `app/backend/prisma/lettura-prova.ts`
+- `app/backend/src/accesso.ts`
 - `app/backend/src/bollettino.ts`
 - `app/backend/src/documenti.ts`
 - `app/backend/src/esporta-liquidazione.ts`
 - `app/backend/src/eventi.ts`
+- `app/backend/src/fornitori.ts`
+- `app/backend/src/impostazioni-api.ts`
+- `app/backend/src/impostazioni.ts`
 - `app/backend/src/incassi.ts`
 - `app/backend/src/lettura-prova.ts`
 - `app/backend/src/motore/dati.ts`
 - `app/backend/src/motore/motore.ts`
+- `app/backend/src/proposta.ts`
 - `app/backend/src/solleciti.ts`
 - `app/backend/test/bollettino.spec.ts`
 - `app/backend/test/documenti-pratica.spec.ts`
 - `app/backend/test/eventi.spec.ts`
+- `app/backend/test/fornitori.spec.ts`
+- `app/backend/test/impostazioni.spec.ts`
 - `app/backend/test/liquidazioni.spec.ts`
 - `app/backend/test/motore-volumi.spec.ts`
 - `app/backend/test/pratiche.spec.ts`
+- `app/backend/test/proposta.spec.ts`
 - `app/frontend/app/(app)/analisi/VistaAnalisi.tsx`
 - `app/frontend/app/(app)/bollettini/VistaBollettini.tsx`
 - `app/frontend/app/(app)/clienti/VistaClienti.tsx`
+- `app/frontend/app/(app)/impostazioni/*`
 - `app/frontend/app/(app)/layout.tsx`
 - `app/frontend/app/(app)/oggi/VistaOggi.tsx`
 - `app/frontend/app/(app)/pratiche/VistaPratiche.tsx`

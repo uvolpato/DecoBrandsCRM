@@ -11,7 +11,7 @@ Raccoglie in un solo passaggio la documentazione di tutti, così spec, guida e p
   documenta: spec, §16.4, §19, guida, LEGGIMI, piano, poi `python3 strumenti/genera-pagine-doc.py`).
 - Italiano semplice e conciso; niente parole inglesi inutili.
 - Registro §19: una riga per decisione nuova o cambiata, **6 colonne** (D-nn, data, decisione, perché, chi, dove),
-  numerazione di seguito all'ultima D-nn presente (controlla l'ultima prima di scrivere). Chi: «Ugo (collaudo
+  numeri D-114…D-132 già assegnati nel piano (sotto); altre D-nn nuove solo di seguito all'ultima presente. Chi: «Ugo (collaudo
   08/11/2026)» per le regole confermate da Ugo, altrimenti «collaudo A-n» con l'ID del rilievo.
 - Versione della spec in testa: alzala di uno (es. 8.61 → 8.62) con il riassunto delle modifiche dell'onda.
 - Funzioni incerte segnalate come tali (D-06).
@@ -24,9 +24,21 @@ Raccoglie in un solo passaggio la documentazione di tutti, così spec, guida e p
 - `strumenti/opencode/resoconto-collaudo-4-02.md` (Tabelle che ricordano ordinamento e scorrimento: Pratiche e Liquidazioni)
 - `strumenti/opencode/resoconto-collaudo-4-03.md` (Scorrimento ripristinato all'arrivo dei dati; «Torna a…» che non punta a sé)
 - `strumenti/opencode/resoconto-collaudo-4-04.md` (Importi in euro scritti in un solo modo nel backend)
+- `strumenti/opencode/resoconto-collaudo-4-05.md` (Report subagenti di un trimestre chiuso dalla fotografia)
+- `strumenti/opencode/resoconto-collaudo-4-06.md` (Contrasti WCAG e carattere fuori dal CSS bloccante)
 
 Applica ogni voce dove dice il resoconto. Se una voce va contro il §19 o non è chiara, non scriverla: elencala nel tuo
 resoconto per Claude Code.
+
+## Righe del §19 da aggiungere (pronte, in fondo al registro, in ordine di numero)
+
+Numeri già assegnati nel piano (D-114…D-132): usa **esattamente** questi, una volta sola. Se il resoconto del pacchetto dice che la decisione non è stata attuata, non scrivere la riga e segnalalo. Per ognuna aggiungi anche una riga *Perché (D-nn)* nella sezione della spec indicata in *Dove* e, se cambia ciò che vede l'utente, il testo in `guida.ts`.
+
+| D-120 | 08/11/2026 | **Report subagenti di un trimestre chiuso = fotografia.** Per un trimestre con liquidazione chiusa il Report subagenti si costruisce dalla fotografia (`liquidazioni.totali.documenti`), come la pagina Liquidazioni; per il trimestre aperto resta il calcolo dal vivo (provvigione generata, compresi i documenti in attesa dei bollettini). | Ricalcolato dal motore, il report di un trimestre chiuso cambiava appena cambiavano i dati di base e non coincideva più con la liquidazione (collaudo A2-07, D-33). | Ugo (collaudo 08/11/2026, U7) | §7.8; `liquidazioni.ts` |
+
+## Righe *Perché* senza numero nuovo (confermano una regola esistente)
+
+- §16.1 — *Perché (U16, D-24 confermata):* i token dei colori (contrasti WCAG) e il carattere si cambiano nel `stile.css` del prototipo e si ricopiano nell'app; i due file restano uguali.
 
 ## Rilievi di documentazione assegnati a questa onda
 

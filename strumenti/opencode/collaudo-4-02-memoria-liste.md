@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A5-10 — Tabelle senza `memoria`: ordinamento e scorrimento persi tornando indietro
 - Gravità: P2
@@ -55,10 +55,13 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 
 - `app/backend/src/formati.ts`
 - `app/backend/src/incassi.ts`
+- `app/backend/src/liquidazioni.ts`
+- `app/backend/src/motore/motore.ts`
 - `app/backend/src/oggi.ts`
 - `app/backend/src/proposta.ts`
 - `app/backend/src/solleciti.ts`
 - `app/backend/test/incassi.spec.ts`
+- `app/backend/test/liquidazioni.spec.ts`
 - `app/backend/test/oggi.spec.ts`
 - `app/frontend/app/(app)/analisi/VistaAnalisi.tsx`
 - `app/frontend/app/(app)/bollettini/[id]/VistaBollettino.tsx`
@@ -67,8 +70,13 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/frontend/app/(app)/scartati/VistaScartati.tsx`
 - `app/frontend/app/(app)/sistema/VistaSistema.tsx`
 - `app/frontend/app/(app)/utenti/VistaUtenti.tsx`
+- `app/frontend/app/layout.tsx`
+- `app/frontend/app/stile/public-sans.css`
+- `app/frontend/app/stile/stile.css`
 - `app/frontend/componenti/Pagina.tsx`
 - `app/frontend/lib/memoria.ts`
+- `app/frontend/public/fonts/*`
+- `prototipo-alternativo/assets/stile.css`
 - `strumenti/prove/app_f7_collaudo.py`
 - `strumenti/prove/app_pratica.py`
 - `strumenti/prove/app_scartati.py`

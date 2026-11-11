@@ -2,7 +2,7 @@
 
 Data: 08/11/2026 · **Esecutore: DeepSeek V4** · Gravità del pacchetto: **P1** · Rilievi: A5-02 · Piano: `strumenti/collaudo/piano-correzioni.md`.
 
-Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: —.
+Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: 0b-02 (`collaudo-0b-02-documenti-righe-agenzia.md`: rileggi il codice di `documenti.ts`, cambiato dall'onda 0 bis).
 
 ## Contesto e regole del progetto
 
@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A5-02 — Confronto delle righe calcolato nel browser, diverso da quello del server (V12, D-60)
 - Gravità: P1
@@ -58,24 +58,33 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/backend/package-lock.json`
 - `app/backend/package.json`
 - `app/backend/prisma/lettura-prova.ts`
+- `app/backend/src/accesso.ts`
 - `app/backend/src/bollettino.ts`
 - `app/backend/src/esporta-liquidazione.ts`
 - `app/backend/src/eventi.ts`
+- `app/backend/src/fornitori.ts`
+- `app/backend/src/impostazioni-api.ts`
+- `app/backend/src/impostazioni.ts`
 - `app/backend/src/incassi.ts`
 - `app/backend/src/lettura-prova.ts`
 - `app/backend/src/motore/dati.ts`
 - `app/backend/src/motore/motore.ts`
+- `app/backend/src/proposta.ts`
 - `app/backend/src/solleciti.ts`
 - `app/backend/test/bollettino.spec.ts`
 - `app/backend/test/documenti-pratica.spec.ts`
 - `app/backend/test/eventi.spec.ts`
+- `app/backend/test/fornitori.spec.ts`
+- `app/backend/test/impostazioni.spec.ts`
 - `app/backend/test/liquidazioni.spec.ts`
 - `app/backend/test/motore-volumi.spec.ts`
+- `app/backend/test/proposta.spec.ts`
 - `app/frontend/app/(app)/analisi/VistaAnalisi.tsx`
 - `app/frontend/app/(app)/bollettini/VistaBollettini.tsx`
 - `app/frontend/app/(app)/clienti/VistaClienti.tsx`
 - `app/frontend/app/(app)/documenti/VistaDocumenti.tsx`
 - `app/frontend/app/(app)/documenti/[id]/VistaDocumento.tsx`
+- `app/frontend/app/(app)/impostazioni/*`
 - `app/frontend/app/(app)/layout.tsx`
 - `app/frontend/app/(app)/oggi/VistaOggi.tsx`
 - `app/frontend/app/(app)/pratiche/VistaPratiche.tsx`

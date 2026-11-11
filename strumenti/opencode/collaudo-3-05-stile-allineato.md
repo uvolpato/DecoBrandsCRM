@@ -2,7 +2,7 @@
 
 Data: 08/11/2026 · **Esecutore: DeepSeek V4 Flash** · Gravità del pacchetto: **P2** · Rilievi: A5-21, A8-04, A7-13 · Piano: `strumenti/collaudo/piano-correzioni.md`.
 
-Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: —.
+Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: 0b-05 (`collaudo-0b-05-cerca-integra-clienti.md`: rileggi il codice di `stile.css`, cambiato dall'onda 0 bis).
 
 ## Contesto e regole del progetto
 
@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A5-21 — `stile.css` dell'app diverso dal prototipo e con regole doppie
 - Gravità: P3
@@ -79,11 +79,20 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 Li modificano altri pacchetti della **stessa onda**, in parallelo:
 
+- `app/backend/src/accesso.ts`
+- `app/backend/src/app.module.ts`
+- `app/backend/src/casella.ts`
 - `app/backend/src/documenti.ts`
+- `app/backend/src/impostazioni.ts`
 - `app/backend/src/liquidazioni.ts`
+- `app/backend/src/motore/motore.ts`
 - `app/backend/src/oggi.ts`
+- `app/backend/test/accesso.spec.ts`
+- `app/backend/test/casella.spec.ts`
 - `app/backend/test/documenti.spec.ts`
+- `app/backend/test/impostazioni.spec.ts`
 - `app/backend/test/liquidazioni.spec.ts`
+- `app/backend/test/motore.spec.ts`
 - `app/backend/test/oggi.spec.ts`
 - `app/frontend/app/(app)/[...resto]/page.tsx`
 - `app/frontend/app/(app)/bollettini/VistaBollettini.tsx`
@@ -92,6 +101,7 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/frontend/app/(app)/documenti/VistaDocumenti.tsx`
 - `app/frontend/app/(app)/documenti/[id]/VistaDocumento.tsx`
 - `app/frontend/app/(app)/fornitori/VistaFornitori.tsx`
+- `app/frontend/app/(app)/impostazioni/*`
 - `app/frontend/app/(app)/liquidazioni/VistaLiquidazioni.tsx`
 - `app/frontend/app/(app)/not-found.tsx`
 - `app/frontend/app/(app)/oggi/VistaOggi.tsx`
@@ -105,11 +115,13 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/frontend/componenti/InCostruzione.tsx`
 - `app/frontend/componenti/Modale.tsx`
 - `app/frontend/lib/formati.ts`
+- `prototipo-alternativo/assets/motore.js`
 - `strumenti/prove/app_caricamento.py`
 - `strumenti/prove/app_clienti.py`
 - `strumenti/prove/app_componenti.py`
 - `strumenti/prove/app_documenti.py`
 - `strumenti/prove/app_guscio.py`
+- `strumenti/prove/app_impostazioni.py`
 - `strumenti/prove/app_pratica.py`
 
 Documentazione (la scrive il **pacchetto documentazione** dell'onda, dopo di te: tu metti il testo pronto nel resoconto, sezione *Da documentare*):

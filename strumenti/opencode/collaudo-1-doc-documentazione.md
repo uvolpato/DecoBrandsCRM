@@ -11,7 +11,7 @@ Raccoglie in un solo passaggio la documentazione di tutti, così spec, guida e p
   documenta: spec, §16.4, §19, guida, LEGGIMI, piano, poi `python3 strumenti/genera-pagine-doc.py`).
 - Italiano semplice e conciso; niente parole inglesi inutili.
 - Registro §19: una riga per decisione nuova o cambiata, **6 colonne** (D-nn, data, decisione, perché, chi, dove),
-  numerazione di seguito all'ultima D-nn presente (controlla l'ultima prima di scrivere). Chi: «Ugo (collaudo
+  numeri D-114…D-132 già assegnati nel piano (sotto); altre D-nn nuove solo di seguito all'ultima presente. Chi: «Ugo (collaudo
   08/11/2026)» per le regole confermate da Ugo, altrimenti «collaudo A-n» con l'ID del rilievo.
 - Versione della spec in testa: alzala di uno (es. 8.61 → 8.62) con il riassunto delle modifiche dell'onda.
 - Funzioni incerte segnalate come tali (D-06).
@@ -21,30 +21,55 @@ Raccoglie in un solo passaggio la documentazione di tutti, così spec, guida e p
 ## Da raccogliere: sezioni *Da documentare* dei resoconti dell'onda
 
 - `strumenti/opencode/resoconto-collaudo-1-01.md` (Motore: storni dalla fotografia, una fattura al mese, correzioni su NC, numero riusato)
-- `strumenti/opencode/resoconto-collaudo-1-02.md` (Documenti: D-87 sulla fattura, documento in errore recuperabile, corpo non valido)
-- `strumenti/opencode/resoconto-collaudo-1-03.md` (Impostazioni: il segreto vecchio non parte verso un server nuovo)
-- `strumenti/opencode/resoconto-collaudo-1-04.md` (Sessione: timeout di inattività vero, durata massima, area sconosciuta)
-- `strumenti/opencode/resoconto-collaudo-1-05.md` (Oggi: bollettini dell'anno prima e gruppo «Documenti da decidere»)
-- `strumenti/opencode/resoconto-collaudo-1-06.md` (Blocco sotto i 744 px (D-44))
-- `strumenti/opencode/resoconto-collaudo-1-07.md` (Due giri di jest sullo stesso database: il secondo si ferma subito)
-- `strumenti/opencode/resoconto-collaudo-1-08.md` (Pulizia degli scartati senza cancellare un documento recuperato)
-- `strumenti/opencode/resoconto-collaudo-1-09.md` (Casella: STARTTLS obbligatorio, email malformata, limite per allegato)
-- `strumenti/opencode/resoconto-collaudo-1-10.md` (Proposta: P.IVA con prefisso del paese; «Affidabile» su un documento senza fornitore)
-- `strumenti/opencode/resoconto-collaudo-1-11.md` (Canale SSE che si riapre dopo un errore HTTP)
-- `strumenti/opencode/resoconto-collaudo-1-12.md` (Registro: 4xx registrati, dettaglio non valido in anomalia, anomalia atomica, filtri per giorno)
-- `strumenti/opencode/resoconto-collaudo-1-13.md` (Segreti d'esempio rifiutati in esercizio)
-- `strumenti/opencode/resoconto-collaudo-1-14.md` (Messa in esercizio: Caddyfile, HSTS, script, README)
-- `strumenti/opencode/resoconto-collaudo-1-15.md` (Sollecito di pagamento: tempo limite e fatture già pagate)
-- `strumenti/opencode/resoconto-collaudo-1-16.md` (PDF del bollettino con PDF.js invece di <object>)
-- `strumenti/opencode/resoconto-collaudo-1-17.md` (Campo di ricerca: voce attiva annunciata e nome dell'input)
-- `strumenti/opencode/resoconto-collaudo-1-18.md` (Tabelle che ricordano lo stato: Subagenti, Utenti, Fornitori, Clienti; colonna di Utenti)
-- `strumenti/opencode/resoconto-collaudo-1-19.md` (Pulizia della radice e cartelle di uscita ignorate)
-- `strumenti/opencode/resoconto-collaudo-1-20.md` (Prove nel browser vecchie o fragili)
-- `strumenti/opencode/resoconto-collaudo-1-21.md` (Avvisi annunciati dal lettore di schermo; errori come alert)
-- `strumenti/opencode/resoconto-collaudo-1-22.md` (Prova a matrice dei permessi su tutte le rotte)
+- `strumenti/opencode/resoconto-collaudo-1-02.md` (Agenzie bloccate nel periodo chiuso (D-51 esteso))
+- `strumenti/opencode/resoconto-collaudo-1-03.md` (Documenti: D-87 sulla fattura, documento in errore recuperabile, corpo non valido)
+- `strumenti/opencode/resoconto-collaudo-1-04.md` (Impostazioni: il segreto vecchio non parte verso un server nuovo)
+- `strumenti/opencode/resoconto-collaudo-1-05.md` (Sessione: timeout di inattività vero, durata massima, area sconosciuta)
+- `strumenti/opencode/resoconto-collaudo-1-06.md` (Oggi: bollettini dell'anno prima e gruppo «Documenti da decidere»)
+- `strumenti/opencode/resoconto-collaudo-1-07.md` (Blocco sotto i 744 px (D-44))
+- `strumenti/opencode/resoconto-collaudo-1-08.md` (Due giri di jest sullo stesso database: il secondo si ferma subito)
+- `strumenti/opencode/resoconto-collaudo-1-09.md` (Pulizia degli scartati senza cancellare un documento recuperato)
+- `strumenti/opencode/resoconto-collaudo-1-10.md` (Casella: STARTTLS obbligatorio, email malformata, limite per allegato)
+- `strumenti/opencode/resoconto-collaudo-1-11.md` (Proposta: P.IVA con prefisso del paese; «Affidabile» su un documento senza fornitore)
+- `strumenti/opencode/resoconto-collaudo-1-12.md` (Canale SSE che si riapre dopo un errore HTTP)
+- `strumenti/opencode/resoconto-collaudo-1-13.md` (Registro: 4xx registrati, dettaglio non valido in anomalia, anomalia atomica, filtri per giorno)
+- `strumenti/opencode/resoconto-collaudo-1-14.md` (Segreti d'esempio rifiutati in esercizio)
+- `strumenti/opencode/resoconto-collaudo-1-15.md` (Messa in esercizio: Caddyfile, HSTS, script, README)
+- `strumenti/opencode/resoconto-collaudo-1-16.md` (Sollecito di pagamento: tempo limite e fatture già pagate)
+- `strumenti/opencode/resoconto-collaudo-1-17.md` (PDF del bollettino con PDF.js invece di <object>)
+- `strumenti/opencode/resoconto-collaudo-1-18.md` (Campo di ricerca: voce attiva annunciata e nome dell'input)
+- `strumenti/opencode/resoconto-collaudo-1-19.md` (Tabelle che ricordano lo stato: Subagenti, Utenti, Fornitori, Clienti; colonna di Utenti)
+- `strumenti/opencode/resoconto-collaudo-1-20.md` (Avviso al vecchio indirizzo quando cambia l'email di un utente)
+- `strumenti/opencode/resoconto-collaudo-1-21.md` (Pulizia della radice e cartelle di uscita ignorate)
+- `strumenti/opencode/resoconto-collaudo-1-22.md` (Prove nel browser vecchie o fragili)
+- `strumenti/opencode/resoconto-collaudo-1-23.md` (Avvisi annunciati dal lettore di schermo; errori come alert)
+- `strumenti/opencode/resoconto-collaudo-1-24.md` (Prova a matrice dei permessi su tutte le rotte)
 
 Applica ogni voce dove dice il resoconto. Se una voce va contro il §19 o non è chiara, non scriverla: elencala nel tuo
 resoconto per Claude Code.
+
+## Righe del §19 da aggiungere (pronte, in fondo al registro, in ordine di numero)
+
+Numeri già assegnati nel piano (D-114…D-132): usa **esattamente** questi, una volta sola. Se il resoconto del pacchetto dice che la decisione non è stata attuata, non scrivere la riga e segnalalo. Per ognuna aggiungi anche una riga *Perché (D-nn)* nella sezione della spec indicata in *Dove* e, se cambia ciò che vede l'utente, il testo in `guida.ts`.
+
+| D-114 | 08/11/2026 | **Agenzie bloccate nel periodo chiuso (D-51 esteso a `interscambio`).** Creazione, eliminazione e modifica di subagente, fornitore, sconto, % dell'agenzia, regola mensile o `valido_dal` di un'agenzia con `valido_dal` ≤ ultima chiusura del fornitore → 409 «chiudi l'agenzia e aprine una nuova da una data successiva»; `valido_al` si sposta solo dopo la chiusura; la riga del fornitore si blocca `FOR UPDATE` nella stessa transazione. | L'agenzia decide subagente, sconto e percentuale di ogni documento alla sua data (D-35): cambiarla sul posto spostava provvigioni di trimestri liquidati e mandava gli storni al subagente sbagliato (collaudo A2-01, A3-01). | Ugo (collaudo 08/11/2026, U1) | §4.2.6, §7.6; `clienti.ts`, `fornitori.ts` |
+| D-127 | 08/11/2026 | **Il blocco sotto i 744 px vale sulla larghezza della finestra, anche con lo zoom.** `@media (max-width: 743px)`: chi ingrandisce al 200 % su uno schermo da 1440 px vede la pagina «usa un computer o un tablet». Eccezione voluta a WCAG 1.4.10. Precisa D-44. | Il CRM si usa da computer e tablet (D-44); bloccare su `screen.width` lascerebbe passare finestre davvero strette. | Ugo (collaudo 08/11/2026, U17) | §16.6; `app/layout.tsx`, `stile.css` |
+| D-117 | 08/11/2026 | **Avviso al vecchio indirizzo quando cambia l'email di un utente.** Se un amministratore o il superutente cambia l'email di un utente, dopo il commit il server manda al vecchio indirizzo un'email con chi ha fatto il cambio e quando; un invio fallito apre un'anomalia ma non annulla la modifica. | Un amministratore poteva cambiare l'email di un operatore e reimpostarne la password per entrare al suo posto: l'avviso lo rende visibile alla persona (collaudo A1, D-39). | Ugo (collaudo 08/11/2026, U4) | §7.13; `utenti.ts` |
+| D-129 | 08/11/2026 | **La pagina d'accesso si svuota dopo 2 minuti senza tasti.** È voluto: sulla postazione lasciata aperta i campi scritti non restano a vista. Eccezione voluta a WCAG 2.2.1. | Sicurezza della postazione, come il timeout di inattività (D-89) (collaudo A7). | Ugo (collaudo 08/11/2026, U19) | §7.0; `ScenaAccesso.tsx` |
+| D-131 | 08/11/2026 | **D-87 nell'app: blocco su *Apri la pratica*.** Un ordine senza fornitore, agenzia o scaglione resta in coda come «da controllare»; *Apri la pratica* risponde 409 con il dato mancante. L'etichetta «da configurare» in coda è solo del prototipo. Precisa D-87. | Il blocco sui soldi c'è già (niente pratica, niente 0 %); lo stato in coda costava un pacchetto in più senza cambiare il risultato (collaudo A9-09). | Ugo (collaudo 08/11/2026, U22) | §6.1; `documenti.ts` |
+
+## Righe *Perché* senza numero nuovo (confermano una regola esistente)
+
+- §6.6 e guida — *Perché (U23, D-06 confermata):* il rettangolo sul valore è verificato con il server di lettura cloud; con GLM-OCR locale e con i documenti scansionati è ancora da verificare.
+
+### Decisioni di Ugo da applicare in questa onda (senza codice)
+
+- **U22 → D-131** (A9-09, opzione a): spec §6.1 e riga D-87 dicono «nell'app il blocco è su *Apri la pratica* (409 con il dato mancante); l'etichetta “da configurare” in coda è del prototipo»; in §6.1 *Perché* aggiungi «fornitore»; in `guida.ts` (Documenti, *sapere*) copia la frase di `prototipo-alternativo/assets/guida.js:122` e una riga sul cliente riconosciuto per P.IVA o ragione sociale (D-91, D-124).
+- **U23** (A9-01, A9-02): formula unica per il rettangolo nel PDF: «verificato con il server di lettura cloud; con GLM-OCR locale e con documenti scansionati o fotografati è ancora da verificare». Usala in `guida.ts`, `guida.js`, `LEGGIMI.md` e nel PRD.
+- **U19 → D-129**: solo la riga del §19 e il *Perché* in §7.0.
+- **U26** (A9-05): in `piano-lavoro-crm.md` aggiungi in §11 (F7) quattro attività già fatte, **da approvare**: D-87 blocco dell'ordine senza fornitore, agenzia o scaglione — **2 h**; D-91/D-92 riconoscimento del cliente per P.IVA e ragione sociale — **2 h**; rettangolo sul valore con PDF.js (`PdfEvidenziato`, spunta verde) — **3 h**; D-93/D-94 elenco Documenti nel layout con aggiornamento via SSE — **3 h**. Totale **10 h da approvare** (stime dell'orchestratore dai commit `f1039f9`, `89d31cd` e dalla spec 8.55–8.61).
+- **U9**: in `piano-lavoro-crm.md` §12 aggiungi l'attività nuova **«Righe dei bollettini dal PDF»** — **12 h da approvare**: lettura del PDF del bollettino con uno schema di estrazione proprio (3 h), rotta che crea le righe in transazione con abbinamento ai documenti per `documento_id` o numero + data (D-34) (3 h), finestra di controllo e correzione delle righe come per i documenti (4 h), prove backend e browser (2 h). Perché la stima: è un flusso completo come la lettura dei documenti (lettura, controllo, abbinamento), ridotto perché riusa connettore e finestra di correzione. Dipende da: F6 (lettura), D-119.
+- **U25**: non è per te. La regola «chi cambia il seed lancia `app_flusso.py` e `app_bollettini.py`» la scrive Ugo in `CLAUDE.md` §4.
 
 ## Rilievi di documentazione assegnati a questa onda
 
@@ -80,6 +105,50 @@ resoconto per Claude Code.
 - Esecutore: DeepSeek V4 Flash — documentazione.
 - File toccati: `specifica-crm-provvigioni.md`, poi pagine generate
 - Dipende da / correlato a: —
+
+### A9-09 — D-87: la spec parla di stato «da configurare» in coda; l'app blocca solo al clic. La guida dell'app non lo dice
+- Gravità: P3 (la regola sui soldi è rispettata: niente pratica, niente 0%)
+- Dove: spec §6.1 r. 1340-1344 e §19 D-87 («il documento resta in coda come «da configurare»») contro `app/backend/src/documenti.ts:1088-1098` (409 «Il fornitore non ha uno scaglione… configuralo» solo in *Apri la pratica*) e `app/backend/src/proposta.ts` (nessun controllo agenzia/scaglione nella proposta: la parola «configur» non compare). Guida: `app/frontend/lib/guida.ts:110-160` non cita D-87 né il cliente riconosciuto per P.IVA (D-91/D-92), mentre `prototipo-alternativo/assets/guida.js:122` sì. In più §6.1 *Perché* elenca «agenzia e scaglione», il §19 «fornitore, agenzia e scaglione».
+- Problema: spec e guida del prototipo descrivono un'etichetta/stato in coda che l'app non mostra; la guida dell'app non spiega perché *Apri la pratica* può rifiutare.
+- Scenario: ordine di cliente senza agenzia → in coda appare come un normale «da controllare»; al clic su *Apri la pratica* arriva l'errore, senza che la Guida lo abbia annunciato.
+- Correzione puntuale: o (a) spec §6.1 e D-87: «nell'app il blocco è al momento di *Apri la pratica* (409 con il dato mancante); l'etichetta “da configurare” in coda è del prototipo», o (b) chiedere ad A4/A5 di portare `manca` nella proposta. In ogni caso copiare in `guida.ts` (Documenti, *sapere*) la frase di `guida.js:122` e una riga sul cliente riconosciuto per P.IVA/ragione sociale; in §6.1 *Perché* aggiungere «fornitore».
+- Prova che la verifica: `strumenti/prove/app_documenti.py` (ordine senza agenzia → messaggio), `app/backend/test` su `apriPratica` 409.
+- Esecutore: DeepSeek V4 Flash per i testi; V4 se si sceglie (b).
+- File toccati: `specifica-crm-provvigioni.md`, `app/frontend/lib/guida.ts` (+ `proposta.ts`, `VistaDocumento.tsx` se b)
+- Dipende da / correlato a: A4 (proposta), D-87, D-91, D-92
+
+### A9-01 — La guida dice che il rettangolo nel PDF «non si disegna ancora», ma l'app lo disegna
+- Gravità: P3
+- Dove: `app/frontend/lib/guida.ts:157` (Documenti, *sapere*) contro `app/frontend/componenti/PdfEvidenziato.tsx` (usato in `app/(app)/documenti/[id]/VistaDocumento.tsx:478`) e spec §6.6 titolo («cloud verificato · locale da verificare»), §6.5 r. 1519-1521, versione 8.59.
+- Problema: dopo F0-A7 positiva sul connettore cloud il rettangolo c'è (posizione `esatta`); la guida promette meno del vero e non dice che il **locale (GLM-OCR) e gli scansionati** restano da verificare (D-06).
+- Scenario: operatore apre *Correggi i dati letti* su un PDF letto da LlamaCloud → vede il rettangolo; la Guida dice che non c'è.
+- Correzione puntuale: riga 157 → «⚠ Il rettangolo sul valore si disegna quando la posizione è *esatta* (verificato con il server di lettura cloud, D-06/F0-A7); con GLM-OCR locale e con documenti scansionati o fotografati è ancora da verificare e può mancare: sotto il documento c'è sempre pagina e precisione.» La riga 195 (finestra *Documenti della pratica*) resta giusta (lì `ConsultaDocumenti` non usa `PdfEvidenziato`). Stesso allineamento in `prototipo-alternativo/assets/guida.js` (voce Documenti).
+- Prova che la verifica: `strumenti/prove/app_guida.py` (testo della voce Documenti), lettura a occhio.
+- Esecutore: DeepSeek V4 Flash — testo.
+- File toccati: `app/frontend/lib/guida.ts`, `prototipo-alternativo/assets/guida.js`
+- Dipende da / correlato a: A9-02, D-06, spec 8.59
+
+### A9-02 — LEGGIMI del prototipo: D-06 e prova `flusso.py` non aggiornati
+- Gravità: P3
+- Dove: `prototipo-alternativo/LEGGIMI.md:47` (avviso evidenziazione) e `:136` (Prove).
+- Problema: r. 47 dice che la fattibilità «si misura con la prova F0-A7 … prima di confermarla» (prova già fatta per il cloud); r. 136 dice che `flusso.py` «deve chiudere con 0 KO», mentre CLAUDE.md §4 regola 4 (Ugo 30/10/2026) la rende non obbligatoria.
+- Scenario: chi legge il LEGGIMI crede che la prova F0-A7 sia ancora da fare e che `flusso.py` blocchi la consegna.
+- Correzione puntuale: r. 47 → «… prova F0-A7 positiva sul connettore cloud; resta da verificare con GLM-OCR locale e sugli scansionati (spec §6.6)». r. 136 → aggiungere «Non è più obbligatoria (Ugo, 30/10/2026): le prove che contano sono quelle dell'app (`strumenti/prove/app_*.py`, `npm test`).»
+- Prova che la verifica: rilettura.
+- Esecutore: DeepSeek V4 Flash — documentazione.
+- File toccati: `prototipo-alternativo/LEGGIMI.md`
+- Dipende da / correlato a: A9-01, D-06
+
+### A9-05 — Piano senza attività/ore per D-87, D-91/D-92, D-93, D-94 e il rettangolo PDF.js
+- Gravità: P3
+- Dove: `piano-lavoro-crm.md` (nessuna occorrenza di D-87, D-91…D-94, PDF.js); spec versioni 8.55-8.61 e §19 D-87…D-94 (07-08/11/2026).
+- Problema: CLAUDE.md §4 regola 2: se una decisione cambia le ore, va l'attività nel piano. Questi lavori (blocco ordine senza agenzia/scaglione, P.IVA cliente, rettangolo PDF.js, layout Documenti con SSE) non hanno attività né ore, né la dicitura «senza ore aggiuntive».
+- Scenario: a consuntivo le ore spese non si ritrovano nel piano; non si sa se sono fuori preventivo.
+- Correzione puntuale: aggiungere in §10 (F6) o §11 (F7) una riga per gruppo (D-87; D-91+D-92; F0-A7→rettangolo PDF.js; D-93+D-94) con ore **da approvare**, oppure una nota «assorbite nel margine» firmata Ugo.
+- Prova che la verifica: rilettura.
+- Esecutore: DeepSeek V4 Flash — documentazione (le ore le decide Ugo).
+- File toccati: `piano-lavoro-crm.md`
+- Dipende da / correlato a: A9-04
 
 ## File ammessi
 

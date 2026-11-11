@@ -11,7 +11,7 @@ Raccoglie in un solo passaggio la documentazione di tutti, così spec, guida e p
   documenta: spec, §16.4, §19, guida, LEGGIMI, piano, poi `python3 strumenti/genera-pagine-doc.py`).
 - Italiano semplice e conciso; niente parole inglesi inutili.
 - Registro §19: una riga per decisione nuova o cambiata, **6 colonne** (D-nn, data, decisione, perché, chi, dove),
-  numerazione di seguito all'ultima D-nn presente (controlla l'ultima prima di scrivere). Chi: «Ugo (collaudo
+  numeri D-114…D-132 già assegnati nel piano (sotto); altre D-nn nuove solo di seguito all'ultima presente. Chi: «Ugo (collaudo
   08/11/2026)» per le regole confermate da Ugo, altrimenti «collaudo A-n» con l'ID del rilievo.
 - Versione della spec in testa: alzala di uno (es. 8.61 → 8.62) con il riassunto delle modifiche dell'onda.
 - Funzioni incerte segnalate come tali (D-06).
@@ -22,18 +22,33 @@ Raccoglie in un solo passaggio la documentazione di tutti, così spec, guida e p
 
 - `strumenti/opencode/resoconto-collaudo-2-01.md` (Confronto delle righe dei documenti calcolato dal server (V12, D-60))
 - `strumenti/opencode/resoconto-collaudo-2-02.md` (Schede controllate, dettaglio del documento che si azzera, testi «non riconosciuto»)
-- `strumenti/opencode/resoconto-collaudo-2-03.md` (Aggiornamenti dal vivo: eventi persi, SSE dopo l'uscita, sollecito che non avvisa)
-- `strumenti/opencode/resoconto-collaudo-2-04.md` (Chiusura del bollettino, somme in Decimal, prove di concorrenza (V13))
-- `strumenti/opencode/resoconto-collaudo-2-05.md` (Esci sicuro, ritorno dopo l'accesso, contatori della barra dal vivo, Stato del sistema)
-- `strumenti/opencode/resoconto-collaudo-2-06.md` (DataTable: paginazione sempre, intestazioni e righe da tastiera)
-- `strumenti/opencode/resoconto-collaudo-2-07.md` (Guscio: pagina d'errore se il server non risponde; pulsanti spenti anche da tastiera)
-- `strumenti/opencode/resoconto-collaudo-2-08.md` (Motore: indici costruiti una volta, niente scansioni quadratiche)
-- `strumenti/opencode/resoconto-collaudo-2-09.md` (Cliente › Pratiche: importo in euro e stato con etichetta)
-- `strumenti/opencode/resoconto-collaudo-2-10.md` (mpiu/mk esportati da PeriodoMesi)
-- `strumenti/opencode/resoconto-collaudo-2-11.md` (Dipendenze: inutile tolta, versioni bloccate, strumento di prova fuori da src, ESLint)
+- `strumenti/opencode/resoconto-collaudo-2-03.md` (Posta, casella e Integra modificabili solo dal superutente)
+- `strumenti/opencode/resoconto-collaudo-2-04.md` (Aggiornamenti dal vivo: eventi persi, SSE dopo l'uscita, sollecito che non avvisa)
+- `strumenti/opencode/resoconto-collaudo-2-05.md` (Chiusura del bollettino, somme in Decimal, prove di concorrenza (V13))
+- `strumenti/opencode/resoconto-collaudo-2-06.md` (Esci sicuro, ritorno dopo l'accesso, contatori della barra dal vivo, Stato del sistema)
+- `strumenti/opencode/resoconto-collaudo-2-07.md` (DataTable: paginazione sempre, intestazioni e righe da tastiera)
+- `strumenti/opencode/resoconto-collaudo-2-08.md` (Guscio: pagina d'errore se il server non risponde; pulsanti spenti anche da tastiera)
+- `strumenti/opencode/resoconto-collaudo-2-09.md` (Motore: indici costruiti una volta, niente scansioni quadratiche)
+- `strumenti/opencode/resoconto-collaudo-2-10.md` (Più clienti con la stessa P.IVA: decide la ragione sociale)
+- `strumenti/opencode/resoconto-collaudo-2-11.md` (Tipo di provvigione del fornitore fisso dopo la prima chiusura)
+- `strumenti/opencode/resoconto-collaudo-2-12.md` (Cliente › Pratiche: importo in euro e stato con etichetta)
+- `strumenti/opencode/resoconto-collaudo-2-13.md` (mpiu/mk esportati da PeriodoMesi)
+- `strumenti/opencode/resoconto-collaudo-2-14.md` (Dipendenze: inutile tolta, versioni bloccate, strumento di prova fuori da src, ESLint)
 
 Applica ogni voce dove dice il resoconto. Se una voce va contro il §19 o non è chiara, non scriverla: elencala nel tuo
 resoconto per Claude Code.
+
+## Righe del §19 da aggiungere (pronte, in fondo al registro, in ordine di numero)
+
+Numeri già assegnati nel piano (D-114…D-132): usa **esattamente** questi, una volta sola. Se il resoconto del pacchetto dice che la decisione non è stata attuata, non scrivere la riga e segnalalo. Per ognuna aggiungi anche una riga *Perché (D-nn)* nella sezione della spec indicata in *Dove* e, se cambia ciò che vede l'utente, il testo in `guida.ts`.
+
+| D-115 | 08/11/2026 | **Connessioni solo al superutente.** Le sezioni Posta, Casella e Integra delle Impostazioni si modificano con il permesso nuovo `sistema.connessioni` (solo superutente); le altre sezioni restano a `sistema.impostazioni`. Se cambia server, porta o utente di una connessione la password va riscritta (400): il segreto salvato non parte mai verso un indirizzo nuovo. | Dalla Posta passa il link di reset della password del superutente: un amministratore con un SMTP suo poteva leggerlo e diventare superutente, contro D-39 e D-45 (collaudo A1-01). | Ugo (collaudo 08/11/2026, U2) | §7.15, §8.3; `impostazioni.ts`, `impostazioni-api.ts`, `accesso.ts` |
+| D-124 | 08/11/2026 | **Cliente riconosciuto per P.IVA anche quando è condivisa.** La P.IVA letta si confronta senza prefisso del paese; un solo cliente con quella P.IVA → quello; più clienti → decide la ragione sociale normalizzata se il candidato è uno solo, altrimenti «non riconosciuto». Precisa D-92. | In Integra le sedi di una catena hanno la stessa P.IVA: si prendeva sempre il primo cliente (collaudo A4-07). | Ugo (collaudo 08/11/2026, U12) | §6.5; `proposta.ts` |
+| D-121 | 08/11/2026 | **Il tipo di provvigione del fornitore non cambia dopo la prima chiusura.** `fornitori.tipo_provvigione` (fatturato / maturato) → 409 se il fornitore ha già una chiusura (bollettino verificato o trimestre liquidato, `ultimaChiusura`); `giorno_bollettino` e `giorni_incasso` restano liberi. | Il tipo decide come si ricalcolano dal vivo i mesi chiusi (Analisi, Report): cambiarlo riscriveva il passato; gli altri due campi toccano solo solleciti e scadenze (collaudo A3). | Ugo (collaudo 08/11/2026, U8) | §5.5, §7.4; `fornitori.ts` |
+
+## Righe *Perché* senza numero nuovo (confermano una regola esistente)
+
+- §16.4.2 — *Perché (U20, D-75 confermata):* i contatori della barra si rileggono a ogni cambio pagina **e** a ogni evento SSE; la richiesta è leggera (conteggi in SQL).
 
 ## Rilievi di documentazione assegnati a questa onda
 

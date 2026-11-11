@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A2-01 — Agenzia modificabile o eliminabile nel periodo chiuso: storni sbagliati o persi
 - Gravità: P0
@@ -178,8 +178,10 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/backend/prisma/seed/dati-prova.json`
 - `app/backend/src/accesso.ts`
 - `app/backend/src/casella.ts`
+- `app/backend/src/clienti.ts`
 - `app/backend/src/documenti.ts`
 - `app/backend/src/errori.filter.ts`
+- `app/backend/src/fornitori.ts`
 - `app/backend/src/impostazioni-api.ts`
 - `app/backend/src/impostazioni.ts`
 - `app/backend/src/incassi.ts`
@@ -187,13 +189,16 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/backend/src/lettura.ts`
 - `app/backend/src/main.ts`
 - `app/backend/src/oggi.ts`
+- `app/backend/src/posta.ts`
 - `app/backend/src/proposta.ts`
 - `app/backend/src/registro-api.ts`
 - `app/backend/src/registro.ts`
 - `app/backend/src/sistema.ts`
+- `app/backend/src/utenti.ts`
 - `app/backend/test/avvio.spec.ts`
 - `app/backend/test/blocco.ts`
 - `app/backend/test/casella.spec.ts`
+- `app/backend/test/clienti.spec.ts`
 - `app/backend/test/coda.spec.ts`
 - `app/backend/test/documenti-lettura.spec.ts`
 - `app/backend/test/documenti-pratica.spec.ts`
@@ -208,6 +213,7 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/backend/test/scartati.spec.ts`
 - `app/backend/test/seed.spec.ts`
 - `app/backend/test/sistema.spec.ts`
+- `app/backend/test/utenti.spec.ts`
 - `app/deploy/*`
 - `app/deploy/Caddyfile`
 - `app/frontend/app/(app)/bollettini/VistaBollettini.tsx`

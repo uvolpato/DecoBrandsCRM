@@ -2,7 +2,7 @@
 
 Data: 08/11/2026 · **Esecutore: DeepSeek V4 Flash** · Gravità del pacchetto: **P2** · Rilievi: A8-01 · Piano: `strumenti/collaudo/piano-correzioni.md`.
 
-Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: 1-05 (`collaudo-1-05-oggi-bollettini-documenti.md`), 2-03 (`collaudo-2-03-eventi-dal-vivo.md`), 1-10 (`collaudo-1-10-proposta-piva.md`), 1-15 (`collaudo-1-15-incassi-sollecito.md`), 3-06 (`collaudo-3-06-carichi-oggi-liquidazioni.md`).
+Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. Dipende da: 1-06 (`collaudo-1-06-oggi-bollettini-documenti.md`), 2-04 (`collaudo-2-04-eventi-dal-vivo.md`), 1-11 (`collaudo-1-11-proposta-piva.md`), 1-16 (`collaudo-1-16-incassi-sollecito.md`), 3-06 (`collaudo-3-06-carichi-oggi-liquidazioni.md`); 0b-02 (`collaudo-0b-02-documenti-righe-agenzia.md`: rileggi il codice di `proposta.ts`, cambiato dall'onda 0 bis).
 
 ## Contesto e regole del progetto
 
@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A8-01 — Importi in euro scritti in tre modi diversi nel backend
 - Gravità: P2
@@ -60,6 +60,9 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 Li modificano altri pacchetti della **stessa onda**, in parallelo:
 
+- `app/backend/src/liquidazioni.ts`
+- `app/backend/src/motore/motore.ts`
+- `app/backend/test/liquidazioni.spec.ts`
 - `app/frontend/app/(app)/analisi/VistaAnalisi.tsx`
 - `app/frontend/app/(app)/bollettini/[id]/VistaBollettino.tsx`
 - `app/frontend/app/(app)/clienti/VistaClienti.tsx`
@@ -69,8 +72,13 @@ Li modificano altri pacchetti della **stessa onda**, in parallelo:
 - `app/frontend/app/(app)/scartati/VistaScartati.tsx`
 - `app/frontend/app/(app)/sistema/VistaSistema.tsx`
 - `app/frontend/app/(app)/utenti/VistaUtenti.tsx`
+- `app/frontend/app/layout.tsx`
+- `app/frontend/app/stile/public-sans.css`
+- `app/frontend/app/stile/stile.css`
 - `app/frontend/componenti/Pagina.tsx`
 - `app/frontend/lib/memoria.ts`
+- `app/frontend/public/fonts/*`
+- `prototipo-alternativo/assets/stile.css`
 - `strumenti/prove/app_f7_collaudo.py`
 - `strumenti/prove/app_liquidazioni.py`
 - `strumenti/prove/app_pratica.py`

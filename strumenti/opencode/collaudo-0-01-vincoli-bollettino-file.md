@@ -26,7 +26,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - I numeri di riga dei report sono del 08/11 mattina: dopo il collaudo è stato committato altro lavoro (f7).
   **Rileggi il codice attuale.** Se un rilievo risulta già corretto, scrivilo nel resoconto e non cambiare nulla.
 
-## Rilievi da correggere (testo dei report del collaudo)
+## Rilievi da correggere (testo dei report del collaudo; i rilievi U* nascono dalle decisioni di Ugo)
 
 ### A3-02 — Il file di un bollettino si può scartare (e poi cancellare) o abbinare a una pratica
 - Gravità: P1
@@ -46,7 +46,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 ## File ammessi (solo questi)
 
-- `app/backend/prisma/migrations/20261109090000_bollettino_file/migration.sql`
+- `app/backend/prisma/migrations/20261113090000_bollettino_file/migration.sql`
 - `app/backend/src/documenti.ts`
 - `app/backend/test/bollettini.spec.ts`
 - `app/backend/test/vincoli.spec.ts`
@@ -54,7 +54,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 ## File vietati
 
-Onda 0: i pacchetti vanno **in serie**, uno per volta, nell'ordine 0-01 → 0-04. Non toccare le migrazioni degli altri pacchetti dell'onda 0.
+Onda 0: i pacchetti vanno **in serie**, uno per volta, nell'ordine 0-01 → 0-05. Non toccare le migrazioni degli altri pacchetti dell'onda 0.
 
 Documentazione (la scrive il **pacchetto documentazione** dell'onda, dopo di te: tu metti il testo pronto nel resoconto, sezione *Da documentare*):
 

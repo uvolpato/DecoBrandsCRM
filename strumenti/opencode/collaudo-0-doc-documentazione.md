@@ -11,7 +11,7 @@ Raccoglie in un solo passaggio la documentazione di tutti, così spec, guida e p
   documenta: spec, §16.4, §19, guida, LEGGIMI, piano, poi `python3 strumenti/genera-pagine-doc.py`).
 - Italiano semplice e conciso; niente parole inglesi inutili.
 - Registro §19: una riga per decisione nuova o cambiata, **6 colonne** (D-nn, data, decisione, perché, chi, dove),
-  numerazione di seguito all'ultima D-nn presente (controlla l'ultima prima di scrivere). Chi: «Ugo (collaudo
+  numeri D-114…D-132 già assegnati nel piano (sotto); altre D-nn nuove solo di seguito all'ultima presente. Chi: «Ugo (collaudo
   08/11/2026)» per le regole confermate da Ugo, altrimenti «collaudo A-n» con l'ID del rilievo.
 - Versione della spec in testa: alzala di uno (es. 8.61 → 8.62) con il riassunto delle modifiche dell'onda.
 - Funzioni incerte segnalate come tali (D-06).
@@ -24,6 +24,7 @@ Raccoglie in un solo passaggio la documentazione di tutti, così spec, guida e p
 - `strumenti/opencode/resoconto-collaudo-0-02.md` (Annullare un documento non cancella le decisioni di un bollettino chiuso)
 - `strumenti/opencode/resoconto-collaudo-0-03.md` (Numero della pratica UNIQUE e indici sulle chiavi esterne)
 - `strumenti/opencode/resoconto-collaudo-0-04.md` (Indici trigram per la ricerca delle Pratiche)
+- `strumenti/opencode/resoconto-collaudo-0-05.md` (`sconti` → `interscambio` con ON DELETE RESTRICT)
 
 Applica ogni voce dove dice il resoconto. Se una voce va contro il §19 o non è chiara, non scriverla: elencala nel tuo
 resoconto per Claude Code.
@@ -31,6 +32,12 @@ resoconto per Claude Code.
 ## Rilievi di documentazione assegnati a questa onda
 
 _Nessun rilievo A9 assegnato a questa onda._
+
+## Righe del §19 da aggiungere
+
+| D-139 | 11/11/2026 | **`sconti` → `interscambio` è `ON DELETE RESTRICT`**: un'agenzia con sconti storici non si elimina, si chiude (come le altre chiavi dell'anagrafica, A3-03). | Eliminare un'agenzia cancellava in silenzio gli sconti storici; le altre chiavi dell'anagrafica sono già RESTRICT (report R1, domanda 3; A3-03). | Ugo (collaudo 11/11/2026, R0 domanda 7) | §4.2.6; migrazione `20261113140000_sconti_restrict` |
+
+Scrivila solo se il resoconto di 0-05 dice che la migrazione è applicata. D-133…D-138 le scrive 0b-doc; D-114…D-132 i pacchetti documentazione delle onde 1–8.
 
 ## File ammessi
 
