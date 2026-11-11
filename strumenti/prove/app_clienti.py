@@ -1,18 +1,25 @@
 # Prova della pagina Clienti dell'app (F1-A3), con Playwright: elenco, ricerca e segmenti, scheda, scheda Agenzie
 # (aggiunge con i campi di ricerca fornitore e subagente, periodo sovrapposto rifiutato, modifica, elimina), scheda
-# Pratiche, memoria della schermata, 768 px, lettura senza comandi. L'agenzia creata viene eliminata alla fine.
+# Pratiche, memoria della schermata, Cerca in Integra (D-111: solo al clic, import dal ponte finto, nessuna
+# corrispondenza, pulsante spento in lettura), 768 px, lettura senza comandi. L'agenzia creata viene eliminata alla fine.
 # Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi, <s>-oper, <s>-lett
 # (password-di-prova, da utenti_prova.js crea <s>). Serve almeno un cliente senza agenzie (seed).
+# Per «Cerca in Integra» servono DATABASE_URL (decobrands_test) e PONTE_URL (decobrands_ponte_prova), come il backend.
 # Uso: python strumenti/prove/app_clienti.py <suffisso> <cartella schermate> [base]
-import sys, pathlib, time
+import subprocess, sys, pathlib, time
 from playwright.sync_api import sync_playwright
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
 BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8011'
 PW, RUN = 'password-di-prova', str(int(time.time()))[-6:]
+COD, PIVA = 'C99001', '99999999991'
+RADICE = pathlib.Path(__file__).resolve().parents[2]
+BACKEND = RADICE / 'app' / 'backend'
+AIUTO = pathlib.Path(__file__).resolve().parent / 'integra_prova.js'
 USCITA.mkdir(parents=True, exist_ok=True)
 esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
+def integra(*args): subprocess.run(['node', str(AIUTO), *args], cwd=BACKEND, check=True, capture_output=True)
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
@@ -75,7 +82,8 @@ with sync_playwright() as p:
     ok(righe(pg) == n_senza, 'segmento Senza agenzie: %d righe' % n_senza)
 
     # scheda di un cliente senza agenzie
-    pg.click('.dt tbody tr.cliccabile'); pg.wait_for_function("/^\\/clienti\\/\\d+/.test(location.pathname)"); pg.wait_for_timeout(500)
+    pg.click('.dt tbody tr.cliccabile'); pg.wait_for_function("/^\\/clienti\\/\\d+/.test(location.pathname)")
+    pg.wait_for_selector('.dt tbody tr.selezionata', timeout=10000)  # il pannello ha caricato il cliente scelto
     cliente = testo(pg, '.pannello-testa h2'); url_cliente = pg.url
     ok(cliente != 'Cliente' and pg.locator('.dt tbody tr.selezionata').count() == 1 and 'Integra' in testo(pg, '.pannello'), 'scheda del cliente «%s» aperta, riga evidenziata' % cliente)
     ok(pg.locator('.schede-barra [role=tab]').count() == 2 and pg.locator('.schede-corpo .dt').count() == 1 and 'Nessuna agenzia' in testo(pg, '.schede-corpo'), 'schede Agenzie e Pratiche; senza agenzie')
@@ -85,6 +93,9 @@ with sync_playwright() as p:
     D1, A1, D2 = '2031-01-01', '2031-06-30', '2031-03-01'
     pg.click('button:has-text("Aggiungi agenzia")'); finestra(pg).wait_for(); pg.wait_for_selector('.velo .campo-ricerca')
     ok(pg.locator('.velo .campo-ricerca').count() == 2, 'nuova agenzia: Fornitore e Subagente sono campi di ricerca')
+    # D-112: la proposta del vecchio CRM arriva solo dal documento (fornitore fisso + codice letto)
+    ok('Dal vecchio CRM' not in testo(pg, '.velo .modale') and 'non era rappresentato' not in testo(pg, '.velo .modale'),
+       'agenzia dalla scheda cliente: nessuna proposta dallo storico')
     f, fid = scegli(pg, 'fornitore_id', 'Gri')
     ok('Gries' in f and fid.isdigit(), 'fornitore scelto dal menu: %s (id %s)' % (f, fid))
     s_, sid = scegli(pg, 'subagente_id', 'Nis')
@@ -162,14 +173,49 @@ with sync_playwright() as p:
         pg.wait_for_function("![...document.querySelectorAll('.schede-corpo .dt tbody tr')].some(r => r.textContent.includes('%s'))" % chi)
     ok(pg.locator('.schede-corpo .dt tbody tr:has-text("Ravelli"), .schede-corpo .dt tbody tr:has-text("T%s")' % RUN).count() == 0 and 'Nessuna agenzia' in testo(pg, '.schede-corpo'), 'agenzie eliminate: tabella vuota')
 
+    # D-111: Cerca in Integra — la ricerca parte solo al clic, l'import aggiunge il cliente all'elenco
+    integra('ponte-aggiungi', 'cliente', COD, 'Cliente Prova Integra', PIVA)
+    cerca(pg, ''); seg(pg, 'Tutti').click(); pg.wait_for_timeout(400)
+    n_prima = righe(pg)
+    pg.click('button:has-text("Cerca in Integra")'); finestra(pg).wait_for()
+    ok(pg.locator('#cerca-integra').count() == 1 and pg.locator('.velo .elenco').count() == 0,
+       'Cerca in Integra: finestra con il campo, nessuna ricerca automatica')
+    # ponte lento: il server risponde {errore: 'ponte lento'} oltre i 3 s; la finestra lo dice, senza attendere
+    pg.route('**/api/integra/cerca*', lambda r: r.fulfill(status=200, content_type='application/json', body='{"errore":"ponte lento","ms":3200}'))
+    pg.fill('#cerca-integra', 'lento'); pg.click('.velo .modale button[type=submit]')
+    pg.wait_for_selector('.velo .modale .nota:has-text("Il ponte di Integra non risponde")', timeout=10000)
+    ok('riprova' in testo(pg, '.velo .modale'), 'ponte lento: «Il ponte di Integra non risponde, riprova»')
+    pg.unroute('**/api/integra/cerca*')
+    pg.fill('#cerca-integra', 'zzzz-nessuno'); pg.click('.velo .modale button[type=submit]')
+    pg.wait_for_selector('.velo .modale .nota:has-text("Nessuna corrispondenza")', timeout=10000)
+    ok('registralo a mano' in testo(pg, '.velo .modale'), 'Cerca in Integra: nessuna corrispondenza, invito a registrarlo a mano')
+    pg.fill('#cerca-integra', 'Prova Integra'); pg.click('.velo .modale button[type=submit]')
+    pg.wait_for_selector('.velo .elenco li', timeout=10000)
+    riga_i = pg.locator('.velo .elenco li').first
+    ok(COD in riga_i.inner_text() and PIVA in riga_i.inner_text() and riga_i.locator('button:has-text("Importa")').count() == 1,
+       'Cerca in Integra: riga con codice, P.IVA e Importa')
+    pg.screenshot(path=str(USCITA / 'app-clienti-cerca-integra-1440.png'))
+    riga_i.locator('button:has-text("Importa")').click()
+    finestra(pg).wait_for(state='detached', timeout=15000)
+    pg.wait_for_selector('.dt tbody tr.cliccabile:has-text("Cliente Prova Integra")', timeout=10000)
+    ok(righe(pg) == n_prima + 1 and pg.locator('.dt tbody tr.cliccabile:has-text("Cliente Prova Integra")').count() == 1,
+       'import da Integra: finestra chiusa, elenco ricaricato (%d -> %d righe)' % (n_prima, righe(pg)))
+    pg.screenshot(path=str(USCITA / 'app-clienti-importato-1440.png'))
+    integra('ponte-togli', 'cliente', COD); integra('pulisci', 'cliente', COD)
+
     # 768 px
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
+    pg.click('button:has-text("Cerca in Integra")'); finestra(pg).wait_for()
+    ok(not sovr(pg), '768 px: la finestra di Cerca in Integra non allarga la pagina')
+    pg.screenshot(path=str(USCITA / 'app-clienti-cerca-integra-768.png'))
+    pg.click('.velo .modale-piede button:has-text("Chiudi")')
     pg.screenshot(path=str(USCITA / 'app-clienti-768.png'), full_page=True)
     pg.close()
 
-    # operatore: percentuale e regola spente, il resto si salva (D-50)
+    # operatore: percentuale e regola spente, il resto si salva (D-50); può cercare in Integra
     pg = entra(S + '-oper'); pg.wait_for_timeout(600)
+    ok(pg.locator('button:has-text("Cerca in Integra"):not([disabled])').count() == 1, 'operatore: Cerca in Integra attivo (dati.importa)')
     seg(pg, 'Tutti').click(); pg.click('.dt tbody tr.cliccabile'); pg.wait_for_timeout(600)
     pg.click('button:has-text("Aggiungi agenzia")'); finestra(pg).wait_for(); pg.wait_for_selector('#c-pct_subagente')
     ok(pg.locator('#c-pct_subagente[disabled]').count() == 1 and pg.locator('#c-regola_mensile[disabled]').count() == 1 and 'responsabile' in testo(pg, '.velo .campo:has(#c-pct_subagente) .aiuto'),
@@ -180,6 +226,8 @@ with sync_playwright() as p:
 
     pg = entra(S + '-lett'); pg.wait_for_timeout(600)
     ok(pg.locator('button:has-text("Aggiungi agenzia")').count() == 0, 'lettura: Aggiungi agenzia assente')
+    ok(pg.locator('button:has-text("Cerca in Integra")[disabled]').count() == 1 and 'operatore in Dati' in (pg.locator('button:has-text("Cerca in Integra")').get_attribute('title') or ''),
+       'lettura: Cerca in Integra spento, con il motivo')
     pg.close()
     b.close()
 

@@ -1,17 +1,24 @@
 # Prova della pagina Fornitori dell'app (F1-A1), con Playwright: elenco, ricerca, scheda, modifica delle regole
-# (responsabile), Percentuali in sola lettura, operatore e lettura senza modifica, memoria della schermata, 768 px.
-# Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi, <s>-oper, <s>-lett
-# (password-di-prova, da utenti_prova.js crea <s>). Le regole modificate vengono rimesse come prima.
+# (responsabile), Percentuali in sola lettura, Cerca in Integra (D-111: solo al clic, import dal ponte finto,
+# nessuna corrispondenza, pulsante spento senza dati.importa), operatore e lettura senza modifica, memoria della
+# schermata, 768 px. Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi,
+# <s>-oper, <s>-lett (password-di-prova, da utenti_prova.js crea <s>). Le regole modificate vengono rimesse come prima.
+# Per «Cerca in Integra» servono DATABASE_URL (decobrands_test) e PONTE_URL (decobrands_ponte_prova), come il backend.
 # Uso: python strumenti/prove/app_fornitori.py <suffisso> <cartella schermate> [base]
-import sys, pathlib, time
+import subprocess, sys, pathlib, time
 from playwright.sync_api import sync_playwright
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
 BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8011'
 PW, RUN = 'password-di-prova', str(int(time.time()))[-6:]
+COD, PIVA = 'F99001', '99999999992'
+RADICE = pathlib.Path(__file__).resolve().parents[2]
+BACKEND = RADICE / 'app' / 'backend'
+AIUTO = pathlib.Path(__file__).resolve().parent / 'integra_prova.js'
 USCITA.mkdir(parents=True, exist_ok=True)
 esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
+def integra(*args): subprocess.run(['node', str(AIUTO), *args], cwd=BACKEND, check=True, capture_output=True)
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
@@ -104,10 +111,57 @@ with sync_playwright() as p:
     pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(500)
     ok(pg.url == url and pg.input_value('.filtri input[type=search]') == 'Gries', 'indietro: stesso fornitore e ricerca ricordata')
     ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Clienti seguiti")').count() == 1, 'indietro: stessa scheda')
+    # D-111: Cerca in Integra — la ricerca parte solo al clic, l'import aggiunge il fornitore all'elenco
+    integra('ponte-aggiungi', 'fornitore', COD, 'Fornitore Prova Integra', PIVA)
+    pg.fill('.filtri input[type=search]', ''); pg.wait_for_timeout(400)
+    n_prima = righe(pg)
+    pg.click('button:has-text("Cerca in Integra")'); finestra(pg).wait_for()
+    ok(pg.locator('#cerca-integra').count() == 1 and pg.locator('.velo .elenco').count() == 0,
+       'Cerca in Integra: finestra con il campo, nessuna ricerca automatica')
+    pg.fill('#cerca-integra', 'zzzz-nessuno'); pg.click('.velo .modale button[type=submit]')
+    pg.wait_for_selector('.velo .modale .nota:has-text("Nessuna corrispondenza")', timeout=10000)
+    ok('registralo a mano' in testo(pg, '.velo .modale'), 'Cerca in Integra: nessuna corrispondenza, invito a registrarlo a mano')
+    pg.fill('#cerca-integra', 'Prova Integra'); pg.click('.velo .modale button[type=submit]')
+    pg.wait_for_selector('.velo .elenco li', timeout=10000)
+    riga_i = pg.locator('.velo .elenco li').first
+    ok(COD in riga_i.inner_text() and PIVA in riga_i.inner_text() and riga_i.locator('button:has-text("Importa")').count() == 1,
+       'Cerca in Integra: riga con codice, P.IVA e Importa')
+    pg.screenshot(path=str(USCITA / 'app-fornitori-cerca-integra-1440.png'))
+    riga_i.locator('button:has-text("Importa")').click()
+    finestra(pg).wait_for(state='detached', timeout=15000)
+    pg.wait_for_selector('.dt tbody tr.cliccabile:has-text("Fornitore Prova Integra")', timeout=10000)
+    ok(righe(pg) == n_prima + 1 and pg.locator('.dt tbody tr.cliccabile:has-text("Fornitore Prova Integra")').count() == 1,
+       'import da Integra: finestra chiusa, elenco ricaricato (%d -> %d righe)' % (n_prima, righe(pg)))
+    pg.screenshot(path=str(USCITA / 'app-fornitori-importato-1440.png'))
+    integra('ponte-togli', 'fornitore', COD); integra('pulisci', 'fornitore', COD)
     # 768 px
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
+    pg.click('button:has-text("Cerca in Integra")'); finestra(pg).wait_for()
+    ok(not sovr(pg), '768 px: la finestra di Cerca in Integra non allarga la pagina')
+    pg.screenshot(path=str(USCITA / 'app-fornitori-cerca-integra-768.png'))
+    pg.click('.velo .modale-piede button:has-text("Chiudi")')
     pg.screenshot(path=str(USCITA / 'app-fornitori-768.png'), full_page=True)
+
+    # D-113: fornitore senza scaglioni → avviso → form → salvati, l'avviso sparisce
+    # (il seed ha «Nuovo Fornitore Demo SRL» senza percentuali; dopo un giro resta configurato, quindi si controlla)
+    pg.set_viewport_size({'width': 1440, 'height': 900}); pg.wait_for_timeout(300)
+    pg.fill('.filtri input[type=search]', 'Nuovo Fornitore'); pg.wait_for_timeout(300)
+    pg.locator('.dt tbody tr.cliccabile').first.click(); pg.wait_for_timeout(600)
+    scheda(pg, 'Percentuali'); pg.wait_for_timeout(300)
+    avviso = pg.locator('.schede-corpo .nota-attesa')
+    if avviso.count() == 1:
+        ok('Senza scaglioni le pratiche' in avviso.inner_text() and avviso.locator('button:has-text("Configura gli scaglioni")').count() == 1,
+           'fornitore senza scaglioni: avviso con «Configura gli scaglioni»')
+        pg.screenshot(path=str(USCITA / 'app-fornitori-senza-scaglioni-1440.png'))
+        avviso.locator('button:has-text("Configura gli scaglioni")').click(); finestra(pg).wait_for(); pg.wait_for_selector('#c-sconto0')
+        pg.fill('#c-sconto0', '10'); pg.fill('#c-agente0', '5'); pg.fill('#c-sub0', '2')
+        pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(700)
+        ok(pg.locator('.schede-corpo .nota-attesa').count() == 0 and 'In vigore dal' in testo(pg, '.schede-corpo') and '10%' in testo(pg, '.schede-corpo'),
+           'scaglioni salvati: l’avviso sparisce e la versione è in vigore')
+        pg.screenshot(path=str(USCITA / 'app-fornitori-scaglioni-salvati-1440.png'))
+    else:
+        ok('In vigore dal' in testo(pg, '.schede-corpo'), 'fornitore già configurato da un giro precedente: versioni in tabella')
     pg.close()
     # operatore e lettura: niente modifica
     for u in ('oper', 'lett'):
@@ -115,6 +169,19 @@ with sync_playwright() as p:
         scheda(pg, 'Percentuali'); pg.wait_for_timeout(300)
         ok(pg.locator('button:has-text("Modifica le regole"), button:has-text("Nuove percentuali"), button:has-text("Correggi")').count() == 0,
            '%s: comandi delle percentuali assenti' % u)
+        if u == 'oper':
+            ok(pg.locator('button:has-text("Cerca in Integra"):not([disabled])').count() == 1, 'operatore: Cerca in Integra attivo (dati.importa)')
+        else:
+            ok(pg.locator('button:has-text("Cerca in Integra")[disabled]').count() == 1 and 'operatore in Dati' in (pg.locator('button:has-text("Cerca in Integra")').get_attribute('title') or ''),
+               'lettura: Cerca in Integra spento, con il motivo')
+        # D-113: senza il permesso il pulsante è spento e il motivo si legge
+        pg.fill('.filtri input[type=search]', 'Nuovo Fornitore'); pg.wait_for_timeout(300)
+        pg.locator('.dt tbody tr.cliccabile').first.click(); pg.wait_for_timeout(600)
+        scheda(pg, 'Percentuali'); pg.wait_for_timeout(300)
+        av = pg.locator('.schede-corpo .nota-attesa')
+        if av.count() == 1:
+            ok(av.locator('button:has-text("Configura gli scaglioni")[disabled]').count() == 1 and 'responsabile' in av.inner_text(),
+               '%s: «Configura gli scaglioni» spento, con il motivo' % u)
         pg.close()
     b.close()
 

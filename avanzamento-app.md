@@ -121,8 +121,15 @@ suo worktree; il gruppo dopo parte a unione avvenuta.
 | | F1-A11 Anagrafica su richiesta (`integra.ts` senza creazioni, `/api/integra/cerca` e `/importa`, permesso `dati.importa`) | 1 | DeepSeek V4 Pro | [x] |
 | | F1-A13 Scaglioni obbligatori e agenzia precompilata dallo storico, messaggi e pulsanti spenti | 2 | DeepSeek Flash | [x] |
 | | F2-A6 Proposta del documento con *Importa da Integra* e guardia *non rappresentato* | 2 | DeepSeek V4 Pro | [x] |
-| | F1-A11b Pagine Clienti e Fornitori con *Cerca in Integra* | 2 | DeepSeek Flash | [ ] |
+| | F1-A11b Pagine Clienti e Fornitori con *Cerca in Integra* | 2 | DeepSeek Flash | [x] |
 | | F2-A7 Prove del percorso completo, schermate 1440/768, spec e guida allineate | 3 | DeepSeek Flash | [ ] |
+
+**F1-A11b fatta l'11/11/2026** (DeepSeek Flash, OpenCode, controllata): componente
+`CercaInIntegra` (pulsante discreto sotto i filtri, finestra con campo e *Cerca* solo al clic,
+risultati con *Importa*, ricarica dell'elenco, messaggi per nessuna corrispondenza e ponte lento,
+pulsante spento con il motivo senza `dati.importa`); voce nel catalogo `/componenti`; guida di
+*Clienti* e *Fornitori*; aiuto `strumenti/prove/integra_prova.js`. Prove browser: `app_clienti` 42,
+`app_fornitori` 34, `app_componenti` 54, `app_guida` 26; `tsc` pulito.
 
 **F1-A13 fatta l'11/11/2026** (DeepSeek Flash, OpenCode, controllata): `mancano_scaglioni` nel
 dettaglio fornitore calcolato dal server, avviso e percorso nella scheda *Percentuali* (pulsante

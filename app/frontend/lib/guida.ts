@@ -499,6 +499,7 @@ export const GUIDA: Argomento[] = [
   { id: 'fornitori', titolo: 'Fornitori', gruppo: 'Anagrafiche', vai: '/fornitori',
     sintesi: 'Anagrafica da Integra in sola lettura; nel CRM si gestiscono le condizioni e le percentuali di provvigione per sconto, con la data da cui valgono.',
     pulsanti: [
+      ['Cerca in Integra', 'L’elenco mostra solo i fornitori già in anagrafica: quelli con documenti o legami. Scrivi codice, P.IVA o ragione sociale e premi Cerca: fino a 10 righe di Integra non ancora in anagrafica, ognuna con Importa. La ricerca parte solo al clic: il ponte di Integra è lento.'],
       ['Riga del fornitore', 'Apre la scheda a destra.'],
       ['Modifica condizioni', 'Giorni attesa conferma, giorno del bollettino, pagamento sul maturato o sul fatturato, giorni per l’incasso dal cliente.'],
       ['Schede Percentuali · Clienti seguiti', 'Percentuali per versione: quella in vigore in alto, poi le future e le passate, con le eccezioni personali sotto la percentuale al subagente; clienti seguiti per quel fornitore (si modificano dal cliente), con filtro a scelta multipla per subagente.'],
@@ -506,6 +507,14 @@ export const GUIDA: Argomento[] = [
       ['Correggi · Elimina', 'Sulla singola versione. Valgono solo dopo l’ultima chiusura del fornitore (bollettino verificato o contestato, trimestre liquidato); altrimenti il server rifiuta e la finestra lo spiega.'],
     ],
     finestre: [
+      { nome: 'Cerca in Integra', da: 'Cerca in Integra', cosa: 'Cerca un fornitore in Integra e lo aggiunge all’anagrafica.',
+        campi: [
+          ['Codice, P.IVA o ragione sociale', 'Il server riconosce prima il codice esatto, poi la P.IVA, poi il nome; chi è già in anagrafica non compare.'],
+        ],
+        azioni: [
+          ['Cerca', 'Interroga Integra: fino a 10 righe, solo quando premi; oltre 3 secondi dice che il ponte non risponde.'],
+          ['Importa', 'Chiude la finestra, ricarica l’elenco e apre il nuovo fornitore; nasce senza scaglioni (D-113).'],
+        ] },
       { nome: 'Condizioni del fornitore', da: 'Modifica condizioni', cosa: 'Regole che fanno scattare solleciti e liquidazioni.',
         campi: [
           ['Giorni attesa conferma', 'Dopo, la pratica è in ritardo.'],
@@ -528,6 +537,7 @@ export const GUIDA: Argomento[] = [
     ],
     sapere: [
       'Il codice <b>C000001</b> sotto il nome è quello del soggetto nella pagina <b>Soggetti</b> (anagrafica unica, D-102); il codice Integra è del singolo ruolo, quindi lo stesso soggetto può averne due diversi.',
+      'In anagrafica ci sono i soggetti che hanno documenti o legami, non tutti quelli di Integra: uno che manca si cerca con <b>Cerca in Integra</b> (serve il livello operatore in Dati).',
     ],
     modifica: 'Responsabile nell’area Dati, per condizioni e percentuali; operatore per il resto.',
   },
@@ -572,12 +582,21 @@ export const GUIDA: Argomento[] = [
   { id: 'clienti', titolo: 'Clienti', gruppo: 'Anagrafiche', vai: '/clienti',
     sintesi: 'Anagrafica da Integra in sola lettura. Per ogni cliente le <b>agenzie</b>: i fornitori per cui Decobrands fa da agente, con codice cliente del fornitore, subagente e sconto.',
     pulsanti: [
+      ['Cerca in Integra', 'L’elenco mostra solo i clienti già in anagrafica: quelli con documenti o legami. Scrivi codice, P.IVA o ragione sociale e premi Cerca: fino a 10 righe di Integra non ancora in anagrafica, ognuna con Importa. La ricerca parte solo al clic: il ponte di Integra è lento.'],
       ['Segmenti e filtri', 'Tutti · Con agenzie · Senza agenzie · Diretta; filtri a scelta multipla per fornitore e subagente (i clienti con un’agenzia così), con riepilogo; i numeri dei segmenti contano con gli altri filtri.'],
       ['Scheda Agenzie', 'Filtri a scelta multipla per fornitore e subagente; clic su una riga per modificarla; contatore giallo se manca un codice cliente.'],
       ['Aggiungi agenzia', 'Nuovo fornitore per questo cliente.'],
       ['Scheda Pratiche', 'Pratiche del cliente con filtro: Aperte · In ritardo · Fatturate · Non pagate · Tutte (numeri calcolati con gli altri filtri), fornitori (filtro standard), numero; imbuto per il riepilogo.'],
     ],
     finestre: [
+      { nome: 'Cerca in Integra', da: 'Cerca in Integra', cosa: 'Cerca un cliente in Integra e lo aggiunge all’anagrafica.',
+        campi: [
+          ['Codice, P.IVA o ragione sociale', 'Il server riconosce prima il codice esatto, poi la P.IVA, poi il nome; chi è già in anagrafica non compare.'],
+        ],
+        azioni: [
+          ['Cerca', 'Interroga Integra: fino a 10 righe, solo quando premi; oltre 3 secondi dice che il ponte non risponde.'],
+          ['Importa', 'Chiude la finestra, ricarica l’elenco e apre il nuovo cliente; le agenzie si aggiungono dalla sua scheda.'],
+        ] },
       { nome: 'Agenzia', da: 'Aggiungi agenzia · clic su una riga', cosa: 'Il cliente è fisso.',
         campi: [
           ['Fornitore', 'Campo con ricerca.'],
@@ -593,6 +612,7 @@ export const GUIDA: Argomento[] = [
     ],
     sapere: [
       'Il codice <b>C000123</b> sotto il nome è quello del soggetto nella pagina <b>Soggetti</b> (anagrafica unica, D-102); il codice Integra è del singolo ruolo.',
+      'In anagrafica ci sono i soggetti che hanno documenti o legami, non tutti quelli di Integra: un cliente che manca si cerca con <b>Cerca in Integra</b> (serve il livello operatore in Dati) e poi gli si aggiunge l’agenzia.',
       'Un solo subagente per cliente e fornitore; il codice cliente è unico per fornitore.',
       '<b>Al subagente per questo cliente %</b> e <b>Provvigione al subagente</b> li cambia solo un responsabile, come le eccezioni personali. La percentuale vale solo per questo cliente e fornitore; vuoto = la percentuale dello scaglione o l’eccezione del subagente.',
       '<b>Una fattura al mese</b> (la prima o la più alta): le altre fatture del mese non danno provvigione al subagente. Il fornitore non cambia: si controlla nel bollettino.',

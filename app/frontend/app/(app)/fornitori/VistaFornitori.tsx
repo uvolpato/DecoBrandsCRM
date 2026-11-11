@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { CampoProps } from '@/componenti/Campo';
+import { CercaInIntegra } from '@/componenti/CercaInIntegra';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
@@ -334,6 +335,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
         {filtri}
+        <CercaInIntegra tipo="fornitore" onImportato={carica} />
         <div className="riempi">
           <DataTable righe={cercati} filtro={String(valori.q)} colonne={colonneFornitori} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/fornitori/' + x.id)}

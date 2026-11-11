@@ -49,6 +49,10 @@ node ../../strumenti/prove/utenti_prova.js togli      # toglie utenti, eventi e 
 Il registro del backend serve ad `app_accesso.py` per leggere il link di *password dimenticata*
 (in sviluppo la posta va nel registro).
 
+`app_clienti.py` e `app_fornitori.py` provano anche *Cerca in Integra* (D-111): servono `DATABASE_URL`
+e `PONTE_URL` nel processo che lancia Python, e la riga di prova si mette e si toglie dal ponte finto
+con `node ../../strumenti/prove/integra_prova.js ponte-aggiungi|ponte-togli|pulisci cliente|fornitore <codice> [nome] [piva]`.
+
 **Demo con i PDF veri** (`strumenti/prove/pdf_veri.js`): da `backend/`, dopo `npm run build` e con
 `demo-ammi` creato con `utenti_prova.js`, ricostruisce il flusso ordine → proforma → fattura di
 Agri Aggio/Gries dai file di `Documenti Veri/` (ordine `AU276839`, proforma `PR102813`, fattura

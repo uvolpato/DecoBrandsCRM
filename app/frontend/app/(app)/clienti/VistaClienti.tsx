@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type Rea
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormAgenzia, type Agenzia } from '@/componenti/FormAgenzia';
+import { CercaInIntegra } from '@/componenti/CercaInIntegra';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
@@ -190,6 +191,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.1fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
         {filtri}
+        <CercaInIntegra tipo="cliente" onImportato={carica} />
         <div className="riempi">
           <DataTable righe={righe} filtro={JSON.stringify(valori)} colonne={colonneClienti} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/clienti/' + x.id)}
