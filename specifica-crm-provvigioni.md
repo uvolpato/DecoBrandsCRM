@@ -1177,6 +1177,11 @@ Indici: `(fornitore_piva, cliente_codice_fornitore)`, `(cliente_codice_fornitore
 `(stato)`, `(cliente_piva_norm)`, `(subagente_nome)`. **Niente FK obbligatorie**: sono proprio
 quelle che hanno reso necessario l'import massivo.
 
+**Il fornitore e il cliente si riconoscono dai dati, non dagli id**: `fornitore_id`/`cliente_id`
+restano **NULL** finché un soggetto non viene collegato (l'import non li conosce) e non si usano per
+cercare. La ricerca confronta il **codice cliente del fornitore**, la **P.IVA normalizzata** e la
+**ragione sociale normalizzata**: è quello che i documenti portano davvero.
+
 **Perché i codici servono (e gli id no):** il documento porta `codice_cliente`, e `proposta.ts`
 cerca già l'agenzia per `interscambio.codice_cliente_fornitore`; quindi la chiave di confronto è
 (fornitore, codice del cliente). Gli id del vecchio CRM servono solo a ritrovare la scheda.

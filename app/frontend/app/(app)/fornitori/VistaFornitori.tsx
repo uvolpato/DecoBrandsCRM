@@ -6,7 +6,7 @@ import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
 import { Conferma } from '@/componenti/Modale';
-import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
+import { Nota, Pagina, Pannello, Pulsante, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli } from '@/componenti/Piccoli';
 import { SagomaCorpo, SagomaElenco, SagomaTabella, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
@@ -52,6 +52,7 @@ interface ClienteSeguito {
   valido_al: string | null;
 }
 type Dettaglio = Omit<Fornitore, 'scaglioni'> & {
+  mancano_scaglioni: boolean; // D-113: nessuna versione delle percentuali in vigore oggi
   scaglioni: Scaglione[];
   clienti_seguiti: ClienteSeguito[];
 };
@@ -157,6 +158,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   const u = dettaglio;
   const chiudi = () => setFinestra(null);
   const puoModificare = puo('dati.condizioni');
+  // D-113: senza una versione in vigore la pratica non si apre; dopo il salvataggio lo dice subito `in_vigore`
+  const mancanoScaglioni = percentuali ? percentuali.in_vigore === null : (u?.mancano_scaglioni ?? false);
 
   const chiedi = (titolo: string, testo: ReactNode, etichetta: string, pericolo = false) =>
     new Promise<boolean>((ok) => setFinestra(<Conferma titolo={titolo} testo={testo} etichetta={etichetta} pericolo={pericolo} onRisposta={(si) => { chiudi(); ok(si); }} />));
@@ -356,9 +359,21 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               {
                 id: 'percentuali', etichetta: 'Percentuali', contenuto: () => (
                   <div className="pila riempi">
+                    {mancanoScaglioni && (
+                      <div className="nota nota-attesa strumenti-scheda" role="status">
+                        <span className="spazio">
+                          Senza scaglioni le pratiche di questo fornitore non si aprono (D-87).
+                          {!puoModificare && <span className="testo-tenue"> Serve il livello responsabile in Dati.</span>}
+                        </span>
+                        <Pulsante piccolo a={{
+                          etichetta: 'Configura gli scaglioni', variante: 'sec', onClick: nuovePercentuali,
+                          disabilitato: !puoModificare, titolo: puoModificare ? undefined : 'Serve il livello responsabile in Dati',
+                        }} />
+                      </div>
+                    )}
                     <div className="strumenti-scheda">
                       <span className="spazio" />
-                      {puoModificare && percentuali && <button type="button" className="btn sec piccolo" onClick={nuovePercentuali}>Nuove percentuali</button>}
+                      {puoModificare && percentuali && !mancanoScaglioni && <button type="button" className="btn sec piccolo" onClick={nuovePercentuali}>Nuove percentuali</button>}
                     </div>
                     {!percentuali
                       ? errorePercentuali ? <div className="vuoto">Percentuali non caricate.</div> : <SagomaTabella righe={4} colonne={5} />

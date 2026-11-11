@@ -245,19 +245,26 @@ export class FornitoriController {
   @Get(':id')
   @Richiede('dati.consulta')
   async dettaglio(@Param('id', ParseIntPipe) id: number) {
-    const f = await this.db.fornitori.findUnique({
-      where: { id: BigInt(id) },
-      include: {
-        corrente: { select: { ragione_sociale: true, piva: true, paese: true } },
-        soggetto: { select: { id: true, codice: true } },
-        scaglioni: { orderBy: { sconto_min: 'asc' } },
-        agenzie: { include: { cliente: { include: { corrente: { select: { ragione_sociale: true, piva: true } } } }, subagente: { select: { id: true, codice: true, nome: true, cognome: true } } } },
-      },
-    });
+    const [f, inVigore] = await Promise.all([
+      this.db.fornitori.findUnique({
+        where: { id: BigInt(id) },
+        include: {
+          corrente: { select: { ragione_sociale: true, piva: true, paese: true } },
+          soggetto: { select: { id: true, codice: true } },
+          scaglioni: { orderBy: { sconto_min: 'asc' } },
+          agenzie: { include: { cliente: { include: { corrente: { select: { ragione_sociale: true, piva: true } } } }, subagente: { select: { id: true, codice: true, nome: true, cognome: true } } } },
+        },
+      }),
+      // D-113: senza una versione delle percentuali valida oggi la pratica non si apre
+      this.db.provvigioni_scaglioni.findFirst({
+        where: { fornitore_id: BigInt(id), valido_dal: { lte: new Date(giornoRoma(new Date())) } }, select: { id: true },
+      }),
+    ]);
     if (!f) throw new NotFoundException('Fornitore non trovato');
     const codice = await this.db.codici_esterni.findFirst({ where: { sistema: 'integra', tipo: 'fornitore', entita_id: BigInt(id) } });
     return {
       ...mappaFornitore(f as never, codice?.codice ?? null),
+      mancano_scaglioni: !inVigore, // D-113
       scaglioni: f.scaglioni.map(mappaScaglione),
       clienti_seguiti: f.agenzie.map((a) => ({
         id: String(a.id),

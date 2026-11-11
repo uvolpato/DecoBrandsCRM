@@ -106,11 +106,13 @@ describe('cercaLegame', () => {
     await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: cv.id } });
     clienteId = c.id;
 
-    // tre righe: una riconoscibile per codice, una per P.IVA, una per ragione sociale
+    // tre righe: una riconoscibile per codice, una per P.IVA, una per ragione sociale.
+    // `fornitore_id` resta NULL come nei dati veri (l'import non lo conosce): il fornitore si
+    // riconosce da P.IVA e ragione sociale (D-112).
     await db.interscambio_storico.createMany({ data: [
-      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9001n, fornitore_legacy_id: 9001n, fornitore_id: fornitoreId, cliente_codice_fornitore: 'C1', cliente_ragione_sociale: 'ALTRO', cliente_piva_norm: '', subagente_nome: 'SUB-CODICE' },
-      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9002n, fornitore_legacy_id: 9002n, fornitore_id: fornitoreId, cliente_codice_fornitore: 'C2', cliente_ragione_sociale: 'ALTRO 2', cliente_piva_norm: '12345678901', subagente_nome: 'SUB-PIVA' },
-      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9003n, fornitore_legacy_id: 9003n, fornitore_id: fornitoreId, cliente_codice_fornitore: 'C3', cliente_ragione_sociale: 'NEGOZIO FIORI', cliente_piva_norm: '', subagente_nome: 'SUB-NOME' },
+      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9001n, fornitore_legacy_id: 9001n, fornitore_ragione_sociale: 'Fornitore Precedenza', cliente_codice_fornitore: 'C1', cliente_ragione_sociale: 'ALTRO', cliente_piva_norm: '', subagente_nome: 'SUB-CODICE' },
+      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9002n, fornitore_legacy_id: 9002n, fornitore_ragione_sociale: 'Fornitore Precedenza', cliente_codice_fornitore: 'C2', cliente_ragione_sociale: 'ALTRO 2', cliente_piva_norm: '12345678901', subagente_nome: 'SUB-PIVA' },
+      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9003n, fornitore_legacy_id: 9003n, fornitore_ragione_sociale: 'Fornitore Precedenza', cliente_codice_fornitore: 'C3', cliente_ragione_sociale: 'NEGOZIO FIORI', cliente_piva_norm: '', subagente_nome: 'SUB-NOME' },
     ] });
   });
 
@@ -132,6 +134,11 @@ describe('cercaLegame', () => {
     expect(r.map((x) => x.subagente_nome)).toEqual(['SUB-NOME']);
   });
 
+  it('funziona senza fornitore_id collegato, come nei dati veri', async () => {
+    const r = await cercaLegame(db, { fornitoreId, codice: 'C2' });
+    expect(r.map((x) => x.subagente_nome)).toEqual(['SUB-PIVA']);
+  });
+
   it('segnaUsata dentro la transazione di chi crea l\'agenzia', async () => {
     const riga = await db.interscambio_storico.findFirstOrThrow({ where: { cliente_codice_fornitore: 'C1' } });
     await db.$transaction(async (tx) => { await segnaUsata(tx, riga.id, 999999n, 'usata dalla prova'); });
@@ -149,9 +156,11 @@ describe('rotta /api/interscambio/storico', () => {
 
   it('rappresentato falso quando il subagente è vuoto', async () => {
     const f = await db.fornitori.create({ data: {} });
+    const fv = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'Fornitore Rappresentanza' } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: fv.id } });
     await db.interscambio_storico.create({ data: {
       fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 8001n, fornitore_legacy_id: 8001n,
-      fornitore_id: f.id, cliente_codice_fornitore: 'RAP-1', cliente_ragione_sociale: 'Cliente senza rappresentanza',
+      fornitore_ragione_sociale: 'Fornitore Rappresentanza', cliente_codice_fornitore: 'RAP-1', cliente_ragione_sociale: 'Cliente senza rappresentanza',
       subagente_nome: null, sconto_1: 0, sconto_2: 0,
     } });
     const r = await (await entra('lett')).get(`/interscambio/storico?fornitore_id=${f.id}&codice=RAP-1`).expect(200);

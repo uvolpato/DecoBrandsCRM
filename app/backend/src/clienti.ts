@@ -8,6 +8,7 @@ import { Richiede, contesto, permessiDi } from './accesso';
 import { ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
+import { normalizzaPiva, segnaUsata } from './storico';
 
 // Clienti (sola lettura, da Integra) e agenzie (interscambio) (F1-A3, §7.6, §8.1, §15.2.3).
 
@@ -23,6 +24,23 @@ class DatiAgenzia {
   @IsOptional() @IsIn(['prima', 'piu_alta']) regola_mensile?: string | null;
   @Facoltativo() @IsISO8601({ strict: true }) valido_dal?: string;
   @IsOptional() @IsISO8601({ strict: true }) valido_al?: string | null;
+  @Facoltativo() @IsInt() @Min(1) storico_id?: number; // D-112: riga dello storico da cui nasce l'agenzia
+}
+
+/** D-112: la riga dello storico deve essere della stessa coppia cliente-fornitore. Gli id si riempiono
+ *  quando i ruoli nascono: se mancano valgono le P.IVA scritte nello storico. Serve almeno un riscontro. */
+function stessaCoppia(
+  r: { cliente_id: bigint | null; fornitore_id: bigint | null; cliente_piva_norm: string; fornitore_piva: string | null },
+  clienteId: bigint, clientePiva: string | null, fornitoreId: bigint, fornitorePiva: string | null,
+) {
+  let visto = false;
+  if (r.cliente_id !== null) { if (r.cliente_id !== clienteId) return false; visto = true; }
+  if (r.fornitore_id !== null) { if (r.fornitore_id !== fornitoreId) return false; visto = true; }
+  const pf = normalizzaPiva(fornitorePiva ?? '');
+  if (r.fornitore_piva && pf) { if (normalizzaPiva(r.fornitore_piva) !== pf) return false; visto = true; }
+  const pc = normalizzaPiva(clientePiva ?? '');
+  if (r.cliente_piva_norm && pc) { if (r.cliente_piva_norm !== pc) return false; visto = true; }
+  return visto;
 }
 
 // D-50 §19: percentuale e regola del subagente cambiano i soldi: solo chi ha dati.condizioni
@@ -193,12 +211,18 @@ export class ClientiController {
     if (!b.valido_dal) throw new BadRequestException('Data di inizio obbligatoria');
     if (b.valido_al && new Date(b.valido_al) <= new Date(b.valido_dal)) throw new BadRequestException('La data di fine deve essere dopo la data di inizio');
     return unico(() => this.db.$transaction(async (tx) => {
-      const cliente = await tx.clienti.findUnique({ where: { id: BigInt(id) }, include: { corrente: { select: { ragione_sociale: true } } } });
+      const cliente = await tx.clienti.findUnique({ where: { id: BigInt(id) }, include: { corrente: { select: { ragione_sociale: true, piva: true } } } });
       if (!cliente) throw new NotFoundException('Cliente non trovato');
       const sub = await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id!) } });
       if (!sub) throw new NotFoundException('Subagente non trovato');
-      const fornitore = await tx.fornitori.findUnique({ where: { id: BigInt(b.fornitore_id!) }, include: { corrente: { select: { ragione_sociale: true } } } });
+      const fornitore = await tx.fornitori.findUnique({ where: { id: BigInt(b.fornitore_id!) }, include: { corrente: { select: { ragione_sociale: true, piva: true } } } });
       if (!fornitore) throw new NotFoundException('Fornitore non trovato');
+      // D-112: la riga dello storico proposta deve essere di questa coppia; il 400 annulla tutto (V13)
+      const legame = b.storico_id ? await tx.interscambio_storico.findUnique({ where: { id: BigInt(b.storico_id) } }) : null;
+      if (b.storico_id && !legame) throw new BadRequestException('Riga dello storico non trovata');
+      if (legame && !stessaCoppia(legame, cliente.id, cliente.corrente?.piva ?? null, fornitore.id, fornitore.corrente?.piva ?? null)) {
+        throw new BadRequestException('La riga dello storico è di un altro cliente o fornitore');
+      }
       const creato = await tx.interscambio.create({
         data: {
           cliente_id: BigInt(id),
@@ -225,8 +249,10 @@ export class ClientiController {
           fornitore_id: String(creato.fornitore_id),
           codice_cliente_fornitore: creato.codice_cliente_fornitore,
           sconto: Number(creato.sconto),
+          ...(legame ? { storico_id: String(legame.id) } : {}),
         },
       }, contesto(req));
+      if (legame) await segnaUsata(tx, legame.id, creato.id, 'Agenzia creata dal CRM'); // D-112, stessa transazione
       return mappaAgenzia(creato as never);
     }));
   }

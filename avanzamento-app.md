@@ -119,10 +119,20 @@ suo worktree; il gruppo dopo parte a unione avvenuta.
 |---|---|:-:|---|:-:|
 | 10 · F8 Anagrafica | F1-A12 Storico dei legami (`interscambio_storico` 4022, `soggetti_storico` 3403, import, servizio di ricerca) | 1 | DeepSeek V4 Pro | [x] |
 | | F1-A11 Anagrafica su richiesta (`integra.ts` senza creazioni, `/api/integra/cerca` e `/importa`, permesso `dati.importa`) | 1 | DeepSeek V4 Pro | [x] |
-| | F1-A13 Scaglioni obbligatori e agenzia precompilata dallo storico, messaggi e pulsanti spenti | 2 | DeepSeek Flash | [ ] |
+| | F1-A13 Scaglioni obbligatori e agenzia precompilata dallo storico, messaggi e pulsanti spenti | 2 | DeepSeek Flash | [x] |
 | | F2-A6 Proposta del documento con *Importa da Integra* e guardia *non rappresentato* | 2 | DeepSeek V4 Pro | [x] |
 | | F1-A11b Pagine Clienti e Fornitori con *Cerca in Integra* | 2 | DeepSeek Flash | [ ] |
 | | F2-A7 Prove del percorso completo, schermate 1440/768, spec e guida allineate | 3 | DeepSeek Flash | [ ] |
+
+**F1-A13 fatta l'11/11/2026** (DeepSeek Flash, OpenCode, controllata): `mancano_scaglioni` nel
+dettaglio fornitore calcolato dal server, avviso e percorso nella scheda *Percentuali* (pulsante
+spento con il motivo senza `dati.condizioni`); `POST /api/clienti/:id/agenzie` con `storico_id`
+(coppia validata, 400 se non corrisponde, `segnaUsata` nella stessa transazione); `FormAgenzia`
+precompilata dallo storico con «Dal vecchio CRM: subagente e sconto» e il caso «non rappresentato».
+Prove: clienti 23, fornitori 7, percentuali 31; browser `app_fornitori` 27, `app_clienti` 34,
+`app_documenti` 40; `tsc` pulito. **Corretto nel controllo**: `cercaLegame` filtrava su
+`fornitore_id`, che nei dati veri è NULL, quindi la proposta dallo storico restava muta; ora
+confronta P.IVA e ragione sociale normalizzate (una query in più, 11 prove sullo storico).
 
 **F2-A6 fatta l'11/11/2026** (DeepSeek V4 Pro, OpenCode, controllata): `propostaDocumento` accetta
 un contesto (candidati di Integra e righe dello storico) e resta **pura**; esiti

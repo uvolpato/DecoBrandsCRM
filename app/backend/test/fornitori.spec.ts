@@ -93,6 +93,20 @@ describe('elenco e dettaglio', () => {
     const a = await entra('lett-forn');
     await a.get('/fornitori').expect(200);
   });
+
+  it('mancano_scaglioni: vero senza versioni, vero con sole versioni future, falso se c’è quella in vigore', async () => {
+    const a = await entra('ammi-forn');
+    // il seed ha MCL SRL senza percentuali (D-113: un fornitore importato nasce senza)
+    const senza = await db.fornitori.findFirstOrThrow({ where: { scaglioni: { none: {} } }, orderBy: { id: 'asc' } });
+    expect((await a.get('/fornitori/' + senza.id).expect(200)).body.mancano_scaglioni).toBe(true);
+    // una versione che comincia domani non vale oggi: mancano lo stesso
+    const futuro = await db.fornitori.create({ data: {} });
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id: futuro.id, sconto_min: 0, pct_agente: 10, pct_subagente: 2, valido_dal: new Date('2050-01-01') } });
+    expect((await a.get('/fornitori/' + futuro.id).expect(200)).body.mancano_scaglioni).toBe(true);
+    // chi ha una versione già in vigore non ha l’avviso
+    const con = await db.fornitori.findFirstOrThrow({ where: { scaglioni: { some: {} } }, orderBy: { id: 'asc' } });
+    expect((await a.get('/fornitori/' + con.id).expect(200)).body.mancano_scaglioni).toBe(false);
+  });
 });
 
 describe('modifica regole', () => {

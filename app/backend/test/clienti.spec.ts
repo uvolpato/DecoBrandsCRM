@@ -166,6 +166,144 @@ describe('percentuale e regola del subagente', () => {
   });
 });
 
+describe('agenzia dallo storico (D-112)', () => {
+  const ESTRATTO = new Date('2026-11-08T00:00:00Z');
+  async function clienteConPiva(piva: string, nome: string) {
+    const c = await db.clienti.create({ data: {} });
+    const v = await db.clienti_versioni.create({ data: { cliente_id: c.id, fonte: 'integra', piva, ragione_sociale: nome, valido_dal: new Date('2025-01-01') } });
+    await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: v.id } });
+    return c.id;
+  }
+  async function fornitoreConPiva(piva: string, nome: string) {
+    const f = await db.fornitori.create({ data: {} });
+    const v = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', piva, ragione_sociale: nome, valido_dal: new Date('2025-01-01') } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: v.id } });
+    return f.id;
+  }
+
+  let clienteS: bigint, fornitoreS: bigint, clienteAltro: bigint, fornitoreAltro: bigint;
+
+  beforeAll(async () => {
+    clienteS = await clienteConPiva('11111111111', 'Cliente Storico');
+    fornitoreS = await fornitoreConPiva('22222222222', 'Fornitore Storico');
+    clienteAltro = await clienteConPiva('33333333333', 'Cliente Altro');
+    fornitoreAltro = await fornitoreConPiva('44444444444', 'Fornitore Altro');
+  });
+
+  it('storico_id valido: riga usata con interscambio_id e usato_il, nella stessa transazione', async () => {
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9101n, fornitore_legacy_id: 9101n,
+      cliente_id: clienteS, fornitore_id: fornitoreS, cliente_codice_fornitore: 'STO-1',
+      cliente_ragione_sociale: 'Cliente Storico', cliente_piva_norm: '11111111111',
+      fornitore_ragione_sociale: 'Fornitore Storico', fornitore_piva: '22222222222',
+      subagente_nome: 'Nista Mario', sconto_1: 8,
+    } });
+    const a = await entra('ammi-cli');
+    const r = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), codice_cliente_fornitore: 'STO-1',
+      sconto: 8, valido_dal: '2035-01-01', valido_al: '2035-12-31', storico_id: Number(riga.id),
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    const dopo = await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } });
+    expect(dopo.stato).toBe('usata');
+    expect(String(dopo.interscambio_id)).toBe(r.body.id);
+    expect(dopo.usato_il).toBeTruthy();
+  });
+
+  it('storico_id di un’altra coppia: 400 e nessuna agenzia scritta', async () => {
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9102n, fornitore_legacy_id: 9102n,
+      cliente_id: clienteAltro, fornitore_id: fornitoreAltro, cliente_codice_fornitore: 'STO-2',
+      cliente_piva_norm: '33333333333', fornitore_piva: '44444444444', subagente_nome: 'Nista Mario', sconto_1: 5,
+    } });
+    const a = await entra('ammi-cli');
+    const prima = await db.interscambio.count({ where: { cliente_id: clienteS, fornitore_id: fornitoreS } });
+    const r = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 5,
+      valido_dal: '2036-01-01', valido_al: '2036-12-31', storico_id: Number(riga.id),
+    }).expect(400);
+    expect(r.body.message).toContain('altro cliente o fornitore');
+    expect(await db.interscambio.count({ where: { cliente_id: clienteS, fornitore_id: fornitoreS } })).toBe(prima);
+    expect((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).stato).toBe('da_usare');
+  });
+
+  it('riga senza id (ruoli non ancora collegati): si riconosce la coppia dalla P.IVA', async () => {
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9103n, fornitore_legacy_id: 9103n,
+      cliente_codice_fornitore: 'STO-3', cliente_piva_norm: '', cliente_ragione_sociale: 'Cliente Storico',
+      fornitore_piva: 'IT22222222222', subagente_nome: 'Granata Riccardo', sconto_1: 12,
+    } });
+    const a = await entra('ammi-cli');
+    // la riga ha solo la P.IVA del fornitore (id non ancora collegati): si riconosce da quella
+    const r = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 12,
+      valido_dal: '2037-01-01', valido_al: '2037-12-31', storico_id: Number(riga.id),
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    expect((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).stato).toBe('usata');
+  });
+
+  it('P.IVA del fornitore diversa: 400', async () => {
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9104n, fornitore_legacy_id: 9104n,
+      cliente_codice_fornitore: 'STO-4', cliente_piva_norm: '', fornitore_piva: '99999999999', sconto_1: 0,
+    } });
+    const a = await entra('ammi-cli');
+    await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 0,
+      valido_dal: '2038-01-01', valido_al: '2038-12-31', storico_id: Number(riga.id),
+    }).expect(400);
+    expect((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).stato).toBe('da_usare');
+  });
+
+  it('la rotta che usa il form trova la riga della coppia, poi l’agenzia la segna usata', async () => {
+    // gli id nello storico restano NULL finché non si collegano (dati veri, §4.7.2): la coppia si
+    // riconosce dalla P.IVA del fornitore
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9106n, fornitore_legacy_id: 9106n,
+      cliente_codice_fornitore: 'STO-6',
+      cliente_piva_norm: '', fornitore_piva: '22222222222', subagente_nome: 'Alfredo Nista', sconto_1: 6,
+    } });
+    const a = await entra('ammi-cli');
+    const trovati = await a.get('/interscambio/storico?fornitore_id=' + fornitoreS + '&cliente_id=' + clienteS + '&codice=STO-6').expect(200);
+    expect(trovati.body.map((x: { id: string }) => x.id)).toContain(String(riga.id));
+    expect(trovati.body[0].rappresentato).toBe(true);
+    const r = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 6,
+      valido_dal: '2040-01-01', valido_al: '2040-12-31', storico_id: Number(riga.id),
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    expect((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).stato).toBe('usata');
+  });
+
+  it('riga senza alcun dato della coppia: 400, non si può segnare a caso', async () => {
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9107n, fornitore_legacy_id: 9107n,
+      cliente_codice_fornitore: 'STO-7', cliente_piva_norm: '', fornitore_piva: null, sconto_1: 0,
+    } });
+    const a = await entra('ammi-cli');
+    const r = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 0,
+      valido_dal: '2041-01-01', valido_al: '2041-12-31', storico_id: Number(riga.id),
+    }).expect(400);
+    expect(r.body.message).toContain('altro cliente o fornitore');
+    expect((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).stato).toBe('da_usare');
+  });
+
+  it('senza storico_id tutto come prima: nessuna riga dello storico toccata', async () => {
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9105n, fornitore_legacy_id: 9105n,
+      cliente_id: clienteS, fornitore_id: fornitoreS, cliente_codice_fornitore: 'STO-5', cliente_piva_norm: '', sconto_1: 0,
+    } });
+    const a = await entra('oper-cli');
+    const r = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 0, valido_dal: '2039-01-01', valido_al: '2039-12-31',
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    expect((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).stato).toBe('da_usare');
+  });
+});
+
 describe('agenzie CRUD', () => {
   let agenziaId = '';
 

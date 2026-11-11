@@ -2569,6 +2569,10 @@ prova di importazione del vecchio CRM (Ugo, 11/11/2026).</p>
 <p>Indici: <code>(fornitore_piva, cliente_codice_fornitore)</code>, <code>(cliente_codice_fornitore)</code>,
 <code>(stato)</code>, <code>(cliente_piva_norm)</code>, <code>(subagente_nome)</code>. <strong>Niente FK obbligatorie</strong>: sono proprio
 quelle che hanno reso necessario l'import massivo.</p>
+<p><strong>Il fornitore e il cliente si riconoscono dai dati, non dagli id</strong>: <code>fornitore_id</code>/<code>cliente_id</code>
+restano <strong>NULL</strong> finché un soggetto non viene collegato (l'import non li conosce) e non si usano per
+cercare. La ricerca confronta il <strong>codice cliente del fornitore</strong>, la <strong>P.IVA normalizzata</strong> e la
+<strong>ragione sociale normalizzata</strong>: è quello che i documenti portano davvero.</p>
 <p><strong>Perché i codici servono (e gli id no):</strong> il documento porta <code>codice_cliente</code>, e <code>proposta.ts</code>
 cerca già l'agenzia per <code>interscambio.codice_cliente_fornitore</code>; quindi la chiave di confronto è
 (fornitore, codice del cliente). Gli id del vecchio CRM servono solo a ritrovare la scheda.</p>

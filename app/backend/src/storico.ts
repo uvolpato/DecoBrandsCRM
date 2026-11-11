@@ -30,23 +30,33 @@ export interface CercaLegame {
 
 /** Cerca i legami nello storico per proporre subagente e sconto (D-112). Precedenza: codice cliente
  *  del fornitore (esatto) → P.IVA cliente → ragione sociale normalizzata (solo proposta, mai fusione).
- *  Al massimo 5 righe. */
+ *  Al massimo 5 righe.
+ *
+ *  Il fornitore si riconosce da P.IVA e ragione sociale, **non** da `fornitore_id`: nello storico
+ *  quegli id sono NULL finché un soggetto non viene collegato (l'import non li conosce), quindi
+ *  filtrare sull'id rendeva la proposta muta sui dati veri. Con `fornitoreId` si leggono P.IVA e nome
+ *  dal fornitore in anagrafica e si confrontano normalizzati (una sola query in più). */
 export async function cercaLegame(db: Db, c: CercaLegame): Promise<interscambio_storico[]> {
+  let piva = c.fornitorePiva ? normalizzaPiva(c.fornitorePiva) : null;
+  let nome = c.fornitoreNome ? normalizzaNome(c.fornitoreNome) : null;
+  if (c.fornitoreId != null && !piva && !nome) {
+    const f = await db.fornitori.findUnique({
+      where: { id: c.fornitoreId },
+      include: { corrente: { select: { piva: true, ragione_sociale: true } } },
+    });
+    piva = f?.corrente?.piva ? normalizzaPiva(f.corrente.piva) : null;
+    nome = f?.corrente?.ragione_sociale ? normalizzaNome(f.corrente.ragione_sociale) : null;
+  }
   // Un codice cliente da solo non è univoco: è il codice di *quel* fornitore. Senza fornitore
   // non si propone niente (D-112: proporre l'agenzia sbagliata è peggio che non proporla).
-  if (c.fornitoreId == null && !c.fornitorePiva && !c.fornitoreNome) return [];
-  const base: Prisma.interscambio_storicoWhereInput = {};
-  if (c.fornitoreId != null) base.fornitore_id = c.fornitoreId;
-  else if (c.fornitorePiva) base.fornitore_piva = normalizzaPiva(c.fornitorePiva);
-  const nomeFornitore = c.fornitoreNome ? normalizzaNome(c.fornitoreNome) : null;
+  if (!piva && !nome) return [];
 
   const prendi = async (w: Prisma.interscambio_storicoWhereInput, n = 5) => {
-    const righe = await db.interscambio_storico.findMany({ where: { ...base, ...w }, orderBy: { id: 'asc' } });
-    // il fornitore per nome si confronta qui: nessuna colonna normalizzata in tabella
-    const scelte = nomeFornitore
-      ? righe.filter((r) => r.fornitore_ragione_sociale && normalizzaNome(r.fornitore_ragione_sociale) === nomeFornitore)
-      : righe;
-    return scelte.slice(0, n);
+    const righe = await db.interscambio_storico.findMany({ where: w, orderBy: { id: 'asc' } });
+    return righe
+      .filter((r) => (piva && normalizzaPiva(r.fornitore_piva ?? '') === piva)
+        || (nome && r.fornitore_ragione_sociale && normalizzaNome(r.fornitore_ragione_sociale) === nome))
+      .slice(0, n);
   };
 
   if (c.codice) {
