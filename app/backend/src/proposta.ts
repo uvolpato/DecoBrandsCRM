@@ -70,7 +70,7 @@ export interface Candidato {
   delta: number;
 }
 
-export type Esito = 'doppio' | 'bollettino' | 'nuova' | 'certo' | 'probabile' | 'ambiguo' | 'nessuno' | 'manca_agenzia';
+export type Esito = 'doppio' | 'bollettino' | 'nuova' | 'certo' | 'probabile' | 'ambiguo' | 'nessuno' | 'manca_agenzia' | 'manca_rappresentanza' | 'fornitore_da_integra' | 'cliente_da_integra';
 
 /** D-106: cliente e fornitore riconosciuti ma senza agenzia valida alla data del documento. */
 export interface AgenziaMancante {
@@ -82,6 +82,31 @@ export interface AgenziaMancante {
   data: string | null;
 }
 
+/** Una riga delle viste di Integra come la cerca `GET /api/integra/cerca` (D-111). */
+export interface RigaIntegra {
+  id_integra: number;
+  ragione_sociale: string | null;
+  piva: string | null;
+}
+
+/** Una riga dello storico dei legami del vecchio CRM, ridotta ai campi della proposta (D-112). */
+export interface RigaStorico {
+  cliente_codice_fornitore: string | null;
+  cliente_ragione_sociale: string | null;
+  cliente_piva: string | null;
+  subagente_nome: string | null;
+  sconto: number;
+  rappresentato: boolean; // D-112: falso = fornitore senza rappresentanza per il cliente
+}
+
+/** Contesto che `documenti.ts` prepara (Integra e storico) e passa a `propostaDocumento` (D-111/D-112).
+ *  `propostaDocumento` resta pura: qui non si tocca né il ponte né lo storico. */
+export interface Contesto {
+  fornitore_su_integra?: RigaIntegra[];
+  cliente_su_integra?: RigaIntegra[];
+  storico?: RigaStorico[];
+}
+
 export interface Proposta {
   esito: Esito;
   candidati: Candidato[];
@@ -91,6 +116,12 @@ export interface Proposta {
   cliente_riconosciuto: { cliente_id: bigint; ragione: string | null } | null;
   /** D-106: senza agenzia il documento non entra in pratica; porta i dati per configurarla dal documento. */
   agenzia_mancante: AgenziaMancante | null;
+  /** D-111: fornitore letto non in anagrafica, una sola riga delle viste di Integra. */
+  fornitore_da_integra: { id_integra: number; ragione_sociale: string | null; piva: string | null } | null;
+  /** D-111/D-112: cliente non riconosciuto, candidato in Integra o nel vecchio CRM, con subagente e sconto dello storico. */
+  cliente_da_integra: { id_integra: number | null; ragione_sociale: string | null; piva: string | null; subagente: string | null; sconto: number | null } | null;
+  /** D-112: coppia cliente-fornitore nello storico senza subagente (non rappresentata). */
+  manca_rappresentanza: { cliente: string | null; fornitore: string | null; codice_cliente: string | null } | null;
 }
 
 export interface Controllo {
@@ -273,6 +304,7 @@ export interface RigaAgenzia {
   id: bigint;
   tipo: string | null;
   fornitore_id: bigint | null;
+  fornitore?: string | null;
   data: string | null;
   codice_cliente: string | null;
   cliente: string | null;
@@ -310,6 +342,26 @@ export async function mancaAgenziaRighe(db: Db, righe: RigaAgenzia[]): Promise<S
   return manca;
 }
 
+/** D-112: fra le righe già senza agenzia, quelle con la coppia (fornitore, codice cliente) nello storico
+ *  **senza** subagente → pillola «Non rappresentato» al posto di «Manca l'agenzia». Si confronta il nome
+ *  normalizzato del fornitore, non `fornitore_id`: nello storico quegli id sono NULL finché un soggetto non
+ *  viene collegato, e la pillola deve funzionare prima. Una query di storico per pagina (V12). */
+export async function mancaRappresentanzaRighe(db: Db, righe: RigaAgenzia[], senzaAgenzia: Set<bigint>): Promise<Set<bigint>> {
+  const out = new Set<bigint>();
+  const rilevanti = righe.filter((r) => senzaAgenzia.has(r.id) && r.fornitore);
+  if (!rilevanti.length) return out;
+  const storici = await db.interscambio_storico.findMany({
+    where: { subagente_nome: null },
+    select: { fornitore_ragione_sociale: true, cliente_codice_fornitore: true },
+  });
+  const chiave = (f: string | null, codice: string | null) => `${normalizzaNome(f ?? '')}|${(codice ?? '').toLowerCase()}`;
+  const senza = new Set(storici.map((s) => chiave(s.fornitore_ragione_sociale, s.cliente_codice_fornitore)));
+  for (const r of rilevanti) {
+    if (senza.has(chiave(r.fornitore ?? null, r.codice_cliente))) out.add(r.id);
+  }
+  return out;
+}
+
 /* ---------- Proposta di abbinamento (M.proposta, §6.5) ---------- */
 const CON_PROP = {
   righe: { orderBy: { numero_riga: 'asc' as const } },
@@ -317,38 +369,87 @@ const CON_PROP = {
   cliente: { select: { ragione_sociale: true } },
 } satisfies Prisma.ordini_fornitore_testataInclude;
 
-export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
+export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {}): Promise<Proposta> {
   const imp = importoDocumento(l);
+  // base della risposta: i campi nuovi (D-111/D-112) sono null finché un esito non li riempie
+  const base: Proposta = { esito: 'nessuno', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null, fornitore_da_integra: null, cliente_da_integra: null, manca_rappresentanza: null };
   if (l.tipo === 'bollettino') {
     const gia = l.fornitore_id != null && l.mese != null && l.anno != null
       ? await db.bollettini_testata.findFirst({ where: { fornitore_id: l.fornitore_id, mese: l.mese, anno: l.anno }, select: { id: true } })
       : null;
-    return { esito: gia ? 'doppio' : 'bollettino', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null };
+    return { ...base, esito: gia ? 'doppio' : 'bollettino' };
   }
+
+  // D-111: fornitore letto non in anagrafica ma una sola riga in Integra → importa; 0 o più righe: a mano,
+  // mai una scelta a caso (D-111)
+  if (l.fornitore_id == null) {
+    const c = (contesto.fornitore_su_integra ?? []).filter((x) => x.id_integra != null);
+    if (c.length === 1) {
+      return { ...base, esito: 'fornitore_da_integra', fornitore_da_integra: { id_integra: c[0].id_integra, ragione_sociale: c[0].ragione_sociale, piva: c[0].piva } };
+    }
+  }
+
   const ab = await abbinamentoPerCodice(db, l);
   // D-92 + D-106: cliente riconosciuto (codice del fornitore, altrimenti P.IVA/ragione sociale)
   const cliente_riconosciuto = ab ? null : await riconosciCliente(db, l);
+  const storico = contesto.storico ?? [];
+  // D-112: la coppia cliente-fornitore nello storico, con o senza subagente
+  const coppiaCon = storico.find((s) => s.rappresentato) ?? null;
+  const coppiaSenza = storico.length > 0 && !storico.some((s) => s.rappresentato) ? storico[0] : null;
+
+  // D-111/D-112: cliente non riconosciuto ma proposto dallo storico (subagente + sconto) o da una riga di Integra.
+  // Vale per i tipi che entrano in pratica, prima dell'ordine (il doppione di un ordine vince comunque, vedi sotto).
+  const clienteDaIntegra = (): Proposta | null => {
+    if (l.fornitore_id == null || ab != null || cliente_riconosciuto != null) return null;
+    if (coppiaCon) {
+      return { ...base, esito: 'cliente_da_integra', cliente_da_integra: { id_integra: null, ragione_sociale: coppiaCon.cliente_ragione_sociale, piva: coppiaCon.cliente_piva, subagente: coppiaCon.subagente_nome, sconto: coppiaCon.sconto } };
+    }
+    const c = (contesto.cliente_su_integra ?? []).filter((x) => x.id_integra != null);
+    if (c.length === 1) {
+      return { ...base, esito: 'cliente_da_integra', cliente_da_integra: { id_integra: c[0].id_integra, ragione_sociale: c[0].ragione_sociale, piva: c[0].piva, subagente: null, sconto: null } };
+    }
+    return null;
+  };
+
   if (l.tipo === 'ordine') {
     // il numero letto è quello del fornitore: il doppione si cerca fra i documenti della pratica,
     // non sul numero della pratica (che il CRM genera OF/AAAA/NNN, D-60)
     const gia = l.fornitore_id != null && l.numero
       ? await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'ordine', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } })
       : null;
+    if (gia) return { ...base, esito: 'doppio' };
+    const cd = clienteDaIntegra();
+    if (cd) return cd;
     const manca = await agenziaMancante(db, l, ab, cliente_riconosciuto);
-    return { esito: gia ? 'doppio' : manca ? 'manca_agenzia' : ab ? 'nuova' : 'nessuno', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto, agenzia_mancante: manca };
+    if (manca) {
+      if (coppiaSenza) {
+        return { ...base, esito: 'manca_rappresentanza', abbinamento: ab, cliente_riconosciuto, agenzia_mancante: manca, manca_rappresentanza: { cliente: manca.cliente, fornitore: manca.fornitore, codice_cliente: manca.codice_cliente } };
+      }
+      return { ...base, esito: 'manca_agenzia', abbinamento: ab, cliente_riconosciuto, agenzia_mancante: manca };
+    }
+    return { ...base, esito: ab ? 'nuova' : 'nessuno', abbinamento: ab, cliente_riconosciuto };
   }
   if (l.tipo !== 'conferma' && l.tipo !== 'fattura' && l.tipo !== 'nota_credito') {
-    return { esito: 'nessuno', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto: null, agenzia_mancante: null }; // proforma, pagamento, altro o tipo non letto
+    return { ...base, esito: 'nessuno', abbinamento: ab, cliente_riconosciuto: null }; // proforma, pagamento, altro o tipo non letto
   }
   // una fattura già registrata in una pratica è un doppione
   if (l.tipo === 'fattura' && l.fornitore_id != null && l.numero) {
     const gia = await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'fattura', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } });
-    if (gia) return { esito: 'doppio', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto: null, agenzia_mancante: null };
+    if (gia) return { ...base, esito: 'doppio', abbinamento: ab, cliente_riconosciuto: null };
   }
+
+  const cd = clienteDaIntegra();
+  if (cd) return cd;
 
   // D-106: cliente e fornitore riconosciuti ma senza agenzia valida alla data → non si abbina
   const manca = await agenziaMancante(db, l, ab, cliente_riconosciuto);
-  if (manca) return { esito: 'manca_agenzia', candidati: [], importo: imp, abbinamento: ab, cliente_riconosciuto, agenzia_mancante: manca };
+  if (manca) {
+    // D-112: la coppia è nello storico senza subagente → messaggio più preciso di "manca l'agenzia"
+    if (coppiaSenza) {
+      return { ...base, esito: 'manca_rappresentanza', abbinamento: ab, cliente_riconosciuto, agenzia_mancante: manca, manca_rappresentanza: { cliente: manca.cliente, fornitore: manca.fornitore, codice_cliente: manca.codice_cliente } };
+    }
+    return { ...base, esito: 'manca_agenzia', abbinamento: ab, cliente_riconosciuto, agenzia_mancante: manca };
+  }
 
   const codiciDoc = l.righe.map((r) => r.codice).filter((c): c is string => !!c);
   const testate = l.fornitore_id != null
@@ -395,7 +496,7 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
       const c = candidati.splice(k, 1)[0];
       c.motivi.unshift(`storna la fattura ${l.riferimento_fattura} di questa pratica`);
       candidati.unshift(c);
-      return { esito: 'certo', candidati, importo: imp, abbinamento: ab, cliente_riconosciuto, agenzia_mancante: null };
+      return { ...base, esito: 'certo', candidati, abbinamento: ab, cliente_riconosciuto };
     }
   }
 
@@ -403,7 +504,7 @@ export async function propostaDocumento(db: Db, l: Letto): Promise<Proposta> {
   if (candidati.length && !ab) esito = candidati[0].punteggio > 0 ? 'probabile' : 'nessuno';
   else if (candidati.length === 1) esito = 'certo';
   else if (candidati.length > 1) esito = candidati[0].punteggio - candidati[1].punteggio >= 0.5 ? 'probabile' : 'ambiguo';
-  return { esito, candidati, importo: imp, abbinamento: ab, cliente_riconosciuto, agenzia_mancante: null };
+  return { ...base, esito, candidati, abbinamento: ab, cliente_riconosciuto };
 }
 
 /* ---------- Controlli fissi (§6.5 punto 5) ---------- */

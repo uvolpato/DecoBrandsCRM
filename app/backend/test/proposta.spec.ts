@@ -9,7 +9,7 @@ import { configura } from '../src/main';
 import { PrismaService } from '../src/prisma.service';
 import {
   controlliFissi, lettoDaCampi, normalizzaNome, propostaDocumento, riconosciCliente, risolviFornitore, valutaLettura,
-  type Letto, type RigaLetta, type Soglie,
+  type Contesto, type Letto, type RigaIntegra, type RigaLetta, type RigaStorico, type Soglie,
 } from '../src/proposta';
 import { svuota } from './svuota';
 
@@ -445,5 +445,59 @@ describe('valutaLettura', () => {
     const val = await valutaLettura(db, r.id, SOGLIE);
     expect(val.campi).toContain('numero');
     expect(val.livello).toBe('da_controllare'); // non bassa
+  });
+});
+
+describe('proposta — import da Integra e storico (D-111/D-112)', () => {
+  const integraFornitore = (id = 1, ragione = 'Nuovo Fornitore SRL', piva = '12345678901'): RigaIntegra => ({ id_integra: id, ragione_sociale: ragione, piva });
+  const integraCliente = (id = 2, ragione = 'Cliente Nuovo SRL', piva = '99999999999'): RigaIntegra => ({ id_integra: id, ragione_sociale: ragione, piva });
+  const storico = (over: Partial<RigaStorico> = {}): RigaStorico => ({
+    cliente_codice_fornitore: 'K-100', cliente_ragione_sociale: 'Verde Vita snc', cliente_piva: 'IT00000000001',
+    subagente_nome: 'Mario Rossi', sconto: 5, rappresentato: true, ...over,
+  });
+
+  it('fornitore non in anagrafica con una sola riga in Integra: fornitore_da_integra', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: null, numero: 'OF-1' }), { fornitore_su_integra: [integraFornitore()] });
+    expect(p.esito).toBe('fornitore_da_integra');
+    expect(p.fornitore_da_integra).toMatchObject({ id_integra: 1, ragione_sociale: 'Nuovo Fornitore SRL', piva: '12345678901' });
+  });
+
+  it('fornitore non in anagrafica senza candidati: esito di oggi (nessuno)', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: null, numero: 'OF-2' }), { fornitore_su_integra: [] });
+    expect(p.esito).toBe('nessuno');
+    expect(p.fornitore_da_integra).toBeNull();
+  });
+
+  it('fornitore non in anagrafica con più righe: mai una scelta a caso', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: null, numero: 'OF-3' }), { fornitore_su_integra: [integraFornitore(1, 'Alfa SRL'), integraFornitore(2, 'Beta SRL')] });
+    expect(p.esito).not.toBe('fornitore_da_integra');
+    expect(p.fornitore_da_integra).toBeNull();
+  });
+
+  it('cliente non riconosciuto con coppia nello storico (subagente): cliente_da_integra con sconto', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-4', codice_cliente: 'ZZZ-9', cliente: 'Sconosciuto SRL' }), { storico: [storico()] });
+    expect(p.esito).toBe('cliente_da_integra');
+    expect(p.cliente_da_integra).toMatchObject({ id_integra: null, ragione_sociale: 'Verde Vita snc', subagente: 'Mario Rossi', sconto: 5 });
+  });
+
+  it('cliente non riconosciuto con una sola riga in Integra: cliente_da_integra senza storico', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-5', codice_cliente: 'ZZZ-9', cliente: 'Sconosciuto SRL' }), { cliente_su_integra: [integraCliente()] });
+    expect(p.esito).toBe('cliente_da_integra');
+    expect(p.cliente_da_integra).toMatchObject({ id_integra: 2, ragione_sociale: 'Cliente Nuovo SRL', subagente: null, sconto: null });
+  });
+
+  it('manca_rappresentanza: coppia nello storico senza subagente e senza agenzia', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-6', codice_cliente: 'K-100', piva_cliente: 'IT00000000001', data: '2026-06-01' }), { storico: [storico({ subagente_nome: null, rappresentato: false })] });
+    expect(p.esito).toBe('manca_rappresentanza');
+    expect(p.agenzia_mancante).toMatchObject({ cliente_id: c1.id, fornitore_id: gasper.id });
+    expect(p.manca_rappresentanza).toMatchObject({ cliente: 'Verde Vita snc', fornitore: 'Gasper GmbH' });
+  });
+
+  it('senza contesto gli esiti di oggi non cambiano (manca_agenzia resta)', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-7', codice_cliente: 'K-100', piva_cliente: 'IT00000000001', data: '2026-06-01' }));
+    expect(p.esito).toBe('manca_agenzia');
+    expect(p.manca_rappresentanza).toBeNull();
+    expect(p.fornitore_da_integra).toBeNull();
+    expect(p.cliente_da_integra).toBeNull();
   });
 });

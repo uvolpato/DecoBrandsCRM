@@ -18,7 +18,10 @@ import { righePagina } from './impostazioni';
 import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
 import { netto, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
-import { type Controllo, lettoDaCampi, mancaAgenziaRighe, propostaDocumento, valutaLettura } from './proposta';
+import { cerca } from './anagrafica-integra';
+import { IntegraService } from './integra';
+import { cercaLegame } from './storico';
+import { type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, propostaDocumento, riconosciClienteDai, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -265,15 +268,114 @@ const controlliFalliti = (v: unknown): number => {
   return Array.isArray(f) ? f.length : 0;
 };
 
+/** Pool e schema del ponte di Integra (D-111): null se la sincronizzazione non è configurata. */
+type Ponte = NonNullable<Awaited<ReturnType<IntegraService['ponte']>>>;
+
+/** Una riga dello storico ridotta ai campi della proposta (D-112). `sconto` = `sconto_1` del vecchio CRM. */
+const rigaStorico = (r: { cliente_codice_fornitore: string | null; cliente_ragione_sociale: string | null; cliente_piva: string | null; subagente_nome: string | null; sconto_1: Prisma.Decimal }): RigaStorico => ({
+  cliente_codice_fornitore: r.cliente_codice_fornitore,
+  cliente_ragione_sociale: r.cliente_ragione_sociale,
+  cliente_piva: r.cliente_piva,
+  subagente_nome: r.subagente_nome,
+  sconto: Number(r.sconto_1),
+  rappresentato: !!r.subagente_nome, // D-112: falso = fornitore senza rappresentanza
+});
+
+/** Contesto della proposta (D-111/D-112): candidati di Integra e righe dello storico per un documento.
+ *  Il ponte si tocca solo se serve (fornitore o cliente non riconosciuti) e una ricerca per tipo; senza
+ *  ponte si prosegue senza candidati e l'esito resta quello di oggi. */
+async function contestoDocumento(db: DbLetto, ponte: Ponte | null, letto: Letto, fornitoreNome: string | null): Promise<ContestoProposta> {
+  const c: ContestoProposta = {};
+  if (letto.fornitore_id == null) {
+    // D-111: fornitore non riconosciuto → ricerca mirata sul nome letto
+    if (ponte && fornitoreNome) {
+      const r = await cerca(db as PrismaService, ponte.pool, ponte.schema, 'fornitore', fornitoreNome);
+      if (!('errore' in r)) c.fornitore_su_integra = r.righe;
+    }
+    return c;
+  }
+  // D-112: fornitore riconosciuto → storico della coppia (per codice del fornitore) e candidati cliente
+  const storico = await cercaLegame(db, { fornitoreId: letto.fornitore_id, codice: letto.codice_cliente ?? null });
+  c.storico = storico.map(rigaStorico);
+  if (ponte) {
+    const q = (letto.codice_cliente || letto.piva_cliente || letto.cliente || '').trim();
+    if (q) {
+      const r = await cerca(db as PrismaService, ponte.pool, ponte.schema, 'cliente', q);
+      if (!('errore' in r)) c.cliente_su_integra = r.righe;
+    }
+  }
+  return c;
+}
+
+/** D-111/D-112: per la lista, i documenti con fornitore o cliente da importare. Una ricerca di Integra
+ *  per chiave distinta e una query di storico, mai per riga (V12). `fornitore` = fornitore non in
+ *  anagrafica con una sola riga in Integra; `cliente` = fornitore riconosciuto e cliente non riconosciuto
+ *  con la coppia nello storico (con subagente) o una sola riga in Integra. */
+async function esitiImportazione(
+  db: PrismaService,
+  ponte: Ponte | null,
+  righe: { id: bigint; fornitore_id: bigint | null; fornitore_letto: string | null; codice_cliente: string | null; cliente: string | null; piva_cliente: string | null }[],
+): Promise<{ fornitore: Set<bigint>; cliente: Set<bigint> }> {
+  const fornitore = new Set<bigint>();
+  const cliente = new Set<bigint>();
+
+  if (ponte) {
+    // fornitore non riconosciuto → una ricerca per nome distinto (di norma una per pagina)
+    const senzaFornitore = righe.filter((r) => r.fornitore_id == null && r.fornitore_letto);
+    for (const nome of new Set(senzaFornitore.map((r) => r.fornitore_letto!))) {
+      const r = await cerca(db, ponte.pool, ponte.schema, 'fornitore', nome);
+      if (!('errore' in r) && r.righe.length === 1) {
+        for (const d of senzaFornitore) if (d.fornitore_letto === nome) fornitore.add(d.id);
+      }
+    }
+  }
+
+  const conFornitore = righe.filter((r) => r.fornitore_id != null);
+  if (!conFornitore.length) return { fornitore, cliente };
+  const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
+  const fornitori = [...new Set(conFornitore.map((r) => r.fornitore_id!))];
+  const interscambi = await db.interscambio.findMany({
+    where: { fornitore_id: { in: fornitori } },
+    select: { cliente_id: true, fornitore_id: true, codice_cliente_fornitore: true },
+  });
+  // D-112: coppia con subagente nello storico → proposta di import (subagente + sconto)
+  const storici = await db.interscambio_storico.findMany({
+    where: { subagente_nome: { not: null } },
+    select: { fornitore_id: true, cliente_codice_fornitore: true },
+  });
+  const storicoCon = new Set(storici.filter((s) => s.fornitore_id != null).map((s) => `${s.fornitore_id}|${(s.cliente_codice_fornitore ?? '').toLowerCase()}`));
+  const daCercare = new Map<string, bigint[]>(); // q Integra → documenti con quella chiave
+  for (const r of conFornitore) {
+    const f = r.fornitore_id!;
+    const perCodice = r.codice_cliente
+      ? interscambi.some((a) => a.fornitore_id === f && (a.codice_cliente_fornitore ?? '').toLowerCase() === r.codice_cliente!.toLowerCase())
+      : false;
+    if (perCodice || riconosciClienteDai(clienti as Parameters<typeof riconosciClienteDai>[0], r.piva_cliente, r.cliente)) continue; // cliente riconosciuto
+    if (storicoCon.has(`${f}|${(r.codice_cliente ?? '').toLowerCase()}`)) { cliente.add(r.id); continue; }
+    const q = (r.codice_cliente || r.piva_cliente || r.cliente || '').trim();
+    if (q) daCercare.set(q, [...(daCercare.get(q) ?? []), r.id]);
+  }
+  if (ponte) {
+    for (const [q, ids] of daCercare) {
+      const r = await cerca(db, ponte.pool, ponte.schema, 'cliente', q);
+      if (!('errore' in r) && r.righe.length === 1) for (const id of ids) cliente.add(id);
+    }
+  }
+  return { fornitore, cliente };
+}
+
 /** Dettaglio per la pagina (§7.9): testata e righe dai valori finali, campi grezzi per i bordi
  *  di affidabilità, proposta ricalcolata. Una sola lettura dei campi per proposta e testata. */
-async function dettaglioDocumento(db: DbLetto, id: bigint) {
+async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null = null) {
   const d = await db.documenti_in_arrivo.findUnique({
     where: { id }, include: { fornitore: true, campi: { orderBy: { id: 'asc' } } },
   });
   if (!d) throw new NotFoundException('Documento non trovato');
   const letto = await lettoDaCampi(db, id);
-  const p = await propostaDocumento(db, letto);
+  // il nome letto del fornitore è un campo grezzo (§6.5): serve solo a cercare su Integra (D-111)
+  const campoFornitore = d.campi.find((c) => c.campo === 'fornitore');
+  const fornitoreNome = (campoFornitore?.valore_finale ?? campoFornitore?.valore_letto ?? null);
+  const p = await propostaDocumento(db, letto, await contestoDocumento(db, ponte, letto, fornitoreNome));
   // il cliente dell'abbinamento è un BigInt: nella risposta va come stringa (come gli altri id)
   const proposta = {
     ...p,
@@ -291,10 +393,14 @@ async function dettaglioDocumento(db: DbLetto, id: bigint) {
         })),
     }
     : null;
+  // D-113: un fornitore riconosciuto senza scaglioni → la card lo dice (non blocca il giro)
+  const scaglioni_mancanti = letto.fornitore_id != null
+    ? !(await db.provvigioni_scaglioni.findFirst({ where: { fornitore_id: letto.fornitore_id }, select: { id: true } }))
+    : false;
   return {
     id: String(d.id), file_nome: d.file_nome, file_tipo: fileTipo(d.file_percorso), stato: d.stato,
     tipo: d.tipo, livello: d.livello, ricevuto_il: d.ricevuto_il.toISOString(),
-    letto_il: d.letto_il?.toISOString() ?? null, errore: d.errore,
+    letto_il: d.letto_il?.toISOString() ?? null, errore: d.errore, scaglioni_mancanti,
     fornitore: letto.fornitore_id != null ? { id: String(letto.fornitore_id), nome: d.fornitore?.ragione_sociale ?? null } : null,
     campi: d.campi.map((c) => ({
       campo: c.campo, valore_letto: c.valore_letto, valore_finale: c.valore_finale,
@@ -364,7 +470,7 @@ const RIGA_CAMPI: Record<string, 'testo' | 'data' | 'numero'> = {
 
 @Controller('documenti')
 export class DocumentiController {
-  constructor(private readonly db: PrismaService) {}
+  constructor(private readonly db: PrismaService, private readonly integra: IntegraService) {}
 
   /** Elenco dei documenti in ingresso (F6-A4a, §7.9, §8.1): segmenti di stato con i conteggi degli
    *  altri filtri (D-23), ricerca e pagine sul server. Testata e righe stanno in `documenti_campi`
@@ -388,7 +494,8 @@ export class DocumentiController {
         MAX(CASE WHEN campo = 'codice_cliente' THEN COALESCE(valore_finale, valore_letto) END) AS codice_cliente,
         MAX(CASE WHEN campo = 'cliente' THEN COALESCE(valore_finale, valore_letto) END) AS cliente,
         MAX(CASE WHEN campo = 'importo_totale' THEN COALESCE(valore_finale, valore_letto) END) AS importo,
-        MAX(CASE WHEN campo = 'piva_cliente' THEN COALESCE(valore_finale, valore_letto) END) AS piva_cliente
+        MAX(CASE WHEN campo = 'piva_cliente' THEN COALESCE(valore_finale, valore_letto) END) AS piva_cliente,
+        MAX(CASE WHEN campo = 'fornitore' THEN COALESCE(valore_finale, valore_letto) END) AS fornitore_letto
       FROM documenti_campi GROUP BY documento_id
     )`;
     const altro = Prisma.sql`
@@ -399,12 +506,12 @@ export class DocumentiController {
     const righe = await this.db.$queryRaw<{
       id: bigint; file_nome: string; file_percorso: string; tipo: string | null; fornitore_id: bigint | null;
       fornitore: string | null; numero: string | null; data: string | null; codice_cliente: string | null;
-      cliente: string | null; piva_cliente: string | null; importo: string | null; livello: string | null; ricevuto_il: Date;
+      cliente: string | null; piva_cliente: string | null; fornitore_letto: string | null; importo: string | null; livello: string | null; ricevuto_il: Date;
       letto_il: Date | null; controlli: Prisma.JsonValue | null;
     }[]>`
       WITH ${campi}
       SELECT d.id, d.file_nome, d.file_percorso, d.tipo, d.fornitore_id, fv.ragione_sociale AS fornitore,
-             c.numero, c.data, c.codice_cliente, c.cliente, c.piva_cliente, c.importo, d.livello, d.ricevuto_il, d.letto_il, d.controlli
+             c.numero, c.data, c.codice_cliente, c.cliente, c.piva_cliente, c.fornitore_letto, c.importo, d.livello, d.ricevuto_il, d.letto_il, d.controlli
       FROM documenti_in_arrivo d
       LEFT JOIN campi c ON c.documento_id = d.id
       LEFT JOIN fornitori_versioni fv ON fv.fornitore_id = d.fornitore_id AND fv.id = d.fornitore_versione_id
@@ -423,6 +530,10 @@ export class DocumentiController {
     for (const c of conti) if (c.stato in conteggi) conteggi[c.stato as keyof typeof conteggi] = Number(c.n);
     // D-106: manca_agenzia con la stessa risoluzione della proposta, una query per pagina (V12)
     const manca = await mancaAgenziaRighe(this.db, righe);
+    // D-112: la coppia senza subagente nello storico → «Non rappresentato» invece di «Manca l'agenzia»
+    const nonRappresentata = await mancaRappresentanzaRighe(this.db, righe, manca);
+    // D-111: candidati di Integra per fornitore o cliente non riconosciuti, una ricerca per chiave per pagina
+    const importa = await esitiImportazione(this.db, await this.integra.ponte(), righe);
     return {
       documenti: righe.map((r) => ({
         id: String(r.id), file_nome: r.file_nome, file_tipo: fileTipo(r.file_percorso), tipo: r.tipo,
@@ -430,7 +541,11 @@ export class DocumentiController {
         fornitore: r.fornitore, codice_cliente: r.codice_cliente, cliente: r.cliente,
         importo: r.importo == null ? null : Number(r.importo), livello: r.livello,
         ricevuto_il: r.ricevuto_il.toISOString(), letto_il: r.letto_il?.toISOString() ?? null,
-        controlli_n: controlliFalliti(r.controlli), manca_agenzia: manca.has(r.id),
+        controlli_n: controlliFalliti(r.controlli),
+        manca_agenzia: manca.has(r.id) && !nonRappresentata.has(r.id),
+        manca_rappresentanza: nonRappresentata.has(r.id),
+        fornitore_da_integra: importa.fornitore.has(r.id),
+        cliente_da_integra: importa.cliente.has(r.id),
       })),
       conteggi, totale: conteggi[stato], pagina, per_pagina: perPagina,
     };
@@ -534,7 +649,7 @@ export class DocumentiController {
     if (!d) throw new NotFoundException('Documento non trovato');
     // uno scartato si apre solo con il permesso provvigioni.scartati, non con la sola consulta (§7.16)
     if (d.stato === 'scartato' && !permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('provvigioni.scartati')) throw new ForbiddenException();
-    return dettaglioDocumento(this.db, did);
+    return dettaglioDocumento(this.db, did, await this.integra.ponte());
   }
 
   /** Correzione dei dati letti (F6-A4a, §6.5 punto 7, D-72). Una transazione con la riga bloccata

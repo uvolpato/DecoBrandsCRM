@@ -87,10 +87,14 @@ interface Proposta {
   abbinamento: { cliente_id: string; cliente: string | null; codice: string | null } | null;
   cliente_riconosciuto: { cliente_id: string; ragione: string | null } | null;
   agenzia_mancante: { cliente_id: string; fornitore_id: string; cliente: string | null; fornitore: string | null; codice_cliente: string | null; data: string | null } | null;
+  fornitore_da_integra: { id_integra: number; ragione_sociale: string | null; piva: string | null } | null;
+  cliente_da_integra: { id_integra: number | null; ragione_sociale: string | null; piva: string | null; subagente: string | null; sconto: number | null } | null;
+  manca_rappresentanza: { cliente: string | null; fornitore: string | null; codice_cliente: string | null } | null;
 }
 interface Dettaglio {
   id: string; file_nome: string; file_tipo: 'pdf' | 'jpg' | 'png'; stato: string; tipo: string | null;
   livello: string | null; ricevuto_il: string; letto_il: string | null; errore: string | null;
+  scaglioni_mancanti: boolean;
   fornitore: { id: string; nome: string | null } | null;
   campi: Campo[]; testata: Testata; righe: Riga[]; controlli: Controllo[];
   proposta: Proposta; bollettino: { esiste: boolean } | null;
@@ -124,6 +128,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
   const router = useRouter();
   const puo = usePuo();
   const puoModifica = puo('provvigioni.modifica');
+  const puoImporta = puo('dati.importa');
   const [d, setD] = useState<Dettaglio | null>(null);
   const [errore, setErrore] = useState('');
   const [finestra, setFinestra] = useState<ReactNode>(null);
@@ -349,7 +354,39 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     );
   }
 
+  /** D-111: importa il fornitore da Integra e collega il documento al fornitore appena creato, così la
+   *  proposta si ricalcola e compare «Mancano gli scaglioni» (D-113). */
+  async function importaFornitore() {
+    const fd = doc.proposta.fornitore_da_integra;
+    if (!fd) return;
+    const r = await api<{ id: string }>('integra/importa', { tipo: 'fornitore', id_integra: fd.id_integra });
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    // il fornitore importato nasce senza scaglioni: si collega il documento al tipo letto
+    const t = doc.testata;
+    const link = t.tipo
+      ? await api('documenti/' + id, { testata: { tipo: t.tipo, fornitore_id: r.dati.id } }, 'PUT')
+      : null;
+    avviso('Fornitore importato da Integra');
+    if (link && !link.ok) avviso(link.messaggio, true);
+    await carica();
+    onFatto?.();
+  }
+
+  /** D-111: importa il cliente da Integra; dopo l'import la proposta riconosce il cliente e chiede l'agenzia. */
+  async function importaCliente() {
+    const cd = doc.proposta.cliente_da_integra;
+    if (!cd || cd.id_integra == null) return;
+    const r = await api<{ id: string }>('integra/importa', { tipo: 'cliente', id_integra: cd.id_integra });
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    avviso('Cliente importato da Integra');
+    await carica();
+    onFatto?.();
+  }
+
   function azione() {
+    const fd = doc.proposta.fornitore_da_integra;
+    const cd = doc.proposta.cliente_da_integra;
+    const nr = doc.proposta.manca_rappresentanza;
     return (
       <>
         {incerte.size > 0 && (
@@ -359,7 +396,36 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
             <button type="button" className="btn sec piccolo" onClick={() => setScheda('righe')}>Vedi le righe</button>
           </div>
         )}
-        {doc.proposta.esito === 'manca_agenzia' ? (
+        {doc.scaglioni_mancanti && doc.fornitore && !boll && !fd && ['ordine', 'conferma', 'fattura', 'nota_credito'].includes(t.tipo ?? '') && (
+          <Nota>Mancano gli scaglioni del fornitore: configurali nella <Link href={'/fornitori/' + doc.fornitore.id}>scheda del fornitore</Link> prima di aprire la pratica.</Nota>
+        )}
+        {fd ? (
+          <div className="pila">
+            <Nota>Il fornitore non è in anagrafica. In Integra c'è: <b>{fd.ragione_sociale ?? '—'}</b>{fd.piva ? `, P.IVA ${fd.piva}` : ''}.</Nota>
+            <div className="azioni-riga">
+              <button type="button" className="btn primario" disabled={!puoImporta} title={!puoImporta ? 'Serve il permesso di importare da Integra' : undefined} onClick={() => void importaFornitore()}>Importa da Integra</button>
+            </div>
+          </div>
+        ) : nr ? (
+          <div className="pila">
+            <Nota>Questo fornitore non è rappresentato per questo cliente: senza agenzia il documento non entra in una pratica.</Nota>
+            <div className="azioni-riga">
+              <button type="button" className="btn primario" onClick={configuraAgenzia}>Configura l’agenzia</button>
+            </div>
+          </div>
+        ) : cd ? (
+          <div className="pila">
+            <Nota>Il cliente <b>{cd.ragione_sociale ?? '—'}</b> non è in anagrafica.</Nota>
+            {cd.subagente != null || cd.sconto != null ? (
+              <div className="nota"><b>Dal vecchio CRM</b>: subagente {cd.subagente ?? '—'}{cd.sconto != null ? `, sconto ${cd.sconto}%` : ''}.</div>
+            ) : null}
+            <div className="azioni-riga">
+              {cd.id_integra != null
+                ? <button type="button" className="btn primario" disabled={!puoImporta} title={!puoImporta ? 'Serve il permesso di importare da Integra' : undefined} onClick={() => void importaCliente()}>Importa da Integra</button>
+                : <button type="button" className="btn primario" disabled title="L’import dal vecchio CRM arriva con l’anagrafica">Importa dal vecchio CRM</button>}
+            </div>
+          </div>
+        ) : doc.proposta.esito === 'manca_agenzia' ? (
           <div className="pila">
             <Nota>Il cliente non ha un’agenzia con questo fornitore: senza, il documento non entra in una pratica. È normale al primo ordine.</Nota>
             <div className="azioni-riga">
@@ -426,7 +492,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
             })} />
           </>
         )}
-        {!boll && doc.stato === 'da_controllare' && doc.proposta.esito !== 'manca_agenzia' && (
+        {!boll && doc.stato === 'da_controllare' && !['manca_agenzia', 'manca_rappresentanza', 'fornitore_da_integra', 'cliente_da_integra'].includes(doc.proposta.esito) && (
           <div className="abbina-altra">
             <span className="testo-tenue">Oppure abbina a un’altra pratica di {nomeFornitore}:</span>
             <CampoRicerca entita={PRATICA} contesto={{ fornitore_id: t.fornitore_id }} valore={altra} onChange={setAltra} />
@@ -467,7 +533,13 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
   const schede: Scheda[] = [
     {
       id: 'azioni',
-      etichetta: boll ? 'Cosa farne' : t.tipo === 'ordine' ? 'Nuova pratica' : doc.proposta.esito === 'nessuno' ? 'Scegli la pratica' : 'Pratica proposta',
+      etichetta: boll ? 'Cosa farne'
+        : doc.proposta.esito === 'fornitore_da_integra' ? 'Fornitore da importare'
+        : doc.proposta.esito === 'manca_rappresentanza' ? 'Configura l’agenzia'
+        : doc.proposta.esito === 'cliente_da_integra' ? 'Cliente da importare'
+        : t.tipo === 'ordine' ? 'Nuova pratica'
+        : doc.proposta.esito === 'nessuno' ? 'Scegli la pratica'
+        : 'Pratica proposta',
       contenuto: azione,
     },
     {

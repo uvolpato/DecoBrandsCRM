@@ -120,9 +120,18 @@ suo worktree; il gruppo dopo parte a unione avvenuta.
 | 10 · F8 Anagrafica | F1-A12 Storico dei legami (`interscambio_storico` 4022, `soggetti_storico` 3403, import, servizio di ricerca) | 1 | DeepSeek V4 Pro | [x] |
 | | F1-A11 Anagrafica su richiesta (`integra.ts` senza creazioni, `/api/integra/cerca` e `/importa`, permesso `dati.importa`) | 1 | DeepSeek V4 Pro | [x] |
 | | F1-A13 Scaglioni obbligatori e agenzia precompilata dallo storico, messaggi e pulsanti spenti | 2 | DeepSeek Flash | [ ] |
-| | F2-A6 Proposta del documento con *Importa da Integra* e guardia *non rappresentato* | 2 | DeepSeek V4 Pro | [ ] |
+| | F2-A6 Proposta del documento con *Importa da Integra* e guardia *non rappresentato* | 2 | DeepSeek V4 Pro | [x] |
 | | F1-A11b Pagine Clienti e Fornitori con *Cerca in Integra* | 2 | DeepSeek Flash | [ ] |
 | | F2-A7 Prove del percorso completo, schermate 1440/768, spec e guida allineate | 3 | DeepSeek Flash | [ ] |
+
+**F2-A6 fatta l'11/11/2026** (DeepSeek V4 Pro, OpenCode, controllata): `propostaDocumento` accetta
+un contesto (candidati di Integra e righe dello storico) e resta **pura**; esiti
+`fornitore_da_integra`, `cliente_da_integra`, `manca_rappresentanza`; la lista porta i tre campi con
+una ricerca per chiave distinta (non per riga); card con *Importa da Integra*, «Dal vecchio CRM:
+subagente e sconto», *Mancano gli scaglioni* e *Non rappresentato*. Corretto un difetto vero della
+pillola: lo storico ha `fornitore_id` NULL finché un soggetto non viene collegato, quindi il
+confronto ora è sul **nome normalizzato** del fornitore e non sull'id. Prove: proposta 50, documenti
+40; `tsc` pulito in backend e frontend.
 
 **F1-A11 fatta l'11/11/2026** (DeepSeek V4 Pro, OpenCode, controllata): la sincronizzazione non crea
 più clienti e fornitori (solo versioni e anomalie, con una prova che lo verifica); `GET

@@ -11,6 +11,8 @@ import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
+import { IntegraService } from '../src/integra';
+import * as anagraficaIntegra from '../src/anagrafica-integra';
 import * as registro from '../src/registro';
 import { seed } from '../prisma/seed';
 import { svuota } from './svuota';
@@ -465,5 +467,98 @@ describe('agenzia mancante: il documento non entra in pratica (D-106)', () => {
     const el = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
     const riga = el.documenti.find((x: any) => x.file_nome === 'ordine-senza-agenzia.pdf');
     expect(riga.manca_agenzia).toBe(false);
+  });
+});
+
+describe('proposta con import da Integra e storico (D-111/D-112)', () => {
+  const ESTRATTO = new Date('2026-11-08T00:00:00Z');
+  let fornitore: { id: bigint; versione_id: bigint; ragione: string };
+  let senza: { id: bigint; versione_id: bigint; ragione: string; piva: string | null };
+
+  beforeAll(async () => {
+    const fv = await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } });
+    const f = await db.fornitori.findUniqueOrThrow({ where: { id: fv.fornitore_id } });
+    fornitore = { id: fv.fornitore_id, versione_id: f.versione_corrente_id!, ragione: fv.ragione_sociale };
+    const c = await db.clienti.findFirstOrThrow({ where: { agenzie: { none: { fornitore_id: fornitore.id } } }, include: { corrente: true } });
+    senza = { id: c.id, versione_id: c.versione_corrente_id!, ragione: c.corrente!.ragione_sociale, piva: c.corrente!.piva };
+  });
+
+  async function creaArrivo(file_nome: string, over: { tipo?: string | null; fornitore_id?: bigint | null; campi?: [string, string | null][] } = {}) {
+    const d = await db.documenti_in_arrivo.create({
+      data: {
+        origine: 'email', file_nome, stato: 'da_controllare',
+        file_hash: createHash('sha256').update(file_nome).digest('hex'), file_percorso: `in_arrivo/${file_nome}`,
+        tipo: over.tipo ?? null, fornitore_id: over.fornitore_id ?? null, fornitore_versione_id: over.fornitore_id != null ? fornitore.versione_id : null,
+      },
+    });
+    if (over.campi?.length) {
+      await db.documenti_campi.createMany({ data: over.campi.map(([campo, valore]) => ({ documento_id: d.id, campo, valore_letto: valore })) });
+    }
+    return d;
+  }
+
+  it('la lista porta i tre campi e «Non rappresentato» per la coppia senza subagente nello storico', async () => {
+    await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7001n, fornitore_legacy_id: 7001n,
+      fornitore_id: fornitore.id, fornitore_ragione_sociale: fornitore.ragione,
+      cliente_codice_fornitore: 'NONRAPP-1', subagente_nome: null, sconto_1: 0, sconto_2: 0,
+    } });
+    const d = await creaArrivo('ordine-non-rappresentato.pdf', {
+      tipo: 'ordine', fornitore_id: fornitore.id,
+      campi: [['numero', 'NR-1'], ['data', '2026-09-01'], ['codice_cliente', 'NONRAPP-1'], ['cliente', senza.ragione], ['piva_cliente', senza.piva]],
+    });
+    const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    const riga = r.documenti.find((x: any) => x.id === String(d.id));
+    expect(riga.manca_rappresentanza).toBe(true);
+    expect(riga.manca_agenzia).toBe(false);
+    expect(r.documenti.every((x: any) => typeof x.fornitore_da_integra === 'boolean' && typeof x.cliente_da_integra === 'boolean')).toBe(true);
+  });
+
+  it('la lista segna cliente_da_integra per la coppia nello storico con subagente', async () => {
+    await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7002n, fornitore_legacy_id: 7002n,
+      fornitore_id: fornitore.id, cliente_codice_fornitore: 'CLI-NUOVO-1', subagente_nome: 'Mario Rossi', sconto_1: 5, sconto_2: 0,
+    } });
+    const d = await creaArrivo('ordine-cliente-nuovo.pdf', {
+      tipo: 'ordine', fornitore_id: fornitore.id,
+      campi: [['numero', 'CN-1'], ['data', '2026-09-01'], ['codice_cliente', 'CLI-NUOVO-1'], ['cliente', 'Sconosciuto SRL']],
+    });
+    const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    const riga = r.documenti.find((x: any) => x.id === String(d.id));
+    expect(riga.cliente_da_integra).toBe(true);
+  });
+
+  it('il dettaglio porta i candidati di Integra e scaglioni_mancanti', async () => {
+    const d = await creaArrivo('fornitore-sconosciuto.pdf', { tipo: 'ordine', campi: [['numero', 'FS-1'], ['fornitore', 'Nuovo Fornitore SRL']] });
+    const spiaPonte = jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue({ pool: {} as never, schema: 'public' });
+    const spiaCerca = jest.spyOn(anagraficaIntegra, 'cerca').mockResolvedValue({ righe: [{ id_integra: 99, codice: 'NF', ragione_sociale: 'Nuovo Fornitore SRL', piva: '12345678901', attivo: true }], ms: 1 });
+    try {
+      const r = (await op.get(`/documenti/${d.id}`).expect(200)).body;
+      expect(r.proposta.esito).toBe('fornitore_da_integra');
+      expect(r.proposta.fornitore_da_integra).toMatchObject({ id_integra: 99, ragione_sociale: 'Nuovo Fornitore SRL', piva: '12345678901' });
+      expect(r.proposta.manca_rappresentanza).toBeNull();
+      expect(r.proposta.cliente_da_integra).toBeNull();
+      expect(typeof r.scaglioni_mancanti).toBe('boolean');
+    } finally {
+      spiaPonte.mockRestore();
+      spiaCerca.mockRestore();
+    }
+  });
+
+  it('un fornitore sconosciuto non fa una query di Integra per riga', async () => {
+    for (let i = 0; i < 10; i++) {
+      await creaArrivo(`sconosciuto-${i}.pdf`, { tipo: 'fattura', campi: [['numero', `S-${i}`], ['fornitore', 'Fornitore Sconosciuto SRL']] });
+    }
+    const spiaPonte = jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue({ pool: {} as never, schema: 'public' });
+    const spiaCerca = jest.spyOn(anagraficaIntegra, 'cerca').mockResolvedValue({ righe: [], ms: 1 });
+    try {
+      await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200);
+      // 10 documenti con lo stesso nome → una sola ricerca per quel nome, non una per riga
+      const perNome = spiaCerca.mock.calls.filter((c) => c[3] === 'fornitore' && c[4] === 'Fornitore Sconosciuto SRL');
+      expect(perNome).toHaveLength(1);
+    } finally {
+      spiaPonte.mockRestore();
+      spiaCerca.mockRestore();
+    }
   });
 });
