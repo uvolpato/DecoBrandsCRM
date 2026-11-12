@@ -29,7 +29,7 @@ CREATE SCHEMA IF NOT EXISTS integra;
 
 -- 5. Importa le sole tabelle usate (stessa lista di Luis, schema B2B §1)
 --    Se lo schema remoto non è "public", cambiarlo qui sotto.
---    `agenti` serve per i subagenti: gli agenti di Integra NON hanno righe in `cliazi` (D-106).
+--    `agenti` serve per i subagenti: gli agenti di Integra NON hanno righe in `cliazi` (D-109).
 IMPORT FOREIGN SCHEMA public
   LIMIT TO (clienti, cliazi, agenti, destinazioni, prodotti, classivoci, entleg,
             listest, listini, movtest, movrig, maginv, maginvt,

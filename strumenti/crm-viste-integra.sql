@@ -5,7 +5,7 @@
 -- scrivono mai sul server di Integra. Eseguire come superuser (postgres).
 --
 -- Sorgenti: integra.clienti (master anagrafica) JOIN integra.cliazi (ruolo C/F);
---           integra.agenti JOIN integra.clienti (ruolo agente, D-106).
+--           integra.agenti JOIN integra.clienti (ruolo agente, D-109).
 --  - id_integra  = clienti.cli_cdcli      (id anagrafica, stabile e unico per ruolo in azi 001)
 --  - codice      = cliazi.cla_codstr      (codice cliente / fornitore mostrato, es. "03208")
 --  - codice_master = clienti.cli_cdclistr (codice del master, es. "00002": è la CHIAVE dei
@@ -92,7 +92,7 @@ WHERE c.cli_cdcli > 0;
 -- ----------------------------------------------------------------------------
 -- Agenti / subagenti (tabella `agenti`, NON cliazi)
 -- Per Decobrands l'agente principale è Decobrands stessa: le righe dell'azienda
--- 001 sono i SUBAGENTI del CRM (D-106). L'agente non ha righe in `cliazi`:
+-- 001 sono i SUBAGENTI del CRM (D-109). L'agente non ha righe in `cliazi`:
 -- l'identità sta nel master `clienti` (age_clicdcli).
 -- ----------------------------------------------------------------------------
 DROP VIEW IF EXISTS public.integra_v_agenti;

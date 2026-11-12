@@ -496,7 +496,7 @@ Restano aperte:
 3. **I 1410 contatti con P.IVA assente da Integra**: clienti veri da creare, archivio storico o
    rubrica contatti? Serve la spunta di Matteo (`decisione` in `piva_non_in_integra.csv`).
 4. **I 1252 senza P.IVA**: si importano per codice fiscale o si lasciano fuori?
-5. **Mappatura agenti — chiarita, restano tre punti (D-106).** Gli agenti di Integra **non**
+5. **Mappatura agenti — chiarita, restano tre punti (D-109).** Gli agenti di Integra **non**
    stanno in `cliazi`: stanno nella tabella `agenti`, uno per azienda, con l'identità nel master
    `clienti` (`age_clicdcli`). `cliazi.cla_tipo = 'A'` **non** è agente: sono articoli (791 righe,
    `cla_codstr` = `prodotti.pro_cod`). L'azienda `001` ha 21 agenti (18 attivi, 16 usati dai

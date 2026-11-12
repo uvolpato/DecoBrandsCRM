@@ -1,8 +1,8 @@
 -- ============================================================================
--- ⚠ SUPERATO (D-101, D-106): questo file è la proposta iniziale per il ponte e
+-- ⚠ SUPERATO (D-101, D-109): questo file è la proposta iniziale per il ponte e
 -- NON va applicato. Lo schema `crm_viste` non esiste (D-101: le viste stanno in
 -- `public`), la chiave `codice` è `cliazi.cla_codstr` e non `cli_cdclistr`, e gli
--- agenti/subagenti si leggono da `agenti` (D-106), non da `cliazi`.
+-- agenti/subagenti si leggono da `agenti` (D-109), non da `cliazi`.
 -- Il setup vero è in `strumenti/integra-fdw.sql` e `strumenti/crm-viste-integra.sql`.
 -- ============================================================================
 -- ============================================================================
