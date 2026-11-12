@@ -348,9 +348,16 @@ export async function sincronizzaGiro(db: PrismaService, ponte: Pool, ora = new 
   return conteggi;
 }
 
-/** Pool del ponte in sola lettura: anche per errore il CRM non scrive su Integra. */
+/** Pool del ponte in sola lettura: anche per errore il CRM non scrive su Integra. I tempi massimi
+ *  (R1-02) fermano la connessione e la query: un ponte appeso non tiene occupate le due connessioni. */
 export function creaPonte(url: string): Pool {
-  return new Pool({ connectionString: url, max: 2, options: '-c default_transaction_read_only=on' });
+  return new Pool({
+    connectionString: url,
+    max: 2,
+    connectionTimeoutMillis: 3000, // la connessione che non arriva non resta appesa
+    query_timeout: 5000, // la query appesa si annulla sul client
+    options: '-c default_transaction_read_only=on -c statement_timeout=5000', // e sul server
+  });
 }
 
 /** Un pool solo, ricreato quando la configurazione cambia: le prove importano il file senza `PONTE_URL`. */

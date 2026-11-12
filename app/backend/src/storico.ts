@@ -5,6 +5,7 @@ import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Richiede } from './accesso';
 import { PrismaService } from './prisma.service';
 import { normalizzaNome } from './proposta';
+import { normalizzaPiva } from './soggetti';
 
 // Storico dei legami del vecchio CRM (F1-A12, D-112, §4.7.2-4.7.4).
 // Due tabelle di sola lettura per l'app: propongono subagente e sconto, non creano niente.
@@ -12,12 +13,9 @@ import { normalizzaNome } from './proposta';
 
 type Db = Prisma.TransactionClient | PrismaClient;
 
-// P.IVA e CF normalizzati come nel master `soggetti` (§1.6, D-112): IT + 11 cifre → 11 cifre,
-// maiuscolo senza spazi né punti. Copia di soggetti.ts/integra.ts (non esportate da lì).
-export const normalizzaPiva = (v: string) => {
-  const s = (v || '').replace(/[\s.]/g, '').toUpperCase();
-  return /^IT\d{11}$/.test(s) ? s.slice(2) : s;
-};
+// La normalizzazione della P.IVA è una sola, quella del master `soggetti` (§1.6, D-112): IT + 11
+// cifre → 11 cifre. Resta esportata da qui per chi già la importava da storico.ts.
+export { normalizzaPiva };
 export const normalizzaCF = (v: string) => (v || '').replace(/\s/g, '').toUpperCase();
 
 export interface CercaLegame {
@@ -105,24 +103,38 @@ export class StoricoController {
       clienteId: q.cliente_id != null ? BigInt(q.cliente_id) : null,
       codice: q.codice ?? null,
     });
-    return righe.map((r) => ({
-      id: String(r.id),
-      cliente_legacy_id: String(r.cliente_legacy_id),
-      fornitore_legacy_id: String(r.fornitore_legacy_id),
-      cliente_codice_fornitore: r.cliente_codice_fornitore,
-      cliente_ragione_sociale: r.cliente_ragione_sociale,
-      cliente_piva: r.cliente_piva,
-      fornitore_ragione_sociale: r.fornitore_ragione_sociale,
-      fornitore_piva: r.fornitore_piva,
-      agente_nome: r.agente_nome,
-      subagente_nome: r.subagente_nome,
-      sconto_1: Number(r.sconto_1),
-      sconto_2: Number(r.sconto_2),
-      stato: r.stato,
-      cliente_id: r.cliente_id ? String(r.cliente_id) : null,
-      fornitore_id: r.fornitore_id ? String(r.fornitore_id) : null,
-      subagente_id: r.subagente_id ? String(r.subagente_id) : null,
-      rappresentato: !!r.subagente_nome, // D-112: falso = fornitore senza rappresentanza
-    }));
+    // D-134: il subagente lo risolve il server dal nome del vecchio CRM («nome cognome» o «cognome
+    // nome»), solo se la corrispondenza è una sola. Il browser non abbina nomi (V12).
+    const subs = righe.some((r) => !r.subagente_id && r.subagente_nome)
+      ? await this.db.subagenti.findMany({ select: { id: true, nome: true, cognome: true } })
+      : [];
+    const perNome = (nome: string | null) => {
+      const n = normalizzaNome(nome ?? '');
+      if (!n) return null;
+      const uguali = subs.filter((s) => normalizzaNome(`${s.nome} ${s.cognome}`) === n || normalizzaNome(`${s.cognome} ${s.nome}`) === n);
+      return uguali.length === 1 ? uguali[0].id : null; // omonimi o assente: resta da scegliere
+    };
+    return righe.map((r) => {
+      const subagenteId = r.subagente_id ?? perNome(r.subagente_nome);
+      return {
+        id: String(r.id),
+        cliente_legacy_id: String(r.cliente_legacy_id),
+        fornitore_legacy_id: String(r.fornitore_legacy_id),
+        cliente_codice_fornitore: r.cliente_codice_fornitore,
+        cliente_ragione_sociale: r.cliente_ragione_sociale,
+        cliente_piva: r.cliente_piva,
+        fornitore_ragione_sociale: r.fornitore_ragione_sociale,
+        fornitore_piva: r.fornitore_piva,
+        agente_nome: r.agente_nome,
+        subagente_nome: r.subagente_nome,
+        sconto_1: Number(r.sconto_1),
+        sconto_2: Number(r.sconto_2),
+        stato: r.stato,
+        cliente_id: r.cliente_id ? String(r.cliente_id) : null,
+        fornitore_id: r.fornitore_id ? String(r.fornitore_id) : null,
+        subagente_id: subagenteId === null ? null : String(subagenteId),
+        rappresentato: !!r.subagente_nome, // D-112: falso = fornitore senza rappresentanza
+      };
+    });
   }
 }

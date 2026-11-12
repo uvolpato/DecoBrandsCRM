@@ -515,9 +515,11 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
   });
 
   it('la lista segna cliente_da_integra per la coppia nello storico con subagente', async () => {
+    // R1-06: lo storico importato ha `fornitore_id` NULL: conta il nome normalizzato del fornitore
     await db.interscambio_storico.create({ data: {
       fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7002n, fornitore_legacy_id: 7002n,
-      fornitore_id: fornitore.id, cliente_codice_fornitore: 'CLI-NUOVO-1', subagente_nome: 'Mario Rossi', sconto_1: 5, sconto_2: 0,
+      fornitore_ragione_sociale: fornitore.ragione,
+      cliente_codice_fornitore: 'CLI-NUOVO-1', subagente_nome: 'Mario Rossi', sconto_1: 5, sconto_2: 0,
     } });
     const d = await creaArrivo('ordine-cliente-nuovo.pdf', {
       tipo: 'ordine', fornitore_id: fornitore.id,
@@ -560,5 +562,60 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
       spiaPonte.mockRestore();
       spiaCerca.mockRestore();
     }
+  });
+
+  it('ponte lento: una sola ricerca di Integra per pagina, non una per nome (R1-02)', async () => {
+    await creaArrivo('lento-1.pdf', { tipo: 'fattura', campi: [['fornitore', 'Lento Uno SRL']] });
+    await creaArrivo('lento-2.pdf', { tipo: 'fattura', campi: [['fornitore', 'Lento Due SRL']] });
+    const spiaPonte = jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue({ pool: {} as never, schema: 'public' });
+    const spiaCerca = jest.spyOn(anagraficaIntegra, 'cerca').mockResolvedValue({ errore: 'ponte lento', ms: 3000 });
+    try {
+      await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200);
+      expect(spiaCerca).toHaveBeenCalledTimes(1);
+    } finally {
+      spiaPonte.mockRestore();
+      spiaCerca.mockRestore();
+    }
+  });
+
+  it('la pagina legge i clienti una volta sola (R1-11)', async () => {
+    const spia = jest.spyOn(db.clienti, 'findMany');
+    try {
+      await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200);
+      expect(spia).toHaveBeenCalledTimes(1);
+    } finally {
+      spia.mockRestore();
+    }
+  });
+
+  it('scaglioni_mancanti guarda la data del documento, non un valido_dal qualsiasi (R1-12)', async () => {
+    const f = await db.fornitori.create({ data: {} });
+    const v = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'Fornitore Dal 2027' } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: v.id } });
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id: f.id, sconto_min: 0, pct_agente: 5, pct_subagente: 2, valido_dal: new Date('2027-01-01') } });
+    const d = await db.documenti_in_arrivo.create({ data: {
+      origine: 'email', file_nome: 'scaglione-futuro.pdf', stato: 'da_controllare',
+      file_hash: createHash('sha256').update('scaglione-futuro').digest('hex'), file_percorso: 'in_arrivo/scaglione-futuro.pdf',
+      tipo: 'ordine', fornitore_id: f.id, fornitore_versione_id: v.id,
+    } });
+    await db.documenti_campi.createMany({ data: [{ documento_id: d.id, campo: 'data', valore_letto: '2026-11-05' }] });
+    expect((await op.get(`/documenti/${d.id}`).expect(200)).body.scaglioni_mancanti).toBe(true);
+    // uno scaglione valido prima della data del documento: la card tace
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id: f.id, sconto_min: 0, pct_agente: 5, pct_subagente: 2, valido_dal: new Date('2026-01-01') } });
+    expect((await op.get(`/documenti/${d.id}`).expect(200)).body.scaglioni_mancanti).toBe(false);
+  });
+
+  it('PUT della sola testata (import del fornitore): le righe lette restano uguali (D-133)', async () => {
+    const d = await creaArrivo('righe-salve.pdf', { tipo: 'fattura', campi: [['numero', 'RS-1'], ['data', '2026-09-01']] });
+    await db.documenti_campi.createMany({ data: [
+      { documento_id: d.id, campo: 'righe[0].codice', valore_letto: 'A-1', affidabilita: 0.95 },
+      { documento_id: d.id, campo: 'righe[0].importo', valore_letto: '10' },
+      { documento_id: d.id, campo: 'righe[1].codice', valore_letto: 'A-2', affidabilita: 0.42 },
+    ] });
+    const righe = { where: { documento_id: d.id, campo: { startsWith: 'righe[' } }, orderBy: { id: 'asc' as const } };
+    const prima = await db.documenti_campi.findMany(righe);
+    await op.put(`/documenti/${d.id}`, { testata: { tipo: 'fattura', fornitore_id: Number(fornitore.id) } }).expect(200);
+    const dopo = await db.documenti_campi.findMany(righe);
+    expect(dopo).toEqual(prima);
   });
 });

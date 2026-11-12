@@ -1,7 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { CampoProps } from '@/componenti/Campo';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
@@ -82,6 +82,7 @@ interface Fatturazione {
 }
 interface Dettaglio extends Soggetto {
   sorgente: string;
+  da_integra: boolean; // D-138: il master arriva da Integra e qui è in sola lettura
   sedi: Sede[];
   recapiti: Recapito[];
   contatti: Contatto[];
@@ -118,12 +119,14 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
   const [dati, setDati] = useState<Elenco | null>(null);
   const [det, setDet] = useState<Dettaglio | null>(null);
   const [detCaricando, setDetCaricando] = useState(false);
+  const [erroreDet, setErroreDet] = useState('');
   const [errore, setErrore] = useState('');
   const [caricando, setCaricando] = useState(true);
   const [versione, setVersione] = useState(0);
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const primaVolta = useRef(true);
   const sagome = useSagome(caricando);
+  const sagomaDet = useSagome(detCaricando && !det); // D-59: niente sagoma sotto i 150 ms, e non dopo un salvataggio
 
   const ricarica = () => setVersione((v) => v + 1);
 
@@ -145,13 +148,22 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
   }, [valori, ordine, pagina, versione, perPagina]);
 
   const id = idSel ?? sel ?? dati?.righe[0]?.id;
-  const caricaDettaglio = useCallback(async (x: string) => {
-    setDet(null); setDetCaricando(true);
-    const r = await api<Dettaglio>('soggetti/' + x);
-    setDetCaricando(false);
-    if (r.ok) setDet(r.dati); else avviso(r.messaggio, true);
-  }, []);
-  useEffect(() => { if (id) void caricaDettaglio(id); }, [id, versione, caricaDettaglio]);
+  useEffect(() => {
+    if (!id) return;
+    let vivo = true;
+    setDetCaricando(true);
+    setErroreDet('');
+    setDet((d) => (d?.id === id ? d : null)); // R2-03: dopo un salvataggio il pannello non si svuota
+    void api<Dettaglio>('soggetti/' + id).then((r) => {
+      if (!vivo) return; // R2-02: vince l'ultimo clic, non l'ultima risposta
+      setDetCaricando(false);
+      if (r.ok) { setDet(r.dati); return; }
+      setErroreDet(r.messaggio); // R2-04: soggetto non caricato, non «nessun soggetto»
+      if (r.stato === 404 && id === sel) setSel(undefined); // l'id ricordato non esiste più
+    });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sel si legge solo per il 404
+  }, [id, versione]);
 
   const chiudi = () => setFinestra(null);
   const chiedi = (titolo: string, testo: ReactNode, etichetta: string, pericolo = false) =>
@@ -210,12 +222,12 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
         campi={[
           { nome: 'tipo', etichetta: 'Ruolo', tipo: 'select', valore: 'cliente', opzioni: [{ value: 'cliente', label: 'Cliente' }, { value: 'fornitore', label: 'Fornitore' }] },
           { nome: 'nome', etichetta: 'Ragione sociale', valore: '', largo: true, aiuto: 'Va nella versione del ruolo, come in Integra.' },
-          { nome: 'codice', etichetta: 'Codice Integra', valore: '', aiuto: 'Lo scrive chi carica l’export; vuoto finché Integra non lo assegna. (D-102)' },
           { nome: 'citta', etichetta: 'Città (ruoli azienda)', valore: '' },
         ]}
         onChiudi={chiudi}
         onConferma={async (v) => {
-          const r = await api<Ruolo>('soggetti/' + s.id + '/ruoli', { tipo: v.tipo, ragione_sociale: v.nome, codice_integra: v.codice || null, citta: v.citta || null });
+          // D-138: senza codice Integra; il legame nasce da Cerca in Integra → Importa
+          const r = await api<Ruolo>('soggetti/' + s.id + '/ruoli', { tipo: v.tipo, ragione_sociale: v.nome, citta: v.citta || null });
           if (!r.ok) return r.messaggio;
           avviso('Ruolo aggiunto');
           ricarica();
@@ -384,7 +396,7 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
             ] as Colonna<Ruolo>[]}
             onRowClick={(r) => router.push(apriRuolo(r))} emptyText="Nessun ruolo" emptyHint="Un soggetto può essere cliente e fornitore insieme: due codici diversi (D-101)." />
         </div>
-        <Nota>Il ruolo si chiude nella sua pagina (attivo = false): i documenti restano appesi. Il codice di Integra lo assegna a chi carica l’export. Un clic sulla riga apre la pagina del ruolo.</Nota>
+        <Nota>Il ruolo si chiude nella sua pagina (attivo = false): i documenti restano appesi. Il codice di Integra arriva dall’import, non si scrive a mano. Un clic sulla riga apre la pagina del ruolo.</Nota>
       </div>
     );
   }
@@ -459,7 +471,8 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
     );
   }
 
-  const azioni: Azione[] = !det || !puoModificare ? [] : [
+  // D-138: il master di un soggetto da Integra non si modifica qui (il server risponde comunque 409)
+  const azioni: Azione[] = !det || !puoModificare || det.da_integra ? [] : [
     { etichetta: 'Modifica identità', onClick: () => formSoggetto(det) },
     det.attivo ? { etichetta: 'Disattiva', variante: 'pericolo', onClick: () => void disattiva(det) } : { etichetta: 'Riattiva', onClick: () => void attiva(det, true) },
   ];
@@ -506,6 +519,7 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
               { etichetta: 'Sorgente', valore: SORGENTE[det.sorgente as string] ?? String(det.sorgente ?? '—') },
               { etichetta: 'Stato', valore: det.attivo ? <Stato v="ok">Attivo</Stato> : <Stato v="neutro">Non attivo: i documenti restano appesi ai loro ruoli</Stato> },
             ]} />
+            {det.da_integra && <Nota>Da Integra: i dati del soggetto si correggono in Integra. Qui restano in sola lettura; ruoli e agenzie si gestiscono come sempre.</Nota>}
             {det.note && <Nota>{det.note}</Nota>}
             <div style={{ height: 8, flex: 'none' }} />
             <Schede riempi memoria="soggetti" schede={[
@@ -515,7 +529,9 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
               { id: 'fatturazione', etichetta: 'Fatturazione', conta: f?.attiva ? 1 : 0, contaVariante: f?.attiva ? 'ok' : 'neutro', contenuto: tabFatturazione },
             ]} />
           </>
-        ) : detCaricando || caricando ? <SagomaCorpo /> : (
+        ) : erroreDet ? (
+          <div className="vuoto"><b>Soggetto non caricato</b>{erroreDet} <button type="button" className="btn sec piccolo" onClick={ricarica}>Riprova</button></div>
+        ) : sagomaDet ? <SagomaCorpo /> : (
           <Nota>Nessun soggetto: cambia la ricerca o il segmento, oppure crea il primo con «Nuovo soggetto».</Nota>
         )}
       </Pannello>

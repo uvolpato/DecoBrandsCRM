@@ -11,7 +11,7 @@ import { PrismaService } from '../src/prisma.service';
 import { svuota } from './svuota';
 import { seed } from '../prisma/seed';
 import { importaStorico } from '../prisma/import-storico';
-import { cercaLegame, segnaUsata } from '../src/storico';
+import { cercaLegame, normalizzaPiva, segnaUsata } from '../src/storico';
 
 @Module({ imports: [AppModule] })
 class ProvaModule {}
@@ -88,6 +88,27 @@ describe('import storico', () => {
       cliente_id: 999999n, fornitore_id: 999999n, subagente_id: 999999n, interscambio_id: 999999n,
     } });
     expect(creata.id).toBeTruthy();
+  });
+
+  it('--sostituisci svuota e reimporta dentro la transazione (in prova, rollback)', async () => {
+    const prima = await db.interscambio_storico.count();
+    const r = await importaStorico(db, { sostituisci: true, prova: true });
+    expect(r.inseriti_legami).toBe(4022);
+    expect(await db.interscambio_storico.count()).toBe(prima);
+  });
+
+  it('--sostituisci con una riga già usata: rifiutato, tabelle intatte (R1-10)', async () => {
+    const riga = await db.interscambio_storico.findFirstOrThrow({ where: { stato: 'da_usare' } });
+    await db.interscambio_storico.update({ where: { id: riga.id }, data: { stato: 'usata', usato_il: new Date() } });
+    const prima = await db.interscambio_storico.count();
+    await expect(importaStorico(db, { sostituisci: true })).rejects.toThrow(/già usate/);
+    expect(await db.interscambio_storico.count()).toBe(prima);
+    await db.interscambio_storico.update({ where: { id: riga.id }, data: { stato: 'da_usare', usato_il: null } });
+  });
+
+  it('P.IVA normalizzata come in soggetti.ts: il prefisso IT non conta (R1-09)', () => {
+    expect(normalizzaPiva('IT 012 345 678 90')).toBe('01234567890');
+    expect(normalizzaPiva('01234567890')).toBe('01234567890');
   });
 });
 
@@ -167,5 +188,25 @@ describe('rotta /api/interscambio/storico', () => {
     expect(r.body).toHaveLength(1);
     expect(r.body[0].rappresentato).toBe(false);
     expect(r.body[0].subagente_nome).toBeNull();
+  });
+
+  it('D-134: subagente_id dal nome se è uno solo; omonimi o assente → null', async () => {
+    const f = await db.fornitori.create({ data: {} });
+    const fv = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'Fornitore Nomi' } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: fv.id } });
+    const base = await db.subagenti.findFirstOrThrow();
+    const unico = await db.subagenti.create({ data: { agente_id: base.agente_id, codice: 'PROVA-UNICO', nome: 'Provaunico', cognome: 'Cognomeunico' } });
+    await db.subagenti.create({ data: { agente_id: base.agente_id, codice: 'PROVA-OM-1', nome: 'Omonimo', cognome: 'Prova' } });
+    await db.subagenti.create({ data: { agente_id: base.agente_id, codice: 'PROVA-OM-2', nome: 'Omonimo', cognome: 'Prova' } });
+    await db.interscambio_storico.createMany({ data: [
+      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7001n, fornitore_legacy_id: 7001n, fornitore_ragione_sociale: 'Fornitore Nomi', cliente_codice_fornitore: 'NOM-1', subagente_nome: 'Provaunico Cognomeunico' },
+      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7002n, fornitore_legacy_id: 7002n, fornitore_ragione_sociale: 'Fornitore Nomi', cliente_codice_fornitore: 'NOM-2', subagente_nome: 'Omonimo Prova' },
+      { fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7003n, fornitore_legacy_id: 7003n, fornitore_ragione_sociale: 'Fornitore Nomi', cliente_codice_fornitore: 'NOM-3', subagente_nome: 'Nessuno In Anagrafica' },
+    ] });
+    const a = await entra('lett');
+    const riga = async (codice: string) => (await a.get(`/interscambio/storico?fornitore_id=${f.id}&codice=${codice}`).expect(200)).body[0];
+    expect((await riga('NOM-1')).subagente_id).toBe(String(unico.id));
+    expect((await riga('NOM-2')).subagente_id).toBeNull();
+    expect((await riga('NOM-3')).subagente_id).toBeNull();
   });
 });

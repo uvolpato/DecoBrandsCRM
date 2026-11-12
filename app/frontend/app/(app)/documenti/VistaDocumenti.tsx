@@ -153,9 +153,10 @@ export function VistaDocumenti() {
                   titolo: (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : ''),
                   valore: d.importo == null ? '' : euro(d.importo),
                   sotto: (d.fornitore ?? 'fornitore non riconosciuto') + ' · caricato il ' + quando(d.ricevuto_il),
-                  stato: l || d.manca_agenzia || d.manca_rappresentanza || d.fornitore_da_integra ? <>
+                  stato: l || d.manca_agenzia || d.manca_rappresentanza || d.fornitore_da_integra || d.cliente_da_integra ? <>
                     {l ? <Stato v={l.v}>{l.testo}</Stato> : null}
-                    {d.fornitore_da_integra ? <Stato v="info">In Integra</Stato> : null}
+                    {d.fornitore_da_integra ? <Stato v="info">Fornitore in Integra</Stato> : null}
+                    {d.cliente_da_integra ? <Stato v="info">Cliente in Integra</Stato> : null}
                     {d.manca_rappresentanza ? <Stato v="attesa">Non rappresentato</Stato> : null}
                     {d.manca_agenzia ? <Stato v="attesa">Manca l’agenzia</Stato> : null}
                   </> : undefined,

@@ -19,7 +19,7 @@ interface Riga {
 }
 export interface CercaInIntegraProps {
   tipo: 'cliente' | 'fornitore';
-  onImportato: () => void | Promise<void>; // ricarica la lista dopo l'import
+  onImportato: (id: string) => void | Promise<void>; // ricarica la lista e apre la scheda (D-135)
 }
 
 export function CercaInIntegra({ tipo, onImportato }: CercaInIntegraProps) {
@@ -54,12 +54,12 @@ export function CercaInIntegra({ tipo, onImportato }: CercaInIntegraProps) {
 
   async function importa(x: Riga) {
     setImportando(x.id_integra); setMessaggio(''); setErrore(false);
-    const r = await api<{ gia_presente?: boolean; ragione_sociale?: string }>('integra/importa', { tipo, id_integra: x.id_integra });
+    const r = await api<{ gia_presente?: boolean; ragione_sociale?: string; id: string }>('integra/importa', { tipo, id_integra: x.id_integra });
     setImportando(0);
     if (!r.ok) { setMessaggio(r.messaggio); setErrore(true); return; }
     setAperta(false);
     avviso(r.dati.gia_presente ? 'Era già in anagrafica' : 'Importato da Integra: ' + (x.ragione_sociale || x.codice));
-    await onImportato();
+    await onImportato(r.dati.id); // D-135: si apre la scheda del nuovo soggetto
   }
 
   return (
@@ -88,6 +88,7 @@ export function CercaInIntegra({ tipo, onImportato }: CercaInIntegraProps) {
                 testo: <><b>{x.ragione_sociale || '—'}</b><span className="sec-riga">{[x.codice, x.piva, x.attivo ? '' : 'non attivo'].filter(Boolean).join(' · ')}</span></>,
                 destra: (
                   <button type="button" className="btn sec piccolo" disabled={!!importando}
+                    aria-label={'Importa ' + (x.ragione_sociale || x.codice)}
                     onClick={() => void importa(x)}>{importando === x.id_integra ? 'Importo…' : 'Importa'}</button>
                 ),
               }))} />

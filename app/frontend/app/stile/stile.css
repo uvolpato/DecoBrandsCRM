@@ -186,6 +186,12 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 .soggetti-filtri .filtri .cerca { flex: 1 1 320px; max-width: 480px; }
 .soggetti-filtri .filtri .segmenti { margin-left: auto; }
 .soggetti-filtri .filtri { margin-bottom: 14px; }
+/* Clienti: ricerca e segmenti sulla stessa riga anche nella colonna stretta */
+.clienti-filtri .filtri { flex-wrap: nowrap; gap: 10px; }
+.clienti-filtri .filtri .cerca { flex: 1 1 140px; min-width: 120px; }
+.clienti-filtri .filtri .segmenti { margin-left: auto; }
+.clienti-filtri .segmenti button { padding: 5px 6px; }
+.clienti-filtri .segmenti { gap: 1px; }
 .filtro-select { padding: 7px 10px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: var(--superficie); }
 .filtro-select:focus, .filtro-select:focus-visible { outline: 0; border-color: var(--primario); box-shadow: inset 0 0 0 1px var(--primario); }
 

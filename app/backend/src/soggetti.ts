@@ -182,7 +182,7 @@ class DatiFatturazione {
 class NuovoRuolo {
   @IsIn(['cliente', 'fornitore'], { message: 'Il ruolo si crea cliente o fornitore: il subagente nasce dalla sua pagina' }) tipo!: 'cliente' | 'fornitore';
   @IsString() @Matches(/\S/, { message: 'Scrivi la ragione sociale' }) @MaxLength(255) ragione_sociale!: string;
-  @IsOptional() @IsString() @MaxLength(50) codice_integra?: string | null;
+  // D-138: il codice di Integra non si scrive a mano; il legame nasce da POST /integra/importa
   @IsOptional() @IsString() @MaxLength(100) citta?: string | null;
 }
 
@@ -318,6 +318,53 @@ async function ruoliAttivi(db: Db, id: bigint) {
   return ruoli.filter((r) => r.attivo);
 }
 
+/** D-138: il master di un soggetto con almeno un ruolo da Integra si corregge in Integra, non qui. */
+async function daIntegra(db: Db, id: bigint, ruoli?: Ruolo[]) {
+  const suoi = ruoli ?? (await ruoliDi(db, [id])).get(String(id)) ?? [];
+  if (suoi.some((r) => r.codice)) return true;
+  const [clienti, fornitori] = await Promise.all([
+    db.clienti.count({ where: { soggetto_id: id, corrente: { fonte: 'integra' } } }),
+    db.fornitori.count({ where: { soggetto_id: id, corrente: { fonte: 'integra' } } }),
+  ]);
+  return clienti + fornitori > 0;
+}
+
+/**
+ * R0-D6 (D-138, D-46): la P.IVA nuova apre una versione nuova di ogni ruolo del soggetto, con gli
+ * altri campi uguali; la vecchia resta nella storia e il ruolo punta alla nuova. Nella stessa
+ * transazione della modifica del master (V13).
+ */
+async function allineaPivaRuoli(tx: Prisma.TransactionClient, soggetto_id: bigint, piva: string | null, req: Request) {
+  const ora = new Date();
+  const creato_da = req.utente?.id ?? null;
+  for (const c of await tx.clienti.findMany({ where: { soggetto_id }, include: { corrente: true } })) {
+    const v = c.corrente;
+    if (!v || v.piva === piva) continue;
+    const nuova = await tx.clienti_versioni.create({ data: {
+      cliente_id: c.id, fonte: v.fonte, valido_dal: ora, creato_da, piva,
+      ragione_sociale: v.ragione_sociale, indirizzo: v.indirizzo, cap: v.cap, citta: v.citta, provincia: v.provincia, email: v.email,
+    } });
+    await tx.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: nuova.id } });
+    await logEvent(tx, {
+      tipo: 'crud', azione: 'update', entita: 'cliente', entita_id: c.id, esito: 'successo',
+      dettaglio: { etichetta: v.ragione_sociale, prima: { piva: v.piva }, dopo: { piva }, versione_id: String(nuova.id) },
+    }, contesto(req));
+  }
+  for (const f of await tx.fornitori.findMany({ where: { soggetto_id }, include: { corrente: true } })) {
+    const v = f.corrente;
+    if (!v || v.piva === piva) continue;
+    const nuova = await tx.fornitori_versioni.create({ data: {
+      fornitore_id: f.id, fonte: v.fonte, valido_dal: ora, creato_da, piva,
+      ragione_sociale: v.ragione_sociale, paese: v.paese,
+    } });
+    await tx.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: nuova.id } });
+    await logEvent(tx, {
+      tipo: 'crud', azione: 'update', entita: 'fornitore', entita_id: f.id, esito: 'successo',
+      dettaglio: { etichetta: v.ragione_sociale, prima: { piva: v.piva }, dopo: { piva }, versione_id: String(nuova.id) },
+    }, contesto(req));
+  }
+}
+
 // Errori del database come risposte: doppione 409, violazione di un CHECK 400 (V12)
 async function unico<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -422,6 +469,7 @@ export class SoggettiController {
       ...mappaIdentita(s),
       nome: nomeDi(ruoli),
       ruoli,
+      da_integra: await daIntegra(this.db, s.id, ruoli), // D-138: il frontend nasconde le modifiche del master
       sedi: sedi.map(mappaSede),
       recapiti: recapiti.map(mappaRecapito),
       contatti: contatti.map((c) => ({
@@ -453,6 +501,8 @@ export class SoggettiController {
     return unico(() => this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM soggetti WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
       const prima = await soggettoEsiste(tx, BigInt(id));
+      // D-138: ciò che arriva da Integra non si tocca nel CRM
+      if (await daIntegra(tx, prima.id)) throw new ConflictException('Dati di Integra: si correggono in Integra');
       const d = datiFiscali(
         b.piva !== undefined ? b.piva : prima.piva,
         b.codice_fiscale !== undefined ? b.codice_fiscale : prima.codice_fiscale,
@@ -479,6 +529,7 @@ export class SoggettiController {
           dopo: Object.fromEntries(cambi.map((c) => [c.campo, c.valore_dopo])),
         },
       }, contesto(req));
+      if (prima.piva_norm !== d.piva_norm) await allineaPivaRuoli(tx, prima.id, d.piva_norm || null, req); // R0-D6
       return mappaIdentita(aggiornato);
     }));
   }
@@ -490,6 +541,8 @@ export class SoggettiController {
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM soggetti WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
       const s = await soggettoEsiste(tx, BigInt(id));
+      // D-138: anche attiva e disattiva, su un soggetto da Integra, si fanno in Integra
+      if (await daIntegra(tx, s.id)) throw new ConflictException('Dati di Integra: si correggono in Integra');
       if (s.attivo === b.attivo) return mappaIdentita(s);
       if (!b.attivo) {
         const attivi = await ruoliAttivi(tx, s.id);
@@ -728,7 +781,6 @@ export class SoggettiController {
     return unico(() => this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM soggetti WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
       const s = await soggettoEsiste(tx, BigInt(id));
-      const codice = b.codice_integra ? testo(b.codice_integra).toUpperCase() : null;
       const nome = testo(b.ragione_sociale);
       const citta = b.citta ? testo(b.citta) : null;
       const dal = soloData(oggi());
@@ -742,12 +794,11 @@ export class SoggettiController {
         const ruolo = await tx.clienti.create({ data: { attivo: true, soggetto_id: s.id } });
         const versione = await tx.clienti_versioni.create({ data: { cliente_id: ruolo.id, fonte: 'crm', valido_dal: dal, piva, ragione_sociale: nome, citta } });
         await tx.clienti.update({ where: { id: ruolo.id }, data: { versione_corrente_id: versione.id } });
-        if (codice) await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'cliente', codice, entita_id: ruolo.id } });
         await logEvent(tx, {
           tipo: 'crud', azione: 'create', entita: 'cliente', entita_id: ruolo.id, esito: 'successo',
           dettaglio: { etichetta: nome, soggetto_id: String(s.id) },
         }, contesto(req));
-        return { tipo: 'cliente', id: String(ruolo.id), nome, codice: codice ?? '', attivo: true } satisfies Ruolo;
+        return { tipo: 'cliente', id: String(ruolo.id), nome, codice: '', attivo: true } satisfies Ruolo;
       }
 
       if (await tx.fornitori.findFirst({ where: { soggetto_id: s.id } })) throw new ConflictException('Il soggetto ha già il ruolo fornitore');
@@ -757,12 +808,11 @@ export class SoggettiController {
       const ruolo = await tx.fornitori.create({ data: { soggetto_id: s.id } });
       const versione = await tx.fornitori_versioni.create({ data: { fornitore_id: ruolo.id, fonte: 'crm', valido_dal: dal, piva, ragione_sociale: nome } });
       await tx.fornitori.update({ where: { id: ruolo.id }, data: { versione_corrente_id: versione.id } });
-      if (codice) await tx.codici_esterni.create({ data: { sistema: 'integra', tipo: 'fornitore', codice, entita_id: ruolo.id } });
       await logEvent(tx, {
         tipo: 'crud', azione: 'create', entita: 'fornitore', entita_id: ruolo.id, esito: 'successo',
         dettaglio: { etichetta: nome, soggetto_id: String(s.id) },
       }, contesto(req));
-      return { tipo: 'fornitore', id: String(ruolo.id), nome, codice: codice ?? '', attivo: true } satisfies Ruolo;
+      return { tipo: 'fornitore', id: String(ruolo.id), nome, codice: '', attivo: true } satisfies Ruolo;
     }));
   }
 }

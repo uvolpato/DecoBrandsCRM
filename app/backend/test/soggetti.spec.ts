@@ -206,13 +206,24 @@ describe('api soggetti', () => {
     expect(await db.modifiche.count({ where: { entita: 'soggetto', entita_id: BigInt(nuovo) } })).toBe(prima + 2);
   });
 
-  it('disattivazione bloccata con ruoli attivi, permessa senza', async () => {
+  it('disattivazione: 409 da Integra (D-138), permessa senza ruoli', async () => {
     const a = await entra('oper');
     const r = await a.post(`/soggetti/${mcl}/attivo`, { attivo: false }).expect(409);
-    expect(r.body.message).toContain('cliente');
+    expect(r.body.message).toContain('Integra');
     const off = await a.post(`/soggetti/${nuovo}/attivo`, { attivo: false }).expect(200);
     expect(off.body.attivo).toBe(false);
     await a.post(`/soggetti/${nuovo}/attivo`, { attivo: true }).expect(200);
+  });
+
+  it('D-138: il master di un soggetto da Integra è in sola lettura', async () => {
+    const a = await entra('oper');
+    const prima = await db.soggetti.findUniqueOrThrow({ where: { id: BigInt(mcl) } });
+    const versioni = await db.clienti_versioni.count({ where: { cliente: { soggetto_id: BigInt(mcl) } } });
+    const r = await a.put('/soggetti/' + mcl, { piva: 'IT00011122233' }).expect(409);
+    expect(r.body.message).toBe('Dati di Integra: si correggono in Integra');
+    await a.put('/soggetti/' + mcl, { note: 'nota nuova' }).expect(409); // 409 anche senza cambi
+    expect(await db.soggetti.findUniqueOrThrow({ where: { id: BigInt(mcl) } })).toEqual(prima);
+    expect(await db.clienti_versioni.count({ where: { cliente: { soggetto_id: BigInt(mcl) } } })).toBe(versioni);
   });
 
   it('sedi: la predefinita si sposta nella stessa transazione', async () => {
@@ -252,19 +263,52 @@ describe('api soggetti', () => {
     expect(estero.body.id_codice_estero).toBe('DE123456789');
   });
 
-  it('ruoli: cliente e fornitore sullo stesso soggetto, versione crm e codice esterno', async () => {
+  it('ruoli: il codice di Integra a mano è 400 (D-138)', async () => {
     const a = await entra('oper');
-    const c = await a.post(`/soggetti/${nuovo}/ruoli`, { tipo: 'cliente', ragione_sociale: 'Nuovo Cliente SRL', codice_integra: 'c99999' }).expect(201);
-    expect(c.body).toMatchObject({ tipo: 'cliente', codice: 'C99999', attivo: true });
+    await a.post(`/soggetti/${nuovo}/ruoli`, { tipo: 'cliente', ragione_sociale: 'Codice a mano', codice_integra: 'C99999' }).expect(400);
+    expect(await db.codici_esterni.count({ where: { codice: 'C99999' } })).toBe(0);
+  });
+
+  it('ruoli: cliente e fornitore sullo stesso soggetto, versione crm', async () => {
+    const a = await entra('oper');
+    const c = await a.post(`/soggetti/${nuovo}/ruoli`, { tipo: 'cliente', ragione_sociale: 'Nuovo Cliente SRL' }).expect(201);
+    expect(c.body).toMatchObject({ tipo: 'cliente', codice: '', attivo: true });
     const cliente = await db.clienti.findFirstOrThrow({ where: { soggetto_id: BigInt(nuovo) }, include: { corrente: true } });
     expect(cliente.corrente?.fonte).toBe('crm');
     expect(cliente.corrente!.valido_dal.toISOString().slice(0, 10)).toBe(new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(new Date())); // la data di Roma, non UTC (a cavallo della mezzanotte differiscono)
-    expect(await db.codici_esterni.count({ where: { tipo: 'cliente', codice: 'C99999', entita_id: cliente.id } })).toBe(1);
+    expect(await db.codici_esterni.count({ where: { tipo: 'cliente', entita_id: cliente.id } })).toBe(0);
     await a.post(`/soggetti/${nuovo}/ruoli`, { tipo: 'cliente', ragione_sociale: 'Doppione' }).expect(409);
     await a.post(`/soggetti/${nuovo}/ruoli`, { tipo: 'fornitore', ragione_sociale: 'Nuovo Cliente SRL' }).expect(201);
     await a.post(`/soggetti/${mcl}/ruoli`, { tipo: 'cliente', ragione_sociale: 'MCL SRL' }).expect(409);
     const dettaglio = await a.get('/soggetti/' + nuovo).expect(200);
     expect((dettaglio.body.ruoli as { tipo: string }[]).map((r) => r.tipo).sort()).toEqual(['cliente', 'fornitore']);
+  });
+
+  it('R0-D6: cambiare la P.IVA di un soggetto solo CRM apre una versione nuova dei ruoli (D-46)', async () => {
+    const a = await entra('oper');
+    const cliente = await db.clienti.findFirstOrThrow({ where: { soggetto_id: BigInt(nuovo) }, include: { corrente: true } });
+    const fornitore = await db.fornitori.findFirstOrThrow({ where: { soggetto_id: BigInt(nuovo) }, include: { corrente: true } });
+    const conta = async () => [
+      await db.clienti_versioni.count({ where: { cliente_id: cliente.id } }),
+      await db.fornitori_versioni.count({ where: { fornitore_id: fornitore.id } }),
+    ];
+    const prima = await conta();
+    await a.put('/soggetti/' + nuovo, { piva: 'IT01234567890' }).expect(200); // stessa P.IVA: nessuna versione
+    expect(await conta()).toEqual(prima);
+    const r = await a.put('/soggetti/' + nuovo, { piva: 'IT01234567891' }).expect(200);
+    expect(r.body).toMatchObject({ piva: 'IT01234567891', piva_norm: '01234567891' });
+    expect(await conta()).toEqual([prima[0] + 1, prima[1] + 1]);
+    const c2 = await db.clienti.findUniqueOrThrow({ where: { id: cliente.id }, include: { corrente: true } });
+    expect(c2.corrente).toMatchObject({ piva: '01234567891', ragione_sociale: 'Nuovo Cliente SRL', fonte: 'crm' });
+    const f2 = await db.fornitori.findUniqueOrThrow({ where: { id: fornitore.id }, include: { corrente: true } });
+    expect(f2.corrente).toMatchObject({ piva: '01234567891', ragione_sociale: 'Nuovo Cliente SRL', fonte: 'crm' });
+    expect(await db.clienti_versioni.count({ where: { cliente_id: cliente.id, id: cliente.versione_corrente_id! } })).toBe(1); // la vecchia resta
+    const off = await a.post(`/soggetti/${nuovo}/attivo`, { attivo: false }).expect(409);
+    expect(off.body.message).toContain('cliente'); // ruoli attivi (D-102)
+    const dup = await a.put('/soggetti/' + nuovo, { piva: 'IT08943010155' }).expect(409); // errore a metà: nulla cambia (V13)
+    expect(dup.body.message).toContain('MCL SRL');
+    expect(await conta()).toEqual([prima[0] + 1, prima[1] + 1]);
+    expect((await db.soggetti.findUniqueOrThrow({ where: { id: BigInt(nuovo) } })).piva_norm).toBe('01234567891');
   });
 
   it('non regressione: lo strato 0 si legge come prima e i ruoli hanno soggetto_id e codice', async () => {

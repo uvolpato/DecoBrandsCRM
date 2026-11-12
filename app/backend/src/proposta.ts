@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { letturaConfig } from './impostazioni';
 import { fiscale, iso } from './motore/dati';
+import { normalizzaPiva as pivaNormalizzata } from './soggetti';
 
 // F6-A3 (§6.5 punti 5–6, D-71): livello del documento, controlli fissi e proposta di abbinamento.
 // Funzioni senza rotte: le userà F6-A4 per la schermata Documenti e `lettura.ts` per il salvataggio.
@@ -239,10 +240,11 @@ async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | nul
 }
 
 /* ---------- Cliente per P.IVA o ragione sociale (D-92) ---------- */
-/** P.IVA normalizzata: solo cifre e lettere, maiuscole (spazi e prefissi ignorati). */
-export const normalizzaPiva = (s: string) => (s || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+/** P.IVA normalizzata: solo lettere e cifre, maiuscole; il prefisso `IT` cade come nell'import da Integra
+ *  (R1-09: una sola normalizzazione, quella di `soggetti.ts`). */
+export const normalizzaPiva = (s: string) => pivaNormalizzata((s || '').replace(/[^0-9A-Za-z]/g, ''));
 
-type ClienteConCorrente = { id: bigint; corrente: { piva: string | null; ragione_sociale: string } | null };
+export type ClienteConCorrente = { id: bigint; corrente: { piva: string | null; ragione_sociale: string } | null };
 
 /** Risolve il cliente per P.IVA o ragione sociale (D-92): vince la P.IVA (univoca), poi la ragione
  *  sociale normalizzata accettata solo con un solo candidato. I clienti si passano già caricati, così
@@ -312,12 +314,12 @@ export interface RigaAgenzia {
 }
 
 /** Dice quali righe dell'elenco hanno `manca_agenzia`, con la stessa risoluzione della proposta.
- *  Una query di clienti e una di interscambio per pagina, niente query per riga (D-106, V12). */
-export async function mancaAgenziaRighe(db: Db, righe: RigaAgenzia[]): Promise<Set<bigint>> {
+ *  Clienti e interscambio si leggono una volta per pagina, niente query per riga (D-106, V12); i clienti
+ *  arrivano da `elenco`, che li legge una volta sola per le tre funzioni (R1-11). */
+export async function mancaAgenziaRighe(db: Db, righe: RigaAgenzia[], clienti: ClienteConCorrente[]): Promise<Set<bigint>> {
   const manca = new Set<bigint>();
   const rilevanti = righe.filter((r) => ENTRA_IN_PRATICA.has(r.tipo ?? '') && r.fornitore_id != null);
   if (!rilevanti.length) return manca;
-  const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
   const fornitori = [...new Set(rilevanti.map((r) => r.fornitore_id!))];
   const interscambi = await db.interscambio.findMany({
     where: { fornitore_id: { in: fornitori } },
@@ -350,10 +352,14 @@ export async function mancaRappresentanzaRighe(db: Db, righe: RigaAgenzia[], sen
   const out = new Set<bigint>();
   const rilevanti = righe.filter((r) => senzaAgenzia.has(r.id) && r.fornitore);
   if (!rilevanti.length) return out;
-  const storici = await db.interscambio_storico.findMany({
-    where: { subagente_nome: null },
-    select: { fornitore_ragione_sociale: true, cliente_codice_fornitore: true },
-  });
+  // R1-11: solo i codici della pagina, non tutto lo storico (l'indice su cliente_codice_fornitore c'è)
+  const codici = [...new Set(rilevanti.map((r) => r.codice_cliente).filter((c): c is string => !!c))];
+  const storici = codici.length
+    ? await db.interscambio_storico.findMany({
+        where: { subagente_nome: null, cliente_codice_fornitore: { in: codici, mode: 'insensitive' } },
+        select: { fornitore_ragione_sociale: true, cliente_codice_fornitore: true },
+      })
+    : [];
   const chiave = (f: string | null, codice: string | null) => `${normalizzaNome(f ?? '')}|${(codice ?? '').toLowerCase()}`;
   const senza = new Set(storici.map((s) => chiave(s.fornitore_ragione_sociale, s.cliente_codice_fornitore)));
   for (const r of rilevanti) {

@@ -6,6 +6,7 @@ import type { CampoProps } from './Campo';
 import { FormModal } from './FormModal';
 import { Modale } from './Modale';
 import { avviso } from './Piccoli';
+import { SagomaCorpo, useSagome } from './Sagoma';
 import { usePuo } from './Utente';
 
 // Finestra dell'agenzia (interscambio) condivisa fra Clienti e Documenti (F2-A5, D-106): nuovo o
@@ -29,7 +30,8 @@ export interface Agenzia {
 
 interface Fornitore { id: string; ragione_sociale: string | null; }
 interface Subagente { id: string; codice: string; nome: string; cognome: string; }
-interface Scaglione { sconto_min: number; valido_dal: string; }
+/** Sconti degli scaglioni in vigore, calcolati dal server (R2-06, V12). */
+interface ScontiFornitore { fornitore_id: string; sconti: number[]; }
 /** Riga dello storico dei legami (D-112): propone subagente, codice e sconto del vecchio CRM. */
 interface RigaStorico {
   id: string;
@@ -41,24 +43,6 @@ interface RigaStorico {
 }
 
 const NOTA_RESP = 'Li cambia un responsabile.'; // D-50 §19
-
-/** Sconti degli scaglioni in vigore (ultima data non futura), per l'aiuto della finestra (§7.6). */
-function scontiInVigore(sc: Scaglione[], oggi: string) {
-  const dal = sc.map((x) => x.valido_dal).filter((d) => d <= oggi).sort().pop();
-  return [...new Set(sc.filter((x) => x.valido_dal === dal).map((x) => x.sconto_min))].sort((a, b) => a - b);
-}
-
-const normalizza = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-
-/** Subagente dell'anagrafica con lo stesso nome del vecchio CRM, che scriveva «nome cognome» (D-112). */
-function trovaSubagente(subagenti: Subagente[], nome: string | null) {
-  const n = normalizza(nome ?? '');
-  if (!n) return undefined;
-  return subagenti.find((s) => normalizza(s.nome + ' ' + s.cognome) === n || normalizza(s.cognome + ' ' + s.nome) === n);
-}
-
-// gli scaglioni dei fornitori si tengono in memoria fra un'apertura e l'altra (costa una lettura)
-const scaglioni = new Map<string, Scaglione[]>();
 
 export interface FormAgenziaProps {
   cliente: { id: string; nome: string | null };
@@ -74,6 +58,7 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
   const [fornitori, setFornitori] = useState<Fornitore[] | null>(null);
   const [subagenti, setSubagenti] = useState<Subagente[] | null>(null);
   const [aiutoSconto, setAiutoSconto] = useState<string | undefined>(undefined);
+  const [errore, setErrore] = useState('');
   const oggi = new Date().toISOString().slice(0, 10);
 
   // D-112: dal documento (fornitore fisso + codice letto) si legge lo storico una volta, all'apertura
@@ -100,23 +85,25 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
   useEffect(() => {
     let vivo = true;
     void (async () => {
-      const [f, s] = await Promise.all([api<Fornitore[]>('fornitori'), api<Subagente[]>('subagenti')]);
+      // V12: fornitori, subagenti e sconti in vigore si rileggono dal server a ogni apertura
+      const [f, s, sc] = await Promise.all([
+        api<Fornitore[]>('fornitori'),
+        api<Subagente[]>('subagenti'),
+        api<ScontiFornitore[]>('fornitori/sconti-in-vigore'),
+      ]);
       if (!vivo) return;
-      const forn = f.ok ? f.dati : [];
-      setFornitori(forn);
-      setSubagenti(s.ok ? s.dati : []);
-      const primo = fornitoreFisso?.id ?? agenzia?.fornitore_id ?? forn[0]?.id;
-      await Promise.all(forn.filter((x) => !scaglioni.has(x.id)).map(async (x) => {
-        const d = await api<{ scaglioni: Scaglione[] }>('fornitori/' + x.id);
-        if (d.ok) scaglioni.set(x.id, d.dati.scaglioni);
-      }));
-      const voci = [...forn].sort((a, b) => (a.id === primo ? -1 : b.id === primo ? 1 : 0))
-        .filter((x) => scaglioni.get(x.id)?.length)
-        .map((x) => (x.ragione_sociale ?? x.id) + ': ' + scontiInVigore(scaglioni.get(x.id)!, oggi).join(' · '));
+      if (!f.ok || !s.ok || !sc.ok) { setErrore(f.messaggio || s.messaggio || sc.messaggio); return; }
+      setFornitori(f.dati);
+      setSubagenti(s.dati);
+      const primo = fornitoreFisso?.id ?? agenzia?.fornitore_id;
+      const scontiPer = new Map(sc.dati.map((x) => [x.fornitore_id, x.sconti]));
+      const voci = [...f.dati].sort((a, b) => (a.id === primo ? -1 : b.id === primo ? 1 : 0))
+        .filter((x) => scontiPer.get(x.id)?.length)
+        .map((x) => (x.ragione_sociale ?? x.id) + ': ' + scontiPer.get(x.id)!.join(' · '));
       if (voci.length) setAiutoSconto('Scaglioni in vigore, sconti in %. ' + voci.join(' — '));
     })();
     return () => { vivo = false; };
-  }, [agenzia, fornitoreFisso, oggi]);
+  }, [agenzia, fornitoreFisso]);
 
   const campi: CampoProps[] | null = useMemo(() => {
     if (!fornitori || !subagenti) return null;
@@ -125,12 +112,12 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
     const campoFornitore: CampoProps = fornitoreFisso
       ? { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'testo', valore: fornitoreFisso.nome, disabilitato: true }
       : { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: fornitore, valore: agenzia?.fornitore_id ?? fornitori[0]?.id ?? '' };
-    // D-112: si precompila solo dalla riga con subagente; resta tutto modificabile
+    // D-112, D-134: si precompila solo dalla riga con subagente che il server ha risolto; se resta
+    // vuoto lo sceglie l'operatore (mai il primo dell'elenco)
     const pro = legame?.rappresentato ? legame : null;
-    const subPro = pro ? trovaSubagente(subagenti, pro.subagente_nome) ?? (pro.subagente_id ? { id: pro.subagente_id } : undefined) : undefined;
     return conResp([
       campoFornitore,
-      { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: agenzia?.subagente_id ?? subPro?.id ?? subagenti[0]?.id ?? '' },
+      { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: agenzia?.subagente_id ?? pro?.subagente_id ?? '' },
       { nome: 'codice_cliente_fornitore', etichetta: 'Codice cliente presso il fornitore', tipo: 'testo', valore: agenzia?.codice_cliente_fornitore ?? iniziali?.codice_cliente_fornitore ?? pro?.cliente_codice_fornitore ?? '' },
       { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: agenzia ? String(agenzia.sconto) : pro ? String(pro.sconto_1) : '0', aiuto: aiutoSconto },
       { nome: 'pct_subagente', etichetta: 'Al subagente per questo cliente % (vuoto = scaglione)', tipo: 'testo', valore: agenzia ? (agenzia.pct_subagente === null ? '' : String(agenzia.pct_subagente)) : '' },
@@ -146,10 +133,16 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
       : 'Questo fornitore non era rappresentato per questo cliente'
     : undefined;
 
-  if (!campi || !legameLetto) return <Modale titolo={agenzia ? 'Modifica agenzia' : 'Nuova agenzia'} testo="Caricamento…" onChiudi={onChiudi} />;
+  const titolo = agenzia ? 'Modifica agenzia' : 'Nuova agenzia per ' + (cliente.nome ?? '');
+  // D-59: sagome nel corpo, non «Caricamento…»; sotto i 150 ms la finestra mostra solo il titolo
+  const sagome = useSagome(!fornitori || !subagenti || !legameLetto);
+
+  // R2-13: se una lettura fallisce il form non si apre vuoto: si mostra il messaggio del server
+  if (errore) return <Modale titolo={titolo} testo={errore} onChiudi={onChiudi} />;
+  if (!campi || !legameLetto) return <Modale titolo={titolo} onChiudi={onChiudi}>{sagome && <SagomaCorpo />}</Modale>;
 
   return (
-    <FormModal titolo={agenzia ? 'Modifica agenzia' : 'Nuova agenzia per ' + (cliente.nome ?? '')} conferma={agenzia ? 'Salva' : 'Crea'} colonne={2}
+    <FormModal titolo={titolo} conferma={agenzia ? 'Salva' : 'Crea'} colonne={2}
       campi={campi} testo={testoStorico} onChiudi={onChiudi}
       onConferma={async (v) => {
         const corpo: Record<string, unknown> = {

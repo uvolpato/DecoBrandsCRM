@@ -304,6 +304,29 @@ describe('correzioni dopo la revisione (D-60)', () => {
     expect(nuova.agente_id).not.toBeNull();
   });
 
+  it("l'agenzia chiusa dopo l'ordine non ferma i documenti della pratica già aperta (D-137)", async () => {
+    // agenzia 01/01→30/06, ordine del 10/05: una fattura di luglio entra nella pratica e la provvigione resta
+    const agente = await db.agenti.create({ data: { codice: 'AG-D137', nome: 'Agente', cognome: 'Prova' } });
+    const sub = await db.subagenti.create({ data: { agente_id: agente.id, codice: 'SUB-D137', nome: 'Sub', cognome: 'Prova' } });
+    const f = await db.fornitori.create({ data: {} });
+    const fv = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'Fornitore D137' } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: fv.id } });
+    const c = await db.clienti.create({ data: {} });
+    const cv = await db.clienti_versioni.create({ data: { cliente_id: c.id, fonte: 'integra', ragione_sociale: 'Cliente D137' } });
+    await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: cv.id } });
+    await db.interscambio.create({ data: { subagente_id: sub.id, cliente_id: c.id, fornitore_id: f.id, sconto: 5, valido_dal: new Date('2026-01-01'), valido_al: new Date('2026-06-30') } });
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id: f.id, sconto_min: 0, pct_agente: 5, pct_subagente: 2, valido_dal: new Date('2026-01-01') } });
+    const t = await db.ordini_fornitore_testata.create({ data: {
+      fornitore_id: f.id, fornitore_versione_id: fv.id, cliente_id: c.id, cliente_versione_id: cv.id,
+      numero_ordine: 'OF/2026/997', data_ordine: new Date('2026-05-10'), agente_id: agente.id,
+    } });
+    await op.post(`/pratiche/${t.id}/documenti`, { tipo: 'fattura', numero: 'D137-1', data: '2026-07-15', importo: 100 }).expect(201);
+    // un ordine alla stessa data apre una pratica nuova: lì l'agenzia alla data dell'ordine serve
+    const a = (await op.carica(pdf('ordine d137'), 'ordine-d137.pdf').expect(201)).body;
+    const r = await op.post(`/documenti/${a.id}/abbina`, { tipo: 'ordine', numero: 'D137-ORD', data: '2026-07-15', cliente_id: Number(c.id), fornitore_id: Number(f.id) }).expect(409);
+    expect(r.body.message).toMatch(/agenzia/);
+  });
+
   it('pratica nuova solo se il fornitore ha uno scaglione per lo sconto dell agenzia (D-87)', async () => {
     // fornitore senza scaglioni: l'agenzia c'è ma la provvigione sarebbe 0% → il documento non apre la pratica
     const f = await db.fornitori.create({ data: {} });

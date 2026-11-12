@@ -258,11 +258,11 @@ describe('agenzia dallo storico (D-112)', () => {
 
   it('la rotta che usa il form trova la riga della coppia, poi l’agenzia la segna usata', async () => {
     // gli id nello storico restano NULL finché non si collegano (dati veri, §4.7.2): la coppia si
-    // riconosce dalla P.IVA del fornitore
+    // riconosce dalle P.IVA (servono entrambi i lati, R1-07)
     const riga = await db.interscambio_storico.create({ data: {
       fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9106n, fornitore_legacy_id: 9106n,
-      cliente_codice_fornitore: 'STO-6',
-      cliente_piva_norm: '', fornitore_piva: '22222222222', subagente_nome: 'Alfredo Nista', sconto_1: 6,
+      cliente_codice_fornitore: 'STO-6', cliente_piva_norm: '11111111111',
+      fornitore_piva: '22222222222', subagente_nome: 'Alfredo Nista', sconto_1: 6,
     } });
     const a = await entra('ammi-cli');
     const trovati = await a.get('/interscambio/storico?fornitore_id=' + fornitoreS + '&cliente_id=' + clienteS + '&codice=STO-6').expect(200);
@@ -288,6 +288,45 @@ describe('agenzia dallo storico (D-112)', () => {
     }).expect(400);
     expect(r.body.message).toContain('altro cliente o fornitore');
     expect((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).stato).toBe('da_usare');
+  });
+
+  it('riga di un altro cliente con la sola P.IVA del fornitore: 400 (R1-07)', async () => {
+    // caso vero: riga senza P.IVA cliente (le «senza P.IVA cliente» del report), con il nome di un
+    // altro cliente: il fornitore da solo non basta più a riconoscere la coppia
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9108n, fornitore_legacy_id: 9108n,
+      cliente_ragione_sociale: 'Cliente Altro', cliente_piva_norm: '',
+      fornitore_piva: '22222222222', subagente_nome: 'Nista Mario', sconto_1: 10,
+    } });
+    const a = await entra('ammi-cli');
+    const prima = await db.interscambio.count({ where: { cliente_id: clienteS, fornitore_id: fornitoreS } });
+    const r = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 10,
+      valido_dal: '2034-01-01', valido_al: '2034-12-31', storico_id: Number(riga.id),
+    }).expect(400);
+    expect(r.body.message).toContain('altro cliente o fornitore');
+    expect(await db.interscambio.count({ where: { cliente_id: clienteS, fornitore_id: fornitoreS } })).toBe(prima);
+    expect((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).stato).toBe('da_usare');
+  });
+
+  it('la stessa riga dello storico non si consuma due volte: 409 (R1-07)', async () => {
+    const riga = await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 9109n, fornitore_legacy_id: 9109n,
+      cliente_piva_norm: '11111111111', fornitore_piva: '22222222222', sconto_1: 4,
+    } });
+    const a = await entra('ammi-cli');
+    const r1 = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 4,
+      valido_dal: '2043-01-01', valido_al: '2043-06-30', storico_id: Number(riga.id),
+    }).expect(201);
+    creati.push(BigInt(r1.body.id));
+    const r2 = await a.post('/clienti/' + clienteS + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreS), sconto: 4,
+      valido_dal: '2043-07-01', valido_al: '2043-12-31', storico_id: Number(riga.id),
+    }).expect(409);
+    expect(r2.body.message).toContain('già stata usata');
+    // la riga resta legata alla prima agenzia
+    expect(String((await db.interscambio_storico.findUniqueOrThrow({ where: { id: riga.id } })).interscambio_id)).toBe(r1.body.id);
   });
 
   it('senza storico_id tutto come prima: nessuna riga dello storico toccata', async () => {
@@ -395,6 +434,25 @@ describe('agenzie CRUD', () => {
     });
     // il secondo ha cliente+fornitore sovrapposto -> 409 comunque
     expect(r2.status).toBe(409);
+  });
+
+  it("elimina agenzia con sconti storici: 409 con il messaggio, l'agenzia resta (D-139)", async () => {
+    const a = await entra('oper-cli');
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', {
+      subagente_id: Number(subagenteId),
+      fornitore_id: Number(fornitoreId),
+      sconto: 1,
+      valido_dal: '2034-01-01',
+      valido_al: '2034-12-31',
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    const sconto = await db.sconti.create({ data: { interscambio_id: BigInt(r.body.id), ordine: 1, tipo: 'commerciale', percentuale: 5 } });
+    const e = await a.del('/clienti/' + clienteId + '/agenzie/' + r.body.id).expect(409);
+    expect(e.body.message).toContain('sconti storici');
+    expect(await db.interscambio.count({ where: { id: BigInt(r.body.id) } })).toBe(1);
+    // senza sconti si elimina come prima
+    await db.sconti.delete({ where: { id: sconto.id } });
+    await a.del('/clienti/' + clienteId + '/agenzie/' + r.body.id).expect(204);
   });
 
   it('elimina agenzia', async () => {

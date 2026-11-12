@@ -335,7 +335,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(0,1fr)' } as CSSProperties}>
       <div className="pila riempi">
         {filtri}
-        <CercaInIntegra tipo="fornitore" onImportato={carica} />
+        <CercaInIntegra tipo="fornitore" onImportato={async (id) => { await carica(); router.push('/fornitori/' + id); }} />
         <div className="riempi">
           <DataTable righe={cercati} filtro={String(valori.q)} colonne={colonneFornitori} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/fornitori/' + x.id)}

@@ -129,12 +129,14 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
   const puo = usePuo();
   const puoModifica = puo('provvigioni.modifica');
   const puoImporta = puo('dati.importa');
+  const puoAgenzia = puo('dati.modifica'); // D-106: l'agenzia si salva con `dati.modifica`
   const [d, setD] = useState<Dettaglio | null>(null);
   const [errore, setErrore] = useState('');
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [scheda, setScheda] = useState('azioni');
   const [altra, setAltra] = useState('');
   const [bollettinoId, setBollettinoId] = useState<string | null>(null);
+  const [importando, setImportando] = useState(false); // R2-08: un solo import per volta
   const sagome = useSagome(!d);
 
   const carica = useCallback(async () => {
@@ -354,33 +356,39 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     );
   }
 
-  /** D-111: importa il fornitore da Integra e collega il documento al fornitore appena creato, così la
-   *  proposta si ricalcola e compare «Mancano gli scaglioni» (D-113). */
+  /** D-111/D-133: il server importa il fornitore e collega il documento nella stessa transazione, così
+   *  la proposta si ricalcola e compare «Mancano gli scaglioni» (D-113) senza perdere le righe lette. */
   async function importaFornitore() {
     const fd = doc.proposta.fornitore_da_integra;
-    if (!fd) return;
-    const r = await api<{ id: string }>('integra/importa', { tipo: 'fornitore', id_integra: fd.id_integra });
-    if (!r.ok) { avviso(r.messaggio, true); return; }
-    // il fornitore importato nasce senza scaglioni: si collega il documento al tipo letto
-    const t = doc.testata;
-    const link = t.tipo
-      ? await api('documenti/' + id, { testata: { tipo: t.tipo, fornitore_id: r.dati.id } }, 'PUT')
-      : null;
-    avviso('Fornitore importato da Integra');
-    if (link && !link.ok) avviso(link.messaggio, true);
-    await carica();
-    onFatto?.();
+    if (!fd || importando) return;
+    setImportando(true);
+    try {
+      const r = await api<{ id: string }>('integra/importa', {
+        tipo: 'fornitore', id_integra: fd.id_integra, documento_id: Number(id),
+      });
+      if (!r.ok) { avviso(r.messaggio, true); return; }
+      avviso('Fornitore importato da Integra');
+      await carica();
+      onFatto?.();
+    } finally {
+      setImportando(false);
+    }
   }
 
   /** D-111: importa il cliente da Integra; dopo l'import la proposta riconosce il cliente e chiede l'agenzia. */
   async function importaCliente() {
     const cd = doc.proposta.cliente_da_integra;
-    if (!cd || cd.id_integra == null) return;
-    const r = await api<{ id: string }>('integra/importa', { tipo: 'cliente', id_integra: cd.id_integra });
-    if (!r.ok) { avviso(r.messaggio, true); return; }
-    avviso('Cliente importato da Integra');
-    await carica();
-    onFatto?.();
+    if (!cd || cd.id_integra == null || importando) return;
+    setImportando(true);
+    try {
+      const r = await api<{ id: string }>('integra/importa', { tipo: 'cliente', id_integra: cd.id_integra });
+      if (!r.ok) { avviso(r.messaggio, true); return; }
+      avviso('Cliente importato da Integra');
+      await carica();
+      onFatto?.();
+    } finally {
+      setImportando(false);
+    }
   }
 
   function azione() {
@@ -403,14 +411,14 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
           <div className="pila">
             <Nota>Il fornitore non è in anagrafica. In Integra c'è: <b>{fd.ragione_sociale ?? '—'}</b>{fd.piva ? `, P.IVA ${fd.piva}` : ''}.</Nota>
             <div className="azioni-riga">
-              <button type="button" className="btn primario" disabled={!puoImporta} title={!puoImporta ? 'Serve il permesso di importare da Integra' : undefined} onClick={() => void importaFornitore()}>Importa da Integra</button>
+              <button type="button" className="btn primario" disabled={!puoImporta || importando} title={!puoImporta ? 'Serve il permesso di importare da Integra' : undefined} onClick={() => void importaFornitore()}>{importando ? 'Importo…' : 'Importa da Integra'}</button>
             </div>
           </div>
         ) : nr ? (
           <div className="pila">
             <Nota>Questo fornitore non è rappresentato per questo cliente: senza agenzia il documento non entra in una pratica.</Nota>
             <div className="azioni-riga">
-              <button type="button" className="btn primario" onClick={configuraAgenzia}>Configura l’agenzia</button>
+              <button type="button" className="btn primario" disabled={!puoAgenzia} title={!puoAgenzia ? 'Serve il livello operatore in Dati' : undefined} onClick={configuraAgenzia}>Configura l’agenzia</button>
             </div>
           </div>
         ) : cd ? (
@@ -421,7 +429,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
             ) : null}
             <div className="azioni-riga">
               {cd.id_integra != null
-                ? <button type="button" className="btn primario" disabled={!puoImporta} title={!puoImporta ? 'Serve il permesso di importare da Integra' : undefined} onClick={() => void importaCliente()}>Importa da Integra</button>
+                ? <button type="button" className="btn primario" disabled={!puoImporta || importando} title={!puoImporta ? 'Serve il permesso di importare da Integra' : undefined} onClick={() => void importaCliente()}>{importando ? 'Importo…' : 'Importa da Integra'}</button>
                 : <button type="button" className="btn primario" disabled title="L’import dal vecchio CRM arriva con l’anagrafica">Importa dal vecchio CRM</button>}
             </div>
           </div>
@@ -429,7 +437,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
           <div className="pila">
             <Nota>Il cliente non ha un’agenzia con questo fornitore: senza, il documento non entra in una pratica. È normale al primo ordine.</Nota>
             <div className="azioni-riga">
-              <button type="button" className="btn primario" onClick={configuraAgenzia}>Configura l’agenzia</button>
+              <button type="button" className="btn primario" disabled={!puoAgenzia} title={!puoAgenzia ? 'Serve il livello operatore in Dati' : undefined} onClick={configuraAgenzia}>Configura l’agenzia</button>
             </div>
           </div>
         ) : boll ? (

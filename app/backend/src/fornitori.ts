@@ -242,6 +242,31 @@ export class FornitoriController {
     }));
   }
 
+  /** D-113, V12: gli sconti degli scaglioni in vigore (ultima versione non futura) di ogni fornitore,
+   *  per l'aiuto della finestra dell'agenzia. Il calcolo sta qui, non nel browser. */
+  @Get('sconti-in-vigore')
+  @Richiede('dati.consulta')
+  async scontiInVigore() {
+    const righe = await this.db.provvigioni_scaglioni.findMany({
+      where: { valido_dal: { lte: new Date(giornoRoma(new Date())) } },
+      orderBy: [{ valido_dal: 'asc' }, { sconto_min: 'asc' }],
+      select: { fornitore_id: true, valido_dal: true, sconto_min: true },
+    });
+    // ordinate per data: l'ultima riga di ogni fornitore è la versione in vigore
+    const ultima = new Map<string, Date>();
+    for (const r of righe) ultima.set(String(r.fornitore_id), r.valido_dal);
+    const perFornitore = new Map<string, number[]>();
+    for (const r of righe) {
+      const k = String(r.fornitore_id);
+      if (r.valido_dal.getTime() !== ultima.get(k)!.getTime()) continue;
+      const sconti = perFornitore.get(k) ?? [];
+      const sconto = Number(r.sconto_min);
+      if (!sconti.includes(sconto)) sconti.push(sconto);
+      perFornitore.set(k, sconti);
+    }
+    return [...perFornitore].map(([fornitore_id, sconti]) => ({ fornitore_id, sconti }));
+  }
+
   @Get(':id')
   @Richiede('dati.consulta')
   async dettaglio(@Param('id', ParseIntPipe) id: number) {

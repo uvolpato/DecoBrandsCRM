@@ -109,6 +109,21 @@ describe('elenco e dettaglio', () => {
   });
 });
 
+describe('sconti in vigore', () => {
+  it('per fornitore le soglie dell’ultima versione non futura (R2-06)', async () => {
+    const f = await db.fornitori.create({ data: {} });
+    // tre versioni: vale la 2021 (la 2099 è futura, la 2020 è superata)
+    const versioni: [string, number[]][] = [['2020-01-01', [0, 10]], ['2021-01-01', [0, 10, 20]], ['2099-01-01', [0]]];
+    for (const [dal, sconti] of versioni) {
+      await db.provvigioni_scaglioni.createMany({ data: sconti.map((sconto_min) => ({ fornitore_id: f.id, valido_dal: new Date(dal), sconto_min, pct_agente: 10, pct_subagente: 2 })) });
+    }
+    const a = await entra('lett-forn');
+    const r = await a.get('/fornitori/sconti-in-vigore').expect(200);
+    const voce = r.body.find((x: { fornitore_id: string }) => x.fornitore_id === String(f.id));
+    expect(voce.sconti).toEqual([0, 10, 20]);
+  });
+});
+
 describe('modifica regole', () => {
   it('null su una regola obbligatoria: 400, non 500', async () => {
     const a = await entra('ammi-forn');

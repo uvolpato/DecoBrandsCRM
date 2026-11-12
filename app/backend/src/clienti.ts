@@ -1,12 +1,13 @@
 import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseIntPipe, Post, Put, Req,
 } from '@nestjs/common';
-import { type clienti, type clienti_versioni, type interscambio } from '@prisma/client';
+import { type clienti, type clienti_versioni, type interscambio, type interscambio_storico } from '@prisma/client';
 import { IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto, permessiDi } from './accesso';
 import { ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { normalizzaNome } from './proposta';
 import { logEvent } from './registro';
 import { normalizzaPiva, segnaUsata } from './storico';
 
@@ -27,20 +28,28 @@ class DatiAgenzia {
   @Facoltativo() @IsInt() @Min(1) storico_id?: number; // D-112: riga dello storico da cui nasce l'agenzia
 }
 
-/** D-112: la riga dello storico deve essere della stessa coppia cliente-fornitore. Gli id si riempiono
- *  quando i ruoli nascono: se mancano valgono le P.IVA scritte nello storico. Serve almeno un riscontro. */
+/** D-112: la riga dello storico deve essere della stessa coppia cliente-fornitore. Ogni lato deve
+ *  avere un riscontro positivo: id, P.IVA oppure, in mancanza di entrambi, ragione sociale
+ *  normalizzata uguale. Un lato solo non basta: una riga con la P.IVA del fornitore passerebbe
+ *  per qualunque cliente di quel fornitore. */
 function stessaCoppia(
-  r: { cliente_id: bigint | null; fornitore_id: bigint | null; cliente_piva_norm: string; fornitore_piva: string | null },
-  clienteId: bigint, clientePiva: string | null, fornitoreId: bigint, fornitorePiva: string | null,
+  r: {
+    cliente_id: bigint | null; fornitore_id: bigint | null;
+    cliente_piva_norm: string; cliente_ragione_sociale: string | null;
+    fornitore_piva: string | null; fornitore_ragione_sociale: string | null;
+  },
+  cliente: { id: bigint; piva: string | null; nome: string | null },
+  fornitore: { id: bigint; piva: string | null; nome: string | null },
 ) {
-  let visto = false;
-  if (r.cliente_id !== null) { if (r.cliente_id !== clienteId) return false; visto = true; }
-  if (r.fornitore_id !== null) { if (r.fornitore_id !== fornitoreId) return false; visto = true; }
-  const pf = normalizzaPiva(fornitorePiva ?? '');
-  if (r.fornitore_piva && pf) { if (normalizzaPiva(r.fornitore_piva) !== pf) return false; visto = true; }
-  const pc = normalizzaPiva(clientePiva ?? '');
-  if (r.cliente_piva_norm && pc) { if (r.cliente_piva_norm !== pc) return false; visto = true; }
-  return visto;
+  const lato = (idRiga: bigint | null, id: bigint, pivaRiga: string | null, piva: string | null, nomeRiga: string | null, nome: string | null) => {
+    if (idRiga !== null) return idRiga === id;
+    const pr = normalizzaPiva(pivaRiga ?? '');
+    const p = normalizzaPiva(piva ?? '');
+    if (pr && p) return pr === p;
+    return !!nomeRiga && !!nome && normalizzaNome(nomeRiga) === normalizzaNome(nome);
+  };
+  return lato(r.cliente_id, cliente.id, r.cliente_piva_norm, cliente.piva, r.cliente_ragione_sociale, cliente.nome)
+    && lato(r.fornitore_id, fornitore.id, r.fornitore_piva, fornitore.piva, r.fornitore_ragione_sociale, fornitore.nome);
 }
 
 // D-50 §19: percentuale e regola del subagente cambiano i soldi: solo chi ha dati.condizioni
@@ -217,10 +226,20 @@ export class ClientiController {
       if (!sub) throw new NotFoundException('Subagente non trovato');
       const fornitore = await tx.fornitori.findUnique({ where: { id: BigInt(b.fornitore_id!) }, include: { corrente: { select: { ragione_sociale: true, piva: true } } } });
       if (!fornitore) throw new NotFoundException('Fornitore non trovato');
-      // D-112: la riga dello storico proposta deve essere di questa coppia; il 400 annulla tutto (V13)
-      const legame = b.storico_id ? await tx.interscambio_storico.findUnique({ where: { id: BigInt(b.storico_id) } }) : null;
-      if (b.storico_id && !legame) throw new BadRequestException('Riga dello storico non trovata');
-      if (legame && !stessaCoppia(legame, cliente.id, cliente.corrente?.piva ?? null, fornitore.id, fornitore.corrente?.piva ?? null)) {
+      // D-112, V13: la riga dello storico si legge bloccata e si consuma una volta sola (409 se già
+      // usata): due agenzie con lo stesso storico_id non si sovrascrivono.
+      let legame: interscambio_storico | null = null;
+      if (b.storico_id) {
+        const bloccate = await tx.$queryRaw<{ id: bigint }[]>`SELECT id FROM interscambio_storico WHERE id = ${BigInt(b.storico_id)} FOR UPDATE`;
+        legame = bloccate.length ? await tx.interscambio_storico.findUnique({ where: { id: BigInt(b.storico_id) } }) : null;
+        if (!legame) throw new BadRequestException('Riga dello storico non trovata');
+        if (legame.stato !== 'da_usare') throw new ConflictException('La riga dello storico è già stata usata per un\'altra agenzia');
+      }
+      if (legame && !stessaCoppia(
+        legame,
+        { id: cliente.id, piva: cliente.corrente?.piva ?? null, nome: cliente.corrente?.ragione_sociale ?? null },
+        { id: fornitore.id, piva: fornitore.corrente?.piva ?? null, nome: fornitore.corrente?.ragione_sociale ?? null },
+      )) {
         throw new BadRequestException('La riga dello storico è di un altro cliente o fornitore');
       }
       const creato = await tx.interscambio.create({
@@ -373,6 +392,10 @@ export class ClientiController {
         },
       });
       if (!a || a.cliente_id !== BigInt(id)) throw new NotFoundException('Agenzia non trovata');
+      // D-139: la FK degli sconti è RESTRICT; senza questo controllo la delete darebbe 500
+      if (await tx.sconti.count({ where: { interscambio_id: a.id } })) {
+        throw new ConflictException('L\'agenzia ha sconti storici: si chiude, non si elimina');
+      }
       await tx.interscambio.delete({ where: { id: a.id } });
       await logEvent(tx, {
         tipo: 'crud', azione: 'delete', entita: 'interscambio', entita_id: a.id, esito: 'successo',

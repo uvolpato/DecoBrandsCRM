@@ -21,7 +21,7 @@ import { aggiornaPratica } from './pratiche';
 import { cerca } from './anagrafica-integra';
 import { IntegraService } from './integra';
 import { cercaLegame } from './storico';
-import { type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, propostaDocumento, riconosciClienteDai, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
+import { type ClienteConCorrente, type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, propostaDocumento, riconosciClienteDai, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -314,17 +314,20 @@ async function contestoDocumento(db: DbLetto, ponte: Ponte | null, letto: Letto,
 async function esitiImportazione(
   db: PrismaService,
   ponte: Ponte | null,
-  righe: { id: bigint; fornitore_id: bigint | null; fornitore_letto: string | null; codice_cliente: string | null; cliente: string | null; piva_cliente: string | null }[],
+  righe: { id: bigint; fornitore_id: bigint | null; fornitore: string | null; fornitore_letto: string | null; codice_cliente: string | null; cliente: string | null; piva_cliente: string | null }[],
+  clienti: ClienteConCorrente[],
 ): Promise<{ fornitore: Set<bigint>; cliente: Set<bigint> }> {
   const fornitore = new Set<bigint>();
   const cliente = new Set<bigint>();
+  let ponteGiu = false; // R1-02: dopo il primo errore le ricerche successive aspettano solo il tempo massimo
 
   if (ponte) {
     // fornitore non riconosciuto → una ricerca per nome distinto (di norma una per pagina)
     const senzaFornitore = righe.filter((r) => r.fornitore_id == null && r.fornitore_letto);
     for (const nome of new Set(senzaFornitore.map((r) => r.fornitore_letto!))) {
       const r = await cerca(db, ponte.pool, ponte.schema, 'fornitore', nome);
-      if (!('errore' in r) && r.righe.length === 1) {
+      if ('errore' in r) { ponteGiu = true; break; }
+      if (r.righe.length === 1) {
         for (const d of senzaFornitore) if (d.fornitore_letto === nome) fornitore.add(d.id);
       }
     }
@@ -332,33 +335,38 @@ async function esitiImportazione(
 
   const conFornitore = righe.filter((r) => r.fornitore_id != null);
   if (!conFornitore.length) return { fornitore, cliente };
-  const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
   const fornitori = [...new Set(conFornitore.map((r) => r.fornitore_id!))];
   const interscambi = await db.interscambio.findMany({
     where: { fornitore_id: { in: fornitori } },
     select: { cliente_id: true, fornitore_id: true, codice_cliente_fornitore: true },
   });
-  // D-112: coppia con subagente nello storico → proposta di import (subagente + sconto)
-  const storici = await db.interscambio_storico.findMany({
-    where: { subagente_nome: { not: null } },
-    select: { fornitore_id: true, cliente_codice_fornitore: true },
-  });
-  const storicoCon = new Set(storici.filter((s) => s.fornitore_id != null).map((s) => `${s.fornitore_id}|${(s.cliente_codice_fornitore ?? '').toLowerCase()}`));
+  // D-112: coppia con subagente nello storico → proposta di import (subagente + sconto).
+  // R1-11: solo i codici della pagina; R1-06: `fornitore_id` nello storico importato è NULL, si confronta il nome
+  const codici = [...new Set(conFornitore.map((r) => r.codice_cliente).filter((c): c is string => !!c))];
+  const storici = codici.length
+    ? await db.interscambio_storico.findMany({
+        where: { subagente_nome: { not: null }, cliente_codice_fornitore: { in: codici, mode: 'insensitive' } },
+        select: { fornitore_ragione_sociale: true, cliente_codice_fornitore: true },
+      })
+    : [];
+  const chiaveStorico = (fornitore: string | null, codice: string | null) => `${normalizzaNome(fornitore ?? '')}|${(codice ?? '').toLowerCase()}`;
+  const storicoCon = new Set(storici.map((s) => chiaveStorico(s.fornitore_ragione_sociale, s.cliente_codice_fornitore)));
   const daCercare = new Map<string, bigint[]>(); // q Integra → documenti con quella chiave
   for (const r of conFornitore) {
     const f = r.fornitore_id!;
     const perCodice = r.codice_cliente
       ? interscambi.some((a) => a.fornitore_id === f && (a.codice_cliente_fornitore ?? '').toLowerCase() === r.codice_cliente!.toLowerCase())
       : false;
-    if (perCodice || riconosciClienteDai(clienti as Parameters<typeof riconosciClienteDai>[0], r.piva_cliente, r.cliente)) continue; // cliente riconosciuto
-    if (storicoCon.has(`${f}|${(r.codice_cliente ?? '').toLowerCase()}`)) { cliente.add(r.id); continue; }
+    if (perCodice || riconosciClienteDai(clienti, r.piva_cliente, r.cliente)) continue; // cliente riconosciuto
+    if (storicoCon.has(chiaveStorico(r.fornitore, r.codice_cliente))) { cliente.add(r.id); continue; }
     const q = (r.codice_cliente || r.piva_cliente || r.cliente || '').trim();
     if (q) daCercare.set(q, [...(daCercare.get(q) ?? []), r.id]);
   }
-  if (ponte) {
+  if (ponte && !ponteGiu) {
     for (const [q, ids] of daCercare) {
       const r = await cerca(db, ponte.pool, ponte.schema, 'cliente', q);
-      if (!('errore' in r) && r.righe.length === 1) for (const id of ids) cliente.add(id);
+      if ('errore' in r) break;
+      if (r.righe.length === 1) for (const id of ids) cliente.add(id);
     }
   }
   return { fornitore, cliente };
@@ -393,9 +401,12 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
         })),
     }
     : null;
-  // D-113: un fornitore riconosciuto senza scaglioni → la card lo dice (non blocca il giro)
+  // D-113/R1-12: un fornitore riconosciuto senza scaglioni validi alla data del documento → la card lo dice
+  // (la pagina fornitore guarda quelli validi oggi; qui vale la data del documento, che apre la pratica)
   const scaglioni_mancanti = letto.fornitore_id != null
-    ? !(await db.provvigioni_scaglioni.findFirst({ where: { fornitore_id: letto.fornitore_id }, select: { id: true } }))
+    ? !(await db.provvigioni_scaglioni.findFirst({
+      where: { fornitore_id: letto.fornitore_id, valido_dal: { lte: new Date(letto.data ?? giornoRoma(new Date())) } }, select: { id: true },
+    }))
     : false;
   return {
     id: String(d.id), file_nome: d.file_nome, file_tipo: fileTipo(d.file_percorso), stato: d.stato,
@@ -528,12 +539,16 @@ export class DocumentiController {
       GROUP BY d.stato`;
     const conteggi: Record<(typeof STATI_ELENCO)[number], number> = { da_controllare: 0, in_coda: 0, in_lettura: 0, errore: 0 };
     for (const c of conti) if (c.stato in conteggi) conteggi[c.stato as keyof typeof conteggi] = Number(c.n);
+    // R1-11: i clienti con la versione corrente si leggono una volta per pagina, non due (D-106, D-111)
+    const clienti = righe.some((r) => r.fornitore_id != null)
+      ? await this.db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } })
+      : [];
     // D-106: manca_agenzia con la stessa risoluzione della proposta, una query per pagina (V12)
-    const manca = await mancaAgenziaRighe(this.db, righe);
+    const manca = await mancaAgenziaRighe(this.db, righe, clienti);
     // D-112: la coppia senza subagente nello storico → «Non rappresentato» invece di «Manca l'agenzia»
     const nonRappresentata = await mancaRappresentanzaRighe(this.db, righe, manca);
     // D-111: candidati di Integra per fornitore o cliente non riconosciuti, una ricerca per chiave per pagina
-    const importa = await esitiImportazione(this.db, await this.integra.ponte(), righe);
+    const importa = await esitiImportazione(this.db, await this.integra.ponte(), righe, clienti);
     return {
       documenti: righe.map((r) => ({
         id: String(r.id), file_nome: r.file_nome, file_tipo: fileTipo(r.file_percorso), tipo: r.tipo,
@@ -667,7 +682,9 @@ export class DocumentiController {
       if (d.stato !== 'da_controllare') throw new ConflictException('Il documento non è più da controllare');
 
       const testata = b.testata ?? {};
-      const righeInput = Array.isArray(b.righe) ? b.righe : [];
+      // D-133: le righe si riscrivono solo se il corpo le porta (l'import del fornitore corregge la sola testata)
+      const portaRighe = Array.isArray(b.righe);
+      const righeInput = portaRighe ? b.righe : [];
       // campi confermati con il ✓: si segnano verificati anche se il valore resta quello letto
       const confermati = new Set((Array.isArray(b.verificati) ? b.verificati : []).filter((x): x is string => typeof x === 'string'));
       const tipo = valoreCampo(testata.tipo, 'tipo', 'testo');
@@ -730,7 +747,8 @@ export class DocumentiController {
       }
 
       // righe: elimina le vecchie, ricrea nell'ordine ricevuto (numerazione 0..n-1);
-      // la riga con lo stesso `i` porta con sé valore letto, affidabilità, posizione e precisione
+      // la riga con lo stesso `i` porta con sé valore letto, affidabilità, posizione e precisione.
+      // D-133: senza `righe` nel corpo non si tocca niente — niente deleteMany, `nuove` resta vuoto
       const giaPerRiga = new Map<number, Map<string, (typeof campiGia)[number]>>();
       for (const c of campiGia) {
         const m = /^righe\[(\d+)\]\.(.+)$/.exec(c.campo);
@@ -739,7 +757,7 @@ export class DocumentiController {
         if (!giaPerRiga.has(ri)) giaPerRiga.set(ri, new Map());
         giaPerRiga.get(ri)!.set(m[2], c);
       }
-      await tx.documenti_campi.deleteMany({ where: { documento_id: did, campo: { startsWith: 'righe[' } } });
+      if (portaRighe) await tx.documenti_campi.deleteMany({ where: { documento_id: did, campo: { startsWith: 'righe[' } } });
       const nuove: Prisma.documenti_campiCreateManyInput[] = [];
       righeInput.forEach((r, j) => {
         let i: number | null = null;
@@ -1068,7 +1086,7 @@ export class DocumentiPraticaController {
       const quale = `${nomeDi(d.tipo)} ${d.numero}`.trim();
       if (d.fattura_id) throw new ConflictException(`${quale} storna una fattura: si sposta con la sua fattura, non da sola`);
       await togliibile(tx, pid, d, quale, 'non si sposta');
-      await richiediAgenzia(tx, nid, iso(d.data)); // D-106: anche spostandolo serve l'agenzia alla data
+      await richiediAgenzia(tx, nid); // D-137: per una pratica già aperta basta l'agenzia alla data del suo ordine
       await controllaNumero(tx, fid, nid, d.tipo, d.numero, iso(d.data), [d.id]);
       await tx.ordini_fornitore_documenti.update({ where: { id: d.id }, data: { testata_id: nid } });
       await tx.ordini_fornitore_righe.updateMany({ where: { documento_id: d.id }, data: { testata_id: nid } });
@@ -1166,16 +1184,17 @@ export class DocumentiPraticaController {
   }
 }
 
-/** D-106: il documento entra in pratica solo se il cliente ha un'agenzia valida col fornitore alla data
- *  del documento (una regola, non un pulsante). Stessa condizione di `nuovaPratica`. */
-async function richiediAgenzia(tx: Tx, pid: bigint, data: string) {
-  const t = await tx.ordini_fornitore_testata.findUnique({ where: { id: pid }, select: { cliente_id: true, fornitore_id: true } });
+/** D-106/D-137: il documento entra in una pratica già aperta solo se il cliente ha un'agenzia valida col
+ *  fornitore alla **data dell'ordine** (subagente e percentuali seguono l'ordine, D-35/D-60). L'agenzia alla
+ *  data del documento si chiede solo quando il documento apre una pratica nuova (`nuovaPratica`). */
+async function richiediAgenzia(tx: Tx, pid: bigint) {
+  const t = await tx.ordini_fornitore_testata.findUnique({ where: { id: pid }, select: { cliente_id: true, fornitore_id: true, data_ordine: true } });
   if (!t) throw new NotFoundException('Pratica non trovata');
   const ag = await tx.interscambio.findFirst({
-    where: { cliente_id: t.cliente_id, fornitore_id: t.fornitore_id, valido_dal: { lte: new Date(data) }, OR: [{ valido_al: null }, { valido_al: { gt: new Date(data) } }] },
+    where: { cliente_id: t.cliente_id, fornitore_id: t.fornitore_id, valido_dal: { lte: t.data_ordine }, OR: [{ valido_al: null }, { valido_al: { gt: t.data_ordine } }] },
     select: { id: true },
   });
-  if (!ag) throw new ConflictException("Il cliente non ha un'agenzia con questo fornitore alla data del documento: aggiungila in Clienti o dal documento");
+  if (!ag) throw new ConflictException("Il cliente non ha un'agenzia con questo fornitore alla data dell'ordine: aggiungila in Clienti o dal documento");
 }
 
 /** Registra un documento nella pratica già bloccata (D-60 §19): un posto solo per la registrazione a mano e
@@ -1185,7 +1204,7 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
   if ((fiscale(b.tipo) || b.tipo === 'ordine') && (!b.numero || !b.data)) throw new BadRequestException(`${nomeDi(b.tipo)}: numero e data sono obbligatori`);
   if (b.tipo !== 'nota_credito' && b.fattura_id) throw new BadRequestException('Solo la nota di credito storna una fattura');
   const numero = b.numero ?? '', data = b.data ?? giornoRoma(new Date());
-  await richiediAgenzia(tx, pid, data); // D-106
+  await richiediAgenzia(tx, pid); // D-137: pratica già aperta → agenzia alla data del suo ordine
   const fattura_id = b.fattura_id ? BigInt(b.fattura_id) : null;
   const storno_totale = b.storno_totale ?? false;
   await controllaNumero(tx, fid, pid, b.tipo, numero, data);

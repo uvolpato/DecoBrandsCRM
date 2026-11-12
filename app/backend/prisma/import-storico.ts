@@ -181,8 +181,10 @@ async function importa(tx: Tx, report: ReportStorico) {
   });
 }
 
-/** Importa lo storico e restituisce il report. `prova` esegue in una transazione con rollback. */
-export async function importaStorico(db: PrismaClient, opts: { prova?: boolean } = {}): Promise<ReportStorico> {
+/** Importa lo storico e restituisce il report. `prova` esegue in una transazione con rollback;
+ *  `sostituisci` svuota le tabelle nella stessa transazione (V13), ma solo se nessuna riga è stata
+ *  usata: lo stato delle agenzie già create non si perde. */
+export async function importaStorico(db: PrismaClient, opts: { prova?: boolean; sostituisci?: boolean } = {}): Promise<ReportStorico> {
   const report: ReportStorico = {
     righe_lette: collegamenti.length,
     schede_lette: schede.length,
@@ -193,6 +195,17 @@ export async function importaStorico(db: PrismaClient, opts: { prova?: boolean }
   };
   try {
     await db.$transaction(async (tx) => {
+      if (opts.sostituisci) {
+        // senza RESTART IDENTITY: gli id già usati non si riusano e il registro resta coerente.
+        // Il lock esclude scritture concorrenti (un'agenzia che consuma una riga) fra il controllo e
+        // lo svuotamento: o si vede la riga usata e si rifiuta, o il TRUNCATE è sicuro.
+        await tx.$executeRawUnsafe('LOCK TABLE interscambio_storico IN EXCLUSIVE MODE');
+        const usate = await tx.interscambio_storico.count({ where: { stato: { not: 'da_usare' } } });
+        if (usate) {
+          throw new Error(`Ci sono ${usate} righe dello storico già usate: --sostituisci non si può usare, lo stato delle agenzie create andrebbe perso`);
+        }
+        await tx.$executeRawUnsafe('TRUNCATE interscambio_storico, soggetti_storico');
+      }
       await importa(tx, report);
       if (opts.prova) throw new ProvaRollback();
     }, { timeout: 600_000, maxWait: 10_000 });
@@ -210,7 +223,7 @@ const SOSTITUISCI = args.includes('--sostituisci');
 function chiediConferma(): Promise<boolean> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question('--sostituisci svuota le tabelle dello storico su DATABASE_URL. Scrivi SI per confermare: ', (r) => { rl.close(); resolve(r.trim().toUpperCase() === 'SI'); });
+    rl.question('--sostituisci svuota le tabelle dello storico su DATABASE_URL (solo se nessuna riga è già stata usata). Scrivi SI per confermare: ', (r) => { rl.close(); resolve(r.trim().toUpperCase() === 'SI'); });
   });
 }
 
@@ -219,13 +232,12 @@ async function main() {
   try {
     if (SOSTITUISCI) {
       if (!(await chiediConferma())) { console.log('Annullato.'); return; }
-      await db.$executeRawUnsafe('TRUNCATE interscambio_storico, soggetti_storico RESTART IDENTITY');
-      console.log('Tabelle dello storico svuotate.');
     }
     const t0 = Date.now();
-    const r = await importaStorico(db, { prova: PROVA });
+    const r = await importaStorico(db, { prova: PROVA, sostituisci: SOSTITUISCI });
     const secondi = ((Date.now() - t0) / 1000).toFixed(1);
     const scarti = r.scarti.map((s) => `${s.tipo} ${s.id}: ${s.motivo}`);
+    if (SOSTITUISCI) console.log('Tabelle dello storico svuotate e reimportate nella stessa transazione.');
     console.log(`${PROVA ? 'PROVA (rollback)' : 'Import completato'}: ${r.inseriti_soggetti} soggetti_storico, ${r.inseriti_legami} interscambio_storico in ${secondi} s`);
     console.log(`righe lette ${r.righe_lette} (${r.senza_subagente} senza subagente, ${r.senza_piva_cliente} senza P.IVA cliente, ${r.senza_piva_fornitore} senza P.IVA fornitore, ${r.senza_riscontro} senza riscontro in clienti.jsonl)`);
     console.log(`già presenti: ${r.gia_soggetti} soggetti, ${r.gia_legami} legami`);

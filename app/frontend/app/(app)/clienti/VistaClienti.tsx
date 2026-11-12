@@ -189,9 +189,9 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
 
   return pagina(
     <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.1fr) minmax(0,1fr)' } as CSSProperties}>
-      <div className="pila riempi">
+      <div className="pila riempi clienti-filtri">
         {filtri}
-        <CercaInIntegra tipo="cliente" onImportato={carica} />
+        <CercaInIntegra tipo="cliente" onImportato={async (id) => { await carica(); router.push('/clienti/' + id); }} />
         <div className="riempi">
           <DataTable righe={righe} filtro={JSON.stringify(valori)} colonne={colonneClienti} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'ragione_sociale', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/clienti/' + x.id)}

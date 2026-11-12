@@ -1,6 +1,7 @@
 // Import su richiesta da Integra (F1-A11, D-111, §4.7.1): cerca e importa, con idempotenza e permessi.
 // Il ponte finto decobrands_ponte_prova viene riempito e svuotato da questa prova.
 import 'dotenv/config';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Test } from '@nestjs/testing';
@@ -12,6 +13,7 @@ import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
 import { cerca, importa } from '../src/anagrafica-integra';
+import { creaPonte } from '../src/integra';
 import { svuota } from './svuota';
 
 let app: NestExpressApplication;
@@ -59,6 +61,21 @@ async function mettiFornitore(r: Record<string, unknown>) {
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
     [v.id_integra, v.codice, v.ragione_sociale, v.piva, v.codice_fiscale, v.indirizzo, v.cap, v.citta, v.provincia, v.paese, v.email, v.pec, v.attivo, v.modificato_il],
   );
+}
+
+/** Un documento in arrivo da controllare, senza fornitore, con il nome del fornitore letto (D-133). */
+async function mettiDocumento(nomeFornitore: string, stato = 'da_controllare') {
+  const nome = `fattura-${createHash('sha256').update(nomeFornitore).digest('hex').slice(0, 8)}.pdf`;
+  const d = await db.documenti_in_arrivo.create({ data: {
+    origine: 'email', file_nome: nome, stato,
+    file_hash: createHash('sha256').update(nome).digest('hex'), file_percorso: `in_arrivo/${nome}`,
+    tipo: 'fattura',
+  } });
+  await db.documenti_campi.createMany({ data: [
+    { documento_id: d.id, campo: 'fornitore', valore_letto: nomeFornitore },
+    { documento_id: d.id, campo: 'righe[0].codice', valore_letto: 'ART-1' },
+  ] });
+  return d;
 }
 
 beforeAll(async () => {
@@ -147,6 +164,97 @@ describe('importa', () => {
   it('riga assente in vista: 404', async () => {
     await expect(importa(db, ponte, SCHEMA, 'cliente', 999999, {})).rejects.toMatchObject({ status: 404 });
   });
+
+  it('P.IVA estera: paese dal prefisso, stesso soggetto (R1-03)', async () => {
+    await db.soggetti.create({ data: {
+      natura: 'azienda', piva: 'DE123456789', piva_norm: 'DE123456789', paese: 'DE', sorgente: 'crm',
+    } });
+    await mettiFornitore({
+      id_integra: 120, codice: 'F00120', ragione_sociale: 'Keller Garten', piva: 'DE123456789', paese: 'Germania',
+    });
+    expect(await importa(db, ponte, SCHEMA, 'fornitore', 120, {})).toMatchObject({ creato: true });
+    expect(await db.soggetti.count()).toBe(1);
+    expect((await db.fornitori.findFirstOrThrow()).soggetto_id).toBe((await db.soggetti.findFirstOrThrow()).id);
+    // variante: in Integra la P.IVA estera è senza prefisso → lo mette il paese, e il soggetto è quello
+    await mettiFornitore({
+      id_integra: 121, codice: 'F00121', ragione_sociale: 'Keller Garten DE', piva: '123456789', paese: 'DE',
+    });
+    expect(await importa(db, ponte, SCHEMA, 'fornitore', 121, {})).toMatchObject({ gia_presente: true, collegato: true });
+    expect(await db.soggetti.count()).toBe(1);
+    expect(await db.fornitori.count()).toBe(1);
+  });
+
+  it('ruolo già presente senza codice Integra: registra il codice, la ricerca non lo ripropone (R1-04)', async () => {
+    await mettiCliente({ id_integra: 130, codice: 'C00130', ragione_sociale: 'Rossi Giardini', piva: '33333333333' });
+    const primo = await importa(db, ponte, SCHEMA, 'cliente', 130, {});
+    await db.codici_esterni.deleteMany({}); // nato dal vecchio CRM: nessun codice di Integra
+    await mettiCliente({ id_integra: 131, codice: 'C00131', ragione_sociale: 'Rossi Giardini', piva: '33333333333' });
+    expect(await importa(db, ponte, SCHEMA, 'cliente', 131, {})).toMatchObject({
+      gia_presente: true, collegato: true, id: primo.id,
+    });
+    const ce = await db.codici_esterni.findFirstOrThrow({ where: { sistema: 'integra', tipo: 'cliente' } });
+    expect(ce).toMatchObject({ codice: 'C00131', entita_id: BigInt(primo.id!) });
+    expect(await db.registro.count({ where: { entita: 'cliente', codice: 'crud.update' } })).toBe(1);
+    const c = await cerca(db, ponte, SCHEMA, 'cliente', 'Rossi Giardini');
+    expect(c.righe!.map((x) => x.codice)).not.toContain('C00131');
+  });
+
+  it('due import insieme dello stesso soggetto: un creato, un gia_presente (R1-05)', async () => {
+    await mettiCliente({ id_integra: 140, codice: 'C00140', ragione_sociale: 'Concorrente', piva: '44444444444' });
+    const esiti = (await Promise.all([
+      importa(db, ponte, SCHEMA, 'cliente', 140, {}),
+      importa(db, ponte, SCHEMA, 'cliente', 140, {}),
+    ])).map((x) => ('creato' in x ? 'creato' : 'gia_presente')).sort();
+    expect(esiti).toEqual(['creato', 'gia_presente']);
+    expect(await db.clienti.count()).toBe(1);
+    expect(await db.soggetti.count()).toBe(1);
+  });
+
+  it('importa con ponte appeso: 502 «ponte lento», non una richiesta appesa (R1-02)', async () => {
+    jest.useFakeTimers();
+    try {
+      const lento = { query: () => new Promise(() => {}) } as unknown as Pool;
+      const p = importa(db, lento, SCHEMA, 'cliente', 10, {});
+      jest.advanceTimersByTime(3100);
+      await expect(p).rejects.toMatchObject({ status: 502 });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('creaPonte: tempi massimi su connessione, query e statement (R1-02)', async () => {
+    const p = creaPonte('postgresql://utente:parola@127.0.0.1:1/nulla');
+    try {
+      expect(p.options).toMatchObject({ max: 2, connectionTimeoutMillis: 3000, query_timeout: 5000 });
+      expect(String(p.options.options)).toContain('statement_timeout=5000');
+    } finally {
+      await p.end();
+    }
+  });
+});
+
+describe('importa con documento_id (D-133)', () => {
+  it('collega il documento con import e collegamento in una transazione, senza toccare campi e righe', async () => {
+    await mettiFornitore({ id_integra: 150, codice: 'F00150', ragione_sociale: 'Fornitore Cento', piva: '55555555555' });
+    const doc = await mettiDocumento('Fornitore Cento');
+    const campiPrima = await db.documenti_campi.count({ where: { documento_id: doc.id } });
+    const r = await importa(db, ponte, SCHEMA, 'fornitore', 150, {}, doc.id);
+    expect(r).toMatchObject({ creato: true });
+    const dopo = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } });
+    expect(String(dopo.fornitore_id)).toBe(r.id);
+    expect(dopo.fornitore_versione_id).not.toBeNull();
+    expect(await db.documenti_campi.count({ where: { documento_id: doc.id } })).toBe(campiPrima);
+    expect(await db.registro.count({ where: { entita: 'documento', codice: 'documento.update' } })).toBe(1);
+  });
+
+  it('fornitore diverso da quello letto: 409, niente creato, documento non collegato', async () => {
+    await mettiFornitore({ id_integra: 160, codice: 'F00160', ragione_sociale: 'Fornitore Uno', piva: '11111111111' });
+    await mettiFornitore({ id_integra: 161, codice: 'F00161', ragione_sociale: 'Fornitore Due', piva: '22222222222' });
+    const doc = await mettiDocumento('Fornitore Uno');
+    await expect(importa(db, ponte, SCHEMA, 'fornitore', 161, {}, doc.id)).rejects.toMatchObject({ status: 409 });
+    expect(await db.fornitori.count()).toBe(0);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } })).fornitore_id).toBeNull();
+  });
 });
 
 describe('cerca', () => {
@@ -213,5 +321,29 @@ describe('rotte', () => {
     const oper = request.agent(app.getHttpServer());
     const r1 = await oper.post('/api/accesso/entra').send({ utente: 'oper-ai2', password: PW }).expect(200);
     await oper.post('/api/integra/importa').set('x-csrf-token', r1.body.csrf).send({ tipo: 'agente', id_integra: 1 }).expect(400);
+    // campo non dichiarato o id non intero: 400, nessun import (R1-13)
+    await oper.post('/api/integra/importa').set('x-csrf-token', r1.body.csrf).send({ tipo: 'cliente', id_integra: 'x', extra: 1 }).expect(400);
+    expect(await db.soggetti.count()).toBe(0);
+  });
+
+  it('importa con documento_id: serve anche provvigioni.modifica (D-133, R1-13)', async () => {
+    await db.utenti.create({ data: { username: 'imp-doc', email: 'imp-doc' + DOMINIO, nome: 'Importa', ruolo: 'utente', password_hash: await cifra(PW), deve_cambiare_password: false, aree: { create: [{ area: 'dati', livello: 'operatore' }, { area: 'provvigioni', livello: 'lettura' }] } } });
+    await db.utenti.create({ data: { username: 'imp-doc2', email: 'imp-doc2' + DOMINIO, nome: 'Importa Due', ruolo: 'utente', password_hash: await cifra(PW), deve_cambiare_password: false, aree: { create: [{ area: 'dati', livello: 'operatore' }, { area: 'provvigioni', livello: 'operatore' }] } } });
+    await mettiFornitore({ id_integra: 170, codice: 'F00170', ragione_sociale: 'Fornitore Rotte', piva: '12312312312' });
+    const doc = await mettiDocumento('Fornitore Rotte');
+
+    const a = request.agent(app.getHttpServer());
+    const r1 = await a.post('/api/accesso/entra').send({ utente: 'imp-doc', password: PW }).expect(200);
+    await a.post('/api/integra/importa').set('x-csrf-token', r1.body.csrf)
+      .send({ tipo: 'fornitore', id_integra: 170, documento_id: Number(doc.id) }).expect(403);
+    expect(await db.fornitori.count()).toBe(0);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } })).fornitore_id).toBeNull();
+
+    const b = request.agent(app.getHttpServer());
+    const r2 = await b.post('/api/accesso/entra').send({ utente: 'imp-doc2', password: PW }).expect(200);
+    const ok = await b.post('/api/integra/importa').set('x-csrf-token', r2.body.csrf)
+      .send({ tipo: 'fornitore', id_integra: 170, documento_id: Number(doc.id) }).expect(200);
+    expect(ok.body.creato).toBe(true);
+    expect(String((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } })).fornitore_id)).toBe(ok.body.id);
   });
 });
