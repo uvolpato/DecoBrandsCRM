@@ -63,6 +63,15 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 > **Per questo pacchetto:** Se scopri un doppio invio del modulo dell'agenzia, **non** correggere il frontend qui: scrivilo nel resoconto (diventa un pacchetto V4).
 
+### O0-B — Altre prove nel browser vecchie dopo D-101 e F1-A11 (fine onda 0, 12/11)
+- Gravità: P3
+- Dove: `strumenti/prove/app_bollettini.py:74-76` (aspetta 11 fornitori nella matrice: con MCL, D-101, sono 12), `strumenti/prove/app_utenti.py:57` (permessi evidenziati `4 + 3 + 6 + 1`: con `dati.importa`, F1-A11, l'area Dati ne ha 4).
+- Scenario: database nuovo con il seed → `app_bollettini.py` si ferma in timeout alla vista *Tutti*; `app_utenti.py` dà 1 KO sui permessi. L'app è giusta, le prove no.
+- Correzione puntuale: niente numeri fissi dove il seed può cambiare: leggi il numero dei fornitori dal segmento *Tutti* (o dall'API) e i permessi dall'API; se resta un numero, aggiornalo (12; 4 + 4 + 6 + 1) con un commento D-101 / F1-A11.
+- Prova che la verifica: `app_bollettini.py` e `app_utenti.py` 0 KO su database nuovo con il seed.
+- Esecutore: DeepSeek V4 Flash.
+- File toccati: strumenti/prove/app_bollettini.py, strumenti/prove/app_utenti.py
+
 ### R0-01 — `app_flusso.py` si ferma alla riga 289: aspetta 11 righe nella matrice Bollettini, il seed ne ha 12
 - Gravità: P3
 - Dove: `strumenti/prove/app_flusso.py:289` (prova dei Bollettini dopo *Togli tutti i filtri*)
@@ -81,6 +90,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - `strumenti/prove/app_analisi.py`
 - `strumenti/prove/app_clienti.py`
 - `strumenti/prove/app_subagenti.py`
+- `strumenti/prove/app_utenti.py`
 - `strumenti/opencode/resoconto-collaudo-1-22.md`
 
 ## File vietati
