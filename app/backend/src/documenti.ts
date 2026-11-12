@@ -809,6 +809,8 @@ export class DocumentiController {
       if (!['da_controllare', 'errore', 'in_coda'].includes(d.stato)) {
         throw new ConflictException('Il documento è già abbinato, scartato o in lettura');
       }
+      // il PDF di un bollettino non si scarta: la pulizia degli scartati cancellerebbe il suo file (D-74)
+      if (d.abbinato_bollettino_id) throw new ConflictException('Il file è il PDF di un bollettino');
       const nota = b.nota?.trim() || null;
       await tx.documenti_in_arrivo.update({
         where: { id: did },
@@ -931,7 +933,7 @@ async function importoValido(tx: Tx, testata_id: bigint, d: Bozza, id?: bigint) 
 /** Documento con i suoi legami; liquidato al subagente = chiuso, si corregge con una nota di credito (D-11, §4.2.7.2). */
 async function documentoDi(tx: Tx, testata_id: bigint, did: number | bigint) {
   const d = await tx.ordini_fornitore_documenti.findUnique({
-    where: { id: BigInt(did) }, include: { correzione: { select: { id: true } }, _count: { select: { righe_bollettino: true, note_credito: true } } },
+    where: { id: BigInt(did) }, include: { correzione: { select: { id: true } }, _count: { select: { righe_bollettino: true, note_credito: true, attese_bollettino: true } } },
   });
   if (!d || d.testata_id !== testata_id) throw new NotFoundException('Documento non trovato');
   if (d.liquidazione_id) throw new ConflictException(`${nomeDi(d.tipo)} ${d.numero} già liquidata al subagente: non si modifica, registra una nota di credito`);
@@ -943,6 +945,8 @@ async function togliibile(tx: Tx, pid: bigint, d: Doc, quale: string, cosa: stri
   if (d._count.note_credito) throw new ConflictException(`Una nota di credito storna la ${quale.toLowerCase()}: annulla prima la nota di credito`);
   if (d.correzione) throw new ConflictException(`${quale} ha una correzione della quota del subagente: toglila prima`);
   if (d._count.righe_bollettino) throw new ConflictException(`${quale} è già in un bollettino: ${cosa}`);
+  // la decisione su un documento mancante (D-56) sta nel bollettino: cancellarla con il documento la perderebbe (A3-03)
+  if (d._count.attese_bollettino) throw new ConflictException(`${quale} ha una decisione in un bollettino: ${cosa}`);
   if (d.tipo === 'ordine' && (await tx.ordini_fornitore_documenti.count({ where: { testata_id: pid, tipo: 'ordine' } })) === 1) {
     throw new ConflictException(`${quale} è l'unico ordine della pratica: ${cosa}`); // la pratica nasce dal primo ordine
   }
@@ -1194,6 +1198,8 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
     if (!a) throw new NotFoundException('File non trovato');
     // solo un file in coda o letto da controllare: uno già abbinato, scartato o in lettura non si riusa (D-54)
     if (a.stato !== 'in_coda' && a.stato !== 'da_controllare') throw new ConflictException('Il file non è più in coda: è già abbinato, scartato o in lettura');
+    // il PDF di un bollettino resta suo: non diventa anche il documento di una pratica (D-54, D-74)
+    if (a.abbinato_bollettino_id) throw new ConflictException('Il file è il PDF di un bollettino');
     await tx.documenti_in_arrivo.update({ where: { id: arrivo_id }, data: { stato: 'abbinato', tipo: b.tipo, abbinato_pratica_id: pid, controllato_il: new Date(), utente_id: ctx.utente_id ?? a.utente_id } });
   }
   const d = await tx.ordini_fornitore_documenti.create({

@@ -73,6 +73,15 @@ describe('interscambio datato (D-35)', () => {
     await q(ins, [1, 1, 'C1', '2026-01-01', null]);
     expect(await errore(`DELETE FROM subagenti WHERE id = 1`)).toMatch('interscambio_subagente_id_fkey');
   });
+
+  it('un\'agenzia con sconti storici non si elimina, si chiude (D-139, 23503)', async () => {
+    await q(ins, [1, 1, 'C1', '2026-01-01', null]);
+    const { rows: [ag] } = await q(`SELECT id FROM interscambio WHERE cliente_id = 1 AND fornitore_id = 1`);
+    expect(await errore(`INSERT INTO sconti (interscambio_id, ordine, tipo, percentuale) VALUES ($1, 1, 'commerciale', 5)`, [ag.id])).toBe('');
+    expect(await errore(`DELETE FROM interscambio WHERE id = $1`, [ag.id])).toMatch('sconti_interscambio_id_fkey');
+    await q(`DELETE FROM sconti WHERE interscambio_id = $1`, [ag.id]);
+    expect(await errore(`DELETE FROM interscambio WHERE id = $1`, [ag.id])).toBe('');
+  });
 });
 
 describe('scaglioni ed eccezioni', () => {
@@ -115,6 +124,12 @@ describe('documenti e liquidazione (D-34)', () => {
 
   it('chi ha chiuso un trimestre non si elimina', async () => {
     expect(await errore(`DELETE FROM utenti WHERE id = 1`)).toMatch('liquidazioni_chiusa_da_fkey');
+  });
+
+  it('il numero della pratica è unico anche nel database (A3-10, 23505)', async () => {
+    // il numero non si ripete nemmeno per un seed o un import che salta il blocco consultivo di nuovaPratica
+    expect(await errore(`INSERT INTO ordini_fornitore_testata (id, fornitore_id, fornitore_versione_id, numero_ordine, data_ordine, cliente_id, cliente_versione_id) VALUES (2, 1, 1, 'O1', '2026-03-02', 1, 1)`))
+      .toMatch('ordini_fornitore_testata_numero_ordine_key');
   });
 });
 
@@ -163,6 +178,16 @@ describe('valori ammessi (spec §4.2, fase 2a)', () => {
     expect(await errore(ins, ['email', 'in_coda', 'ricevuta', null])).toMatch('documenti_in_arrivo_tipo_check');
     expect(await errore(ins, ['email', 'in_coda', 'fattura', 'alta'])).toMatch('documenti_in_arrivo_livello_check');
     expect(await errore(ins, ['email', 'da_controllare', 'fattura', 'bassa'])).toBe('');
+  });
+
+  it('il file di un bollettino non si scarta e non si abbina a una pratica (A3-02)', async () => {
+    // due CHECK, 23514: lo scarto perderebbe il PDF del bollettino alla pulizia, l'abbinamento lo farebbe passare per una fattura
+    await q(`INSERT INTO documenti_in_arrivo (id, origine, file_nome, file_hash, file_percorso, abbinato_bollettino_id) VALUES (2, 'email', 'b.pdf', repeat('c', 64), 'b.pdf', 1)`);
+    expect(await errore(`UPDATE documenti_in_arrivo SET stato = 'scartato' WHERE id = 2`)).toMatch('documenti_in_arrivo_scarto_libero_check');
+    expect(await errore(`UPDATE documenti_in_arrivo SET abbinato_pratica_id = 1 WHERE id = 2`)).toMatch('documenti_in_arrivo_un_abbinamento_check');
+    expect(await errore(`INSERT INTO documenti_in_arrivo (origine, file_nome, file_hash, file_percorso, stato, abbinato_pratica_id) VALUES ('email', 'c.pdf', repeat('d', 64), 'c.pdf', 'scartato', 1)`))
+      .toMatch('documenti_in_arrivo_scarto_libero_check');
+    expect(await errore(`UPDATE documenti_in_arrivo SET stato = 'abbinato', abbinato_bollettino_id = NULL, abbinato_pratica_id = 1 WHERE id = 2`)).toBe('');
   });
 
   it('campo letto: affidabilità 0–1', async () => {

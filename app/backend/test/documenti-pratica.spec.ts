@@ -31,6 +31,7 @@ async function entra(utente: string) {
   return {
     get: (p: string) => agente.get('/api' + p),
     post: (p: string, b: object = {}) => agente.post('/api' + p).set('x-csrf-token', csrf).send(b),
+    elimina: (p: string) => agente.delete('/api' + p).set('x-csrf-token', csrf),
     carica: (dati: Buffer, nome: string) => agente.post('/api/documenti/carica').set('x-csrf-token', csrf).attach('file', dati, nome),
   };
 }
@@ -248,6 +249,19 @@ describe('spostamento in un\'altra pratica (POST /api/pratiche/:id/documenti/:di
     const dest = await db.ordini_fornitore_testata.findFirstOrThrow({ where: { fornitore_id: base.fornitore_id, id: { not: BigInt(pid) } } });
     await op.post(`/pratiche/${pid}/documenti/${ordini[1].id}/sposta`, { pratica_id: Number(dest.id) }).expect(200); // erano due
     expect((await op.post(`/pratiche/${pid}/documenti/${ordini[0].id}/sposta`, { pratica_id: Number(dest.id) }).expect(409)).body.message).toMatch(/unico ordine/);
+  });
+
+  it('una decisione in un bollettino ferma annullamento e spostamento (A3-03)', async () => {
+    const t = BigInt(base.id);
+    const c = await db.ordini_fornitore_documenti.create({
+      data: { testata_id: t, tipo: 'conferma', numero: 'C-A303', data: new Date('2026-09-02') },
+    });
+    const b = await db.bollettini_testata.findFirstOrThrow();
+    await db.bollettini_attese.create({ data: { testata_id: b.id, documento_id: c.id, decisione: 'attendere' } });
+    const dest = await db.ordini_fornitore_testata.findFirstOrThrow({ where: { fornitore_id: base.fornitore_id, id: { not: t } } });
+    expect((await op.elimina(`/pratiche/${t}/documenti/${c.id}`).expect(409)).body.message).toMatch(/decisione in un bollettino/);
+    expect((await op.post(`/pratiche/${t}/documenti/${c.id}/sposta`, { pratica_id: Number(dest.id) }).expect(409)).body.message).toMatch(/decisione in un bollettino/);
+    expect(await db.ordini_fornitore_documenti.count({ where: { id: c.id } })).toBe(1);
   });
 });
 

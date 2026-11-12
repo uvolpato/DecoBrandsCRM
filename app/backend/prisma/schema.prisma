@@ -57,6 +57,7 @@ model fornitori_versioni {
 
   @@unique([fornitore_id, id])
   @@index([piva])
+  @@index([ragione_sociale(ops: raw("gin_trgm_ops"))], type: Gin) // ricerca delle Pratiche (A7-24)
 }
 
 /// Identità del cliente, scritta solo dalla sincronizzazione (§4.2.20, D-33, D-46). Dati descrittivi
@@ -98,6 +99,7 @@ model clienti_versioni {
 
   @@unique([cliente_id, id])
   @@index([piva])
+  @@index([ragione_sociale(ops: raw("gin_trgm_ops"))], type: Gin) // ricerca delle Pratiche (A7-24)
 }
 
 /// Codice di un'entità in un sistema esterno (Integra, …). Due codici possono puntare alla stessa
@@ -239,6 +241,9 @@ model ordini_fornitore_testata {
   @@index([cliente_id])
   @@index([data_ordine])
   @@index([importo])
+  @@index([agente_id])
+  @@unique([numero_ordine]) // OF/AAAA/NNN non si ripete nemmeno per errore di script (A3-10)
+  @@index([numero_ordine(ops: raw("gin_trgm_ops"))], type: Gin) // ricerca delle Pratiche (A7-24)
 }
 
 /// Documenti della pratica (§4.2.7.1, D-60): ordine | conferma | proforma | fattura | nota_credito | pagamento | altro.
@@ -275,6 +280,7 @@ model ordini_fornitore_documenti {
   righe            ordini_fornitore_righe[]
 
   @@index([numero, tipo])
+  @@index([numero(ops: raw("gin_trgm_ops"))], type: Gin) // ricerca delle Pratiche (A7-24)
   @@index([testata_id])
   @@index([fattura_id])
   @@index([liquidazione_id])
@@ -375,6 +381,7 @@ model bollettini_righe {
   @@index([testata_id])
   @@index([documento_id])
   @@index([liquidazione_id])
+  @@index([deciso_da]) // FK SET/RESTRICT senza indice: l'eliminazione dell'utente scorrerebbe le righe (A3-11)
 }
 
 /// Decisione su un documento del mese che manca nel bollettino (§7.7, D-56): nostra, non è una riga del fornitore.
@@ -388,7 +395,7 @@ model bollettini_attese {
   deciso_il        DateTime @default(now()) @db.Timestamptz(6)
 
   testata   bollettini_testata         @relation(fields: [testata_id], references: [id], onDelete: Cascade)
-  documento ordini_fornitore_documenti @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+  documento ordini_fornitore_documenti @relation(fields: [documento_id], references: [id], onDelete: Restrict)
   decisore  utenti?                    @relation(fields: [deciso_da], references: [id], onDelete: Restrict)
 
   @@unique([testata_id, documento_id])
@@ -455,6 +462,8 @@ model documenti_in_arrivo {
   @@index([fornitore_id])
   @@index([abbinato_pratica_id])
   @@index([abbinato_bollettino_id])
+  @@index([utente_id]) // FK SET NULL senza indice (A3-11)
+  @@index([scartato_da])
 }
 
 model documenti_campi {
@@ -474,6 +483,7 @@ model documenti_campi {
   autore    utenti?             @relation(fields: [corretto_da], references: [id], onDelete: SetNull)
 
   @@index([documento_id])
+  @@index([corretto_da]) // FK SET NULL sulla tabella più grande (A3-11)
 }
 
 // ---------- Gestione (§4.2.11, §4.2.14, §4.2.15, §4.2.18) ----------
@@ -764,7 +774,7 @@ model sconti {
   valido_al       DateTime? @db.Date
   note            String?
 
-  interscambio interscambio @relation(fields: [interscambio_id], references: [id], onDelete: Cascade)
+  interscambio interscambio @relation(fields: [interscambio_id], references: [id], onDelete: Restrict) // D-139
 
   @@unique([interscambio_id, ordine, valido_dal])
 }

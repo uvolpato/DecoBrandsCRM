@@ -1,6 +1,6 @@
 # Collaudo · Onda 0 bis · Pacchetto 0b-03 — Storico del vecchio CRM e agenzia dal documento: coppia giusta e riga bloccata, subagente dal server, scaglioni dal server, import dello storico in transazione
 
-Data: 11/11/2026 · **Esecutore: DeepSeek V4** · Gravità del pacchetto: **P2** · Rilievi: R1-07, R2-05, R2-06, R2-13, R1-10, R1-09, R1-13 · Piano: `strumenti/collaudo/piano-correzioni.md`.
+Data: 11/11/2026 · **Esecutore: DeepSeek V4** · Gravità del pacchetto: **P2** · Rilievi: O0-10, R1-07, R2-05, R2-06, R2-13, R1-10, R1-09, R1-13 · Piano: `strumenti/collaudo/piano-correzioni.md`.
 
 Si lancia **dopo** la chiusura dell'onda 0 (migrazioni 0-01 → 0-05) e **prima** dell'onda 1. Fonte: `strumenti/collaudo/report/R0-ultime-modifiche.md`, `R1-backend-ultime.md`, `R2-frontend-ultime.md` (commit 89a4105..e879c62). I pacchetti dell'onda 0 bis lavorano in parallelo e non hanno file in comune. Dipende da: —.
 
@@ -82,6 +82,17 @@ Sono decise: applicale come scritte, non riaprirle. La riga del §19 la scrive i
 - Esecutore: DeepSeek V4 Flash
 - File toccati: app/frontend/componenti/FormAgenzia.tsx
 - Dipende da / correlato a: D-59, R2-06
+
+### O0-10 — Eliminare un'agenzia con sconti dà 500 dopo la FK RESTRICT (D-139, onda 0)
+- Gravità: P3
+- Dove: app/backend/src/clienti.ts:~376 (`eliminaAgenzia`, `tx.interscambio.delete`)
+- Problema: dopo la migrazione `20261113140000_sconti_restrict` la cancellazione di un'agenzia con righe in `sconti` viola la FK (23503 / P2003) e l'errore non è intercettato → 500.
+- Scenario: agenzia con uno sconto storico → *Elimina* → 500 invece di un messaggio.
+- Correzione puntuale: avvolgere la cancellazione con `unico()` di `clienti.ts` (già gestisce P2003 → 409) oppure, meglio, prima della `delete` contare `sconti` dell'agenzia e rispondere 409 «L'agenzia ha sconti storici: si chiude, non si elimina» (D-139). Il messaggio va mostrato com'è nella finestra.
+- Prova che la verifica: test/clienti.spec.ts: agenzia con una riga in `sconti` → DELETE 409 con quel testo, agenzia ancora presente; senza sconti → 200 come oggi.
+- Esecutore: DeepSeek V4 (stesso pacchetto).
+- File toccati: app/backend/src/clienti.ts, app/backend/test/clienti.spec.ts
+- Dipende da / correlato a: 0-05, D-139
 
 ### R1-10 — `import:storico --sostituisci` su `decobrands_db`: TRUNCATE fuori transazione e `RESTART IDENTITY` riusa gli id
 - Gravità: P2

@@ -201,6 +201,15 @@ describe('POST /api/bollettini', () => {
     const prima = await db.bollettini_testata.count();
     await op.post('/bollettini', { fornitore_id: Number(gasper), anno: 2026, mese: 11, arrivo_id: Number(arrivo) }).expect(409);
     expect(await db.bollettini_testata.count()).toBe(prima);
+
+    // A3-02: il PDF di un bollettino non si scarta (la pulizia degli scartati lo cancellerebbe)...
+    await op.post(`/documenti/${arrivo}/scarta`, { motivo: 'Altro' }).expect(409);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: arrivo } })).stato).not.toBe('scartato');
+    // ...e non diventa anche il documento di una pratica
+    const p = await db.ordini_fornitore_testata.findFirstOrThrow({ where: { fornitore_id: gasper }, select: { id: true } });
+    const a = await op.post(`/documenti/${arrivo}/abbina`, { tipo: 'conferma', data: '2026-09-01', pratica_id: Number(p.id) }).expect(409);
+    expect(a.body.message).toBe('Il file è il PDF di un bollettino');
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: arrivo } })).abbinato_pratica_id).toBeNull();
   });
 
   it('documento inesistente o scartato: errore e rollback, nessuna testata', async () => {
