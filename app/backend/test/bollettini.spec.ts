@@ -194,6 +194,10 @@ describe('POST /api/bollettini', () => {
     const t = await db.bollettini_testata.findUniqueOrThrow({ where: { id: BigInt(r.body.id as string) } });
     const d = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: arrivo } });
     expect(d.abbinato_bollettino_id).toBe(t.id);
+    expect(d.stato).toBe('abbinato'); // D-140
+    expect(d.controllato_il).not.toBeNull();
+    // D-140: il file legato al bollettino non entra nei documenti da controllare di Oggi (i 15 del seed)
+    expect((await op.get('/oggi/conteggi').expect(200)).body.documenti).toBe(15);
     const evento = await db.registro.findFirstOrThrow({ where: { codice: 'crud.create', entita: 'bollettino', entita_id: t.id } });
     expect(evento.dettaglio).toMatchObject({ file_nome: 'bollettino-ottobre.pdf' });
 
@@ -204,11 +208,12 @@ describe('POST /api/bollettini', () => {
 
     // A3-02: il PDF di un bollettino non si scarta (la pulizia degli scartati lo cancellerebbe)...
     await op.post(`/documenti/${arrivo}/scarta`, { motivo: 'Altro' }).expect(409);
-    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: arrivo } })).stato).not.toBe('scartato');
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: arrivo } })).stato).toBe('abbinato');
     // ...e non diventa anche il documento di una pratica
     const p = await db.ordini_fornitore_testata.findFirstOrThrow({ where: { fornitore_id: gasper }, select: { id: true } });
     const a = await op.post(`/documenti/${arrivo}/abbina`, { tipo: 'conferma', data: '2026-09-01', pratica_id: Number(p.id) }).expect(409);
-    expect(a.body.message).toBe('Il file è il PDF di un bollettino');
+    // D-140: il file ora è `abbinato`, quindi il rifiuto arriva dal controllo di stato, non da quello del bollettino
+    expect(a.body.message).toBe('Il file non è più in coda: è già abbinato, scartato o in lettura');
     expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: arrivo } })).abbinato_pratica_id).toBeNull();
   });
 

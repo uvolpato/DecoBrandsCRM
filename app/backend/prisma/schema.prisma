@@ -638,7 +638,7 @@ model servizi_esecuzioni {
 /// Master dell'identità: solo chiavi di riconoscimento. I dati descrittivi restano nelle *_versioni.
 model soggetti {
   id                       BigInt    @id @default(autoincrement())
-  codice                   String    @unique @default(dbgenerated("('C' || lpad(nextval('soggetti_codice_seq')::text, 6, '0'))")) @db.VarChar(20)
+  codice                   String    @unique @default(dbgenerated("('C'::text || lpad((nextval('soggetti_codice_seq'::regclass))::text, 6, '0'::text))")) @db.VarChar(20) // D-102: codici da sequenza, mai riusati
   natura                   String    @db.VarChar(10) // azienda | persona (CHECK)
   paese                    String    @default("IT") @db.Char(2)
   piva                     String?   @db.VarChar(30) // come scritta in origine
@@ -661,6 +661,10 @@ model soggetti {
   recapiti     recapiti[]
   contatti     persone_contatti[]
   fatturazione fatturazione?
+
+  // ricerca e controllo dei doppioni sul master (D-102); nomi della migrazione 20261108090000
+  @@index([piva_norm], map: "soggetti_piva_norm_idx")
+  @@index([cf_norm], map: "soggetti_cf_norm_idx")
 }
 
 /// Sede del soggetto: una catena = un soggetto con N punti vendita (§4.2). Il settore è della sede.
@@ -846,10 +850,11 @@ model interscambio_storico {
   creato_il                 DateTime  @default(now()) @db.Timestamptz(6)
   usato_il                  DateTime? @db.Timestamptz(6)
 
-  @@unique([fonte, cliente_legacy_id, fornitore_legacy_id])
-  @@index([fornitore_piva, cliente_codice_fornitore])
-  @@index([cliente_codice_fornitore])
-  @@index([stato])
+  // i nomi sono quelli nel database (migrazione 20261112090000): una rinomina non serve
+  @@unique([fonte, cliente_legacy_id, fornitore_legacy_id], map: "interscambio_storico_fonte_cliente_fornitore_key")
+  @@index([fornitore_piva, cliente_codice_fornitore], map: "interscambio_storico_fornitore_piva_codice_idx")
+  @@index([cliente_codice_fornitore], map: "interscambio_storico_cliente_codice_idx")
+  @@index([stato], map: "interscambio_storico_stato_idx")
   @@index([cliente_piva_norm])
   @@index([subagente_nome])
 }

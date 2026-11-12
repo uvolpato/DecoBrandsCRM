@@ -87,7 +87,8 @@ export async function conteggiBarra(db: PrismaService, S: Dati) {
   const mesi = await mesiBollettini(db, S.oggi);
   const bollettini = mesi.filter(aperto).length + mesi.filter((m) => mancante(m, S.oggi)).length;
   const documenti = await db.documenti_in_arrivo.count({
-    where: { stato: { not: 'scartato' }, abbinato_pratica_id: null, abbinato_bollettino_id: null },
+    // D-140: una regola sola, lo stato: chiusi sono `scartato` e `abbinato` (pratica o bollettino)
+    where: { stato: { notIn: ['scartato', 'abbinato'] }, abbinato_pratica_id: null },
   });
   return { oggi: documenti + conferme + bollettini + pagamenti, documenti, pratiche, bollettini };
 }
@@ -108,7 +109,7 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
     return { mese: m.mese, fornitore: m.fornitore, id: String(m.bollettino_id), aperte: r?.aperte ?? null };
   });
   const daDecidere = await db.documenti_in_arrivo.findMany({
-    where: { stato: { not: 'scartato' }, abbinato_pratica_id: null, abbinato_bollettino_id: null },
+    where: { stato: { notIn: ['scartato', 'abbinato'] }, abbinato_pratica_id: null },
     orderBy: { ricevuto_il: 'asc' },
     select: {
       id: true, tipo: true, livello: true,

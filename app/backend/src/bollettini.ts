@@ -160,7 +160,9 @@ export class BollettiniController {
         const t = await tx.bollettini_testata.create({
           data: { fornitore_id, fornitore_versione_id: f.fornitore_versione_id, mese: b.mese, anno: b.anno },
         });
-        if (arrivo_id) await tx.documenti_in_arrivo.update({ where: { id: arrivo_id }, data: { abbinato_bollettino_id: t.id } });
+        // D-140: il PDF legato al bollettino del suo fornitore e mese è «abbinato», come quello di una pratica:
+        // «da controllare» si conta con lo stato, senza filtri a parte
+        if (arrivo_id) await tx.documenti_in_arrivo.update({ where: { id: arrivo_id }, data: { abbinato_bollettino_id: t.id, stato: 'abbinato', controllato_il: new Date() } });
         await logEvent(tx, {
           tipo: 'crud', azione: 'create', entita: 'bollettino', entita_id: t.id, esito: 'successo',
           dettaglio: { etichetta: `${b.mese}/${b.anno} · ${f.fornitore}`, fornitore_id: String(fornitore_id), mese: b.mese, anno: b.anno, file_nome },
