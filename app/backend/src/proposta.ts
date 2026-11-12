@@ -352,11 +352,17 @@ export async function mancaRappresentanzaRighe(db: Db, righe: RigaAgenzia[], sen
   const out = new Set<bigint>();
   const rilevanti = righe.filter((r) => senzaAgenzia.has(r.id) && r.fornitore);
   if (!rilevanti.length) return out;
-  // R1-11: solo i codici della pagina, non tutto lo storico (l'indice su cliente_codice_fornitore c'è)
+  // R1-11: solo i codici della pagina, non tutto lo storico (l'indice su cliente_codice_fornitore c'è).
+  // C1 (0b-02 correzioni 1): un documento senza codice si ritrova con la chiave `fornitore|`,
+  // quindi contano anche le righe dello storico senza codice.
   const codici = [...new Set(rilevanti.map((r) => r.codice_cliente).filter((c): c is string => !!c))];
-  const storici = codici.length
+  const senzaCodice = rilevanti.some((r) => !r.codice_cliente);
+  const filtri: Prisma.interscambio_storicoWhereInput[] = [];
+  if (codici.length) filtri.push({ cliente_codice_fornitore: { in: codici, mode: 'insensitive' } });
+  if (senzaCodice) filtri.push({ cliente_codice_fornitore: null }, { cliente_codice_fornitore: '' });
+  const storici = filtri.length
     ? await db.interscambio_storico.findMany({
-        where: { subagente_nome: null, cliente_codice_fornitore: { in: codici, mode: 'insensitive' } },
+        where: { subagente_nome: null, OR: filtri },
         select: { fornitore_ragione_sociale: true, cliente_codice_fornitore: true },
       })
     : [];

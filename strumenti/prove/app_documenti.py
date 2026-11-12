@@ -4,7 +4,7 @@
 # prova <s>-ammi e <s>-lett (utenti_prova.js crea <s>) e il documento di prova (lo crea e lo toglie
 # questo script con documenti_prova.js).
 # Uso: python strumenti/prove/app_documenti.py <suffisso> <cartella schermate>
-import pathlib, subprocess, sys
+import pathlib, subprocess, sys, json, re
 from playwright.sync_api import sync_playwright
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
@@ -154,6 +154,67 @@ try:
         pg.wait_for_function("location.pathname.startsWith('/pratiche/')")
         ok(True, 'il documento senza agenzia si registra: aperta la pratica')
         pg.close()
+
+        # D-133 (R2-01, R2-08): import del fornitore dal documento. La scheda è simulata (il documento
+        # vero vorrebbe un fornitore nel ponte di Integra); si guarda quello che la correzione cambia:
+        # il browser non manda più il PUT che cancellava le righe, aspetta l'import, ricarica la scheda.
+        scheda = {
+            'id': '999999', 'file_nome': 'prova-integra.pdf', 'file_tipo': 'pdf', 'stato': 'da_controllare',
+            'tipo': 'fattura', 'livello': 'affidabile', 'ricevuto_il': '2026-09-15T09:00:00.000Z',
+            'letto_il': '2026-09-15T09:01:00.000Z', 'errore': None, 'scaglioni_mancanti': False, 'fornitore': None,
+            'campi': [], 'controlli': [],
+            'testata': {'tipo': 'fattura', 'numero': 'PROVA-INTEGRA', 'data': '2026-09-15', 'fornitore_id': None,
+                        'codice_cliente': 'K-1', 'cliente': 'Cliente Prova', 'importo': 250,
+                        'mese': None, 'anno': None, 'riferimento_fattura': None},
+            'righe': [
+                {'i': 0, 'codice': 'ART-1', 'descrizione': 'Articolo di prova', 'quantita': 2, 'prezzo': 100,
+                 'importo': 200, 'numero_fattura': None, 'data_fattura': None, 'provvigione': None},
+                {'i': 1, 'codice': 'ART-2', 'descrizione': 'Secondo articolo', 'quantita': 1, 'prezzo': 50,
+                 'importo': 50, 'numero_fattura': None, 'data_fattura': None, 'provvigione': None},
+            ],
+            'proposta': {
+                'esito': 'fornitore_da_integra', 'candidati': [], 'importo': 250, 'abbinamento': None,
+                'cliente_riconosciuto': None, 'agenzia_mancante': None, 'cliente_da_integra': None,
+                'manca_rappresentanza': None,
+                'fornitore_da_integra': {'id_integra': 99001, 'ragione_sociale': 'Fornitore Prova Integra', 'piva': '99999999991'},
+            },
+            'bollettino': None,
+        }
+        visti = {'dettaglio': 0, 'importa': 0, 'put': 0, 'pendente': []}
+        def risposta(route, corpo):
+            route.fulfill(status=200, content_type='application/json', body=corpo)
+        def dettaglio_simulato(route):
+            visti['dettaglio'] += 1
+            risposta(route, json.dumps(scheda))
+        def importa_in_attesa(route):
+            visti['importa'] += 1
+            visti['pendente'].append(route)  # non risponde: il pulsante resta «Importo…»
+        pg2 = entra(S + '-ammi')
+        pg2.on('request', lambda r: visti.__setitem__('put', visti['put'] + 1) if r.method == 'PUT' else None)
+        pg2.route(re.compile(r'^.*/api/documenti/999999$'), dettaglio_simulato)
+        pg2.route('**/api/integra/importa', importa_in_attesa)
+        pg2.goto(BASE + '/documenti/999999')
+        pronto = pg2.locator('button:has-text("Importa da Integra")')
+        pronto.wait_for()
+        pronto.click()
+        pg2.wait_for_selector('button:has-text("Importo…")')
+        ok(pg2.locator('button[disabled]:has-text("Importo…")').count() == 1, 'import in corso: pulsante spento e «Importo…»')
+        pg2.locator('button:has-text("Importo…")').dispatch_event('click')  # il secondo clic non deve partire
+        pg2.wait_for_timeout(400)
+        ok(visti['importa'] == 1, 'secondo clic durante l’attesa: una sola richiesta (R2-08)')
+        visti['pendente'][0].abort()
+        pg2.wait_for_selector('button:has-text("Importa da Integra")', timeout=5000)
+        ok(visti['put'] == 0, 'il browser non manda il PUT che cancellava le righe lette (R2-01)')
+        pg2.unroute('**/api/integra/importa')
+        pg2.route('**/api/integra/importa', lambda r: risposta(r, '{"creato":true,"id":"1"}'))
+        pg2.locator('button:has-text("Importa da Integra")').click()
+        pg2.wait_for_selector('.avviso:has-text("Fornitore importato da Integra")')
+        ok(visti['dettaglio'] == 2 and visti['put'] == 0, 'dopo l’import la scheda si ricarica, senza PUT')
+        pg2.click('.schede-barra [role=tab]:has-text("Righe lette")'); pg2.wait_for_timeout(200)
+        ok(pg2.locator('.dt tbody tr').count() == 2 and 'ART-1' in testo(pg2, '.dt tbody'),
+           'dopo l’import le righe lette sono ancora nella scheda Righe')
+        pg2.screenshot(path=str(USCITA / 'app-documento-import-integra-1440.png'))
+        pg2.close()
         b.close()
 finally:
     prova_documento('togli')

@@ -13,7 +13,7 @@ import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
 import { creaPonte, IntegraService, pulisci, sincronizzaGiro } from '../src/integra';
-import { importa } from '../src/anagrafica-integra';
+import { cerca, importa } from '../src/anagrafica-integra';
 import { svuota } from './svuota';
 
 let app: NestExpressApplication;
@@ -333,4 +333,34 @@ describe('un giro', () => {
     }
     expect(pulisci(new Error('getaddrinfo ENOTFOUND nome-host'))).toBe('getaddrinfo ENOTFOUND [indirizzo rimosso]');
   });
+});
+
+describe('ponte su richiesta', () => {
+  it('creaPonte: tempi massimi sulla connessione, nessun limite alle query del giro (R1-02, C2)', async () => {
+    const p = creaPonte('postgresql://utente:parola@127.0.0.1:1/nulla');
+    try {
+      expect(p.options).toMatchObject({ max: 2, connectionTimeoutMillis: 3000 });
+      expect(p.options.options).toBe('-c default_transaction_read_only=on');
+      expect(p.options.options).not.toContain('statement_timeout');
+      expect(p.options.query_timeout).toBeUndefined();
+    } finally {
+      await p.end();
+    }
+  });
+
+  it('il limite di 5 s vale solo per la ricerca: pg_sleep dà «ponte lento» (C2)', async () => {
+    await mettiCliente({ id_integra: 300, codice: 'C00300', ragione_sociale: 'Negozio Lento' });
+    await ponte.query('CREATE SCHEMA IF NOT EXISTS lento_prova');
+    await ponte.query(`CREATE OR REPLACE VIEW lento_prova.integra_v_clienti AS
+      SELECT c.* FROM public.integra_v_clienti c
+      CROSS JOIN LATERAL (SELECT pg_sleep(4) WHERE c.id_integra IS NOT NULL) s`);
+    try {
+      const r = await cerca(db, ponte, 'lento_prova', 'cliente', 'C00300');
+      expect(r.errore).toBe('ponte lento');
+      expect(r.ms).toBeGreaterThanOrEqual(3000);
+      expect(r.ms).toBeLessThan(5000);
+    } finally {
+      await ponte.query('DROP SCHEMA IF EXISTS lento_prova CASCADE');
+    }
+  }, 15000);
 });

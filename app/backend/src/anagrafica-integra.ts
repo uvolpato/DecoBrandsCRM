@@ -6,11 +6,11 @@ import type { Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import type { Request } from 'express';
-import { Pool } from 'pg';
+import { Pool, type QueryConfig } from 'pg';
 import { Richiede, contesto, permessiDi } from './accesso';
-import { IntegraService, VISTE, codiceDi, datiCliente, datiFornitore, pulisci, type Riga } from './integra';
+import { IntegraService, VISTE, codiceDi, datiCliente, datiFornitore, type Riga } from './integra';
 import { PrismaService } from './prisma.service';
-import { apriAnomalia, logEvent, type Contesto } from './registro';
+import { logEvent, type Contesto } from './registro';
 import { datiFiscali, normalizzaPiva } from './soggetti';
 
 // Anagrafica di Integra su richiesta (F1-A11, D-111, §4.7.1): niente import massivo, solo le righe
@@ -28,7 +28,7 @@ const LENTO = Symbol('lento');
 const testo = (v: unknown) => String(v ?? '').trim().replace(/\s+/g, ' ');
 
 /** La query del ponte entro 3 s: oltre, la ricerca risponde «ponte lento» invece di un 500 (D-111).
- *  La query che resta appesa si annulla da sola con `query_timeout`/`statement_timeout` di `creaPonte`. */
+ *  La query che resta appesa si annulla da sola con il `query_timeout` di `cerca` e `importa` (C2). */
 async function conTempo<T>(p: Promise<T>): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   try {
@@ -59,14 +59,14 @@ function paesePiva(r: Riga): { paese: string; piva: string | null } {
   return { paese, piva: pn && paese !== 'IT' && !/^[A-Z]{2}/.test(pn) ? paese + pn : pn || null };
 }
 
-/** Ricerca mirata sulla vista: massimo 10 righe, per codice esatto → P.IVA → ragione sociale (D-111). */
-export async function cerca(db: Db, ponte: Pool, schema: string, tipo: Tipo, q: string) {
+/** La SQL della ricerca mirata sulla vista: la usano `cerca` e il controllo del documento (C1). */
+function sqlRicerca(schema: string, tipo: Tipo, q: string) {
   const v = VISTE[VISTA_DI[tipo]];
   const codice = testo(q).toUpperCase();
   const piva = normalizzaPiva(testo(q));
-  const nome = `%${testo(q)}%`;
-  // nessun conteggio e nessuna scansione completa: LIMIT 10 e ordine dal più preciso (§4.7.1)
-  const sql = `
+  return {
+    // nessun conteggio e nessuna scansione completa: LIMIT 10 e ordine dal più preciso (§4.7.1)
+    text: `
     SELECT ${v.colonne.join(', ')}
     FROM ${schema}.${v.vista}
     WHERE upper(COALESCE(codice, '')) = $1
@@ -75,20 +75,29 @@ export async function cerca(db: Db, ponte: Pool, schema: string, tipo: Tipo, q: 
     ORDER BY (upper(COALESCE(codice, '')) = $1) DESC,
              (regexp_replace(upper(COALESCE(piva, '')), '[^A-Z0-9]', '', 'g') IN ($2, $3)) DESC,
              ragione_sociale
-    LIMIT 10`;
+    LIMIT 10`,
+    values: [codice, piva, `IT${piva}`, `%${testo(q)}%`],
+  };
+}
+
+/** Le righe della vista, anche quelle già in anagrafica: il documento deve vederle tutte (C1).
+ *  C2: il limite di 5 s vale solo per la ricerca e l'import su richiesta, non per la sincronizzazione. */
+async function righeVista(ponte: Pool, schema: string, tipo: Tipo, q: string): Promise<Riga[]> {
+  const { text, values } = sqlRicerca(schema, tipo, q);
+  // @types/pg non dichiara `query_timeout`, che pg legge per query
+  return (await conTempo(ponte.query<Riga>({ text, values, query_timeout: 5000 } as unknown as QueryConfig))).rows;
+}
+
+/** Ricerca mirata sulla vista: massimo 10 righe, per codice esatto → P.IVA → ragione sociale (D-111). */
+export async function cerca(db: Db, ponte: Pool, schema: string, tipo: Tipo, q: string) {
   const inizio = Date.now();
   let righe: Riga[];
   try {
-    righe = (await conTempo(ponte.query<Riga>(sql, [codice, piva, `IT${piva}`, nome]))).rows;
+    righe = await righeVista(ponte, schema, tipo, q);
   } catch (e) {
     if (e === LENTO) return { errore: 'ponte lento' as const, ms: Date.now() - inizio };
-    // R1-01: ponte giù (VPN, password, vista) → nessun candidato, non un 500: la pagina Documenti
-    // resta utilizzabile. Un'anomalia sola, non una per riga (§7.14.3).
-    await apriAnomalia(db, {
-      servizio: 'integra', codice: 'integra.connessione',
-      messaggio: 'Integra non risponde: controllare server, utente e password in Impostazioni → Sincronizzazione e avvisare chi gestisce Integra.',
-      dettaglio: { errore: pulisci(e) },
-    });
+    // C4: la ricerca non apre anomalie (la regola dei tre giri è della sincronizzazione, §7.14.3):
+    // ponte giù (VPN, password, vista) → nessun candidato, non un 500
     return { errore: 'ponte non raggiungibile' as const, ms: Date.now() - inizio };
   }
   // esclude chi è già in anagrafica: una sola query sui codici trovati, niente cicli (D-111)
@@ -108,8 +117,10 @@ export async function cerca(db: Db, ponte: Pool, schema: string, tipo: Tipo, q: 
 
 /**
  * Import puntuale in una transazione: rilegge la riga dalla vista per id, poi soggetto + ruolo +
- * versione + codici_esterni. Idempotente per codice e per P.IVA/CF (D-111, §4.7.1, V13).
- * Con `documentoId` collega il documento al fornitore nella stessa transazione (D-133).
+ * versione + codici_esterni. Idempotente per codice; la stessa P.IVA aggiunge il ruolo, ma un secondo
+ * codice Integra sulla stessa P.IVA è un doppione e dà 409 (C5, D-111, §4.7.1, V13).
+ * Con `documentoId` il nome letto si controlla prima della transazione e il documento si collega
+ * dentro la stessa transazione (C1, C3, D-133).
  */
 export async function importa(
   db: PrismaService, ponte: Pool, schema: string, tipo: Tipo, idIntegra: number,
@@ -118,10 +129,11 @@ export async function importa(
   const v = VISTE[VISTA_DI[tipo]];
   let rows: Riga[];
   try {
-    rows = (await conTempo(ponte.query<Riga>(
-      `SELECT ${v.colonne.join(', ')} FROM ${schema}.${v.vista} WHERE id_integra = $1`,
-      [idIntegra],
-    ))).rows;
+    rows = (await conTempo(ponte.query<Riga>({
+      text: `SELECT ${v.colonne.join(', ')} FROM ${schema}.${v.vista} WHERE id_integra = $1`,
+      values: [idIntegra],
+      query_timeout: 5000, // C2: il limite vale per l'import su richiesta, non per la sincronizzazione
+    } as unknown as QueryConfig))).rows;
   } catch (e) {
     // R1-02: ponte appeso → 502, non una richiesta che non torna
     if (e === LENTO) throw new BadGatewayException('Integra non risponde in tempo: riprova');
@@ -131,44 +143,62 @@ export async function importa(
   if (!r) throw new NotFoundException(`${tipo} ${idIntegra} non trovato in Integra`);
   const p = paesePiva(r);
   const ora = new Date();
+
+  // C3: nome letto e ricerca sul ponte **prima** della transazione: un ponte lento non tiene aperti
+  // advisory lock, `FOR UPDATE` e il limite di 5 s della transazione di Prisma.
+  let documento: { id: bigint; nome_letto: string } | null = null;
+  if (documentoId != null) {
+    if (tipo !== 'fornitore') throw new BadRequestException('documento_id vale solo per un fornitore');
+    const campo = await db.documenti_campi.findFirst({
+      where: { documento_id: documentoId, campo: 'fornitore' }, select: { valore_letto: true, valore_finale: true },
+    });
+    const letto = testo(campo?.valore_finale ?? campo?.valore_letto);
+    if (!letto) throw new ConflictException('Il documento non ha il nome del fornitore letto');
+    // V12: il nome letto lo rilegge il server; C1: la ricerca vede anche i fornitori già importati e
+    // deve trovare **questa** riga, con la stessa P.IVA normalizzata
+    let c: Riga[];
+    try {
+      c = await righeVista(ponte, schema, 'fornitore', letto);
+    } catch {
+      throw new BadGatewayException('Integra non risponde: riprova');
+    }
+    if (c.length !== 1 || c[0].id_integra !== idIntegra
+      || normalizzaPiva(c[0].piva ?? '') !== normalizzaPiva(r.piva ?? '')) {
+      throw new ConflictException('Il fornitore del documento non è questo: controlla il nome letto');
+    }
+    documento = { id: documentoId, nome_letto: letto };
+  }
+
   return db.$transaction(async (tx) => {
     const codice = codiceDi(r);
     const nome = testo(r.ragione_sociale);
     // R1-05: due import dello stesso soggetto insieme si mettono in fila (V13)
     await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtext(${'integra:' + tipo + ':' + codice}))`;
 
-    // D-133: con `documento_id` si blocca e si controlla il documento prima di qualsiasi scrittura
-    let documento: { id: bigint; file_nome: string } | null = null;
-    if (documentoId != null) {
-      if (tipo !== 'fornitore') throw new BadRequestException('documento_id vale solo per un fornitore');
-      await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${documentoId} FOR UPDATE`;
+    // D-133: con `documento_id` si blocca e si ricontrolla il documento prima di qualsiasi scrittura
+    let nomeFile = '';
+    if (documento) {
+      await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${documento.id} FOR UPDATE`;
       const doc = await tx.documenti_in_arrivo.findUnique({
-        where: { id: documentoId }, select: { stato: true, fornitore_id: true, file_nome: true },
+        where: { id: documento.id }, select: { stato: true, fornitore_id: true, file_nome: true },
       });
       if (!doc) throw new NotFoundException('Documento non trovato');
       if (doc.stato !== 'da_controllare' || doc.fornitore_id != null) {
         throw new ConflictException('Il documento non è più da controllare o ha già il fornitore');
       }
-      // V12: il nome letto lo rilegge il server, con la stessa ricerca della proposta (§4.7.1), e la
-      // P.IVA normalizzata deve essere quella che si collega. Zero righe = il codice è già in
-      // anagrafica (pagina vecchia): il documento si collega lo stesso.
+      // C3: se il nome letto è cambiato mentre si cercava sul ponte, il documento è un altro
       const campo = await tx.documenti_campi.findFirst({
-        where: { documento_id: documentoId, campo: 'fornitore' }, select: { valore_letto: true, valore_finale: true },
+        where: { documento_id: documento.id, campo: 'fornitore' }, select: { valore_letto: true, valore_finale: true },
       });
-      const letto = testo(campo?.valore_finale ?? campo?.valore_letto);
-      if (!letto) throw new ConflictException('Il documento non ha il nome del fornitore letto');
-      const c = await cerca(tx, ponte, schema, 'fornitore', letto);
-      if ('errore' in c) throw new BadGatewayException('Integra non risponde: riprova');
-      if (c.righe.length > 1 || (c.righe.length === 1 && (c.righe[0].id_integra !== idIntegra
-        || normalizzaPiva(c.righe[0].piva ?? '') !== normalizzaPiva(r.piva ?? '')))) {
-        throw new ConflictException('Il fornitore del documento non è questo: controlla il nome letto');
+      if (testo(campo?.valore_finale ?? campo?.valore_letto) !== documento.nome_letto) {
+        throw new ConflictException('Il documento è cambiato: riprova');
       }
-      documento = { id: documentoId, file_nome: doc.file_nome };
+      nomeFile = doc.file_nome;
     }
 
     /** D-133: del documento si scrivono solo fornitore e versione, mai campi o righe. */
     const collegaDocumento = async (f: { id: bigint; versione_corrente_id: bigint | null }) => {
-      if (!documento) return;
+      if (!documento) return false;
       // i due campi vanno insieme (CHECK `fornitore_check`): senza versione corrente non si collega
       if (!f.versione_corrente_id) throw new ConflictException('Il fornitore non ha una versione corrente: riprova dalla scheda del fornitore');
       await tx.documenti_in_arrivo.update({
@@ -178,15 +208,24 @@ export async function importa(
       await logEvent(tx, {
         tipo: 'documento', azione: 'update', entita: 'documento', entita_id: documento.id, esito: 'successo',
         dettaglio: {
-          etichetta: documento.file_nome, documento_id: String(documento.id), pratica_id: null,
+          etichetta: nomeFile, documento_id: String(documento.id), pratica_id: null,
           prima: { fornitore_id: null }, dopo: { fornitore_id: String(f.id) }, codice_integra: codice,
         },
       }, ctx);
+      return true;
     };
 
     /** R1-04: il ruolo c'era già ma senza il codice di Integra: si registra, così il giro lo aggiorna
      *  e la ricerca non lo ripropone più (D-102, D-111). */
     const registraCodice = async (entitaId: bigint) => {
+      // C5: un ruolo con un altro codice Integra è un doppione in Integra (stessa P.IVA su due master):
+      // registrargli il secondo farebbe alternare il ruolo a ogni giro
+      const altro = await tx.codici_esterni.findFirst({
+        where: { sistema: 'integra', tipo, entita_id: entitaId, codice: { not: codice } }, select: { codice: true },
+      });
+      if (altro) {
+        throw new ConflictException(`Il ${tipo} è già legato al codice Integra ${altro.codice}: in Integra c'è un doppione con la stessa P.IVA (da correggere in Integra)`);
+      }
       await tx.codici_esterni.create({ data: { sistema: 'integra', tipo, codice, etichetta: codice, entita_id: entitaId } });
       await logEvent(tx, {
         tipo: 'crud', azione: 'update', entita: tipo, entita_id: entitaId, esito: 'successo',
@@ -199,11 +238,12 @@ export async function importa(
 
     const esistente = await tx.codici_esterni.findFirst({ where: { sistema: 'integra', tipo, codice } });
     if (esistente) {
+      let documentoCollegato = false;
       if (tipo === 'fornitore') {
         const f = await tx.fornitori.findUnique({ where: { id: esistente.entita_id }, select: { id: true, versione_corrente_id: true } });
-        if (f) await collegaDocumento(f);
+        if (f) documentoCollegato = await collegaDocumento(f);
       }
-      return { gia_presente: true, collegato: false, id: String(esistente.entita_id) };
+      return { gia_presente: true, codice_registrato: false, documento_collegato: documentoCollegato, id: String(esistente.entita_id) };
     }
 
     const d = datiFiscali(p.piva, r.codice_fiscale ?? null, p.paese);
@@ -226,7 +266,7 @@ export async function importa(
       const gia = await tx.clienti.findFirst({ where: { soggetto_id: soggetto.id } });
       if (gia) {
         await registraCodice(gia.id); // idempotente anche per P.IVA
-        return { gia_presente: true, collegato: true, id: String(gia.id) };
+        return { gia_presente: true, codice_registrato: true, documento_collegato: false, id: String(gia.id) };
       }
       const ruolo = await tx.clienti.create({ data: { soggetto_id: soggetto.id, attivo: r.attivo ?? true, modificato_il: r.modificato_il ?? ora, sincronizzato_il: ora } });
       const versione = await tx.clienti_versioni.create({ data: { cliente_id: ruolo.id, fonte: 'integra', valido_dal: ora, ...datiCliente(r) } });
@@ -239,8 +279,8 @@ export async function importa(
     const gia = await tx.fornitori.findFirst({ where: { soggetto_id: soggetto.id } });
     if (gia) {
       await registraCodice(gia.id);
-      await collegaDocumento(gia);
-      return { gia_presente: true, collegato: true, id: String(gia.id) };
+      const documentoCollegato = await collegaDocumento(gia);
+      return { gia_presente: true, codice_registrato: true, documento_collegato: documentoCollegato, id: String(gia.id) };
     }
     const ruolo = await tx.fornitori.create({ data: { soggetto_id: soggetto.id, attivo: r.attivo ?? true, modificato_il: r.modificato_il ?? ora, sincronizzato_il: ora } });
     const versione = await tx.fornitori_versioni.create({ data: { fornitore_id: ruolo.id, fonte: 'integra', valido_dal: ora, ...datiFornitore(r) } });

@@ -45,6 +45,13 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 
 > **Per questo pacchetto:** In questo pacchetto **solo il backend**: `dataIt` e `MESI` in `app/backend/src/formati.ts` (creato dal pacchetto dei formati), `ELENCO_ID` e `MESE` in un nuovo `app/backend/src/validazione.ts`. `mpiu`/`mk` del frontend sono in un altro pacchetto.
 
+### R3-01 — Paese dalla P.IVA e P.IVA valida copiati (review 0b-01, 12/11/2026)
+- Gravità: P3
+- Dove: `paeseDi` ×3 (`prisma/seed/00-base.ts:36`, `prisma/import-storico.ts:60`, `prisma/import-vecchio-crm.ts:57`) più `paesePiva` (`src/anagrafica-integra.ts:55`), che fa la stessa cosa e aggiunge il prefisso; `pivaValida` ×2 (`src/soggetti.ts:33`, `prisma/import-vecchio-crm.ts:54`).
+- Problema: la stessa regola in più posti: se cambia (es. prefissi `EL`/`XI`) uno sfugge e due import danno paesi diversi allo stesso soggetto.
+- Correzione: `paeseDi` e `pivaValida` esportati da `src/soggetti.ts` (accanto a `normalizzaPiva`/`datiFiscali`); `paesePiva` li usa; gli import e il seed li importano. Nessun cambio di logica.
+- Prova: `npm test` (soggetti, anagrafica-integra, import).
+
 ### A8-12 — Commenti `ponytail:` senza tetto né uscita
 - Gravità: P3
 - Dove: `app/backend/src/bollettino.ts:87`, `app/backend/src/liquidazioni.ts:150`
@@ -89,6 +96,7 @@ Si lancia **dopo** il commit del lavoro f7 e la chiusura dell'onda precedente. D
 - `app/backend/src/bollettini.ts`
 - `app/backend/src/registro-api.ts`
 - `app/backend/src/motore/dati.ts`
+- `app/backend/src/soggetti.ts`, `app/backend/src/anagrafica-integra.ts`, `app/backend/prisma/seed/00-base.ts`, `app/backend/prisma/import-storico.ts`, `app/backend/prisma/import-vecchio-crm.ts` (solo R3-01)
 - `strumenti/opencode/resoconto-collaudo-7-01.md`
 
 ## File vietati

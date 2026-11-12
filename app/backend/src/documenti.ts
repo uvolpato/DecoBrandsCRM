@@ -21,7 +21,7 @@ import { aggiornaPratica } from './pratiche';
 import { cerca } from './anagrafica-integra';
 import { IntegraService } from './integra';
 import { cercaLegame } from './storico';
-import { type ClienteConCorrente, type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, propostaDocumento, riconosciClienteDai, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
+import { type ClienteConCorrente, type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, riconosciClienteDai, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -314,7 +314,7 @@ async function contestoDocumento(db: DbLetto, ponte: Ponte | null, letto: Letto,
 async function esitiImportazione(
   db: PrismaService,
   ponte: Ponte | null,
-  righe: { id: bigint; fornitore_id: bigint | null; fornitore: string | null; fornitore_letto: string | null; codice_cliente: string | null; cliente: string | null; piva_cliente: string | null }[],
+  righe: { id: bigint; fornitore_id: bigint | null; fornitore: string | null; fornitore_piva: string | null; fornitore_letto: string | null; codice_cliente: string | null; cliente: string | null; piva_cliente: string | null }[],
   clienti: ClienteConCorrente[],
 ): Promise<{ fornitore: Set<bigint>; cliente: Set<bigint> }> {
   const fornitore = new Set<bigint>();
@@ -341,16 +341,29 @@ async function esitiImportazione(
     select: { cliente_id: true, fornitore_id: true, codice_cliente_fornitore: true },
   });
   // D-112: coppia con subagente nello storico → proposta di import (subagente + sconto).
-  // R1-11: solo i codici della pagina; R1-06: `fornitore_id` nello storico importato è NULL, si confronta il nome
+  // R1-11: solo i codici della pagina; R1-06: `fornitore_id` nello storico importato è NULL, si confronta il nome.
+  // C1 (0b-02 correzioni 1): un documento senza codice si ritrova con la chiave `fornitore|`, quindi
+  // contano anche le righe dello storico senza codice. Una query sola per pagina (D-106).
   const codici = [...new Set(conFornitore.map((r) => r.codice_cliente).filter((c): c is string => !!c))];
-  const storici = codici.length
+  const senzaCodice = conFornitore.some((r) => !r.codice_cliente);
+  const filtriStorico: Prisma.interscambio_storicoWhereInput[] = [];
+  if (codici.length) filtriStorico.push({ cliente_codice_fornitore: { in: codici, mode: 'insensitive' } });
+  if (senzaCodice) filtriStorico.push({ cliente_codice_fornitore: null }, { cliente_codice_fornitore: '' });
+  const storici = filtriStorico.length
     ? await db.interscambio_storico.findMany({
-        where: { subagente_nome: { not: null }, cliente_codice_fornitore: { in: codici, mode: 'insensitive' } },
-        select: { fornitore_ragione_sociale: true, cliente_codice_fornitore: true },
+        where: { subagente_nome: { not: null }, OR: filtriStorico },
+        select: { fornitore_ragione_sociale: true, fornitore_piva: true, cliente_codice_fornitore: true },
       })
     : [];
   const chiaveStorico = (fornitore: string | null, codice: string | null) => `${normalizzaNome(fornitore ?? '')}|${(codice ?? '').toLowerCase()}`;
-  const storicoCon = new Set(storici.map((s) => chiaveStorico(s.fornitore_ragione_sociale, s.cliente_codice_fornitore)));
+  // C2 (0b-02 correzioni 1): la stessa regola di `cercaLegame` (storico.ts), P.IVA normalizzata o nome,
+  // non solo il nome: l'elenco deve proporre quello che propone il dettaglio.
+  const chiavePiva = (piva: string | null, codice: string | null) => `${normalizzaPiva(piva ?? '')}|${(codice ?? '').toLowerCase()}`;
+  const storicoNome = new Set(storici.filter((s) => s.fornitore_ragione_sociale).map((s) => chiaveStorico(s.fornitore_ragione_sociale, s.cliente_codice_fornitore)));
+  const storicoPiva = new Set(storici.filter((s) => s.fornitore_piva).map((s) => chiavePiva(s.fornitore_piva, s.cliente_codice_fornitore)));
+  const inStorico = (r: { fornitore: string | null; fornitore_piva: string | null; codice_cliente: string | null }) =>
+    storicoNome.has(chiaveStorico(r.fornitore, r.codice_cliente))
+    || (!!r.fornitore_piva && storicoPiva.has(chiavePiva(r.fornitore_piva, r.codice_cliente)));
   const daCercare = new Map<string, bigint[]>(); // q Integra → documenti con quella chiave
   for (const r of conFornitore) {
     const f = r.fornitore_id!;
@@ -358,7 +371,7 @@ async function esitiImportazione(
       ? interscambi.some((a) => a.fornitore_id === f && (a.codice_cliente_fornitore ?? '').toLowerCase() === r.codice_cliente!.toLowerCase())
       : false;
     if (perCodice || riconosciClienteDai(clienti, r.piva_cliente, r.cliente)) continue; // cliente riconosciuto
-    if (storicoCon.has(chiaveStorico(r.fornitore, r.codice_cliente))) { cliente.add(r.id); continue; }
+    if (inStorico(r)) { cliente.add(r.id); continue; }
     const q = (r.codice_cliente || r.piva_cliente || r.cliente || '').trim();
     if (q) daCercare.set(q, [...(daCercare.get(q) ?? []), r.id]);
   }
@@ -516,12 +529,12 @@ export class DocumentiController {
       AND (${livello} = '' OR d.livello = ${livello})`;
     const righe = await this.db.$queryRaw<{
       id: bigint; file_nome: string; file_percorso: string; tipo: string | null; fornitore_id: bigint | null;
-      fornitore: string | null; numero: string | null; data: string | null; codice_cliente: string | null;
+      fornitore: string | null; fornitore_piva: string | null; numero: string | null; data: string | null; codice_cliente: string | null;
       cliente: string | null; piva_cliente: string | null; fornitore_letto: string | null; importo: string | null; livello: string | null; ricevuto_il: Date;
       letto_il: Date | null; controlli: Prisma.JsonValue | null;
     }[]>`
       WITH ${campi}
-      SELECT d.id, d.file_nome, d.file_percorso, d.tipo, d.fornitore_id, fv.ragione_sociale AS fornitore,
+      SELECT d.id, d.file_nome, d.file_percorso, d.tipo, d.fornitore_id, fv.ragione_sociale AS fornitore, fv.piva AS fornitore_piva,
              c.numero, c.data, c.codice_cliente, c.cliente, c.piva_cliente, c.fornitore_letto, c.importo, d.livello, d.ricevuto_il, d.letto_il, d.controlli
       FROM documenti_in_arrivo d
       LEFT JOIN campi c ON c.documento_id = d.id

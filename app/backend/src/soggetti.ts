@@ -193,6 +193,7 @@ interface Ruolo {
   nome: string;
   codice: string;
   attivo: boolean;
+  fonte: string;
 }
 
 /** I ruoli dei soggetti richiesti, letti dallo strato 0 (D-101: un codice per ruolo). */
@@ -200,8 +201,8 @@ async function ruoliDi(db: Db, ids: bigint[]): Promise<Map<string, Ruolo[]>> {
   const mappa = new Map<string, Ruolo[]>();
   if (!ids.length) return mappa;
   const [clienti, fornitori, subagenti] = await Promise.all([
-    db.clienti.findMany({ where: { soggetto_id: { in: ids } }, include: { corrente: { select: { ragione_sociale: true } } } }),
-    db.fornitori.findMany({ where: { soggetto_id: { in: ids } }, include: { corrente: { select: { ragione_sociale: true } } } }),
+    db.clienti.findMany({ where: { soggetto_id: { in: ids } }, include: { corrente: { select: { ragione_sociale: true, fonte: true } } } }),
+    db.fornitori.findMany({ where: { soggetto_id: { in: ids } }, include: { corrente: { select: { ragione_sociale: true, fonte: true } } } }),
     db.subagenti.findMany({ where: { soggetto_id: { in: ids } } }),
   ]);
   const [cc, cf, cs] = await Promise.all([
@@ -214,9 +215,9 @@ async function ruoliDi(db: Db, ids: bigint[]): Promise<Map<string, Ruolo[]>> {
     const k = String(soggetto_id);
     mappa.set(k, [...(mappa.get(k) ?? []), ruolo]);
   };
-  for (const c of clienti) aggiungi(c.soggetto_id, { tipo: 'cliente', id: String(c.id), nome: c.corrente?.ragione_sociale ?? '', codice: cc.get(String(c.id)) ?? '', attivo: c.attivo });
-  for (const f of fornitori) aggiungi(f.soggetto_id, { tipo: 'fornitore', id: String(f.id), nome: f.corrente?.ragione_sociale ?? '', codice: cf.get(String(f.id)) ?? '', attivo: f.attivo });
-  for (const s of subagenti) aggiungi(s.soggetto_id, { tipo: 'subagente', id: String(s.id), nome: `${s.nome} ${s.cognome}`.trim(), codice: cs.get(String(s.id)) ?? '', attivo: s.attivo });
+  for (const c of clienti) aggiungi(c.soggetto_id, { tipo: 'cliente', id: String(c.id), nome: c.corrente?.ragione_sociale ?? '', codice: cc.get(String(c.id)) ?? '', attivo: c.attivo, fonte: c.corrente?.fonte ?? '' });
+  for (const f of fornitori) aggiungi(f.soggetto_id, { tipo: 'fornitore', id: String(f.id), nome: f.corrente?.ragione_sociale ?? '', codice: cf.get(String(f.id)) ?? '', attivo: f.attivo, fonte: f.corrente?.fonte ?? '' });
+  for (const s of subagenti) aggiungi(s.soggetto_id, { tipo: 'subagente', id: String(s.id), nome: `${s.nome} ${s.cognome}`.trim(), codice: cs.get(String(s.id)) ?? '', attivo: s.attivo, fonte: '' });
   return mappa;
 }
 
@@ -319,14 +320,8 @@ async function ruoliAttivi(db: Db, id: bigint) {
 }
 
 /** D-138: il master di un soggetto con almeno un ruolo da Integra si corregge in Integra, non qui. */
-async function daIntegra(db: Db, id: bigint, ruoli?: Ruolo[]) {
-  const suoi = ruoli ?? (await ruoliDi(db, [id])).get(String(id)) ?? [];
-  if (suoi.some((r) => r.codice)) return true;
-  const [clienti, fornitori] = await Promise.all([
-    db.clienti.count({ where: { soggetto_id: id, corrente: { fonte: 'integra' } } }),
-    db.fornitori.count({ where: { soggetto_id: id, corrente: { fonte: 'integra' } } }),
-  ]);
-  return clienti + fornitori > 0;
+function daIntegra(ruoli: Ruolo[]) {
+  return ruoli.some((r) => r.codice || r.fonte === 'integra');
 }
 
 /**
@@ -469,7 +464,7 @@ export class SoggettiController {
       ...mappaIdentita(s),
       nome: nomeDi(ruoli),
       ruoli,
-      da_integra: await daIntegra(this.db, s.id, ruoli), // D-138: il frontend nasconde le modifiche del master
+      da_integra: daIntegra(ruoli), // D-138: il frontend nasconde le modifiche del master
       sedi: sedi.map(mappaSede),
       recapiti: recapiti.map(mappaRecapito),
       contatti: contatti.map((c) => ({
@@ -501,8 +496,10 @@ export class SoggettiController {
     return unico(() => this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM soggetti WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
       const prima = await soggettoEsiste(tx, BigInt(id));
-      // D-138: ciò che arriva da Integra non si tocca nel CRM
-      if (await daIntegra(tx, prima.id)) throw new ConflictException('Dati di Integra: si correggono in Integra');
+      // D-138: ciò che arriva da Integra non si tocca nel CRM. I ruoli si leggono una volta sola.
+      if (daIntegra((await ruoliDi(tx, [prima.id])).get(String(prima.id)) ?? [])) {
+        throw new ConflictException('Dati di Integra: si correggono in Integra');
+      }
       const d = datiFiscali(
         b.piva !== undefined ? b.piva : prima.piva,
         b.codice_fiscale !== undefined ? b.codice_fiscale : prima.codice_fiscale,
@@ -542,7 +539,9 @@ export class SoggettiController {
       await tx.$queryRaw`SELECT id FROM soggetti WHERE id = ${BigInt(id)} FOR UPDATE`; // V13
       const s = await soggettoEsiste(tx, BigInt(id));
       // D-138: anche attiva e disattiva, su un soggetto da Integra, si fanno in Integra
-      if (await daIntegra(tx, s.id)) throw new ConflictException('Dati di Integra: si correggono in Integra');
+      if (daIntegra((await ruoliDi(tx, [s.id])).get(String(s.id)) ?? [])) {
+        throw new ConflictException('Dati di Integra: si correggono in Integra');
+      }
       if (s.attivo === b.attivo) return mappaIdentita(s);
       if (!b.attivo) {
         const attivi = await ruoliAttivi(tx, s.id);
@@ -798,7 +797,7 @@ export class SoggettiController {
           tipo: 'crud', azione: 'create', entita: 'cliente', entita_id: ruolo.id, esito: 'successo',
           dettaglio: { etichetta: nome, soggetto_id: String(s.id) },
         }, contesto(req));
-        return { tipo: 'cliente', id: String(ruolo.id), nome, codice: '', attivo: true } satisfies Ruolo;
+        return { tipo: 'cliente', id: String(ruolo.id), nome, codice: '', attivo: true, fonte: 'crm' } satisfies Ruolo;
       }
 
       if (await tx.fornitori.findFirst({ where: { soggetto_id: s.id } })) throw new ConflictException('Il soggetto ha già il ruolo fornitore');
@@ -812,7 +811,7 @@ export class SoggettiController {
         tipo: 'crud', azione: 'create', entita: 'fornitore', entita_id: ruolo.id, esito: 'successo',
         dettaglio: { etichetta: nome, soggetto_id: String(s.id) },
       }, contesto(req));
-      return { tipo: 'fornitore', id: String(ruolo.id), nome, codice: '', attivo: true } satisfies Ruolo;
+      return { tipo: 'fornitore', id: String(ruolo.id), nome, codice: '', attivo: true, fonte: 'crm' } satisfies Ruolo;
     }));
   }
 }

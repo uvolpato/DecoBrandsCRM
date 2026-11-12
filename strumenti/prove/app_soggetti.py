@@ -1,7 +1,8 @@
 # Prova della pagina Soggetti dell'app (F1-A8b, D-102), con Playwright: elenco dal server, ricerca,
 # segmenti, ordinamento, pagine, memoria della schermata, scheda con le quattro schede, nuovo soggetto
 # (P.IVA doppia, corta, senza dati fiscali), ruoli, sedi, recapiti, fatturazione, disattiva, permessi,
-# codice soggetto nelle altre anagrafiche, 768 px. Crea un soggetto di prova che resta nel database.
+# codice soggetto nelle altre anagrafiche, 768 px, risposta fuori ordine (R2-02) e soggetto che non
+# c'è (R2-04). Crea un soggetto di prova che resta nel database.
 # Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi, <s>-lett
 # (password-di-prova, da utenti_prova.js crea <s>), sul database di prova con il seed caricato.
 # Uso: python strumenti/prove/app_soggetti.py <suffisso> <cartella schermate> [base]
@@ -112,6 +113,10 @@ with sync_playwright() as p:
     scheda(pg, 'Ruoli'); pg.wait_for_timeout(300)
     corpo = testo(pg, '.schede-corpo')
     ok('C02477' in corpo and 'F90012' in corpo and 'cliente' in corpo and 'fornitore' in corpo, 'D-101: due ruoli e due codici sullo stesso soggetto')
+    # D-138: il master arriva da Integra: in sola lettura, con la nota
+    ok(pg.locator('.pannello-testa button:has-text("Modifica identità"), .pannello-testa button:has-text("Disattiva")').count() == 0,
+       'D-138: soggetto da Integra senza comandi sul master')
+    ok('Da Integra' in testo(pg, '.pannello'), 'D-138: la scheda dice che il master si corregge in Integra')
     scheda(pg, 'Sedi'); pg.wait_for_timeout(300)
     ok(pg.locator('.schede-corpo .dt tbody tr').count() == 4 and 'MCL Brescello' in testo(pg, '.schede-corpo'), 'sedi: quattro punti vendita, insegna e indirizzo')
     scheda(pg, 'Recapiti'); pg.wait_for_timeout(300)
@@ -150,17 +155,18 @@ with sync_playwright() as p:
     # ---------- 4. Aggiungi ruolo cliente e fornitore
     scheda(pg, 'Ruoli'); pg.wait_for_timeout(300)
     pg.click('button:has-text("Aggiungi ruolo")'); finestra(pg).wait_for()
-    pg.select_option('#c-tipo', 'cliente'); pg.fill('#c-nome', CLIENTE); pg.fill('#c-codice', 'c99' + RUN); invia(pg)
+    ok(pg.locator('#c-codice').count() == 0, 'R1-08: la finestra del ruolo non chiede il codice di Integra')
+    pg.select_option('#c-tipo', 'cliente'); pg.fill('#c-nome', CLIENTE); invia(pg)
     finestra(pg).wait_for(state='detached'); attesa_scheda(pg)
     scheda(pg, 'Ruoli'); pg.wait_for_timeout(300)
     ok(pg.locator('.schede-corpo .dt tbody tr').count() == 1 and 'cliente' in testo(pg, '.schede-corpo'), 'ruolo cliente aggiunto')
     pg.click('button:has-text("Aggiungi ruolo")'); finestra(pg).wait_for()
-    pg.select_option('#c-tipo', 'fornitore'); pg.fill('#c-nome', FORNITORE); pg.fill('#c-codice', 'f99' + RUN); invia(pg)
+    pg.select_option('#c-tipo', 'fornitore'); pg.fill('#c-nome', FORNITORE); invia(pg)
     finestra(pg).wait_for(state='detached'); attesa_scheda(pg)
     scheda(pg, 'Ruoli'); pg.wait_for_timeout(300)
     corpo = testo(pg, '.schede-corpo')
-    ok(pg.locator('.schede-corpo .dt tbody tr').count() == 2 and ('C99' + RUN) in corpo.upper() and ('F99' + RUN) in corpo.upper(),
-       'due ruoli con due codici sullo stesso soggetto (D-101)')
+    ok(pg.locator('.schede-corpo .dt tbody tr').count() == 2 and 'cliente' in corpo and 'fornitore' in corpo,
+       'due ruoli sullo stesso soggetto (D-101), senza codice Integra (D-138)')
     # il clic sulla riga del ruolo apre la pagina del ruolo
     pg.click('.schede-corpo .dt tbody tr:has-text("cliente")'); pg.wait_for_selector('.testa h1:has-text("Clienti")', timeout=20000)
     pg.wait_for_selector('.pannello-testa h2:has-text("%s")' % CLIENTE, timeout=20000)
@@ -188,7 +194,10 @@ with sync_playwright() as p:
     pg.select_option('#c-tipo', 'email'); pg.fill('#c-valore', 'non-una-email'); invia(pg)
     ok('email non è valida' in errore(pg), 'email con formato sbagliato rifiutata dal server')
     pg.fill('#c-valore', 'Prova.A8@Example.IT'); invia(pg)
-    finestra(pg).wait_for(state='detached'); attesa_scheda(pg)
+    finestra(pg).wait_for(state='detached')
+    ok(pg.locator('.pannello .sagoma').count() == 0 and pg.locator('.pannello-testa h2').count() == 1,
+       'R2-03: dopo il salvataggio il pannello resta, senza sagoma')
+    attesa_scheda(pg)
     scheda(pg, 'Recapiti'); pg.wait_for_timeout(300)
     ok('prova.a8@example.it' in testo(pg, '.schede-corpo'), 'email salvata in minuscolo')
     pg.click('button:has-text("Nuovo recapito")'); finestra(pg).wait_for()
@@ -258,6 +267,29 @@ with sync_playwright() as p:
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
     ok(righe(pg) > 0 and pg.locator('.pannello-testa h2').count() == 1, '768 px: elenco e scheda si usano')
     pg.screenshot(path=str(USCITA / 'app-soggetti-768.png'), full_page=True)
+    pg.close()
+
+    # ---------- 12. R2-02 e R2-04: risposta vecchia non sovrascrive, soggetto che non c'è
+    pg = entra(S + '-ammi')
+    primi = pg.evaluate("""async () => {
+        const r = await fetch('/api/soggetti?righe=3&ordina=codice&dir=asc');
+        const j = await r.json();
+        return j.righe.map((x) => ({ id: x.id, nome: x.nome || 'Soggetto ' + x.codice }));
+    }""")
+    # il primo clic (riga 2) risponde dopo 0,9 s; il secondo (riga 3) subito: vince il secondo
+    pg.route('**/api/soggetti/' + primi[1]['id'], lambda route: (time.sleep(0.9), route.continue_()))
+    pg.evaluate("""() => {
+        const r = document.querySelectorAll('.soggetti-filtri .dt tbody tr.cliccabile');
+        r[1].click(); setTimeout(() => r[2].click(), 60);
+    }""")
+    pg.wait_for_timeout(2200)
+    ok('/soggetti/' + primi[2]['id'] in pg.url and testo(pg, '.pannello-testa h2') == primi[2]['nome'],
+       'R2-02: con due clic rapidi vince l’ultimo, non la risposta più lenta')
+    pg.unroute('**/api/soggetti/' + primi[1]['id'])
+    pg.goto(BASE + '/soggetti/999999')
+    ok(attesa(pg, '.vuoto:has-text("Soggetto non caricato")', 10000),
+       'R2-04: un soggetto che non c’è dice «Soggetto non caricato», non «Nessun soggetto»')
+    ok(pg.locator('.soggetti-filtri .dt tbody tr.cliccabile').count() > 0, 'R2-04: l’elenco resta al suo posto')
     pg.close()
     b.close()
 

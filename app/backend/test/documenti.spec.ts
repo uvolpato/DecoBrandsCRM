@@ -472,13 +472,13 @@ describe('agenzia mancante: il documento non entra in pratica (D-106)', () => {
 
 describe('proposta con import da Integra e storico (D-111/D-112)', () => {
   const ESTRATTO = new Date('2026-11-08T00:00:00Z');
-  let fornitore: { id: bigint; versione_id: bigint; ragione: string };
+  let fornitore: { id: bigint; versione_id: bigint; ragione: string; piva: string | null };
   let senza: { id: bigint; versione_id: bigint; ragione: string; piva: string | null };
 
   beforeAll(async () => {
     const fv = await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } });
     const f = await db.fornitori.findUniqueOrThrow({ where: { id: fv.fornitore_id } });
-    fornitore = { id: fv.fornitore_id, versione_id: f.versione_corrente_id!, ragione: fv.ragione_sociale };
+    fornitore = { id: fv.fornitore_id, versione_id: f.versione_corrente_id!, ragione: fv.ragione_sociale, piva: fv.piva };
     const c = await db.clienti.findFirstOrThrow({ where: { agenzie: { none: { fornitore_id: fornitore.id } } }, include: { corrente: true } });
     senza = { id: c.id, versione_id: c.versione_corrente_id!, ragione: c.corrente!.ragione_sociale, piva: c.corrente!.piva };
   });
@@ -617,5 +617,62 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
     await op.put(`/documenti/${d.id}`, { testata: { tipo: 'fattura', fornitore_id: Number(fornitore.id) } }).expect(200);
     const dopo = await db.documenti_campi.findMany(righe);
     expect(dopo).toEqual(prima);
+  });
+
+  it('documento senza codice cliente: lo storico con codice NULL si ritrova come prima (C1)', async () => {
+    await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7003n, fornitore_legacy_id: 7003n,
+      fornitore_ragione_sociale: fornitore.ragione,
+      cliente_codice_fornitore: null, cliente_ragione_sociale: 'Sconosciuto SRL',
+      subagente_nome: 'Mario Rossi', sconto_1: 5, sconto_2: 0,
+    } });
+    const d = await creaArrivo('ordine-senza-codice.pdf', {
+      tipo: 'ordine', fornitore_id: fornitore.id,
+      campi: [['numero', 'SC-1'], ['data', '2026-09-01'], ['cliente', 'Sconosciuto SRL']],
+    });
+    const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    expect(r.documenti.find((x: any) => x.id === String(d.id)).cliente_da_integra).toBe(true);
+  });
+
+  it('documento con codice: la riga dello storico senza codice non lo riguarda (C1, R1-11 invariato)', async () => {
+    const d = await creaArrivo('ordine-con-codice.pdf', {
+      tipo: 'ordine', fornitore_id: fornitore.id,
+      campi: [['numero', 'CC-1'], ['data', '2026-09-01'], ['codice_cliente', 'CODICE-ALTRO'], ['cliente', 'Sconosciuto SRL']],
+    });
+    const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    expect(r.documenti.find((x: any) => x.id === String(d.id)).cliente_da_integra).toBe(false);
+  });
+
+  it('documento senza codice: la coppia senza subagente nello storico dà «Non rappresentato» (C1)', async () => {
+    await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7004n, fornitore_legacy_id: 7004n,
+      fornitore_ragione_sociale: fornitore.ragione,
+      cliente_codice_fornitore: null, cliente_ragione_sociale: senza.ragione,
+      subagente_nome: null, sconto_1: 0, sconto_2: 0,
+    } });
+    const d = await creaArrivo('ordine-senza-codice-nonrapp.pdf', {
+      tipo: 'ordine', fornitore_id: fornitore.id,
+      campi: [['numero', 'SC-2'], ['data', '2026-09-01'], ['cliente', senza.ragione], ['piva_cliente', senza.piva]],
+    });
+    const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    const riga = r.documenti.find((x: any) => x.id === String(d.id));
+    expect(riga.manca_rappresentanza).toBe(true);
+    expect(riga.manca_agenzia).toBe(false);
+  });
+
+  it('elenco e dettaglio trovano lo storico per P.IVA anche con un nome diverso (C2)', async () => {
+    await db.interscambio_storico.create({ data: {
+      fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7005n, fornitore_legacy_id: 7005n,
+      fornitore_ragione_sociale: 'GRIES GmbH', fornitore_piva: fornitore.piva,
+      cliente_codice_fornitore: 'CLI-PIVA-1', subagente_nome: 'Mario Rossi', sconto_1: 5, sconto_2: 0,
+    } });
+    const d = await creaArrivo('ordine-storico-piva.pdf', {
+      tipo: 'ordine', fornitore_id: fornitore.id,
+      campi: [['numero', 'PV-1'], ['data', '2026-09-01'], ['codice_cliente', 'CLI-PIVA-1'], ['cliente', 'Sconosciuto SRL']],
+    });
+    const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    expect(r.documenti.find((x: any) => x.id === String(d.id)).cliente_da_integra).toBe(true);
+    const dettaglio = (await op.get(`/documenti/${d.id}`).expect(200)).body;
+    expect(dettaglio.proposta.esito).toBe('cliente_da_integra');
   });
 });

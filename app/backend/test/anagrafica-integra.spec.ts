@@ -13,7 +13,6 @@ import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
 import { cerca, importa } from '../src/anagrafica-integra';
-import { creaPonte } from '../src/integra';
 import { svuota } from './svuota';
 
 let app: NestExpressApplication;
@@ -151,14 +150,15 @@ describe('importa', () => {
     expect(await db.codici_esterni.count({ where: { tipo: 'cliente' } })).toBe(1);
   });
 
-  it('idempotente per P.IVA: fornitore con la P.IVA di un fornitore esistente → gia_presente', async () => {
+  it('stessa P.IVA su due codici Integra: 409, un solo codice (C5)', async () => {
     await mettiFornitore({ id_integra: 50, codice: 'F00050', piva: '12345678901' });
     await importa(db, ponte, SCHEMA, 'fornitore', 50, {});
     await mettiFornitore({ id_integra: 51, codice: 'F00051', piva: '12345678901' });
-    const r = await importa(db, ponte, SCHEMA, 'fornitore', 51, {});
-    expect(r).toMatchObject({ gia_presente: true });
+    await expect(importa(db, ponte, SCHEMA, 'fornitore', 51, {})).rejects.toMatchObject({ status: 409 });
     expect(await db.soggetti.count()).toBe(1);
     expect(await db.fornitori.count()).toBe(1);
+    expect(await db.codici_esterni.count({ where: { sistema: 'integra' } })).toBe(1);
+    expect(await db.registro.count({ where: { codice: 'crud.update' } })).toBe(0);
   });
 
   it('riga assente in vista: 404', async () => {
@@ -176,12 +176,18 @@ describe('importa', () => {
     expect(await db.soggetti.count()).toBe(1);
     expect((await db.fornitori.findFirstOrThrow()).soggetto_id).toBe((await db.soggetti.findFirstOrThrow()).id);
     // variante: in Integra la P.IVA estera è senza prefisso → lo mette il paese, e il soggetto è quello
+    await db.soggetti.create({ data: {
+      natura: 'azienda', piva: 'DE777777777', piva_norm: 'DE777777777', paese: 'DE', sorgente: 'crm',
+    } });
     await mettiFornitore({
-      id_integra: 121, codice: 'F00121', ragione_sociale: 'Keller Garten DE', piva: '123456789', paese: 'DE',
+      id_integra: 121, codice: 'F00121', ragione_sociale: 'Keller Garten DE', piva: '777777777', paese: 'DE',
     });
-    expect(await importa(db, ponte, SCHEMA, 'fornitore', 121, {})).toMatchObject({ gia_presente: true, collegato: true });
-    expect(await db.soggetti.count()).toBe(1);
-    expect(await db.fornitori.count()).toBe(1);
+    expect(await importa(db, ponte, SCHEMA, 'fornitore', 121, {})).toMatchObject({ creato: true });
+    expect(await db.soggetti.count()).toBe(2);
+    expect(await db.fornitori.count()).toBe(2);
+    const ce = await db.codici_esterni.findFirstOrThrow({ where: { codice: 'F00121' } });
+    const keller = await db.fornitori.findUniqueOrThrow({ where: { id: ce.entita_id } });
+    expect((await db.soggetti.findUniqueOrThrow({ where: { id: keller.soggetto_id! } })).piva_norm).toBe('DE777777777');
   });
 
   it('ruolo già presente senza codice Integra: registra il codice, la ricerca non lo ripropone (R1-04)', async () => {
@@ -190,7 +196,7 @@ describe('importa', () => {
     await db.codici_esterni.deleteMany({}); // nato dal vecchio CRM: nessun codice di Integra
     await mettiCliente({ id_integra: 131, codice: 'C00131', ragione_sociale: 'Rossi Giardini', piva: '33333333333' });
     expect(await importa(db, ponte, SCHEMA, 'cliente', 131, {})).toMatchObject({
-      gia_presente: true, collegato: true, id: primo.id,
+      gia_presente: true, codice_registrato: true, id: primo.id,
     });
     const ce = await db.codici_esterni.findFirstOrThrow({ where: { sistema: 'integra', tipo: 'cliente' } });
     expect(ce).toMatchObject({ codice: 'C00131', entita_id: BigInt(primo.id!) });
@@ -221,16 +227,6 @@ describe('importa', () => {
       jest.useRealTimers();
     }
   });
-
-  it('creaPonte: tempi massimi su connessione, query e statement (R1-02)', async () => {
-    const p = creaPonte('postgresql://utente:parola@127.0.0.1:1/nulla');
-    try {
-      expect(p.options).toMatchObject({ max: 2, connectionTimeoutMillis: 3000, query_timeout: 5000 });
-      expect(String(p.options.options)).toContain('statement_timeout=5000');
-    } finally {
-      await p.end();
-    }
-  });
 });
 
 describe('importa con documento_id (D-133)', () => {
@@ -255,6 +251,47 @@ describe('importa con documento_id (D-133)', () => {
     expect(await db.fornitori.count()).toBe(0);
     expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } })).fornitore_id).toBeNull();
   });
+
+  it('nome letto che non trova nulla: 409 e nessuna scrittura (C1)', async () => {
+    await mettiFornitore({ id_integra: 180, codice: 'F00180', ragione_sociale: 'Fornitore Noto', piva: '66677788899' });
+    const doc = await mettiDocumento('Gries Deco');
+    await expect(importa(db, ponte, SCHEMA, 'fornitore', 180, {}, doc.id)).rejects.toMatchObject({ status: 409 });
+    expect(await db.soggetti.count()).toBe(0);
+    expect(await db.fornitori.count()).toBe(0);
+    expect(await db.codici_esterni.count()).toBe(0);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } })).fornitore_id).toBeNull();
+  });
+
+  it('fornitore già importato con il nome letto giusto: collegato (C1)', async () => {
+    await mettiFornitore({ id_integra: 181, codice: 'F00181', ragione_sociale: 'Fornitore Già Importato', piva: '11122233344' });
+    const primo = await importa(db, ponte, SCHEMA, 'fornitore', 181, {});
+    const doc = await mettiDocumento('Fornitore Già Importato');
+    const r = await importa(db, ponte, SCHEMA, 'fornitore', 181, {}, doc.id);
+    expect(r).toMatchObject({ gia_presente: true, codice_registrato: false, documento_collegato: true, id: primo.id });
+    expect(String((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } })).fornitore_id)).toBe(primo.id);
+  });
+
+  it('fornitore già importato con l\'id_integra di un altro: 409 (C1)', async () => {
+    await mettiFornitore({ id_integra: 182, codice: 'F00182', ragione_sociale: 'Fornitore Alfa', piva: '55566677788' });
+    await importa(db, ponte, SCHEMA, 'fornitore', 182, {});
+    await mettiFornitore({ id_integra: 183, codice: 'F00183', ragione_sociale: 'Fornitore Beta', piva: '99988877766' });
+    const doc = await mettiDocumento('Fornitore Alfa');
+    await expect(importa(db, ponte, SCHEMA, 'fornitore', 183, {}, doc.id)).rejects.toMatchObject({ status: 409 });
+    expect(await db.fornitori.count()).toBe(1);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } })).fornitore_id).toBeNull();
+  });
+
+  it('ponte lento con un documento: 502 e documento libero (C3)', async () => {
+    await mettiFornitore({ id_integra: 184, codice: 'F00184', ragione_sociale: 'Fornitore Lento', piva: '12398745600' });
+    const doc = await mettiDocumento('Fornitore Lento');
+    let chiamate = 0;
+    const lento = {
+      query: (config: Parameters<Pool['query']>[0]) => (++chiamate === 1 ? ponte.query(config) : new Promise(() => {})),
+    } as unknown as Pool;
+    await expect(importa(db, lento, SCHEMA, 'fornitore', 184, {}, doc.id)).rejects.toMatchObject({ status: 502 });
+    expect(await db.fornitori.count()).toBe(0);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: doc.id } })).fornitore_id).toBeNull();
+  }, 15000);
 });
 
 describe('cerca', () => {
@@ -315,6 +352,20 @@ describe('rotte', () => {
     await lett.get('/api/integra/cerca?tipo=cliente&q=Ottanta').set('x-csrf-token', r2.body.csrf).expect(403);
     await lett.post('/api/integra/importa').set('x-csrf-token', r2.body.csrf).send({ tipo: 'cliente', id_integra: 80 }).expect(403);
   });
+
+  it('ponte giù: cerca risponde 502 e non apre anomalie (C4)', async () => {
+    await db.utenti.create({ data: { username: 'oper-c4', email: 'oper-c4' + DOMINIO, nome: 'Operatore', ruolo: 'utente', password_hash: await cifra(PW), deve_cambiare_password: false, aree: { create: [{ area: 'dati', livello: 'operatore' }] } } });
+    const buono = process.env.PONTE_URL;
+    process.env.PONTE_URL = 'postgresql://x:y@127.0.0.1:1/nope';
+    try {
+      const a = request.agent(app.getHttpServer());
+      const r = await a.post('/api/accesso/entra').send({ utente: 'oper-c4', password: PW }).expect(200);
+      await a.get('/api/integra/cerca?tipo=cliente&q=Chiunque').set('x-csrf-token', r.body.csrf).expect(502);
+    } finally {
+      process.env.PONTE_URL = buono;
+    }
+    expect(await db.registro.count({ where: { codice: 'integra.connessione' } })).toBe(0);
+  }, 15000);
 
   it('importa: tipo non valido → 400', async () => {
     await db.utenti.create({ data: { username: 'oper-ai2', email: 'oper-ai2' + DOMINIO, nome: 'Operatore', ruolo: 'utente', password_hash: await cifra(PW), deve_cambiare_password: false, aree: { create: [{ area: 'dati', livello: 'operatore' }] } } });

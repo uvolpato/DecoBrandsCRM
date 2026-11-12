@@ -124,14 +124,19 @@ with sync_playwright() as p:
     pg.fill('#cerca-integra', 'Prova Integra'); pg.click('.velo .modale button[type=submit]')
     pg.wait_for_selector('.velo .elenco li', timeout=10000)
     riga_i = pg.locator('.velo .elenco li').first
-    ok(COD in riga_i.inner_text() and PIVA in riga_i.inner_text() and riga_i.locator('button:has-text("Importa")').count() == 1,
-       'Cerca in Integra: riga con codice, P.IVA e Importa')
+    bt = riga_i.get_by_role('button', name='Importa Fornitore Prova Integra')
+    ok(COD in riga_i.inner_text() and PIVA in riga_i.inner_text() and bt.count() == 1,
+       'Cerca in Integra: riga con codice, P.IVA e pulsante «Importa <ragione sociale>»')
     pg.screenshot(path=str(USCITA / 'app-fornitori-cerca-integra-1440.png'))
-    riga_i.locator('button:has-text("Importa")').click()
+    bt.click()
     finestra(pg).wait_for(state='detached', timeout=15000)
     pg.wait_for_selector('.dt tbody tr.cliccabile:has-text("Fornitore Prova Integra")', timeout=10000)
     ok(righe(pg) == n_prima + 1 and pg.locator('.dt tbody tr.cliccabile:has-text("Fornitore Prova Integra")').count() == 1,
        'import da Integra: finestra chiusa, elenco ricaricato (%d -> %d righe)' % (n_prima, righe(pg)))
+    # D-135: dopo Importa si apre la scheda del nuovo fornitore
+    pg.wait_for_function("/^\\/fornitori\\/\\d+$/.test(location.pathname)")
+    pg.wait_for_selector('.pannello-testa h2:has-text("Fornitore Prova Integra")', timeout=10000)
+    ok('Fornitore Prova Integra' in testo(pg, '.pannello-testa h2'), 'import da Integra: si apre la scheda del nuovo fornitore (D-135)')
     pg.screenshot(path=str(USCITA / 'app-fornitori-importato-1440.png'))
     integra('ponte-togli', 'fornitore', COD); integra('pulisci', 'fornitore', COD)
     # 768 px

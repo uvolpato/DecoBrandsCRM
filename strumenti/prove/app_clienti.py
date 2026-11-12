@@ -61,6 +61,10 @@ with sync_playwright() as p:
     ok('Clienti' in testo(pg, '.testa h1'), 'titolo della pagina')
     n_tutti = int(seg(pg, 'Tutti').locator('.n').inner_text()); n_con = int(seg(pg, 'Con agenzie').locator('.n').inner_text()); n_senza = int(seg(pg, 'Senza agenzie').locator('.n').inner_text())
     ok(n_tutti >= 3 and n_con + n_senza == n_tutti and n_senza >= 1, 'elenco e segmenti: %d clienti = %d con agenzie + %d senza' % (n_tutti, n_con, n_senza))
+    # R2-10 (D-24): ricerca e segmenti sulla stessa riga, come il prototipo
+    y = lambda s: pg.locator(s).first.bounding_box()['y']
+    ok(abs(y('.clienti-filtri .filtri .cerca') - y('.clienti-filtri .filtri .segmenti')) < 6,
+       '1440 px: ricerca e segmenti sulla stessa riga')
     nome0 = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
     cerca(pg, nome0[:6])
     ok(1 <= righe(pg) <= n_tutti, 'ricerca per nome: elenco filtrato')
@@ -192,14 +196,19 @@ with sync_playwright() as p:
     pg.fill('#cerca-integra', 'Prova Integra'); pg.click('.velo .modale button[type=submit]')
     pg.wait_for_selector('.velo .elenco li', timeout=10000)
     riga_i = pg.locator('.velo .elenco li').first
-    ok(COD in riga_i.inner_text() and PIVA in riga_i.inner_text() and riga_i.locator('button:has-text("Importa")').count() == 1,
-       'Cerca in Integra: riga con codice, P.IVA e Importa')
+    bt = riga_i.get_by_role('button', name='Importa Cliente Prova Integra')
+    ok(COD in riga_i.inner_text() and PIVA in riga_i.inner_text() and bt.count() == 1,
+       'Cerca in Integra: riga con codice, P.IVA e pulsante «Importa <ragione sociale>»')
     pg.screenshot(path=str(USCITA / 'app-clienti-cerca-integra-1440.png'))
-    riga_i.locator('button:has-text("Importa")').click()
+    bt.click()
     finestra(pg).wait_for(state='detached', timeout=15000)
     pg.wait_for_selector('.dt tbody tr.cliccabile:has-text("Cliente Prova Integra")', timeout=10000)
     ok(righe(pg) == n_prima + 1 and pg.locator('.dt tbody tr.cliccabile:has-text("Cliente Prova Integra")').count() == 1,
        'import da Integra: finestra chiusa, elenco ricaricato (%d -> %d righe)' % (n_prima, righe(pg)))
+    # D-135: dopo Importa si apre la scheda del nuovo cliente
+    pg.wait_for_function("/^\\/clienti\\/\\d+$/.test(location.pathname)")
+    pg.wait_for_selector('.pannello-testa h2:has-text("Cliente Prova Integra")', timeout=10000)
+    ok('Cliente Prova Integra' in testo(pg, '.pannello-testa h2'), 'import da Integra: si apre la scheda del nuovo cliente (D-135)')
     pg.screenshot(path=str(USCITA / 'app-clienti-importato-1440.png'))
     integra('ponte-togli', 'cliente', COD); integra('pulisci', 'cliente', COD)
 
