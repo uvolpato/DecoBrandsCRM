@@ -1,107 +1,89 @@
 ---
 name: fase
-description: Esegue una fase di avanzamento-app.md con un agente sul modello che scegli tu in base al lavoro (Opus, Sonnet, Haiku), passandogli solo il contesto che serve. Usare SEMPRE, senza aspettare che Ugo lo chieda, quando si comincia o si riprende una fase o un'attività di avanzamento-app.md / piano-lavoro-crm.md ("andiamo avanti", "prossima fase", "fai la 2b", "/fase 2a").
+description: Esegue una fase o un pacchetto (avanzamento-app.md, piano-lavoro-crm.md, collaudo) facendolo scrivere a OpenCode con il modello giusto (DeepSeek V4 pro per il lavoro da Opus, DeepSeek Flash per il resto), lanciato da Claude Code con `opencode run`; Claude Code scrive il prompt, supervisiona e controlla. Usare SEMPRE, senza aspettare che Ugo lo chieda, quando si comincia o si riprende una fase, un'attività o un'onda ("andiamo avanti", "prossima fase", "fai la 2b", "/fase 2a", "lancia l'onda 1").
 ---
 
-# Fase con il modello giusto
+# Fase con OpenCode e il modello giusto
 
-Fa eseguire una fase a un agente secondario sul modello segnato in `avanzamento-app.md`
-(colonna *Modello*), con un brief mirato al posto di tutta la conversazione. La sessione
-principale prepara il brief e poi controlla il risultato.
+**Il codice lo scrive OpenCode, sempre** (Ugo, 12/11/2026). Claude Code (Opus) non scrive
+codice: prepara il prompt, lancia OpenCode, supervisiona, controlla e fa il commit. Lavora sul
+codice da sé solo se lo decide Ugo.
+
+## Modelli (si scelgono guardando il lavoro, la colonna *Modello* è solo un'indicazione)
+
+| Lavoro | Esempi | Modello OpenCode |
+|---|---|---|
+| da **Opus** | regole, soldi e calcoli delle provvigioni, stati, abbinamenti, accesso e permessi, Integra, SQL e migrazioni delicate, architettura | `deepseek/deepseek-v4-pro` |
+| da **Sonnet** | schema e migrazioni seguendo la spec, pagine, elenchi, esportazioni, prove | `deepseek/deepseek-flash` |
+| da **Haiku** | rinomine, spostamenti, documentazione, piccole correzioni | `deepseek/deepseek-flash` |
+
+Una fase che mescola i due tipi si divide in due pacchetti (prima il server, poi le pagine).
+A Ugo si scrive in mezza riga quale modello e perché.
 
 ## Passi
 
-1. **Fase.** Usa quella indicata negli argomenti (es. `2a`, `F2-A1`). Se non ce n'è una, prendi la
-   prima con `[ ]` in `avanzamento-app.md`. Se il gruppo ha più attività non fatte, usa il modo
-   *Parallelo* qui sotto.
-   **Modello: lo scegli tu**, guardando il lavoro, non solo la colonna *Modello* (che è un'indicazione):
-   - `opus`: regole, soldi e calcoli delle provvigioni, stati, abbinamenti, accesso e permessi,
-     scelte di architettura;
-   - `sonnet`: schema e migrazioni seguendo la spec, pagine, elenchi, esportazioni, sincronizzazioni,
-     prove;
-   - `haiku`: rinomine, ricerche, piccole correzioni.
+1. **Fase.** Quella degli argomenti (es. `2a`, `F2-A1`, `onda 1`); se manca, la prima con `[ ]` in
+   `avanzamento-app.md` (o la prima onda non chiusa in `strumenti/collaudo/piano-correzioni.md`).
+2. **Contesto minimo.** Solo quello che serve: riga del piano (*Riferimenti*, *Sorgente prototipo*,
+   *Output*, *DoD*), numeri di sezione della spec, file dell'app toccati (`graphify query`, poi
+   `Grep`/`Glob`, non letture intere).
+3. **Prompt.** Se il pacchetto non esiste già, scrivilo in `strumenti/opencode/<pacchetto>.md`,
+   autosufficiente:
+   - **compito** e DoD in punti; **file ammessi** (solo quelli) e file vietati;
+   - sezioni della spec e del piano da leggere (con numero), file del prototipo da replicare;
+   - **regole del progetto** (OpenCode non ha questa conversazione): V12 tutto sul backend, V13 una
+     transazione; italiano semplice, commenti con rimando alla decisione (`// D-11 §19`); codice
+     minimo (ponytail); prove solo su `decobrands_test_<pacchetto>`, mai su `decobrands_db`; niente
+     commit, push, `.env`, porte 8001/8002; Integra (192.168.239.49) mai;
+   - **skill da caricare davvero**: `owasp-security`, `postgresql-code-review` (SQL), `ponytail-review`,
+     `caveman`, secondo il rischio (CLAUDE.md §4 punto 6);
+   - **prove** da lanciare con 0 KO (`npx jest <suite>` con `DATABASE_URL_TEST`, `npx tsc --noEmit`;
+     le prove nel browser solo `py_compile`, le lancia Claude Code);
+   - **resoconto** in `strumenti/opencode/resoconto-<pacchetto>.md`: file toccati, prove ed esito,
+     dubbi, sezione «Da documentare» con il testo pronto per spec, guida e piano.
+   Per i pacchetti in parallelo il prompt rimanda a `strumenti/opencode/regole-onda-parallela.md`.
+4. **Prima del lancio.**
+   - Controlla che Ugo non abbia già lo stesso pacchetto in corso in OpenCode desktop: `git status`
+     con modifiche ai file ammessi che non sono tue, oppure chiedi in una riga. Il 12/11 due
+     sessioni sullo stesso pacchetto hanno scritto gli stessi file.
+   - Database di prova per pacchetto: crea `decobrands_test_<pacchetto>` (owner `decobrands`) e
+     applica le migrazioni (`npx prisma migrate deploy`); `test/ambiente.ts` accetta i nomi con
+     `decobrands_test`.
+5. **Lancio**, dalla radice del progetto, in background, un processo per pacchetto:
+   ```bash
+   opencode run -m <modello> --title "<pacchetto>" \
+     "Sei l'esecutore del Decobrands CRM (c:\Progetti\Decobrands_CRM). Leggi strumenti/opencode/regole-onda-parallela.md e poi esegui strumenti/opencode/<pacchetto>.md. Rispondi con il riepilogo di massimo 10 righe chiesto dalle regole." \
+     > "<scratchpad>/oc-<pacchetto>.log" 2>&1
+   ```
+   - Bash con `run_in_background: true`; la notifica arriva quando il processo esce. Non inventare
+     il risultato, non leggere il log a ogni minuto.
+   - Più pacchetti insieme solo se i **file ammessi non si toccano** (stesso albero, niente worktree);
+     altrimenti uno dopo l'altro. I file comuni (spec, guida, piano, `avanzamento-app.md`,
+     `app.module`) li tocca solo il pacchetto di documentazione dell'onda.
+   - Se un processo va fermato, `TaskStop` più `Stop-Process` sugli `opencode.exe run` rimasti.
+6. **Controllo** (questo è il lavoro di Claude Code):
+   - fine del log e resoconto; `git diff` dei soli file ammessi (un file fuori elenco è un rilievo);
+   - prove rilanciate da te: `npx tsc --noEmit` (backend e frontend), jest delle suite toccate (a
+     metà o una per volta, il giro completo in un colpo va in crash su Windows), prove nel browser
+     delle pagine toccate (1440 e 768 px);
+   - review: completa sul codice sensibile (`owasp-security`, `/code-review`, `postgresql-code-review`
+     su SQL), leggera sul resto, completa nel dubbio.
+   - **Se qualcosa non va non correggi tu**: scrivi `strumenti/opencode/<pacchetto>-correzioni-N.md`
+     (rilievi con dove, scenario, correzione, prova, file ammessi) e lo rilanci con lo stesso modello
+     (passo 5), finché è tutto ok.
+7. **Chiusura.** Commit in italiano (con la riga Co-Authored-By), aggiorna `avanzamento-app.md` o
+   `piano-correzioni.md`, cancella i database `decobrands_test_<pacchetto>`, e scrivi a Ugo in breve:
+   pacchetto e modello, cosa è stato fatto, prove e controlli, cosa resta aperto.
 
-   **Lavoro da `sonnet` (e da `haiku`) in Claude Code: va a OpenCode** (Ugo, 02/11/2026). Non
-   lanciare un agente: scrivi il prompt in `strumenti/opencode/<fase>.md` (compito, file, regole,
-   sottoagenti, prove, resoconto in `strumenti/opencode/resoconto-<fase>.md`) e dallo a Ugo.
-   Quando Ugo dice che ha finito, fai solo il **controllo finale** (passo 5). Se qualcosa non va,
-   non correggere tu: scrivi `strumenti/opencode/<fase>-correzioni-N.md` e ridallo a Ugo, finché
-   è tutto ok. Lavori tu (o un agente `sonnet`) solo se **Ugo lo decide**. Il lavoro da `opus`
-   resta qui.
+## Se giri dentro OpenCode (non in Claude Code)
 
-   Se una fase mescola i due tipi, dividila in due agenti (prima il server, poi le pagine).
-   Nel messaggio a Ugo scrivi quale modello hai scelto e perché, in mezza riga.
-
-   **Se giri in OpenCode** (non in Claude Code: niente strumento `Agent` con `model`, ma `task` e
-   gli agenti di `opencode.json`):
-   - lavoro da `sonnet`: usa **`deepseek/deepseek-flash`** (DeepSeek V4.1 Flash), senza chiedere
-     (Ugo, 05/11/2026);
-   - lavoro da `haiku`: usa il **modello caricato in OpenCode** (quello della sessione), senza chiedere;
-   - lavoro da `opus`: usa **`deepseek/deepseek-v4-pro`** senza chiedere (Ugo, 05/11/2026), dicendo
-     in mezza riga che è un lavoro da Opus (regole, soldi, stati…);
-   - niente modo *Parallelo* (OpenCode non ha i worktree automatici): una attività alla volta.
-2. **Contesto minimo.** Leggi solo quello che serve alla fase:
-   - la riga della fase nel piano (`piano-lavoro-crm.md`, attività F…): *Riferimenti*, *Sorgente
-     prototipo*, *Output*, *DoD*;
-   - le sezioni della spec citate (solo i numeri di sezione, l'agente le legge da sé);
-   - i file dell'app che la fase tocca (`Grep`/`Glob`, non letture intere).
-3. **Brief.** Scrivi il prompt dell'agente, autosufficiente, con:
-   - **compito**: cosa consegnare e la DoD, in punti;
-   - **dove**: percorsi dei file da creare o modificare, sezioni della spec e del piano da leggere
-     (con numero), file del prototipo da replicare;
-   - **regole del progetto** (riportale, l'agente non ha questa conversazione):
-     - tutto sul backend, mai dai dati del frontend (V12); una operazione, una transazione (V13);
-     - italiano semplice nel codice, nei commenti e nell'interfaccia; commenti brevi con rimando
-       alla decisione (`// D-11 §19`);
-     - codice minimo (ponytail): niente astrazioni non richieste, riusa quello che c'è;
-     - prove sul database `decobrands_test`, mai su `decobrands_db`; nessun reset distruttivo;
-     - niente commit, niente push, niente modifiche a `.env`;
-   - **verifica**: quali prove lanciare (`npm test` in `app/backend`, `strumenti/prove/app_*.py`)
-     e che devono chiudersi con 0 KO;
-   - **resoconto finale**: file toccati, prove e loro esito, dubbi e cose lasciate aperte.
-4. **Lancio.** `Agent` con `model` = il modello della fase, `description` = "Fase <n>",
-   `prompt` = il brief. Non usare `subagent_type: "fork"` (ignora il modello e porta tutto il
-   contesto). Aspetta la notifica: non inventare il risultato.
-5. **Controllo nella sessione principale.**
-   - Leggi il resoconto e il `git diff`.
-   - Rilancia le prove indicate.
-   - Fai i controlli prima del commit (CLAUDE.md §4 punto 6: completi sul codice sensibile, leggeri
-     sul resto, completi nel dubbio).
-   - Se qualcosa non va, correggi o rimanda all'agente con `SendMessage` (stesso contesto, stesso
-     modello).
-6. **Chiusura.** Aggiorna `avanzamento-app.md` (`[x]` e una riga su cosa è stato fatto), fai il
-   commit in italiano e scrivi a Ugo in breve:
-   - fase e modello usato;
-   - cosa è stato fatto;
-   - esito delle prove e dei controlli;
-   - cosa resta aperto.
-
-## Parallelo (`/fase <blocco> parallelo`)
-
-Per i blocchi divisi in attività (`avanzamento-app.md`, tabella *Attività F1–F7*): si lancia
-insieme il **primo gruppo non fatto**, un agente per attività, ognuno sul suo modello.
-
-1. Per ogni attività: brief come al passo 3, più i **file che può toccare** (dal piano) e l'elenco
-   di quelli che toccano gli altri agenti del gruppo, da non toccare. I file comuni (`app.module`,
-   barra, guida, spec, `avanzamento-app.md`) **non li tocca nessun agente**: l'agente scrive nel
-   resoconto cosa ci va e lo aggiunge la sessione principale.
-2. Database di prova separato per agente, perché le prove svuotano il database: prima del lancio
-   la sessione principale crea `decobrands_test_<attività>` (es. `decobrands_test_f2a1`, owner
-   `decobrands`) e ci applica le migrazioni. Nel brief scrivi di lanciare le prove con
-   `DATABASE_URL_TEST` che punta a quel database (`test/ambiente.ts` lo accetta perché il nome
-   contiene `decobrands_test`). Se non si può creare il database, avvisa Ugo e lancia gli agenti
-   uno alla volta.
-3. Lancio: `Agent` con `isolation: "worktree"`, `model` dell'attività, `description` =
-   "Fase <attività>". Tutti nello stesso messaggio. Il worktree non ha `.env`: nel brief scrivi
-   di copiarlo da `C:\Progetti\Decobrands_CRM\app\backend\.env` senza modificarlo.
-4. Unione **una alla volta**, nell'ordine in cui finiscono: diff, controlli (passo 5), merge in
-   `main`, `npm test` su `decobrands_test`, commit. Un conflitto lo risolve la sessione principale.
-5. Dopo l'ultimo: file comuni, `avanzamento-app.md`, cancellazione dei database
-   `decobrands_test_<attività>`, messaggio a Ugo (passo 6, un punto per attività).
+Niente `opencode run`: usa lo strumento `task` con gli agenti di `opencode.json`, stessi modelli della
+tabella (`deepseek/deepseek-v4-pro` per il lavoro da Opus, `deepseek/deepseek-flash` per il resto),
+un sottoagente per pacchetto, in parallelo solo con file ammessi separati.
 
 ## Limiti
 
-- L'agente parte senza la conversazione: se il brief manca di un vincolo, l'agente non lo conosce.
-  Nel dubbio aggiungi una riga al brief, non un file intero.
-- Il modello della sessione principale non cambia: le decisioni di architettura le prende la
-  sessione principale o un agente `opus`.
+- OpenCode parte senza la conversazione: un vincolo che manca nel prompt non lo conosce. Nel dubbio
+  una riga in più nel prompt.
+- Le decisioni di architettura e quelle che vanno contro il §19 le prende Ugo (o Claude Code
+  chiedendo a Ugo), non OpenCode.
