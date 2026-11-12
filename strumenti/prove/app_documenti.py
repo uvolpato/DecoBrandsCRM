@@ -27,6 +27,15 @@ def apri(pg):
         pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
+def scegli(pg, campo, scritto):
+    """Campo di ricerca (CampoRicerca): si scrive, compare il menu, si sceglie la prima voce. Ritorna il valore scelto."""
+    pg.fill('#c-' + campo, scritto)
+    menu = pg.locator('.velo .ricerca-menu:not([hidden])')
+    menu.wait_for(); voce = menu.locator('li[role=option]').first
+    voce.wait_for(); nome = voce.locator('b').inner_text(); voce.click()
+    pg.wait_for_function("document.querySelectorAll('.velo .ricerca-menu:not([hidden])').length === 0")
+    return nome, pg.locator('input[name=%s]' % campo).input_value()
+
 prova_documento('crea')
 prova_documento('crea-senza')
 try:
@@ -140,6 +149,9 @@ try:
         ok(pg.locator('.velo input[name=fornitore_id]').get_attribute('disabled') is not None, 'finestra: fornitore fisso (disabilitato)')
         ok('Nuova agenzia per ' in testo(pg, '.velo .modale-testa'), 'finestra: cliente fisso nel titolo')
         ok(pg.input_value('.velo input[name=valido_dal]') == '2026-09-15', 'finestra: «Valido dal» = data del documento')
+        ok(pg.input_value('.velo input[name=subagente_id]') == '', 'finestra: subagente vuoto da scegliere (D-134, mai il primo dell’elenco)')
+        s_, sid = scegli(pg, 'subagente_id', 'Nis')
+        ok('Nista' in s_ and sid.isdigit(), 'subagente scelto dal menu: %s (id %s)' % (s_, sid))
         pg.click('.velo .modale-piede button:has-text("Crea")')
         pg.wait_for_selector('.avviso:has-text("Agenzia creata")')
         try:
@@ -196,6 +208,7 @@ try:
         pg2.goto(BASE + '/documenti/999999')
         pronto = pg2.locator('button:has-text("Importa da Integra")')
         pronto.wait_for()
+        prima = visti['dettaglio']  # C1: la scheda si legge 1 o 2 volte all'apertura (Strict Mode)
         pronto.click()
         pg2.wait_for_selector('button:has-text("Importo…")')
         ok(pg2.locator('button[disabled]:has-text("Importo…")').count() == 1, 'import in corso: pulsante spento e «Importo…»')
@@ -205,11 +218,13 @@ try:
         visti['pendente'][0].abort()
         pg2.wait_for_selector('button:has-text("Importa da Integra")', timeout=5000)
         ok(visti['put'] == 0, 'il browser non manda il PUT che cancellava le righe lette (R2-01)')
+        ok(visti['dettaglio'] == prima, 'import non riuscito: la scheda non si ricarica')
         pg2.unroute('**/api/integra/importa')
         pg2.route('**/api/integra/importa', lambda r: risposta(r, '{"creato":true,"id":"1"}'))
+        prima = visti['dettaglio']
         pg2.locator('button:has-text("Importa da Integra")').click()
         pg2.wait_for_selector('.avviso:has-text("Fornitore importato da Integra")')
-        ok(visti['dettaglio'] == 2 and visti['put'] == 0, 'dopo l’import la scheda si ricarica, senza PUT')
+        ok(visti['dettaglio'] == prima + 1 and visti['put'] == 0, 'dopo l’import la scheda si ricarica una volta, senza PUT')
         pg2.click('.schede-barra [role=tab]:has-text("Righe lette")'); pg2.wait_for_timeout(200)
         ok(pg2.locator('.dt tbody tr').count() == 2 and 'ART-1' in testo(pg2, '.dt tbody'),
            'dopo l’import le righe lette sono ancora nella scheda Righe')

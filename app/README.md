@@ -53,6 +53,10 @@ Il registro del backend serve ad `app_accesso.py` per leggere il link di *passwo
 e `PONTE_URL` nel processo che lancia Python, e la riga di prova si mette e si toglie dal ponte finto
 con `node ../../strumenti/prove/integra_prova.js ponte-aggiungi|ponte-togli|pulisci cliente|fornitore <codice> [nome] [piva]`.
 
+`app_documenti.py` simula la scheda di un documento con fornitore solo in Integra (`page.route`): la
+prova guarda che il browser non mandi più il `PUT` che cancellava le righe e che aspetti l'import
+(D-133). Non serve il ponte vero.
+
 **Demo con i PDF veri** (`strumenti/prove/pdf_veri.js`): da `backend/`, dopo `npm run build` e con
 `demo-ammi` creato con `utenti_prova.js`, ricostruisce il flusso ordine → proforma → fattura di
 Agri Aggio/Gries dai file di `Documenti Veri/` (ordine `AU276839`, proforma `PR102813`, fattura

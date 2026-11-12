@@ -64,6 +64,9 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 - **Regole del subagente** (D-27), ognuna vince sulle successive: correzione sul singolo documento in *Liquidazioni* (*Correggi*: altra %, importo fisso o nessuna, con motivo) → *Una fattura al mese* (la prima o la più alta) e *Al subagente per questo cliente %* nella finestra dell'agenzia del cliente → eccezione personale → scaglione. Il fornitore non cambia: si controlla nel bollettino.
 - **Trimestre**: si chiude solo a trimestre finito e senza documenti in attesa.
 
+> **Cerca in Integra** (Clienti, Fornitori, Documento) è solo nell'app: il prototipo non la mostra
+> (D-136), perché la ricerca sulle viste di Integra non ha senso senza ponte.
+
 ## Prova consigliata (5 minuti)
 
 1. **Oggi**: 20 cose da fare divise per tipo; *Prepara i solleciti* prepara un testo per Gries, Gasper e Ing's.

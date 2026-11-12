@@ -126,7 +126,10 @@ export const GUIDA: Argomento[] = [
       ['Apri la pratica', 'Per un ordine: crea la pratica nuova, con cliente e fornitore.'],
       ['Registra e verifica', 'Per un bollettino: lo registra e apre la verifica.'],
       ['Scarta il documento', 'Per doppioni o documenti che non riguardano Decobrands.'],
-      ['Configura l’agenzia', 'Quando un documento è di un cliente che non ha l’agenzia con quel fornitore: apre il form dell’agenzia (cliente e fornitore già fissi). Senza, il documento non entra in una pratica.'],
+      ['Configura l’agenzia', 'Quando un documento è di un cliente che non ha l’agenzia con quel fornitore alla data che serve (l’ordine della pratica, o la data del documento se la pratica è nuova): apre il form dell’agenzia (cliente e fornitore già fissi). Senza, il documento non entra in una pratica. Serve il livello operatore in Dati: senza, il pulsante è spento e il suggerimento dice perché.'],
+      ['Importa da Integra', 'Sul documento: quando il fornitore (o il cliente) non è in anagrafica ma esiste in Integra, lo importa e collega il documento nella stessa operazione. I dati letti e le righe restano come sono; se il nome letto non corrisponde a un solo soggetto, l’import si ferma e chiede di correggere il nome. Mentre importa il pulsante dice «Importo…» ed è spento.'],
+      ['Importa dal vecchio CRM', 'Spento: l’import dei legami del vecchio CRM si fa a mano con il comando dello storico (D-112).'],
+      ['Segni in elenco', 'Accanto a ogni documento: Affidabile · Da controllare · Affidabilità bassa · Fornitore in Integra (non è in anagrafica ma esiste in Integra) · Cliente in Integra (la stessa cosa per il cliente) · Non rappresentato · Manca l’agenzia. Aprendo il documento i segni diventano i pulsanti per importare l’anagrafica mancante.'],
     ],
     finestre: [
       { nome: 'Correggi i dati letti', da: 'Correggi i dati letti', cosa: 'A tutto schermo: a sinistra il documento originale (PDF o foto), a destra testata e righe modificabili. Il PDF si apre alla pagina del campo scelto. Sotto gli 860 px i due lati si impilano.',
@@ -155,7 +158,9 @@ export const GUIDA: Argomento[] = [
     ],
     sapere: [
       'Le righe stanno nella seconda scheda perché qui si decide cosa fare del documento; se sono incerte, l’avviso e il contatore lo dicono subito.',
-      'Un documento per un cliente che non ha l’agenzia con quel fornitore non entra in una pratica: nell’azione proposta compare «Configura l’agenzia» (è normale al primo ordine di quella coppia). L’elenco lo segnala con la pillola «Manca l’agenzia», che sparisce dopo la configurazione.',
+      'Un documento entra in una pratica già aperta se il cliente aveva l’agenzia con quel fornitore <b>alla data dell’ordine</b>; se l’agenzia si è chiusa dopo, il documento entra lo stesso (D-137). L’agenzia alla data del documento serve solo quando il documento apre una pratica nuova. Per un documento non ancora abbinato l’elenco segnala con la pillola «Manca l’agenzia» la coppia senza agenzia a quella data.',
+      '«Importa da Integra» dal documento crea il fornitore e lo collega al documento senza toccare le righe lette: testata, righe, affidabilità e controlli restano (D-133).',
+      'Un documento senza codice cliente si riconosce dallo storico anche quando lo storico non ha il codice: conta il nome del fornitore. Il fornitore può essere lo stesso anche se il nome è scritto in modo diverso (es. «Gries GmbH» e «Gries Deco Company GmbH»): basta la P.IVA.',
       '⚠ L’evidenziazione del valore nel documento è da verificare sui file reali (D-06, prova F0-A7): il rettangolo sul valore non si disegna ancora. La finestra apre il PDF alla pagina del campo e dice quanto è precisa la posizione; sui documenti scansionati o fotografati può mancare.',
       'Gli Excel dei bollettini non entrano da qui: il canale comune accetta solo PDF e foto (D-60).',
     ],
@@ -470,7 +475,7 @@ export const GUIDA: Argomento[] = [
           ['Partita IVA e codice fiscale', 'La versione normalizzata (maiuscolo, senza spazi e punti) la calcola il server; i doppioni sono rifiutati.'],
         ],
         azioni: [['Crea soggetto · Salva', 'Il codice C000000 lo assegna il server.']] },
-      { nome: 'Aggiungi ruolo', da: 'Aggiungi ruolo', cosa: 'Cliente o fornitore; il codice di Integra lo scrive chi carica l’export (D-101: un codice per ruolo).',
+      { nome: 'Aggiungi ruolo', da: 'Aggiungi ruolo', cosa: 'Cliente o fornitore; il codice di Integra non si digita, arriva con Cerca in Integra → Importa (D-138).',
         azioni: [['Aggiungi ruolo', 'Il ruolo nuovo nasce con la sua versione e il suo codice.']] },
       { nome: 'Sede', da: 'Nuova sede · clic su una sede', cosa: 'Il soggetto è fisso.',
         campi: [
@@ -493,6 +498,9 @@ export const GUIDA: Argomento[] = [
       'Il codice CRM è quello che si cita al telefono; i codici di Integra stanno sui ruoli (D-101: cliente e fornitore possono avere due codici diversi).',
       'Niente cancellazioni: ruoli e soggetti chiudono con attivo = false o valido_al; i documenti restano appesi alle loro versioni.',
       'Un soggetto con ruoli attivi non si disattiva: prima si chiudono i ruoli. La fusione dei doppioni la decide la deduplica (§7.5), non si inventa un soggetto nuovo.',
+      '<b>Se il soggetto arriva da Integra</b> i dati del master non si modificano qui: si correggono in Integra (D-138). Nel CRM si gestiscono ruoli, sedi, recapiti, fatturazione e agenzie.',
+      'Il <b>codice di Integra</b> non si digita: arriva solo con <i>Cerca in Integra → Importa</i>. Un codice scritto a mano poteva far sovrascrivere i dati di un’altra azienda (D-138).',
+      '<b>Cambiare la P.IVA</b> di un soggetto solo del CRM apre una versione nuova di ogni suo ruolo, con gli altri dati uguali: la storia resta (D-46, D-138).',
     ],
     modifica: 'Operatore o superiore nell’area Dati.',
   },
@@ -505,6 +513,7 @@ export const GUIDA: Argomento[] = [
       ['Schede Percentuali · Clienti seguiti', 'Percentuali per versione: quella in vigore in alto, poi le future e le passate, con le eccezioni personali sotto la percentuale al subagente; clienti seguiti per quel fornitore (si modificano dal cliente), con filtro a scelta multipla per subagente.'],
       ['Nuove percentuali', 'Inserisce una nuova versione delle percentuali da una data: le righe partono da quelle più recenti e si possono aggiungere sconti, non togliere.'],
       ['Correggi · Elimina', 'Sulla singola versione. Valgono solo dopo l’ultima chiusura del fornitore (bollettino verificato o contestato, trimestre liquidato); altrimenti il server rifiuta e la finestra lo spiega.'],
+      ['Configura gli scaglioni', 'Compare quando il fornitore non ha percentuali: apre il form degli scaglioni (sconto, % a Decobrands, % al subagente). Finché mancano, la pratica non si apre e la card del documento lo dice (D-113).'],
     ],
     finestre: [
       { nome: 'Cerca in Integra', da: 'Cerca in Integra', cosa: 'Cerca un fornitore in Integra e lo aggiunge all’anagrafica.',
@@ -513,7 +522,7 @@ export const GUIDA: Argomento[] = [
         ],
         azioni: [
           ['Cerca', 'Interroga Integra: fino a 10 righe, solo quando premi; oltre 3 secondi dice che il ponte non risponde.'],
-          ['Importa', 'Chiude la finestra, ricarica l’elenco e apre il nuovo fornitore; nasce senza scaglioni (D-113).'],
+          ['Importa', 'Chiude la finestra, ricarica l’elenco e apre la scheda del nuovo fornitore, anche se era già in anagrafica (D-135); nasce senza scaglioni (D-113).'],
         ] },
       { nome: 'Condizioni del fornitore', da: 'Modifica condizioni', cosa: 'Regole che fanno scattare solleciti e liquidazioni.',
         campi: [
@@ -595,19 +604,19 @@ export const GUIDA: Argomento[] = [
         ],
         azioni: [
           ['Cerca', 'Interroga Integra: fino a 10 righe, solo quando premi; oltre 3 secondi dice che il ponte non risponde.'],
-          ['Importa', 'Chiude la finestra, ricarica l’elenco e apre il nuovo cliente; le agenzie si aggiungono dalla sua scheda.'],
+          ['Importa', 'Chiude la finestra, ricarica l’elenco e apre la scheda del nuovo cliente, anche se era già in anagrafica (D-135); le agenzie si aggiungono dalla sua scheda.'],
         ] },
       { nome: 'Agenzia', da: 'Aggiungi agenzia · clic su una riga', cosa: 'Il cliente è fisso.',
         campi: [
           ['Fornitore', 'Campo con ricerca.'],
           ['Codice cliente del fornitore', 'Come il fornitore chiama il cliente: serve ad abbinare i documenti in automatico.'],
-          ['Seguito da', 'Subagente, campo con ricerca.'],
-          ['Sconto al cliente', 'Sotto il campo compaiono gli sconti degli scaglioni in vigore dei fornitori; un altro valore va bene lo stesso.'],
+          ['Seguito da', 'Subagente, campo con ricerca. Si precompila solo se il vecchio CRM indica un subagente che in anagrafica è uno solo; se il campo resta vuoto scegli tu: è obbligatorio (D-134).'],
+          ['Sconto al cliente', 'Sotto il campo compaiono gli sconti degli scaglioni in vigore dei fornitori; un altro valore va bene lo stesso. Gli sconti si leggono a ogni apertura dal server: se li hai appena cambiati in Fornitori, qui sono già aggiornati.'],
           ['Al subagente per questo cliente % · Provvigione al subagente', 'Riservati al responsabile: per l’operatore sono spenti (cambiano i soldi del subagente).'],
         ],
         azioni: [
           ['Aggiungi agenzia · Salva', 'Registra.'],
-          ['Elimina', 'Con conferma: le pratiche con quel fornitore non generano più provvigioni.'],
+          ['Elimina', 'Con conferma: le pratiche con quel fornitore non generano più provvigioni. Un’agenzia con sconti storici non si elimina: il server risponde 409 e va chiusa con «Valido al» (D-139).'],
         ] }
     ],
     sapere: [

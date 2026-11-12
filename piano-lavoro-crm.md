@@ -309,6 +309,12 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **DoD:** `test/profilo.spec.ts` e `app_profilo.py` 0 KO; 1440 e 768 px; documenti allineati.
 - **Ore:** 4 h **fuori preventivo** (1,5 server + 1,5 pagina + 1 prove e documenti): non entrano nel totale di §4 finché non sono approvate.
 
+#### F7-A4 · Onda 0 bis del collaudo — correzioni su Documenti e anagrafiche — 6 h **da approvare**
+- **Dipende da:** merge F1–F6 · **Riferimenti:** D-133…D-138, §4.7, §6.5, §7.9
+- **Output:** righe del documento salve nella correzione e import da Integra che collega il documento nella stessa transazione (0b-01/0b-02, 2 h); storico senza fornitore nell'elenco, scaglioni alla data del documento, agenzia alla data dell'ordine (D-137), P.IVA con «IT», clienti e storico letti una volta per pagina (0b-02, compreso nel conteggio sopra); storico consumato una volta, subagente deciso dal server (D-134), sconti in vigore dal server, sagome e 409 sull'eliminazione dell'agenzia con sconti (0b-03, 1 h); soggetti da Integra in sola lettura e versioni sulla P.IVA (D-138) con la scheda del soggetto (0b-04, 1,5 h); *Importa* che apre la scheda (D-135) e riga dei filtri nei Clienti (0b-05, 1 h); i segni «Fornitore in Integra» e «Cliente in Integra» in elenco (0b-06).
+- **Da aggiungere:** le ore di 0b-01 (import da Integra dal documento: collegamento in transazione, tempi del ponte, codice sui ruoli, lucchetto) e della sua correzione di review, non conteggiate qui.
+- **Ore:** 6 h **fuori preventivo**: non entrano nel totale di §4 finché Ugo non le approva.
+
 ---
 
 ## 12. Regole di consegna per agente (riepilogo)
