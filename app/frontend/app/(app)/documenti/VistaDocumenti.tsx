@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Caricamento, Elenco, ElencoSelezionabile } from '@/componenti/Flussi';
+import { Icona } from '@/componenti/Icona';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso, quando, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
@@ -29,14 +30,14 @@ const LIVELLO: Record<string, { testo: string; v: Variante }> = {
 interface Documento {
   id: string; file_nome: string; file_tipo: string; tipo: string | null; numero: string | null;
   data: string | null; fornitore_id: string | null; fornitore: string | null; codice_cliente: string | null;
-  cliente: string | null; importo: number | null; livello: string | null; ricevuto_il: string;
+  cliente: string | null; importo: number | null; livello: string | null; stato: string; ricevuto_il: string;
   letto_il: string | null; controlli_n: number; manca_agenzia: boolean;
   manca_rappresentanza: boolean; fornitore_da_integra: boolean; cliente_da_integra: boolean;
 }
 interface Risposta {
   documenti: Documento[];
   conteggi: Record<string, number>;
-  totale: number; pagina: number; per_pagina: number;
+  totale: number; pagina: number; per_pagina: number; lettura_configurata: boolean;
 }
 
 export function VistaDocumenti() {
@@ -68,7 +69,7 @@ export function VistaDocumenti() {
   useEffect(() => {
     let vivo = true;
     setCaricando(true);
-    void api<Risposta>('documenti?stato=da_controllare&pagina=1&per_pagina=200').then((r) => {
+    void api<Risposta>('documenti?stato=aperte&pagina=1&per_pagina=200').then((r) => {
       if (!vivo) return;
       setCaricando(false);
       if (r.ok) { setDati(r.dati); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
@@ -81,7 +82,7 @@ export function VistaDocumenti() {
     if (vEventi === vVista.current) return;
     vVista.current = vEventi;
     let vivo = true;
-    void api<Risposta>('documenti?stato=da_controllare&pagina=1&per_pagina=200', undefined, undefined, { automatico: true }).then((r) => {
+    void api<Risposta>('documenti?stato=aperte&pagina=1&per_pagina=200', undefined, undefined, { automatico: true }).then((r) => {
       if (vivo && r.ok) setDati(r.dati);
     });
     return () => { vivo = false; };
@@ -107,7 +108,6 @@ export function VistaDocumenti() {
   const documenti = dati?.documenti ?? [];
   const selezionato = id?.[0] ?? documenti[0]?.id ?? null;
   const c = dati?.conteggi;
-  const inAttesa = c ? (c.in_coda ?? 0) + (c.in_lettura ?? 0) : 0;
 
   return (
     <Pagina titolo="Documenti" pieno
@@ -117,6 +117,12 @@ export function VistaDocumenti() {
           {dati.totale} {dati.totale === 1 ? 'documento' : 'documenti'}
           {scartati != null && <> · <Link href="/scartati">{scartati} scartati</Link></>}
         </> : ' '} riempi>
+          {dati && !dati.lettura_configurata && (
+            <div className="avviso-variazioni" role="status">
+              <Icona nome="avviso" />
+              <span>La lettura dei documenti non è configurata: i file restano in coda. Impostala in <Link href="/impostazioni">Impostazioni → Lettura</Link> (superutente).</span>
+            </div>
+          )}
           {puoModifica && (
             <>
               <Caricamento titolo="Trascina qui i documenti"
@@ -125,14 +131,7 @@ export function VistaDocumenti() {
               <div style={{ height: 12 }} />
             </>
           )}
-          {inAttesa > 0 && (
-            <Nota>
-              {c?.in_coda ? `${c.in_coda} in coda` : ''}
-              {c?.in_coda && c?.in_lettura ? ' · ' : ''}
-              {c?.in_lettura ? `${c.in_lettura} in lettura` : ''}
-              {': compaiono qui appena letti.'}
-            </Nota>
-          )}
+          <Nota>Si legge un documento ogni 15 secondi.</Nota>
           {(c?.errore ?? 0) > 0 && (
             <Nota>{c!.errore} {c!.errore === 1 ? 'documento non letto' : 'documenti non letti'} dopo 3 tentativi: aprili per inserire i dati a mano o scartali.</Nota>
           )}
@@ -146,20 +145,22 @@ export function VistaDocumenti() {
           ) : documenti.length ? (
             <ElencoSelezionabile selezionata={selezionato ?? undefined}
               voci={documenti.map((d) => {
-                const l = d.livello ? LIVELLO[d.livello] : null;
+                const inCoda = d.stato === 'in_coda' || d.stato === 'in_lettura';
+                const l = !inCoda && d.livello ? LIVELLO[d.livello] : null;
                 return {
                   id: d.id,
                   href: '/documenti/' + d.id,
-                  titolo: (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : ''),
-                  valore: d.importo == null ? '' : euro(d.importo),
-                  sotto: (d.fornitore ?? 'fornitore non riconosciuto') + ' · caricato il ' + quando(d.ricevuto_il),
-                  stato: l || d.manca_agenzia || d.manca_rappresentanza || d.fornitore_da_integra || d.cliente_da_integra ? <>
-                    {l ? <Stato v={l.v}>{l.testo}</Stato> : null}
-                    {d.fornitore_da_integra ? <Stato v="info">Fornitore in Integra</Stato> : null}
-                    {d.cliente_da_integra ? <Stato v="info">Cliente in Integra</Stato> : null}
-                    {d.manca_rappresentanza ? <Stato v="attesa">Non rappresentato</Stato> : null}
-                    {d.manca_agenzia ? <Stato v="attesa">Manca l’agenzia</Stato> : null}
-                  </> : undefined,
+                  titolo: inCoda ? d.file_nome : (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : ''),
+                  valore: inCoda ? '' : d.importo == null ? '' : euro(d.importo),
+                  sotto: inCoda ? 'arrivato il ' + quando(d.ricevuto_il) : (d.fornitore ?? 'fornitore non riconosciuto') + ' · caricato il ' + quando(d.ricevuto_il),
+                  stato: inCoda ? <Stato v="info">{d.stato === 'in_coda' ? 'In coda' : 'In lettura'}</Stato>
+                    : l || d.manca_agenzia || d.manca_rappresentanza || d.fornitore_da_integra || d.cliente_da_integra ? <>
+                      {l ? <Stato v={l.v}>{l.testo}</Stato> : null}
+                      {d.fornitore_da_integra ? <Stato v="info">Fornitore in Integra</Stato> : null}
+                      {d.cliente_da_integra ? <Stato v="info">Cliente in Integra</Stato> : null}
+                      {d.manca_rappresentanza ? <Stato v="attesa">Non rappresentato</Stato> : null}
+                      {d.manca_agenzia ? <Stato v="attesa">Manca l’agenzia</Stato> : null}
+                    </> : undefined,
                 };
               })} />
           ) : (

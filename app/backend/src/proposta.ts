@@ -46,6 +46,7 @@ export interface RigaLetta {
 export interface Letto {
   tipo: string | null;
   fornitore_id: bigint | null;
+  fornitore: string | null; // nome del fornitore letto (D-152: per i candidati dal CRM quando non è riconosciuto)
   numero: string | null;
   data: string | null;
   codice_cliente: string | null;
@@ -71,7 +72,17 @@ export interface Candidato {
   delta: number;
 }
 
-export type Esito = 'doppio' | 'bollettino' | 'nuova' | 'certo' | 'probabile' | 'ambiguo' | 'nessuno' | 'manca_agenzia' | 'manca_rappresentanza' | 'fornitore_da_integra' | 'cliente_da_integra';
+export type Esito = 'doppio' | 'bollettino' | 'nuova' | 'certo' | 'probabile' | 'ambiguo' | 'nessuno' | 'manca_agenzia' | 'manca_rappresentanza' | 'fornitore_da_integra' | 'cliente_da_integra' | 'fornitore_da_scegliere' | 'cliente_da_scegliere';
+
+/** Un soggetto candidato da scegliere per il documento (D-152): dal CRM o dalle viste di Integra. */
+export interface CandidatoSoggetto {
+  fonte: 'crm' | 'integra';
+  id: string; // CRM: id del ruolo; Integra: id_integra
+  ragione_sociale: string | null;
+  piva: string | null;
+  citta: string | null;
+  motivo: 'P.IVA uguale' | 'nome simile';
+}
 
 /** D-106: cliente e fornitore riconosciuti ma senza agenzia valida alla data del documento. */
 export interface AgenziaMancante {
@@ -106,6 +117,8 @@ export interface Contesto {
   fornitore_su_integra?: RigaIntegra[];
   cliente_su_integra?: RigaIntegra[];
   storico?: RigaStorico[];
+  /** D-152: il ponte di Integra non ha risposto → candidati solo dal CRM e una nota, niente errore. */
+  integra_non_raggiungibile?: boolean;
 }
 
 export interface Proposta {
@@ -123,6 +136,12 @@ export interface Proposta {
   cliente_da_integra: { id_integra: number | null; ragione_sociale: string | null; piva: string | null; subagente: string | null; sconto: number | null } | null;
   /** D-112: coppia cliente-fornitore nello storico senza subagente (non rappresentata). */
   manca_rappresentanza: { cliente: string | null; fornitore: string | null; codice_cliente: string | null } | null;
+  /** D-152: fornitore non riconosciuto in modo univoco → candidati dal CRM e da Integra da scegliere. */
+  candidati_fornitore: CandidatoSoggetto[];
+  /** D-152: cliente non riconosciuto in modo univoco → candidati dal CRM e da Integra da scegliere. */
+  candidati_cliente: CandidatoSoggetto[];
+  /** D-152: il ponte di Integra non ha risposto (i candidati sono solo del CRM). */
+  integra_non_raggiungibile: boolean;
 }
 
 export interface Controllo {
@@ -170,7 +189,7 @@ function componiLetto(tipo: string | null, fornitore_id: bigint | null, m: Map<s
     righe.push(r);
   }
   return {
-    tipo, fornitore_id,
+    tipo, fornitore_id, fornitore: valore('fornitore'),
     numero: valore('numero'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'), piva_cliente: valore('piva_cliente'),
     importo: num(valore('importo_totale')),
     mese: intero(valore('mese')), anno: intero(valore('anno')), riferimento_fattura: valore('riferimento_fattura'),
@@ -244,7 +263,7 @@ async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | nul
  *  (`IT 012…`, `DE 012…`, D-124), con la stessa base dell'import da Integra (R1-09). */
 export const normalizzaPiva = (s: string) => pivaNormalizzata((s || '').replace(/[^0-9A-Za-z]/g, '')).replace(/^[A-Z]{2}(?=\d)/, '');
 
-export type ClienteConCorrente = { id: bigint; corrente: { piva: string | null; ragione_sociale: string } | null };
+export type ClienteConCorrente = { id: bigint; corrente: { piva: string | null; ragione_sociale: string; citta: string | null } | null };
 
 /** Risolve il cliente per P.IVA o ragione sociale (D-92, D-124): vince la P.IVA; se più clienti
  *  hanno quella P.IVA (sedi di una catena in Integra) decide la ragione sociale normalizzata, e solo
@@ -276,6 +295,49 @@ export async function riconosciCliente(db: Db, l: Letto): Promise<{ cliente_id: 
   const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
   return riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
 }
+
+/* ---------- Candidati da scegliere (D-152) ---------- */
+
+/** Fornitori del CRM il cui nome normalizzato somiglia a quello letto (D-71): i candidati che
+ *  `risolviFornitore` non ha potuto decidere (nessuno o più di uno). Massimo 10. */
+async function candidatiFornitoreCrm(db: Db, nome: string): Promise<CandidatoSoggetto[]> {
+  const t = normalizzaNome(nome ?? '');
+  if (!t) return [];
+  const fornitori = await db.fornitori.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
+  const t2 = senzaSigle(nome);
+  const visti = new Set<bigint>();
+  const out: CandidatoSoggetto[] = [];
+  for (const f of fornitori) {
+    if (!f.corrente) continue;
+    const n = normalizzaNome(f.corrente.ragione_sociale);
+    const sn = senzaSigle(f.corrente.ragione_sociale);
+    const simile = n === t || (t2.length >= 3 && sn.length >= 3 && (sn === t2 || sn.startsWith(t2 + ' ') || t2.startsWith(sn + ' ')));
+    if (simile && !visti.has(f.id)) {
+      visti.add(f.id);
+      out.push({ fonte: 'crm', id: String(f.id), ragione_sociale: f.corrente.ragione_sociale, piva: f.corrente.piva ?? null, citta: null, motivo: 'nome simile' });
+    }
+  }
+  return out.slice(0, 10);
+}
+
+/** Clienti del CRM candidati quando il riconoscimento (D-92, D-124) non è univoco: la P.IVA letta
+ *  (con o senza prefisso del paese) o la ragione sociale normalizzata. Massimo 10. */
+function candidatiClienteCrm(clienti: ClienteConCorrente[], piva_cliente: string | null, cliente: string | null): CandidatoSoggetto[] {
+  const piva = normalizzaPiva(piva_cliente ?? '');
+  const nome = normalizzaNome(cliente ?? '');
+  const perPiva = piva.length >= 11 ? clienti.filter((x) => x.corrente?.piva != null && normalizzaPiva(x.corrente.piva) === piva) : [];
+  if (perPiva.length) {
+    return perPiva.slice(0, 10).map((x) => ({ fonte: 'crm', id: String(x.id), ragione_sociale: x.corrente!.ragione_sociale, piva: x.corrente!.piva, citta: x.corrente!.citta ?? null, motivo: 'P.IVA uguale' as const }));
+  }
+  if (nome) {
+    const perNome = clienti.filter((x) => x.corrente && normalizzaNome(x.corrente.ragione_sociale) === nome);
+    return perNome.slice(0, 10).map((x) => ({ fonte: 'crm', id: String(x.id), ragione_sociale: x.corrente!.ragione_sociale, piva: x.corrente!.piva, citta: x.corrente!.citta ?? null, motivo: 'nome simile' as const }));
+  }
+  return [];
+}
+
+/** Riga di Integra come candidato (D-152): solo i campi che ha la ricerca (niente città). */
+const candidatoIntegra = (x: RigaIntegra): CandidatoSoggetto => ({ fonte: 'integra', id: String(x.id_integra), ragione_sociale: x.ragione_sociale, piva: x.piva, citta: null, motivo: 'nome simile' });
 
 /* ---------- Agenzia mancante (D-106) ---------- */
 
@@ -391,7 +453,7 @@ const CON_PROP = {
 export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {}): Promise<Proposta> {
   const imp = importoDocumento(l);
   // base della risposta: i campi nuovi (D-111/D-112) sono null finché un esito non li riempie
-  const base: Proposta = { esito: 'nessuno', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null, fornitore_da_integra: null, cliente_da_integra: null, manca_rappresentanza: null };
+  const base: Proposta = { esito: 'nessuno', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null, fornitore_da_integra: null, cliente_da_integra: null, manca_rappresentanza: null, candidati_fornitore: [], candidati_cliente: [], integra_non_raggiungibile: !!contesto.integra_non_raggiungibile };
   if (l.tipo === 'bollettino') {
     const gia = l.fornitore_id != null && l.mese != null && l.anno != null
       ? await db.bollettini_testata.findFirst({ where: { fornitore_id: l.fornitore_id, mese: l.mese, anno: l.anno }, select: { id: true } })
@@ -399,24 +461,30 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
     return { ...base, esito: gia ? 'doppio' : 'bollettino' };
   }
 
-  // D-111: fornitore letto non in anagrafica ma una sola riga in Integra → importa; 0 o più righe: a mano,
-  // mai una scelta a caso (D-111)
+  // D-152: fornitore non in anagrafica → candidati dal CRM (nome) e da Integra; una sola riga di
+  // Integra senza candidati CRM resta l'import certo di oggi (D-111); mai una scelta a caso (D-111).
   if (l.fornitore_id == null) {
     const c = (contesto.fornitore_su_integra ?? []).filter((x) => x.id_integra != null);
-    if (c.length === 1) {
+    const crm = await candidatiFornitoreCrm(db, l.fornitore ?? '');
+    if (crm.length === 0 && c.length === 1) {
       return { ...base, esito: 'fornitore_da_integra', fornitore_da_integra: { id_integra: c[0].id_integra, ragione_sociale: c[0].ragione_sociale, piva: c[0].piva } };
     }
+    const tutti = [...crm, ...c.map(candidatoIntegra)];
+    if (tutti.length) return { ...base, esito: 'fornitore_da_scegliere', candidati_fornitore: tutti };
   }
 
   const ab = await abbinamentoPerCodice(db, l);
-  // D-92 + D-106: cliente riconosciuto (codice del fornitore, altrimenti P.IVA/ragione sociale)
-  const cliente_riconosciuto = ab ? null : await riconosciCliente(db, l);
+  // D-92 + D-106: cliente riconosciuto (codice del fornitore, altrimenti P.IVA/ragione sociale).
+  // D-152: i clienti con la versione corrente si leggono una volta sola, per riconoscimento e candidati.
+  const clienti = ab ? [] : await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
+  const cliente_riconosciuto = ab ? null : riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
   const storico = contesto.storico ?? [];
   // D-112: la coppia cliente-fornitore nello storico, con o senza subagente
   const coppiaCon = storico.find((s) => s.rappresentato) ?? null;
   const coppiaSenza = storico.length > 0 && !storico.some((s) => s.rappresentato) ? storico[0] : null;
 
-  // D-111/D-112: cliente non riconosciuto ma proposto dallo storico (subagente + sconto) o da una riga di Integra.
+  // D-111/D-112/D-152: cliente non riconosciuto ma proposto dallo storico (subagente + sconto), da una
+  // sola riga di Integra (certo, come oggi) o da un elenco di candidati da scegliere.
   // Vale per i tipi che entrano in pratica, prima dell'ordine (il doppione di un ordine vince comunque, vedi sotto).
   const clienteDaIntegra = (): Proposta | null => {
     if (l.fornitore_id == null || ab != null || cliente_riconosciuto != null) return null;
@@ -424,9 +492,12 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
       return { ...base, esito: 'cliente_da_integra', cliente_da_integra: { id_integra: null, ragione_sociale: coppiaCon.cliente_ragione_sociale, piva: coppiaCon.cliente_piva, subagente: coppiaCon.subagente_nome, sconto: coppiaCon.sconto } };
     }
     const c = (contesto.cliente_su_integra ?? []).filter((x) => x.id_integra != null);
-    if (c.length === 1) {
+    const crm = candidatiClienteCrm(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
+    if (crm.length === 0 && c.length === 1) {
       return { ...base, esito: 'cliente_da_integra', cliente_da_integra: { id_integra: c[0].id_integra, ragione_sociale: c[0].ragione_sociale, piva: c[0].piva, subagente: null, sconto: null } };
     }
+    const tutti = [...crm, ...c.map(candidatoIntegra)];
+    if (tutti.length) return { ...base, esito: 'cliente_da_scegliere', candidati_cliente: tutti };
     return null;
   };
 
@@ -578,10 +649,10 @@ export async function controlliFissi(db: Db, l: Letto, proposta: Proposta): Prom
 }
 
 /* ---------- Livello del documento (§6.5 punto 6, M.statoLettura) ---------- */
-/** Soglie dalla configurazione; se non c'è una configurazione valida, le iniziali 0,9/0,7. */
-async function soglieLettura(db: Db): Promise<Soglie> {
+/** Soglie dalla configurazione; se non c'è una configurazione valida, le iniziali 0,8/0,7 (D-151). */
+export async function soglieLettura(db: Db): Promise<Soglie> {
   const c = await letturaConfig(db);
-  return { soglia_ok: c?.soglia_ok ?? 0.9, soglia_bassa: c?.soglia_bassa ?? 0.7 };
+  return { soglia_ok: c?.soglia_ok ?? 0.8, soglia_bassa: c?.soglia_bassa ?? 0.7 };
 }
 
 /** Livello dai campi e dai controlli. `tipo` è escluso (D-71): la sua confidenza è strutturalmente bassa,

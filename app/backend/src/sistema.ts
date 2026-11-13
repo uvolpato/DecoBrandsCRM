@@ -141,7 +141,7 @@ export const sondaLettura: Sonda = async (db) => {
   if (!c) return { ok: true, configurata: false, testo: 'non configurata' };
   const inizio = Date.now();
   if (c.connettore !== 'llamacloud_eu') {
-    return { ok: true, testo: 'Connettore locale: prova non disponibile', misure: { secondi: secondiDa(inizio) } };
+    return { ok: true, configurata: false, testo: 'non configurata' };
   }
   const r = await entro(provaConnettore(c));
   return { ok: r.ok, testo: r.testo, misure: { secondi: secondiDa(inizio), ...(r.ok ? {} : { errore: pulisci(r.testo) }) } };
@@ -324,7 +324,7 @@ export async function stato(db: PrismaService, ora = new Date()): Promise<Riquad
   const servizi: Riquadro[] = [];
   for (const s of SERVIZI) {
     const configurata = s.id === 'casella' ? !!conf.casella
-      : s.id === 'lettura' ? !!conf.lettura
+      : s.id === 'lettura' ? !!conf.lettura && conf.lettura.connettore === 'llamacloud_eu'
         : s.id === 'integra' ? !!conf.integra : !!conf.posta;
     const [ultima, ultimi3, aperte, daVedere] = await Promise.all([
       ultimaEsecuzione(db, s.id),

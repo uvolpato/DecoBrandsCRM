@@ -60,6 +60,10 @@ try:
         nota = pg.locator('.pannello:has(h2:has-text("Da controllare")) .pannello-nota').first
         pg.wait_for_function("() => /\\d+ document/.test(document.querySelector('.pannello-nota')?.textContent ?? '')")
         ok('document' in nota.inner_text(), 'conteggio dei documenti nel pannello')
+        # §7.9: lettura non configurata → avviso fisso (non a scomparsa) e ritmo dichiarato
+        ok(pg.locator('.avviso-variazioni:has-text("lettura dei documenti non è configurata")').count() == 1,
+           'avviso fisso: la lettura dei documenti non è configurata')
+        ok('ogni 15 secondi' in testo(pg, '.pannello'), 'nota: si legge un documento ogni 15 secondi')
         pg.wait_for_selector(voce)
         pg.click(voce)  # due documenti di prova: si sceglie quello normale
         pg.locator(voce + '[aria-current=true]').wait_for(timeout=10000)
@@ -98,18 +102,23 @@ try:
         pg.screenshot(path=str(USCITA / 'app-documento-1440.png'), full_page=True)
 
         pg.click('.pannello-testa button:has-text("Correggi i dati letti")'); pg.wait_for_selector('.affiancata')
-        ok(pg.locator('.aff-sx canvas').count() == 1, 'finestra di correzione: PDF originale a sinistra')
+        pg.wait_for_selector('.aff-sx canvas', timeout=20000)  # il visore disegna le pagine in modo asincrono (PDF.js)
+        ok(pg.locator('.aff-sx canvas').count() >= 1, 'finestra di correzione: PDF originale a sinistra')
         ok(pg.input_value('input[data-campo="numero"]') == 'PROVA-' + S.upper(), 'finestra di correzione: numero letto')
         ok(pg.locator('.aff-dx .incerto-errore').count() >= 1 and pg.locator('.aff-dx .incerto-attesa').count() >= 1, 'campi bordati giallo e rosso')
         ok('pagina' in testo(pg, '.aff-dx') or 'Seleziona un campo' in testo(pg, '.aff-dx'), 'posizione del campo accanto ai dati')
         pg.fill('input[data-campo="numero"]', 'PROVA-' + S.upper() + '-B')
-        pg.fill('input[data-campo="importo"]', '260')
+        pg.fill('input[data-campo="importo"]', '')  # campo euro: si svuota prima di scrivere (CampoEuro non si azzera da solo)
+        pg.fill('input[data-campo="importo"]', '260.5')
         pg.click('button:has-text("Aggiungi riga")'); pg.wait_for_timeout(100)
         pg.fill('input[data-campo="righe[2].codice"]', 'BALC-405')
         pg.fill('input[data-campo="righe[2].descrizione"]', 'Riga aggiunta')
         pg.fill('input[data-campo="righe[2].quantita"]', '1')
-        pg.fill('input[data-campo="righe[2].prezzo"]', '10')
-        pg.fill('input[data-campo="righe[2].importo"]', '10')
+        pg.fill('input[data-campo="righe[2].prezzo"]', '10.5')
+        pg.fill('input[data-campo="righe[2].importo"]', '10.5')
+        pg.wait_for_timeout(100)
+        ok(pg.input_value('input[data-campo="righe[2].prezzo"]').replace('\u00a0', ' ') == '10,50 €',
+           'campo in euro: fuori dal fuoco il prezzo si legge 10,50 € (col fuoco il punto è accettato)')
         # il segno di conferma accanto al campo incerto non cambia il valore (F6-A4b)
         const_cerchi = pg.locator('.aff-dx .conferma-campo').count()
         ok(const_cerchi >= 1, 'finestra: il segno di conferma per i campi incerti')
@@ -208,9 +217,11 @@ try:
                 'esito': 'fornitore_da_integra', 'candidati': [], 'importo': 250, 'abbinamento': None,
                 'cliente_riconosciuto': None, 'agenzia_mancante': None, 'cliente_da_integra': None,
                 'manca_rappresentanza': None,
+                'candidati_fornitore': [], 'candidati_cliente': [], 'integra_non_raggiungibile': False,
                 'fornitore_da_integra': {'id_integra': 99001, 'ragione_sociale': 'Fornitore Prova Integra', 'piva': '99999999991'},
             },
             'bollettino': None,
+            'soglie': {'soglia_ok': 0.8, 'soglia_bassa': 0.7},
         }
         visti = {'dettaglio': 0, 'importa': 0, 'put': 0, 'pendente': []}
         def risposta(route, corpo):
@@ -264,8 +275,10 @@ try:
             'righe': [],
             'proposta': {'esito': 'nessuno', 'candidati': [], 'importo': 0, 'abbinamento': None,
                          'cliente_riconosciuto': None, 'agenzia_mancante': None, 'cliente_da_integra': None,
-                         'manca_rappresentanza': None, 'fornitore_da_integra': None},
+                         'manca_rappresentanza': None, 'fornitore_da_integra': None,
+            'candidati_fornitore': [], 'candidati_cliente': [], 'integra_non_raggiungibile': False},
             'bollettino': None,
+            'soglie': {'soglia_ok': 0.8, 'soglia_bassa': 0.7},
         }
         pg3 = entra(S + '-ammi')
         pg3.route(re.compile(r'^.*/api/documenti/999998$'), lambda r: risposta(r, json.dumps(scheda_errore)))
@@ -289,6 +302,93 @@ try:
         ok('Fornitore e codice cliente non letti' in corpo4, 'A6-16: avviso per fornitore e codice non letti')
         ok('Oppure abbina a un’altra pratica:' in corpo4, 'A6-16: «Oppure abbina a un’altra pratica» senza il nome')
         pg4.close()
+
+        # §7.9: la lista mostra i documenti in coda (stato «In coda», in cima) e il dettaglio offre
+        # «Togli dalla coda» che usa lo scarto esistente. La lista e il dettaglio sono simulati.
+        lista_coda = {
+            'documenti': [
+                {'id': '999996', 'file_nome': 'prova-coda.pdf', 'file_tipo': 'pdf', 'tipo': None, 'numero': None,
+                 'data': None, 'fornitore_id': None, 'fornitore': None, 'codice_cliente': None, 'cliente': None,
+                 'importo': None, 'livello': None, 'stato': 'in_coda', 'ricevuto_il': '2026-09-15T09:00:00.000Z',
+                 'letto_il': None, 'controlli_n': 0, 'manca_agenzia': False, 'manca_rappresentanza': False,
+                 'fornitore_da_integra': False, 'cliente_da_integra': False},
+            ],
+            'conteggi': {'da_controllare': 0, 'in_coda': 1, 'in_lettura': 0, 'errore': 0},
+            'totale': 1, 'pagina': 1, 'per_pagina': 200, 'lettura_configurata': False,
+        }
+        scheda_coda = {
+            'id': '999996', 'file_nome': 'prova-coda.pdf', 'file_tipo': 'pdf', 'stato': 'in_coda', 'tipo': None,
+            'livello': None, 'ricevuto_il': '2026-09-15T09:00:00.000Z', 'letto_il': None, 'errore': None,
+            'scaglioni_mancanti': False, 'fornitore': None, 'campi': [], 'controlli': [],
+            'testata': {'tipo': None, 'numero': None, 'data': None, 'fornitore_id': None, 'codice_cliente': None,
+                        'cliente': None, 'importo': None, 'mese': None, 'anno': None, 'riferimento_fattura': None},
+            'righe': [],
+            'proposta': {'esito': 'nessuno', 'candidati': [], 'importo': 0, 'abbinamento': None,
+                         'cliente_riconosciuto': None, 'agenzia_mancante': None, 'cliente_da_integra': None,
+                         'manca_rappresentanza': None, 'fornitore_da_integra': None,
+            'candidati_fornitore': [], 'candidati_cliente': [], 'integra_non_raggiungibile': False},
+            'bollettino': None,
+            'soglie': {'soglia_ok': 0.8, 'soglia_bassa': 0.7},
+        }
+        scarti = {'n': 0}
+        pg5 = entra(S + '-ammi')
+        pg5.route(re.compile(r'^.*/api/documenti\?stato=aperte.*'), lambda r: risposta(r, json.dumps(lista_coda)))
+        pg5.route(re.compile(r'^.*/api/documenti/999996$'), lambda r: risposta(r, json.dumps(scheda_coda)))
+        def scarta_coda(route):
+            scarti['n'] += 1
+            route.fulfill(status=204, content_type='application/json', body='')
+        pg5.route(re.compile(r'^.*/api/documenti/999996/scarta$'), scarta_coda)
+        pg5.goto(BASE + '/documenti')
+        pg5.wait_for_selector('.selezionabile a')
+        ok(pg5.locator('.selezionabile a .stato:has-text("In coda")').count() == 1, 'lista: il documento in coda compare con «In coda»')
+        ok('prova-coda.pdf' in testo(pg5, '.selezionabile'), 'lista: la riga in coda mostra il nome del file')
+        pg5.click('.selezionabile a:has-text("prova-coda.pdf")')
+        pg5.locator('button:has-text("Togli dalla coda")').wait_for(timeout=15000)
+        ok(pg5.locator('button:has-text("Togli dalla coda")').count() == 1, 'dettaglio in coda: pulsante Togli dalla coda')
+        ok(pg5.locator('button:has-text("Scarta il documento")').count() == 0, 'dettaglio in coda: niente Scarta il documento')
+        pg5.screenshot(path=str(USCITA / 'app-documenti-coda-1440.png'))
+        pg5.locator('button:has-text("Togli dalla coda")').click(); pg5.wait_for_selector('.modale')
+        pg5.locator('.modale-piede button:has-text("Togli dalla coda")').click(); pg5.wait_for_timeout(500)
+        ok(scarti['n'] == 1, 'Togli dalla coda: chiama lo scarto esistente (una volta)')
+        pg5.close()
+
+        # D-152: fornitore non univoco → elenco dei candidati con la fonte (CRM/Integra) e il pulsante
+        # «Scegli»; scegliendo un candidato il server ricollega e la scheda si ricarica. Scheda simulata.
+        scheda_scegli = dict(scheda_errore, id='999995', stato='da_controllare', tipo='ordine', livello='da_controllare',
+                             file_nome='prova-scegli.pdf')
+        scheda_scegli['proposta'] = {
+            'esito': 'fornitore_da_scegliere', 'candidati': [], 'importo': 0, 'abbinamento': None,
+            'cliente_riconosciuto': None, 'agenzia_mancante': None, 'cliente_da_integra': None,
+            'manca_rappresentanza': None, 'fornitore_da_integra': None,
+            'candidati_fornitore': [
+                {'fonte': 'crm', 'id': '11', 'ragione_sociale': 'Arte Wohnaccessoires GmbH & Co. KG', 'piva': '12345678901', 'citta': None, 'motivo': 'nome simile'},
+                {'fonte': 'integra', 'id': '22', 'ragione_sociale': 'Arte SRL', 'piva': '12345678901', 'citta': None, 'motivo': 'nome simile'},
+            ],
+            'candidati_cliente': [], 'integra_non_raggiungibile': False,
+        }
+        scelti = {'n': 0, 'dettaglio': 0}
+        def dettaglio_scegli(route):
+            scelti['dettaglio'] += 1
+            risposta(route, json.dumps(scheda_scegli))
+        def scegli_rotta(route):
+            scelti['n'] += 1
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(scheda_scegli))
+        pg6 = entra(S + '-ammi')
+        pg6.route(re.compile(r'^.*/api/documenti/999995$'), dettaglio_scegli)
+        pg6.route(re.compile(r'^.*/api/documenti/999995/scegli$'), scegli_rotta)
+        pg6.goto(BASE + '/documenti/999995')
+        pg6.locator('button[aria-label^="Scegli "]').first.wait_for(timeout=15000)
+        ok(pg6.locator('button[aria-label^="Scegli "]').count() == 2, 'D-152: due candidati con il pulsante Scegli')
+        ok('CRM' in pg6.locator('body').inner_text() and 'Integra' in pg6.locator('body').inner_text(), 'D-152: la fonte del candidato è un\'etichetta')
+        ok('Fornitore da scegliere' in testo(pg6, '.schede-barra'), 'D-152: scheda «Fornitore da scegliere»')
+        ok(pg6.locator('button:has-text("Nessuno di questi")').count() == 1, 'D-152: «Nessuno di questi» per cercare a mano')
+        pg6.screenshot(path=str(USCITA / 'app-documento-scegli-1440.png'))
+        prima = scelti['dettaglio']
+        pg6.locator('button[aria-label^="Scegli "]').first.click()
+        pg6.wait_for_timeout(400)
+        ok(scelti['n'] == 1, 'D-152: la scelta chiama la rotta scegli una volta')
+        ok(scelti['dettaglio'] > prima, 'D-152: dopo la scelta la scheda si ricarica')
+        pg6.close()
 
         b.close()
 finally:

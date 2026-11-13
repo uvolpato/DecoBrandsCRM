@@ -43,6 +43,11 @@ with sync_playwright() as p:
     api = pg.evaluate("async () => (await (await fetch('/api/oggi')).json())")
     ok(testo(pg, '.testa h1') == 'Oggi', 'titolo della pagina: Oggi')
     ok(api['sottotitolo'] in testo(pg, '.testa .sotto'), 'sottotitolo dal server: «%s»' % testo(pg, '.testa .sotto'))
+    # §7.9: lettura non configurata → avviso fisso in Oggi, con il collegamento alle Impostazioni
+    if not api['lettura_configurata']:
+        ok(pg.locator('.avviso-variazioni:has-text("lettura dei documenti non è configurata")').count() == 1,
+           'avviso fisso in Oggi: lettura non configurata')
+        ok(pg.locator('.avviso-variazioni a[href="/impostazioni"]').count() == 1, 'avviso: collegamento alle Impostazioni')
 
     kpi = pg.locator('.kpi-riga button.kpi')
     ok(kpi.count() == 4, 'quattro riquadri in testa, cliccabili')

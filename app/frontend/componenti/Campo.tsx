@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { Contesto, Entita } from '@/lib/entita';
+import { euro, num } from '@/lib/formati';
 import { CampoRicerca } from './CampoRicerca';
 import { Icona } from './Icona';
 
@@ -25,6 +26,39 @@ export interface CampoProps {
   multipla?: boolean;
   contesto?: Contesto;
   onCambia?: (valore: string) => void; // per chi deve ricaricare altri campi della finestra (es. gli sconti del fornitore)
+}
+
+// Virgola o punto → stringa numerica col punto (quella che il server si aspetta, V12).
+const aNumero = (testo: string) => {
+  const t = testo.replace(/[^\d,.-]/g, '');
+  return t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t;
+};
+
+export interface CampoEuroProps {
+  valore: string;
+  onChange: (valore: string) => void;
+  dataCampo?: string;
+  onFocus?: () => void;
+  valuta?: boolean; // false per le quantità: virgola, senza €
+  ariaLabel?: string;
+}
+
+/** Campo numerico delle finestre: fuori dal fuoco l'importo si legge all'italiana (12,50 €), col fuoco
+ *  si modifica con virgola o punto. Al genitore arriva la stringa col punto, come prima. */
+export function CampoEuro({ valore, onChange, dataCampo, onFocus, valuta = true, ariaLabel }: CampoEuroProps) {
+  const [fuoco, setFuoco] = useState(false);
+  const mostrato = fuoco ? valore.replace('.', ',') : valore.trim() === '' ? '' : valuta ? euro(valore) : num(valore);
+  return (
+    <input className="campo-euro" type="text" inputMode="decimal" data-campo={dataCampo} aria-label={ariaLabel} value={mostrato}
+      onFocus={() => { setFuoco(true); onFocus?.(); }}
+      onBlur={() => {
+        setFuoco(false);
+        const n = Number(valore);
+        const t = valore.trim() === '' || !isFinite(n) ? '' : String(n);
+        if (t !== valore) onChange(t);
+      }}
+      onChange={(e) => onChange(aNumero(e.target.value))} />
+  );
 }
 
 export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, segnaposto, min, max, step, disabilitato, entita, multipla, contesto, onCambia }: CampoProps) {

@@ -6,6 +6,7 @@ import { erroriOggi } from './registro-api';
 import { liquidazione } from './liquidazioni';
 import { type Dati, caricaDati, giornoRoma } from './motore/dati';
 import { abbinamento, analisiTrimestre, giorni, importoPratica, pagamentiDaSollecitare, piuGiorni, riconcilia, statoPratica, trimestre } from './motore/motore';
+import { letturaConfig } from './impostazioni';
 import { PrismaService } from './prisma.service';
 
 // Pagina Oggi (F5-A1, §7.1): tutto quello che chiede un'azione, calcolato dal server (V12, D-28).
@@ -277,6 +278,8 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
 
   return {
     oggi, aggiornato_il: new Date().toISOString(),
+    // §7.9: il connettore di lettura non scelto (o non utilizzabile) → i file restano in coda (V12)
+    lettura_configurata: (await letturaConfig(db))?.connettore === 'llamacloud_eu',
     sottotitolo: dataLunga(oggi) + ' · ' + (fare ? `${fare} ${fare === 1 ? 'cosa da fare' : 'cose da fare'}` : 'niente in sospeso'),
     riquadri, gruppi, scadenze,
     operazioni: operazioni.map((r) => ({

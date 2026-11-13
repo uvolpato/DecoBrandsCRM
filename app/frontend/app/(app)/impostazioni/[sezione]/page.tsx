@@ -1,7 +1,5 @@
-'use client';
-import { VistaImpostazioni } from '../VistaImpostazioni';
-
-// /impostazioni/:sezione: la sezione la legge VistaImpostazioni da useParams.
+// /impostazioni/:sezione: la vista sta nel layout, che resta montato fra le sezioni (rilievo 13/11/2026).
+// La pagina dà solo l'indirizzo; la sezione la legge vista da useParams.
 export default function Pagina() {
-  return <VistaImpostazioni />;
+  return null;
 }

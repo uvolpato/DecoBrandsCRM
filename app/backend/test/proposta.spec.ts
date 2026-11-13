@@ -27,7 +27,7 @@ let c1: { id: bigint; versione_id: bigint };
 let c2: { id: bigint; versione_id: bigint };
 
 const L = (over: Partial<Letto>): Letto => ({
-  tipo: null, fornitore_id: null, numero: null, data: null, codice_cliente: null, cliente: null, piva_cliente: null,
+  tipo: null, fornitore_id: null, fornitore: null, numero: null, data: null, codice_cliente: null, cliente: null, piva_cliente: null,
   importo: null, mese: null, anno: null, riferimento_fattura: null, righe: [],
   ...over,
 });
@@ -523,5 +523,47 @@ describe('proposta — import da Integra e storico (D-111/D-112)', () => {
     expect(p.manca_rappresentanza).toBeNull();
     expect(p.fornitore_da_integra).toBeNull();
     expect(p.cliente_da_integra).toBeNull();
+  });
+});
+
+describe('proposta — candidati da scegliere (D-152)', () => {
+  it('cliente riconosciuto per P.IVA unica: certo, nessun candidato', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-152', piva_cliente: 'IT00000000001' }));
+    expect(p.cliente_riconosciuto).toMatchObject({ cliente_id: c1.id });
+    expect(p.candidati_cliente).toEqual([]);
+  });
+
+  it('due clienti con la stessa P.IVA e nome diverso: candidati (D-152)', async () => {
+    const a = await creaCliente('Garden Rossi Bergamo srl', '01234567890');
+    const b = await creaCliente('Garden Rossi Brescia srl', '01234567890');
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-153', piva_cliente: '01234567890', cliente: 'Garden Rossi Verona srl' }));
+    expect(p.esito).toBe('cliente_da_scegliere');
+    expect(p.candidati_cliente).toHaveLength(2);
+    expect(p.candidati_cliente.map((c) => c.id).sort()).toEqual([String(a.id), String(b.id)].sort());
+    expect(p.candidati_cliente.every((c) => c.fonte === 'crm' && c.motivo === 'P.IVA uguale')).toBe(true);
+  });
+
+  it('fornitore con più nomi simili: candidati dal CRM (nome simile)', async () => {
+    await creaFornitore('Arte Wohnaccessoires GmbH & Co. KG');
+    await creaFornitore('Arte della Casa SRL');
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: null, fornitore: 'ARTE GmbH', numero: 'OF-154' }));
+    expect(p.esito).toBe('fornitore_da_scegliere');
+    expect(p.candidati_fornitore.length).toBeGreaterThanOrEqual(2);
+    expect(p.candidati_fornitore.every((c) => c.fonte === 'crm' && c.motivo === 'nome simile')).toBe(true);
+  });
+
+  it('fornitore con una sola riga di Integra e nessun candidato CRM: certo (come oggi)', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: null, fornitore: 'Nuovo Fornitore SRL', numero: 'OF-155' }), { fornitore_su_integra: [{ id_integra: 7, ragione_sociale: 'Nuovo Fornitore SRL', piva: '12345678901' }] });
+    expect(p.esito).toBe('fornitore_da_integra');
+    expect(p.candidati_fornitore).toEqual([]);
+  });
+
+  it('Integra giù: candidati solo dal CRM con la nota', async () => {
+    await creaFornitore('Arte Wohnaccessoires GmbH & Co. KG');
+    await creaFornitore('Arte della Casa SRL');
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: null, fornitore: 'ARTE GmbH', numero: 'OF-156' }), { fornitore_su_integra: [], integra_non_raggiungibile: true });
+    expect(p.esito).toBe('fornitore_da_scegliere');
+    expect(p.integra_non_raggiungibile).toBe(true);
+    expect(p.candidati_fornitore.every((c) => c.fonte === 'crm')).toBe(true);
   });
 });

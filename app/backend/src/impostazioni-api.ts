@@ -10,6 +10,7 @@ import {
 } from './impostazioni';
 import { creaTrasporto } from './posta';
 import { provaConnettore } from './lettore';
+import { valutaLettura, type Soglie } from './proposta';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -42,6 +43,23 @@ const TESTO_PROVA: Record<string, string> = {
 // provano solo dal superutente (permesso `sistema.connessioni`). Il controllo del guard vale per tutta
 // la pagina (`sistema.impostazioni`); qui si stringe per le singole sezioni di connessione.
 const CONNESSIONI = ['casella', 'posta', 'integra'] as const;
+
+/** D-151 §19: con le soglie nuove si riclassificano i soli documenti ancora da decidere (`da_controllare`,
+ *  `errore`): quelli già abbinati o scartati non si toccano. Stesse funzioni del salvataggio della lettura
+ *  (`valutaLettura`), nella stessa transazione (V13). Ritorna quanti documenti sono cambiati. */
+async function riclassificaDocumenti(tx: Prisma.TransactionClient, soglie: Soglie): Promise<number> {
+  const documenti = await tx.documenti_in_arrivo.findMany({
+    where: { stato: { in: ['da_controllare', 'errore'] } }, select: { id: true },
+  });
+  for (const d of documenti) {
+    const val = await valutaLettura(tx, d.id, soglie);
+    await tx.documenti_in_arrivo.update({
+      where: { id: d.id },
+      data: { livello: val.livello, controlli: { falliti: val.controlli } as unknown as Prisma.InputJsonValue },
+    });
+  }
+  return documenti.length;
+}
 
 @Controller('impostazioni')
 export class ImpostazioniController {
@@ -83,10 +101,14 @@ export class ImpostazioniController {
         update: { valore: nuovo as Prisma.InputJsonValue, aggiornato_da: utenteId },
         create: { chiave, valore: nuovo as Prisma.InputJsonValue, aggiornato_da: utenteId },
       });
+      // D-151 §19: soglie cambiate → riclassifico i soli documenti da decidere, nella stessa transazione
+      const riclassificati = chiave === 'lettura' && ('soglia_ok' in dopo || 'soglia_bassa' in dopo)
+        ? await riclassificaDocumenti(tx, { soglia_ok: Number(nuovo.soglia_ok), soglia_bassa: Number(nuovo.soglia_bassa) })
+        : 0;
       if (Object.keys(prima).length) {
         await logEvent(tx, {
           tipo: 'crud', azione: 'update', entita: 'impostazione', entita_id: null, esito: 'successo',
-          dettaglio: { etichetta: sezioneDi(chiave).titolo, chiave, prima, dopo },
+          dettaglio: { etichetta: sezioneDi(chiave).titolo, chiave, prima, dopo, ...(riclassificati ? { riclassificati } : {}) },
         }, ctx);
       }
     });

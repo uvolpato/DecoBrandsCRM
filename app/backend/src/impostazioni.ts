@@ -126,7 +126,7 @@ const INIZIALI: Record<string, Record<string, unknown>> = {
     connettore: 'llamacloud_eu',
     llamacloud_chiave: null, llamacloud_modo: 'agentic', llamacloud_progetto: '', llamacloud_attesa_s: 300,
     locale_indirizzo: '', locale_modello: 'zai-org/GLM-OCR', locale_attesa_s: 300,
-    soglia_ok: 0.9, soglia_bassa: 0.7,
+    soglia_ok: 0.8, soglia_bassa: 0.7,
   },
   posta: { server: '', porta: null, utente: '', password: null, mittente: '' },
   integra: { server: '', database: '', utente: '', password: null, schema: 'public', secondi: 60 },

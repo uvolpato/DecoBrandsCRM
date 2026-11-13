@@ -610,13 +610,13 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
   });
 
   it('il dettaglio porta i candidati di Integra e scaglioni_mancanti', async () => {
-    const d = await creaArrivo('fornitore-sconosciuto.pdf', { tipo: 'ordine', campi: [['numero', 'FS-1'], ['fornitore', 'Nuovo Fornitore SRL']] });
+    const d = await creaArrivo('fornitore-sconosciuto.pdf', { tipo: 'ordine', campi: [['numero', 'FS-1'], ['fornitore', 'Zeta Giardini Sconosciuti SRL']] });
     const spiaPonte = jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue({ pool: {} as never, schema: 'public' });
-    const spiaCerca = jest.spyOn(anagraficaIntegra, 'cerca').mockResolvedValue({ righe: [{ id_integra: 99, codice: 'NF', ragione_sociale: 'Nuovo Fornitore SRL', piva: '12345678901', attivo: true }], ms: 1 });
+    const spiaCerca = jest.spyOn(anagraficaIntegra, 'cerca').mockResolvedValue({ righe: [{ id_integra: 99, codice: 'NF', ragione_sociale: 'Zeta Giardini Sconosciuti SRL', piva: '12345678901', attivo: true }], ms: 1 });
     try {
       const r = (await op.get(`/documenti/${d.id}`).expect(200)).body;
       expect(r.proposta.esito).toBe('fornitore_da_integra');
-      expect(r.proposta.fornitore_da_integra).toMatchObject({ id_integra: 99, ragione_sociale: 'Nuovo Fornitore SRL', piva: '12345678901' });
+      expect(r.proposta.fornitore_da_integra).toMatchObject({ id_integra: 99, ragione_sociale: 'Zeta Giardini Sconosciuti SRL', piva: '12345678901' });
       expect(r.proposta.manca_rappresentanza).toBeNull();
       expect(r.proposta.cliente_da_integra).toBeNull();
       expect(typeof r.scaglioni_mancanti).toBe('boolean');
@@ -753,5 +753,121 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
     expect(r.documenti.find((x: any) => x.id === String(d.id)).cliente_da_integra).toBe(true);
     const dettaglio = (await op.get(`/documenti/${d.id}`).expect(200)).body;
     expect(dettaglio.proposta.esito).toBe('cliente_da_integra');
+  });
+});
+
+describe('coda visibile in elenco e lettura non configurata (§7.9)', () => {
+  it('stato=aperte: in coda, in lettura e da controllare insieme, in cima con lo stato', async () => {
+    const inCoda = await db.documenti_in_arrivo.create({ data: {
+      origine: 'caricamento', file_nome: 'coda-elenco.pdf', stato: 'in_coda',
+      file_hash: createHash('sha256').update('coda-elenco').digest('hex'), file_percorso: 'in_arrivo/coda-elenco.pdf',
+    } });
+    const inLettura = await db.documenti_in_arrivo.create({ data: {
+      origine: 'caricamento', file_nome: 'lettura-elenco.pdf', stato: 'in_lettura',
+      file_hash: createHash('sha256').update('lettura-elenco').digest('hex'), file_percorso: 'in_arrivo/lettura-elenco.pdf',
+    } });
+    const r = (await op.get('/documenti?stato=aperte&per_pagina=200').expect(200)).body;
+    // il server dichiara la lettura non configurata (V12): nessuna deduzione del browser
+    expect(r.lettura_configurata).toBe(false);
+    expect(r.documenti.every((x: any) => typeof x.stato === 'string')).toBe(true);
+    expect(r.documenti.find((x: any) => x.id === String(inCoda.id))).toMatchObject({ stato: 'in_coda', file_nome: 'coda-elenco.pdf' });
+    expect(r.documenti.find((x: any) => x.id === String(inLettura.id))).toMatchObject({ stato: 'in_lettura' });
+    // in coda e in lettura in cima, poi i da controllare
+    const stati = r.documenti.map((x: any) => x.stato);
+    const primoDaControllare = stati.indexOf('da_controllare');
+    expect(primoDaControllare).toBeGreaterThanOrEqual(0);
+    expect(stati.slice(0, primoDaControllare).every((s: string) => s === 'in_coda' || s === 'in_lettura')).toBe(true);
+    // niente chiusi né in errore
+    expect(stati).not.toContain('scartato');
+    expect(stati).not.toContain('abbinato');
+    expect(stati).not.toContain('errore');
+    // il totale di «aperte» è la somma dei tre segmenti
+    expect(r.totale).toBe(r.conteggi.in_coda + r.conteggi.in_lettura + r.conteggi.da_controllare);
+  });
+
+  it('stato=da_controllare resta solo da_controllare (non cambia)', async () => {
+    const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
+    expect(r.documenti.length).toBeGreaterThan(0);
+    expect(r.documenti.every((x: any) => x.stato === 'da_controllare')).toBe(true);
+  });
+
+  it('Togli dalla coda usa lo scarto esistente: motivo «Tolto dalla coda»', async () => {
+    const id = BigInt((await op.carica(pdf('togli-coda'), 'togli-coda.pdf').expect(201)).body.id);
+    await op.post(`/documenti/${id}/scarta`, { motivo: 'Tolto dalla coda', nota: 'prima della lettura' }).expect(204);
+    expect(await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } })).toMatchObject({ stato: 'scartato', motivo_scarto: 'Tolto dalla coda', nota_scarto: 'prima della lettura' });
+  });
+});
+
+describe('scelta del fornitore o del cliente (D-152)', () => {
+  async function creaArrivo(file_nome: string, campi: [string, string][] = []) {
+    const d = await db.documenti_in_arrivo.create({ data: {
+      origine: 'email', file_nome, stato: 'da_controllare',
+      file_hash: createHash('sha256').update(file_nome + Math.random()).digest('hex'), file_percorso: `in_arrivo/${file_nome}`,
+    } });
+    if (campi.length) {
+      await db.documenti_campi.createMany({ data: campi.map(([campo, valore]) => ({ documento_id: d.id, campo, valore_letto: valore })) });
+    }
+    return d;
+  }
+
+  // operatore con anche l'area Dati: può correggere i documenti E importare da Integra (D-152)
+  let opImporta: Awaited<ReturnType<typeof entra>>;
+  beforeAll(async () => {
+    await db.utenti.create({ data: {
+      username: 'op-importa', email: 'op-importa' + DOMINIO, nome: 'Prova Importa', ruolo: 'utente',
+      aree: { create: [{ area: 'provvigioni', livello: 'operatore' }, { area: 'dati', livello: 'operatore' }] },
+      password_hash: await cifra(PW), deve_cambiare_password: false,
+    } });
+    opImporta = await entra('op-importa');
+  });
+
+  it('scelta di un cliente del CRM: si collega e il dettaglio lo riconosce', async () => {
+    // due clienti con la stessa P.IVA: la sola P.IVA non decide (D-152)
+    const mk = async (ragione: string) => {
+      const c = await db.clienti.create({ data: { attivo: true } });
+      const v = await db.clienti_versioni.create({ data: { cliente_id: c.id, fonte: 'integra', ragione_sociale: ragione, piva: '88888888888' } });
+      await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: v.id } });
+      return c;
+    };
+    const nord = await mk('Catena Nord srl');
+    await mk('Catena Sud srl');
+    const griesV = await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } });
+    const gries = await db.fornitori.findUniqueOrThrow({ where: { id: griesV.fornitore_id } });
+    const d = await creaArrivo('scelta-cliente.pdf', [
+      ['numero', 'SC-CLI-1'], ['data', '2026-09-01'],
+      ['piva_cliente', '88888888888'], ['cliente', 'Catena Verona srl'],
+    ]);
+    await db.documenti_in_arrivo.update({ where: { id: d.id }, data: { tipo: 'ordine', fornitore_id: gries.id, fornitore_versione_id: gries.versione_corrente_id } });
+
+    const dettaglio = (await op.get(`/documenti/${d.id}`).expect(200)).body;
+    expect(dettaglio.proposta.esito).toBe('cliente_da_scegliere');
+    expect(dettaglio.proposta.candidati_cliente).toHaveLength(2);
+
+    await op.post(`/documenti/${d.id}/scegli`, { ruolo: 'cliente', fonte: 'crm', id: String(nord.id) }).expect(200);
+    const dopo = (await op.get(`/documenti/${d.id}`).expect(200)).body;
+    expect(dopo.proposta.cliente_riconosciuto).toMatchObject({ cliente_id: String(nord.id) });
+  });
+
+  it('scelta di un fornitore da Integra: importa e collega nella stessa transazione (D-133)', async () => {
+    const d = await creaArrivo('scelta-fornitore.pdf', [['fornitore', 'Nuovo Fornitore SRL'], ['numero', 'SC-FOR-1']]);
+    const spiaPonte = jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue({ pool: {} as never, schema: 'public' });
+    const spiaImporta = jest.spyOn(anagraficaIntegra, 'importa').mockResolvedValue({ creato: true, id: '99' } as never);
+    try {
+      await opImporta.post(`/documenti/${d.id}/scegli`, { ruolo: 'fornitore', fonte: 'integra', id: '77' }).expect(200);
+      expect(spiaImporta).toHaveBeenCalledTimes(1);
+      // il documento si collega nella stessa chiamata (D-133), con l'id_integra scelto
+      const chiamata = spiaImporta.mock.calls[0];
+      expect(chiamata[3]).toBe('fornitore');
+      expect(chiamata[4]).toBe(77);
+      expect(chiamata[6]).toBe(BigInt(d.id)); // documento_id
+    } finally {
+      spiaPonte.mockRestore();
+      spiaImporta.mockRestore();
+    }
+  });
+
+  it('fonte Integra senza dati.importa: 403', async () => {
+    const d = await creaArrivo('scelta-403.pdf', [['fornitore', 'Nuovo Fornitore SRL']]);
+    await op.post(`/documenti/${d.id}/scegli`, { ruolo: 'fornitore', fonte: 'integra', id: '1' }).expect(403);
   });
 });

@@ -1,6 +1,6 @@
 'use client';
-// PDF renderizzato con PDF.js, con sopra lo strato trasparente per il rettangolo del valore
-// selezionato (§6.6.1): le coordinate sono normalizzate 0–1 e restano allineate a ogni scala.
+// PDF intero con PDF.js: tutte le pagine una sotto l'altra in un riquadro che scorre, con il
+// rettangolo del valore selezionato sulla sua pagina (§6.6.1). Coordinate normalizzate 0–1.
 import { useEffect, useRef, useState } from 'react';
 import type { PDFDocumentLoadingTask } from 'pdfjs-dist';
 
@@ -13,15 +13,17 @@ export interface PosizionePdf {
   y1: number;
 }
 
-export function PdfEvidenziato({ src, pagina, posizione }: {
-  src: string; pagina: number; posizione: PosizionePdf | null;
+export function PdfEvidenziato({ src, pagina = 1, posizione }: {
+  src: string; pagina?: number; posizione: PosizionePdf | null;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const retRef = useRef<HTMLDivElement>(null);
+  const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
   const [larghezza, setLarghezza] = useState(0);
+  const [pagine, setPagine] = useState(0);
+  const [aspetti, setAspetti] = useState<number[]>([]);
 
-  // la larghezza del riquadro decide la scala della pagina (resta allineata al ridimensionamento)
+  // la larghezza del riquadro decide la scala delle pagine (resta allineata al ridimensionamento)
   useEffect(() => {
     const box = boxRef.current;
     if (!box) return;
@@ -41,26 +43,39 @@ export function PdfEvidenziato({ src, pagina, posizione }: {
       pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
       task = pdfjs.getDocument({ url: src });
       const doc = await task.promise;
-      const page = await doc.getPage(pagina);
-      const base = page.getViewport({ scale: 1 });
-      const sc = larghezza / base.width;
-      const vp = page.getViewport({ scale: sc });
-      const canvas = canvasRef.current;
-      if (!canvas || !vivo) return;
-      canvas.width = Math.floor(vp.width);
-      canvas.height = Math.floor(vp.height);
-      await page.render({ canvas, viewport: vp }).promise;
+      if (!vivo) return;
+      const ratio: number[] = [];
+      for (let n = 1; n <= doc.numPages; n++) {
+        const base = (await doc.getPage(n)).getViewport({ scale: 1 });
+        ratio.push(base.height / base.width);
+      }
+      setPagine(doc.numPages);
+      setAspetti(ratio);
+      // i canvas nascono al render successivo: si aspetta un fotogramma prima di disegnarci sopra
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      // ponytail: tutte le pagine disegnate subito, fine a ~20 pagine; oltre serve il disegno a richiesta
+      for (let n = 1; n <= doc.numPages; n++) {
+        const page = await doc.getPage(n);
+        const base = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: larghezza / base.width });
+        const canvas = canvases.current[n - 1];
+        if (!canvas || !vivo) return;
+        canvas.width = Math.floor(vp.width);
+        canvas.height = Math.floor(vp.height);
+        await page.render({ canvas, viewport: vp }).promise;
+        if (!vivo) return;
+      }
     })().catch(() => {});
     return () => {
       vivo = false;
       void task?.destroy();
     };
-  }, [src, pagina, larghezza]);
+  }, [src, larghezza]);
 
-  const canvas = canvasRef.current;
   const MARGINE = 5; // px di allargamento per lato: il rettangolo non taglia le prime/ultime lettere
-  const dx = canvas?.clientWidth ? (MARGINE / canvas.clientWidth) * 100 : 0;
-  const dy = canvas?.clientHeight ? (MARGINE / canvas.clientHeight) * 100 : 0;
+  const altezzaPagina = larghezza && aspetti[pagina - 1] ? larghezza * aspetti[pagina - 1] : 0;
+  const dx = larghezza ? (MARGINE / larghezza) * 100 : 0;
+  const dy = altezzaPagina ? (MARGINE / altezzaPagina) * 100 : 0;
   const r = posizione && posizione.x0 != null && posizione.x1 != null
     ? {
         left: `${(posizione.x0 * 100 - dx).toFixed(3)}%`,
@@ -70,7 +85,7 @@ export function PdfEvidenziato({ src, pagina, posizione }: {
       }
     : null;
 
-  // porta il rettangolo in vista quando cambia il campo selezionato (il valore può essere in basso nella pagina)
+  // porta il rettangolo in vista quando cambia il campo selezionato (può stare in qualsiasi pagina)
   const chiaveR = r ? `${pagina}:${posizione!.x0}:${posizione!.y0}:${posizione!.x1}:${posizione!.y1}` : '';
   useEffect(() => {
     if (chiaveR) retRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -78,17 +93,20 @@ export function PdfEvidenziato({ src, pagina, posizione }: {
 
   return (
     <div ref={boxRef} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'auto', background: '#525659' }}>
-      <div style={{ position: 'relative', width: '100%' }}>
-        <canvas ref={canvasRef} style={{ width: '100%', display: 'block' }} aria-label={'Pagina ' + pagina + ' del documento'} />
-        {r && (
-          <div ref={retRef} style={{
-            position: 'absolute', ...r,
-            border: '2px solid #ffd24d', background: 'rgba(255,210,77,0.22)',
-            borderRadius: 2, pointerEvents: 'none', boxShadow: '0 0 0 1px rgba(0,0,0,0.35)',
-            scrollMargin: '64px',
-          }} aria-hidden="true" />
-        )}
-      </div>
+      {Array.from({ length: pagine }, (_, i) => (
+        <div key={i} style={{ position: 'relative', width: '100%', marginBottom: 8 }}>
+          <canvas ref={(el) => { canvases.current[i] = el; }} style={{ width: '100%', display: 'block' }}
+            aria-label={'Pagina ' + (i + 1) + ' di ' + pagine} />
+          {r && pagina === i + 1 && (
+            <div ref={retRef} style={{
+              position: 'absolute', ...r,
+              border: '2px solid #ffd24d', background: 'rgba(255,210,77,0.22)',
+              borderRadius: 2, pointerEvents: 'none', boxShadow: '0 0 0 1px rgba(0,0,0,0.35)',
+              scrollMargin: '64px',
+            }} aria-hidden="true" />
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 node_modules/
 .next/
 dist/
+dist-prove/
 coverage/
 .env
 .env.local

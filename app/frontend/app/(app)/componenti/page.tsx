@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Campo } from '@/componenti/Campo';
+import { Campo, CampoEuro } from '@/componenti/Campo';
 import { CampoRicerca } from '@/componenti/CampoRicerca';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
@@ -17,7 +17,7 @@ import { RiepilogoFiltri } from '@/componenti/RiepilogoFiltri';
 import { Sagoma, SagomaRiquadri, SagomaSegmenti, SagomaTabella } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import type { Entita } from '@/lib/entita';
-import { euro } from '@/lib/formati';
+import { euro, num } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
 
 // Catalogo dei componenti (voce Componenti, come #/componenti del prototipo): un esempio dal vivo per
@@ -108,6 +108,16 @@ function DemoPeriodo() {
   const [da, setDa] = useMemoria('catalogo-periodo', '2026-04');
   const [a, setA] = useState('2026-09');
   return <><PeriodoMesi da={da} primo="2026-01" ultimo="2026-09" onChange={(d, x) => { setDa(d); setA(x); }} /><p className="nota">Scelto: {da} → {a}</p></>;
+}
+
+function DemoCampoEuro() {
+  const [prezzo, setPrezzo] = useState('12.5');
+  const [quantita, setQuantita] = useState('3');
+  return <div className="modulo modulo-2">
+    <div className="campo"><label>Prezzo</label><CampoEuro ariaLabel="Prezzo" dataCampo="d-euro" valore={prezzo} onChange={setPrezzo} /></div>
+    <div className="campo"><label>Quantità</label><CampoEuro ariaLabel="Quantità" dataCampo="d-qta" valore={quantita} valuta={false} onChange={setQuantita} /></div>
+    <p className="nota">Fuori dal fuoco: {prezzo ? euro(prezzo) : '—'} · quantità {quantita ? num(quantita) : '—'}. Con il fuoco si scrive con la virgola o il punto.</p>
+  </div>;
 }
 
 function DemoKpi() {
@@ -222,6 +232,7 @@ const VOCI: Voce[] = [
       { href: '/componenti', titolo: '3° trimestre', sotto: 'luglio–settembre', stato: 'In corso', attivo: true, avanzamento: 72 }, { href: '/componenti', titolo: '4° trimestre', sotto: 'ottobre–dicembre', stato: 'Non iniziato', futuro: true }]} /> },
   { nome: 'Campo', gruppo: 'Finestre', testo: 'Campi standard con etichetta e aiuto: testo, numero, password, casella, select, livello e ricerca su un’entità.', firma: '<Campo nome etichetta tipo={testo|numero|password|casella|select|livello|ricerca} valore opzioni aiuto largo segnaposto min max step disabilitato entita multipla contesto />',
     demo: <div className="modulo modulo-2"><Campo nome="demo_codice" etichetta="Codice del fornitore" aiuto="Come il fornitore chiama il cliente." /><Campo nome="demo_sconto" etichetta="Sconto %" tipo="select" opzioni={[{ value: '0', label: '0 %' }, { value: '5', label: '5 %' }]} /><Campo nome="demo_pw" etichetta="Password" tipo="password" /><Campo nome="demo_resta" etichetta="Resta collegato" tipo="casella" valore /></div> },
+  { nome: 'CampoEuro', gruppo: 'Finestre', testo: 'Campo numerico delle finestre per prezzi e importi: fuori dal fuoco il valore si legge all’italiana (12,50 €), col fuoco si modifica con la virgola o il punto; al server arriva la stringa numerica col punto, come sempre (V12). Con valuta={false} mostra le quantità: virgola, senza €. Allineato a destra, inputMode decimale.', firma: '<CampoEuro valore onChange dataCampo onFocus valuta ariaLabel />', demo: <DemoCampoEuro /> },
   { nome: 'FormModal · Modale · Conferma · Avviso', gruppo: 'Finestre', testo: 'Finestre sopra la pagina. FormModal resta aperta se onConferma restituisce il messaggio d’errore (il controllo vero lo fa il server). Avviso: messaggio temporaneo.',
     firma: '<FormModal titolo testo campi colonne conferma pericolo azioniExtra onConferma={async (valori) => messaggio d’errore | niente} onChiudi />\n<Modale titolo testo piede larga onChiudi>   <Conferma titolo testo etichetta pericolo onRisposta={(si) => …} />   avviso(testo, errore)', demo: <DemoFinestre /> },
   { nome: 'FormAgenzia', gruppo: 'Finestre', testo: 'Form dell’agenzia (interscambio) condiviso fra Clienti e Documenti: nuovo o modifica, con fornitore fisso facoltativo (dal documento) e valori iniziali. Salva con POST/PUT /api/clienti/:id/agenzie.',

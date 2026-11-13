@@ -11,6 +11,21 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.1 — 13/11/2026 — correzioni dal primo giro con i documenti veri
+
+- **Coda visibile**: i file caricati compaiono subito in *Documenti* («In coda», «In lettura») e si
+  possono togliere dalla coda prima della lettura; se la lettura non è configurata lo dicono
+  Documenti, Oggi e Stato del sistema. Si legge un documento ogni 15 secondi.
+- **Soglie di affidabilità** (D-151): «Affidabile da» 0,80; le soglie arrivano dal server e i documenti
+  ancora da controllare si riclassificano quando si salvano.
+- **Fornitore e cliente** (D-152): dopo la lettura si cercano nel CRM e in Integra; se non è certo,
+  l'operatore sceglie fra i candidati (un candidato di Integra si importa e si collega insieme).
+- **PDF**: si vedono tutte le pagine e si scorrono; il campo scelto porta alla sua pagina.
+- **Correggi i dati letti**: prezzi e importi in euro (`12,50 €`); *Aggiungi riga* porta il fuoco sulla
+  riga nuova.
+- **Interfaccia**: lente dei campi di ricerca a destra; in Impostazioni cambiando sezione si aggiorna
+  solo la parte destra; pagina d'avvio scura.
+
 ### 0.2.0 — 13/11/2026 — primi documenti veri
 
 Collaudo delle onde 0, 0 bis, 1 e 2 e dei pacchetti 3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01

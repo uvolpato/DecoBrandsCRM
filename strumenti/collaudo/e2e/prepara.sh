@@ -6,5 +6,5 @@ cd /c/Progetti/Decobrands_CRM/app/backend
 B=$(grep ^DATABASE_URL= .env | cut -d= -f2-); E=$(echo $B | sed "s#/decobrands_db#/$1#")
 node -e "const {Client}=require('pg');const c=new Client({connectionString:process.argv[1].replace(/\/decobrands_db.*/,'/postgres')});(async()=>{await c.connect();await c.query('DROP DATABASE IF EXISTS $1 WITH (FORCE)');await c.query('CREATE DATABASE $1');await c.end()})()" "$B" || exit 1
 DATABASE_URL="$E" npx prisma migrate deploy > /dev/null 2>&1 && DATABASE_URL="$E" npx prisma db seed > /dev/null 2>&1 && echo "database $1 pronto" || exit 1
-npx nest build > /dev/null 2>&1 && echo "build ok" || exit 1
+rm -rf dist-prove; npx tsc -p tsconfig.build.json --outDir dist-prove > /dev/null 2>&1 && echo "build ok" || exit 1  # cartella sua: non tocca dist del backend di Ugo (start:dev)
 powershell -NoProfile -Command "robocopy C:\Progetti\Decobrands_CRM\app\frontend '$FE' /MIR /XD node_modules .next /NFL /NDL /NJH /NJS | Out-Null; if (\$LASTEXITCODE -lt 8) { 'frontend copiato' } else { exit 1 }"

@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, applyDecorators, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, NotFoundException, Param, ParseIntPipe,
+  BadGatewayException, BadRequestException, Body, applyDecorators, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, NotFoundException, Param, ParseIntPipe,
   PayloadTooLargeException, Post, Put, Query, Req, Res, StreamableFile, UnsupportedMediaTypeException, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -14,14 +14,14 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import type { Request, Response } from 'express';
 import { permessiDi, Richiede, TentativiGuard, contesto } from './accesso';
 import { Data, Facoltativo } from './fornitori';
-import { righePagina } from './impostazioni';
+import { letturaConfig, righePagina } from './impostazioni';
 import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
 import { chiaveRiga, netto, perCodice, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
-import { cerca } from './anagrafica-integra';
+import { cerca, importa } from './anagrafica-integra';
 import { IntegraService } from './integra';
 import { cercaLegame } from './storico';
-import { type ClienteConCorrente, type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, riconosciClienteDai, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
+import { type ClienteConCorrente, type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, riconosciClienteDai, soglieLettura, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -282,11 +282,14 @@ class CercaDocumenti {
 /* ---------- Pagina Documenti (F6-A4a, §7.9, §8.1, D-72) ---------- */
 
 const STATI_ELENCO = ['da_controllare', 'in_coda', 'in_lettura', 'errore'] as const;
+// §7.9: la lista «Da controllare» mostra anche i documenti in coda e in lettura, in cima
+const STATI_APERTE = ['in_coda', 'in_lettura', 'da_controllare'] as const;
+const STATI_FILTRO = [...STATI_ELENCO, 'aperte'] as const;
 const TIPI_ARRIVO = [...TIPI_DOCUMENTO, 'bollettino'] as const;
-const MOTIVI_SCARTO = ['Doppione', 'Non riguarda Decobrands', 'Documento illeggibile', 'Altro'] as const;
+const MOTIVI_SCARTO = ['Doppione', 'Non riguarda Decobrands', 'Documento illeggibile', 'Altro', 'Tolto dalla coda'] as const;
 
 class ElencoDocumenti {
-  @IsOptional() @IsIn(STATI_ELENCO) stato?: (typeof STATI_ELENCO)[number];
+  @IsOptional() @IsIn(STATI_FILTRO) stato?: (typeof STATI_FILTRO)[number];
   @IsOptional() @IsString() @MaxLength(100) q?: string;
   @IsOptional() @IsIn(TIPI_ARRIVO) tipo?: (typeof TIPI_ARRIVO)[number];
   @IsOptional() @IsIn(['affidabile', 'da_controllare', 'bassa']) livello?: string;
@@ -297,6 +300,13 @@ class ElencoDocumenti {
 class ScartaDocumento {
   @IsIn(MOTIVI_SCARTO as unknown as string[]) motivo!: string;
   @IsOptional() @IsString() @MaxLength(2000) nota?: string;
+}
+
+/** D-152: la persona sceglie il fornitore o il cliente fra i candidati del CRM o di Integra. */
+class ScegliSoggetto {
+  @IsIn(['fornitore', 'cliente']) ruolo!: 'fornitore' | 'cliente';
+  @IsIn(['crm', 'integra']) fonte!: 'crm' | 'integra';
+  @IsString() @IsNotEmpty() @MaxLength(30) id!: string;
 }
 
 /** Correzione dei dati letti: testata e righe arrivano come oggetti, validati qui campo per campo
@@ -343,6 +353,7 @@ async function contestoDocumento(db: DbLetto, ponte: Ponte | null, letto: Letto,
     if (ponte && fornitoreNome) {
       const r = await cerca(db as PrismaService, ponte.pool, ponte.schema, 'fornitore', fornitoreNome);
       if (!('errore' in r)) c.fornitore_su_integra = r.righe;
+      else c.integra_non_raggiungibile = true; // D-152: candidati solo dal CRM, con la nota
     }
     return c;
   }
@@ -354,6 +365,7 @@ async function contestoDocumento(db: DbLetto, ponte: Ponte | null, letto: Letto,
     if (q) {
       const r = await cerca(db as PrismaService, ponte.pool, ponte.schema, 'cliente', q);
       if (!('errore' in r)) c.cliente_su_integra = r.righe;
+      else c.integra_non_raggiungibile = true; // D-152
     }
   }
   return c;
@@ -495,8 +507,37 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
       importo: Number(r2(letto.righe.reduce((s, r) => s + (r.importo ?? 0), 0))),
       provvigione: Number(r2(letto.righe.reduce((s, r) => s + (r.provvigione ?? 0), 0))),
     },
+    // D-151 §19: le soglie in vigore viaggiano col documento (V12): il browser non ha soglie fisse
+    soglie: await soglieLettura(db),
     controlli, proposta, bollettino,
   };
+}
+
+/* ---------- Scelta del fornitore o del cliente (D-152) ---------- */
+
+/** D-152: collega un cliente del CRM al documento scrivendo ragione sociale e P.IVA fra i campi letti
+ *  (valore finale, verificato), così il riconoscimento successivo è univoco. Il documento non ha un
+ *  campo cliente: è il riconoscimento per P.IVA/ragione sociale a "ricordare" chi è (V12). */
+async function collegaClienteDocumento(tx: Tx, did: bigint, ragione: string, piva: string | null, ctx: Contesto, fileNome: string) {
+  const ora = new Date();
+  const scrivi = async (campo: string, valore: string | null) => {
+    const gia = await tx.documenti_campi.findFirst({ where: { documento_id: did, campo } });
+    if (valore == null) {
+      if (gia) await tx.documenti_campi.delete({ where: { id: gia.id } });
+      return;
+    }
+    if (gia) {
+      await tx.documenti_campi.update({ where: { id: gia.id }, data: { valore_finale: valore, verificato: true, corretto_da: ctx.utente_id ?? null, corretto_il: ora } });
+    } else {
+      await tx.documenti_campi.create({ data: { documento_id: did, campo, valore_letto: null, valore_finale: valore, affidabilita: null, posizione: Prisma.DbNull, precisione: 'assente', verificato: true, corretto_da: ctx.utente_id ?? null, corretto_il: ora } });
+    }
+  };
+  await scrivi('cliente', ragione);
+  await scrivi('piva_cliente', piva);
+  await logEvent(tx, {
+    tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
+    dettaglio: { etichetta: fileNome, documento_id: String(did), pratica_id: null, prima: { cliente: null }, dopo: { cliente: ragione } },
+  }, ctx);
 }
 
 /* ---------- Valori della correzione (V12: il server valida e scrive) ---------- */
@@ -561,6 +602,8 @@ export class DocumentiController {
   @Richiede('provvigioni.consulta')
   async elenco(@Query() q: ElencoDocumenti) {
     const stato = q.stato ?? 'da_controllare';
+    // §7.9: «aperte» = in coda + in lettura + da controllare, i documenti da decidere
+    const stati = stato === 'aperte' ? STATI_APERTE : [stato];
     const perPagina = q.per_pagina ?? await righePagina(this.db);
     const pagina = q.pagina ?? 1;
     const testo = (q.q ?? '').trim();
@@ -587,17 +630,17 @@ export class DocumentiController {
     const righe = await this.db.$queryRaw<{
       id: bigint; file_nome: string; file_percorso: string; tipo: string | null; fornitore_id: bigint | null;
       fornitore: string | null; fornitore_piva: string | null; numero: string | null; data: string | null; codice_cliente: string | null;
-      cliente: string | null; piva_cliente: string | null; fornitore_letto: string | null; importo: string | null; livello: string | null; ricevuto_il: Date;
+      cliente: string | null; piva_cliente: string | null; fornitore_letto: string | null; importo: string | null; livello: string | null; stato: string; ricevuto_il: Date;
       letto_il: Date | null; controlli: Prisma.JsonValue | null;
     }[]>`
       WITH ${campi}
       SELECT d.id, d.file_nome, d.file_percorso, d.tipo, d.fornitore_id, fv.ragione_sociale AS fornitore, fv.piva AS fornitore_piva,
-             c.numero, c.data, c.codice_cliente, c.cliente, c.piva_cliente, c.fornitore_letto, c.importo, d.livello, d.ricevuto_il, d.letto_il, d.controlli
+             c.numero, c.data, c.codice_cliente, c.cliente, c.piva_cliente, c.fornitore_letto, c.importo, d.livello, d.stato, d.ricevuto_il, d.letto_il, d.controlli
       FROM documenti_in_arrivo d
       LEFT JOIN campi c ON c.documento_id = d.id
       LEFT JOIN fornitori_versioni fv ON fv.fornitore_id = d.fornitore_id AND fv.id = d.fornitore_versione_id
-      WHERE d.stato = ${stato} AND ${altro}
-      ORDER BY d.ricevuto_il DESC, d.id DESC
+      WHERE d.stato IN (${Prisma.join(stati.map((s) => Prisma.sql`${s}`))}) AND ${altro}
+      ORDER BY CASE WHEN d.stato IN ('in_coda', 'in_lettura') THEN 0 ELSE 1 END, d.ricevuto_il DESC, d.id DESC
       LIMIT ${perPagina} OFFSET ${(pagina - 1) * perPagina}`;
     const conti = await this.db.$queryRaw<{ stato: string; n: bigint }[]>`
       WITH ${campi}
@@ -619,12 +662,16 @@ export class DocumentiController {
     const nonRappresentata = await mancaRappresentanzaRighe(this.db, righe, manca);
     // D-111: candidati di Integra per fornitore o cliente non riconosciuti, una ricerca per chiave per pagina
     const importa = await esitiImportazione(this.db, await this.integra.ponte(), righe, clienti);
+    // §7.9: il connettore di lettura non scelto (o non utilizzabile) → i file restano in coda (V12)
+    const lettura = await letturaConfig(this.db);
+    const lettura_configurata = !!lettura && lettura.connettore === 'llamacloud_eu';
+    const totale = stato === 'aperte' ? conteggi.in_coda + conteggi.in_lettura + conteggi.da_controllare : conteggi[stato];
     return {
       documenti: righe.map((r) => ({
         id: String(r.id), file_nome: r.file_nome, file_tipo: fileTipo(r.file_percorso), tipo: r.tipo,
         numero: r.numero, data: r.data, fornitore_id: r.fornitore_id != null ? String(r.fornitore_id) : null,
         fornitore: r.fornitore, codice_cliente: r.codice_cliente, cliente: r.cliente,
-        importo: r.importo == null ? null : Number(r.importo), livello: r.livello,
+        importo: r.importo == null ? null : Number(r.importo), livello: r.livello, stato: r.stato,
         ricevuto_il: r.ricevuto_il.toISOString(), letto_il: r.letto_il?.toISOString() ?? null,
         controlli_n: controlliFalliti(r.controlli),
         manca_agenzia: manca.has(r.id) && !nonRappresentata.has(r.id),
@@ -632,7 +679,7 @@ export class DocumentiController {
         fornitore_da_integra: importa.fornitore.has(r.id),
         cliente_da_integra: importa.cliente.has(r.id),
       })),
-      conteggi, totale: conteggi[stato], pagina, per_pagina: perPagina,
+      conteggi, totale, pagina, per_pagina: perPagina, lettura_configurata,
     };
   }
 
@@ -735,6 +782,51 @@ export class DocumentiController {
     // uno scartato si apre solo con il permesso provvigioni.scartati, non con la sola consulta (§7.16)
     if (d.stato === 'scartato' && !permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('provvigioni.scartati')) throw new ForbiddenException();
     return dettaglioDocumento(this.db, did, await this.integra.ponte());
+  }
+
+  /** D-152: la persona sceglie il fornitore o il cliente fra i candidati proposti. Un candidato del
+   *  CRM si collega; uno di Integra si importa e collega nella stessa transazione (D-133/D-111, con
+   *  `dati.importa`). Una transazione con la riga bloccata (V13), evento nel registro, poi la proposta
+   *  ricalcolata. */
+  @Post(':id/scegli')
+  @HttpCode(200)
+  @Richiede('provvigioni.modifica')
+  async scegli(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: ScegliSoggetto) {
+    const ctx = contesto(req);
+    const did = BigInt(id);
+    const n = Number(b.id);
+    if (!Number.isInteger(n) || n < 1) throw new BadRequestException('Candidato non valido');
+    // D-152: una fonte Integra importa, e l'import chiede anche dati.importa (come POST /integra/importa)
+    if (b.fonte === 'integra' && !permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('dati.importa')) {
+      throw new ForbiddenException('Serve il permesso di importare da Integra');
+    }
+    if (b.fonte === 'integra') {
+      const c = await this.integra.ponte();
+      if (!c) throw new BadGatewayException('Sincronizzazione non configurata');
+      await importa(this.db, c.pool, c.schema, b.ruolo, n, ctx, b.ruolo === 'fornitore' ? did : null);
+      return dettaglioDocumento(this.db, did, c);
+    }
+    // fonte CRM: si collega il soggetto già in anagrafica, nella stessa transazione (V13)
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
+      const d = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
+      if (!d) throw new NotFoundException('Documento non trovato');
+      if (d.stato !== 'da_controllare' && d.stato !== 'errore') throw new ConflictException('Il documento non è più da controllare');
+      if (b.ruolo === 'fornitore') {
+        const f = await tx.fornitori.findUnique({ where: { id: BigInt(n) }, select: { versione_corrente_id: true, corrente: { select: { ragione_sociale: true } } } });
+        if (!f?.versione_corrente_id) throw new BadRequestException('Fornitore non valido');
+        await tx.documenti_in_arrivo.update({ where: { id: did }, data: { fornitore_id: BigInt(n), fornitore_versione_id: f.versione_corrente_id } });
+        await logEvent(tx, {
+          tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
+          dettaglio: { etichetta: d.file_nome, documento_id: String(did), pratica_id: null, prima: { fornitore_id: null }, dopo: { fornitore_id: String(n), fornitore: f.corrente?.ragione_sociale ?? null } },
+        }, ctx);
+      } else {
+        const cli = await tx.clienti.findUnique({ where: { id: BigInt(n) }, include: { corrente: true } });
+        if (!cli?.corrente) throw new BadRequestException('Cliente non valido');
+        await collegaClienteDocumento(tx, did, cli.corrente.ragione_sociale, cli.corrente.piva, ctx, d.file_nome);
+      }
+      return dettaglioDocumento(tx, did);
+    });
   }
 
   /** Correzione dei dati letti (F6-A4a, §6.5 punto 7, D-72). Una transazione con la riga bloccata

@@ -40,6 +40,20 @@ with sync_playwright() as p:
     pg = entra(S + '-ammi')
     pg.wait_for_selector('.selezionabile a')
 
+    # 13/11/2026: cambiando sezione la vista resta montata: il pannello «Sezioni» è lo stesso nodo,
+    # il pannello di destra cambia senza sagome e senza una nuova GET delle impostazioni.
+    pg.evaluate("document.querySelector('.selezionabile').closest('.pannello').dataset.provaFerma = 'si'")
+    ricariche = []
+    pg.on('response', lambda r: ricariche.append(r.url) if '/api/impostazioni' in r.url and r.request.method == 'GET' else None)
+    pg.locator('.selezionabile a', has_text='Conservazione').click()
+    pg.wait_for_function("location.pathname === '/impostazioni/conservazione'")
+    pg.wait_for_timeout(800)
+    ok(pg.locator('[data-prova-ferma="si"]').count() == 1, 'cambiando sezione il pannello «Sezioni» resta lo stesso nodo')
+    ok(pg.locator('.sagoma').count() == 0, 'cambiando sezione non compaiono sagome')
+    ok(pg.locator('#c-righe_pagina').count() == 1, 'cambiando sezione il pannello di destra mostra la nuova sezione')
+    ok(not ricariche, 'cambiando sezione non si ricarica GET /api/impostazioni')
+    pg.goto(BASE + '/impostazioni/azienda'); pg.wait_for_load_state('networkidle')
+
     # pagina e sei sezioni, la prima aperta è azienda
     ok(testo(pg, '.testa h1') == 'Impostazioni', 'titolo della pagina: Impostazioni')
     sez = pg.locator('.selezionabile a')

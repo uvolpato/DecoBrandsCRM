@@ -27,18 +27,18 @@
 
   <div class="alert alert-light border small">
     <strong>Redatto da:</strong> Ugo Volpato — AI Consultant<br>
-    <strong>Data:</strong> 04/09/2026 — aggiornato il 19/10/2026 (variazioni da approvare §5: 59 h, con accesso Microsoft 365, registro unico e database ponte; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
+    <strong>Data:</strong> 04/09/2026 — <strong>aggiornato il 13/11/2026</strong>: versione <strong>0.2.0</strong> consegnata e provata per i documenti veri; collaudo con le onde 0, 0 bis, 1, 2 e i pacchetti scelti (3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01); variazioni §5 salite a 92 h con F7-A0, F7-A3, F7-A5, F7-A6 e F7-A7 e con la riga del collaudo fuori dai totali. Aggiornato il 19/10/2026 (variazioni da approvare §5: 59 h, con accesso Microsoft 365, registro unico e database ponte; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)<br>
     <strong>Cliente:</strong> Decobrands S.r.l. (da confermare)<br>
     <strong>Modalità di sviluppo:</strong> assistita da AI (analisi, generazione e codifica tramite modelli AI)
   </div>
 
 <h2 id="sez-1">1. Oggetto</h2>
-<p>Web app full-stack con <strong>lo stesso stack del Portale B2B Luis</strong> (<strong>Next.js 16 + React 19 + TypeScript</strong>, <strong>NestJS 11</strong>, <strong>Prisma 7</strong>, <strong>PostgreSQL condiviso</strong> con la Gestione Ordini — <strong>senza modificare le tabelle esistenti</strong> —, pubblicazione con <strong>Caddy</strong> e due processi Node) per:</p>
+<p>Web app full-stack con <strong>lo stesso stack del Portale B2B Luis</strong> (<strong>Next.js 16 + React 19 + TypeScript</strong>, <strong>NestJS 11</strong>, <strong>Prisma 7</strong>, <strong>PostgreSQL con un database proprio del CRM</strong> <code>decobrands_db</code> — <strong>nessuna tabella della Gestione Ordini</strong> (D-29) —, pubblicazione con <strong>Caddy</strong> e due processi Node) per:</p>
 <ul>
 <li>tracciare il percorso <strong>ordine → conferma d'ordine → fattura</strong> delle pratiche verso i fornitori, con <strong>upload dei documenti PDF</strong> e scadenze conferma automatiche;</li>
 <li>controllare i <strong>bollettini</strong> mensili dei fornitori, confrontando riga per riga il <strong>riconosciuto</strong> con il <strong>calcolato</strong> (differenze evidenziate, verifica/contestazione);</li>
 <li><strong>liquidare i subagenti</strong> ogni trimestre con rendiconto calcolato al volo dagli scaglioni e <strong>export a 8 campi</strong>;</li>
-<li>condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, <code>requireAuth</code>/<code>requireAdmin</code>);</li>
+<li>avere <strong>utenti propri</strong> del CRM, con <strong>nome utente (o email) e password</strong> come nella Gestione Ordini (D-39); clienti e fornitori in sola lettura dalle <strong>viste di Integra</strong> del database ponte (D-32);</li>
 <li>far entrare <strong>tutti i documenti</strong> (ordini a fornitore, conferme, fatture, note di credito, bollettini) da un <strong>ingresso documenti interno</strong>: casella email e caricamento, coda nel database, lettura con <strong>GLM-OCR su un server locale con GPU</strong>, affidabilità per campo, controllo dell'operatore con il PDF a fianco — <strong>senza n8n e senza servizi esterni</strong>.</li>
 </ul>
 <p>La <strong>sostituzione della Gestione Ordini</strong> (ordini cliente, CSV Integra) è prevista in una fase successiva, <strong>esclusa</strong> da questo preventivo (spec §17).</p>
@@ -144,7 +144,7 @@
 </tr>
 <tr>
 <td>2</td>
-<td>Accesso <strong>ripreso da Luis B2B</strong> su una tabella <code>utenti</code> propria: sessioni nel DB, CSRF, Helmet, limite tentativi, guard <code>requireAuth</code>/permessi, pagina di accesso (il modo di accesso è la variazione V10)</td>
+<td>Accesso <strong>ripreso da Luis B2B</strong> su una tabella <code>utenti</code> propria: sessioni nel DB, CSRF, Helmet, limite tentativi, guard <code>requireAuth</code>/permessi, pagina di accesso con <strong>nome utente (o email) e password</strong> (D-39; la variazione V10 sull'accesso con Microsoft 365 è sostituita)</td>
 <td>3</td>
 <td>8</td>
 <td>€ 165,00</td>
@@ -221,7 +221,7 @@
 </tr>
 <tr>
 <td>12</td>
-<td><strong>Margine di rischio (25 %)</strong>: imprevisti su lettura documenti, server GPU, accesso condiviso e dati reali. Riserva usata solo se necessaria e rendicontata a ore</td>
+<td><strong>Margine di rischio (25 %)</strong>: imprevisti su lettura documenti, server GPU, accesso e dati reali. Riserva usata solo se necessaria e rendicontata a ore</td>
 <td>18</td>
 <td>46</td>
 <td>€ 990,00</td>
@@ -237,7 +237,8 @@
 </table>
 <h2 id="sez-5">5. Variazioni da approvare (fuori preventivo)</h2>
 <p>Funzioni nate dal confronto con il cliente dopo la specifica iniziale e già presenti nel
-prototipo ufficiale. Si sviluppano <strong>solo se approvate</strong>; ognuna è indipendente dalle altre.</p>
+prototipo ufficiale, più quelle nate dal collaudo sui documenti veri (V13…V18). Si sviluppano
+<strong>solo se approvate</strong>; ognuna è indipendente dalle altre.</p>
 <table class="table table-bordered bg-white">
 <thead>
 <tr>
@@ -315,7 +316,7 @@ prototipo ufficiale. Si sviluppano <strong>solo se approvate</strong>; ognuna è
 <tr>
 <td>V10</td>
 <td><strong>Accesso con Microsoft 365 o link via email</strong>, solo su invito, senza password (F0-A3)</td>
-<td>Decobrands usa Microsoft 365; il link copre subagenti ed esterni (D-30)</td>
+<td>⚠ <strong>sostituita da D-39</strong> (nome utente o email e password, come la Gestione Ordini): le 2 h restano nel piano F0-A3, riusate per superutente, password provvisoria e password dimenticata</td>
 <td>2</td>
 <td>€ 110,00</td>
 </tr>
@@ -334,15 +335,57 @@ prototipo ufficiale. Si sviluppano <strong>solo se approvate</strong>; ognuna è
 <td>€ 110,00</td>
 </tr>
 <tr>
+<td>V13</td>
+<td><strong>Correzioni di sicurezza</strong> dopo l'audit OWASP (F7-A0)</td>
+<td>formula injection nei CSV, limite ai tentativi per persona e ai caricamenti, permessi su solleciti e scarti, registro senza dati sensibili, CSP completa (D-80…D-86)</td>
+<td>3</td>
+<td>€ 165,00</td>
+</tr>
+<tr>
+<td>V14</td>
+<td><strong>Profilo, pagina di ingresso e timeout</strong> di inattività di 30 minuti (F7-A3)</td>
+<td>ogni utente sceglie dove atterra dopo l'accesso ed entra solo nelle aree che ha (D-88, D-89)</td>
+<td>4</td>
+<td>€ 220,00</td>
+</tr>
+<tr>
+<td>V15</td>
+<td><strong>Onda 1 del collaudo — attività già fatte</strong> (F7-A5): blocco dell'ordine senza fornitore, agenzia o scaglione; riconoscimento del cliente per P.IVA e ragione sociale; rettangolo sul valore nel PDF; elenco Documenti con aggiornamento dal vivo</td>
+<td>i documenti veri hanno mostrato casi che il prototipo non copriva (D-87, D-91…D-94)</td>
+<td>10</td>
+<td>€ 550,00</td>
+</tr>
+<tr>
+<td>V16</td>
+<td><strong>Onda 1 del collaudo — correzioni documentate</strong> (F7-A6): documento in errore recuperabile, 400 sul corpo malformato, segreti d'esempio rifiutati in esercizio, messa in esercizio con HSTS</td>
+<td>gli errori di lettura non devono bruciare i tentativi e la pubblicazione deve essere sicura (D-114…D-149)</td>
+<td>4</td>
+<td>€ 220,00</td>
+</tr>
+<tr>
+<td>V17</td>
+<td><strong>Righe dei bollettini dal PDF</strong> (F7-A7): lettura, creazione in transazione con abbinamento ai documenti, finestra di correzione, prove — ⚠ <strong>non ancora fatta</strong> (stima)</td>
+<td>il bollettino arriva come PDF: le righe si devono ricavare dal documento, non digitare (D-34, D-119)</td>
+<td>12</td>
+<td>€ 660,00</td>
+</tr>
+<tr>
+<td>V18</td>
+<td><strong>Collaudo onde 0–2 e correzioni per i documenti veri (13/11/2026)</strong> — ore da definire (Ugo)</td>
+<td>le prove sui documenti veri hanno guidato correzioni e pacchetti scelti (3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01); <strong>fuori dai totali</strong></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
 <td></td>
 <td><strong>Totale variazioni</strong></td>
 <td></td>
-<td><strong>59</strong></td>
-<td><strong>€ 3.245,00</strong></td>
+<td><strong>92</strong></td>
+<td><strong>€ 5.060,00</strong></td>
 </tr>
 </tbody>
 </table>
-<p>Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 15 h, € 825,00),
+<p>Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 23 h, € 1.265,00),
 usato solo se serve e rendicontato a ore.</p>
 <h2 id="sez-6">6. Riepilogo economico</h2>
 <table class="table table-bordered bg-white">
@@ -371,18 +414,18 @@ usato solo se serve e rendicontato a ore.</p>
 </tr>
 <tr>
 <td>Variazioni da approvare (§5), tutte</td>
-<td>59</td>
-<td>€ 3.245,00</td>
+<td>92</td>
+<td>€ 5.060,00</td>
 </tr>
 <tr>
 <td><strong>Totale con tutte le variazioni</strong></td>
-<td><strong>164</strong></td>
-<td><strong>€ 9.420,00</strong></td>
+<td><strong>197</strong></td>
+<td><strong>€ 11.235,00</strong></td>
 </tr>
 <tr>
 <td>Margine sulle variazioni (riserva, solo se usato)</td>
-<td>fino a 15</td>
-<td>fino a € 825,00</td>
+<td>fino a 23</td>
+<td>fino a € 1.265,00</td>
 </tr>
 </tbody>
 </table>
@@ -399,9 +442,9 @@ usato solo se serve e rendicontato a ore.</p>
 <li><strong>Ingresso documenti senza n8n (attività 7)</strong>: sostituisce l'integrazione del modulo ordini cliente (6 h) prevista nella versione precedente; la lettura dei documenti non passa più dalla pipeline n8n + LlamaIndex della Gestione Ordini ma da GLM-OCR in locale: nessun costo per pagina, documenti che non escono dall'azienda, regole nel codice del CRM.</li>
 <li><strong>Server GPU</strong> per GLM-OCR: hardware, sistema operativo e driver a carico del cliente; l'attività 7 copre installazione del servizio di lettura e taratura iniziale.</li>
 <li><strong>Stack allineato al Portale B2B Luis</strong> (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di <strong>5 ore</strong>, reinvestite nella <strong>prova di lettura dei documenti fornitore</strong> (attività 11), principale rischio tecnico del progetto.</li>
-<li><strong>Margine di rischio 25 % (18 h, € 990,00)</strong>: copre gli imprevisti più probabili (formati dei documenti fornitore, configurazione di Microsoft 365, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.</li>
+<li><strong>Margine di rischio 25 % (18 h, € 990,00)</strong>: copre gli imprevisti più probabili (formati dei documenti fornitore, casella di posta per le password provvisorie, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.</li>
 <li>Il motore di calcolo è <strong>solo lato server</strong> (spec §10): eliminata la voce "motore lato client" della versione precedente.</li>
-<li><strong>CRM separato dalla Gestione Ordini</strong> (spec D-29): database e utenti propri; la Gestione Ordini resta in esercizio e sarà inglobata con la vendita diretta (fase successiva). Per l'accesso con Microsoft 365 serve la registrazione dell'app in Entra ID da parte dell'amministratore di Microsoft 365 di Decobrands.</li>
+<li><strong>CRM separato dalla Gestione Ordini</strong> (spec D-29): database e utenti propri; la Gestione Ordini resta in esercizio e sarà inglobata con la vendita diretta (fase successiva). L'accesso è con <strong>nome utente (o email) e password</strong> (D-39, che sostituisce D-30): nessuna registrazione dell'app in Entra ID, serve solo una <strong>casella SMTP</strong> per la password provvisoria e la password dimenticata.</li>
 <li><strong>Database ponte per Integra</strong> (spec D-32): lo prepara Ugo, collegato a Integra; il CRM legge solo le sue viste.</li>
 <li><strong>Grafica</strong>: <code>stile.css</code> del prototipo ufficiale <code>prototipo-alternativo/</code>, carattere Public Sans, <strong>niente Bootstrap</strong> (spec D-24); stessa palette della Gestione Ordini.</li>
 <li>L'esito dell'attività 11 può richiedere una <strong>stima aggiuntiva</strong> per adattare la lettura ai formati dei singoli fornitori; sarà quotata a parte prima di procedere.</li>

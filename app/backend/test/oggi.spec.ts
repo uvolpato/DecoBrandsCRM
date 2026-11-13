@@ -146,6 +146,8 @@ describe('F5-A1 pagina Oggi', () => {
     expect(r.oggi).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(r.aggiornato_il).toBeTruthy();
     expect(r.registro_href).toBe('/registro');
+    // §7.9: il server dichiara se la lettura è configurata (V12)
+    expect(r.lettura_configurata).toBe(false);
     expect(r.riquadri).toHaveLength(4);
     expect(r.gruppi.map((g: any) => g.id)).toEqual(['conferme', 'documenti', 'bollettini', 'pagamenti']);
     expect(r.trimestre.href).toMatch(/^\/liquidazioni\/\d{4}\/[1-4]$/);

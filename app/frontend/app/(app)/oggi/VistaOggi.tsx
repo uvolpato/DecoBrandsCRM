@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Aggiornamenti } from '@/componenti/Aggiornamenti';
 import { Elenco, GruppiDaFare, Periodi, type GruppoDaFare } from '@/componenti/Flussi';
+import { Icona } from '@/componenti/Icona';
 import { Cifre, KpiRow, type Kpi } from '@/componenti/Kpi';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso } from '@/componenti/Piccoli';
@@ -35,6 +36,7 @@ interface Dati {
   riquadri: Riquadro[]; gruppi: Gruppo[]; scadenze: Scadenza[]; operazioni: Operazione[];
   registro_href: string; trimestre: Trimestre;
   errori_oggi?: { conteggio: number; href: string }; // solo per chi ha sistema.registro (§15.6)
+  lettura_configurata: boolean;
 }
 
 export function VistaOggi() {
@@ -129,6 +131,12 @@ export function VistaOggi() {
   const t = dati.trimestre;
   return (
     <Pagina titolo="Oggi" pieno sottotitolo={dati.sottotitolo}>
+      {!dati.lettura_configurata && (
+        <div className="avviso-variazioni" role="status" style={{ marginBottom: 12 }}>
+          <Icona nome="avviso" />
+          <span>La lettura dei documenti non è configurata: i file restano in coda. Impostala in <Link href="/impostazioni">Impostazioni → Lettura</Link> (superutente).</span>
+        </div>
+      )}
       <KpiRow voci={dati.riquadri} selezionata={filtro} onSeleziona={setFiltro} />
 
       <div className="colonne riempi">

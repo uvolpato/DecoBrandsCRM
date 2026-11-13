@@ -331,3 +331,47 @@ describe('F5-A6 servizi e righe per pagina', () => {
     expect(await db.registro.count({ where: { codice: 'posta.connessione', stato: 'aperta' } })).toBe(1);
   });
 });
+
+describe('D-151 soglie di lettura', () => {
+  it('valori iniziali 0,80/0,70 quando non c\'è una riga salvata', async () => {
+    await db.impostazioni.deleteMany({ where: { chiave: 'lettura' } });
+    const r = await ammi.get('/api/impostazioni').expect(200);
+    const lettura = (r.body.sezioni as { chiave: string; campi: { nome: string; valore: unknown }[] }[])
+      .find((s) => s.chiave === 'lettura')!;
+    expect(lettura.campi.find((c) => c.nome === 'soglia_ok')!.valore).toBe(0.8);
+    expect(lettura.campi.find((c) => c.nome === 'soglia_bassa')!.valore).toBe(0.7);
+  });
+
+  it('al cambio delle soglie si riclassificano i soli documenti da decidere, nella stessa transazione', async () => {
+    const arrivo = (file: string, stato: string) => db.documenti_in_arrivo.create({
+      data: { origine: 'caricamento', file_nome: file, file_hash: 'hash-' + file, file_percorso: 'in_arrivo/' + file, stato, ricevuto_il: new Date('2026-09-04') },
+    });
+    const campo = (id: bigint) => db.documenti_campi.create({
+      data: { documento_id: id, campo: 'numero', valore_letto: 'F-1', affidabilita: 0.85 },
+    });
+    // da_controllare ed errore si riclassificano; abbinato e scartato no
+    const daControllare = await arrivo('dc.pdf', 'da_controllare');
+    const inErrore = await arrivo('er.pdf', 'errore');
+    const abbinato = await arrivo('ab.pdf', 'abbinato');
+    const scartato = await arrivo('sc.pdf', 'scartato');
+    await db.documenti_in_arrivo.updateMany({ where: { id: { in: [abbinato.id, scartato.id] } }, data: { livello: 'bassa' } });
+    await Promise.all([campo(daControllare.id), campo(inErrore.id), campo(abbinato.id), campo(scartato.id)]);
+
+    // soglia 0,9: il campo a 0,85 resta incerto
+    await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf).send({ valori: { soglia_ok: 0.9, soglia_bassa: 0.7 } }).expect(200);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: daControllare.id } })).livello).toBe('da_controllare');
+
+    // soglia 0,8: da_controllare ed errore diventano affidabili; abbinato e scartato restano bassa
+    const prima = await db.registro.count({ where: { entita: 'impostazione' } });
+    await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf).send({ valori: { soglia_ok: 0.8, soglia_bassa: 0.7 } }).expect(200);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: daControllare.id } })).livello).toBe('affidabile');
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: inErrore.id } })).livello).toBe('affidabile');
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: abbinato.id } })).livello).toBe('bassa');
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: scartato.id } })).livello).toBe('bassa');
+    // un solo evento per il salvataggio, con il numero dei riclassificati (stessa transazione, V13)
+    const ev = (await db.registro.findMany({ where: { entita: 'impostazione', codice: 'crud.update' }, orderBy: { id: 'desc' }, take: 1 }))[0];
+    const daDecidere = await db.documenti_in_arrivo.count({ where: { stato: { in: ['da_controllare', 'errore'] } } });
+    expect((ev.dettaglio as { riclassificati?: number }).riclassificati).toBe(daDecidere);
+    expect(await db.registro.count({ where: { entita: 'impostazione' } })).toBe(prima + 1);
+  });
+});

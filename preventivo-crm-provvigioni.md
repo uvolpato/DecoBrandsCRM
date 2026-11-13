@@ -1,7 +1,7 @@
 # Preventivo — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
 **Redatto da:** Ugo Volpato — AI Consultant
-**Data:** 04/09/2026 — aggiornato il 19/10/2026 (variazioni da approvare §5: 59 h, con accesso Microsoft 365, registro unico e database ponte; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)
+**Data:** 04/09/2026 — **aggiornato il 13/11/2026**: versione **0.2.0** consegnata e provata per i documenti veri; collaudo con le onde 0, 0 bis, 1, 2 e i pacchetti scelti (3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01); variazioni §5 salite a 92 h con F7-A0, F7-A3, F7-A5, F7-A6 e F7-A7 e con la riga del collaudo fuori dai totali. Aggiornato il 19/10/2026 (variazioni da approvare §5: 59 h, con accesso Microsoft 365, registro unico e database ponte; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)
 **Cliente:** Decobrands S.r.l. (da confermare)
 **Modalità di sviluppo:** assistita da AI (analisi, generazione e codifica tramite modelli AI)
 
@@ -9,12 +9,12 @@
 
 ## 1. Oggetto
 
-Web app full-stack con **lo stesso stack del Portale B2B Luis** (**Next.js 16 + React 19 + TypeScript**, **NestJS 11**, **Prisma 7**, **PostgreSQL condiviso** con la Gestione Ordini — **senza modificare le tabelle esistenti** —, pubblicazione con **Caddy** e due processi Node) per:
+Web app full-stack con **lo stesso stack del Portale B2B Luis** (**Next.js 16 + React 19 + TypeScript**, **NestJS 11**, **Prisma 7**, **PostgreSQL con un database proprio del CRM** `decobrands_db` — **nessuna tabella della Gestione Ordini** (D-29) —, pubblicazione con **Caddy** e due processi Node) per:
 
 - tracciare il percorso **ordine → conferma d'ordine → fattura** delle pratiche verso i fornitori, con **upload dei documenti PDF** e scadenze conferma automatiche;
 - controllare i **bollettini** mensili dei fornitori, confrontando riga per riga il **riconosciuto** con il **calcolato** (differenze evidenziate, verifica/contestazione);
 - **liquidare i subagenti** ogni trimestre con rendiconto calcolato al volo dagli scaglioni e **export a 8 campi**;
-- condividere autenticazione, clienti, articoli e ordini con la Gestione Ordini esistente (stesse tabelle, stessi ruoli, `requireAuth`/`requireAdmin`);
+- avere **utenti propri** del CRM, con **nome utente (o email) e password** come nella Gestione Ordini (D-39); clienti e fornitori in sola lettura dalle **viste di Integra** del database ponte (D-32);
 - far entrare **tutti i documenti** (ordini a fornitore, conferme, fatture, note di credito, bollettini) da un **ingresso documenti interno**: casella email e caricamento, coda nel database, lettura con **GLM-OCR su un server locale con GPU**, affidabilità per campo, controllo dell'operatore con il PDF a fianco — **senza n8n e senza servizi esterni**.
 
 La **sostituzione della Gestione Ordini** (ordini cliente, CSV Integra) è prevista in una fase successiva, **esclusa** da questo preventivo (spec §17).
@@ -47,7 +47,7 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 | # | Attività | Ore (AI) | Ore (senza AI) | Importo (AI) |
 |---|---|---|---|---|
 | 1 | Setup progetto sul modello Luis B2B (Next.js + NestJS + Prisma), database PostgreSQL **proprio** `decobrands_db` (nessuna tabella della Gestione Ordini, D-29), Caddy + due processi Node (8001/8002), Docker solo in sviluppo | 3 | 8 | € 165,00 |
-| 2 | Accesso **ripreso da Luis B2B** su una tabella `utenti` propria: sessioni nel DB, CSRF, Helmet, limite tentativi, guard `requireAuth`/permessi, pagina di accesso (il modo di accesso è la variazione V10) | 3 | 8 | € 165,00 |
+| 2 | Accesso **ripreso da Luis B2B** su una tabella `utenti` propria: sessioni nel DB, CSRF, Helmet, limite tentativi, guard `requireAuth`/permessi, pagina di accesso con **nome utente (o email) e password** (D-39; la variazione V10 sull'accesso con Microsoft 365 è sostituita) | 3 | 8 | € 165,00 |
 | 3 | Schema Prisma delle **nuove tabelle CRM** (fornitori, scaglioni, eccezioni, agenti, subagenti, interscambio, pratiche + righe + documenti, bollettini + righe, eventi, utenti, copia dei clienti da Integra) | 6 | 16 | € 330,00 |
 | 4 | Motore provvigioni **solo lato server**: scaglioni, eccezioni, maturato/fatturato, congelamento percentuali alla verifica, note di credito, confronto bollettini riconosciuto vs calcolato (§4.2, §5.3, §5.5, §5.11, §10) | 5 | 14 | € 275,00 |
 | 5 | API REST NestJS: CRUD fornitori + scaglioni, interscambio (vincolo unico), pratiche + righe + documenti + cambio stato, **upload documenti** (multer), bollettini + righe con calcolo differenze, liquidazione, controllo pianificato conferme scadute | 12 | 30 | € 660,00 |
@@ -58,13 +58,14 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 | 10 | Export liquidazione a 8 campi (§11) e gestione trimestri | 1 | 3 | € 55,00 |
 | 11 | **Prova GLM-OCR su documenti reali** (conferme, fatture, bollettini di 2–3 fornitori) sul server GPU: esito per campo, affidabilità, tempi; prime soglie e stima dell'adattamento | 4 | 10 | € 220,00 |
 | | *Subtotale attività* | *71* | *182* | *€ 3.905,00* |
-| 12 | **Margine di rischio (25 %)**: imprevisti su lettura documenti, server GPU, accesso condiviso e dati reali. Riserva usata solo se necessaria e rendicontata a ore | 18 | 46 | € 990,00 |
+| 12 | **Margine di rischio (25 %)**: imprevisti su lettura documenti, server GPU, accesso e dati reali. Riserva usata solo se necessaria e rendicontata a ore | 18 | 46 | € 990,00 |
 | **Subtotale da svolgere** | | **89** | **228** | **€ 4.895,00** |
 
 ## 5. Variazioni da approvare (fuori preventivo)
 
 Funzioni nate dal confronto con il cliente dopo la specifica iniziale e già presenti nel
-prototipo ufficiale. Si sviluppano **solo se approvate**; ognuna è indipendente dalle altre.
+prototipo ufficiale, più quelle nate dal collaudo sui documenti veri (V13…V18). Si sviluppano
+**solo se approvate**; ognuna è indipendente dalle altre.
 
 | # | Attività (piano) | Perché | Ore (AI) | Importo (AI) |
 |---|---|---|---|---|
@@ -77,12 +78,18 @@ prototipo ufficiale. Si sviluppano **solo se approvate**; ognuna è indipendente
 | V7 | **Report subagenti** e pagina **Analisi** con filtri, grafici ed esportazione (F4-A4, F4-A5) | controllo e analisi hanno bisogni diversi (D-18, D-19) | 13 | € 715,00 |
 | V8 | **Filtri standard** e numeri aggiornati dal vivo (F4-A6) | un solo modo di filtrare in tutte le pagine (D-22, D-23) | 4 | € 220,00 |
 | V9 | **Pagine di gestione**: ruoli e permessi, utenti, stato del sistema, impostazioni, documenti scartati, guida in linea (F5-A3…A8) | amministrazione senza intervento tecnico (D-05) | 13 | € 715,00 |
-| V10 | **Accesso con Microsoft 365 o link via email**, solo su invito, senza password (F0-A3) | Decobrands usa Microsoft 365; il link copre subagenti ed esterni (D-30) | 2 | € 110,00 |
+| V10 | **Accesso con Microsoft 365 o link via email**, solo su invito, senza password (F0-A3) | ⚠ **sostituita da D-39** (nome utente o email e password, come la Gestione Ordini): le 2 h restano nel piano F0-A3, riusate per superutente, password provvisoria e password dimenticata | 2 | € 110,00 |
 | V11 | **Registro unico** di eventi e anomalie, con dettaglio controllato per codice e pagina delle anomalie (F5-A2) | un solo posto dove guardare cosa è successo (D-31) | 2 | € 110,00 |
 | V12 | **Viste di Integra sul database ponte**: colonne e chiavi fissate sui dati veri (F0-A8) | le viste si provano senza toccare Integra (D-32) | 2 | € 110,00 |
-| | **Totale variazioni** | | **59** | **€ 3.245,00** |
+| V13 | **Correzioni di sicurezza** dopo l'audit OWASP (F7-A0) | formula injection nei CSV, limite ai tentativi per persona e ai caricamenti, permessi su solleciti e scarti, registro senza dati sensibili, CSP completa (D-80…D-86) | 3 | € 165,00 |
+| V14 | **Profilo, pagina di ingresso e timeout** di inattività di 30 minuti (F7-A3) | ogni utente sceglie dove atterra dopo l'accesso ed entra solo nelle aree che ha (D-88, D-89) | 4 | € 220,00 |
+| V15 | **Onda 1 del collaudo — attività già fatte** (F7-A5): blocco dell'ordine senza fornitore, agenzia o scaglione; riconoscimento del cliente per P.IVA e ragione sociale; rettangolo sul valore nel PDF; elenco Documenti con aggiornamento dal vivo | i documenti veri hanno mostrato casi che il prototipo non copriva (D-87, D-91…D-94) | 10 | € 550,00 |
+| V16 | **Onda 1 del collaudo — correzioni documentate** (F7-A6): documento in errore recuperabile, 400 sul corpo malformato, segreti d'esempio rifiutati in esercizio, messa in esercizio con HSTS | gli errori di lettura non devono bruciare i tentativi e la pubblicazione deve essere sicura (D-114…D-149) | 4 | € 220,00 |
+| V17 | **Righe dei bollettini dal PDF** (F7-A7): lettura, creazione in transazione con abbinamento ai documenti, finestra di correzione, prove — ⚠ **non ancora fatta** (stima) | il bollettino arriva come PDF: le righe si devono ricavare dal documento, non digitare (D-34, D-119) | 12 | € 660,00 |
+| V18 | **Collaudo onde 0–2 e correzioni per i documenti veri (13/11/2026)** — ore da definire (Ugo) | le prove sui documenti veri hanno guidato correzioni e pacchetti scelti (3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01); **fuori dai totali** | — | — |
+| | **Totale variazioni** | | **92** | **€ 5.060,00** |
 
-Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 15 h, € 825,00),
+Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 23 h, € 1.265,00),
 usato solo se serve e rendicontato a ore.
 
 ## 6. Riepilogo economico
@@ -92,9 +99,9 @@ usato solo se serve e rendicontato a ore.
 | Attività già svolte | 16 | € 1.280,00 |
 | Attività da svolgere (incluso margine 18 h) | 89 | € 4.895,00 |
 | **Totale del preventivo** | **105** | **€ 6.175,00** |
-| Variazioni da approvare (§5), tutte | 59 | € 3.245,00 |
-| **Totale con tutte le variazioni** | **164** | **€ 9.420,00** |
-| Margine sulle variazioni (riserva, solo se usato) | fino a 15 | fino a € 825,00 |
+| Variazioni da approvare (§5), tutte | 92 | € 5.060,00 |
+| **Totale con tutte le variazioni** | **197** | **€ 11.235,00** |
+| Margine sulle variazioni (riserva, solo se usato) | fino a 23 | fino a € 1.265,00 |
 
 **Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **228 ore** (≈ 2,6× le ore assistite, margine incluso): 228 h × € 70,00 = **€ 15.960,00**, per un totale di **€ 17.240,00** (€ 1.280,00 già svolto + € 15.960,00 sviluppo).
 
@@ -108,9 +115,9 @@ L'approccio assistito da AI consente un **risparmio di € 11.065,00** sul solo 
 - **Ingresso documenti senza n8n (attività 7)**: sostituisce l'integrazione del modulo ordini cliente (6 h) prevista nella versione precedente; la lettura dei documenti non passa più dalla pipeline n8n + LlamaIndex della Gestione Ordini ma da GLM-OCR in locale: nessun costo per pagina, documenti che non escono dall'azienda, regole nel codice del CRM.
 - **Server GPU** per GLM-OCR: hardware, sistema operativo e driver a carico del cliente; l'attività 7 copre installazione del servizio di lettura e taratura iniziale.
 - **Stack allineato al Portale B2B Luis** (spec §16.3): il riuso di accesso, sicurezza, registro eventi e configurazione di pubblicazione riduce le attività 1, 2 e 9 di **5 ore**, reinvestite nella **prova di lettura dei documenti fornitore** (attività 11), principale rischio tecnico del progetto.
-- **Margine di rischio 25 % (18 h, € 990,00)**: copre gli imprevisti più probabili (formati dei documenti fornitore, configurazione di Microsoft 365, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.
+- **Margine di rischio 25 % (18 h, € 990,00)**: copre gli imprevisti più probabili (formati dei documenti fornitore, casella di posta per le password provvisorie, dati reali diversi dal seed). È una riserva: si consuma solo se serve e viene rendicontata a ore; le ore non usate non vengono fatturate.
 - Il motore di calcolo è **solo lato server** (spec §10): eliminata la voce "motore lato client" della versione precedente.
-- **CRM separato dalla Gestione Ordini** (spec D-29): database e utenti propri; la Gestione Ordini resta in esercizio e sarà inglobata con la vendita diretta (fase successiva). Per l'accesso con Microsoft 365 serve la registrazione dell'app in Entra ID da parte dell'amministratore di Microsoft 365 di Decobrands.
+- **CRM separato dalla Gestione Ordini** (spec D-29): database e utenti propri; la Gestione Ordini resta in esercizio e sarà inglobata con la vendita diretta (fase successiva). L'accesso è con **nome utente (o email) e password** (D-39, che sostituisce D-30): nessuna registrazione dell'app in Entra ID, serve solo una **casella SMTP** per la password provvisoria e la password dimenticata.
 - **Database ponte per Integra** (spec D-32): lo prepara Ugo, collegato a Integra; il CRM legge solo le sue viste.
 - **Grafica**: `stile.css` del prototipo ufficiale `prototipo-alternativo/`, carattere Public Sans, **niente Bootstrap** (spec D-24); stessa palette della Gestione Ordini.
 - L'esito dell'attività 11 può richiedere una **stima aggiuntiva** per adattare la lettura ai formati dei singoli fornitori; sarà quotata a parte prima di procedere.

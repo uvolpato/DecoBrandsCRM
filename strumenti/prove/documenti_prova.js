@@ -100,7 +100,7 @@ async function pulisci(c, nomi) {
       tipo: ['fattura', 0.95], numero: [numero, 0.95], data: [data, 0.95],
       codice_cliente: [inter.codice, 0.95], cliente: [inter.cliente, 0.95], importo_totale: [importo, 0.95],
       'righe[0].codice': [codici[0].codice, 0.95], 'righe[0].descrizione': [codici[0].descrizione, 0.95],
-      'righe[0].quantita': ['2', 0.8], 'righe[0].prezzo': ['100', 0.95], 'righe[0].importo': ['200', 0.95],
+      'righe[0].quantita': ['2', 0.75], 'righe[0].prezzo': ['100', 0.95], 'righe[0].importo': ['200', 0.95],
       'righe[1].codice': [codici[1].codice, 0.95], 'righe[1].descrizione': [codici[1].descrizione, 0.95],
       'righe[1].quantita': ['1', 0.95], 'righe[1].prezzo': ['50', 0.6], 'righe[1].importo': ['50', 0.95],
     };

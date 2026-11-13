@@ -18,10 +18,11 @@ def numero(testo):
     return float(re.sub(r'[^\d,-]', '', testo).replace('.', '').replace(',', '.'))
 
 def pdf_prova(marca):
-    """PDF valido di una pagina vuota: PDF.js deve poterlo aprire e disegnare il canvas (A4-10)."""
+    """PDF valido di due pagine vuote: PDF.js le disegna tutte, una sotto l'altra (13/11/2026)."""
     oggetti = [
         b'<< /Type /Catalog /Pages 2 0 R >>',
-        b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        b'<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+        b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> >>',
         b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> >>',
     ]
     fuori, posizioni = b'%PDF-1.4\n% bollettino ' + marca.encode() + b'\n', []
@@ -302,17 +303,19 @@ with sync_playwright() as p:
         with pg.expect_response(lambda r: re.search(r'/api/documenti/\d+/file$', r.url)) as risposta:
             pg.goto(BASE + '/bollettini/' + str(nuovo))
         pg.wait_for_selector('.cerniera')
-        ok('bollettino-pdf-prova.pdf' in testo(pg, '.testa') and pg.locator('.pannello canvas[aria-label="Pagina 1 del documento"]').count() == 1
+        ok('bollettino-pdf-prova.pdf' in testo(pg, '.testa')
+           and pg.locator('.pannello canvas[aria-label="Pagina 1 di 2"]').count() == 1
+           and pg.locator('.pannello canvas[aria-label="Pagina 2 di 2"]').count() == 1
            and pg.locator('object[type="application/pdf"]').count() == 0,
-           'PDF del bollettino affiancato alla cerniera, disegnato con PDF.js')
+           'PDF del bollettino affiancato alla cerniera: tutte e due le pagine disegnate con PDF.js')
         try:
-            pg.wait_for_function("""() => { const c = document.querySelector('.pannello canvas[aria-label="Pagina 1 del documento"]');
-              return c && c.width > 0 && c.height > 0; }""", timeout=20000)
+            pg.wait_for_function("""() => { const c = [...document.querySelectorAll('.pannello canvas')];
+              return c.length == 2 && c.every(x => x.width > 0 && x.height > 0); }""", timeout=20000)
             canvas_pieno = True
         except Exception:
             canvas_pieno = False
         ok(risposta.value.status == 200 and canvas_pieno,
-           'il PDF passa da /api/documenti/<arrivo>/file e il canvas ha dimensioni > 0')
+           'il PDF passa da /api/documenti/<arrivo>/file e i canvas hanno dimensioni > 0')
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(500)
     ok(pg.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'),
        '768 px: la pagina non scorre di lato (la cerniera sì)')

@@ -2,9 +2,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { CampoEuro } from '@/componenti/Campo';
 import { CampoRicerca } from '@/componenti/CampoRicerca';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
-import { Scelte } from '@/componenti/Flussi';
+import { Scelte, Elenco } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
 import { FormAgenzia } from '@/componenti/FormAgenzia';
 import { Icona } from '@/componenti/Icona';
@@ -38,11 +39,9 @@ const STATO_PRATICA: Record<string, { testo: string; v: Variante }> = {
   confermata: { testo: 'Confermata', v: 'info' },
   fatturata: { testo: 'Fatturata', v: 'ok' },
 };
-// Scelta dichiarata (F6-A4b): i bordi dei campi usano 0,90/0,70 fissi come il prototipo, perché le
-// soglie vere stanno nelle Impostazioni e il dettaglio non le riceve. Il livello del documento resta
-// quello calcolato dal server.
-const SOGLIA_OK = 0.9;
-const SOGLIA_BASSA = 0.7;
+// D-151 §19: le soglie (bordi, «%», conteggio dei punti) arrivano dal server col documento (V12);
+// niente soglie fisse nel browser. Il livello del documento resta quello calcolato dal server.
+type Soglie = { soglia_ok: number; soglia_bassa: number };
 
 const PRATICA: Entita = {
   titolo: 'Pratica',
@@ -82,6 +81,11 @@ interface Candidato {
   pratica: { id: string; numero: string; cliente: string | null; stato: string; data_ordine: string };
   punteggio: number; motivi: string[]; delta: number;
 }
+/** D-152: un soggetto candidato per il documento, dal CRM o da Integra. */
+interface CandidatoSoggetto {
+  fonte: 'crm' | 'integra'; id: string; ragione_sociale: string | null;
+  piva: string | null; citta: string | null; motivo: string;
+}
 interface Proposta {
   esito: string; candidati: Candidato[]; importo: number;
   abbinamento: { cliente_id: string; cliente: string | null; codice: string | null } | null;
@@ -90,6 +94,9 @@ interface Proposta {
   fornitore_da_integra: { id_integra: number; ragione_sociale: string | null; piva: string | null } | null;
   cliente_da_integra: { id_integra: number | null; ragione_sociale: string | null; piva: string | null; subagente: string | null; sconto: number | null } | null;
   manca_rappresentanza: { cliente: string | null; fornitore: string | null; codice_cliente: string | null } | null;
+  candidati_fornitore: CandidatoSoggetto[];
+  candidati_cliente: CandidatoSoggetto[];
+  integra_non_raggiungibile: boolean;
 }
 interface Dettaglio {
   id: string; file_nome: string; file_tipo: 'pdf' | 'jpg' | 'png'; stato: string; tipo: string | null;
@@ -100,6 +107,7 @@ interface Dettaglio {
   proposta: Proposta; bollettino: { esiste: boolean } | null;
   // D-126 §19: totali del piede della tabella delle righe dal server, non sommati nel browser (V12)
   totali: { importo: number; provvigione: number };
+  soglie: Soglie;
 }
 
 /** Punti da controllare (come M.statoLettura): controlli falliti + campi incerti con un valore. */
@@ -107,7 +115,7 @@ function punti(d: Dettaglio) {
   let n = d.controlli.length;
   for (const c of d.campi) {
     if (c.campo === 'tipo' || c.verificato || c.affidabilita == null) continue;
-    if (c.affidabilita < SOGLIA_OK && (c.valore_finale ?? c.valore_letto) != null) n++;
+    if (c.affidabilita < d.soglie.soglia_ok && (c.valore_finale ?? c.valore_letto) != null) n++;
   }
   return n;
 }
@@ -118,13 +126,13 @@ function righeIncerte(d: Dettaglio) {
   for (const c of d.campi) {
     const m = /^righe\[(\d+)\]\./.exec(c.campo);
     if (!m || c.verificato || c.affidabilita == null) continue;
-    if (c.affidabilita < SOGLIA_OK && (c.valore_finale ?? c.valore_letto) != null) out.add(Number(m[1]));
+    if (c.affidabilita < d.soglie.soglia_ok && (c.valore_finale ?? c.valore_letto) != null) out.add(Number(m[1]));
   }
   return out;
 }
 
-const classeAff = (a: number | null, verificato: boolean) =>
-  a == null ? '' : verificato && a < SOGLIA_OK ? 'campo-verificato' : verificato ? '' : a < SOGLIA_BASSA ? 'incerto-errore' : a < SOGLIA_OK ? 'incerto-attesa' : '';
+const classeAff = (a: number | null, verificato: boolean, s: Soglie) =>
+  a == null ? '' : verificato && a < s.soglia_ok ? 'campo-verificato' : verificato ? '' : a < s.soglia_bassa ? 'incerto-errore' : a < s.soglia_ok ? 'incerto-attesa' : '';
 
 export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => void }) {
   const router = useRouter();
@@ -333,6 +341,24 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     router.push('/documenti');
   }
 
+  /** §7.9: toglie un documento in coda prima della lettura, con lo scarto già esistente (motivo fisso). */
+  function togliDallaCoda() {
+    setFinestra(
+      <Conferma titolo="Togliere il documento dalla coda?"
+        testo="Il documento non verrà letto né registrato: va fra i documenti scartati e si può recuperare."
+        etichetta="Togli dalla coda" pericolo
+        onRisposta={async (x) => {
+          chiudi();
+          if (!x) return;
+          const r = await api('documenti/' + id + '/scarta', { motivo: 'Tolto dalla coda', nota: 'prima della lettura' });
+          if (!r.ok) { avviso(r.messaggio, true); return; }
+          avviso('Documento tolto dalla coda: lo trovi fra gli scartati');
+          onFatto?.();
+          router.push('/documenti');
+        }} />,
+    );
+  }
+
   const azioni: Azione[] = [
     ...(puoModifica && ['da_controllare', 'errore'].includes(d.stato) ? [{
       etichetta: 'Correggi i dati letti', onClick: () => setFinestra(<FinestraCorreggi d={d} onChiudi={chiudi} onSalvato={salvato} />),
@@ -343,7 +369,11 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     ...(puoModifica && d.stato === 'errore' ? [{
       etichetta: 'Rileggi il documento', onClick: rileggi,
     }] : []),
-    ...(puoModifica && ['da_controllare', 'errore', 'in_coda'].includes(d.stato) ? [{
+    // §7.9: un documento in coda si può togliere prima della lettura (scarto con motivo fisso)
+    ...(puoModifica && d.stato === 'in_coda' ? [{
+      etichetta: 'Togli dalla coda', variante: 'pericolo' as const, onClick: togliDallaCoda,
+    }] : []),
+    ...(puoModifica && ['da_controllare', 'errore'].includes(d.stato) ? [{
       etichetta: 'Scarta il documento', variante: 'pericolo' as const, onClick: scarta,
     }] : []),
   ];
@@ -417,10 +447,47 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     }
   }
 
+  /** D-152: la persona sceglie il fornitore o il cliente fra i candidati proposti dal server. */
+  async function scegli(ruolo: 'fornitore' | 'cliente', cand: CandidatoSoggetto) {
+    if (importando) return;
+    setImportando(true);
+    try {
+      const r = await api<Dettaglio>('documenti/' + id + '/scegli', { ruolo, fonte: cand.fonte, id: cand.id });
+      if (!r.ok) { avviso(r.messaggio, true); return; }
+      avviso((ruolo === 'fornitore' ? 'Fornitore' : 'Cliente') + ' collegato al documento');
+      await carica();
+      onFatto?.();
+    } finally {
+      setImportando(false);
+    }
+  }
+
   function azione() {
     const fd = doc.proposta.fornitore_da_integra;
     const cd = doc.proposta.cliente_da_integra;
     const nr = doc.proposta.manca_rappresentanza;
+    // D-152: candidati da scegliere (il riconoscimento non è univoco)
+    const riquadroScelta = (ruolo: 'fornitore' | 'cliente', candidati: CandidatoSoggetto[]) => (
+      <div className="pila">
+        <Nota>{ruolo === 'fornitore' ? 'Il fornitore letto non è univoco' : 'Il cliente letto non è univoco'}: scegli fra i candidati.</Nota>
+        {doc.proposta.integra_non_raggiungibile && <Nota>Integra non raggiungibile: i candidati sono solo del CRM.</Nota>}
+        <Elenco voci={candidati.map((c) => ({
+          testo: <><b>{c.ragione_sociale ?? '—'}</b><span className="sec-riga">{[c.piva, c.citta, c.motivo].filter(Boolean).join(' · ')}</span></>,
+          destra: <>
+            <Stato v={c.fonte === 'crm' ? 'info' : 'neutro'}>{c.fonte === 'crm' ? 'CRM' : 'Integra'}</Stato>
+            <button type="button" className="btn sec piccolo" disabled={importando || (c.fonte === 'integra' && !puoImporta)}
+              title={c.fonte === 'integra' && !puoImporta ? 'Serve il permesso di importare da Integra' : undefined}
+              aria-label={'Scegli ' + (c.ragione_sociale ?? '')}
+              onClick={() => void scegli(ruolo, c)}>{importando ? '…' : 'Scegli'}</button>
+          </>,
+        }))} />
+        <div className="azioni-riga">
+          <button type="button" className="btn testo" onClick={() => setFinestra(<FinestraCorreggi d={doc} onChiudi={chiudi} onSalvato={salvato} />)}>Nessuno di questi: scegli a mano</button>
+        </div>
+      </div>
+    );
+    if (doc.proposta.candidati_fornitore.length) return riquadroScelta('fornitore', doc.proposta.candidati_fornitore);
+    if (doc.proposta.candidati_cliente.length) return riquadroScelta('cliente', doc.proposta.candidati_cliente);
     return (
       <>
         {incerte.size > 0 && (
@@ -574,8 +641,10 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
       id: 'azioni',
       etichetta: boll ? 'Cosa farne'
         : doc.proposta.esito === 'fornitore_da_integra' ? 'Fornitore da importare'
+        : doc.proposta.esito === 'fornitore_da_scegliere' ? 'Fornitore da scegliere'
         : doc.proposta.esito === 'manca_rappresentanza' ? 'Configura l’agenzia'
         : doc.proposta.esito === 'cliente_da_integra' ? 'Cliente da importare'
+        : doc.proposta.esito === 'cliente_da_scegliere' ? 'Cliente da scegliere'
         : t.tipo === 'ordine' ? 'Nuova pratica'
         : doc.proposta.esito === 'nessuno' ? 'Scegli la pratica'
         : 'Pratica proposta',
@@ -632,13 +701,13 @@ const RIGA_KEYS = ['codice', 'descrizione', 'quantita', 'prezzo', 'importo', 'nu
 
 /** Campo con il bordo dell'affidabilità (giallo 0,70–0,90 · rosso < 0,70 · verde se confermato).
  *  Il ✓ accanto al campo conferma il valore letto: da lì non conta più fra i punti da controllare. */
-function CampoLetto({ x, etichetta, verificato, onConferma, children }: {
-  x: Campo | undefined; etichetta: string; verificato: boolean; onConferma?: () => void; children: ReactNode;
+function CampoLetto({ x, etichetta, verificato, onConferma, soglie, children }: {
+  x: Campo | undefined; etichetta: string; verificato: boolean; onConferma?: () => void; soglie: Soglie; children: ReactNode;
 }) {
   const a = x?.affidabilita ?? null;
-  const incerto = a != null && !verificato && a < SOGLIA_OK;
+  const incerto = a != null && !verificato && a < soglie.soglia_ok;
   return (
-    <div className={'campo-letto ' + classeAff(a, verificato)}>
+    <div className={'campo-letto ' + classeAff(a, verificato, soglie)}>
       <label>{etichetta}{incerto && <span className="aff">{Math.round(a * 100)}%</span>}</label>
       <div className="campo-riga">
         {children}
@@ -669,6 +738,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
   const [riepAperto, setRiepAperto] = useState(true);
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
+  const [nuovaRiga, setNuovaRiga] = useState<number | null>(null);
   // campi già validati (dal server o con il ✓ in questa finestra): non sono più punti da controllare
   const [verificati, setVerificati] = useState<Set<string>>(() => new Set(d.campi.filter((c) => c.verificato).map((c) => c.campo)));
   const af = useMemo(() => new Map(d.campi.map((c) => [c.campo, c])), [d.campi]);
@@ -676,7 +746,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
   const verificato = (k: string) => verificati.has(k);
   const conferma = (k: string) => setVerificati((s) => s.has(k) ? s : new Set(s).add(k));
   const campoSi = (k: string, etichetta: string, children: ReactNode, senzaAff = false) => (
-    <CampoLetto x={senzaAff ? undefined : af.get(k)} etichetta={etichetta} verificato={verificato(k)} onConferma={() => conferma(k)}>{children}</CampoLetto>
+    <CampoLetto x={senzaAff ? undefined : af.get(k)} etichetta={etichetta} verificato={verificato(k)} onConferma={() => conferma(k)} soglie={d.soglie}>{children}</CampoLetto>
   );
 
   useEffect(() => {
@@ -685,6 +755,15 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
     return () => document.removeEventListener('keydown', tasto);
   }, [onChiudi]);
 
+  // D-151: la riga aggiunta si porta in vista e il fuoco va sul suo primo campo
+  useEffect(() => {
+    if (nuovaRiga == null) return;
+    const riga = document.querySelector<HTMLElement>(`[data-riga="${nuovaRiga}"]`);
+    riga?.scrollIntoView({ block: 'nearest' });
+    riga?.querySelector('input')?.focus();
+    setNuovaRiga(null);
+  }, [nuovaRiga]);
+
   const t = (k: keyof Bozza['testata'], v: string) => setB((x) => ({ ...x, testata: { ...x.testata, [k]: v } }));
   const r = (idx: number, k: keyof BozzaRiga, v: string) => setB((x) => ({ ...x, righe: x.righe.map((z, j) => j === idx ? { ...z, [k]: v } : z) }));
   const campoRiga = (riga: BozzaRiga, idx: number, k: string) => `righe[${riga.i ?? idx}].${k}`;
@@ -692,9 +771,9 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
   const pagina = pos?.posizione?.pagina;
   // punti ancora aperti: controlli falliti + campi incerti non confermati (si aggiorna a ogni ✓)
   const restanti = d.campi.filter((c) => c.campo !== 'tipo' && !verificato(c.campo) && c.affidabilita != null
-    && c.affidabilita < SOGLIA_OK && (c.valore_finale ?? c.valore_letto) != null);
+    && c.affidabilita < d.soglie.soglia_ok && (c.valore_finale ?? c.valore_letto) != null);
   const nPunti = d.controlli.length + restanti.length;
-  const bassa = d.controlli.some((c) => c.grave) || restanti.some((c) => (c.affidabilita ?? 1) < SOGLIA_BASSA);
+  const bassa = d.controlli.some((c) => c.grave) || restanti.some((c) => (c.affidabilita ?? 1) < d.soglie.soglia_bassa);
 
   // porta l'attenzione sul campo di un punto (controllo o campo incerto) selezionato dall'elenco
   const saltaAl = (nome: string) => {
@@ -801,7 +880,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                   {campoSi('cliente', 'Cliente letto',
                     <input data-campo="cliente" value={b.testata.cliente} onFocus={() => setCampo('cliente')} onChange={(e) => t('cliente', e.target.value)} />)}
                   {campoSi('importo_totale', 'Importo',
-                    <input data-campo="importo" type="number" step="0.01" value={b.testata.importo} onFocus={() => setCampo('importo_totale')} onChange={(e) => t('importo', e.target.value)} />)}
+                    <CampoEuro dataCampo="importo" valore={b.testata.importo} onFocus={() => setCampo('importo_totale')} onChange={(v) => t('importo', v)} />)}
                   {b.testata.tipo === 'nota_credito' &&
                     campoSi('riferimento_fattura', 'Fattura stornata',
                       <input data-campo="riferimento_fattura" value={b.testata.riferimento_fattura} onFocus={() => setCampo('riferimento_fattura')} onChange={(e) => t('riferimento_fattura', e.target.value)} />)}
@@ -810,7 +889,10 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
             </div>
             <div className="righe-testa">
               <h3>Righe <span className="testo-tenue">{b.righe.length}</span></h3>
-              <button type="button" className="btn sec piccolo" onClick={() => setB((x) => ({ ...x, righe: [...x.righe, { i: null, codice: '', descrizione: '', quantita: '', prezzo: '', importo: '', numero_fattura: '', data_fattura: '', provvigione: '' }] }))}>
+              <button type="button" className="btn sec piccolo" onClick={() => {
+                setB((x) => ({ ...x, righe: [...x.righe, { i: null, codice: '', descrizione: '', quantita: '', prezzo: '', importo: '', numero_fattura: '', data_fattura: '', provvigione: '' }] }));
+                setNuovaRiga(b.righe.length);
+              }}>
                 <Icona nome="piu" />Aggiungi riga
               </button>
             </div>
@@ -826,7 +908,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                 </thead>
                 <tbody>
                   {b.righe.map((x, idx) => {
-                    const cella = (k: keyof BozzaRiga, tipo: 'text' | 'number' | 'date' = 'text') => {
+                    const cella = (k: keyof BozzaRiga, tipo: 'text' | 'number' | 'euro' | 'date' = 'text') => {
                       const c = campoRiga(x, idx, k);
                       // una riga nuova non ha affidabilità: la chiave non deve scontrarsi con una riga tolta
                       const keyAff = x.i != null ? c : `righe[new-${idx}].${k}`;
@@ -834,12 +916,15 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                       const ver = verificato(keyAff);
                       const extra = k === 'descrizione' ? 'largo ' : k === 'codice' || k === 'numero_fattura' ? 'col-codice ' : '';
                       return (
-                        <td key={k} className={extra + classeAff(aff, ver)}>
+                          <td key={k} className={extra + classeAff(aff, ver, d.soglie)}>
                           <div className="campo-riga">
-                            <input data-campo={c} type={tipo} step={tipo === 'number' ? 'any' : undefined} value={String(x[k] ?? '')}
-                              onFocus={() => setCampo(keyAff)} onChange={(e) => { r(idx, k, e.target.value); conferma(keyAff); }} />
+                            {tipo === 'number' || tipo === 'euro'
+                              ? <CampoEuro dataCampo={c} valore={String(x[k] ?? '')} valuta={tipo === 'euro'}
+                                  onFocus={() => setCampo(keyAff)} onChange={(v) => { r(idx, k, v); conferma(keyAff); }} />
+                              : <input data-campo={c} type={tipo} value={String(x[k] ?? '')}
+                                  onFocus={() => setCampo(keyAff)} onChange={(e) => { r(idx, k, e.target.value); conferma(keyAff); }} />}
                             {ver && <span className="spunta-verde" title="Campo verificato" aria-label={'Verificato: riga ' + (idx + 1)}>✓</span>}
-                            {aff != null && !ver && aff < SOGLIA_OK && (
+                            {aff != null && !ver && aff < d.soglie.soglia_ok && (
                               <button type="button" className="conferma-campo" title="Il valore è giusto: confermalo"
                                 aria-label={'Conferma la riga ' + (idx + 1)} onClick={() => conferma(keyAff)}>✓</button>
                             )}
@@ -848,10 +933,10 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                       );
                     };
                     return (
-                      <tr key={idx} className={x.i == null ? 'nuova' : undefined}>
+                      <tr key={idx} data-riga={idx} className={x.i == null ? 'nuova' : undefined}>
                         <td className="testo-tenue">{idx + 1}</td>
-                        {boll ? <>{cella('numero_fattura')}{cella('data_fattura', 'date')}{cella('importo', 'number')}{cella('provvigione', 'number')}</>
-                          : <>{cella('codice')}{cella('descrizione')}{cella('quantita', 'number')}{cella('prezzo', 'number')}{cella('importo', 'number')}</>}
+                        {boll ? <>{cella('numero_fattura')}{cella('data_fattura', 'date')}{cella('importo', 'euro')}{cella('provvigione', 'euro')}</>
+                          : <>{cella('codice')}{cella('descrizione')}{cella('quantita', 'number')}{cella('prezzo', 'euro')}{cella('importo', 'euro')}</>}
                         <td><button type="button" className="btn testo piccolo" title="Elimina la riga" aria-label={'Elimina la riga ' + (idx + 1)}
                           onClick={() => setB((z) => ({ ...z, righe: z.righe.filter((_, j) => j !== idx) }))}>✕</button></td>
                       </tr>
