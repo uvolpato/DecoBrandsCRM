@@ -285,6 +285,22 @@ export async function applica(db: Db, chiave: string, valori: Record<string, unk
     }
   }
 
+  // D-115 §19: il segreto non parte mai verso un indirizzo nuovo. Per le sezioni di connessione,
+  // se cambia un campo che individua il server e la password non arriva nello stesso salvataggio,
+  // si risponde 400: il segreto vecchio non si riusa con un indirizzo nuovo.
+  const CONNESSIONI: Record<string, string[]> = {
+    casella: ['server', 'porta', 'utente'],
+    posta: ['server', 'porta', 'utente'],
+    integra: ['server', 'utente'],
+  };
+  const campiIndirizzo = CONNESSIONI[chiave];
+  if (campiIndirizzo) {
+    const segreto = sezione.campi.find((c) => c.segreto)!;
+    if (campiIndirizzo.some((nome) => nome in dopo) && dopo[segreto.nome] !== 'sostituita') {
+      throw new BadRequestException('Hai cambiato il server: scrivi di nuovo la password');
+    }
+  }
+
   // §6.5, §7.15: le soglie si controllano sul valore finale (nuovo o quello rimasto)
   if (chiave === 'lettura') {
     const ok = Number(nuovo.soglia_ok), bassa = Number(nuovo.soglia_bassa);
@@ -309,5 +325,3 @@ export async function sezionePubblica(db: Db, chiave: string) {
     }),
   };
 }
-
-export const elencoSezioni = () => SEZIONI.map((s) => ({ chiave: s.chiave, titolo: s.titolo, sotto: s.sotto }));

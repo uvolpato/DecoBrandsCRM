@@ -82,6 +82,11 @@ with sync_playwright() as p:
     campo = fb.locator('.ricerca.multipla .ricerca-testo')
     campo.click()
     ok(fb.locator('.ricerca-menu').is_visible(), 'ricerca multipla: il menu si apre')
+    pg.keyboard.press('ArrowDown'); pg.keyboard.press('ArrowDown')
+    adv = campo.get_attribute('aria-activedescendant')
+    ok(bool(adv) and fb.locator(f'[id="{adv}"]').get_attribute('role') == 'option', 'ricerca multipla: la freccia annuncia la voce attiva (aria-activedescendant)')
+    ctrl = campo.get_attribute('aria-controls')
+    ok(bool(ctrl) and fb.locator(f'[id="{ctrl}"] li[role=option]').count() > 0, 'ricerca multipla: aria-controls punta al menu')
     fb.locator('.ricerca-menu li[role=option]', has_text='Arredo Bagno Rossi').click()
     fb.locator('.ricerca-menu li[role=option]', has_text='Ceramiche Verdi').click()
     ok(fb.locator('.ricerca-menu li.menu-titolo', has_text='Scelti (2)').count() == 1, 'ricerca multipla: due voci scelte')
@@ -107,6 +112,13 @@ with sync_playwright() as p:
     f = cr.locator('#d-f')
     f.fill('')
     f.type('gas')
+    pg.wait_for_selector('#' + f.get_attribute('aria-controls') + ' li[role=option]')
+    pg.keyboard.press('ArrowDown')
+    adv = f.get_attribute('aria-activedescendant')
+    ok(bool(adv) and cr.locator(f'[id="{adv}"]').get_attribute('role') == 'option', 'campo singolo: la freccia annuncia la voce attiva (aria-activedescendant)')
+    ctrl = f.get_attribute('aria-controls')
+    ok(bool(ctrl) and cr.locator(f'[id="{ctrl}"] li[role=option]').count() > 0, 'campo singolo: aria-controls punta al menu')
+    ok(cr.get_by_role('combobox', name='Cerca fornitore').count() == 1, 'campo singolo: il combobox ha un nome')
     cr.locator('.ricerca-menu li[role=option]', has_text='Gasper').click()
     ok('fornitore 2' in cr.inner_text(), 'campo singolo: scelta dal menu')
     f.fill('xyz')
@@ -160,6 +172,7 @@ with sync_playwright() as p:
 
     # --- non amministratore ---
     pg = entra(S + '-ammi')
+    pg.wait_for_selector('.testa h1')  # la pagina (Riservata) si compone dopo l'accesso
     ok(pg.locator('.vuoto b', has_text='Pagina riservata').count() == 1, 'amministratore: Pagina riservata')
     ok(pg.locator('.barra .voce', has_text='Componenti').count() == 0, 'amministratore: la voce Componenti non c’è')
     ok(pg.locator('.catalogo-voci').count() == 0, 'amministratore: il catalogo non si vede')

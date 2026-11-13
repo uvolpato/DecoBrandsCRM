@@ -238,10 +238,12 @@ with sync_playwright() as p:
     ok(bocca is not None, 'bollettino di luglio di Gries da verificare')
     pg.goto(BASE + '/bollettini/' + str(bocca)); pg.wait_for_selector('.cerniera')
     decidi = pg.locator('.c-riga', has_text='importo diverso').first
-    decidi.locator('button', has_text='Accetta il loro importo').first.click()
-    pg.wait_for_selector('.velo .modale-piede button:has-text("Conferma")')
-    pg.click('.velo .modale-piede button:has-text("Conferma")')
-    pg.wait_for_function("!document.querySelector('.velo')"); attesa(pg)
+    # una prova prima (app_bollettino) può aver già deciso la riga: si decide solo se serve
+    if decidi.locator('button', has_text='Accetta il loro importo').count():
+        decidi.locator('button', has_text='Accetta il loro importo').first.click()
+        pg.wait_for_selector('.velo .modale-piede button:has-text("Conferma")')
+        pg.click('.velo .modale-piede button:has-text("Conferma")')
+        pg.wait_for_function("!document.querySelector('.velo')"); attesa(pg)
     pg.click('.barra-decisione button:has-text("Segna come verificato")')
     pg.wait_for_selector('.velo .modale-piede button:has-text("Segna come verificato")')
     pg.click('.velo .modale-piede button:has-text("Segna come verificato")')

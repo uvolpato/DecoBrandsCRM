@@ -1,7 +1,8 @@
 # Prova degli aggiornamenti dal server (F4-A6, §16.4.2, D-23), con Playwright: due schede dello stesso
 # utente; la scheda B registra una fattura di prova su una pratica e poi la annulla; la scheda A (Pratiche,
 # con il filtro "Attesa fattura") mostra la barra entro pochi secondi, i contatori cambiano e le righe
-# restano; "Aggiorna" applica e la riga esce. Alla fine la fattura è tolta (pulizia anche in caso di errore).
+# restano; "Aggiorna" applica e la riga esce. All'inizio si finge un 502 sul flusso: la fonte SSE deve
+# riaprirsi da sola (A5-12). Alla fine la fattura è tolta (pulizia anche in caso di errore).
 # Servono backend e frontend accesi (base: terzo argomento) e gli utenti <s>-ammi (password-di-prova).
 # Uso: python strumenti/prove/app_eventi.py <suffisso> <cartella schermate> [base]
 import re
@@ -64,6 +65,29 @@ with sync_playwright() as p:
     entra(pgA, S + '-ammi')
     entra(pgB, S + '-ammi')
 
+    # A5-12: un 502 (riavvio del backend dietro Caddy) chiude la fonte SSE senza che EventSource riprovi;
+    # il provider la riapre da solo dopo 15 s. La pagina non si ricarica: la verifica è una seconda
+    # richiesta al flusso senza intervento dell'utente.
+    risposte = {'finte': 0}
+    flussi = []
+    pgA.on('request', lambda r: flussi.append(r.url) if '/api/eventi/flusso' in r.url else None)
+
+    def finto_502(route):
+        if risposte['finte'] < 1:
+            risposte['finte'] += 1
+            route.fulfill(status=502, body='')
+        else:
+            route.continue_()
+
+    pgA.route('**/api/eventi/flusso', finto_502)
+    pgA.reload()
+    pgA.wait_for_selector('.dt tbody tr')
+    for _ in range(50):  # riapre dopo 15 s: si aspetta fino a 25 s
+        if len(flussi) >= 2: break
+        pgA.wait_for_timeout(500)
+    ok(len(flussi) >= 2, 'A5-12: dopo il 502 la fonte SSE si riapre da sola')
+    pgA.unroute('**/api/eventi/flusso', finto_502)
+
     # scheda A: la lista con il filtro "Attesa fattura" (una pratica confermata)
     segmento(pgA, 'Attesa fattura').click(); pgA.wait_for_timeout(700); quieta(pgA)
     conta = numero(segmento(pgA, 'Attesa fattura').locator('.n').inner_text())
@@ -78,7 +102,7 @@ with sync_playwright() as p:
     ok(pratica['numero'] in riga1, 'la prima riga è la pratica %s' % pratica['numero'])
 
     # scheda B: una scrittura vera (fattura di prova), poi si toglie
-    pgB.goto(BASE + '/pratiche/' + pratica['id']); pgB.wait_for_selector('.schede-barra')
+    pgB.goto(BASE + '/pratiche/' + pratica['id']); pgB.wait_for_load_state('networkidle'); pgB.wait_for_selector('.schede-barra')
     pgB.click('button:has-text("Registra fattura")')
     pgB.wait_for_selector('.velo #c-numero')
     pgB.fill('.velo #c-numero', NUMERO)

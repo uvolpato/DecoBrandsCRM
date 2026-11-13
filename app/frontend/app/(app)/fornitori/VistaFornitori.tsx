@@ -99,8 +99,6 @@ interface Bozza {
 
 const oggi = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
-let schedaFornitore = 'percentuali';
-
 export function VistaFornitori({ idSel }: { idSel?: string }) {
   const puo = usePuo();
   const router = useRouter();
@@ -327,7 +325,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
 
   if (!fornitori) return pagina(errore
     ? <Pannello><div className="vuoto"><b>Fornitori non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
-    : sagome && <SagomaElenco filtri={filtri} />);
+    : sagome && <SagomaElenco filtri={<>{filtri}<CercaInIntegra tipo="fornitore" onImportato={async (id) => { await carica(); router.push('/fornitori/' + id); }} /></>} />);
 
   const azioni: Azione[] = puoModificare && u ? [{ etichetta: 'Modifica le regole', icona: 'impostazioni', onClick: () => modificaRegole(u) }] : [];
 
@@ -357,7 +355,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               { etichetta: 'Giorni per l’incasso', valore: u.giorni_incasso },
               { etichetta: 'Note', valore: u.note ?? '—' },
             ]} />
-            <Schede riempi attiva={schedaFornitore} onCambia={(id) => { schedaFornitore = id; }} memoria="fornitori" schede={[
+            <Schede riempi memoria="fornitori" schede={[
               {
                 id: 'percentuali', etichetta: 'Percentuali', contenuto: () => (
                   <div className="pila riempi">

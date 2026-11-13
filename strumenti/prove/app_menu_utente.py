@@ -63,8 +63,8 @@ with sync_playwright() as p:
 
     # scelta di un'area: va alla sua prima pagina e il titolo in cima cambia
     apri_menu(pg); pg.click('.menu-utente-voce:has-text("Dati")')
-    pg.wait_for_function("location.pathname === '/fornitori'"); pg.wait_for_timeout(500)
-    ok('Dati' in testo(pg, '.area-titolo') and testo(pg, '.testa h1') == 'Fornitori', 'scelto Dati: prima pagina e titolo dell’area aggiornati')
+    pg.wait_for_function("location.pathname === '/soggetti'"); pg.wait_for_timeout(500)
+    ok('Dati' in testo(pg, '.area-titolo') and testo(pg, '.testa h1') == 'Soggetti', 'scelto Dati: prima pagina e titolo dell’area aggiornati')
     apri_menu(pg)
     ok(attiva(pg) == 'Dati', 'dopo la scelta la spunta è su Dati')
     pg.keyboard.press('Escape')

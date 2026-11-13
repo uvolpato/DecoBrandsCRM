@@ -14,7 +14,18 @@ type Config = NonNullable<Awaited<ReturnType<typeof letturaConfig>>>;
 type ConfigCloud = Extract<Config, { connettore: 'llamacloud_eu' }>;
 
 export class LetturaNonConfigurata extends Error {}
-export class LetturaFallita extends Error {}
+export class LetturaFallita extends Error {
+  /** Stato HTTP della risposta: 401/402/403/429 chiave scaduta o crediti, 5xx servizio giù, altri 4xx file rifiutato. */
+  stato?: number;
+  /** Vero se il problema è del servizio, non del documento (rete giù, timeout, 5xx, chiave/crediti):
+   *  in questo caso il documento non consuma il tentativo (C1, A4-01). */
+  servizio?: boolean;
+  constructor(messaggio: string, stato?: number, servizio?: boolean) {
+    super(messaggio);
+    this.stato = stato;
+    this.servizio = servizio ?? (stato !== undefined && (stato >= 500 || [401, 402, 403, 429].includes(stato)));
+  }
+}
 
 export interface PosizionePdf {
   tipo: 'pdf';
@@ -50,6 +61,10 @@ const base = (c: ConfigCloud) => c.indirizzo.replace(/\/$/, '');
 const intestazioni = (c: ConfigCloud) => ({ Authorization: `Bearer ${c.chiave}` });
 const pulisci = (s: unknown) => String(s instanceof Error ? s.message : s).replace(/\s+/g, ' ').slice(0, 300);
 
+/** Errore di rete o timeout del fetch (TypeError = rete giù, AbortError/TimeoutError = AbortSignal.timeout):
+ *  il servizio non risponde, non è colpa del documento (C1). */
+const rete = (e: unknown) => ['TypeError', 'AbortError', 'TimeoutError'].includes((e as { name?: string }).name ?? '');
+
 async function leggiErrore(r: Response): Promise<string> {
   const testo = await r.text().catch(() => '');
   try {
@@ -64,7 +79,7 @@ async function leggiErrore(r: Response): Promise<string> {
 async function progetto(c: ConfigCloud, f: typeof fetch): Promise<string> {
   if (c.progetto) return c.progetto;
   const r = await f(`${base(c)}/api/v1/projects`, { headers: intestazioni(c), signal: AbortSignal.timeout(15_000) });
-  if (!r.ok) throw new LetturaFallita(`LlamaCloud non ha restituito i progetti (${r.status}): ${await leggiErrore(r)}`);
+  if (!r.ok) throw new LetturaFallita(`LlamaCloud non ha restituito i progetti (${r.status}): ${await leggiErrore(r)}`, r.status);
   const j = (await r.json()) as { id: string }[] | { items?: { id: string }[] };
   const primo = Array.isArray(j) ? j[0] : j.items?.[0];
   if (!primo) throw new LetturaFallita('LlamaCloud: nessun progetto nell’account');
@@ -125,7 +140,7 @@ async function leggiConLlamaCloud(c: ConfigCloud, nome: string, dati: Buffer, sc
     const caricato = await f(`${base(c)}/api/v1/beta/files`, {
       method: 'POST', headers: intestazioni(c), body: modulo, signal: AbortSignal.timeout(60_000),
     });
-    if (!caricato.ok) throw new LetturaFallita(`LlamaCloud non ha accettato il file (${caricato.status}): ${await leggiErrore(caricato)}`);
+    if (!caricato.ok) throw new LetturaFallita(`LlamaCloud non ha accettato il file (${caricato.status}): ${await leggiErrore(caricato)}`, caricato.status);
     fileId = ((await caricato.json()) as { id: string }).id;
 
     const pid = await progetto(c, f);
@@ -146,7 +161,7 @@ async function leggiConLlamaCloud(c: ConfigCloud, nome: string, dati: Buffer, sc
         },
       }),
     });
-    if (!creato.ok) throw new LetturaFallita(`LlamaCloud non ha avviato la lettura (${creato.status}): ${await leggiErrore(creato)}`);
+    if (!creato.ok) throw new LetturaFallita(`LlamaCloud non ha avviato la lettura (${creato.status}): ${await leggiErrore(creato)}`, creato.status);
     const job = (await creato.json()) as { id: string; status: string };
 
     let ultimo = job;
@@ -155,7 +170,7 @@ async function leggiConLlamaCloud(c: ConfigCloud, nome: string, dati: Buffer, sc
       const r = await f(`${base(c)}/api/v2/extract/${encodeURIComponent(job.id)}?project_id=${encodeURIComponent(pid)}&expand=extract_metadata&expand=usage`, {
         headers: intestazioni(c), signal: AbortSignal.timeout(30_000),
       });
-      if (!r.ok) throw new LetturaFallita(`LlamaCloud non ha restituito l’esito (${r.status}): ${await leggiErrore(r)}`);
+      if (!r.ok) throw new LetturaFallita(`LlamaCloud non ha restituito l’esito (${r.status}): ${await leggiErrore(r)}`, r.status);
       ultimo = (await r.json()) as typeof job & { extract_result?: unknown; extract_metadata?: unknown; usage?: { credits_used?: number } };
       if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(ultimo.status)) break;
       if (Date.now() + pollMs > scadenza) {
@@ -177,7 +192,7 @@ async function leggiConLlamaCloud(c: ConfigCloud, nome: string, dati: Buffer, sc
     return { campi, risultato, modello: `llamacloud:extract:2.5:${c.modo}`, crediti: Number.isFinite(crediti) ? crediti : null };
   } catch (e) {
     if (e instanceof LetturaFallita) throw e;
-    throw new LetturaFallita(`Lettura non riuscita: ${pulisci(e)}`);
+    throw new LetturaFallita(`Lettura non riuscita: ${pulisci(e)}`, undefined, rete(e));
   } finally {
     // il documento non resta nel cloud più del necessario (D-67): la pulizia non deve far fallire la lettura
     if (fileId) {

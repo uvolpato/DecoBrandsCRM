@@ -17,6 +17,23 @@ def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 def numero(testo):
     return float(re.sub(r'[^\d,-]', '', testo).replace('.', '').replace(',', '.'))
 
+def pdf_prova(marca):
+    """PDF valido di una pagina vuota: PDF.js deve poterlo aprire e disegnare il canvas (A4-10)."""
+    oggetti = [
+        b'<< /Type /Catalog /Pages 2 0 R >>',
+        b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> >>',
+    ]
+    fuori, posizioni = b'%PDF-1.4\n% bollettino ' + marca.encode() + b'\n', []
+    for i, o in enumerate(oggetti, 1):
+        posizioni.append(len(fuori))
+        fuori += b'%d 0 obj\n' % i + o + b'\nendobj\n'
+    inizio_xref = len(fuori)
+    fuori += b'xref\n0 %d\n0000000000 65535 f \n' % (len(oggetti) + 1)
+    fuori += b''.join(b'%010d 00000 n \n' % p for p in posizioni)
+    fuori += b'trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(oggetti) + 1, inizio_xref)
+    return fuori
+
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
     # il tasto si perde se la pagina non ha ancora agganciato l'ascolto (idratazione): si riprova
@@ -174,7 +191,7 @@ with sync_playwright() as p:
        and tot(pg, '.cerniera-riepilogo .cucitura b') == -2954.58, 'Gasper agosto: totali 394,80 / 3.349,38 / -2.954,58')
     ok(n_gruppo(pg, 'Da decidere') == 1 and n_gruppo(pg, 'Quadrano') == 1 and n_gruppo(pg, 'Incassi') == 1,
        'gruppi: 1 da decidere, 1 che quadra, 1 incasso')
-    ok(pg.locator('object[type="application/pdf"]').count() == 0 and 'nessun file allegato' in testo(pg, '.testa'),
+    ok(pg.locator('.pannello canvas').count() == 0 and 'nessun file allegato' in testo(pg, '.testa'),
        'senza PDF: la pagina lo dice e non mostra il riquadro')
     pg.screenshot(path=str(USCITA / 'app-bollettino-1440.png'))
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(500)
@@ -196,7 +213,8 @@ with sync_playwright() as p:
     mancante = riga_testo(pg, 'F-2026-0933')
     decidi(pg, mancante, 'Attendi il prossimo', 'Conferma')
     ok(n_gruppo(pg, 'Da decidere') == 0 and n_gruppo(pg, 'Decise') == 1, 'attesa sul mancante: passa fra le decise')
-    riga_testo(pg, 'F-2026-0933').locator('button', has_text='Annulla').first.click(); attesa(pg)
+    riga_testo(pg, 'F-2026-0933').locator('button', has_text='Annulla').first.click()
+    riga_testo(pg, 'F-2026-0933').locator('button', has_text='Attendi il prossimo').first.wait_for(timeout=10000)
     dopo_annulla = (n_gruppo(pg, 'Da decidere'), n_gruppo(pg, 'Decise'))
     ok(dopo_annulla == (1, 0), 'annullata la decisione: torna da decidere (%d da decidere, %d decise)' % dopo_annulla)
 
@@ -246,21 +264,55 @@ with sync_playwright() as p:
     pg.goto(BASE + '/bollettini'); pg.wait_for_selector('.matrice')
     pg.click('button:has-text("Carica un bollettino")')
     pg.wait_for_selector('.velo form#carica-bollettino')
-    campo = pg.locator('.velo .ricerca .ricerca-testo').first
-    campo.fill("Ing's"); pg.wait_for_timeout(300); campo.press('Enter'); pg.wait_for_timeout(200)
-    pg.select_option('#c-mese', '9'); pg.select_option('#c-anno', '2026')
-    pg.set_input_files('.velo input[type=file]', {'name': 'bollettino-pdf-prova.pdf', 'mimeType': 'application/pdf',
-                                                 'buffer': b'%PDF-1.4\n% bollettino per la prova del PDF\n%%EOF\n'})
-    pg.click('.velo .modale-piede button:has-text("Carica")')
-    pg.wait_for_selector('.avviso'); pg.wait_for_timeout(600)
-    nuovo = id_bollettino(pg, "Ing's", '2026-09')
-    ok(nuovo is not None, 'bollettino nuovo caricato: presente nella matrice')
-    pg.goto(BASE + '/bollettini/' + str(nuovo)); pg.wait_for_selector('.cerniera')
-    ok('bollettino-pdf-prova.pdf' in testo(pg, '.testa') and pg.locator('object[type="application/pdf"]').count() == 1,
-       'PDF del bollettino affiancato alla cerniera')
-    ok(pg.locator('object[type="application/pdf"]').count() == 1
-       and re.match(r'^/api/documenti/\d+/file$', pg.locator('object').first.get_attribute('data') or '') is not None,
-       'il PDF passa da /api/documenti/<arrivo>/file')
+    # nel giro app_bollettini carica già Ing's 9/2026: si prende il primo mese del 2026 libero, letto dal
+    # server (cella del fornitore presente e senza bollettino), così il 409 non fa fallire la prova (c)
+    mese_libero = None
+    for m in range(1, 13):
+        mm = '2026-%02d' % m
+        rr = pg.request.get(BASE + '/api/bollettini?al=' + mm).json()
+        f = next((x for x in rr['fornitori'] if "ing's" in x['fornitore'].lower()), None)
+        if f and any(c['mese'] == mm and not c['bollettino_id'] for c in f['celle']):
+            mese_libero = mm
+            break
+    ok(mese_libero is not None, 'un mese del 2026 libero per Ing\'s (nessuno: bollettini tutti caricati)')
+    nuovo = None
+    if mese_libero:
+        campo = pg.locator('.velo .ricerca .ricerca-testo').first
+        campo.fill("Ing's"); pg.wait_for_timeout(300); campo.press('Enter'); pg.wait_for_timeout(200)
+        pg.select_option('#c-mese', str(int(mese_libero[5:])))
+        pg.select_option('#c-anno', '2026')
+        pg.set_input_files('.velo input[type=file]', {'name': 'bollettino-pdf-prova.pdf', 'mimeType': 'application/pdf',
+                                                     'buffer': pdf_prova('prova PDF')})
+        pg.click('.velo .modale-piede button:has-text("Carica")')
+        # avviso oppure errore nel modulo, appena esce: un errore fa fallire subito, non dopo 30 s
+        pg.wait_for_selector('.avviso:not([hidden]), .velo .modulo-errore:not([hidden])')
+        errore_modulo = pg.locator('.velo .modulo-errore:not([hidden])')
+        if errore_modulo.count():
+            ok(False, 'carica un bollettino: errore nel modulo «%s»' % errore_modulo.first.inner_text())
+        else:
+            pg.wait_for_timeout(600)
+        nuovo = id_bollettino(pg, "Ing's", mese_libero)
+        ok(nuovo is not None, 'bollettino nuovo caricato: presente nella matrice (%s)' % mese_libero)
+    else:
+        ok(False, 'bollettino nuovo: non caricato, nessun mese libero per Ing\'s')
+    if nuovo is None:
+        ok(False, 'PDF affiancato: non provato, il bollettino nuovo non c\'è')
+    else:
+        # PDF.js disegna il PDF su un canvas: niente <object> (bloccato dal CSP sandbox, A4-10)
+        with pg.expect_response(lambda r: re.search(r'/api/documenti/\d+/file$', r.url)) as risposta:
+            pg.goto(BASE + '/bollettini/' + str(nuovo))
+        pg.wait_for_selector('.cerniera')
+        ok('bollettino-pdf-prova.pdf' in testo(pg, '.testa') and pg.locator('.pannello canvas[aria-label="Pagina 1 del documento"]').count() == 1
+           and pg.locator('object[type="application/pdf"]').count() == 0,
+           'PDF del bollettino affiancato alla cerniera, disegnato con PDF.js')
+        try:
+            pg.wait_for_function("""() => { const c = document.querySelector('.pannello canvas[aria-label="Pagina 1 del documento"]');
+              return c && c.width > 0 && c.height > 0; }""", timeout=20000)
+            canvas_pieno = True
+        except Exception:
+            canvas_pieno = False
+        ok(risposta.value.status == 200 and canvas_pieno,
+           'il PDF passa da /api/documenti/<arrivo>/file e il canvas ha dimensioni > 0')
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(500)
     ok(pg.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'),
        '768 px: la pagina non scorre di lato (la cerniera sì)')

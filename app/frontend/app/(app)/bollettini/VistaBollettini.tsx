@@ -88,7 +88,7 @@ export function VistaBollettini() {
     vVista.current = vEventi;
     if (!dati) return;
     let vivo = true;
-    void api<Risposta>('bollettini?' + parametri().toString()).then((r) => {
+    void api<Risposta>('bollettini?' + parametri().toString(), undefined, undefined, { automatico: true }).then((r) => {
       if (!vivo || !r.ok) return;
       setDati((d) => (d ? { ...d, conteggi: r.dati.conteggi } : d));
       setInAttesa(JSON.stringify(dati.fornitori) === JSON.stringify(r.dati.fornitori) ? null : r.dati);

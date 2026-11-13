@@ -2,7 +2,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '@prisma/client';
-import { logEvent, logEventSicuro } from '../src/registro';
+import { apriAnomalia, logEvent, logEventSicuro } from '../src/registro';
 
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
@@ -43,4 +43,35 @@ it('dettaglio senza le chiavi del codice, o codice sconosciuto: errore nelle pro
   await expect(logEvent(db, { ...login, dettaglio: { etichetta: 'x' } })).rejects.toThrow('mancano modo');
   await expect(logEvent(db, { ...login, azione: 'inventata' })).rejects.toThrow('codice sconosciuto');
   await expect(logEventSicuro(db, { ...login, azione: 'inventata' })).rejects.toThrow('codice sconosciuto');
+});
+
+it("un evento riuscito con il campo `errore` resta soggetto allo schema (C2)", async () => {
+  await expect(logEvent(db, { tipo: 'crud', azione: 'update', entita: 'prova', esito: 'successo', dettaglio: { etichetta: 'x', errore: 'x' } }))
+    .rejects.toThrow('mancano prima, dopo');
+});
+
+it('in esercizio un dettaglio non valido apre l\'anomalia app.dettaglio_non_valido (A8-03)', async () => {
+  const prima = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  try {
+    await inTransazione(async (tx) => {
+      await logEvent(tx, { ...login, dettaglio: { etichetta: 'x' } });
+      const an = await tx.registro.findFirst({ where: { genere: 'anomalia', codice: 'app.dettaglio_non_valido' } });
+      expect(an).not.toBeNull();
+    });
+  } finally {
+    process.env.NODE_ENV = prima;
+  }
+});
+
+it('apriAnomalia atomica: due aperture insieme fanno una riga con volte = 2 (A3-09)', async () => {
+  const a = { servizio: 'lettura', codice: 'lettura.fallita', chiave: 'conflitto-a3-09', messaggio: 'prova', dettaglio: { documento_id: '1', errore: 'x' } };
+  try {
+    await Promise.all([apriAnomalia(db, a), apriAnomalia(db, a)]);
+    const righe = await db.registro.findMany({ where: { genere: 'anomalia', codice: 'lettura.fallita', chiave: 'conflitto-a3-09' } });
+    expect(righe).toHaveLength(1);
+    expect(righe[0].volte).toBe(2);
+  } finally {
+    await db.registro.deleteMany({ where: { genere: 'anomalia', codice: 'lettura.fallita', chiave: 'conflitto-a3-09' } });
+  }
 });

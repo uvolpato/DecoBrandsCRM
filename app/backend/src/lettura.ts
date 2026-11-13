@@ -2,10 +2,10 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { Prisma } from '@prisma/client';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { prelevaDocumento, letturaFallita } from './documenti';
+import { letturaFallita, letturaNonRaggiungibile, prelevaDocumento } from './documenti';
 import { letturaConfig } from './impostazioni';
 import { pulisci } from './integra';
-import { leggiDocumento, type Lettura } from './lettore';
+import { leggiDocumento, LetturaFallita, type Lettura } from './lettore';
 import { TIPI_DOCUMENTO } from './motore/dati';
 import { PrismaService } from './prisma.service';
 import { risolviFornitore, valutaLettura, type Soglie } from './proposta';
@@ -149,7 +149,15 @@ export async function leggiDallaCoda(db: PrismaService, config: Config | null, l
     const errore = pulisci(e);
     misure.secondi = Math.round((Date.now() - inizio) / 100) / 10;
     log.warn(`documento ${d.id} non letto: ${errore}`);
-    await letturaFallita(db, d.id, errore);
+    // A4-01/C1: un errore del servizio (chiave scaduta, crediti finiti, rete giù, timeout, 5xx) non è
+    // colpa del documento: non consuma il tentativo e apre un'anomalia sola, altrimenti un solo giro
+    // sbagliato brucerebbe i 3 tentativi di ogni file in coda. Il tentativo si consuma solo per un
+    // errore del documento (risposta valida ma illeggibile, oppure 4xx sul file).
+    if (e instanceof LetturaFallita && e.servizio) {
+      await letturaNonRaggiungibile(db, d.id, errore);
+    } else {
+      await letturaFallita(db, d.id, errore);
+    }
     await db.servizi_esecuzioni.update({
       where: { id: esecuzione.id },
       data: { fine: new Date(), esito: 'errore', testo: 'Lettura non riuscita', misure: misure as unknown as Prisma.InputJsonValue },

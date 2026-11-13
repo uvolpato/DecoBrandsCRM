@@ -5,8 +5,11 @@ import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
-import { CasellaService, giroCasella, type ApriCasella, type ConfigCasella, type MessaggioEmail } from '../src/casella';
+import { CasellaService, giroCasella, leggiMessaggi, opzioniImap, type ApriCasella, type ConfigCasella, type MessaggioEmail } from '../src/casella';
+import type { ImapFlow } from 'imapflow';
 import { cifra } from '../src/segreto';
+import { MAX_BYTE } from '../src/documenti';
+import * as documenti from '../src/documenti';
 import { PrismaService } from '../src/prisma.service';
 import { svuota } from './svuota';
 
@@ -23,6 +26,38 @@ const pdf = (testo: string) => Buffer.from(`%PDF-1.4\n% ${testo}\n%%EOF\n`);
 const excel = () => Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]); // firma zip (xlsx/xlsm)
 const msg = (uid: number, oggetto: string, da: string, allegati: { nome: string; dati: Buffer }[]): MessaggioEmail =>
   ({ uid, da, oggetto, allegati });
+
+// una email MIME minima con un allegato, per provare leggiMessaggi senza rete né file grossi (A4-12)
+const emailMime = (nome: string, dati: Buffer): Buffer => {
+  const corpo = [
+    'MIME-Version: 1.0',
+    'From: <fornitore@x.it>',
+    'Subject: Fattura',
+    'Content-Type: multipart/mixed; boundary="bnd"',
+    '',
+    '--bnd',
+    `Content-Type: application/pdf; name="${nome}"`,
+    `Content-Disposition: attachment; filename="${nome}"`,
+    'Content-Transfer-Encoding: base64',
+    '',
+    dati.toString('base64'),
+    '--bnd--',
+    '',
+  ].join('\r\n');
+  return Buffer.from(corpo, 'utf-8');
+};
+
+const raccogli = async (it: AsyncIterable<MessaggioEmail>): Promise<MessaggioEmail[]> => {
+  const out: MessaggioEmail[] = [];
+  for await (const m of it) out.push(m);
+  return out;
+};
+
+// client imapflow finto: solo fetch (uid+dimensione) e fetchOne (source), quel che usa leggiMessaggi
+const clientFinto = (righe: { uid: number; size?: number }[], fonte: (uid: number) => Buffer | null): unknown => ({
+  fetch: () => (async function* () { for (const r of righe) yield r; })(),
+  fetchOne: async (uid: string) => { const s = fonte(Number(uid)); return s ? { source: s } : false; },
+});
 
 function apriFinto(messaggi: MessaggioEmail[]) {
   const sposta = jest.fn(async () => undefined);
@@ -104,6 +139,36 @@ describe('F6-A1 un giro della casella', () => {
     expect(sposta).toHaveBeenCalledTimes(2); // anche l'email troppo grande va spostata
   });
 
+  it('email illeggibile in mezzo alle altre: le buone entrano, lei resta e apre casella.allegato (A4-05)', async () => {
+    const { apri, sposta } = apriFinto([
+      msg(1, 'Fattura', 'a@x.it', [{ nome: 'a.pdf', dati: pdf('a') }]),
+      { uid: 2, da: '', oggetto: '', allegati: [], errore: 'MIME non valido' },
+      msg(3, 'Fattura', 'b@x.it', [{ nome: 'b.pdf', dati: pdf('b') }]),
+    ]);
+    const r = await giroCasella(db, config, apri, ora);
+    expect(r).toMatchObject({ email: 3, presi: 2, ignorati: 1, esito: 'attenzione' });
+    expect(await db.documenti_in_arrivo.count()).toBe(2);
+    expect(await anomalia('casella.allegato', 'aperta')).toBe(1);
+    expect(sposta).toHaveBeenCalledTimes(2); // la seconda non si sposta
+    expect(sposta).toHaveBeenCalledWith(1);
+    expect(sposta).toHaveBeenCalledWith(3);
+  });
+
+  it('errore interno del server su un allegato: casella.interno, non si sposta, si va avanti (C1)', async () => {
+    const spia = jest.spyOn(documenti, 'riceviDocumento').mockRejectedValueOnce(new Error('database giù'));
+    const { apri, sposta } = apriFinto([
+      msg(1, 'Fattura', 'a@x.it', [{ nome: 'a.pdf', dati: pdf('a') }]),
+      msg(2, 'Fattura', 'b@x.it', [{ nome: 'b.pdf', dati: pdf('b') }]),
+    ]);
+    const r = await giroCasella(db, config, apri, ora);
+    expect(r).toMatchObject({ email: 2, presi: 1, ignorati: 1, esito: 'attenzione' });
+    expect(await anomalia('casella.interno', 'aperta')).toBe(1);
+    expect(await anomalia('casella.allegato', 'aperta')).toBe(0);
+    expect(sposta).toHaveBeenCalledTimes(1); // la prima non si sposta
+    expect(sposta).toHaveBeenCalledWith(2);
+    spia.mockRestore();
+  });
+
   it('connessione fallita 3 volte: casella.connessione aperta; al primo giro riuscito si chiude', async () => {
     const apriKo: ApriCasella = async () => { throw new Error('ECONNREFUSED'); };
     for (let i = 0; i < 3; i++) {
@@ -121,6 +186,32 @@ describe('F6-A1 un giro della casella', () => {
     expect((await giroCasella(db, config, apriKo, ora)).esito).toBe('errore');
     expect(await anomalia('casella.cartella', 'aperta')).toBe(1);
     expect(await anomalia('casella.connessione')).toBe(0);
+  });
+});
+
+describe('F6-A1 opzioni imapflow e soglia dell\'email', () => {
+  it('porta 993: TLS diretto, nessuno STARTTLS; altra porta: STARTTLS obbligatorio (A4-04)', () => {
+    const su993 = opzioniImap(config);
+    expect(su993.secure).toBe(true);
+    expect(su993.doSTARTTLS).toBeUndefined();
+    const su143 = opzioniImap({ ...config, porta: 143 });
+    expect(su143.secure).toBe(false);
+    expect(su143.doSTARTTLS).toBe(true);
+  });
+
+  it('email sopra MAX_BYTE ma sotto la nuova soglia si scarica e l\'allegato entra (A4-12)', async () => {
+    const fonte = emailMime('fattura.pdf', pdf('fattura'));
+    const client = clientFinto([{ uid: 1, size: MAX_BYTE * 2 }], (uid) => (uid === 1 ? fonte : null)) as unknown as ImapFlow;
+    const [m] = await raccogli(leggiMessaggi(client));
+    expect(m.troppoGrande).toBeUndefined();
+    expect(m.allegati.map((a) => a.nome)).toEqual(['fattura.pdf']);
+  });
+
+  it('email oltre la soglia: troppoGrande, non si scarica (A4-12)', async () => {
+    const soglia = Math.ceil(MAX_BYTE * 1.4) * 3;
+    const client = clientFinto([{ uid: 1, size: soglia + 1 }], () => null) as unknown as ImapFlow;
+    const [m] = await raccogli(leggiMessaggi(client));
+    expect(m.troppoGrande).toBe(soglia + 1);
   });
 });
 

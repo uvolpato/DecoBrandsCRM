@@ -123,7 +123,7 @@ function giornoDa(d: string) {
 }
 
 /** D-51 §19: un cambio vale da una data in poi e la data non cade in un periodo chiuso; 409 altrimenti. */
-async function dopoChiusura(tx: Db, fid: bigint, data: string, testo: (chiusura: string) => string) {
+export async function dopoChiusura(tx: Db, fid: bigint, data: string, testo: (chiusura: string) => string) {
   const c = await ultimaChiusura(tx, fid);
   if (c && data <= c) throw new ConflictException(testo(c));
 }

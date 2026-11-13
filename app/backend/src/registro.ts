@@ -66,6 +66,8 @@ export const SCHEMI: Record<string, string[]> = {
   'casella.allegato': ['nome', 'errore'],
   'casella.vuota': ['oggetto'],
   'lettura.fallita': ['documento_id', 'errore'],
+  // registro stesso (§15.4): un dettaglio che non rispetta lo schema del codice
+  'app.dettaglio_non_valido': [],
 };
 
 /** Anomalia del registro (§4.2.11, D-31): una per chiave finché resta aperta; si ripete e si chiude. */
@@ -80,23 +82,27 @@ export interface Anomalia {
 
 const log = new Logger('Registro');
 
-function controlla(codice: string, dettaglio: Record<string, unknown>) {
+/** Controlla che il dettaglio rispetti lo schema del codice (§15.4, D-31) e restituisce l'errore
+ *  (undefined se valido). Un esito `errore` porta `errore` al posto delle chiavi del successo (§15.2.7). */
+function controlla(codice: string, esito: Evento['esito'], dettaglio: Record<string, unknown>): string | undefined {
   const chiavi = SCHEMI[codice];
-  const mancano = chiavi && ['etichetta', ...chiavi].filter((k) => dettaglio[k] === undefined);
-  if (mancano && !mancano.length) return;
-  const errore = `registro: dettaglio non valido per ${codice}` + (mancano ? `: mancano ${mancano.join(', ')}` : ' (codice sconosciuto)');
-  // nelle prove si ferma subito; in esercizio la riga si scrive lo stesso (§15.4)
-  // ponytail: in esercizio solo il log del processo; l'anomalia app.dettaglio_non_valido arriva con apriAnomalia (§7.14.4)
-  if (process.env.NODE_ENV === 'test') throw new Error(errore);
-  log.warn(errore);
+  if (chiavi === undefined) return `registro: dettaglio non valido per ${codice} (codice sconosciuto)`;
+  // il campo `errore` prende il posto delle chiavi del successo solo per un esito non riuscito
+  // (errore o rifiuto): un successo con `errore` nel dettaglio resta soggetto allo schema (C2).
+  const erroreAlPosto = esito !== 'successo' && dettaglio.errore !== undefined && !chiavi.includes('errore');
+  const richieste = erroreAlPosto ? ['etichetta'] : ['etichetta', ...chiavi];
+  const mancano = richieste.filter((k) => dettaglio[k] === undefined);
+  if (!mancano.length) return;
+  return `registro: dettaglio non valido per ${codice}: mancano ${mancano.join(', ')}`;
 }
 
 /** Scrive un evento. Dentro un'operazione: `logEvent(tx, …)`, stessa transazione (§15.3, V13). */
 export async function logEvent(db: Db, e: Evento, ctx: Contesto = {}) {
   const codice = `${e.tipo}.${e.azione}`;
-  controlla(codice, e.dettaglio);
+  const errore = controlla(codice, e.esito, e.dettaglio);
+  if (errore && process.env.NODE_ENV === 'test') throw new Error(errore); // nelle prove si ferma subito (§15.4)
   const conIp = e.tipo === 'auth' || e.esito === 'negato'; // solo l'IP qui (§15.1); la sessione non si salva più
-  return db.registro.create({
+  const riga = await db.registro.create({
     data: {
       genere: 'evento',
       livello: e.esito === 'successo' ? 'info' : e.esito === 'negato' ? 'attenzione' : 'errore',
@@ -113,6 +119,11 @@ export async function logEvent(db: Db, e: Evento, ctx: Contesto = {}) {
       ip: conIp ? ctx.ip : null,
     },
   });
+  if (errore) {
+    // in esercizio la riga si scrive lo stesso e si apre l'anomalia (§15.4, A8-03)
+    await apriAnomalia(db, { servizio: 'app', codice: 'app.dettaglio_non_valido', chiave: codice, messaggio: errore });
+  }
+  return riga;
 }
 
 /** Per gli eventi senza transazione (accesso, negato, errori): il log non fa mai fallire l'operazione (§15.3). */
@@ -128,23 +139,15 @@ export async function logEventSicuro(db: Db, e: Evento, ctx: Contesto = {}) {
 /** Apre (o ripete) un'anomalia. Resta una sola riga aperta per servizio/codice/chiave. */
 export async function apriAnomalia(db: Db, a: Anomalia, ora = new Date()) {
   const chiave = a.chiave ?? '';
-  const aperta = await db.registro.findFirst({
-    where: { genere: 'anomalia', servizio: a.servizio, codice: a.codice, chiave, stato: 'aperta' },
-  });
-  const dettaglio = (a.dettaglio ?? {}) as Prisma.InputJsonValue;
-  if (aperta) {
-    await db.registro.update({
-      where: { id: aperta.id },
-      data: { volte: { increment: 1 }, ultimo: ora, messaggio: a.messaggio, dettaglio },
-    });
-    return;
-  }
-  await db.registro.create({
-    data: {
-      genere: 'anomalia', livello: a.livello ?? 'errore', codice: a.codice, servizio: a.servizio,
-      chiave, messaggio: a.messaggio, dettaglio, stato: 'aperta', ultimo: ora,
-    },
-  });
+  const livello = a.livello ?? 'errore';
+  const dettaglio = JSON.stringify(a.dettaglio ?? {});
+  // un solo INSERT … ON CONFLICT: due aperture insieme non si rompono a vicenda (A3-09, D-31)
+  await db.$executeRaw`
+    INSERT INTO registro (genere, livello, codice, servizio, chiave, messaggio, dettaglio, stato, ultimo)
+    VALUES ('anomalia', ${livello}, ${a.codice}, ${a.servizio}, ${chiave}, ${a.messaggio}, ${dettaglio}::jsonb, 'aperta', ${ora})
+    ON CONFLICT ((COALESCE(servizio, '')), codice, (COALESCE(chiave, ''))) WHERE genere = 'anomalia' AND stato = 'aperta'
+    DO UPDATE SET volte = registro.volte + 1, ultimo = EXCLUDED.ultimo, messaggio = EXCLUDED.messaggio, dettaglio = EXCLUDED.dettaglio
+  `;
 }
 
 /** Chiude l'anomalia aperta (se c'è) quando il problema sparisce. */

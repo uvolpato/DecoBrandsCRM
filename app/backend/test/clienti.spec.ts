@@ -5,6 +5,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { ClientiController } from '../src/clienti';
 import { configura } from '../src/main';
+import { ultimaChiusura } from '../src/motore/dati';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
 import { svuota } from './svuota';
@@ -466,5 +467,66 @@ describe('agenzie CRUD', () => {
     }).expect(201);
     const id = r.body.id;
     await a.del('/clienti/' + clienteId + '/agenzie/' + id).expect(204);
+  });
+});
+
+describe('agenzia nel periodo chiuso (D-114)', () => {
+  let clienteChiuso = '';
+  let fornitoreChiuso = '';
+  let chiusura = '';
+  let agenziaChiusaId = '';
+
+  const giornoDopo = (d: string) => {
+    const dt = new Date(d + 'T00:00:00Z');
+    dt.setUTCDate(dt.getUTCDate() + 1);
+    return dt.toISOString().slice(0, 10);
+  };
+
+  beforeAll(async () => {
+    const chiuso = await db.bollettini_testata.findFirst({ where: { chiuso_il: { not: null } }, orderBy: { chiuso_il: 'desc' } });
+    if (!chiuso) throw new Error('seed senza bollettini chiusi');
+    fornitoreChiuso = String(chiuso.fornitore_id);
+    chiusura = (await ultimaChiusura(db, chiuso.fornitore_id))!;
+    const c = await db.clienti.create({ data: {} });
+    clienteChiuso = String(c.id);
+    // agenzia nata prima della chiusura, scritta direttamente in banca dati (via API sarebbe 409)
+    const ag = await db.interscambio.create({
+      data: { cliente_id: c.id, subagente_id: BigInt(subagenteId), fornitore_id: chiuso.fornitore_id, sconto: 5, valido_dal: new Date('2026-01-01') },
+    });
+    agenziaChiusaId = String(ag.id);
+    creati.push(ag.id);
+  });
+
+  it('modifica di un campo che sposta i soldi nel periodo chiuso: 409', async () => {
+    const a = await entra('ammi-cli');
+    const e = await a.put('/clienti/' + clienteChiuso + '/agenzie/' + agenziaChiusaId, { sconto: 10 }).expect(409);
+    expect(e.body.message).toContain('chiudi l\'agenzia');
+  });
+
+  it('eliminazione nel periodo chiuso: 409', async () => {
+    const a = await entra('ammi-cli');
+    const e = await a.del('/clienti/' + clienteChiuso + '/agenzie/' + agenziaChiusaId).expect(409);
+    expect(e.body.message).toContain('chiudi l\'agenzia');
+  });
+
+  it('chiusura (valido_al): nel periodo chiuso 409, dopo la chiusura 200', async () => {
+    const a = await entra('ammi-cli');
+    const url = '/clienti/' + clienteChiuso + '/agenzie/' + agenziaChiusaId;
+    // la fine non può cadere entro la chiusura (D-114)
+    const e = await a.put(url, { valido_al: chiusura }).expect(409);
+    expect(e.body.message).toContain('smettere di valere');
+    const m = await a.put(url, { valido_al: giornoDopo(chiusura) }).expect(200);
+    expect(m.body.valido_al).toBe(giornoDopo(chiusura));
+  });
+
+  it('nuova agenzia nel periodo chiuso: 409; da dopo la chiusura: 201', async () => {
+    const a = await entra('ammi-cli');
+    await a.post('/clienti/' + clienteChiuso + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreChiuso), sconto: 4, valido_dal: '2026-01-01',
+    }).expect(409);
+    const r = await a.post('/clienti/' + clienteChiuso + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreChiuso), sconto: 4, valido_dal: giornoDopo(chiusura),
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
   });
 });

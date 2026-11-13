@@ -55,8 +55,6 @@ interface Dettaglio {
   agenzie: Agenzia[];
 }
 
-let schedaCliente = 'agenzie';
-
 export function VistaClienti({ idSel }: { idSel?: string }) {
   const io = useUtente();
   const puo = usePuo();
@@ -183,7 +181,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
 
   if (!clienti) return pagina(errore
     ? <Pannello><div className="vuoto"><b>Clienti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
-    : sagome && <SagomaElenco filtri={filtri} larghezze="minmax(0,1.1fr) minmax(0,1fr)" />);
+    : sagome && <SagomaElenco classe="clienti-filtri" filtri={<>{filtri}<CercaInIntegra tipo="cliente" onImportato={async (id) => { await carica(); router.push('/clienti/' + id); }} /></>} larghezze="minmax(0,1.1fr) minmax(0,1fr)" />);
 
   const azioni: Azione[] = [];
 
@@ -210,7 +208,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
               { etichetta: 'Codice Integra', valore: u.codice_integra ?? '—' },
             ]} />
             <Nota>Anagrafica da Integra (sola lettura).</Nota>
-            <Schede riempi attiva={schedaCliente} onCambia={(id) => { schedaCliente = id; }} memoria="clienti" schede={[
+            <Schede riempi memoria="clienti" schede={[
               {
                 id: 'agenzie', etichetta: 'Agenzie', contenuto: () => (
                   <div className="pila riempi">

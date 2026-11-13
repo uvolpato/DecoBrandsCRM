@@ -80,10 +80,12 @@ describe('F5-A1 pagina Oggi', () => {
     const riquadro = (id: string) => r.riquadri.find((x) => x.id === id)!;
 
     expect(gruppo('conferme').conta).toBe(conf.length);
-    expect(gruppo('bollettini').conta).toBe(bol.length);
+    // A4-02: la finestra sono gli ultimi 12 mesi più quello in corso, non solo l'anno. Il seed ha
+    // documenti dal 2025-09 e bollettini solo dal 2026-05: 3 aperti + 9 non arrivati (8 del 2025, giugno 2026).
+    expect(gruppo('bollettini').conta).toBe(3 + 9);
     expect(gruppo('pagamenti').conta).toBe(pag.length);
     expect(riquadro('conferme').valore).toBe(String(conf.length));
-    expect(riquadro('bollettini').valore).toBe(String(bol.length));
+    expect(riquadro('bollettini').valore).toBe(String(3 + 9));
     expect(riquadro('pagamenti').valore).toBe(String(pag.length));
     // il gruppo Documenti ora è disponibile (F6, D-75): 15 documenti in coda dal seed
     expect(riquadro('documenti').disponibile).toBe(true);
@@ -99,9 +101,13 @@ describe('F5-A1 pagina Oggi', () => {
     const daSollecitare = pagamentiDaSollecitare(S);
     expect(gruppo('pagamenti').conta).toBe(daSollecitare.length);
     for (const p of daSollecitare) expect(gruppo('pagamenti').voci.map((v) => v.titolo).join('|')).toContain(p.numero);
-    // bollettini: 3 aperti e 1 non arrivato
-    expect(gruppo('bollettini').voci.filter((v) => v.azione === 'Vedi')).toHaveLength(1);
-    expect(gruppo('bollettini').voci.filter((v) => v.azione === 'Vedi')[0].titolo).toContain('giugno');
+    // bollettini: gli aperti sono quelli del prototipo; i non arrivati seguono la finestra di A4-02
+    expect(gruppo('bollettini').voci.filter((v) => v.azione !== 'Vedi').length)
+      .toBe(bol.filter((x: any) => x.tipo !== 'mancante').length);
+    const vedi = gruppo('bollettini').voci.filter((v) => v.azione === 'Vedi');
+    expect(vedi).toHaveLength(9);
+    expect(vedi.map((v) => v.titolo).join('|')).toContain('giugno 2026');
+    expect(vedi.map((v) => v.titolo).join('|')).toContain('dicembre 2025');
   });
 
   it('i numeri del menu sono gli stessi del prototipo (Oggi, Documenti, Pratiche, Bollettini)', async () => {
@@ -109,9 +115,10 @@ describe('F5-A1 pagina Oggi', () => {
     const fare = M.daFare();
     const S = await caricaDati(db, OGGI);
     const r = await conteggiBarra(db, S);
-    expect(r.oggi).toBe(fare.length);
+    // 8 in più del prototipo: i mesi del 2025 senza bollettino che entrano nella finestra di A4-02
+    expect(r.oggi).toBe(fare.length + 8);
     expect(r.pratiche).toBe(M.S.pratiche.filter((p: any) => M.statoPratica(p).chiave === 'scaduta').length);
-    expect(r.bollettini).toBe(fare.filter((x: any) => x.gruppo === 'bollettini').length);
+    expect(r.bollettini).toBe(fare.filter((x: any) => x.gruppo === 'bollettini').length + 8);
     expect(r.documenti).toBe(15); // i documenti in arrivo del seed, tutti da controllare
     const api = (await op.get('/api/oggi/conteggi').expect(200)).body;
     expect(Object.keys(api).sort()).toEqual(['bollettini', 'documenti', 'oggi', 'pratiche']);
@@ -237,5 +244,33 @@ describe('F5-A1 pagina Oggi', () => {
     })();
     await le.agente.post('/api/solleciti/conferme').set('x-csrf-token', le.csrf)
       .send({ fornitore_id: Number(f.fornitore_id) }).expect(403);
+  });
+});
+
+describe('A4-02: bollettini dell\'anno prima', () => {
+  it('a gennaio il bollettino di dicembre dell\'anno prima non arrivato si sollecita', async () => {
+    const cliente = await db.clienti.findFirstOrThrow({ where: { attivo: true, versione_corrente_id: { not: null } } });
+    const f = await db.fornitori.create({ data: { giorno_bollettino: 15 } });
+    const fv = await db.fornitori_versioni.create({
+      data: { fornitore_id: f.id, fonte: 'crm', ragione_sociale: 'Fornitore Dicembre' },
+    });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: fv.id } });
+    const t = await db.ordini_fornitore_testata.create({
+      data: {
+        fornitore_id: f.id, fornitore_versione_id: fv.id, numero_ordine: 'OF/2026/990',
+        data_ordine: new Date('2026-12-01'), cliente_id: cliente.id, cliente_versione_id: cliente.versione_corrente_id!,
+      },
+    });
+    await db.ordini_fornitore_documenti.create({
+      data: { testata_id: t.id, tipo: 'fattura', numero: 'FT/2026/990', data: new Date('2026-12-10'), importo: 1000 },
+    });
+
+    const S = await caricaDati(db, '2027-01-20');
+    const r = await calcolaOggi(db, S);
+    const bollettini = r.gruppi.find((g) => g.id === 'bollettini')!;
+    const voce = bollettini.voci.find((v) => v.titolo === 'Sollecita il bollettino di dicembre 2026 di Fornitore Dicembre');
+    expect(voce).toBeTruthy();
+    expect(voce!.azione).toBe('Vedi');
+    expect((await conteggiBarra(db, S)).bollettini).toBeGreaterThan(0);
   });
 });

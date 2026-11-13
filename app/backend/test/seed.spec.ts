@@ -46,6 +46,11 @@ describe('seed §12', () => {
     expect(await db.registro.count({ where: { genere: 'evento', codice: 'errore.error' } })).toBe(1);
   });
 
+  it('documento con fornitore non riconosciuto: livello da controllare, mai «affidabile» (A6-18)', async () => {
+    const d = await db.documenti_in_arrivo.findFirstOrThrow({ where: { file_nome: 'ordine_OF-2026-064.pdf' }, select: { livello: true } });
+    expect(d.livello).toBe('da_controllare');
+  });
+
   it('anagrafica a soggetti: un soggetto per ruolo, MCL con due ruoli (D-101, D-102)', async () => {
     expect(await db.soggetti.count()).toBe(28); // 12 fornitori + 13 clienti − MCL condivisa + 4 subagenti persone
     expect(await db.sedi.count()).toBe(8); // MCL 4, Consorzio 4

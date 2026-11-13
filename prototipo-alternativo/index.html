@@ -10,8 +10,15 @@
 <body>
   <!-- D-42: sulle pagine di accesso la pagina nasce già scura, senza lampo di barra e area chiara al ricaricamento -->
   <script>if (/^#\/accesso/.test(location.hash)) document.body.classList.add('in-accesso');</script>
-  <aside class="barra" id="barra"></aside>
-  <main class="principale" id="principale"></main>
+  <!-- V6, §16.6, D-44, D-127: sotto i 744 px l'app si ferma a monte, accesso compreso -->
+  <div class="schermo-stretto">
+    <img src="assets/logo-decobrands.png" alt="Decobrands">
+    <p>Il Sistema Informativo Aziendale si usa da computer o tablet. Apri questa pagina da uno schermo più grande, o allarga la finestra.</p>
+  </div>
+  <div class="app-tutta">
+    <aside class="barra" id="barra"></aside>
+    <main class="principale" id="principale"></main>
+  </div>
 
   <script src="assets/dati.js"></script>
   <script src="assets/dati-soggetti.js"></script>

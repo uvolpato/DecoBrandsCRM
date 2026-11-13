@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, OnModuleDestroy, OnModuleInit, PayloadTooLargeException, UnsupportedMediaTypeException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { ImapFlow } from 'imapflow';
+import { ImapFlow, type ImapFlowOptions } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { riceviDocumento, MAX_BYTE } from './documenti';
 import { pulisci } from './integra';
@@ -32,6 +32,7 @@ export interface MessaggioEmail {
   oggetto: string;
   allegati: AllegatoEmail[]; // solo allegati veri, non immagini incorporate
   troppoGrande?: number; // dimensione oltre DOCUMENTI_MAX_MB: non scaricata, solo l'anomalia
+  errore?: string; // email illeggibile (parse MIME fallito): solo l'anomalia, non si sposta (A4-05)
 }
 export interface CasellaAperta {
   messaggi: AsyncIterable<MessaggioEmail>;
@@ -53,6 +54,8 @@ const TESTO = {
   cartella: (nome: string) => `La cartella ${nome} non esiste nella casella: crearla o correggere il nome in Impostazioni → Casella.`,
   allegato: (nome: string) => `L'allegato ${nome} non è un PDF né una foto (JPEG, PNG): si scarta; aprire l'email e caricare il documento a mano da Documenti.`,
   troppoGrande: 'Un\'email della casella supera il limite dei documenti: non si scarica; aprire l\'email e caricare il documento a mano da Documenti.',
+  illeggibile: 'Un\'email della casella non si è potuta leggere: resta nella cartella dei fornitori; aprire l\'email e caricare il documento a mano da Documenti.',
+  interno: 'Un\'email non si è potuta registrare per un errore del server: riprova; se si ripete, avvisa l\'assistenza.',
   vuota: 'Un\'email della casella dei fornitori è arrivata senza allegati: verificare se il documento era nel corpo dell\'email.',
 };
 
@@ -67,19 +70,29 @@ class ErroreCartella extends Error {
 /** I messaggi della cartella, letti uno alla volta e già trasformati in MessaggioEmail. Prima si
  *  legge solo uid e dimensione (niente corpo), poi si scarica (fetchOne) solo l'email sotto il
  *  limite: un allegato enorme da un mittente qualsiasi non finisce in memoria. */
-async function* leggiMessaggi(client: ImapFlow): AsyncIterable<MessaggioEmail> {
+// Soglia dell'email intera in byte: MAX_BYTE copre un allegato, ×1.4 la codifica base64 (+37 %),
+// ×3 più allegati in una sola email (A4-12); il limite del singolo file resta in riceviDocumento.
+const SOGLIA_EMAIL = Math.ceil(MAX_BYTE * 1.4) * 3;
+export async function* leggiMessaggi(client: ImapFlow): AsyncIterable<MessaggioEmail> {
   const elenco: { uid: number; size?: number }[] = [];
   for await (const m of client.fetch('1:*', { uid: true, size: true })) {
     elenco.push({ uid: m.uid, size: m.size });
   }
   for (const m of elenco) {
-    if ((m.size ?? 0) > MAX_BYTE) {
+    if ((m.size ?? 0) > SOGLIA_EMAIL) {
       yield { uid: m.uid, da: '', oggetto: '', allegati: [], troppoGrande: m.size ?? 0 };
       continue;
     }
     const msg = await client.fetchOne(String(m.uid), { source: true }, { uid: true });
     if (!msg || !msg.source) continue;
-    const parsed = await simpleParser(msg.source);
+    let parsed: Awaited<ReturnType<typeof simpleParser>>;
+    try {
+      parsed = await simpleParser(msg.source);
+    } catch (e) {
+      // email illeggibile (parse MIME fallito): non blocca le altre (A4-05), il giro la segnala e non la sposta
+      yield { uid: m.uid, da: '', oggetto: '', allegati: [], errore: pulisci(e) };
+      continue;
+    }
     const allegati: AllegatoEmail[] = [];
     for (const a of parsed.attachments ?? []) {
       if (!a.filename || a.cid || a.related) continue; // le immagini incorporate nei loghi non sono documenti
@@ -99,11 +112,19 @@ async function* leggiMessaggi(client: ImapFlow): AsyncIterable<MessaggioEmail> {
  *  shortcut: si leggono prima solo uid e dimensione e si scarica (fetchOne) solo l'email sotto il
  *  limite; l'email sotto soglia sta comunque tutta in memoria (`source`), per il download del
  *  singolo allegato si passerà a `bodyStructure`. */
-export async function apriImap(config: ConfigCasella): Promise<CasellaAperta> {
-  const client = new ImapFlow({
+/** Opzioni per imapflow (A4-04, D-66): sulla porta 993 la connessione è già TLS (`secure`); sulle
+ *  altre lo STARTTLS è obbligatorio (`doSTARTTLS: true`), così la password non viaggia mai in
+ *  chiaro: se il server non offre STARTTLS si fallisce invece di fare `LOGIN` in chiaro. */
+export function opzioniImap(config: ConfigCasella): ImapFlowOptions {
+  return {
     host: config.server, port: config.porta, secure: config.porta === 993,
+    doSTARTTLS: config.porta === 993 ? undefined : true,
     auth: { user: config.utente, pass: config.password }, logger: false,
-  });
+  };
+}
+
+export async function apriImap(config: ConfigCasella): Promise<CasellaAperta> {
+  const client = new ImapFlow(opzioniImap(config));
   let lock: { release(): void } | null = null;
   let chiuso = false;
   const chiudi = async () => {
@@ -146,6 +167,17 @@ async function controllaConnessione(db: PrismaService, ora: Date) {
   }
 }
 
+/** Apre un'anomalia della casella per un'email o un allegato (dettaglio nome+errore, §7.14.3): un aiuto
+ *  solo per le cause con codice e messaggio diversi (illeggibile, allegato scartato, errore interno). */
+async function apriAnomaliaCasella(
+  db: PrismaService, codice: string, chiave: string, messaggio: string, errore: string, ora: Date,
+): Promise<void> {
+  await apriAnomalia(db, {
+    servizio: 'casella', codice, chiave, livello: 'attenzione',
+    messaggio, dettaglio: { nome: chiave, errore },
+  }, ora);
+}
+
 /** Un giro: apre la casella, scorre i messaggi uno alla volta e sposta ogni email lavorata (§6.5 punti 1–2).
  *  I doppioni (ConflictException) contano fra gli ignorati, senza errore; Excel/.msg e file oltre il
  *  limite aprono `casella.allegato`; un'email senza allegati apre `casella.vuota`. Ritorna l'esito, non lancia. */
@@ -174,14 +206,19 @@ export async function giroCasella(db: PrismaService, config: ConfigCasella, apri
         // email oltre il limite: non scaricata, resta solo l'anomalia casella.allegato e si sposta
         if (msg.troppoGrande) {
           esito = 'attenzione';
-          await apriAnomalia(db, {
-            servizio: 'casella', codice: 'casella.allegato', chiave: String(msg.uid), livello: 'attenzione',
-            messaggio: TESTO.troppoGrande, dettaglio: { nome: String(msg.uid), errore: `dimensione ${msg.troppoGrande} byte` },
-          }, ora);
+          await apriAnomaliaCasella(db, 'casella.allegato', String(msg.uid), TESTO.troppoGrande, `dimensione ${msg.troppoGrande} byte`, ora);
           await casella.sposta(msg.uid).catch((e) => log.warn(`email ${msg.uid} non spostata: ${pulisci(e)}`));
           continue;
         }
+        // email illeggibile (parse MIME fallito nel generatore): si segnala e non si sposta, si va avanti (A4-05)
+        if (msg.errore) {
+          ignorati++;
+          esito = 'attenzione';
+          await apriAnomaliaCasella(db, 'casella.allegato', String(msg.uid), TESTO.illeggibile, msg.errore, ora);
+          continue; // resta in cartella: al giro dopo si riprova e si ripete l'anomalia finché non interviene una persona
+        }
         let vuota = msg.allegati.length === 0;
+        let guasto = false;
         for (const a of msg.allegati) {
           try {
             await riceviDocumento(db, { nome: a.nome, dati: a.dati, origine: 'email', email_da: msg.da, email_oggetto: msg.oggetto }, {});
@@ -192,15 +229,19 @@ export async function giroCasella(db: PrismaService, config: ConfigCasella, apri
             } else if (e instanceof UnsupportedMediaTypeException || e instanceof PayloadTooLargeException) {
               ignorati++;
               esito = 'attenzione';
-              await apriAnomalia(db, {
-                servizio: 'casella', codice: 'casella.allegato', chiave: a.nome, livello: 'attenzione',
-                messaggio: TESTO.allegato(a.nome), dettaglio: { nome: a.nome, errore: pulisci(e) },
-              }, ora);
+              await apriAnomaliaCasella(db, 'casella.allegato', a.nome, TESTO.allegato(a.nome), pulisci(e), ora);
             } else {
-              throw e; // errore nostro: non è né un doppione né un allegato scartabile
+              // errore nostro su questa email (es. database): non è un doppione né un allegato scartabile,
+              // si segnala e non si sposta, si va avanti (A4-05)
+              ignorati++;
+              esito = 'attenzione';
+              await apriAnomaliaCasella(db, 'casella.interno', String(msg.uid), TESTO.interno, pulisci(e), ora);
+              guasto = true;
+              break; // smette di lavorare gli allegati di questa email
             }
           }
         }
+        if (guasto) continue; // niente spostamento: si riprova al giro dopo
         // un'email con allegati tutti ignorati non è vuota: resta solo casella.allegato
         if (vuota) {
           esito = 'attenzione';

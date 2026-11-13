@@ -95,19 +95,27 @@ export class IncassiController {
   @Richiede('provvigioni.modifica')
   async registra(@Req() req: Request, @Body() b: RegistraSollecito) {
     const ctx = contesto(req);
+    // ponytail: 30 s perché caricaDati legge tutto; il caricamento parziale è A7-25 (dipende da A7-21)
     return this.db.$transaction(async (tx) => {
       const voci = pagamentiDaSollecitare(await caricaDati(tx)).filter((v) => v.cliente_id === String(b.cliente_id));
       if (!voci.length) throw new NotFoundException('Nessuna fattura da sollecitare per questo cliente');
       const ids = voci.map((v) => BigInt(v.documento_id));
       await tx.$queryRaw`SELECT id FROM ordini_fornitore_documenti WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
-      const massimo = (await tx.ordini_fornitore_documenti.aggregate({ where: { id: { in: ids } }, _max: { solleciti: true } }))._max.solleciti ?? 0;
-      await tx.ordini_fornitore_documenti.updateMany({ where: { id: { in: ids } }, data: { solleciti: { increment: 1 }, sollecitata_il: new Date(giornoRoma(new Date())) } });
-      const totale = r2(voci.reduce((s, v) => s.plus(v.importo), new Prisma.Decimal(0)));
+      // Dopo il blocco una fattura può essere stata segnata pagata: resta fuori dall'incremento (A3-07)
+      const daSollecitare = { id: { in: ids }, stato_incasso: { not: 'pagata' as const } };
+      const massimo = (await tx.ordini_fornitore_documenti.aggregate({ where: daSollecitare, _max: { solleciti: true } }))._max.solleciti ?? 0;
+      const aggiornate = await tx.ordini_fornitore_documenti.updateMany({
+        where: daSollecitare, data: { solleciti: { increment: 1 }, sollecitata_il: new Date(giornoRoma(new Date())) },
+      });
+      if (!aggiornate.count) throw new NotFoundException('Nessuna fattura da sollecitare per questo cliente');
+      // C1: importo e numeri solo dalle fatture ancora da sollecitare dopo il blocco, non da tutte quelle lette prima
+      const sollecitate = await tx.ordini_fornitore_documenti.findMany({ where: daSollecitare, select: { numero: true, importo: true } });
+      const totale = r2(sollecitate.reduce((s, v) => s.plus(v.importo), new Prisma.Decimal(0)));
       await logEvent(tx, {
         tipo: 'documento', azione: 'export', entita: 'documento', esito: 'successo',
-        dettaglio: { etichetta: voci[0].cliente, fatture: voci.map((v) => v.numero), importo_totale: Number(totale), solleciti: massimo + 1 },
+        dettaglio: { etichetta: voci[0].cliente, fatture: sollecitate.map((v) => v.numero), importo_totale: Number(totale), solleciti: massimo + 1 },
       }, ctx);
-      return { cliente_id: String(b.cliente_id), cliente: voci[0].cliente, fatture: voci.length, solleciti: massimo + 1 };
-    });
+      return { cliente_id: String(b.cliente_id), cliente: voci[0].cliente, fatture: aggiornate.count, solleciti: massimo + 1 };
+    }, { timeout: 30_000 });
   }
 }

@@ -28,7 +28,6 @@ const aaaamm = (a: number, m: number) => `${a}-${String(m).padStart(2, '0')}`;
 export const fineMese = (a: number, m: number) => new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
 
 /* ---------- Documenti e stato pratica (§5.1, §5.3, §5.8) ---------- */
-export const importoRighe = (righe: Riga[]) => r2(somma(righe.map((r) => r.importo)));
 /** Netto della pratica: fatture − note di credito (§5.3). */
 export const netto = (p: Pratica) => r2(somma(p.documenti.map((d) => d.importo)));
 /** Netto se ci sono documenti fiscali, altrimenti le conferme o gli ordini sommati (solo stima, D-60).
@@ -108,10 +107,11 @@ export function scaglione(S: Dati, fornitore_id: string, sconto: Dec, data: stri
 export const abbinamento = (S: Dati, cliente_id: string, fornitore_id: string, data: string) =>
   S.interscambio.find((a) => a.cliente_id === cliente_id && a.fornitore_id === fornitore_id && a.valido_dal <= data && (!a.valido_al || data < a.valido_al)) ?? null;
 
-/** Percentuali di una pratica alla data del documento: dal fornitore agente + subagente standard
- *  dello scaglione; al subagente la sua percentuale (eccezione personale, §5.2). */
+/** Percentuali di una pratica: agenzia (subagente e sconto) alla data dell'ordine, scaglione ed
+ *  eccezione alla data del documento. Al subagente la sua percentuale (eccezione personale, §5.2). */
 export function percentuali(S: Dati, p: Pratica, data = p.data) {
-  const ab = abbinamento(S, p.cliente_id, p.fornitore_id, data);
+  // D-146 §19: agenzia alla data dell'ordine (D-137), scaglioni alla data del documento
+  const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
   if (!ab) return null;
   const sc = scaglione(S, p.fornitore_id, ab.sconto, data);
   if (!sc) return null;
@@ -135,20 +135,39 @@ export function documentoPerId(S: Dati, id: string) {
 }
 
 /** Documento fiscale per numero, nel fornitore se dato: solo dove l'id manca (riga di bollettino non
- *  ancora abbinata). Il numero da solo non identifica: un fornitore può riusarlo in un altro anno (D-34). */
-export function trovaDocumento(S: Dati, numero: string, fornitore_id?: string) {
+ *  ancora abbinata). Il numero da solo non identifica: un fornitore può riusarlo in un altro anno (D-34);
+ *  con `data` (la data della riga) vince il documento dello stesso giorno, senza data il più recente con
+ *  data entro `entro` (la fine del mese del bollettino). */
+export function trovaDocumento(S: Dati, numero: string, fornitore_id?: string, data?: string | null, entro?: string) {
+  const candidati: { pratica: Pratica; doc: Documento }[] = [];
   for (const pratica of S.pratiche) {
     if (fornitore_id && pratica.fornitore_id !== fornitore_id) continue;
     const doc = pratica.documenti.find((d) => d.numero === numero);
-    if (doc) return { pratica, doc };
+    if (doc) candidati.push({ pratica, doc });
   }
-  return null;
+  if (!candidati.length) return null;
+  if (data) {
+    const esatto = candidati.find((c) => c.doc.data === data);
+    if (esatto) return esatto;
+  }
+  if (entro) {
+    const nelMese = candidati.filter((c) => c.doc.data <= entro);
+    if (nelMese.length) return nelMese.reduce((a, c) => (c.doc.data > a.doc.data ? c : a));
+  }
+  return candidati[0];
 }
 
 /** "Una fattura al mese" (D-27): la prima o la più alta del mese per cliente × fornitore. */
 export function fatturaDelMese(S: Dati, ab: Abbinamento, mese: string) {
   const ff = S.pratiche.filter((p) => p.cliente_id === ab.cliente_id && p.fornitore_id === ab.fornitore_id)
     .flatMap((p) => p.documenti.filter((d) => d.tipo === 'fattura' && d.data.slice(0, 7) === mese));
+  // D-27 §19: se una fattura del mese è già liquidata, il mese è "consumato" (A2-02): resta la scelta,
+  // la più vecchia per liquidazione, anche se una tardiva vincerebbe prima/piu_alta.
+  const liquidate = ff.filter((d) => d.liquidazione_id);
+  if (liquidate.length) {
+    liquidate.sort((x, y) => S.liquidazioni_chiuse.findIndex((l) => l.id === x.liquidazione_id) - S.liquidazioni_chiuse.findIndex((l) => l.id === y.liquidazione_id));
+    return liquidate[0];
+  }
   ff.sort(ab.regola_mensile === 'piu_alta'
     ? (x, y) => y.importo.comparedTo(x.importo) || x.data.localeCompare(y.data)
     : (x, y) => x.data.localeCompare(y.data) || x.numero.localeCompare(y.numero));
@@ -164,7 +183,12 @@ export function quotaSub(S: Dati, p: Pratica, d: Documento) {
   const q = (pct: Dec, regola: string, vale: string | null = null) => ({ pct, provvigione: quota(imp, pct), regola, vale });
   const cor = d.correzione;
   if (cor) {
-    if (cor.tipo === 'importo') return { pct: imp.isZero() ? ZERO : r2(cor.valore.div(imp).times(100)), provvigione: r2(cor.valore), regola: 'correzione', vale: null };
+    if (cor.tipo === 'importo') {
+      // D-27 §19: l'importo fisso è sempre positivo (come lo salva il server); su una nota di credito
+      // (importo negativo) va preso col segno invertito, per ridurre e non dare (A2-03).
+      const v = imp.isNegative() ? cor.valore.neg() : cor.valore;
+      return { pct: imp.isZero() ? ZERO : r2(v.div(imp).times(100)), provvigione: r2(v), regola: 'correzione', vale: null };
+    }
     return q(cor.tipo === 'nessuna' ? ZERO : cor.valore, 'correzione');
   }
   if (perc.ab.regola_mensile) {
@@ -190,16 +214,17 @@ export const fiscaliDelMese = (S: Dati, fornitore_id: string, mese: string) =>
   S.pratiche.filter((p) => p.fornitore_id === fornitore_id).flatMap((pratica) => pratica.documenti.filter((d) => d.data.slice(0, 7) === mese).map((doc) => ({ pratica, doc })));
 export const bollettinoDi = (S: Dati, fornitore_id: string, a: number, m: number) =>
   S.bollettini.find((b) => b.fornitore_id === fornitore_id && b.anno === a && b.mese === m) ?? null;
-/** La riga del bollettino è su quel documento? Per id se abbinata, altrimenti per numero nel fornitore (D-34). */
-const suDocumento = (r: RigaBollettino, d: Documento) => (r.documento_id ? r.documento_id === d.id : r.numero === d.numero);
+/** La riga del bollettino è su quel documento? Il documento della riga è quello di `documentoDiRiga`
+ *  (per id se abbinata, altrimenti per numero disambiguato per data e mese, D-34 §19, A2-05). */
+const suDocumento = (S: Dati, b: Bollettino, r: RigaBollettino, d: Documento) => documentoDiRiga(S, b, r)?.doc.id === d.id;
 /** Documento di una riga di bollettino: per id se abbinata, altrimenti per numero. */
-const documentoDiRiga = (S: Dati, b: Bollettino, r: RigaBollettino) => (r.documento_id ? documentoPerId(S, r.documento_id) : trovaDocumento(S, r.numero, b.fornitore_id));
+const documentoDiRiga = (S: Dati, b: Bollettino, r: RigaBollettino) => (r.documento_id ? documentoPerId(S, r.documento_id) : trovaDocumento(S, r.numero, b.fornitore_id, r.data, fineMese(b.anno, b.mese)));
 /** Il documento è riconosciuto in un bollettino verificato? (maturato, §5.14) */
 export const riconosciutoIn = (S: Dati, d: Documento, fornitore_id: string) =>
-  S.bollettini.find((b) => b.fornitore_id === fornitore_id && b.stato === 'verificato' && b.righe.some((r) => suDocumento(r, d))) ?? null;
+  S.bollettini.find((b) => b.fornitore_id === fornitore_id && b.stato === 'verificato' && b.righe.some((r) => suDocumento(S, b, r, d))) ?? null;
 /** Righe dei bollettini su un documento, dal mese più vecchio. */
 export const righeBollettinoDi = (S: Dati, d: Documento, fornitore_id: string) =>
-  S.bollettini.filter((b) => b.fornitore_id === fornitore_id).flatMap((b) => b.righe.filter((r) => suDocumento(r, d)).map((r) => ({ b, r })))
+  S.bollettini.filter((b) => b.fornitore_id === fornitore_id).flatMap((b) => b.righe.filter((r) => suDocumento(S, b, r, d)).map((r) => ({ b, r })))
     .sort((x, y) => x.b.anno * 100 + x.b.mese - (y.b.anno * 100 + y.b.mese));
 
 type Lato = { imponibile: Dec | null; pct: Dec | null; importo: Dec };
@@ -209,7 +234,7 @@ export function riconcilia(S: Dati, b: Bollettino) {
   const f = S.fornitori.get(b.fornitore_id)!, maturato = f.maturazione === 'maturato', meseB = aaaamm(b.anno, b.mese);
   const nostri = fiscaliDelMese(S, b.fornitore_id, meseB);
   const righe = b.righe.map((r) => {
-    const n = r.documento_id ? documentoPerId(S, r.documento_id) : (nostri.find((x) => x.doc.numero === r.numero) ?? trovaDocumento(S, r.numero, b.fornitore_id));
+    const n = r.documento_id ? documentoPerId(S, r.documento_id) : (nostri.find((x) => x.doc.numero === r.numero) ?? trovaDocumento(S, r.numero, b.fornitore_id, r.data, fineMese(b.anno, b.mese)));
     const riga = {
       id: r.id as string | null, documento_id: n?.doc.id ?? null,
       numero: r.numero, data: r.data, pratica_id: n?.pratica.id ?? null, cliente_id: n?.pratica.cliente_id ?? null, tipo: n?.doc.tipo ?? null,
@@ -236,7 +261,7 @@ export function riconcilia(S: Dati, b: Bollettino) {
     riga.pagamento = riga.categoria === 'quadra' && n.doc.data.slice(0, 7) < meseB && maturato;
     return riga;
   });
-  for (const x of nostri.filter((x) => !b.righe.some((r) => suDocumento(r, x.doc)))) {
+  for (const x of nostri.filter((x) => !b.righe.some((r) => suDocumento(S, b, r, x.doc)))) {
     const perc = percentuali(S, x.pratica, x.doc.data), pct = perc ? perc.dal_fornitore : ZERO;
     const atteso = perc ? quota(x.doc.importo, pct) : ZERO;
     // la decisione su un documento assente sta in bollettini_attese (D-56 §19); vale solo qui, finché manca
@@ -250,7 +275,7 @@ export function riconcilia(S: Dati, b: Bollettino) {
     };
     // maturato (§5.14): una fattura assente non è "mancante": il cliente non ha ancora pagato
     if (maturato && x.doc.tipo === 'fattura') {
-      const pag = S.bollettini.find((o) => o !== b && o.fornitore_id === b.fornitore_id && o.righe.some((r) => suDocumento(r, x.doc)));
+      const pag = S.bollettini.find((o) => o !== b && o.fornitore_id === b.fornitore_id && o.righe.some((r) => suDocumento(S, o, r, x.doc)));
       riga.incasso = true; riga.categoria = pag ? 'pagata_dopo' : 'attesa_incasso'; riga.pagata_in = pag?.id ?? null;
       riga.giorni = giorni(x.doc.data, S.oggi);
     }
@@ -365,7 +390,15 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
       if (!qui(rb.liquidazione_id, quando)) continue;
       const n = documentoDiRiga(S, b, rb);
       if (!n || !percentuali(S, n.pratica, n.doc.data)) continue;
-      out.push({ ...riga(n.pratica, n.doc, rb.tipo === 'storno' ? -1 : 1), data: quando, origine: n.doc.data, voce: rb.tipo, motivo: rb.tipo, bollettino_id: b.id, riga_bollettino_id: rb.id });
+      const base = riga(n.pratica, n.doc, rb.tipo === 'storno' ? -1 : 1);
+      // D-35 §19: se il documento è già liquidato, la voce riprende subagente e provvigione della fotografia
+      // di quella liquidazione (non quotaSub ricalcolato sull'agenzia attuale, che può essere cambiata) — A2-01.
+      const foto = n.doc.liquidazione_id ? S.fotografie.get(n.doc.id) : undefined;
+      out.push({
+        ...base,
+        ...(foto ? { subagente_id: foto.subagente_id, importo: rb.tipo === 'storno' ? foto.importo.neg() : foto.importo, pct: foto.pct, provvigione: rb.tipo === 'storno' ? foto.provvigione.neg() : foto.provvigione } : {}),
+        data: quando, origine: n.doc.data, voce: rb.tipo, motivo: rb.tipo, bollettino_id: b.id, riga_bollettino_id: rb.id,
+      });
     }
   }
   return out.sort((x, y) => x.data.localeCompare(y.data));

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { KpiRow, type Kpi } from '@/componenti/Kpi';
@@ -68,14 +68,18 @@ export function VistaSistema() {
   const sagome = useSagome(caricando && !dati);
   const stretto = useStretto();
 
+  const poll = useRef(false);
+
   const ricarica = () => setVersione((v) => v + 1);
 
   useEffect(() => {
     let vivo = true;
+    const automatico = poll.current;
+    poll.current = false;
     const p = new URLSearchParams({ vista: String(valori.vista ?? 'da_vedere') });
     if (servizio) p.set('servizio', servizio);
     setCaricando(true);
-    void api<Risposta>('sistema?' + p.toString()).then((r) => {
+    void api<Risposta>('sistema?' + p.toString(), undefined, undefined, automatico ? { automatico: true } : undefined).then((r) => {
       if (!vivo) return;
       setCaricando(false);
       if (r.ok) { setDati(r.dati); setErrore(''); } else { setErrore(r.messaggio); avviso(r.messaggio, true); }
@@ -84,9 +88,9 @@ export function VistaSistema() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- parametri: vista e servizio
   }, [valori.vista, servizio, versione]);
 
-  // §7.14: la pagina si aggiorna da sola ogni 30 secondi mentre è aperta
+  // §7.14: la pagina si aggiorna da sola ogni 30 secondi mentre è aperta (richiesta automatica, D-89)
   useEffect(() => {
-    const t = setInterval(() => setVersione((v) => v + 1), 30_000);
+    const t = setInterval(() => { poll.current = true; setVersione((v) => v + 1); }, 30_000);
     return () => clearInterval(t);
   }, []);
 

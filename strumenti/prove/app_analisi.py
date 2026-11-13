@@ -80,6 +80,8 @@ with sync_playwright() as p:
     ok(periodo(pg) == 'ott 2025 → set 2026', 'freccia avanti: torna al periodo di prima')
 
     seg(pg, '6 mesi').click(); quieta(pg)
+    # la risposta del server ridisegna i segmenti: si aspetta che il 6 mesi sia davvero scelto
+    pg.wait_for_function("() => [...document.querySelectorAll('.barra-analisi .segmenti [role=tab]')].some(e => e.textContent.includes('6 mesi') && e.getAttribute('aria-selected') === 'true')")
     ok(seg(pg, '6 mesi').get_attribute('aria-selected') == 'true', 'durata 6 mesi: il segmento è scelto')
     seg(pg, '12 mesi').click(); quieta(pg)
 
@@ -167,6 +169,8 @@ with sync_playwright() as p:
     prima_di = (periodo(pg), campo_nome(pg, 0))
     pg.click('.barra a.voce:has-text("Pratiche")'); pg.wait_for_url('**/pratiche')
     pg.click('.barra a.voce:has-text("Analisi")'); pg.wait_for_url('**/analisi'); pg.wait_for_selector('.kpi .kpi-valore'); quieta(pg)
+    # §7.12: i campi tornano quando le sagome sono sparite, non prima (D-59)
+    pg.wait_for_function("document.querySelectorAll('.sagoma').length === 0")
     ok((periodo(pg), campo_nome(pg, 0)) == prima_di and tab(pg, 'Per fornitore').get_attribute('aria-selected') == 'true',
        'ritorno: periodo, filtro e raggruppamento come li avevi lasciati')
 

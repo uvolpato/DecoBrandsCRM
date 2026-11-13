@@ -174,3 +174,33 @@ Ogni voce *Da documentare* applicata o motivata; rilievi A9 dell'onda chiusi; pa
 - Non inventare decisioni: si scrive solo ciò che i resoconti e i rilievi dicono.
 - Non cambiare il senso delle decisioni del §19 esistenti.
 - Niente commit, niente push.
+
+## Aggiunte del 13/11/2026 (dopo la fine dei pacchetti di codice)
+
+**Comandi**: niente `cd`, niente `/tmp` o cartelle fuori dal progetto, niente `&` (sono rifiutati e la sessione si ferma). Percorsi dalla radice. Scrivi **subito** il resoconto e aggiornalo strada facendo.
+
+### Altri resoconti da raccogliere
+- `resoconto-collaudo-1-25.md` (motore: agenzia alla data dell'ordine) e tutti i `resoconto-collaudo-1-*-correzioni-*.md` (1-01, 1-02, 1-03, 1-05, 1-10, 1-13, 1-16, 1-20, 1-23, 1-e2e-correzioni-2).
+
+### Numeri nuovi del §19 dopo D-143
+- I resoconti 1-06, 1-14 e 1-25 propongono tutti **D-144**. L'ultima riga del §19 è D-143. Assegna i numeri in ordine di pacchetto: **1-06 → D-144, 1-14 → D-145, 1-25 → D-146**. Se un altro resoconto propone una decisione nuova, prende il numero successivo (D-147 …), sempre in ordine di pacchetto.
+- **D-146 (1-25)** è una decisione di Ugo: «Il motore prende l'agenzia (subagente e sconto) alla **data dell'ordine**; scaglioni ed eccezioni restano alla data del documento.» Perché: è la regola di D-137, già valida per l'apertura della pratica; il motore la deve seguire, altrimenti una fattura dopo un cambio d'agenzia va al subagente nuovo. Chi: «Ugo (collaudo 12/11/2026)». Dove: §4.2.6, `motore.ts` (`percentuali`).
+- Nel codice cambia **solo** il commento in `app/backend/src/motore/motore.ts` (`// D-144 §19: …` → `// D-146 §19: …`) e ogni altro commento `D-144` dei pacchetti 1-06/1-14 che ora ha un numero diverso (cercalo con grep in `app/`). Nient'altro nel codice.
+
+### Dominio e certificato (Ugo, 12/11/2026)
+- `crm.decobrands.it` è il dominio vero: nel `app/deploy/Caddyfile` e in `app/README.md` non è più un segnaposto.
+- All'inizio l'app gira solo in **intranet**: Caddy non può prendere il certificato pubblico con la sfida HTTP. Scrivi, come commento nel Caddyfile e come paragrafo nel README, le due strade: `tls internal` (certificato interno da installare sui PC) oppure la sfida DNS (serve il modulo DNS del fornitore del dominio). Si sceglie al rilascio, con il tecnico della rete. Non cambiare le direttive attive del Caddyfile, solo i commenti.
+
+### Piano
+- In `piano-lavoro-crm.md` togli la riga «409 chiaro eliminando un'agenzia con sconti (D-139): 0,25 h da approvare»: con D-139 dell'onda 0 la chiave è `ON DELETE RESTRICT` e la riga è superata.
+
+### Catalogo del registro
+- Il codice `casella.interno` (pacchetto 1-10) va nel catalogo dei codici §7.14.3 della spec, come gli altri codici della casella.
+
+### File ammessi in più
+- `app/backend/src/motore/motore.ts` e gli altri file di `app/` **solo** per il numero nei commenti `D-144` (vedi sopra), `app/deploy/Caddyfile` (solo commenti).
+
+### Fine
+- Versione della spec: 8.78 → **8.79**, con in testa il riassunto dell'onda 1 (D-114…D-132 attuate e D-144…).
+- `python3 strumenti/genera-pagine-doc.py`, `npx tsc --noEmit` in `app/frontend` e in `app/backend`.
+- Carica davvero `caveman`.

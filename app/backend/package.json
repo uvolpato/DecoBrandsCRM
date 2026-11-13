@@ -80,6 +80,8 @@
     "testEnvironment": "node",
     "testTimeout": 30000,
     "maxWorkers": 1,
+    "globalSetup": "<rootDir>/test/blocco.ts",
+    "globalTeardown": "<rootDir>/test/blocco.ts",
     "setupFiles": [
       "<rootDir>/test/ambiente.ts"
     ]

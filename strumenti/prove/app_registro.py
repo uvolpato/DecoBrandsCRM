@@ -39,6 +39,7 @@ with sync_playwright() as p:
     piede = lambda pg: testo(pg, '.dt-piede')
 
     pg = entra(S + '-ammi')
+    pg.wait_for_function("() => { const n = document.querySelector('.filtri .segmenti button .n'); return !!n && /\\d/.test(n.textContent); }")
     dati = api(pg)
     ok(testo(pg, '.testa h1') == 'Registro', 'titolo della pagina: Registro')
 
@@ -66,7 +67,14 @@ with sync_playwright() as p:
     seg.nth(2).click()
     pg.wait_for_function("(n) => { const t = document.querySelector('.dt-piede')?.textContent || ''; return t.includes(n + ' elementi') || t.includes('di ' + n + ' elementi'); }", arg=str(errori_api['totale']))
     ok(str(errori_api['totale']) in piede(pg), 'segmento Errori: %d righe (piede: %s)' % (errori_api['totale'], piede(pg)))
-    ok(pg.locator('.dt tbody tr').count() == min(dati.get('per_pagina', 25), errori_api['totale']), 'il segmento restringe davvero le righe')
+    # il piede cambia prima delle righe: si aspetta anche il numero di righe prima di contarle (c)
+    attese = min(per_pagina, errori_api['totale'])
+    try:
+        pg.wait_for_function("(n) => document.querySelectorAll('.dt tbody tr').length === n", arg=attese)
+    except Exception:
+        pass
+    righe_errori = pg.locator('.dt tbody tr').count()
+    ok(righe_errori == attese, 'il segmento restringe davvero le righe (%d attese, %d a schermo)' % (attese, righe_errori))
 
     # filtro Codice con una tendina (i valori vengono dal server)
     seg.nth(0).click(); pg.wait_for_timeout(500)

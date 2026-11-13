@@ -1,5 +1,5 @@
 # Prova del guscio dell'app (passo 1.11), con Playwright: barra per ruolo e per area (D-47), sola lettura,
-# Pagina riservata, ritorno alla pagina chiesta, Esci, telefono.
+# Pagina riservata, ritorno alla pagina chiesta, Esci, schermo stretto (sotto i 744 px, V6/D-44).
 # Servono backend (8002) e frontend (8001) accesi e tre utenti di prova con la password PW,
 # nomi utente <s>-ammi, <s>-oper, <s>-lett (vedi app_guscio.sql). Uso:
 #   python strumenti/prove/app_guscio.py <suffisso> <cartella schermate>
@@ -57,10 +57,10 @@ with sync_playwright() as p:
     ok(pg.locator('.voce.attiva').inner_text().startswith('Pratiche'), 'voce attiva = pagina corrente')
     ok(pg.locator('.barra-piede .io b').inner_text() == 'Prova Ammi' and 'Amministratore' in pg.locator('.barra-piede .io').inner_text(), 'utente e ruolo in fondo alla barra')
     ok(not pg.evaluate("document.body.classList.contains('sola-lettura')"), 'amministratore: niente fascia di sola lettura')
-    scegli(pg, 'Dati'); pg.wait_for_function("location.pathname === '/fornitori'")
-    ok(voci(pg) == ['Fornitori', 'Subagenti', 'Clienti'] and not pg.locator('#carica-barra').count(), 'area Dati: le sue voci, niente Carica documenti')
-    pg.wait_for_selector('.dt tbody tr.cliccabile')
-    ok(pg.locator('.testa h1').inner_text() == 'Fornitori', 'pagina Fornitori dentro il guscio')
+    scegli(pg, 'Dati'); pg.wait_for_function("location.pathname === '/soggetti'")
+    ok(voci(pg) == ['Soggetti', 'Fornitori', 'Subagenti', 'Clienti'] and not pg.locator('#carica-barra').count(), 'area Dati: le sue voci, niente Carica documenti')
+    pg.wait_for_selector('.soggetti-filtri .dt tbody tr.cliccabile')
+    ok(pg.locator('.testa h1').inner_text() == 'Soggetti', 'pagina Soggetti dentro il guscio')
     pg.goto(BASE + '/utenti'); pg.wait_for_selector('.testa h1')
     ok(attiva(pg) == 'Gestione' and 'Impostazioni' in voci(pg), 'su /utenti è aperta Gestione')
     apri_utente(pg); pg.click('.menu-utente-voce:has-text("Guida")'); pg.wait_for_function("location.pathname === '/guida'")
@@ -92,7 +92,30 @@ with sync_playwright() as p:
     pg = entra(f'{S}-ammi', '/', 768)
     ok(pg.evaluate('document.documentElement.scrollWidth <= 768'), '768 px: niente scorrimento orizzontale')
     ok(pg.locator('.area-titolo').is_visible() and pg.locator('.io-btn').is_visible(), '768 px: nome dell’area e pulsante utente visibili')
+    ok('computer o tablet' not in pg.locator('body').inner_text(), '768 px: app visibile, niente blocco')
     pg.screenshot(path=str(USCITA / 'guscio-768.png'))
+
+    # V6, §16.6, D-44, D-127: sotto i 744 px l'app si ferma a monte, anche dopo l'accesso
+    pg.set_viewport_size({'width': 743, 'height': 900}); pg.wait_for_timeout(150)
+    ok('computer o tablet' in pg.locator('body').inner_text(), '743 px: il blocco chiede un computer o un tablet')
+    ok(not pg.locator('.barra').is_visible() and not pg.locator('.principale').is_visible(), '743 px: app nascosta')
+    pg.screenshot(path=str(USCITA / 'guscio-743.png'))
+    pg.set_viewport_size({'width': 744, 'height': 900}); pg.wait_for_timeout(150)
+    ok(pg.locator('.barra').is_visible() and pg.locator('.principale').is_visible()
+       and 'computer o tablet' not in pg.locator('body').inner_text(), '744 px: app di nuovo visibile')
+    pg.close()
+
+    pg = b.new_page(viewport={'width': 743, 'height': 900})
+    pg.goto(BASE + '/accesso'); pg.wait_for_selector('.schermo-stretto')
+    ok('computer o tablet' in pg.locator('body').inner_text(), '743 px prima dell’accesso: il blocco chiede un computer o un tablet')
+    ok(not pg.locator('.barra').is_visible() and not pg.locator('.accesso-scena').is_visible(), '743 px prima dell’accesso: niente barra né finestra')
+    pg.close()
+
+    pg = b.new_page(viewport={'width': 700, 'height': 900})
+    pg.goto(BASE + '/accesso'); pg.wait_for_selector('.schermo-stretto')
+    ok('computer o tablet' in pg.locator('body').inner_text() and not pg.locator('.principale').is_visible(), '700 px: c’è il blocco, nessuna app')
+    pg.close()
+
     b.close()
 
 print('\n'.join(esiti)); print('errori della pagina:', errori or 'nessuno')

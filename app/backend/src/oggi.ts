@@ -9,9 +9,9 @@ import { abbinamento, analisiTrimestre, giorni, importoPratica, pagamentiDaSolle
 import { PrismaService } from './prisma.service';
 
 // Pagina Oggi (F5-A1, §7.1): tutto quello che chiede un'azione, calcolato dal server (V12, D-28).
-// I gruppi sono quelli del prototipo (M.daFare), nell'ordine di urgenza; il gruppo Documenti resta
-// vuoto finché l'ingresso dei documenti arriva con F6 (`disponibile: false`, nessun numero finto).
-// I testi dei solleciti e delle righe sono composti qui: il browser mostra e basta.
+// I gruppi sono quelli del prototipo (M.daFare), nell'ordine di urgenza; il gruppo Documenti è acceso
+// dall'ingresso dei documenti (F6, D-75). I testi dei solleciti e delle righe sono composti qui:
+// il browser mostra e basta.
 
 const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 const euro = (n: Prisma.Decimal | number) => Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -42,21 +42,22 @@ export function confermeInRitardo(S: Dati): Scaduta[] {
 }
 
 type MeseBollettino = {
-  fornitore_id: bigint; fornitore: string; mese: number; bollettino_id: bigint | null; stato: string | null;
+  fornitore_id: bigint; fornitore: string; anno: number; mese: number; bollettino_id: bigint | null; stato: string | null;
   righe: number; documenti: number; entro: string; fine: string;
 };
 
-/** Mesi dell'anno in corso con il bollettino (o no) di ogni fornitore attivo: la stessa regola della
- *  matrice (§5.6, D-03), in SQL perché l'anno intero è troppo per il motore. */
+/** Gli ultimi dodici mesi e quello in corso, con il bollettino (o no) di ogni fornitore attivo: la stessa
+ *  regola della matrice (§5.6, D-03), in SQL perché il periodo è troppo per il motore. Il periodo non si
+ *  ferma all'anno di oggi: il bollettino di dicembre si sollecita a gennaio (A4-02). */
 async function mesiBollettini(db: PrismaService, oggi: string): Promise<MeseBollettino[]> {
-  const anno = Number(oggi.slice(0, 4));
   return db.$queryRaw<MeseBollettino[]>`
     WITH periodi AS (
-      SELECT m AS mese, make_date(${anno}, m, 1) AS inizio,
-             (make_date(${anno}, m, 1) + interval '1 month - 1 day')::date AS fine
-      FROM generate_series(1, 12) m
+      SELECT extract(month FROM g)::int AS mese, extract(year FROM g)::int AS anno,
+             g::date AS inizio, (g + interval '1 month - 1 day')::date AS fine
+      FROM generate_series(date_trunc('month', ${oggi}::date) - interval '12 months',
+                           date_trunc('month', ${oggi}::date), interval '1 month') g
     )
-    SELECT f.id AS fornitore_id, coalesce(fv.ragione_sociale, '') AS fornitore, p.mese,
+    SELECT f.id AS fornitore_id, coalesce(fv.ragione_sociale, '') AS fornitore, p.anno, p.mese,
            b.id AS bollettino_id, b.stato,
            coalesce((SELECT count(*) FROM bollettini_righe r WHERE r.testata_id = b.id), 0)::int AS righe,
            (SELECT count(*) FROM ordini_fornitore_documenti d
@@ -69,9 +70,9 @@ async function mesiBollettini(db: PrismaService, oggi: string): Promise<MeseBoll
     FROM fornitori f
     JOIN fornitori_versioni fv ON fv.id = f.versione_corrente_id
     CROSS JOIN periodi p
-    LEFT JOIN bollettini_testata b ON b.fornitore_id = f.id AND b.anno = ${anno} AND b.mese = p.mese
+    LEFT JOIN bollettini_testata b ON b.fornitore_id = f.id AND b.anno = p.anno AND b.mese = p.mese
     WHERE f.attivo
-    ORDER BY fv.ragione_sociale, p.mese`;
+    ORDER BY fv.ragione_sociale, p.anno, p.mese`;
 }
 
 const aperto = (m: MeseBollettino) => m.bollettino_id != null && m.stato !== 'verificato' && m.stato !== 'contestato';
@@ -106,7 +107,7 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
   const vociBollettini = aperti.map((m) => {
     const b = S.bollettini.find((x) => x.id === String(m.bollettino_id));
     const r = b ? riconcilia(S, b) : null;
-    return { mese: m.mese, fornitore: m.fornitore, id: String(m.bollettino_id), aperte: r?.aperte ?? null };
+    return { anno: m.anno, mese: m.mese, fornitore: m.fornitore, id: String(m.bollettino_id), aperte: r?.aperte ?? null };
   });
   const daDecidere = await db.documenti_in_arrivo.findMany({
     where: { stato: { notIn: ['scartato', 'abbinato'] }, abbinato_pratica_id: null },
@@ -145,14 +146,16 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
       });
     }
   }
-  const meseScorso = Number(oggi.slice(5, 7)) === 1 ? 12 : Number(oggi.slice(5, 7)) - 1;
+  // il mese scorso, anno compreso: a gennaio è dicembre dell'anno prima (A4-02)
+  const scorso = new Date(oggi + 'T12:00:00Z');
+  scorso.setUTCDate(1);
+  scorso.setUTCMonth(scorso.getUTCMonth() - 1);
+  const scorsoAnno = scorso.getUTCFullYear(), scorsoMese = scorso.getUTCMonth() + 1;
   for (const m of mesi) {
-    // shortcut: a gennaio il bollettino di dicembre dell'anno prima non entra (i mesi sono quelli dell'anno in corso);
-    // si aggiunge quando il CRM avrà più di un anno di storico
-    if (m.mese !== meseScorso) continue;
+    if (m.anno !== scorsoAnno || m.mese !== scorsoMese) continue;
     if (m.bollettino_id == null && m.fine < oggi && m.documenti > 0 && oggi <= m.entro && m.entro <= fino) {
       scadenze.push({
-        data: m.entro, testo: `Bollettino di ${MESI[m.mese - 1]} di ${m.fornitore}`,
+        data: m.entro, testo: `Bollettino di ${MESI[m.mese - 1]} ${m.anno} di ${m.fornitore}`,
         dettaglio: `${m.documenti} ${m.documenti === 1 ? 'documento atteso' : 'documenti attesi'}`, href: '/bollettini',
         giorni: giorni(oggi, m.entro),
       });
@@ -249,12 +252,12 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
       voci: [
         ...vociBollettini.map((v) => ({
           tipo: 'attesa',
-          titolo: v.aperte ? `Verifica il bollettino di ${MESI[v.mese - 1]} di ${v.fornitore}` : `Chiudi il bollettino di ${MESI[v.mese - 1]} di ${v.fornitore}`,
+          titolo: v.aperte ? `Verifica il bollettino di ${MESI[v.mese - 1]} ${v.anno} di ${v.fornitore}` : `Chiudi il bollettino di ${MESI[v.mese - 1]} ${v.anno} di ${v.fornitore}`,
           dettaglio: v.aperte == null ? 'da verificare' : v.aperte === 1 ? '1 riga non quadra' : v.aperte > 0 ? `${v.aperte} righe non quadrano` : 'tutte le righe quadrano',
           href: '/bollettini/' + v.id, azione: v.aperte ? 'Verifica' : 'Chiudi',
         })),
         ...mancanti.map((m) => ({
-          tipo: 'errore', titolo: `Sollecita il bollettino di ${MESI[m.mese - 1]} di ${m.fornitore}`,
+          tipo: 'errore', titolo: `Sollecita il bollettino di ${MESI[m.mese - 1]} ${m.anno} di ${m.fornitore}`,
           dettaglio: `${m.documenti} ${m.documenti === 1 ? 'documento atteso' : 'documenti attesi'}`, href: '/bollettini', azione: 'Vedi',
         })),
       ],

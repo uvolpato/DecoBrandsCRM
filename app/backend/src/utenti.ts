@@ -7,7 +7,7 @@ import { IsBoolean, IsEmail, IsIn, IsObject, IsOptional, IsString, Matches, MaxL
 import type { Request } from 'express';
 import { AREE, contesto, LIVELLI, livelliDi, PERMESSI, permessiDi, Richiede, RUOLI, type Livelli } from './accesso';
 import { cifra, provvisoria } from './password';
-import { mandaPassword } from './posta';
+import { avvisoEmailCambiata, mandaPassword } from './posta';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -91,6 +91,8 @@ export class UtentiController {
   @Put(':id')
   @Richiede('sistema.utenti')
   async modifica(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: ModificaUtente) {
+    let vecchiaEmail: string | null = null;
+    let vecchioUsername: string | null = null;
     await unico(() => this.db.$transaction(async (tx) => {
       const prima = await this.gestibile(tx, req, id, true);
       const io = req.utente!;
@@ -108,10 +110,14 @@ export class UtentiController {
       if (!diff) return;
       await tx.utenti.update({ where: { id: prima.id }, data: nuovo });
       if (areeCambiate) await scriviAree(tx, prima.id, aDopo);
-      if ('email' in diff.dopo) await tx.accessi_link.deleteMany({ where: { utente_id: prima.id, usato_il: null } });
+      if ('email' in diff.dopo) {
+        await tx.accessi_link.deleteMany({ where: { utente_id: prima.id, usato_il: null } });
+        if (prima.email) { vecchiaEmail = prima.email; vecchioUsername = prima.username; } // avviso al vecchio indirizzo dopo il commit (D-117)
+      }
       await logEvent(tx, { tipo: 'crud', azione: 'update', entita: 'utente', entita_id: prima.id, esito: 'successo',
         dettaglio: { etichetta: nuovo.username, ...diff } }, contesto(req));
     }));
+    if (vecchiaEmail) await avvisoEmailCambiata(this.db, vecchiaEmail, { username: vecchioUsername! }, { nome: req.utente!.nome }, new Date()); // dopo il commit (V13)
     return fuori(await this.trova(this.db, id));
   }
 

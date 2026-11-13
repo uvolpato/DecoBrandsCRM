@@ -107,10 +107,11 @@ async function entro<T>(p: Promise<T>, ms = ATTESA_SONDA): Promise<T> {
 /** Le configurazioni dei servizi dalle Impostazioni (§7.15): nessun segreto esce da qui. */
 async function configurazioni(db: PrismaService) {
   const [casella, lettura, integra, posta] = await Promise.all([casellaConfig(db), letturaConfig(db), integraConfig(db), postaConfig(db)]);
-  // senza Impostazioni si usa il PONTE_URL dello sviluppo (§4.5)
+  // Il riquadro della pagina mostra «Non configurata» dalle sole Impostazioni: il PONTE_URL di sviluppo
+  // resta solo per la sincronizzazione vera (IntegraService.connessione, §4.5), non qui (D-74 §19).
   const ponte = integra
     ? { url: `postgresql://${encodeURIComponent(integra.utente)}:${encodeURIComponent(integra.password)}@${integra.server}:5432/${encodeURIComponent(integra.database)}`, schema: integra.schema, secondi: integra.secondi }
-    : process.env.PONTE_URL ? { url: process.env.PONTE_URL, schema: 'public', secondi: 60 } : null;
+    : null;
   return { casella, lettura, integra: ponte, posta };
 }
 
@@ -417,11 +418,12 @@ export async function pulisciScartati(db: PrismaService, ora = new Date()) {
   if (!Number.isInteger(giorni) || giorni < 1) return 0;
   const limite = new Date(ora.getTime() - giorni * GIORNO);
   const tolti = await db.$transaction(async (tx) => {
-    const righe = await tx.documenti_in_arrivo.findMany({
-      where: { stato: 'scartato', scartato_il: { lt: limite } }, select: { id: true, file_percorso: true },
-    });
-    if (!righe.length) return [];
-    await tx.documenti_in_arrivo.deleteMany({ where: { id: { in: righe.map((r) => r.id) } } });
+    // Una sola istruzione: lo stato si ricontrolla dentro il WHERE al momento di cancellare, così
+    // un documento recuperato o rianimato nel frattempo non sparisce con il suo file (A3-04, A4-09).
+    const righe = await tx.$queryRaw<{ id: bigint; file_percorso: string }[]>`
+      DELETE FROM documenti_in_arrivo
+      WHERE stato = 'scartato' AND scartato_il < ${limite}
+      RETURNING id, file_percorso`;
     // un documento eliminato non deve lasciare aperta l'anomalia della lettura (§7.14.3)
     for (const r of righe) await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(r.id));
     return righe;

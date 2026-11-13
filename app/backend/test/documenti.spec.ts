@@ -460,7 +460,7 @@ describe('agenzia mancante: il documento non entra in pratica (D-106)', () => {
 
   it("creata l'agenzia via API, la registrazione riesce e la pillola sparisce", async () => {
     const sub = await db.subagenti.findFirstOrThrow();
-    await senzaArea.post(`/clienti/${senza.id}/agenzie`, { subagente_id: Number(sub.id), fornitore_id: Number(fornitore.id), sconto: 5, valido_dal: '2026-01-01' }).expect(201);
+    await senzaArea.post(`/clienti/${senza.id}/agenzie`, { subagente_id: Number(sub.id), fornitore_id: Number(fornitore.id), sconto: 5, valido_dal: '2026-09-01' }).expect(201);
     const r = await op.post(`/pratiche/${praticaSenza}/documenti`, { tipo: 'fattura', numero: 'AG-2', data: '2026-09-10', importo:100 }).expect(201);
     expect(r.body.totali.netto).toBe(100);
     // il documento da controllare ora ha l'agenzia: manca_agenzia false

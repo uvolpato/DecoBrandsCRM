@@ -21,6 +21,7 @@ declare module 'express-session' {
     utente_id: string; // solo l'id: ruolo e stato si rileggono a ogni richiesta (D-38)
     csrf: string;
     ultimo?: number; // ultima richiesta dell'utente, per il timeout di inattività (D-89)
+    creata?: number; // quando la sessione è nata, per la durata massima di 30 giorni (D-89)
   }
 }
 declare module 'express' {
@@ -155,6 +156,7 @@ export function apriSessione(req: Request, utente_id: bigint, resta = true) {
       req.session.utente_id = String(utente_id);
       req.session.csrf = randomBytes(32).toString('hex');
       req.session.ultimo = Date.now(); // timeout di inattività: si parte da adesso (D-89)
+      req.session.creata = Date.now(); // durata massima: si parte da adesso (D-89)
       // senza "Resta collegato" il cookie non ha scadenza e finisce con il browser (null: i tipi non lo prevedono)
       (req.session.cookie as { maxAge: number | null }).maxAge = resta ? TRENTA_GIORNI : null;
       req.session.save((e) => (e ? ko(e) : ok()));
@@ -183,13 +185,22 @@ export class AccessoGuard implements CanActivate {
     req.utente = utente as utenti;
     req.livelli = livelliDi(aree);
     // timeout di inattività (D-89): dopo N minuti senza richieste la sessione si chiude. La SSE
-    // degli aggiornamenti non conta come attività: una scheda aperta da sola non tiene viva la sessione.
+    // degli aggiornamenti e le richieste automatiche del browser (x-automatico) non contano come
+    // attività: una scheda aperta da sola non tiene viva la sessione.
     const ora = Date.now();
     if (scaduta(req.session.ultimo, ora, timeoutMinuti())) {
       await new Promise((ok) => req.session.destroy(ok));
       throw new UnauthorizedException('Sessione scaduta per inattività: entra di nuovo');
     }
-    if (req.method !== 'GET' || req.path !== '/api/eventi/flusso') req.session.ultimo = ora;
+    // durata massima (D-89): anche con "Resta collegato" la sessione non vive oltre 30 giorni.
+    // Le sessioni nate prima della correzione non hanno `creata`: la si imposta adesso, così i
+    // 30 giorni partono da qui (C1).
+    if (!req.session.creata) req.session.creata = ora;
+    else if (ora - req.session.creata > TRENTA_GIORNI) {
+      await new Promise((ok) => req.session.destroy(ok));
+      throw new UnauthorizedException('Sessione scaduta: entra di nuovo');
+    }
+    if (req.get('x-automatico') !== '1' && !(req.method === 'GET' && req.path === '/api/eventi/flusso')) req.session.ultimo = ora;
     if (trovato.deve_cambiare_password && !this.reflector.getAllAndOverride<boolean>('provvisoria', dove)) {
       throw new ForbiddenException('cambia_password'); // prima il cambio della password provvisoria
     }
@@ -278,7 +289,7 @@ export class AccessoController {
     const attuali = (u.ingressi ?? {}) as Record<string, unknown>;
     const nuovo: Record<string, unknown> = { ...attuali };
     for (const [area, v] of Object.entries(b.ingressi ?? {})) {
-      const pagine = PAGINE[area];
+      const pagine = Object.hasOwn(PAGINE, area) ? PAGINE[area] : undefined;
       if (!pagine) throw new BadRequestException('Area sconosciuta: ' + area);
       if (v === null) { delete nuovo[area]; continue; } // null toglie la scelta
       if (typeof v !== 'string') throw new BadRequestException('Percorso non valido per l’area ' + area);

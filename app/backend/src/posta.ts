@@ -39,9 +39,9 @@ const rifiutato = (e: unknown) => {
   return codice === 550 || codice === 551 || codice === 553 || /(recipient|rcpt|mailbox|user unknown|no such user)/.test(testo);
 };
 
-/** Manda un'email e scrive l'esito in utenti.ultimo_invio (§4.2.18). Non lancia mai. */
-export async function invia(db: Db, utente_id: bigint, tipo: 'benvenuto' | 'password' | 'reset', m: Messaggio, trasportoFinto?: Transporter) {
-  const esito = { quando: new Date().toISOString(), tipo, errore: null as string | null };
+/** Spedisce e apre/chiude le anomalie della posta; non scrive ultimo_invio né lancia mai. Torna il testo
+ *  dell'errore (o null se partita). */
+async function spedisci(db: Db, m: Messaggio, trasportoFinto?: Transporter): Promise<string | null> {
   try {
     const c = await postaConfig(db);
     if (c) {
@@ -53,9 +53,9 @@ export async function invia(db: Db, utente_id: bigint, tipo: 'benvenuto' | 'pass
       // il testo (password provvisorie, link) va nel log solo in sviluppo: mai le credenziali altrove
       log.log(`a ${m.a} · ${m.oggetto}` + (process.env.NODE_ENV === 'development' ? `\n${m.testo}` : ''));
     }
-    await db.utenti.update({ where: { id: utente_id }, data: { ultimo_invio: esito } }).catch((e: unknown) => log.error(`ultimo_invio non scritto: ${String(e)}`));
+    return null;
   } catch (e) {
-    esito.errore = pulisci(e);
+    const errore = pulisci(e);
     const respinta = rifiutato(e);
     try {
       await apriAnomalia(db, {
@@ -63,14 +63,21 @@ export async function invia(db: Db, utente_id: bigint, tipo: 'benvenuto' | 'pass
         messaggio: respinta
           ? `L'email a ${m.a} non è partita: indirizzo rifiutato dal server di posta.`
           : 'La posta in uscita non risponde: controllare server e password in Impostazioni → Posta.',
-        dettaglio: { destinatario: m.a, errore: esito.errore },
+        dettaglio: { destinatario: m.a, errore },
       });
     } catch (e2) {
       log.error(`anomalia posta non scritta: ${String(e2)}`);
     }
-    await db.utenti.update({ where: { id: utente_id }, data: { ultimo_invio: esito } }).catch(() => undefined);
-    log.error(`invio a ${m.a} non riuscito: ${esito.errore}`);
+    log.error(`invio a ${m.a} non riuscito: ${errore}`);
+    return errore;
   }
+}
+
+/** Manda un'email e scrive l'esito in utenti.ultimo_invio (§4.2.18). Non lancia mai. */
+export async function invia(db: Db, utente_id: bigint, tipo: 'benvenuto' | 'password' | 'reset', m: Messaggio, trasportoFinto?: Transporter) {
+  const esito = { quando: new Date().toISOString(), tipo, errore: null as string | null };
+  esito.errore = await spedisci(db, m, trasportoFinto);
+  await db.utenti.update({ where: { id: utente_id }, data: { ultimo_invio: esito } }).catch((e: unknown) => log.error(`ultimo_invio non scritto: ${String(e)}`));
 }
 
 /** Indirizzo dell'app per i link nelle email (in produzione quello pubblico, dietro Caddy). */
@@ -85,3 +92,15 @@ export const mandaPassword = (db: Db, u: { id: bigint; email: string; nome: stri
       'Al primo accesso ti verrà chiesto di scegliere una nuova password.' +
       (tipo === 'password' ? ' La password di prima non vale più.' : ''),
   });
+
+/** Avviso al vecchio indirizzo quando l'email di un utente cambia (D-117): nome utente dell'account
+ *  cambiato, chi l'ha fatto e quando (ora di Roma, C2), senza rivelare il nuovo indirizzo. Non scrive
+ *  ultimo_invio (quello è per le password); un invio fallito apre la solita anomalia posta e non annulla
+ *  la modifica. */
+export const avvisoEmailCambiata = (db: Db, vecchio: string, utente: { username: string }, da: { nome: string }, quando: Date, trasportoFinto?: Transporter) =>
+  spedisci(db, {
+    a: vecchio,
+    oggetto: 'Decobrands: email del tuo utente cambiata',
+    testo: `L'email del tuo utente ${utente.username} nel CRM Decobrands è stata cambiata il ${quando.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })} da ${da.nome}.\n` +
+      'Se non l\'hai chiesto tu, avvisa il superutente.',
+  }, trasportoFinto);

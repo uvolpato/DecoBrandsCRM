@@ -108,7 +108,7 @@ export function VistaPratiche() {
     vVista.current = vEventi;
     if (!dati) return;
     let vivo = true;
-    void api<Risposta>('pratiche?' + parametri().toString()).then((r) => {
+    void api<Risposta>('pratiche?' + parametri().toString(), undefined, undefined, { automatico: true }).then((r) => {
       if (!vivo || !r.ok) return;
       setDati((d) => (d ? { ...d, conteggi: r.dati.conteggi, totali: r.dati.totali } : d));
       setInAttesa(JSON.stringify(dati.righe) === JSON.stringify(r.dati.righe) ? null : r.dati);

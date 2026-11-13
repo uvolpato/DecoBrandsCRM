@@ -240,9 +240,9 @@ async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | nul
 }
 
 /* ---------- Cliente per P.IVA o ragione sociale (D-92) ---------- */
-/** P.IVA normalizzata: solo lettere e cifre, maiuscole; il prefisso `IT` cade come nell'import da Integra
- *  (R1-09: una sola normalizzazione, quella di `soggetti.ts`). */
-export const normalizzaPiva = (s: string) => pivaNormalizzata((s || '').replace(/[^0-9A-Za-z]/g, ''));
+/** P.IVA normalizzata: solo lettere e cifre, maiuscole; il prefisso del paese davanti alle cifre cade
+ *  (`IT 012…`, `DE 012…`, D-124), con la stessa base dell'import da Integra (R1-09). */
+export const normalizzaPiva = (s: string) => pivaNormalizzata((s || '').replace(/[^0-9A-Za-z]/g, '')).replace(/^[A-Z]{2}(?=\d)/, '');
 
 export type ClienteConCorrente = { id: bigint; corrente: { piva: string | null; ragione_sociale: string } | null };
 

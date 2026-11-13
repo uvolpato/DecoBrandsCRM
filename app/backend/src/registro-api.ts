@@ -95,8 +95,8 @@ function query(q: Filtri) {
   if (q.codice) filtri.push(Prisma.sql`r.codice = ${q.codice}`);
   if (q.entita) filtri.push(Prisma.sql`r.entita = ${q.entita}`);
   if (q.utenti) filtri.push(Prisma.sql`r.utente_id IN (${Prisma.join(q.utenti.split(',').map((x) => BigInt(x)))})`);
-  if (q.dal) filtri.push(Prisma.sql`(r.ts AT TIME ZONE 'Europe/Rome')::date >= ${q.dal}::date`);
-  if (q.al) filtri.push(Prisma.sql`(r.ts AT TIME ZONE 'Europe/Rome')::date <= ${q.al}::date`);
+  if (q.dal) filtri.push(Prisma.sql`r.ts >= (${q.dal}::date::timestamp AT TIME ZONE 'Europe/Rome')`);
+  if (q.al) filtri.push(Prisma.sql`r.ts < ((${q.al}::date + 1)::timestamp AT TIME ZONE 'Europe/Rome')`);
   if (q.operazione) filtri.push(Prisma.sql`r.operazione_id = ${q.operazione}::uuid`);
   const testo = (q.q ?? '').trim();
   if (testo) {
@@ -284,7 +284,9 @@ export async function erroriOggi(db: PrismaService, oggi: string) {
   const [r] = await db.$queryRaw<{ n: number }[]>`
     SELECT (
       (SELECT count(*) FROM registro
-        WHERE genere = 'evento' AND livello = 'errore' AND (ts AT TIME ZONE 'Europe/Rome')::date = ${oggi}::date)
+        WHERE genere = 'evento' AND livello = 'errore'
+          AND ts >= (${oggi}::date::timestamp AT TIME ZONE 'Europe/Rome')
+          AND ts < ((${oggi}::date + 1)::timestamp AT TIME ZONE 'Europe/Rome'))
       + (SELECT count(*) FROM registro WHERE genere = 'anomalia' AND stato = 'aperta')
     )::int AS n`;
   return r.n;

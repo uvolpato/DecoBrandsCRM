@@ -163,6 +163,26 @@ export async function letturaFallita(db: PrismaService, id: bigint, errore: stri
   });
 }
 
+/** Il servizio di lettura non risponde (chiave scaduta, crediti finiti: 401/402/403/429): la riga torna
+ *  `in_coda` **senza** consumare il tentativo (A4-01), perché non è colpa del documento. Apre
+ *  `lettura.non_raggiungibile` con la chiave vuota, come il controllo di Sistema (§7.14.3): un'anomalia
+ *  sola di servizio, non una per documento. */
+export async function letturaNonRaggiungibile(db: PrismaService, id: bigint, errore: string): Promise<string> {
+  return db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${id} FOR UPDATE`;
+    const riga = await tx.documenti_in_arrivo.findUnique({ where: { id } });
+    if (!riga || riga.stato !== 'in_lettura') return riga?.stato ?? ''; // non in lettura: non si tocca
+    const errorePulito = errore.replace(/\s+/g, ' ').slice(0, 300);
+    await tx.documenti_in_arrivo.update({ where: { id }, data: { stato: 'in_coda', tentativi: Math.max(0, riga.tentativi - 1), errore: errorePulito } });
+    await apriAnomalia(tx, {
+      servizio: 'lettura', codice: 'lettura.non_raggiungibile',
+      messaggio: `Il servizio di lettura non è raggiungibile (${errorePulito}): i documenti restano in coda.`,
+      dettaglio: { errore: errorePulito },
+    });
+    return 'in_coda';
+  });
+}
+
 /** Pezzo di nome leggibile e sicuro per il disco: lettere senza accenti, cifre, . _ - (D-60). */
 const pulisci = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 60);
 
@@ -688,11 +708,18 @@ export class DocumentiController {
   async correggi(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: CorrezioneLettura) {
     const ctx = contesto(req);
     const did = BigInt(id);
+    // A4-13: il corpo è un'interfaccia, il ValidationPipe non lo controlla: qui si valida a mano.
+    // Senza questo, `testata` stringa o una riga `null` darebbero TypeError → 500.
+    const ogg = (v: unknown) => v != null && typeof v === 'object' && !Array.isArray(v);
+    if (!ogg(b.testata)) throw new BadRequestException('Corpo non valido: `testata` deve essere un oggetto');
+    if (b.righe !== undefined && (!Array.isArray(b.righe) || b.righe.some((r) => !ogg(r)) || b.righe.length > 1000)) {
+      throw new BadRequestException('Corpo non valido: `righe` deve essere un elenco di oggetti, al massimo 1000');
+    }
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
       const d = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
       if (!d) throw new NotFoundException('Documento non trovato');
-      if (d.stato !== 'da_controllare') throw new ConflictException('Il documento non è più da controllare');
+      if (d.stato !== 'da_controllare' && d.stato !== 'errore') throw new ConflictException('Il documento non è più da controllare');
 
       const testata = b.testata ?? {};
       // D-133: le righe si riscrivono solo se il corpo le porta (l'import del fornitore corregge la sola testata)
@@ -804,15 +831,18 @@ export class DocumentiController {
       if (nuove.length) await tx.documenti_campi.createMany({ data: nuove });
 
       const livelloPrima = d.livello;
+      // A4-01: da `errore` la correzione a mano riporta il documento `da_controllare` e chiude l'anomalia
+      const daErrore = d.stato === 'errore';
       await tx.documenti_in_arrivo.update({
         where: { id: did },
-        data: { tipo, fornitore_id, fornitore_versione_id, errore: null },
+        data: { stato: 'da_controllare', tipo, fornitore_id, fornitore_versione_id, errore: null, ...(daErrore ? { tentativi: 0 } : {}) },
       });
       const val = await valutaLettura(tx, did);
       await tx.documenti_in_arrivo.update({
         where: { id: did },
         data: { livello: val.livello, controlli: { falliti: val.controlli } as unknown as Prisma.InputJsonValue },
       });
+      if (daErrore) await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(did));
       await logEvent(tx, {
         tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
         dettaglio: {
@@ -856,6 +886,31 @@ export class DocumentiController {
         },
       }, ctx);
       // §7.14.3: l'anomalia della lettura si chiude quando il documento è scartato
+      await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(did));
+    });
+  }
+
+  /** Riprova la lettura di un documento in `errore` (A4-01, §7.9): torna `in_coda` e chiude
+   *  `lettura.fallita`; il lettore lo riprende al giro successivo. Solo da `errore`. */
+  @Post(':id/rileggi')
+  @HttpCode(204)
+  @Richiede('provvigioni.modifica')
+  async rileggi(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
+    const ctx = contesto(req);
+    const did = BigInt(id);
+    await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
+      const d = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
+      if (!d) throw new NotFoundException('Documento non trovato');
+      if (d.stato !== 'errore') throw new ConflictException('Solo un documento in errore si può rileggere');
+      await tx.documenti_in_arrivo.update({ where: { id: did }, data: { stato: 'in_coda', tentativi: 0, errore: null } });
+      await logEvent(tx, {
+        tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
+        dettaglio: {
+          etichetta: d.file_nome, documento_id: String(did), pratica_id: null,
+          prima: { stato: 'errore' }, dopo: { stato: 'in_coda' },
+        },
+      }, ctx);
       await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(did));
     });
   }
@@ -1229,10 +1284,12 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
     const a = await tx.documenti_in_arrivo.findUnique({ where: { id: arrivo_id } });
     if (!a) throw new NotFoundException('File non trovato');
     // solo un file in coda o letto da controllare: uno già abbinato, scartato o in lettura non si riusa (D-54)
-    if (a.stato !== 'in_coda' && a.stato !== 'da_controllare') throw new ConflictException('Il file non è più in coda: è già abbinato, scartato o in lettura');
+    // A4-01: anche da `errore` si può abbinare a mano (dati inseriti qui, lettura non riuscita)
+    if (a.stato !== 'in_coda' && a.stato !== 'da_controllare' && a.stato !== 'errore') throw new ConflictException('Il file non è più in coda: è già abbinato, scartato o in lettura');
     // il PDF di un bollettino resta suo: non diventa anche il documento di una pratica (D-54, D-74)
     if (a.abbinato_bollettino_id) throw new ConflictException('Il file è il PDF di un bollettino');
     await tx.documenti_in_arrivo.update({ where: { id: arrivo_id }, data: { stato: 'abbinato', tipo: b.tipo, abbinato_pratica_id: pid, controllato_il: new Date(), utente_id: ctx.utente_id ?? a.utente_id } });
+    if (a.stato === 'errore') await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(arrivo_id));
   }
   const d = await tx.ordini_fornitore_documenti.create({
     data: { testata_id: pid, tipo: b.tipo, numero, data: new Date(data), importo, storno_totale, fattura_id, arrivo_id, note: b.note },

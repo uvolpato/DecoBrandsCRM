@@ -18,3 +18,7 @@ Valgono per ogni sessione di OpenCode che esegue un pacchetto `collaudo-<onda>-N
   - `npx tsc --noEmit` passa nel backend e, se hai toccato il frontend, anche nel frontend;
   - c'è il resoconto `strumenti/opencode/resoconto-collaudo-<onda>-NN.md` con la sezione «Da documentare».
 - Alla fine scrivi un riepilogo di massimo 10 righe: rilievi corretti, prove con l'esito, cose aperte.
+
+## Comandi della shell (13/11/2026)
+- Niente `cd` nei comandi: `opencode run` rifiuta da solo i permessi per le cartelle esterne e un `cd` fuori posto ferma la sessione senza lavoro. Percorsi sempre dalla radice del progetto (`npx --prefix app/backend …`); per cercare file gli strumenti glob/grep, non `find`.
+- Niente `/tmp` né cartelle fuori dal progetto (anche questo ferma la sessione): file temporanei e log in `strumenti/collaudo/e2e/uscita/` (ignorata da git). Niente processi lanciati in background con `&`: i comandi lunghi si lanciano in primo piano con un timeout lungo.

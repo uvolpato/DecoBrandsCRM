@@ -60,9 +60,14 @@ with sync_playwright() as p:
 
     pg = entra(S + '-ammi')
     # ---------- 1. elenco, ricerca, segmenti, ordinamento, pagine, memoria
+    # i conteggi vengono dal server: le prove precedenti creano/importano soggetti (c)
+    c_conteggi = pg.evaluate("async () => (await (await fetch('/api/soggetti')).json()).conteggi")
+    n_tutti, n_clienti, n_fornitori, n_subagenti = c_conteggi['tutti'], c_conteggi['cliente'], c_conteggi['fornitore'], c_conteggi['subagente']
+    n_pag2 = max(0, n_tutti - 25)
     ok('Soggetti' in testo(pg, '.testa h1'), 'titolo della pagina')
-    ok(righe(pg) == 25 and 'di 28' in testo(pg, '.soggetti-filtri .dt-piede'), 'elenco: 25 righe in pagina, 28 soggetti dal server')
-    ok(seg(pg, 'Tutti').locator('.n').inner_text() == '28', 'segmento Tutti: 28 dal server')
+    ok(righe(pg) == min(25, n_tutti) and 'di %d' % n_tutti in testo(pg, '.soggetti-filtri .dt-piede'),
+       'elenco: %d righe in pagina, %d soggetti dal server' % (min(25, n_tutti), n_tutti))
+    ok(seg(pg, 'Tutti').locator('.n').inner_text() == str(n_tutti), 'segmento Tutti: %d dal server' % n_tutti)
     cerca(pg, 'MCL')
     ok(attesa(pg, '.soggetti-filtri .dt tbody tr:has-text("MCL SRL")') and righe(pg) == 1, 'ricerca per nome: MCL SRL')
     ok(attesa(pg, '.segmenti [role=tab]:has-text("Tutti") .n:text-is("1")') and seg(pg, 'Tutti').locator('.n').inner_text() == '1',
@@ -71,37 +76,40 @@ with sync_playwright() as p:
     ok(righe(pg) == 1 and 'P.IVA 08943010155' in testo(pg, '.soggetti-filtri .dt tbody'), 'ricerca per P.IVA: MCL')
     cerca(pg, '')
     seg(pg, 'Clienti').click()
-    ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("13 elementi")') and '13 elementi' in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Clienti: 13 dal server')
+    ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("%d elementi")' % n_clienti) and '%d elementi' % n_clienti in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Clienti: %d dal server' % n_clienti)
     seg(pg, 'Fornitori').click()
-    ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("12 elementi")') and '12 elementi' in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Fornitori: 12 dal server')
+    ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("%d elementi")' % n_fornitori) and '%d elementi' % n_fornitori in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Fornitori: %d dal server' % n_fornitori)
     seg(pg, 'Subagenti').click()
-    ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("4 elementi")') and '4 elementi' in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Subagenti: 4 dal server')
+    ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("%d elementi")' % n_subagenti) and '%d elementi' % n_subagenti in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Subagenti: %d dal server' % n_subagenti)
     seg(pg, 'Non attivi').click()
     ok(attesa(pg, '.soggetti-filtri .dt:has-text("Nessun soggetto")') and righe(pg) == 0, 'segmento Non attivi: elenco vuoto')
     seg(pg, 'Tutti').click(); pg.wait_for_timeout(800)
     pg.click('.soggetti-filtri .dt th:has-text("Codice")')
     ok(attesa(pg, '.soggetti-filtri .dt th[aria-sort="descending"]:has-text("Codice")'), 'ordinamento dal server: codice decrescente')
-    codici = lambda pg: [x.inner_text() for x in pg.locator('.soggetti-filtri .dt tbody tr td:first-child').all()]
+    codici = lambda pg: pg.locator('.soggetti-filtri .dt tbody tr td:first-child').all_inner_texts()
     def codici_attesi(pg, n, rovescio=None, minore=None, timeout=20000):
         fine, c = time.time() + timeout / 1000, []
         while time.time() < fine:
-            c = codici(pg)
+            try:
+                c = codici(pg)
+            except Exception:
+                c = []  # la tabella sta cambiando pagina: si riprova
             if len(c) == n and (rovescio is None or c == sorted(c, reverse=rovescio)) and (minore is None or c[0] < minore):
                 return c
             pg.wait_for_timeout(250)
         return c
-    c1 = codici_attesi(pg, 25, rovescio=True)
-    ok(len(c1) == 25 and c1 == sorted(c1, reverse=True), 'ordinamento dal server: righe in ordine decrescente')
+    c1 = codici_attesi(pg, min(25, n_tutti), rovescio=True)
+    ok(len(c1) == min(25, n_tutti) and c1 == sorted(c1, reverse=True), 'ordinamento dal server: righe in ordine decrescente')
     pg.click('.dt-pagine button[title="Pagina 2"]')
-    c2 = codici_attesi(pg, 3, rovescio=True, minore=c1[-1])
-    ok(len(c2) == 3 and c2[0] < c1[-1] and c2 == sorted(c2, reverse=True), 'pagina 2: le ultime tre righe')
+    c2 = codici_attesi(pg, n_pag2, rovescio=True, minore=c1[-1])
+    ok(len(c2) == n_pag2 and (not c2 or c2[0] < c1[-1]) and c2 == sorted(c2, reverse=True), 'pagina 2: le ultime righe')
     # memoria della schermata (§7.12): ricerca, scheda, ordinamento e pagina si ritrovano
     pg.click('.soggetti-filtri .dt tbody tr:first-child'); pg.wait_for_selector('.schede-barra [role=tab]', timeout=10000)
     pg.wait_for_selector('.dettagli'); pg.wait_for_timeout(500)
     scheda(pg, 'Sedi'); pg.wait_for_timeout(300)
     vai(pg, 'Clienti'); ok('/clienti' in pg.url, 'vado a Clienti dal menu')
     pg.go_back(); pg.wait_for_selector('.soggetti-filtri .dt tbody tr.cliccabile'); pg.wait_for_timeout(700)
-    ok(codici_attesi(pg, 3, rovescio=True, minore=c1[-1]) == c2, 'indietro: pagina e ordinamento ricordati')
+    ok(codici_attesi(pg, n_pag2, rovescio=True, minore=c1[-1]) == c2, 'indietro: pagina e ordinamento ricordati')
     ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Sedi")').count() == 1, 'indietro: stessa scheda')
 
     # ---------- 2. scheda del soggetto: quattro schede con i contatori

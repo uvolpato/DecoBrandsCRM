@@ -13,17 +13,16 @@ const config: NextConfig = {
     const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'" +
       (process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'") +
       "; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'";
-    return [
-      {
-        source: '/((?!api/).*)',
-        headers: [
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Content-Security-Policy', value: csp },
-        ],
-      },
+    const intestazioni: { key: string; value: string }[] = [
+      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Content-Security-Policy', value: csp },
     ];
+    // HSTS solo in esercizio: in sviluppo il browser non deve ricordare localhost (D-41, §3.4)
+    if (process.env.NODE_ENV === 'production')
+      intestazioni.push({ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' });
+    return [{ source: '/((?!api/).*)', headers: intestazioni }];
   },
   // Il browser parla solo con il frontend: /api/* va al backend, così sessione e CSRF
   // restano sulla stessa origine (§3.3).

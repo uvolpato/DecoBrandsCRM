@@ -2,7 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
-import { FilterBar } from '@/componenti/FilterBar';
+import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
@@ -12,6 +12,7 @@ import { SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { AREE, LIVELLI, RUOLI, usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
+import { useMemoria } from '@/lib/memoria';
 
 // Utenti e ruoli (§7.13, D-39, D-45), come vistaUtenti del prototipo (viste-gestione.js): elenco con
 // ricerca e segmenti, scheda Dati dell'utente · Cosa può fare ogni ruolo, finestre.
@@ -35,8 +36,6 @@ interface Utente {
 interface Permesso { id: string; area: string; testo: string; ruoli?: string[]; minimo?: string; ancheOperatore?: boolean }
 
 // filtro e scheda restano tornando alla pagina, come nel prototipo
-let filtro: Record<string, string> = { vista: 'attivi', q: '' };
-let schedaUtente = 'utente';
 const VISTE: Record<string, (u: Utente) => boolean> = { attivi: (u) => u.attivo, disattivati: (u) => !u.attivo, tutti: () => true };
 const ULTIMA_EMAIL: Record<string, string> = { benvenuto: 'Benvenuto con la password provvisoria', password: 'Nuova password provvisoria', reset: 'Password dimenticata' };
 const ORDINE = Object.keys(LIVELLI); // lettura < operatore < responsabile
@@ -51,7 +50,7 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
   const router = useRouter();
   const [utenti, setUtenti] = useState<Utente[] | null>(null);
   const [permessi, setPermessi] = useState<Permesso[] | null>(null);
-  const [valori, setValori] = useState(filtro);
+  const [valori, setValori] = useMemoria<Valori>('filtri', { vista: 'attivi', q: '' });
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [errore, setErrore] = useState('');
   const sagome = useSagome(!utenti);
@@ -68,10 +67,10 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
 
   // la ricerca vale anche per i numeri dei segmenti (D-23): contano con gli altri filtri
   const cercati = useMemo(() => {
-    const q = (valori.q ?? '').toLowerCase();
+    const q = String(valori.q ?? '').toLowerCase();
     return (utenti ?? []).filter((x) => !q || [x.nome, x.username, x.email].some((t) => t.toLowerCase().includes(q)));
   }, [utenti, valori.q]);
-  const righe = useMemo(() => cercati.filter(VISTE[valori.vista]), [cercati, valori.vista]);
+  const righe = useMemo(() => cercati.filter(VISTE[String(valori.vista ?? 'attivi')]), [cercati, valori.vista]);
 
   const nuovo = () => modifica(null);
   const pagina = (corpo?: ReactNode) => (
@@ -82,7 +81,7 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
     </Pagina>
   );
   const filtri = (
-    <FilterBar valori={valori} onChange={(v) => { filtro = v; setValori(v); }} caricando={sagome} campi={[
+    <FilterBar valori={valori} onChange={setValori} caricando={sagome} campi={[
       { nome: 'q', tipo: 'cerca', placeholder: 'Nome, nome utente o email' },
       { nome: 'vista', tipo: 'segmenti', opzioni: [
         { value: 'attivi', label: 'Attivi', n: utenti ? cercati.filter(VISTE.attivi).length : undefined },
@@ -183,7 +182,7 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
 
   const colonne: Colonna<Utente>[] = [
     { key: 'nome', header: 'Utente', grow: true, cell: (x) => <><b>{x.nome}</b>{x.id === io.id && <> <span className="testo-tenue">(tu)</span></>}<span className="sec-riga">{x.username} · {x.email}</span></> },
-    { key: 'ruolo', header: 'Ruolo e aree', valore: (x) => (x.ruolo === 'utente' ? 'z' : RUOLI[x.ruolo]) + ' ' + livelliTesto(x), cell: (x) => x.sistema ? <Stato v="neutro">Servizi automatici</Stato>
+    { key: 'ruolo', header: 'Ruolo e aree', classe: () => 'avvolgi', valore: (x) => (x.ruolo === 'utente' ? 'z' : RUOLI[x.ruolo]) + ' ' + livelliTesto(x), cell: (x) => x.sistema ? <Stato v="neutro">Servizi automatici</Stato>
       : <>{x.ruolo !== 'utente' && <Stato v="primario">{RUOLI[x.ruolo]}</Stato>}<span className="sec-riga">{livelliTesto(x) || 'nessuna area'}</span></> },
     { key: 'accesso', header: 'Ultimo accesso', valore: (x) => x.ultimo_accesso ?? '', cell: (x) => !x.attivo ? <Stato v="neutro">Disattivato</Stato> : x.ultimo_accesso || x.sistema ? quando(x.ultimo_accesso) : <Stato v="attesa">Mai entrato</Stato> },
   ];
@@ -252,13 +251,13 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
       <div className="pila riempi">
         {filtri}
         <div className="riempi">
-          <DataTable righe={righe} filtro={valori.q + '|' + valori.vista} colonne={colonne} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'nome', dir: 'asc' }}
+          <DataTable righe={righe} filtro={String(valori.q ?? '') + '|' + String(valori.vista ?? '')} colonne={colonne} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'nome', dir: 'asc' }}
             rowClass={(x) => (x.id === u.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/utenti/' + x.id)}
-            emptyText="Nessun utente" emptyHint="Cambia la ricerca o il filtro." />
+            emptyText="Nessun utente" emptyHint="Cambia la ricerca o il filtro." memoria="utenti" />
         </div>
       </div>
       <Pannello titolo={u.nome} nota={u.sistema ? 'utente dei servizi automatici' : ''} riempi azioni={azioni}>
-        <Schede riempi attiva={schedaUtente} onCambia={(id) => { schedaUtente = id; }} schede={[
+        <Schede riempi memoria="utenti" schede={[
           { id: 'utente', etichetta: 'Dati dell’utente', contenuto: datiUtente },
           { id: 'ruoli', etichetta: 'Permessi', contenuto: cosaPuoFare },
         ]} />

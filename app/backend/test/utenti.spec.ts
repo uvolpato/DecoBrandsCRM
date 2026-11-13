@@ -6,6 +6,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra, verifica } from '../src/password';
+import { cifra as cifraSegreto } from '../src/segreto';
 import * as posta from '../src/posta';
 import { PrismaService } from '../src/prisma.service';
 import { restaUnAmministratore } from '../src/utenti';
@@ -140,6 +141,36 @@ describe('modifica', () => {
     await db.accessi_link.create({ data: { utente_id: BigInt(id.trasloco), tipo: 'reset', impronta: 'a'.repeat(64), scade_il: new Date(Date.now() + 3600_000) } });
     await (await entra('ammi')).put('/utenti/' + id.trasloco, { ...nuovo('trasloco'), email: 'nuova-casa' + DOMINIO }).expect(200);
     expect(await db.accessi_link.count({ where: { utente_id: BigInt(id.trasloco) } })).toBe(0);
+  });
+
+  it("cambio email: avviso al vecchio indirizzo; altri campi: nessun messaggio (D-117)", async () => {
+    const spiaAvviso = jest.spyOn(posta, 'avvisoEmailCambiata').mockResolvedValue(null);
+    await crea('trasloco2', 'operatore');
+    await (await entra('ammi')).put('/utenti/' + id.trasloco2, { ...nuovo('trasloco2'), email: 'nuova-casa2' + DOMINIO }).expect(200);
+    expect(spiaAvviso).toHaveBeenCalledTimes(1);
+    expect(spiaAvviso.mock.calls[0][1]).toBe('trasloco2' + DOMINIO); // il vecchio indirizzo
+    expect(spiaAvviso.mock.calls[0][2]).toMatchObject({ username: 'trasloco2' }); // l'account cambiato (C1)
+    expect(spiaAvviso.mock.calls[0][3]).toMatchObject({ nome: 'Prova ammi' }); // chi l'ha fatto
+    spiaAvviso.mockClear();
+    await (await entra('ammi')).put('/utenti/' + id.trasloco2, { ...nuovo('trasloco2'), email: 'nuova-casa2' + DOMINIO, nome: 'Trasloco Due' }).expect(200);
+    expect(spiaAvviso).not.toHaveBeenCalled();
+    spiaAvviso.mockRestore();
+  });
+
+  it('l’avviso nomina l’utente cambiato e l’ora di Roma (C1, C2)', async () => {
+    await db.impostazioni.upsert({
+      where: { chiave: 'posta' },
+      update: { valore: { server: 'smtp.x', porta: 587, utente: 'u', password: cifraSegreto('pw'), mittente: 'Decobrands' } },
+      create: { chiave: 'posta', valore: { server: 'smtp.x', porta: 587, utente: 'u', password: cifraSegreto('pw'), mittente: 'Decobrands' } },
+    });
+    let testo = '';
+    const trasportoFinto = { sendMail: async (m: { text: string }) => { testo = m.text; return { messageId: 'x' }; } } as never;
+    await posta.avvisoEmailCambiata(db, 'lbianchi' + DOMINIO, { username: 'lbianchi' }, { nome: 'Prova ammi' }, new Date('2026-01-15T10:30:00Z'), trasportoFinto);
+    expect(testo).toContain('tuo utente lbianchi'); // l'account cambiato, non chi l'ha fatto (C1)
+    expect(testo).toContain('da Prova ammi');
+    expect(testo).toContain('11:30'); // 10:30 UTC → 11:30 a Roma (C2)
+    expect(testo).not.toContain('10:30');
+    await db.impostazioni.delete({ where: { chiave: 'posta' } });
   });
 
   it('i propri dati sì, il proprio ruolo no', async () => {

@@ -311,11 +311,24 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         }} />);
   }
 
+  /** A4-01: riprova la lettura di un documento in errore (chiave o crediti del servizio sistemati). */
+  async function rileggi() {
+    const r = await api('documenti/' + id + '/rileggi', {});
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    avviso('Documento rimesso in coda: la lettura riparte al prossimo giro');
+    onFatto?.();
+    router.push('/documenti');
+  }
+
   const azioni: Azione[] = [
-    ...(puoModifica && d.stato === 'da_controllare' ? [{
+    ...(puoModifica && ['da_controllare', 'errore'].includes(d.stato) ? [{
       etichetta: 'Correggi i dati letti', onClick: () => setFinestra(<FinestraCorreggi d={d} onChiudi={chiudi} onSalvato={salvato} />),
       conta: n || undefined, contaVariante: d.livello === 'bassa' ? 'errore' as const : 'attesa' as const,
       titolo: n + (n === 1 ? ' punto da controllare' : ' punti da controllare'),
+    }] : []),
+    // A4-01: da errore si riprova la lettura (servizio di nuovo raggiungibile, dati inseriti a mano)
+    ...(puoModifica && d.stato === 'errore' ? [{
+      etichetta: 'Rileggi il documento', onClick: rileggi,
     }] : []),
     ...(puoModifica && ['da_controllare', 'errore', 'in_coda'].includes(d.stato) ? [{
       etichetta: 'Scarta il documento', variante: 'pericolo' as const, onClick: scarta,

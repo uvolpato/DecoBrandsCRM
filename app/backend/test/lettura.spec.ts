@@ -9,7 +9,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { leggiDallaCoda } from '../src/lettura';
-import { type CampoLetto, type Lettura } from '../src/lettore';
+import { leggiDocumento, type CampoLetto, type Lettura } from '../src/lettore';
 import { PrismaService } from '../src/prisma.service';
 import { svuota } from './svuota';
 
@@ -205,5 +205,33 @@ describe('F6-A2 lettura dalla coda', () => {
     const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } });
     expect(riga.controlli).toEqual({ falliti: [{ codice: 'codice_cliente', campo: 'codice_cliente', testo: 'Codice cliente ZZZ-999 non presente fra i clienti del fornitore', grave: true }] });
     expect(riga.livello).toBe('bassa');
+  });
+
+  // C1: se il servizio è giù (5xx, rete o timeout) il documento non consuma il tentativo e
+  // l'anomalia del servizio resta una sola, non una per documento.
+  async function treGiri(lettore: Parameters<typeof leggiDallaCoda>[2]) {
+    await leggiDallaCoda(db, config, lettore);
+    await leggiDallaCoda(db, config, lettore);
+    await leggiDallaCoda(db, config, lettore);
+  }
+
+  it('servizio che risponde 503: tentativi invariati e una sola anomalia di servizio', async () => {
+    const d = await inCoda();
+    const giu = (async () => new Response('giù', { status: 503 })) as typeof fetch;
+    await treGiri((c, nome, dati, schema, prompt) => leggiDocumento(c, nome, dati, schema, prompt, giu, 1));
+    expect(await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } }))
+      .toMatchObject({ stato: 'in_coda', tentativi: 0 });
+    expect(await db.registro.count({ where: { codice: 'lettura.non_raggiungibile', stato: 'aperta' } })).toBe(1);
+    expect(await db.registro.count({ where: { codice: 'lettura.fallita' } })).toBe(0);
+  });
+
+  it('servizio che va in timeout: tentativi invariati e una sola anomalia di servizio', async () => {
+    const d = await inCoda();
+    const inTimeout = (async () => { throw Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' }); }) as typeof fetch;
+    await treGiri((c, nome, dati, schema, prompt) => leggiDocumento(c, nome, dati, schema, prompt, inTimeout, 1));
+    expect(await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } }))
+      .toMatchObject({ stato: 'in_coda', tentativi: 0 });
+    expect(await db.registro.count({ where: { codice: 'lettura.non_raggiungibile', stato: 'aperta' } })).toBe(1);
+    expect(await db.registro.count({ where: { codice: 'lettura.fallita' } })).toBe(0);
   });
 });

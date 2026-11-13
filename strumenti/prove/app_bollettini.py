@@ -59,10 +59,13 @@ with sync_playwright() as p:
         if conferma: pg.click('.velo .modale-piede button:has-text("Carica")')
 
     pg = entra(S + '-ammi')
+    # il numero dei fornitori viene dal server (D-101: il seed è cresciuto), non da una costante
+    n_tot = len(pg.request.get(BASE + '/api/bollettini?al=2026-09').json()['fornitori'])
+    ok(n_tot >= 2, 'il server ha %d fornitori nella matrice' % n_tot)
     ok('Bollettini' in testo(pg, '.testa h1'), 'titolo della pagina')
-    ok(righe_m(pg) == 11 and celle_max(pg) == 66, 'matrice: 11 fornitori x 6 mesi')
+    ok(righe_m(pg) == n_tot and celle_max(pg) == n_tot * 6, 'matrice: %d fornitori x 6 mesi' % n_tot)
     ok(pg.locator('.matrice .m-intest').count() == 7, 'intestazione: fornitore + 6 mesi')
-    ok('Tutti' in testo(pg, '.segmenti') and nseg(pg, 'Tutti') == 11, 'segmento Tutti: 11 fornitori')
+    ok('Tutti' in testo(pg, '.segmenti') and nseg(pg, 'Tutti') == n_tot, 'segmento Tutti: %d fornitori' % n_tot)
     ok(cella(pg, indice_riga(pg, 'Gasper'), 3).inner_text().startswith('Non arrivato'), 'cella senza bollettino passato il giorno: Non arrivato')
     pg.screenshot(path=str(USCITA / 'app-bollettini-1440.png'))
 
@@ -70,9 +73,9 @@ with sync_playwright() as p:
     da_fare = nseg(pg, 'Con qualcosa da fare')
     seg(pg, 'Con qualcosa da fare').click()
     pg.wait_for_function("n => document.querySelectorAll('.matrice .m-riga').length === n", arg=da_fare)
-    ok(righe_m(pg) == da_fare and nseg(pg, 'Tutti') == 11, 'vista Da fare: %d fornitori, i numeri non cambiano' % da_fare)
-    seg(pg, 'Tutti').click(); pg.wait_for_function("document.querySelectorAll('.matrice .m-riga').length === 11")
-    ok(righe_m(pg) == 11, 'vista Tutti: tornano 11 fornitori')
+    ok(righe_m(pg) == da_fare and nseg(pg, 'Tutti') == n_tot, 'vista Da fare: %d fornitori, i numeri non cambiano' % da_fare)
+    seg(pg, 'Tutti').click(); pg.wait_for_function("n => document.querySelectorAll('.matrice .m-riga').length === n", arg=n_tot)
+    ok(righe_m(pg) == n_tot, 'vista Tutti: tornano %d fornitori' % n_tot)
 
     # filtro multiplo (D-22), riepilogo dei filtri e conteggi che seguono
     fb = pg.locator('.barra-periodo')
@@ -88,8 +91,8 @@ with sync_playwright() as p:
     pg.screenshot(path=str(USCITA / 'app-bollettini-filtro-1440.png'))
     pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
     pg.locator('.riepilogo-filtri .btn-icona').nth(1).click()
-    pg.wait_for_function("document.querySelectorAll('.matrice .m-riga').length === 11")
-    ok(righe_m(pg) == 11, 'tolti i filtri dal riepilogo: tornano 11 fornitori')
+    pg.wait_for_function("n => document.querySelectorAll('.matrice .m-riga').length === n", arg=n_tot)
+    ok(righe_m(pg) == n_tot, 'tolti i filtri dal riepilogo: tornano %d fornitori' % n_tot)
 
     # periodo: selettore a mesi (D-16), sempre 6 colonne; le frecce spostano di un mese
     pg.click('.periodo-btn'); pg.wait_for_selector('.pm-mesi')
@@ -137,7 +140,7 @@ with sync_playwright() as p:
 
     # sola lettura: consulta la matrice, niente pulsante di caricamento
     pg = entra(S + '-lett'); pg.wait_for_timeout(500)
-    ok(righe_m(pg) == 11 and pg.locator('button:has-text("Carica un bollettino")').count() == 0 and pg.locator('button:has-text("Sollecita")').count() == 0, 'sola lettura: matrice senza pulsanti di modifica')
+    ok(righe_m(pg) == n_tot and pg.locator('button:has-text("Carica un bollettino")').count() == 0 and pg.locator('button:has-text("Sollecita")').count() == 0, 'sola lettura: matrice senza pulsanti di modifica')
     pg.close()
     b.close()
 

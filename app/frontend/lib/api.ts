@@ -36,8 +36,10 @@ function allAccesso() {
   window.location.assign('/accesso?dopo=' + encodeURIComponent(window.location.pathname));
 }
 
-/** GET senza corpo, POST con il corpo; PUT e DELETE si chiedono con `metodo`. */
-export async function api<T = unknown>(percorso: string, corpo?: object, metodo?: 'PUT' | 'DELETE'): Promise<Risposta<T>> {
+/** GET senza corpo, POST con il corpo; PUT e DELETE si chiedono con `metodo`. `automatico` segna le
+ *  richieste che il browser fa da solo (polling, riletture su evento SSE): non contano come attività
+ *  della persona, così il timeout di inattività (D-89) scatta anche su una scheda aperta da sola. */
+export async function api<T = unknown>(percorso: string, corpo?: object, metodo?: 'PUT' | 'DELETE', opzioni?: { automatico?: boolean }): Promise<Risposta<T>> {
   const scrive = !!corpo || !!metodo;
   // pagina appena aperta con una sessione: il token si prende prima di modificare (senza sessione non serve)
   if (scrive && !csrf && percorso !== 'accesso/io') await api('accesso/io');
@@ -45,7 +47,9 @@ export async function api<T = unknown>(percorso: string, corpo?: object, metodo?
   try {
     r = await fetch('/api/' + percorso, {
       method: metodo ?? (corpo ? 'POST' : 'GET'),
-      headers: scrive ? { 'content-type': 'application/json', 'x-csrf-token': csrf } : undefined,
+      headers: scrive
+        ? { 'content-type': 'application/json', 'x-csrf-token': csrf, ...(opzioni?.automatico ? { 'x-automatico': '1' } : {}) }
+        : opzioni?.automatico ? { 'x-automatico': '1' } : undefined,
       body: corpo ? JSON.stringify(corpo) : undefined,
       credentials: 'same-origin',
     });

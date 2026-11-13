@@ -44,10 +44,11 @@ Ogni documento letto ha un'**affidabilità per campo** (nell'app arriva da GLM-O
 - Le righe sono una **DataTable** standard (ordinabile, totale fisso) con celle modificabili. Il codice articolo è un campo di ricerca sugli articoli già usati dal fornitore nei documenti registrati (nel giro agenzia gli articoli non sono nell'anagrafica Decobrands): pallino verde se noto, rosso se nuovo; un articolo nuovo si inserisce lo stesso e non conta fra i punti da controllare. *Aggiungi riga* apre una finestra modale: scegliendo un articolo noto propone descrizione e ultimo prezzo.
 - **Prova:** conferma AB-77120 di Gries → quantità della riga 3 letta 12 ma stampata 18 (il totale non torna) e codice della riga 8 letto CI0T-387 con lo zero (affidabilità 86 %) → correggi in 18 e CIOT-387, conferma data e prezzo della riga 5 → lettura affidabile.
 
-> ⚠ **Evidenziazione nel documento: funzione da verificare.** Nel prototipo il documento a sinistra è una pagina simulata, quindi l'evidenziazione è sempre precisa. Con i file reali dipende dal file: attesa precisa sui PDF da gestionale e sugli Excel, possibile approssimata o assente sugli scansionati. La fattibilità si misura con la prova F0-A7 (specifica §6.6) prima di confermarla al cliente.
+> ⚠ **Evidenziazione nel documento.** Nel prototipo il documento a sinistra è una pagina simulata, quindi l'evidenziazione è sempre precisa. Con i file reali il rettangolo sul valore è **verificato con il server di lettura cloud** (prova F0-A7 positiva); con GLM-OCR locale e con documenti scansionati o fotografati è **ancora da verificare** (specifica §6.6, D-06).
 
 ## Regole di flusso applicate
 
+- **Sotto i 744 px di larghezza il prototipo si ferma** con la pagina scura *computer o tablet* (V6, §16.6, D-44, D-127).
 - **Si torna sempre indietro, nello stesso punto**: ogni schermata aperta da un'altra ha *‹ Torna a …* in testa (come il tasto Indietro del browser); al ritorno filtri, riquadri scelti, ordinamento delle tabelle e scorrimento sono come li avevi lasciati. Prova: Pratiche → filtra, ordina, scorri → apri una pratica → *Torna a Pratiche*.
 - **Dati di Integra**: clienti e fornitori (con l'ampliamento anche articoli e giacenze) si leggono da viste sul database di Integra, sincronizzate ogni pochi secondi (sola lettura, niente file da importare); i subagenti, alias e kit si gestiscono nel CRM.
 - **Bollettino atteso**: ogni fornitore ha nelle condizioni il giorno del mese successivo entro cui manda il bollettino (iniziale 10). Fino a quel giorno il bollettino è *atteso* (Prossime scadenze), dopo diventa *non arrivato* e in Oggi compare il sollecito.
@@ -138,7 +139,7 @@ assets/logo-decobrands.png    logo
 
 ## Prove
 
-`python strumenti/prove/flusso.py` (dalla radice del repository; servono `playwright` con Chromium e `openpyxl`): percorre tutti i flussi e stampa una riga OK/KO per controllo; deve chiudere con 0 KO.
+`python strumenti/prove/flusso.py` (dalla radice del repository; servono `playwright` con Chromium e `openpyxl`): percorre tutti i flussi e stampa una riga OK/KO per controllo. **Non è più obbligatoria** (Ugo, 30/10/2026): le prove che contano sono quelle dell'app (`strumenti/prove/app_*.py`, `npm test`).
 
 ## Perché
 

@@ -240,7 +240,7 @@
     const q = (pct, regola, nota) => ({ pct: pct, provvigione: M.r2(imp * pct / 100), regola: regola, nota: nota || '' });
     const cor = M.correzioneSub(d.numero);
     if (cor) {
-      if (cor.tipo === 'importo') return { pct: imp ? M.r2(cor.valore / imp * 100) : 0, provvigione: M.r2(cor.valore), regola: 'correzione', nota: 'importo fisso: ' + cor.motivo };
+      if (cor.tipo === 'importo') { const v = imp < 0 ? -cor.valore : cor.valore; return { pct: imp ? M.r2(v / imp * 100) : 0, provvigione: M.r2(v), regola: 'correzione', nota: 'importo fisso: ' + cor.motivo }; }
       return q(cor.tipo === 'nessuna' ? 0 : cor.valore, 'correzione', (cor.tipo === 'nessuna' ? 'nessuna provvigione: ' : 'corretta: ') + cor.motivo);
     }
     if (ab && ab.mensile) {

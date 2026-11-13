@@ -6,6 +6,7 @@ import { Cerniera, type GruppoCerniera, type RigaCerniera } from '@/componenti/F
 import { FormModal } from '@/componenti/FormModal';
 import { Conferma, Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
+import { PdfEvidenziato } from '@/componenti/PdfEvidenziato';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
@@ -288,10 +289,8 @@ export function VistaBollettino({ id }: { id: string }) {
         {d.file ? (
           <div className="colonne riempi" style={{ '--colonne': 'minmax(300px, 0.8fr) minmax(0, 1.9fr)', flex: '1 1 auto', minHeight: 0 } as React.CSSProperties}>
             <Pannello titolo="Bollettino del fornitore" nota={d.file.nome} riempi>
-              <object data={'/api/documenti/' + d.file.arrivo_id + '/file'} type="application/pdf" aria-label="PDF del bollettino"
-                style={{ width: '100%', height: '100%', minHeight: 420, border: 0, borderRadius: 8, background: '#f1f3f5' }}>
-                <p>Il browser non mostra il PDF qui. <a href={'/api/documenti/' + d.file.arrivo_id + '/file'} target="_blank" rel="noreferrer">Apri il PDF in una scheda</a>.</p>
-              </object>
+              {/* PDF.js invece di <object>: il file arriva con CSP sandbox e il visualizzatore di Chromium non si apre (A4-10) */}
+              <PdfEvidenziato src={'/api/documenti/' + d.file.arrivo_id + '/file'} pagina={1} posizione={null} />
             </Pannello>
             {cerniera}
           </div>

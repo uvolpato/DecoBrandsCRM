@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { CampoProps } from '@/componenti/Campo';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
-import { FilterBar } from '@/componenti/FilterBar';
+import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Elenco } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
 import { Conferma, Modale } from '@/componenti/Modale';
@@ -14,6 +14,7 @@ import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
 import { agente, fornitore } from '@/lib/entita';
+import { useMemoria } from '@/lib/memoria';
 import { data as dataIt, pct } from '@/lib/formati';
 
 interface Agente {
@@ -66,8 +67,6 @@ interface FormEccezione {
 
 const oggi = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
-let filtro: Record<string, string> = { vista: 'attivi', q: '' };
-let schedaSubagente = 'dati';
 const VISTE: Record<string, (x: Subagente) => boolean> = { attivi: (x) => x.attivo, disattivati: (x) => !x.attivo, tutti: () => true };
 
 export function VistaSubagenti({ idSel }: { idSel?: string }) {
@@ -77,7 +76,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   const [subagenti, setSubagenti] = useState<Subagente[] | null>(null);
   const [agenti, setAgenti] = useState<Agente[] | null>(null);
   const [eccezioni, setEccezioni] = useState<Eccezione[] | null>(null);
-  const [valori, setValori] = useState(filtro);
+  const [valori, setValori] = useMemoria<Valori>('filtri', { vista: 'attivi', q: '' });
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [bozzaEccezione, setBozzaEccezione] = useState<FormEccezione | null>(null);
   const [errore, setErrore] = useState('');
@@ -102,10 +101,10 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   }, [subagenti, idSel, router]);
 
   const cercati = useMemo(() => {
-    const q = (valori.q ?? '').toLowerCase();
+    const q = String(valori.q ?? '').toLowerCase();
     return (subagenti ?? []).filter((x) => !q || [x.nome, x.cognome, x.codice, x.email ?? ''].some((t) => t.toLowerCase().includes(q)));
   }, [subagenti, valori.q]);
-  const righe = useMemo(() => cercati.filter(VISTE[valori.vista]), [cercati, valori.vista]);
+  const righe = useMemo(() => cercati.filter(VISTE[String(valori.vista ?? 'attivi')]), [cercati, valori.vista]);
 
   const chiudi = () => setFinestra(null);
   const chiedi = (titolo: string, testo: ReactNode, etichetta: string, pericolo = false) =>
@@ -349,7 +348,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   ];
 
   const filtri = (
-    <FilterBar valori={valori} onChange={(v) => { filtro = v; setValori(v); }} caricando={sagome} campi={[
+    <FilterBar valori={valori} onChange={setValori} caricando={sagome} campi={[
       { nome: 'q', tipo: 'cerca', placeholder: 'Nome, cognome, codice o email' },
       { nome: 'vista', tipo: 'segmenti', opzioni: [
         { value: 'attivi', label: 'Attivi', n: subagenti ? cercati.filter(VISTE.attivi).length : undefined },
@@ -407,13 +406,13 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
       <div className="pila riempi">
         {filtri}
         <div className="riempi">
-          <DataTable righe={righe} filtro={valori.q + '|' + valori.vista} colonne={colonne} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'nome', dir: 'asc' }}
+          <DataTable righe={righe} filtro={String(valori.q ?? '') + '|' + String(valori.vista ?? '')} colonne={colonne} chiave={(x) => x.id} ordinamentoIniziale={{ key: 'nome', dir: 'asc' }}
             rowClass={(x) => (x.id === u?.id ? 'selezionata' : '')} onRowClick={(x) => router.push('/subagenti/' + x.id)}
-            emptyText="Nessun subagente" emptyHint="Cambia la ricerca o il filtro." />
+            emptyText="Nessun subagente" emptyHint="Cambia la ricerca o il filtro." memoria="subagenti" />
         </div>
       </div>
       <Pannello titolo={u ? u.cognome + ' ' + u.nome : 'Subagente'} riempi azioni={azioni}>
-        {u ? <Schede riempi attiva={schedaSubagente} onCambia={(id) => { schedaSubagente = id; }} schede={[
+        {u ? <Schede riempi memoria="subagenti" schede={[
           { id: 'dati', etichetta: 'Dati', contenuto: datiSubagente },
           { id: 'eccezioni', etichetta: 'Eccezioni personali', conta: eccezioni?.length, contenuto: tabEccezioni },
         ]} /> : <SagomaCorpo />}

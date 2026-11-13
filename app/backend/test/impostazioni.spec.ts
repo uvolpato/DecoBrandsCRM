@@ -154,11 +154,39 @@ describe('F5-A6 rotte delle impostazioni', () => {
       update: { valore: { server: 'imap.x', porta: 993, utente: 'u', password: cifra('vecchia'), cartella: 'A', cartella_lette: 'B', minuti: 2 } },
       create: { chiave: 'casella', valore: { server: 'imap.x', porta: 993, utente: 'u', password: cifra('vecchia'), cartella: 'A', cartella_lette: 'B', minuti: 2 } },
     });
-    await ammi.put('/api/impostazioni/casella').set('x-csrf-token', csrf).send({ valori: { server: 'imap2.x', password: '' } }).expect(200);
-    expect((await casellaConfig(db))).toMatchObject({ server: 'imap2.x', password: 'vecchia' });
+    // cambio del server senza riscrivere la password: 400 e il segreto resta (D-115 §19)
+    await ammi.put('/api/impostazioni/casella').set('x-csrf-token', csrf).send({ valori: { server: 'imap2.x', password: '' } }).expect(400);
+    expect((await casellaConfig(db))).toMatchObject({ server: 'imap.x', password: 'vecchia' });
+    // password vuota su un campo che non individua il server: conserva la precedente
+    await ammi.put('/api/impostazioni/casella').set('x-csrf-token', csrf).send({ valori: { cartella: 'Altro', password: '' } }).expect(200);
+    expect((await casellaConfig(db))).toMatchObject({ server: 'imap.x', password: 'vecchia', cartella: 'Altro' });
 
     await ammi.put('/api/impostazioni/casella').set('x-csrf-token', csrf).send({ valori: { password: 'nuova' } }).expect(200);
     expect((await casellaConfig(db))!.password).toBe('nuova');
+  });
+
+  it('cambio di server, porta o utente senza password è 400 e il segreto non parte (A1-01)', async () => {
+    await db.impostazioni.upsert({
+      where: { chiave: 'posta' },
+      update: { valore: { server: 'smtp.x', porta: 587, utente: 'u', password: cifra('segreta'), mittente: 'Decobrands' } },
+      create: { chiave: 'posta', valore: { server: 'smtp.x', porta: 587, utente: 'u', password: cifra('segreta'), mittente: 'Decobrands' } },
+    });
+    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { server: 'smtp.attaccante.example' } }).expect(400);
+    expect(await postaConfig(db)).toMatchObject({ server: 'smtp.x', password: 'segreta' });
+    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { porta: 2525 } }).expect(400);
+    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { utente: 'altro' } }).expect(400);
+    expect(await postaConfig(db)).toMatchObject({ server: 'smtp.x', porta: 587, utente: 'u', password: 'segreta' });
+    // con la password nello stesso salvataggio il cambio passa
+    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { server: 'smtp.nuovo.example', password: 'altra' } }).expect(200);
+    expect(await postaConfig(db)).toMatchObject({ server: 'smtp.nuovo.example', password: 'altra' });
+  });
+
+  it('azienda (sezione senza connessione) si salva da amministratore e scrive il registro', async () => {
+    const prima = await db.registro.count({ where: { entita: 'impostazione' } });
+    const r = await ammi.put('/api/impostazioni/azienda').set('x-csrf-token', csrf)
+      .send({ valori: { ragione_sociale: 'RS Collaudo 1-04', piva: 'IT12345678901', email: 'a@b.it', indirizzo: 'Via X' } }).expect(200);
+    expect(r.body.campi.find((c: { nome: string }) => c.nome === 'ragione_sociale').valore).toBe('RS Collaudo 1-04');
+    expect(await db.registro.count({ where: { entita: 'impostazione' } })).toBe(prima + 1);
   });
 
   it('evento crud/update: entita impostazione, prima/dopo coi soli campi cambiati, mai il segreto', async () => {

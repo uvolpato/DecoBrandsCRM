@@ -3,6 +3,11 @@
 # file locali da non pubblicare
 image.png
 Claude outputs/
+# credenziali di prova di curl (A1-10, A8-14): mai nel repository pubblico
+body.json
+cookies.txt
+# cartelle di uscita delle prove: non vanno committate
+strumenti/prove/schermate-*/
 # documenti reali dei fornitori: non vanno nel repository
 documenti veri/
 app/documenti/
@@ -11,3 +16,6 @@ graphify-out/
 __pycache__/
 FDW_INTEGRA.txt
 dati-crm-legacy/
+
+# uscita del giro delle prove nel browser (strumenti/collaudo/e2e)
+strumenti/collaudo/e2e/uscita/

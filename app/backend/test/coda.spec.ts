@@ -2,11 +2,15 @@
 // letturaFallita con i 3 tentativi; nessuna rete (le righe si creano direttamente, senza file).
 import 'dotenv/config';
 import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { letturaFallita, prelevaDocumento } from '../src/documenti';
+import { leggiDallaCoda } from '../src/lettura';
+import { LetturaFallita } from '../src/lettore';
 import { PrismaService } from '../src/prisma.service';
 import { svuota } from './svuota';
 
@@ -22,6 +26,26 @@ async function inCoda(ricevuto_il: Date, nome = 'documento.pdf') {
     },
   });
 }
+
+// per `leggiDallaCoda`: il file deve esistere davvero, altrimenti fallisce prima di chiamare il lettore
+const radice = process.env.DOCUMENTI_DIR!;
+async function inCodaConFile() {
+  const nome = `doc-${++n}.pdf`;
+  const percorso = `in_arrivo/2026/20260904/${nome}`;
+  await mkdir(join(radice, dirname(percorso)), { recursive: true });
+  await writeFile(join(radice, percorso), Buffer.from('%PDF-1.4\n%%EOF\n'));
+  return db.documenti_in_arrivo.create({
+    data: {
+      origine: 'email', file_nome: nome, stato: 'in_coda', ricevuto_il: new Date(),
+      file_hash: createHash('sha256').update(String(n)).digest('hex'), file_percorso: percorso,
+    },
+  });
+}
+
+const config = {
+  connettore: 'llamacloud_eu' as const, indirizzo: 'https://api.cloud.eu.llamaindex.ai', chiave: 'llx-prova',
+  modo: 'agentic' as const, progetto: '', attesa_s: 30, soglia_ok: 0.9, soglia_bassa: 0.7,
+};
 
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -84,5 +108,20 @@ describe('letturaFallita', () => {
     await db.documenti_in_arrivo.update({ where: { id: d.id }, data: { stato: 'abbinato' } });
     expect(await letturaFallita(db, d.id, 'x')).toBe('abbinato');
     expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } })).stato).toBe('abbinato');
+  });
+});
+
+describe('leggiDallaCoda: errore di servizio (A4-01)', () => {
+  it('un 402 rimette in coda senza consumare il tentativo e apre lettura.non_raggiungibile', async () => {
+    const d = await inCodaConFile();
+    const rotto = async () => { throw new LetturaFallita('LlamaCloud non ha accettato il file (402): crediti finiti', 402); };
+    expect(await leggiDallaCoda(db, config, rotto)).toBe(true);
+    const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } });
+    expect(riga).toMatchObject({ stato: 'in_coda', tentativi: 0 });
+    expect(riga.errore).toContain('402');
+    expect(await db.registro.count({ where: { codice: 'lettura.non_raggiungibile', stato: 'aperta' } })).toBe(1);
+    // il tentativo non si è consumato: un secondo giro riparte da 1, non da 2
+    expect(await leggiDallaCoda(db, config, rotto)).toBe(true);
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } })).tentativi).toBe(0);
   });
 });

@@ -81,7 +81,7 @@ export function VistaDocumenti() {
     if (vEventi === vVista.current) return;
     vVista.current = vEventi;
     let vivo = true;
-    void api<Risposta>('documenti?stato=da_controllare&pagina=1&per_pagina=200').then((r) => {
+    void api<Risposta>('documenti?stato=da_controllare&pagina=1&per_pagina=200', undefined, undefined, { automatico: true }).then((r) => {
       if (vivo && r.ok) setDati(r.dati);
     });
     return () => { vivo = false; };

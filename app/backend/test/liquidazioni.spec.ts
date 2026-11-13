@@ -129,6 +129,36 @@ describe('GET /api/liquidazioni', () => {
     }
   });
 
+  it('storno di una fattura liquidata: voce = −provvigione della fotografia, allo stesso subagente, anche se l\'agenzia è cambiata (A2-01)', async () => {
+    const S = await caricaDati(db);
+    const liquida = S.pratiche.flatMap((p) => p.documenti.map((d) => ({ p, d })))
+      .find(({ p, d }) => d.tipo === 'fattura' && d.liquidazione_id && S.fornitori.get(p.fornitore_id)!.maturazione !== 'maturato')!;
+    expect(liquida).toBeTruthy();
+    const foto = S.fotografie.get(liquida.d.id)!;
+    expect(foto).toBeTruthy();
+    const ab = S.interscambio.find((a) => a.cliente_id === liquida.p.cliente_id && a.fornitore_id === liquida.p.fornitore_id)!;
+    const altro = [...S.subagenti.keys()].find((id) => id !== foto.subagente_id)!;
+    const prima = ab.subagente_id;
+    ab.subagente_id = altro; // cambio d'agenzia in memoria: la provvigione passata non si sposta (D-35)
+    const b: any = {
+      id: 'prova-storno', fornitore_id: liquida.p.fornitore_id, anno: 2026, mese: 8, stato: 'verificato',
+      ricevuto: '2026-08-20', chiuso_il: '2026-09-10',
+      righe: [{ id: 'prova-storno-riga', documento_id: liquida.d.id, liquidazione_id: null, numero: liquida.d.numero, data: null, imponibile: null, pct: null, importo: null, tipo: 'storno', pct_calcolata: null, importo_calcolato: null, decisione: null }],
+      attese: [],
+    };
+    (S.bollettini as any[]).push(b);
+    try {
+      const voce = righeLiquidazione(S, 2026, 3).find((r) => r.riga_bollettino_id === 'prova-storno-riga')!;
+      expect(voce).toBeTruthy();
+      expect(voce.subagente_id).toBe(foto.subagente_id);
+      expect(Number(voce.provvigione)).toBe(-Number(foto.provvigione));
+      expect(Number(voce.pct)).toBe(Number(foto.pct));
+    } finally {
+      ab.subagente_id = prima;
+      (S.bollettini as any[]).pop();
+    }
+  });
+
   it('trimestre chiuso: dalla fotografia salvata', async () => {
     const liq = await db.liquidazioni.findUniqueOrThrow({ where: { anno_trimestre: { anno: 2026, trimestre: 2 } }, include: { autore: true } });
     const b = await pagina(2026, 2);

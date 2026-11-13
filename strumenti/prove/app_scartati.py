@@ -74,6 +74,7 @@ with sync_playwright() as p:
             return pg.locator('.dt tbody tr').filter(has_text=NUMERO)
 
         pg = entra(S + '-ammi')
+        pg.wait_for_selector('.testa .sotto:has-text("90 giorni")')
         ok(testo(pg, '.testa h1') == 'Documenti scartati', 'titolo della pagina: Documenti scartati')
         ok('90 giorni' in testo(pg, '.testa .sotto'), 'il sottotitolo dice i giorni di conservazione')
 

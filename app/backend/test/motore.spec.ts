@@ -5,7 +5,7 @@ import 'dotenv/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../src/prisma.service';
 import { seed } from '../prisma/seed';
-import { caricaDati, Dati } from '../src/motore/dati';
+import { caricaDati, Dati, praticaDaDb } from '../src/motore/dati';
 import * as m from '../src/motore/motore';
 import { svuota } from './svuota';
 import { prototipo } from './prototipo';
@@ -64,6 +64,32 @@ describe('motore §10 = prototipo', () => {
     expect([n(perc.sconto), n(perc.agente), n(perc.sub_standard), n(perc.sub), perc.eccezione, n(perc.dal_fornitore)]).toEqual([1, 18, 0, 3, true, 18]);
     const pm = M.percentuali(praticaM('OF/2026/041'));
     expect([n(perc.sub), n(perc.dal_fornitore)]).toEqual([pm.sub, pm.dal_fornitore]);
+  });
+
+  it('D-146: l\'agenzia si prende alla data dell\'ordine, non della fattura', () => {
+    const forn = fornitore('Gries').id, cliente = 'D144-cliente';
+    const subA = [...S.subagenti.keys()][0];
+    const baseDoc = S.pratiche.find((x) => x.documenti.length)!.documenti[0];
+    const d = { ...baseDoc, id: 'D144-d1', numero: 'D144-F1', data: '2026-09-15', importo: dec(1000), tipo: 'fattura' as const, fattura_id: null, liquidazione_id: null, incasso: null, correzione: null };
+    const p = { ...pratica('OF/2026/041'), id: 'D144-p', numero: 'D144-P', fornitore_id: forn, cliente_id: cliente, data: '2026-05-10', documenti: [d] };
+    // agenzia valida 01/01 → 30/06 (valido_al escluso): alla data della fattura non vale più
+    const agA = { id: 'D144-ag', subagente_id: subA, cliente_id: cliente, fornitore_id: forn, codice: 'D144', sconto: dec(0), pct_subagente: null, regola_mensile: null, valido_dal: '2026-01-01', valido_al: '2026-07-01' };
+    const S2 = { ...S, interscambio: [...S.interscambio, agA] };
+    const perc = m.percentuali(S2, p, d.data)!;
+    expect(perc).not.toBeNull();
+    expect(perc.subagente_id).toBe(subA);
+    expect(n(m.provvigioneDoc(S2, p, d)!.pagate)).toBe(100); // 10 % dello scaglione 0, non 0
+  });
+
+  it('D-146: cambio agenzia a luglio — la fattura di settembre va al subagente dell\'ordine', () => {
+    const forn = fornitore('Gries').id, cliente = 'D144b-cliente';
+    const [subA, subB] = [...S.subagenti.keys()];
+    const baseDoc = S.pratiche.find((x) => x.documenti.length)!.documenti[0];
+    const d = { ...baseDoc, id: 'D144b-d1', numero: 'D144b-F1', data: '2026-09-15', importo: dec(1000), tipo: 'fattura' as const, fattura_id: null, liquidazione_id: null, incasso: null, correzione: null };
+    const p = { ...pratica('OF/2026/041'), id: 'D144b-p', numero: 'D144b-P', fornitore_id: forn, cliente_id: cliente, data: '2026-05-10', documenti: [d] };
+    const ag = (id: string, sub: string, dal: string, al: string | null) => ({ id, subagente_id: sub, cliente_id: cliente, fornitore_id: forn, codice: 'D144b', sconto: dec(0), pct_subagente: null, regola_mensile: null, valido_dal: dal, valido_al: al });
+    const S2 = { ...S, interscambio: [...S.interscambio, ag('D144b-a', subA, '2026-01-01', '2026-07-01'), ag('D144b-b', subB, '2026-07-01', null)] };
+    expect(m.percentuali(S2, p, d.data)!.subagente_id).toBe(subA);
   });
 
   it('ogni documento fiscale: importo, % dal fornitore, provvigione presa e quota del subagente', () => {
@@ -266,5 +292,59 @@ describe('motore §10 = prototipo', () => {
       for (const [num] of correzioni) doc(num).doc.correzione = null;
       M.S.correzioni_sub.length = 0;
     }
+  });
+
+  it('una fattura al mese: la già liquidata resta la scelta, la tardiva va a zero (A2-02)', () => {
+    const { pratica: p1, doc: f1 } = doc('F-2026-0862'); // la più bassa, già liquidata
+    const { pratica: p2, doc: f2 } = doc('F-2026-0858'); // la più alta, arrivata tardi
+    const ab = m.percentuali(S, p1, f1.data)!.ab;
+    ab.regola_mensile = 'piu_alta';
+    f1.liquidazione_id = S.liquidazioni_chiuse[0].id;
+    try {
+      expect(m.fatturaDelMese(S, ab, '2026-06')!.id).toBe(f1.id);
+      const q = m.quotaSub(S, p2, f2)!;
+      expect([q.regola, n(q.provvigione)]).toEqual(['mensile', 0]);
+    } finally { f1.liquidazione_id = null; ab.regola_mensile = null; }
+  });
+
+  it('numero riusato in due anni: con la data della riga vince il documento dello stesso giorno (A2-05)', () => {
+    const { pratica: p, doc: d } = doc('F-2026-0858');
+    const vecchio = { ...p, id: 'anno-prima', documenti: [{ ...d, id: 'anno-prima-doc', data: '2025-06-05' }] };
+    const S2 = { ...S, pratiche: [...S.pratiche, vecchio] };
+    expect(m.trovaDocumento(S2, 'F-2026-0858', fornitore('Gries').id, '2026-06-05')!.doc.id).toBe(d.id);
+    expect(m.trovaDocumento(S2, 'F-2026-0858', fornitore('Gries').id, '2025-06-05')!.doc.id).toBe('anno-prima-doc');
+  });
+
+  it('storno con il solo numero, stesso numero in due anni: lega il documento del 2026 (A6-13)', () => {
+    const { pratica: p, doc: d } = doc('F-2026-0858');
+    const vecchio = { ...p, id: 'anno-prima', documenti: [{ ...d, id: 'anno-prima-doc', data: '2025-06-05' }] };
+    const S2 = { ...S, pratiche: [...S.pratiche, vecchio] };
+    // riga senza documento_id e senza data: vince il più recente entro la fine del mese del bollettino
+    expect(m.trovaDocumento(S2, 'F-2026-0858', fornitore('Gries').id, null, '2026-06-30')!.doc.id).toBe(d.id);
+    expect(m.trovaDocumento(S2, 'F-2026-0858', fornitore('Gries').id, null, '2025-06-30')!.doc.id).toBe('anno-prima-doc');
+  });
+
+  it('numero riusato sul maturato: la riga del bollettino di un anno non riconosce il documento dell\'altro (C1)', () => {
+    const { pratica: p, doc: d } = doc('F-2026-0858'); // Gries (maturato), giugno 2026
+    const gries = fornitore('Gries').id;
+    const vecchio = { ...p, id: 'anno-prima', documenti: [{ ...d, id: 'anno-prima-doc', data: '2025-06-05' }] };
+    const S2 = { ...S, pratiche: [...S.pratiche, vecchio] };
+    // due bollettini verificati, uno per anno, ciascuno con una riga "F-2026-0858" non abbinata (D-34)
+    const b0 = S.bollettini[0];
+    const riga = (data: string) => ({ ...b0.righe[0], documento_id: null, liquidazione_id: null, numero: d.numero, data, tipo: null });
+    const b25 = { ...b0, id: 'b25', fornitore_id: gries, anno: 2025, mese: 6, stato: 'verificato', righe: [riga('2025-06-05')] };
+    const b26 = { ...b25, id: 'b26', anno: 2026, mese: 6, righe: [riga(d.data)] };
+    const S3 = { ...S2, bollettini: [b25, b26] };
+    // il documento del 2026 è riconosciuto solo nel bollettino del 2026, non in quello del 2025 che riusa il numero
+    expect(m.riconosciutoIn(S3, d, gries)!.id).toBe('b26');
+    expect(m.riconosciutoIn(S3, vecchio.documenti[0], gries)!.id).toBe('b25');
+  });
+
+  it('riga di reso: importo al mezzo contabile, −0,005 → −0,01 (D-49, A2-08)', () => {
+    const t = {
+      id: 1n, numero_ordine: 'X', fornitore_id: 1n, cliente_id: 1n, data_ordine: new Date('2026-01-01'),
+      documenti: [], righe: [{ fase: 'fattura', codice: 'A', descrizione: 'reso', quantita: dec(-1), prezzo_unitario: dec(0.005), importo: null }],
+    } as unknown as Parameters<typeof praticaDaDb>[0];
+    expect(n(praticaDaDb(t).righe.fattura[0].importo)).toBe(-0.01);
   });
 });

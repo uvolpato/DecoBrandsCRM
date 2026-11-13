@@ -52,8 +52,18 @@ export function configura(app: NestExpressApplication) {
 // provvisorie finiscono nel log della posta. Valori ammessi: sviluppo, prove, esercizio.
 export function controllaAmbiente(env = process.env) {
   const v = env.NODE_ENV;
-  if (v === 'development' || v === 'test' || v === 'production') return v;
-  throw new Error('NODE_ENV non impostato: metti NODE_ENV=development (sviluppo), test (prove) o production (esercizio) in backend/.env');
+  if (v !== 'development' && v !== 'test' && v !== 'production')
+    throw new Error('NODE_ENV non impostato: metti NODE_ENV=development (sviluppo), test (prove) o production (esercizio) in backend/.env');
+  // In esercizio i segreti d'esempio del .env.example non devono passare: la chiave è nel
+  // repository pubblico, chi ha un backup del database decifra i segreti delle Impostazioni (D-65).
+  if (v === 'production') {
+    for (const nome of ['SESSION_SECRET', 'SEGRETI_CHIAVE']) {
+      const s = env[nome];
+      if (!s || s === 'CAMBIARE' || s.length < 32)
+        throw new Error(`${nome} non valida in esercizio: serve una stringa lunga e casuale, almeno 32 caratteri (openssl rand -base64 48)`);
+    }
+  }
+  return v;
 }
 
 async function avvia() {

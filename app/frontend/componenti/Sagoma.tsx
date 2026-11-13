@@ -98,10 +98,10 @@ export function SagomaScheda() {
 }
 
 /** Elenco a due colonne (anagrafiche): i filtri veri, la tabella in sagoma e la scheda a destra. */
-export function SagomaElenco({ filtri, colonne = 3, larghezze = 'minmax(0,1.15fr) minmax(0,1fr)' }: { filtri: ReactNode; colonne?: number; larghezze?: string }) {
+export function SagomaElenco({ filtri, colonne = 3, larghezze = 'minmax(0,1.15fr) minmax(0,1fr)', classe }: { filtri: ReactNode; colonne?: number; larghezze?: string; classe?: string }) {
   return (
     <div className="colonne riempi" style={{ '--colonne': larghezze } as CSSProperties} aria-busy="true">
-      <div className="pila riempi">
+      <div className={'pila riempi' + (classe ? ' ' + classe : '')}>
         {filtri}
         <div className="riempi"><SagomaTabella righe={9} colonne={colonne} /></div>
       </div>

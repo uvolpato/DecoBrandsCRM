@@ -136,6 +136,60 @@ describe('F3-A3 incassi dei clienti', () => {
     expect(await db.registro.count({ where: { codice: 'documento.export' } })).toBeGreaterThanOrEqual(1);
   });
 
+  it('POST /api/pagamenti/solleciti: la fattura segnata pagata prima della chiamata resta fuori (A3-07)', async () => {
+    const d = await documento('F-2026-0822');
+    await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta' }).expect(200);
+    // un'altra fattura dello stesso cliente, così il cliente resta da sollecitare
+    const testate = (await db.ordini_fornitore_testata.findMany({ where: { cliente_id: d.cliente_id }, select: { id: true } })).map((t) => t.id);
+    const altra = await db.ordini_fornitore_documenti.findFirstOrThrow({
+      where: { tipo: 'fattura', testata_id: { in: testate }, id: { not: d.id } }, select: { id: true },
+    });
+    await op.put(`/documenti/${altra.id}/incasso`, { stato: 'insoluta' }).expect(200);
+    const prima = (await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: d.id } })).solleciti;
+    // portata a pagata prima della chiamata: non riceve il +1 e non entra nel conteggio
+    await op.put(`/documenti/${d.id}/incasso`, { stato: 'pagata' }).expect(200);
+    const r = (await op.post('/pagamenti/solleciti', { cliente_id: Number(d.cliente_id) }).expect(201)).body;
+    expect(r.fatture).toBeGreaterThanOrEqual(1);
+    expect((await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: d.id } })).solleciti).toBe(prima);
+    expect((await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: altra.id } })).solleciti).toBeGreaterThan(0);
+  });
+
+  it('C1: importo e numeri dell\'evento solo dalle fatture ancora da sollecitare dopo il blocco', async () => {
+    const d = await documento('F-2026-0822');
+    await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta' }).expect(200);
+    const testate = (await db.ordini_fornitore_testata.findMany({ where: { cliente_id: d.cliente_id }, select: { id: true } })).map((t) => t.id);
+    const altra = await db.ordini_fornitore_documenti.findFirstOrThrow({
+      where: { tipo: 'fattura', testata_id: { in: testate }, id: { not: d.id } }, select: { id: true },
+    });
+    await op.put(`/documenti/${altra.id}/incasso`, { stato: 'insoluta' }).expect(200);
+    const [bassa, alta] = [d.id, altra.id].sort((a, b) => (a < b ? -1 : 1));
+    const { numero: numeroBassa, importo: importoBassa } = await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: bassa }, select: { numero: true, importo: true } });
+    // un'altra connessione tiene bloccata la fattura più bassa: la POST resta in attesa sul FOR UPDATE
+    // dopo aver letto i dati, così l'altra diventa pagata "prima del blocco" (fra caricaDati e l'aggiornamento)
+    let sblocca!: () => void;
+    const cancello = new Promise<void>((r) => { sblocca = r; });
+    const holder = db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM ordini_fornitore_documenti WHERE id = ${bassa} FOR UPDATE`;
+      await cancello;
+    }, { timeout: 30_000 });
+    const richiesta = op.post('/pagamenti/solleciti', { cliente_id: Number(d.cliente_id) }).expect(201).then((r: any) => r.body);
+    // aspetta che la POST sia ferma sul FOR UPDATE (cioè che caricaDati abbia già letto le due fatture)
+    for (let i = 0; i < 200; i++) {
+      const q = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query ILIKE '%ordini_fornitore_documenti%'`;
+      if (q[0].n > 0) break;
+      await new Promise((res) => setTimeout(res, 25));
+    }
+    await op.put(`/documenti/${alta}/incasso`, { stato: 'pagata' }).expect(200);
+    sblocca();
+    await holder;
+    const r = await richiesta;
+    expect(r.fatture).toBe(1);
+    const ev = await db.registro.findFirstOrThrow({ where: { codice: 'documento.export' }, orderBy: { ts: 'desc' }, select: { dettaglio: true } });
+    const det = ev.dettaglio as { fatture: string[]; importo_totale: number };
+    expect(det.fatture).toEqual([numeroBassa]);
+    expect(det.importo_totale).toBe(Number(importoBassa));
+  });
+
   it('POST solleciti per un cliente senza fatture da sollecitare: 404', async () => {
     await op.post('/pagamenti/solleciti', { cliente_id: 999999999 }).expect(404);
   });

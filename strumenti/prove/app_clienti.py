@@ -20,6 +20,11 @@ USCITA.mkdir(parents=True, exist_ok=True)
 esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
 def integra(*args): subprocess.run(['node', str(AIUTO), *args], cwd=BACKEND, check=True, capture_output=True)
+# A6-09: le richieste di creazione agenzia si registrano, per scoprire un doppio invio del modulo
+post_agenzie = []
+def conta_agenzia(r):
+    if r.method == 'POST' and r.url.split('?')[0].rstrip('/').endswith('/agenzie'):
+        post_agenzie.append(r.url)
 
 def apri(pg):
     pg.wait_for_selector('.accesso-scena')
@@ -34,6 +39,7 @@ with sync_playwright() as p:
     def entra(utente, larghezza=1440):
         pg = b.new_page(viewport={'width': larghezza, 'height': 900 if larghezza > 800 else 1024})
         pg.on('pageerror', lambda e: errori.append(str(e)))
+        pg.on('request', conta_agenzia)
         pg.goto(BASE + '/clienti'); pg.wait_for_function("location.pathname === '/accesso'")
         apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
         pg.wait_for_function("location.pathname.startsWith('/clienti')"); pg.wait_for_load_state('networkidle')
@@ -107,13 +113,15 @@ with sync_playwright() as p:
     ok('Scaglioni in vigore' in testo(pg, '.velo .campo:has(#c-sconto) .aiuto') and 'Gries' in testo(pg, '.velo .campo:has(#c-sconto) .aiuto'), 'sconto: aiuto con gli scaglioni dei fornitori')
     ok(pg.locator('#c-pct_subagente:not([disabled])').count() == 1 and pg.locator('#c-regola_mensile:not([disabled])').count() == 1, 'responsabile: percentuale e regola del subagente attive')
     pg.fill('#c-codice_cliente_fornitore', 'T' + RUN); pg.fill('#c-sconto', '5'); pg.fill('#c-valido_dal', D1); pg.fill('#c-valido_al', A1)
+    prima_post = len(post_agenzie)
     pg.click('.modale-piede button[type=submit]')
     try:
         finestra(pg).wait_for(state='detached', timeout=15000)
     except Exception:
         errore = pg.locator('.modulo-errore').inner_text() if pg.locator('.modulo-errore').count() else 'finestra ancora aperta'
-        raise AssertionError('creazione agenzia non riuscita: ' + errore)
+        raise AssertionError('creazione agenzia non riuscita (%d POST): %s' % (len(post_agenzie) - prima_post, errore))
     pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
+    ok(len(post_agenzie) - prima_post == 1, 'creazione agenzia: %d richiesta POST, nessun doppio invio' % (len(post_agenzie) - prima_post))
     riga = pg.locator('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
     ok('Gries' in riga.inner_text() and 'Nista' in riga.inner_text() and '5 %' in riga.inner_text() and A1 in riga.inner_text(), 'agenzia creata: fornitore, subagente, sconto e periodo in tabella')
     pg.reload(); pg.wait_for_selector('.schede-corpo .dt'); pg.wait_for_timeout(500)

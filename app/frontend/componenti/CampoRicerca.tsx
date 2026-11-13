@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { caricaVoci, vociMenu, type Contesto, type Entita } from '@/lib/entita';
 import { DataTable, type Colonna } from './DataTable';
 import { FilterBar, type CampoFiltro } from './FilterBar';
@@ -52,6 +52,7 @@ function usePosizione(aperto: boolean, rif: React.RefObject<HTMLElement | null>,
 
 function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valori, onChange }: Comuni & { valori: string[]; onChange: (v: string[]) => void }) {
   const tutte = useVoci(ent, contesto);
+  const lid = useId(); // A7-08: collega input e menu per il lettore di schermo
   const box = useRef<HTMLDivElement>(null);
   const [bozza, setBozza] = useState(valori);
   const [q, setQ] = useState('');
@@ -86,7 +87,7 @@ function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valo
   const li = (k: string, i: number, scelta: boolean) => {
     const r = voce(k);
     return (
-      <li key={k} role="option" data-i={i} aria-selected={scelta} className={i === attiva ? 'attiva' : undefined}
+      <li key={k} id={lid + '-' + i} role="option" data-i={i} aria-selected={scelta} className={i === attiva ? 'attiva' : undefined}
         onMouseDown={(e) => { e.preventDefault(); alterna(k); }}>
         <i className="spunta-voce" aria-hidden="true">{scelta ? '✓' : ''}</i><b>{r ? ent.testo(r) : k}</b>{r && ent.dettaglio && <span>{ent.dettaglio(r)}</span>}
       </li>
@@ -97,11 +98,12 @@ function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valo
     <div ref={box} className={'ricerca multipla' + (bozza.length ? ' con-scelte' : '') + (bozza.length > 1 ? ' piu-scelte' : '')}
       onBlur={(e) => { if (!box.current?.contains(e.relatedTarget as Node) && !maschera) chiudi(); }}>
       <input className="ricerca-testo" id={id} type="text" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={aperto}
+        aria-controls={lid} aria-activedescendant={aperto && chiavi[attiva] ? lid + '-' + attiva : undefined}
         aria-label={etichetta ?? 'Cerca ' + ent.titolo.toLowerCase()} placeholder={ria || vuoto} value={q}
         title={bozza.length ? ent.titolo + ': ' + bozza.map(nome).join(', ') : ''}
         onChange={(e) => { setQ(e.target.value); setAperto(true); setAttiva(bozza.length); }} onFocus={() => { if (dopo.current) dopo.current = false; else apri(); }} onMouseDown={() => { if (document.activeElement === box.current?.querySelector('input')) apri(); }} onKeyDown={tasto} />
       <button type="button" className="ricerca-lente" title={'Apri la ricerca di ' + ent.titolo.toLowerCase() + ' (F4): scelta di più voci'} aria-label="Apri la ricerca" onClick={apriMaschera}><Icona nome="cerca" /></button>
-      <ul className="ricerca-menu" role="listbox" aria-multiselectable="true" hidden={!aperto} style={pos}>
+      <ul className="ricerca-menu" id={lid} role="listbox" aria-multiselectable="true" hidden={!aperto} style={pos}>
         {bozza.length > 0 && <>
           <li className="menu-titolo" role="presentation">Scelti ({bozza.length})
             <button type="button" className="link-azzera" onMouseDown={(e) => { e.preventDefault(); setBozza([]); }}>Togli tutti</button></li>
@@ -117,8 +119,9 @@ function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valo
   );
 }
 
-function Singola({ entita: ent, contesto = {}, placeholder, id, valore, onChange }: Comuni & { valore: string; onChange: (v: string) => void }) {
+function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valore, onChange }: Comuni & { valore: string; onChange: (v: string) => void }) {
   const tutte = useVoci(ent, contesto);
+  const lid = useId(); // A7-08: collega input e menu per il lettore di schermo
   const box = useRef<HTMLDivElement>(null);
   const trova = (v: string) => { const x = v.trim().toLowerCase(); if (!x) return undefined; const m = vociMenu(ent, contesto, tutte); return m.find((r) => String(ent.chiave(r)).toLowerCase() === x) ?? m.find((r) => ent.testo(r).toLowerCase() === x); };
   const nota = trova(valore);
@@ -160,11 +163,13 @@ function Singola({ entita: ent, contesto = {}, placeholder, id, valore, onChange
       onBlur={(e) => { if (box.current?.contains(e.relatedTarget as Node) || maschera) return; setAperto(false); const t = testo.trim(); if (nota && ent.testo(nota) === t) return; const r = trova(t); imposta(r, t); }}>
       <span className={'pallino ' + stato} title={nota ? ent.titolo + ' trovato in anagrafica' : valore ? 'Valore non trovato in anagrafica' : ''} />
       <input ref={campo} className="ricerca-testo" id={id} type="text" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={aperto}
+        aria-controls={lid} aria-activedescendant={aperto && prime[attiva] ? lid + '-' + attiva : undefined}
+        aria-label={etichetta ?? 'Cerca ' + ent.titolo.toLowerCase()}
         value={testo} placeholder={placeholder ?? 'Scrivi per cercare'} onChange={(e) => { setTesto(e.target.value); setAperto(true); setAttiva(0); }} onKeyDown={tasto} />
       <button type="button" className="ricerca-lente" title={'Apri la ricerca di ' + ent.titolo.toLowerCase() + ' (F4)'} aria-label="Apri la ricerca" onClick={() => { setAperto(false); setMaschera(true); }}><Icona nome="cerca" /></button>
-      <ul className="ricerca-menu" role="listbox" hidden={!aperto} style={pos}>
+      <ul className="ricerca-menu" id={lid} role="listbox" hidden={!aperto} style={pos}>
         {prime.length ? prime.map((r, i) => (
-          <li key={String(ent.chiave(r))} role="option" aria-selected={i === attiva} className={i === attiva ? 'attiva' : undefined} data-i={i} onMouseDown={(e) => { e.preventDefault(); imposta(r); }}>
+          <li key={String(ent.chiave(r))} id={lid + '-' + i} role="option" aria-selected={i === attiva} className={i === attiva ? 'attiva' : undefined} data-i={i} onMouseDown={(e) => { e.preventDefault(); imposta(r); }}>
             <b>{ent.testo(r)}</b><span>{ent.dettaglio?.(r) ?? ''}</span></li>
         )) : <li className="nessuna">Nessun risultato</li>}
         <li className="altre" onMouseDown={(e) => { e.preventDefault(); setAperto(false); setMaschera(true); }}><Icona nome="cerca" />{tutteMenu.length > 5 ? `Altri ${tutteMenu.length - 5} risultati: ` : ''}apri la ricerca di {ent.titolo.toLowerCase()}</li>

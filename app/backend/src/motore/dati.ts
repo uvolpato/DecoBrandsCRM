@@ -10,6 +10,8 @@ type Db = Prisma.TransactionClient;
 const Dec = Prisma.Decimal;
 const ZERO = new Dec(0);
 const id = (x: bigint) => String(x);
+/** Riga della fotografia di una liquidazione chiusa (liquidazioni.totali.documenti): importi come testo, pct come numero. */
+type FotoDoc = { documento_id: string; subagente_id: string; provvigione: string; pct: number; importo: string; voce?: string | null };
 /** Giorno 'aaaa-mm-gg' di una colonna DATE (mezzanotte UTC). */
 export const iso = (d: Date) => d.toISOString().slice(0, 10);
 /** Giorno a Roma di un TIMESTAMPTZ. */
@@ -24,7 +26,8 @@ export type Testata = Prisma.ordini_fornitore_testataGetPayload<{ include: typeo
 
 const riga = (r: Testata['righe'][number]) => {
   const qta = r.quantita ?? ZERO, prezzo = r.prezzo_unitario ?? ZERO;
-  return { codice: r.codice, descrizione: r.descrizione, qta, prezzo, importo: r.importo ?? qta.times(prezzo).toDecimalPlaces(2, Dec.ROUND_HALF_CEIL) };
+  // D-49 §19: il mezzo si allontana dallo zero (HALF_UP), anche sui negativi (resi): −0,005 → −0,01.
+  return { codice: r.codice, descrizione: r.descrizione, qta, prezzo, importo: r.importo ?? qta.times(prezzo).toDecimalPlaces(2, Dec.ROUND_HALF_UP) };
 };
 
 /** Tipi di documento della pratica (D-60 §19); solo i fiscali toccano le provvigioni. */
@@ -205,6 +208,11 @@ function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccez
       attese: b.attese.map((a) => ({ documento_id: id(a.documento_id), decisione: decisione(a)! })),
     })),
     liquidazioni_chiuse: liquidazioni.map((l) => ({ id: id(l.id), anno: l.anno, trimestre: l.trimestre, chiusa_il: giornoRoma(l.chiusa_il) })),
+    // Fotografia delle liquidazioni chiuse (D-33, A2-01): per documento liquidato, subagente e provvigione pagati
+    // alla chiusura. Gli storni e i riaccrediti la rileggono, così un cambio d'agenzia non sposta le provvigioni passate.
+    fotografie: new Map(liquidazioni.flatMap((l) => ((l.totali as { documenti?: FotoDoc[] } | null)?.documenti ?? [])
+      .filter((r) => !r.voce)
+      .map((r) => [r.documento_id, { subagente_id: r.subagente_id, provvigione: new Dec(r.provvigione), pct: new Dec(r.pct), importo: new Dec(r.importo) }]))),
   };
 }
 

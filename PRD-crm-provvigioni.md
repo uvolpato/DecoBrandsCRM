@@ -1,8 +1,8 @@
 # PRD — CRM Ordini a fornitore, Bollettini e Provvigioni (Decobrands)
 
-**Versione:** 1.1 · **Data:** 19/10/2026 (D-29…D-32: CRM staccato dalla Gestione Ordini, accesso con Microsoft 365 o link via email, registro unico, database ponte per Integra) · **Autore:** Ugo Volpato (con Claude Code)
+**Versione:** 1.2 · **Data:** 13/11/2026 (D-39/D-41: accesso con nome utente o email e password; D-65: Impostazioni a 6 sezioni; sintesi del §19 ferma a D-32, il registro vero è la specifica §19) · **Data originale:** 19/10/2026 (D-29…D-32) · **Autore:** Ugo Volpato (con Claude Code)
 **Stato:** bozza da rivedere con Decobrands (Matteo Caironi) prima della condivisione
-**Fonti sintetizzate:** `specifica-crm-provvigioni.md` v4.9 (fonte di verità), `piano-lavoro-crm.md` v1.4,
+**Fonti sintetizzate:** `specifica-crm-provvigioni.md` v8.79 (fonte di verità), `piano-lavoro-crm.md` v1.4,
 `preventivo-crm-provvigioni.md` (aggiornato al 15/10/2026), `ANALISI_CRM_PROVVIGIONI.md`,
 `idee-supporto-decisioni.md`, `mtngfxeo-specifica-app-gestione-ordini.md` (sistema esistente),
 `prototipo-alternativo/LEGGIMI.md`, `app/README.md`, `CLAUDE.md`.
@@ -279,8 +279,9 @@ caricamento ──┴─► coda (PostgreSQL, SKIP LOCKED) ─► GLM-OCR su vLL
 - **Articoli**: nessun blocco sull'anagrafica articoli (nel giro agenzia gli articoli dei
   fornitori non sono di Decobrands): pallino verde se l'articolo è già noto, rosso se è nuovo.
 - **Excel dei bollettini**: si leggono con `exceljs`, senza modello.
-- **Evidenziazione del valore nel PDF**: **da verificare** con la prova F0-A7 prima di
-  prometterla (D-06, §6.6). Correggere i dati funziona comunque, anche senza.
+- **Evidenziazione del valore nel PDF**: il rettangolo è **verificato con il server di lettura
+  cloud**; con GLM-OCR locale e con documenti scansionati o fotografati è **ancora da verificare**
+  (D-06, §6.6). Correggere i dati funziona comunque, anche senza.
 
 ### 5.6 Esportazione della liquidazione (spec §11)
 
@@ -419,7 +420,8 @@ guardando il PDF.
 - [ ] Ogni campo confermato o corretto diventa `verificato`.
 - [ ] Al salvataggio si ricalcolano controlli e abbinamento proposto.
 - [ ] L'evidenziazione nel PDF compare **solo** se la posizione è stata trovata (esatta,
-      approssimata o "posizione non trovata"), secondo l'esito di F0-A7.
+      approssimata o "posizione non trovata"): verificata con il server di lettura cloud, da
+      verificare con GLM-OCR locale e sui documenti scansionati o fotografati (D-06).
 
 **E1.5 — Decidere cosa farne.** Come operatore, voglio vedere prima l'azione proposta e poi
 le righe (D-15).
@@ -669,7 +671,7 @@ quadrano.
 
 **E9.2 — Utenti** (F5-A4, **da approvare**).
 - [ ] Utenti propri del CRM, nessun legame con la Gestione Ordini (D-29).
-- [ ] Si entra solo su invito, con Microsoft 365 o con un link via email; nessuna password (D-30).
+- [ ] Si entra con nome utente (o email) e password, come nella Gestione Ordini (D-39): password provvisoria da cambiare al primo accesso, limite ai tentativi per persona e per IP (D-41), un solo messaggio «Credenziali non valide».
 - [ ] Chi non è invitato o è disattivato non entra, nemmeno con un account Microsoft valido.
 - [ ] *Invia di nuovo l'invito* e *Invia un link di accesso*; un invio non recapitato apre un'anomalia.
 - [ ] Deve restare almeno un amministratore attivo.
@@ -683,7 +685,7 @@ quadrano.
 - [ ] *Segna come visto*, *Controlla adesso*, aggiornamento da solo ogni 30 s.
 
 **E9.4 — Impostazioni** (F5-A6, **da approvare**).
-- [ ] 7 sezioni: azienda, casella, server di lettura e soglie, posta, accesso con Microsoft 365, Integra (database ponte), conservazione.
+- [ ] 6 sezioni: azienda, casella, server di lettura e soglie, posta, Integra (database ponte), conservazione (D-65).
 - [ ] Password e segreti sono cifrati e non si rileggono mai.
 - [ ] *Prova la connessione*.
 - [ ] Ogni salvataggio scrive un evento, mai le password.
@@ -736,8 +738,8 @@ quadrano.
 
 - **Il CRM è staccato dalla Gestione Ordini** (V2, D-29): database e utenti propri, nessuna
   tabella della Gestione Ordini; la ingloberà con la vendita diretta (§17 della spec).
-- **Accesso** (D-30): Microsoft 365 o link via email, solo su invito; serve la registrazione
-  dell'app in Entra ID da parte di Decobrands.
+- **Accesso** (D-39): nome utente o email e password, come nella Gestione Ordini; password
+  provvisoria da cambiare, limite ai tentativi per persona e per IP (D-41).
 - **Codice cliente del fornitore mancante**: l'abbinamento resta manuale (*Scegli la pratica*).
 - **Articoli nuovi del fornitore**: si accettano con il pallino rosso; non sono un errore.
 - **Fornitore con cadenza non mensile**: è uno solo e verrà dismesso; non si gestisce.
@@ -823,7 +825,7 @@ quadrano.
 | F0-A7 Prova di fattibilità dell'evidenziazione | 6 | rendere certa o escludere una funzione vista nel prototipo |
 | F1-A4 Sincronizzazione da Integra (viste) | 3 | sostituisce l'import da file (D-07) |
 | F0-A8 Viste di Integra sul database ponte | 2 | colonne e chiavi sui dati veri (D-32) |
-| F0-A3 Accesso con Microsoft 365 o link via email | +2 | niente password, solo su invito (D-30) |
+| F0-A3 Accesso con nome utente o email e password | +2 | D-39 sostituisce D-30; password provvisoria e limite ai tentativi |
 | F5-A2 Registro unico di eventi e anomalie | +2 | un solo posto per tutto (D-31) |
 | F3-A3 Incassi dei clienti | 4 | regole chiarite il 16 e 18/10/2026 (D-11) |
 | F4-A3 Esportazione completa (3 contenuti × 3 formati) | +3 | D-04 (era 1 h) |
@@ -1137,7 +1139,7 @@ F0 blocca tutto il resto; F1–F6 procedono in parallelo; F7 chiude.
 | D-03 | Bollettino atteso entro il giorno del fornitore; sollecito solo dopo | i fornitori hanno giorni diversi |
 | D-04 | Esportazione: completa, un subagente, riepilogo; Excel, PDF, CSV | sono i tre usi reali |
 | D-05 | Ruolo *sola lettura*, permessi verificati sul server | nascondere i pulsanti non basta |
-| D-06 | Evidenziazione nel documento da verificare (F0-A7) | non garantita sugli scansionati |
+| D-06 | Evidenziazione nel documento: cloud verificato, locale e scansionati da verificare | non garantita sugli scansionati |
 | D-07 | Integra letto da viste, sincronizzato ogni pochi secondi | dati allineati senza import |
 | D-08 | Vendita diretta spenta, ampliamento futuro | prima l'agenzia |
 | D-09 | Componente Schede; i segmenti restano per filtrare | due bisogni, due strumenti |
@@ -1158,9 +1160,17 @@ F0 blocca tutto il resto; F1–F6 procedono in parallelo; F7 chiude.
 | D-27 | Regole del subagente: agenzia, una fattura al mese, correzione sul documento | ogni accordo si gestisce senza toccare il codice, con il motivo |
 | D-28 | **Tutto sul backend, mai dai dati del frontend** | dal browser si può alterare tutto; sono soldi |
 | D-29 | CRM staccato dalla Gestione Ordini: database e utenti propri; la ingloberà con la vendita diretta | non sovrapporre le prove; niente compatibilità da buttare |
-| D-30 | Accesso con Microsoft 365 o link via email, solo su invito, senza password | Decobrands usa Microsoft 365; il link copre gli esterni |
+| D-30 | Accesso con Microsoft 365 o link via email, solo su invito, senza password — **sostituita da D-39** | voce storica: non è più la regola |
 | D-31 | Registro unico di eventi e anomalie, `dettaglio` JSON con schema per codice | un solo posto dove guardare |
 | D-32 | Viste di Integra in un database PostgreSQL ponte | si provano senza toccare Integra |
+| D-36 | Ogni operazione che scrive su più tabelle sta in una sola transazione | niente scritture a metà |
+| D-39 | Accesso con nome utente (o email) e password, password provvisoria da cambiare | come la Gestione Ordini; sostituisce D-30 |
+| D-41 | Limite ai tentativi per persona e, più largo, per IP | frenare chi prova le password |
+| D-43 | Licenza d’uso e copyright nella pagina di accesso | software proprietario |
+| D-44 | Solo computer e tablet: sotto i 744 px la pagina si ferma | tabelle larghe e due colonne non si usano su un telefono |
+| D-59 | Caricamento con sagome, mai zeri o testi finti | la pagina non salta quando i dati arrivano |
+| D-60 | Un documento per tipo nella pratica, archivio per pratica | conferme e fatture non si copiano nella testata |
+| D-87 | Un ordine senza fornitore, agenzia o scaglione non apre la pratica | una provvigione mancante non deve diventare 0 % in silenzio |
 
 ---
 

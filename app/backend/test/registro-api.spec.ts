@@ -251,6 +251,47 @@ describe('F5-A2 elenco del registro', () => {
       await agente.get('/api/registro/1').expect(403);
     }
   });
+
+  it('un 4xx di validazione si registra come rifiuto, non come errore (A8-02, C1)', async () => {
+    const io = (await ammi.get('/api/accesso/io').expect(200)).body;
+    await ammi.put('/api/fornitori/' + fornitoreId).set('x-csrf-token', io.csrf).send({ giorno_bollettino: 40 }).expect(400);
+    const riga = await db.registro.findFirst({ where: { codice: 'crud.update', esito: 'negato' }, orderBy: { id: 'desc' } });
+    expect(riga).not.toBeNull();
+    expect(riga!.entita).toBe('fornitori');
+    expect(riga!.livello).toBe('attenzione'); // non conta fra gli «errori di oggi» (§15.6)
+    expect(riga!.utente_id).toBe(ammiId);
+    expect(riga!.dettaglio).toMatchObject({ errore: { campo: 'giorno_bollettino', messaggio: 'valore non valido' } });
+  });
+
+  it('un 400 senza accesso non si registra (C1)', async () => {
+    const prima = await db.registro.count({ where: { codice: 'crud.create', entita: 'accesso' } });
+    await request(app.getHttpServer()).post('/api/accesso/entra').send({}).expect(400);
+    expect(await db.registro.count({ where: { codice: 'crud.create', entita: 'accesso' } })).toBe(prima);
+  });
+
+  it('un rifiuto non porta nel dettaglio il valore inviato (C1, D-85)', async () => {
+    const io = (await ammi.get('/api/accesso/io').expect(200)).body;
+    await ammi.put('/api/accesso/profilo').set('x-csrf-token', io.csrf).send({ ingressi: { 'AREA-FINTA': '/' } }).expect(400);
+    const riga = await db.registro.findFirst({ where: { codice: 'crud.update', esito: 'negato', entita: 'accesso' }, orderBy: { id: 'desc' } });
+    expect(riga).not.toBeNull();
+    expect(JSON.stringify(riga!.dettaglio)).not.toContain('AREA-FINTA');
+    expect(riga!.dettaglio).toMatchObject({ errore: { messaggio: 'valore non valido' } });
+  });
+
+  it('filtro per giorno: i bordi dell\'ora di Roma (A3-12)', async () => {
+    await db.$executeRaw`
+      INSERT INTO registro (genere, livello, codice, tipo, azione, entita, esito, messaggio, dettaglio, ts)
+      VALUES ('evento', 'info', 'crud.create', 'crud', 'create', 'pratica', 'successo', ${SEGNO + ' bordo sera'}, '{"etichetta":"x"}'::jsonb, ('2026-09-05 23:30:00'::timestamp AT TIME ZONE 'Europe/Rome'))`;
+    await db.$executeRaw`
+      INSERT INTO registro (genere, livello, codice, tipo, azione, entita, esito, messaggio, dettaglio, ts)
+      VALUES ('evento', 'info', 'crud.create', 'crud', 'create', 'pratica', 'successo', ${SEGNO + ' bordo notte'}, '{"etichetta":"x"}'::jsonb, ('2026-09-06 00:30:00'::timestamp AT TIME ZONE 'Europe/Rome'))`;
+    const sera = await elenco('&dal=2026-09-05&al=2026-09-05');
+    expect(sera.righe.some((r: { messaggio: string }) => r.messaggio.includes('bordo sera'))).toBe(true);
+    expect(sera.righe.some((r: { messaggio: string }) => r.messaggio.includes('bordo notte'))).toBe(false);
+    const notte = await elenco('&dal=2026-09-06&al=2026-09-06');
+    expect(notte.righe.some((r: { messaggio: string }) => r.messaggio.includes('bordo notte'))).toBe(true);
+    expect(notte.righe.some((r: { messaggio: string }) => r.messaggio.includes('bordo sera'))).toBe(false);
+  });
 });
 
 describe('F5-A2 pulizia notturna', () => {

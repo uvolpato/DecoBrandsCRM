@@ -11,7 +11,7 @@ impostazioni, registro, scarti e guida in linea.
 |---|---|
 | Node.js | 24 |
 | PostgreSQL | database `decobrands_db` (utente proprietario `decobrands`) |
-| Caddy | davanti all'app, porta 80/443 (`deploy/Caddyfile`) |
+| Caddy | ≥ 2.5, davanti all'app, porte 80/443 (`deploy/Caddyfile`) |
 | LibreOffice | per i PDF delle liquidazioni e dell'Analisi (`SOFFICE`) |
 | Cartella documenti | `DOCUMENTI_DIR`, fuori dal repository, con backup |
 
@@ -20,20 +20,25 @@ su `127.0.0.1`.
 
 ## Passi
 
-1. Scaricare **solo `app/`** (sparse checkout, vedi `README.md`) e `npm ci` in `backend/` e `frontend/`.
+1. Scaricare **solo `app/`** (sparse checkout `--no-cone`, vedi `README.md`) e `npm ci` in
+   `backend/` e `frontend/`.
 2. `backend/.env` da `.env.example`: `NODE_ENV=production`, `DATABASE_URL`, `SESSION_SECRET`,
    `SEGRETI_CHIAVE`, `DOCUMENTI_DIR`, `DOCUMENTI_MAX_MB`, `SOFFICE`, e i parametri della casella e di
    Integra quando ci sono.
 3. `npx prisma migrate deploy` in `backend/`, poi `npm run build` in `backend/` e `frontend/`.
 4. Primo utente: `npm run superutente -- <nome utente> <email> "<nome>"` (da `backend/`).
 5. `avvia-esercizio.bat`: backend (`start:prod`), frontend (`start`) e Caddy.
-6. Nel `deploy/Caddyfile` sostituire `:80` con il nome del server (es. `crm.decobrands.it`), così
-   Caddy prende il certificato da solo.
+6. Nel `deploy/Caddyfile` sostituire `crm.decobrands.it` con il nome del server: Caddy prende il
+   certificato da solo. Il file mette `Strict-Transport-Security` e non dichiara `trusted_proxies`
+   (Caddy sostituisce `X-Forwarded-For` con l'IP del client, D-41). Per gli aggiornamenti:
+   `deploy/pubblica.bat` (`git pull` di `app/`, `npm ci`, migrazioni, build).
 
 ## Controlli dopo l'avvio
 
 - `GET /api/salute` risponde `{ok: true}`; in *Stato del sistema* i quattro servizi sono verdi o
   dicono cosa manca.
+- `curl -I https://<server>/` mostra `Strict-Transport-Security`; con
+  `curl -H 'X-Forwarded-For: 1.2.3.4' …` il registro salva l'IP vero (D-41).
 - Accesso con il superutente, poi creazione degli amministratori e degli utenti; ogni utente cambia
   la password provvisoria al primo accesso.
 - In *Impostazioni → Casella dei documenti* e *Server di lettura* i parametri si vedono in sola

@@ -82,7 +82,7 @@ with sync_playwright() as p:
     ok('6,5%' in pg.locator('.elenco li:has-text("Gasper")').inner_text(), 'eccezione modificata: nuova percentuale')
     pg.click('.elenco li:has-text("Gasper")'); pg.wait_for_selector('.velo .modale')
     pg.click('.velo .modale button.pericolo'); pg.wait_for_selector('.velo .modale h2:has-text("Eliminare l’eccezione")')
-    pg.click('.velo .modale button.pericolo'); pg.wait_for_timeout(800)
+    pg.click('.velo .modale button.pericolo'); pg.wait_for_function("() => ![...document.querySelectorAll('.elenco li')].some(l => l.textContent.includes('Gasper'))")
     ok(pg.locator('.elenco li:has-text("Gasper")').count() == 0, 'eccezione eliminata')
     pg.click('.schede-barra [role=tab]:has-text("Dati")'); pg.wait_for_timeout(300)
 

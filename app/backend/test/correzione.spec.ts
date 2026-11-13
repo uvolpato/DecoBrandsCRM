@@ -151,4 +151,19 @@ describe('PUT /api/documenti-fiscali/:id/correzione', () => {
     await op.put(`/documenti-fiscali/99999999/correzione`, { tipo: 'pct', valore: 5, motivo: 'x' }).expect(404); // inesistente
     await lett.put(`/documenti-fiscali/${id}/correzione`, { tipo: 'pct', valore: 5, motivo: 'x' }).expect(403); // senza modifica
   });
+
+  it('importo fisso su una nota di credito: provvigione negativa (A2-03)', async () => {
+    const S = await caricaDati(db);
+    const riga = righeLiquidazione(S, 2026, 3).find((r) => r.tipo === 'nota_credito' && r.liquidabile && !r.voce && S.fornitori.get(r.fornitore_id)!.maturazione !== 'maturato')!;
+    expect(riga).toBeTruthy();
+    const id = riga.documento_id;
+    const prima = Number(riga.provvigione);
+    await op.put(`/documenti-fiscali/${id}/correzione`, { tipo: 'importo', valore: 10, motivo: 'riduzione reso' }).expect(200);
+    const S2 = await caricaDati(db);
+    const dopo = rigaDi(S2, id)!;
+    expect(Number(dopo.provvigione)).toBe(-10);
+    expect(dopo.regola).toBe('correzione');
+    await op.del(`/documenti-fiscali/${id}/correzione`).expect(204);
+    expect(Number(rigaDi(await caricaDati(db), id)!.provvigione)).toBe(prima);
+  });
 });

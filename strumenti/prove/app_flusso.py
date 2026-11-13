@@ -101,8 +101,10 @@ try:
     ok(abs(extra - 99.65) < 0.01, 'app: due pratiche in più nel seed (§12) valgono 99,65 € (FT-S12-2A + FT-S12-2B)')
     ok(abs((q3['riepilogo']['provvigione'] - extra) - proto_q3) < 0.01,
        'app − pratiche in più = prototipo: %.2f − %.2f = %.2f' % (q3['riepilogo']['provvigione'], extra, proto_q3))
-    ok(len(json(pg, 'pratiche?pagina=0')['righe']) == 25, 'app: Seed con 54 pratiche (25 per pagina)')
-    ok(json(pg, 'pratiche?pagina=0')['totale'] == 54, 'app: 54 pratiche, 52 del prototipo + 2 dei casi §12')
+    pratiche0 = json(pg, 'pratiche?pagina=0')
+    totale_pratiche = pratiche0['totale']
+    ok(len(pratiche0['righe']) == 25, 'app: 25 pratiche per pagina')
+    ok(totale_pratiche >= 54, 'app: %d pratiche (almeno 54: 52 del prototipo + 2 dei casi §12)' % totale_pratiche)
     bol = json(pg, 'bollettini/6')
     ok(bol['fornitore'] == 'Gasper GmbH' and bol['mese'] == 8 and bol['anno'] == 2026, 'app: bollettino Gasper agosto 2026')
     ok(bol['totali']['riconosciuto'] == 394.8 and bol['totali']['calcolato'] == 3349.38
@@ -146,7 +148,7 @@ try:
     ok(pg.locator('.segmenti [role=tab]').count() == 6, 'pratiche: sei segmenti di stato')
     n = nseg('Tutte')
     stati = sum(nseg(t) for t in ('Conferma in ritardo', 'Attesa conferma', 'Attesa fattura', 'Fatturate'))
-    ok(n == 54 and stati == n, 'pratiche: i numeri dei segmenti vengono dal server (54 = somma degli stati)')
+    ok(n == totale_pratiche and stati == n, 'pratiche: i numeri dei segmenti vengono dal server (%d = somma degli stati)' % totale_pratiche)
     ok(nseg('Con variazioni') >= 1, 'pratiche: almeno una con variazioni fra le fasi')
     numero0 = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
     cerca(pg, numero0)
@@ -180,7 +182,7 @@ try:
     pg.click('.dt-pagine button[title="Pagina successiva"]')
     pg.wait_for_function("() => document.querySelector('.dt-piede > span')?.textContent.startsWith('26–')"); quieta(pg)
     inizio = testo(pg, '.dt-piede > span:first-child')
-    ok(inizio.startswith('26–') and 'di 54 elementi' in inizio, 'pagine: «%s»' % inizio)
+    ok(inizio.startswith('26–') and 'di %d elementi' % totale_pratiche in inizio, 'pagine: «%s»' % inizio)
     ok(pg.locator('.dt tbody tr.cliccabile b').first.inner_text() != prima_dec, 'pagina successiva: righe diverse')
     ok(pg.locator('.dt th.attivo:has-text("Importo")').get_attribute('aria-sort') == 'descending', 'la pagina tiene l’ordinamento')
     pg.click('.dt-pagine button[title="Pagina precedente"]')
@@ -269,6 +271,8 @@ try:
 
     # ---------- 7. Bollettini: matrice, periodo, filtri, riconciliazione ----------
     pg.goto(BASE + '/bollettini'); pg.wait_for_selector('.matrice'); pg.wait_for_timeout(800)
+    # il numero dei fornitori viene dal server (D-101: il seed è cresciuto), non da una costante
+    n_bol = len(json(pg, 'bollettini?al=2026-09')['fornitori'])
     ok(testo(pg, '.testa h1') == 'Bollettini', 'Bollettini: matrice fornitore × 6 mesi')
     ok(pg.locator('.matrice .m-intest').count() == 7, 'matrice: sei mesi + intestazione fornitore')
     ok('2026' in testo(pg, '.periodo-btn'), 'bollettini: periodo con l’anno')
@@ -286,13 +290,13 @@ try:
     pg.locator('.riepilogo-filtri .btn-icona').first.click(); pg.wait_for_timeout(200)
     ok('Periodo' in testo(pg, '.riepilogo-pop') and 'Gasper' in testo(pg, '.riepilogo-pop'), 'riepilogo: periodo e fornitore')
     pg.click('.riepilogo-pop >> text=Togli tutti i filtri')
-    pg.wait_for_function("() => document.querySelectorAll('.matrice .m-riga').length === 11")
-    ok(pg.locator('.matrice .m-riga').count() == 11, 'tolti i filtri: undici fornitori in matrice')
+    pg.wait_for_function("n => document.querySelectorAll('.matrice .m-riga').length === n", arg=n_bol)
+    ok(pg.locator('.matrice .m-riga').count() == n_bol, 'tolti i filtri: %d fornitori in matrice' % n_bol)
 
-    # bollettino da riconciliare: il primo ancora «arrivato» (di norma Gasper agosto)
-    celle = json(pg, 'bollettini?al=2026-09')['fornitori']
-    da_fare = [(f['fornitore'], c) for f in celle for c in f['celle'] if c['stato'] == 'arrivato' and c['bollettino_id']]
-    id_bol = da_fare[0][1]['bollettino_id'] if da_fare else '6'
+    # bollettino da riconciliare: Gasper agosto (id 6 del seed). Se una prova prima l'ha già
+    # verificato, la sezione sotto salta (il primo «arrivato» potrebbe essere un altro fornitore,
+    # che una prova successiva — app_liquidazioni — vuole ancora aperto).
+    id_bol = '6'
     pg.goto(BASE + '/bollettini/' + str(id_bol)); pg.wait_for_selector('.cerniera'); pg.wait_for_timeout(700)
     ok(testo(pg, '.testa .stato') in ('Da verificare', 'Pronto da chiudere', 'Verificato'), 'bollettino: testata con lo stato')
     ok(pg.locator('.cerniera-riepilogo .lato b').count() == 2, 'cerniera: i due lati (loro / noi)')
@@ -485,7 +489,7 @@ try:
     # ---------- 12. Anagrafiche ----------
     pg.goto(BASE + '/fornitori'); pg.wait_for_selector('.dt tbody tr'); quieta(pg)
     ok(testo(pg, '.testa h1') == 'Fornitori', 'Fornitori: elenco')
-    ok(pg.locator('.dt tbody tr.cliccabile').count() == 11, 'Fornitori: undici righe dal seed')
+    ok(pg.locator('.dt tbody tr.cliccabile').count() == len(json(pg, 'fornitori')), 'Fornitori: righe come il server (D-101)')
     pg.fill('.filtri input[type=search]', 'Gries')
     pg.wait_for_function("() => document.querySelectorAll('.dt tbody tr.cliccabile').length === 1"); quieta(pg)
     ok(pg.locator('.dt tbody tr.cliccabile').count() == 1 and 'Gries' in testo(pg, '.dt tbody'), 'Fornitori: ricerca Gries')
@@ -494,11 +498,11 @@ try:
     ok('F00031' in testo(pg, '.principale') and 'sola lettura' in testo(pg, '.testa'), 'Fornitore: codice Integra e nota di sola lettura')
     ok(pg.locator('.schede-barra [role=tab]').count() >= 2, 'Fornitore: schede (percentuali, clienti seguiti)')
     ok('Percentuali' in testo(pg, '.schede-barra') and 'Clienti seguiti' in testo(pg, '.schede-barra'), 'Fornitore: nomi delle schede')
-    pg.goto(BASE + '/subagenti'); pg.wait_for_selector('.dt tbody tr'); quieta(pg)
+    pg.goto(BASE + '/subagenti'); pg.wait_for_selector('.dt tbody tr.cliccabile'); quieta(pg)
     ok(pg.locator('.dt tbody tr.cliccabile').count() == 4 and 'Nista' in testo(pg, '.dt tbody'), 'Subagenti: quattro righe del seed')
     ok(pg.locator('.segmenti [role=tab]').count() == 3, 'Subagenti: segmenti Attivi, Disattivati, Tutti')
     pg.goto(BASE + '/clienti'); pg.wait_for_selector('.dt tbody tr.cliccabile'); quieta(pg)
-    ok(pg.locator('.dt tbody tr.cliccabile').count() == 11, 'Clienti: undici righe dal seed')
+    ok(pg.locator('.dt tbody tr.cliccabile').count() == len(json(pg, 'clienti')), 'Clienti: righe come il server (D-101)')
     ok(pg.locator('.segmenti [role=tab]').count() == 3, 'Clienti: segmenti Tutti, Con agenzie, Senza agenzie')
     pg.fill('.filtri input[type=search]', 'Vivaio'); pg.wait_for_timeout(800); quieta(pg)
     ok('Vivaio Verde Azzurro' in testo(pg, '.dt tbody'), 'Clienti: ricerca per nome')
@@ -512,7 +516,8 @@ try:
     pg.goto(BASE + '/utenti'); pg.wait_for_selector('.dt tbody tr'); quieta(pg)
     ok('Utenti' in testo(pg, '.testa h1'), 'Utenti: elenco e tabella dei ruoli')
     ok(pg.locator('.dt tbody tr').count() >= 4, 'Utenti: utenti dal seed')
-    pg.locator('.dt tbody tr').first.click(); pg.wait_for_timeout(600)
+    pg.locator('.dt tbody tr').first.click()
+    pg.wait_for_selector('.schede-barra [role=tab]:has-text("Permessi")', timeout=10000)
     ok(pg.locator('.schede-barra [role=tab]').count() == 2, 'Scheda utente: due schede (dati, permessi)')
     pg.goto(BASE + '/sistema'); pg.wait_for_selector('.kpi'); pg.wait_for_timeout(600)
     ok(testo(pg, '.testa h1') == 'Stato del sistema', 'Stato del sistema: titolo')
@@ -531,7 +536,7 @@ try:
     pg.goto(BASE + '/scartati'); pg.wait_for_selector('.dt'); pg.wait_for_timeout(600)
     ok(testo(pg, '.testa h1') == 'Documenti scartati', 'Scartati: elenco dei documenti scartati')
     pg.goto(BASE + '/guida'); pg.wait_for_selector('.selezionabile a'); pg.wait_for_timeout(600)
-    ok(pg.locator('.selezionabile a').count() == 18, 'Guida: 18 argomenti (senza Vendita diretta, con Registro)')
+    ok(pg.locator('.selezionabile a').count() == 19, 'Guida: 19 argomenti (senza Vendita diretta, con Registro)')
     ok('Come funziona il CRM' in testo(pg, '.selezionabile'), 'Guida: primo argomento «Come funziona il CRM»')
     ok(pg.locator('.filtri input[type=search]').count() == 1, 'Guida: ricerca in tutto il testo')
 

@@ -158,6 +158,12 @@ describe('riconosciCliente (D-92)', () => {
     expect(await riconosciCliente(db, L({ piva_cliente: 'IT 01234567890' }))).toEqual({ cliente_id: c.id, ragione: 'Orti Riuniti snc' });
   });
 
+  it('P.IVA con il prefisso del paese davanti alle cifre (D-124): si confronta senza', async () => {
+    const c = await creaCliente('Orti Riuniti snc', '01234567890');
+    expect(await riconosciCliente(db, L({ piva_cliente: 'IT01234567890' }))).toEqual({ cliente_id: c.id, ragione: 'Orti Riuniti snc' });
+    expect(await riconosciCliente(db, L({ piva_cliente: 'DE 01234567890' }))).toEqual({ cliente_id: c.id, ragione: 'Orti Riuniti snc' });
+  });
+
   it('ragione sociale riconosciuta senza P.IVA', async () => {
     expect(await riconosciCliente(db, L({ cliente: 'Verde Vita snc' }))).toEqual({ cliente_id: c1.id, ragione: 'Verde Vita snc' });
   });

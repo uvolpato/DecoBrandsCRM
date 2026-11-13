@@ -39,6 +39,7 @@ with sync_playwright() as p:
     sovr = lambda pg: pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth')
 
     pg = entra(S + '-ammi')
+    pg.wait_for_selector('.selezionabile a')
 
     # pagina e sei sezioni, la prima aperta è azienda
     ok(testo(pg, '.testa h1') == 'Impostazioni', 'titolo della pagina: Impostazioni')

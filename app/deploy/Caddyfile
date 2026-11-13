@@ -1,7 +1,19 @@
-# Caddy davanti all'app (F7-A2, spec §3.2): tutto al frontend Next, che inoltra /api al backend.
-# In esercizio si sostituisce :80 con il nome del server, es. crm.decobrands.it (Caddy prende il
-# certificato da solo). Backend (8002) e frontend (8001) ascoltano solo su 127.0.0.1.
-:80 {
+# Caddy davanti all'app (F7-A2, spec §3.2 e §3.4): tutto al frontend Next, che inoltra /api al backend.
+# Caddy >= 2.5. crm.decobrands.it è il dominio vero: Caddy prende il certificato da solo.
+# All'inizio l'app gira solo in intranet e la sfida HTTP non basta per il certificato pubblico.
+# Due strade, da scegliere al rilascio con il tecnico della rete:
+#   - `tls internal`: certificato interno di Caddy, da installare sui PC che usano il CRM;
+#   - sfida DNS: serve il modulo DNS del fornitore del dominio (Caddy built with the DNS plugin).
+# Non cambiare qui le direttive attive: si aggiunge solo `tls …` nel blocco del sito.
+# Niente trusted_proxies: Caddy sostituisce X-Forwarded-For con l'IP del client, così il limite ai
+# tentativi per IP e il registro vedono l'IP vero (D-41).
+crm.decobrands.it {
 	encode zstd gzip
-	reverse_proxy 127.0.0.1:8001
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	reverse_proxy 127.0.0.1:8001 {
+		# il PDF passa da LibreOffice e può impiegare ~1 minuto: non chiudere prima (F4-A3, §11)
+		transport http {
+			read_timeout 190s
+		}
+	}
 }

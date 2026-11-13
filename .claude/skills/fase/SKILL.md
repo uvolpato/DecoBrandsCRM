@@ -49,9 +49,9 @@ A Ugo si scrive in mezza riga quale modello e perché.
    - Database di prova per pacchetto: crea `decobrands_test_<pacchetto>` (owner `decobrands`) e
      applica le migrazioni (`npx prisma migrate deploy`); `test/ambiente.ts` accetta i nomi con
      `decobrands_test`.
-5. **Lancio**, dalla radice del progetto, in background, un processo per pacchetto:
+5. **Lancio**, dalla radice del progetto, in background, un processo per pacchetto, **sul server `opencode serve --port 4097`** (Ugo segue le sessioni dal vivo su http://127.0.0.1:4097, progetto `C:\Progetti\Decobrands_CRM`; senza server `opencode run` a volte si blocca prima di creare la sessione). Se il server non risponde, avvialo con `opencode serve --port 4097 --hostname 127.0.0.1` in background:
    ```bash
-   opencode run -m <modello> --title "<pacchetto>" \
+   opencode run --attach http://127.0.0.1:4097 --dir "c:\Progetti\Decobrands_CRM" -m <modello> --title "<pacchetto>" \
      "Sei l'esecutore del Decobrands CRM (c:\Progetti\Decobrands_CRM). Leggi strumenti/opencode/regole-onda-parallela.md e poi esegui strumenti/opencode/<pacchetto>.md. Rispondi con il riepilogo di massimo 10 righe chiesto dalle regole." \
      > "<scratchpad>/oc-<pacchetto>.log" 2>&1
    ```
@@ -87,3 +87,9 @@ un sottoagente per pacchetto, in parallelo solo con file ammessi separati.
   una riga in più nel prompt.
 - Le decisioni di architettura e quelle che vanno contro il §19 le prende Ugo (o Claude Code
   chiedendo a Ugo), non OpenCode.
+- `opencode run` rifiuta da solo ogni permesso chiesto (cartelle esterne, `/tmp`) e **la sessione
+  si chiude senza resoconto**: nel prompt vanno sempre «niente `cd`, niente `/tmp`, niente `&`»
+  (sono anche in `regole-onda-parallela.md`). Lanciare con `timeout` (2 h) per fermare una
+  sessione appesa.
+- Le prove nel browser lunghe (giro completo ~40 min) le lancia Claude Code con
+  `strumenti/collaudo/e2e/prepara.sh` e `giro.sh`; OpenCode lancia solo prove singole.

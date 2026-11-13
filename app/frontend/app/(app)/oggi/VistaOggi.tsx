@@ -66,7 +66,7 @@ export function VistaOggi() {
     vVista.current = vEventi;
     if (!dati) return;
     let vivo = true;
-    void api<Dati>('oggi').then((r) => {
+    void api<Dati>('oggi', undefined, undefined, { automatico: true }).then((r) => {
       if (!vivo || !r.ok) return;
       setDati((d) => d && {
         ...d, riquadri: r.dati.riquadri, scadenze: r.dati.scadenze, operazioni: r.dati.operazioni,

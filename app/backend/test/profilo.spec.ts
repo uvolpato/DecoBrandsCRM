@@ -10,6 +10,7 @@ import { scaduta } from '../src/accesso';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
+import type { Prisma } from '@prisma/client';
 
 let app: NestExpressApplication;
 let db: PrismaService;
@@ -103,6 +104,15 @@ describe('pagina di ingresso per area', () => {
     await a.put('/api/accesso/profilo').set('x-csrf-token', a.csrf).send({ ingressi: { sconosciuta: '/' } }).expect(400, /Area sconosciuta/);
   });
 
+  it('area dal prototipo (constructor, hasOwnProperty) non dà mai 500 (A1-07)', async () => {
+    const a = await entra('oper');
+    // class-transformer (ValidationPipe transform) scarta già queste chiavi da ingressi; qui si
+    // verifica solo che la richiesta non scoppi mai in un 500 (difesa in profondità di Object.hasOwn)
+    const r = await a.put('/api/accesso/profilo').set('x-csrf-token', a.csrf)
+      .send({ ingressi: { constructor: '/', hasOwnProperty: '/' } });
+    expect(r.status).toBeLessThan(500);
+  });
+
   it('percorso di un\'altra area 400', async () => {
     const a = await entra('oper');
     await a.put('/api/accesso/profilo').set('x-csrf-token', a.csrf).send({ ingressi: { provvigioni: '/fornitori' } }).expect(400, /Percorso non valido/);
@@ -163,5 +173,45 @@ describe('timeout di inattività', () => {
     req.abort();
     await new Promise((ok) => setTimeout(ok, 100));
     expect((await sessione(a)).sess.ultimo).toBe(prima);
+  });
+
+  it('una richiesta automatica non rinnova; senza intestazione sì (A1-02)', async () => {
+    const a = await entra('oper');
+    await invecchia(a, 20_000); // dentro il timeout di default: non scade
+    const prima = (await sessione(a)).sess.ultimo;
+    await a.get('/api/oggi').set('x-automatico', '1').expect(200);
+    expect((await sessione(a)).sess.ultimo).toBe(prima); // il polling non conta come attività
+    await a.get('/api/oggi').expect(200); // richiesta della persona: rinnova
+    expect((await sessione(a)).sess.ultimo).toBeGreaterThan(prima as number);
+  });
+
+  it('una richiesta automatica oltre il timeout risponde 401 (A1-02)', async () => {
+    process.env.SESSION_TIMEOUT_MINUTI = '1';
+    try {
+      const a = await entra('oper');
+      await invecchia(a, 2 * 60_000);
+      await a.get('/api/oggi').set('x-automatico', '1').expect(401, /Sessione scaduta per inattività/);
+    } finally {
+      delete process.env.SESSION_TIMEOUT_MINUTI;
+    }
+  });
+
+  it('una sessione più vecchia di 30 giorni si chiude anche da attiva (A1-03)', async () => {
+    const a = await entra('oper');
+    const { sid, sess } = await sessione(a);
+    await db.sessioni.update({ where: { sid }, data: { sess: { ...sess, creata: Date.now() - 31 * 24 * 3600 * 1000 } } });
+    await a.get('/api/accesso/io').expect(401, /Sessione scaduta: entra di nuovo/);
+  });
+
+  it('una sessione senza creata (nata prima della correzione) la riceve al primo passaggio (C1)', async () => {
+    await crea('c1', 'operatore');
+    const a = await entra('c1');
+    const { sid, sess } = await sessione(a);
+    const { creata: _ignorata, ...senza } = sess;
+    await db.sessioni.update({ where: { sid }, data: { sess: senza as Prisma.InputJsonValue } });
+    await a.get('/api/accesso/io').expect(200);
+    const dopo = (await sessione(a)).sess;
+    expect(typeof dopo.creata).toBe('number');
+    expect(dopo.creata as number).toBeGreaterThan(Date.now() - 60_000); // i 30 giorni partono da adesso
   });
 });

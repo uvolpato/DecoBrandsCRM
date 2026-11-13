@@ -83,9 +83,13 @@ with sync_playwright() as p:
     ok(totali_piede(pg) == n, 'tolti i filtri dal riepilogo: tornano %d pratiche' % n)
 
     # ordinamento sul server: clic su Importo = crescente, secondo clic = decrescente
-    pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(1200)
+    pg.click('.dt th:has-text("Importo")')
+    pg.wait_for_function("() => document.querySelector('.dt th.attivo')?.getAttribute('aria-sort') === 'ascending'")
+    pg.wait_for_function("""() => { const v = [...document.querySelectorAll('.dt tbody tr.cliccabile')].map(r => Number((r.children[4]?.textContent || '').replace(/[^0-9,-]/g, '').replace('.', '').replace(',', '.'))); return v.length && v.every((x, i) => i === 0 || v[i-1] <= x); }""")
     ok(pg.locator('.dt th.attivo:has-text("Importo")').count() == 1 and importi(pg) == sorted(importi(pg)), 'ordinamento per importo crescente')
-    pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(1200)
+    pg.click('.dt th:has-text("Importo")')
+    pg.wait_for_function("() => document.querySelector('.dt th.attivo')?.getAttribute('aria-sort') === 'descending'")
+    pg.wait_for_function("""() => { const v = [...document.querySelectorAll('.dt tbody tr.cliccabile')].map(r => Number((r.children[4]?.textContent || '').replace(/[^0-9,-]/g, '').replace('.', '').replace(',', '.'))); return v.length && v.every((x, i) => i === 0 || v[i-1] >= x); }""")
     ok(importi(pg) == sorted(importi(pg), reverse=True), 'secondo clic: importo decrescente')
     prima_dec = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
 

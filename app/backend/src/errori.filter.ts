@@ -2,12 +2,25 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Injectable, Logge
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { PrismaService } from './prisma.service';
+import { contesto } from './accesso';
 import { logEventSicuro } from './registro';
 
 // Errori generici verso il browser: niente dettagli interni (§15.5). I 4xx tornano con il loro
 // messaggio; i 5xx con un codice, che è l'operazione_id dell'evento errore.error nel registro.
-// ponytail: i 4xx di validazione si registrano con il tipo dell'operazione (§15.2.7) quando
-// arrivano le prime rotte che scrivono.
+// I 4xx di validazione (400/422) si registrano nel registro, solo per un utente entrato (§15.2.7).
+
+/** Campo di un errore di validazione: la prima parola del messaggio del ValidationPipe (il nome del
+ *  campo), senza mai i valori inviati (§15.2.7, D-85). Il testo dell'eccezione non si usa: a volte
+ *  contiene il valore inviato (`Area sconosciuta: xyz`, `Campo sconosciuto: <k>`). */
+function campoValidazione(risposta: unknown): string | null {
+  if (!risposta || typeof risposta !== 'object') return null;
+  const m = (risposta as { message?: unknown }).message;
+  if (!Array.isArray(m)) return null;
+  const primo = typeof m[0] === 'string' ? m[0] : String(m[0] ?? '');
+  const i = primo.indexOf(' ');
+  return i > 0 ? primo.slice(0, i) : primo;
+}
+
 @Catch()
 @Injectable()
 export class ErroriFilter implements ExceptionFilter {
@@ -25,7 +38,26 @@ export class ErroriFilter implements ExceptionFilter {
         res.status(429).json({ statusCode: 429, message: 'Troppi tentativi ravvicinati: riprova fra qualche minuto.' });
         return;
       }
-      res.status(errore.getStatus()).json(errore.getResponse());
+      const stato = errore.getStatus();
+      if (stato === 400 || stato === 422) {
+        // operazione rifiutata dalla validazione: si registra solo la richiesta di un utente entrato,
+        // come rifiuto (`negato`, livello attenzione), mai come errore del sistema, e mai con i valori
+        // inviati (solo campo e messaggio generico, §15.2.7, D-85).
+        if (req.utente) {
+          const azione = req.method === 'POST' ? 'create' : req.method === 'PUT' || req.method === 'PATCH' ? 'update' : req.method === 'DELETE' ? 'delete' : null;
+          if (azione) {
+            const campo = campoValidazione(errore.getResponse());
+            await logEventSicuro(this.db, {
+              tipo: 'crud',
+              azione,
+              entita: req.path.split('/').filter(Boolean)[1] ?? 'sistema',
+              esito: 'negato',
+              dettaglio: { etichetta: `${req.method} ${req.path}`, errore: { messaggio: 'valore non valido', ...(campo ? { campo } : {}) } },
+            }, contesto(req));
+          }
+        }
+      }
+      res.status(stato).json(errore.getResponse());
       return;
     }
     const codice = randomUUID();

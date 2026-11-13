@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Barra, primaPagina, voceDi } from '@/componenti/Barra';
 import { ClasseBody } from '@/componenti/ClasseBody';
 import { Riservata } from '@/componenti/Pagina';
+import { RegioneAvvisi } from '@/componenti/Piccoli';
 import { UtenteCtx, AggiornaUtenteCtx } from '@/componenti/Utente';
 import { api, type Io } from '@/lib/api';
 import { EventiProvider } from '@/lib/eventi';
@@ -41,6 +42,7 @@ export default function Guscio({ children }: { children: ReactNode }) {
           {/* stile.css: body.sola-lettura mostra la fascia e spegne i pulsanti che modificano (§8.3) */}
           {solaLettura && <ClasseBody classe="sola-lettura" />}
           <Barra />
+          <RegioneAvvisi />
           <main className="principale" id="principale">
             {voce?.permesso ? <Riservata permesso={voce.permesso} titolo={voce.t}>{children}</Riservata> : children}
           </main>

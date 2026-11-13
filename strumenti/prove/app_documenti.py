@@ -60,12 +60,14 @@ try:
         pg.wait_for_function("() => /\\d+ document/.test(document.querySelector('.pannello-nota')?.textContent ?? '')")
         ok('document' in nota.inner_text(), 'conteggio dei documenti nel pannello')
         pg.wait_for_selector(voce)
-        pg.click(voce); pg.wait_for_timeout(200)  # due documenti di prova: si sceglie quello normale
+        pg.click(voce)  # due documenti di prova: si sceglie quello normale
+        pg.locator(voce + '[aria-current=true]').wait_for(timeout=10000)
         ok('Fattura PROVA-' + S.upper() in testo(pg, voce), 'elenco: tipo e numero letti')
         ok(pg.locator(voce + ' .stato:has-text("Affidabilità bassa")').count() == 1, 'elenco: livello basso (rosso)')
         ok(pg.locator(voce + '[aria-current=true]').count() == 1, 'il primo documento è selezionato nella stessa pagina')
         pg.screenshot(path=str(USCITA / 'app-documenti-1440.png'), full_page=True)
 
+        pg.wait_for_selector('.dettagli', timeout=10000)  # il dettaglio arriva dal server
         ok(pg.locator('.dettagli').count() == 1, 'a destra il documento scelto, senza cambiare pagina')
         ok('PROVA-' + S.upper() in pg.locator('.pannello-testa h2').last.inner_text(), 'dettaglio: titolo con il documento')
         ok('Codice cliente' in testo(pg, '.dettagli') and 'Importo' in testo(pg, '.dettagli'), 'dettaglio: testata con codice cliente e importo')
@@ -230,6 +232,31 @@ try:
            'dopo l’import le righe lette sono ancora nella scheda Righe')
         pg2.screenshot(path=str(USCITA / 'app-documento-import-integra-1440.png'))
         pg2.close()
+
+        # A4-01: un documento in errore offre «Rileggi il documento» (la lettura si riprova). La scheda
+        # è simulata come per l'import: non serve un documento vero nello stato errore.
+        scheda_errore = {
+            'id': '999998', 'file_nome': 'prova-errore.pdf', 'file_tipo': 'pdf', 'stato': 'errore',
+            'tipo': None, 'livello': None, 'ricevuto_il': '2026-09-15T09:00:00.000Z',
+            'letto_il': None, 'errore': 'LlamaCloud non ha accettato il file (402): crediti finiti',
+            'scaglioni_mancanti': False, 'fornitore': None, 'campi': [], 'controlli': [],
+            'testata': {'tipo': None, 'numero': None, 'data': None, 'fornitore_id': None,
+                        'codice_cliente': None, 'cliente': None, 'importo': None,
+                        'mese': None, 'anno': None, 'riferimento_fattura': None},
+            'righe': [],
+            'proposta': {'esito': 'nessuno', 'candidati': [], 'importo': 0, 'abbinamento': None,
+                         'cliente_riconosciuto': None, 'agenzia_mancante': None, 'cliente_da_integra': None,
+                         'manca_rappresentanza': None, 'fornitore_da_integra': None},
+            'bollettino': None,
+        }
+        pg3 = entra(S + '-ammi')
+        pg3.route(re.compile(r'^.*/api/documenti/999998$'), lambda r: risposta(r, json.dumps(scheda_errore)))
+        pg3.goto(BASE + '/documenti/999998')
+        pg3.locator('button:has-text("Rileggi il documento")').wait_for(timeout=15000)
+        ok(pg3.locator('button:has-text("Rileggi il documento")').count() == 1, 'errore: pulsante Rileggi il documento')
+        ok(pg3.locator('button:has-text("Correggi i dati letti")').count() == 1, 'errore: pulsante Correggi i dati letti per inserire i dati a mano')
+        pg3.close()
+
         b.close()
 finally:
     prova_documento('togli')

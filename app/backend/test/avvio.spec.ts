@@ -70,8 +70,19 @@ describe('controllaAmbiente', () => {
   it('sviluppo, prove ed esercizio passano; gli altri valori fermano l\'avvio', () => {
     expect(controllaAmbiente({ NODE_ENV: 'development' })).toBe('development');
     expect(controllaAmbiente({ NODE_ENV: 'test' })).toBe('test');
-    expect(controllaAmbiente({ NODE_ENV: 'production' })).toBe('production');
+    expect(controllaAmbiente({ NODE_ENV: 'production', SESSION_SECRET: 'a'.repeat(48), SEGRETI_CHIAVE: 'b'.repeat(48) })).toBe('production');
     expect(() => controllaAmbiente({})).toThrow(/NODE_ENV/);
     expect(() => controllaAmbiente({ NODE_ENV: 'staging' })).toThrow(/NODE_ENV/);
+  });
+
+  it("in esercizio i segreti d'esempio o troppo corti fermano l'avvio", () => {
+    const buono = { NODE_ENV: 'production', SESSION_SECRET: 'a'.repeat(48), SEGRETI_CHIAVE: 'b'.repeat(48) };
+    expect(controllaAmbiente(buono)).toBe('production');
+    expect(() => controllaAmbiente({ ...buono, SESSION_SECRET: 'CAMBIARE' })).toThrow(/SESSION_SECRET/);
+    expect(() => controllaAmbiente({ ...buono, SEGRETI_CHIAVE: 'CAMBIARE' })).toThrow(/SEGRETI_CHIAVE/);
+    expect(() => controllaAmbiente({ ...buono, SESSION_SECRET: 'corto' })).toThrow(/SESSION_SECRET/);
+    expect(() => controllaAmbiente({ ...buono, SEGRETI_CHIAVE: undefined })).toThrow(/SEGRETI_CHIAVE/);
+    // in sviluppo i valori d'esempio non fermano: si parte anche solo copiando il file
+    expect(controllaAmbiente({ NODE_ENV: 'development', SESSION_SECRET: 'CAMBIARE' })).toBe('development');
   });
 });

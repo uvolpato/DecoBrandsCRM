@@ -1,11 +1,12 @@
 import {
   BadRequestException, Body, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseIntPipe, Post, Put, Req,
 } from '@nestjs/common';
-import { type clienti, type clienti_versioni, type interscambio, type interscambio_storico } from '@prisma/client';
+import { Prisma, type clienti, type clienti_versioni, type interscambio, type interscambio_storico } from '@prisma/client';
 import { IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto, permessiDi } from './accesso';
 import { ForbiddenException } from '@nestjs/common';
+import { dopoChiusura } from './fornitori';
 import { PrismaService } from './prisma.service';
 import { normalizzaNome } from './proposta';
 import { logEvent } from './registro';
@@ -63,6 +64,17 @@ function soloResponsabile(req: Request, b: DatiAgenzia, attuale: { pct: number |
 
 function iso(d: Date | null | undefined): string | null {
   return d ? d.toISOString().slice(0, 10) : null;
+}
+
+// D-114 §19: l'agenzia non si cambia né si elimina nel periodo chiuso del fornitore (D-51 esteso a interscambio)
+const agenziaChiusa = (c: string) => `Il periodo fino al ${c} è chiuso: chiudi l'agenzia e aprine una nuova da una data successiva`;
+const agenziaFinisce = (c: string) => `Il periodo fino al ${c} è chiuso: l'agenzia può smettere di valere solo dopo il ${c}`;
+
+/** D-114 §19, V13: blocca i fornitori in ordine stabile (evita deadlock fra modifiche incrociate) prima di
+ *  leggere la chiusura, così un cambio di agenzia non passa fra le letture di una chiusura in corso. */
+async function bloccaFornitori(tx: Prisma.TransactionClient, fids: bigint[]) {
+  const unici = [...new Set(fids)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const fid of unici) await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${fid} FOR UPDATE`;
 }
 
 function mappaCliente(c: clienti & { corrente?: clienti_versioni | null; soggetto?: { id: bigint; codice: string } | null }, codice: string | null) {
@@ -220,12 +232,14 @@ export class ClientiController {
     if (!b.valido_dal) throw new BadRequestException('Data di inizio obbligatoria');
     if (b.valido_al && new Date(b.valido_al) <= new Date(b.valido_dal)) throw new BadRequestException('La data di fine deve essere dopo la data di inizio');
     return unico(() => this.db.$transaction(async (tx) => {
+      await bloccaFornitori(tx, [BigInt(b.fornitore_id!)]);
+      const fornitore = await tx.fornitori.findUnique({ where: { id: BigInt(b.fornitore_id!) }, include: { corrente: { select: { ragione_sociale: true, piva: true } } } });
+      if (!fornitore) throw new NotFoundException('Fornitore non trovato');
+      await dopoChiusura(tx, fornitore.id, b.valido_dal!, agenziaChiusa); // D-114 §19
       const cliente = await tx.clienti.findUnique({ where: { id: BigInt(id) }, include: { corrente: { select: { ragione_sociale: true, piva: true } } } });
       if (!cliente) throw new NotFoundException('Cliente non trovato');
       const sub = await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id!) } });
       if (!sub) throw new NotFoundException('Subagente non trovato');
-      const fornitore = await tx.fornitori.findUnique({ where: { id: BigInt(b.fornitore_id!) }, include: { corrente: { select: { ragione_sociale: true, piva: true } } } });
-      if (!fornitore) throw new NotFoundException('Fornitore non trovato');
       // D-112, V13: la riga dello storico si legge bloccata e si consuma una volta sola (409 se già
       // usata): due agenzie con lo stesso storico_id non si sovrascrivono.
       let legame: interscambio_storico | null = null;
@@ -349,6 +363,22 @@ export class ClientiController {
         });
         return mappaAgenzia(ag as never);
       }
+      // D-114 §19: nel periodo chiuso del fornitore l'agenzia non cambia i campi che spostano i soldi
+      const cambiaFornitore = dopoData.fornitore_id !== prima.fornitore_id;
+      await bloccaFornitori(tx, cambiaFornitore ? [prima.fornitore_id, dopoData.fornitore_id] : [prima.fornitore_id]);
+      const sensibile = ['subagente_id', 'fornitore_id', 'sconto', 'pct_subagente', 'regola_mensile', 'valido_dal'].some((k) => k in dopoDiff);
+      if (sensibile) {
+        await dopoChiusura(tx, prima.fornitore_id, iso(prima.valido_dal)!, agenziaChiusa);
+        if (cambiaFornitore || iso(dopoData.valido_dal) !== iso(prima.valido_dal)) {
+          await dopoChiusura(tx, dopoData.fornitore_id, iso(dopoData.valido_dal)!, agenziaChiusa);
+        }
+      } else if ('valido_al' in dopoDiff) {
+        // come fornitori.ts termina (D-51): né la vecchia né la nuova fine possono cadere entro la chiusura
+        const alPrima = prima.valido_al ? iso(prima.valido_al) : null;
+        const alNuovo = dopoData.valido_al ? iso(dopoData.valido_al) : null;
+        if (alPrima) await dopoChiusura(tx, prima.fornitore_id, alPrima, agenziaFinisce);
+        if (alNuovo) await dopoChiusura(tx, dopoData.fornitore_id, alNuovo, agenziaFinisce);
+      }
       const dopo = await tx.interscambio.update({
         where: { id: prima.id },
         data: {
@@ -392,6 +422,9 @@ export class ClientiController {
         },
       });
       if (!a || a.cliente_id !== BigInt(id)) throw new NotFoundException('Agenzia non trovata');
+      // D-114 §19: nel periodo chiuso del fornitore l'agenzia non si elimina (D-51 esteso a interscambio)
+      await bloccaFornitori(tx, [a.fornitore_id]);
+      await dopoChiusura(tx, a.fornitore_id, iso(a.valido_dal)!, agenziaChiusa);
       // D-139: la FK degli sconti è RESTRICT; senza questo controllo la delete darebbe 500
       if (await tx.sconti.count({ where: { interscambio_id: a.id } })) {
         throw new ConflictException('L\'agenzia ha sconti storici: si chiude, non si elimina');

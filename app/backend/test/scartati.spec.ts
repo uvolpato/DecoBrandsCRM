@@ -73,6 +73,38 @@ const fileCè = async (id: bigint) => {
   return access(join(process.env.DOCUMENTI_DIR!, d.file_percorso)).then(() => true, () => false);
 };
 
+/** Il database che, un attimo prima di cancellare, riporta il documento in coda: la corsa fra la
+ *  pulizia notturna e il recupero (A3-04, A4-09) resa certa invece che casuale. */
+function dbConRecupero(id: bigint) {
+  let fatto = false;
+  const recupera = async () => {
+    if (fatto) return;
+    fatto = true;
+    await db.documenti_in_arrivo.update({
+      where: { id },
+      data: { stato: 'in_coda', scartato_il: null, scartato_da: null, motivo_scarto: null, nota_scarto: null },
+    });
+  };
+  const conGancio = (bersaglio: object, nomi: string[]): object => new Proxy(bersaglio, {
+    get(oggetto, chiave) {
+      const v = Reflect.get(oggetto, chiave) as unknown;
+      if (chiave === 'documenti_in_arrivo' && v && typeof v === 'object') return conGancio(v, ['deleteMany']);
+      if (typeof chiave === 'string' && nomi.includes(chiave) && typeof v === 'function') {
+        return async (...a: unknown[]) => {
+          await recupera();
+          return (v as (...x: unknown[]) => unknown).apply(oggetto, a);
+        };
+      }
+      if (chiave === '$transaction' && typeof v === 'function') {
+        return (cb: (tx: object) => Promise<unknown>) =>
+          (v as (f: (tx: object) => Promise<unknown>) => Promise<unknown>).call(oggetto, (tx) => cb(conGancio(tx, ['$queryRaw'])));
+      }
+      return typeof v === 'function' ? v.bind(oggetto) : v;
+    },
+  });
+  return conGancio(db, ['$queryRaw']) as PrismaService;
+}
+
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = configura(mod.createNestApplication<NestExpressApplication>({ logger: false }));
@@ -198,6 +230,17 @@ describe('F5-A7 pulizia oltre i giorni di conservazione (§7.15-16)', () => {
     expect(await fileCè(recente.id)).toBe(true);
     // nessun evento: la pulizia è manutenzione (D-74)
     expect(await db.registro.count({ where: { entita: 'documento', entita_id: vecchio.id } })).toBe(0);
+
+    await rm(join(process.env.DOCUMENTI_DIR!, 'in_arrivo'), { recursive: true, force: true });
+  });
+
+  it('non elimina uno scartato recuperato fra la lettura e la cancellazione (A3-04, A4-09)', async () => {
+    await db.impostazioni.update({ where: { chiave: 'conservazione' }, data: { valore: { eventi_mesi: 36, scartati_giorni: 10, righe_pagina: 25 } } });
+    const d = await scartato({ nome: 'corsa', numero: 'F-702', quando: new Date(Date.now() - 20 * 86_400_000) });
+
+    expect(await pulisciScartati(dbConRecupero(d.id))).toBe(0);
+    expect(await db.documenti_in_arrivo.findUnique({ where: { id: d.id } })).not.toBeNull();
+    expect(await fileCè(d.id)).toBe(true);
 
     await rm(join(process.env.DOCUMENTI_DIR!, 'in_arrivo'), { recursive: true, force: true });
   });

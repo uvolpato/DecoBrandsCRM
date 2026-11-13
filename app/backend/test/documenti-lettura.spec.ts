@@ -383,6 +383,24 @@ describe('PUT /api/documenti/:id — correzione dei dati letti', () => {
   it('404 se il documento non c\'è', async () => {
     await oper.put('/documenti/999999999', { testata: { tipo: 'fattura' }, righe: [] }).expect(404);
   });
+
+  it('da errore la correzione a mano porta a da_controllare e chiude lettura.fallita (A4-01)', async () => {
+    const id = await creaDoc({ stato: 'errore' });
+    await apriAnomalia(db, { servizio: 'lettura', codice: 'lettura.fallita', chiave: String(id), messaggio: 'non si legge' });
+    const r = await oper.put(`/documenti/${id}`, { testata: { tipo: 'fattura', numero: 'F-ERR', data: '2026-09-01' }, righe: [] }).expect(200);
+    expect(r.body.stato).toBe('da_controllare');
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } })).stato).toBe('da_controllare');
+    expect(await db.registro.count({ where: { codice: 'lettura.fallita', chiave: String(id), stato: 'aperta' } })).toBe(0);
+  });
+
+  it('corpo non valido: 400 invece di 500 (A4-13)', async () => {
+    const id = await creaDoc({ tipo: 'fattura' });
+    await oper.put(`/documenti/${id}`, { testata: 'x', righe: [null] }).expect(400);
+    await oper.put(`/documenti/${id}`, { testata: { tipo: 'fattura' }, righe: [null] }).expect(400);
+    await oper.put(`/documenti/${id}`, { testata: { tipo: 'fattura' }, righe: 'x' }).expect(400);
+    // il documento non è cambiato dalle richieste fallite
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } })).stato).toBe('da_controllare');
+  });
 });
 
 describe('POST /api/documenti/:id/scarta', () => {
@@ -412,11 +430,31 @@ describe('POST /api/documenti/:id/scarta', () => {
   });
 });
 
+describe('POST /api/documenti/:id/rileggi (A4-01)', () => {
+  it('da errore torna in_coda, azzera i tentativi e chiude lettura.fallita', async () => {
+    const id = await creaDoc({ stato: 'errore', nome: 'da-rileggere.pdf' });
+    await apriAnomalia(db, { servizio: 'lettura', codice: 'lettura.fallita', chiave: String(id), messaggio: 'non si legge' });
+    await oper.post(`/documenti/${id}/rileggi`).expect(204);
+    const d = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } });
+    expect(d).toMatchObject({ stato: 'in_coda', tentativi: 0, errore: null });
+    expect(await db.registro.count({ where: { codice: 'lettura.fallita', chiave: String(id), stato: 'aperta' } })).toBe(0);
+    const ev = await db.registro.findFirstOrThrow({ where: { codice: 'documento.update', entita_id: id } });
+    expect(ev.dettaglio).toMatchObject({ documento_id: String(id), prima: { stato: 'errore' }, dopo: { stato: 'in_coda' } });
+  });
+
+  it('409 se non è in errore; 404 se non c\'è', async () => {
+    const id = await creaDoc({ stato: 'da_controllare' });
+    await oper.post(`/documenti/${id}/rileggi`).expect(409);
+    await oper.post('/documenti/999999999/rileggi').expect(404);
+  });
+});
+
 describe('permessi', () => {
   it('la sola lettura consulta elenco e dettaglio ma non corregge né scarta', async () => {
     await lett.get('/documenti').expect(200);
     await lett.get(`/documenti/${docA}`).expect(200);
     await lett.put(`/documenti/${docA}`, { testata: { tipo: 'fattura' }, righe: [] }).expect(403);
     await lett.post(`/documenti/${docA}/scarta`, { motivo: 'Altro' }).expect(403);
+    await lett.post(`/documenti/${docA}/rileggi`).expect(403);
   });
 });
