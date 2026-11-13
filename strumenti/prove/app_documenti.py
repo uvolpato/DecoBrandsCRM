@@ -53,6 +53,8 @@ try:
         voceSenza = '.selezionabile a:has-text("PROVA-SENZA-%s")' % S.upper()
 
         pg = entra(S + '-ammi')
+        # se la pagina ha errori JS l'elenco non compare: li si dice subito, non con un timeout muto
+        ok(not errori, 'nessun errore di pagina all’apertura' + ((': ' + '; '.join(errori[:3])) if errori else ''))
         pg.wait_for_selector('.selezionabile a')
         ok('Documenti' in testo(pg, '.testa h1'), 'titolo della pagina')
         ok(pg.locator('.caricamento').count() == 1, 'area di caricamento nel pannello Da controllare')
@@ -103,6 +105,8 @@ try:
 
         pg.click('.pannello-testa button:has-text("Correggi i dati letti")'); pg.wait_for_selector('.affiancata')
         pg.wait_for_selector('.aff-sx canvas', timeout=20000)  # il visore disegna le pagine in modo asincrono (PDF.js)
+        pg.wait_for_timeout(400)  # le voci delle anagrafiche arrivano dal server: la ricerca mostra il nome, non l'id
+        pg.screenshot(path=str(USCITA.parents[1] / 'correggi-1440.png'))  # schermata della finestra per il controllo visivo
         ok(pg.locator('.aff-sx canvas').count() >= 1, 'finestra di correzione: PDF originale a sinistra')
         ok(pg.input_value('input[data-campo="numero"]') == 'PROVA-' + S.upper(), 'finestra di correzione: numero letto')
         ok(pg.locator('.aff-dx .incerto-errore').count() >= 1 and pg.locator('.aff-dx .incerto-attesa').count() >= 1, 'campi bordati giallo e rosso')
@@ -142,8 +146,17 @@ try:
         ok(pg.evaluate("getComputedStyle(document.querySelector('.colonne')).gridTemplateColumns.split(' ').length") == 1, '768 px: elenco e dettaglio impilati')
         pg.screenshot(path=str(USCITA / 'app-documenti-768.png'), full_page=True)
         pg.click('.pannello-testa button:has-text("Correggi i dati letti")'); pg.wait_for_selector('.affiancata')
+        pg.wait_for_selector('.aff-sx canvas', timeout=20000)
+        pg.screenshot(path=str(USCITA.parents[1] / 'correggi-768.png'))  # schermata della finestra a 768 px
         ok(pg.evaluate("getComputedStyle(document.querySelector('.aff-corpo')).flexDirection") == 'column', '768 px: correzione impilata')
         ok(not pg.evaluate('document.documentElement.scrollWidth > innerWidth'), '768 px: correzione senza scorrimento orizzontale')
+        # correzioni 1: a 768 la «Somma righe» resta dentro la colonna dell'Importo
+        dentro768 = pg.evaluate("""() => {
+          const s = document.querySelector('.sopra-riga'); if (!s) return null;
+          const c = s.closest('.campo-letto').getBoundingClientRect(), r = s.getBoundingClientRect();
+          return r.left >= c.left - 1 && r.right <= c.right + 1;
+        }""")
+        ok(dentro768 is True, '768 px: «Somma righe» dentro la colonna dell’Importo')
         pg.screenshot(path=str(USCITA / 'app-documento-768.png'), full_page=True)
         pg.click('.aff-piede button:has-text("Annulla")'); pg.wait_for_timeout(200)
         pg.set_viewport_size({'width': 1440, 'height': 900}); pg.wait_for_timeout(300)
@@ -303,6 +316,57 @@ try:
         ok('Oppure abbina a un’altra pratica:' in corpo4, 'A6-16: «Oppure abbina a un’altra pratica» senza il nome')
         pg4.close()
 
+        # «Fornitore letto» e «Cliente letto»: il nome scritto sul documento si corregge come gli altri
+        # campi; il pulsante › (non più «Cerca questo») mette il nome letto nella ricerca (per parole).
+        scheda_letto = dict(scheda_errore, id='999996', stato='da_controllare', tipo='fattura',
+                            livello='bassa', file_nome='prova-letto.jpg', file_tipo='jpg',
+                            campi=[{'campo': 'fornitore', 'valore_letto': 'Gries GmbH', 'valore_finale': None,
+                                    'affidabilita': 0.62, 'posizione': None, 'precisione': 'assente', 'verificato': False}])
+        scheda_letto['testata'] = dict(scheda_errore['testata'], tipo='fattura', numero='PROVA-LETTO',
+                                       piva_cliente='DE123456', piva_fornitore='DE987654', fornitore='Gries GmbH',
+                                       cliente='Agri Aggio SNC')
+        pg5 = entra(S + '-ammi')
+        pg5.route(re.compile(r'^.*/api/documenti/999996$'), lambda r: risposta(r, json.dumps(scheda_letto)))
+        pg5.goto(BASE + '/documenti/999996')
+        pg5.locator('button:has-text("Correggi i dati letti")').wait_for(timeout=15000)
+        pg5.click('button:has-text("Correggi i dati letti")'); pg5.wait_for_selector('.affiancata')
+        ok(pg5.input_value('input[data-campo="fornitore"]') == 'Gries GmbH',
+           'Correggi i dati letti: il campo Fornitore letto mostra il nome letto')
+        ok(pg5.locator('input[data-campo="piva_cliente"]').count() == 1
+           and pg5.input_value('input[data-campo="piva_cliente"]') == 'DE123456', 'Correggi i dati letti: la P.IVA letta sotto il nome')
+        ok(pg5.locator('input[data-campo="piva_fornitore"]').count() == 1
+           and pg5.input_value('input[data-campo="piva_fornitore"]') == 'DE987654', 'Correggi i dati letti: la P.IVA del fornitore letta sotto il nome')
+        # D-154: tre righe nell'ordine (tipo·numero·data·importo / cliente / fornitore), niente «Cerca questo»
+        ok(pg5.locator('.aff-dx .riga-letti.tipo').count() == 1
+           and pg5.locator('.aff-dx .riga-letti.cliente').count() == 1
+           and pg5.locator('.aff-dx .riga-letti.fornitore').count() == 1, 'testata su tre righe (tipo, cliente, fornitore)')
+        ok(pg5.locator('.riga-letti.tipo input[data-campo="importo"]').count() == 1, 'l’Importo sta nella prima riga')
+        ok(pg5.locator('.aff-dx button:has-text("Cerca questo")').count() == 0,
+           'niente più «Cerca questo» nella finestra Correggi')
+        ok(pg5.locator('.aff-dx button.btn-arrow').count() == 2, 'due pulsanti › (cliente e fornitore)')
+        # correzioni 1: etichette sulla stessa linea e campi della stessa altezza/linea in ogni riga
+        righe_top = pg5.evaluate("""() => [...document.querySelectorAll('.aff-dx .riga-letti')].map((r) =>
+          [...r.querySelectorAll('input, select, button.btn-arrow')].map((e) => Math.round(e.getBoundingClientRect().top)))""")
+        ok(righe_top and all(max(t) - min(t) <= 2 for t in righe_top if t),
+           'testata: campi di ogni riga sulla stessa linea (±2 px)')
+        # D-153: la lente resta sulla stessa riga del campo Fornitore (niente wrap)
+        campo_f = pg5.locator('.aff-dx input[aria-label="Cerca fornitore"]')
+        lente_f = campo_f.locator('xpath=..').locator('button.ricerca-lente')
+        bf = campo_f.bounding_box(); bl = lente_f.bounding_box()
+        ok(bf is not None and bl is not None and abs(bf['y'] - bl['y']) <= 4,
+           'la lente resta sulla stessa riga del campo Fornitore')
+        # D-153: riepilogo dell'affidabilità chiuso di default, con la freccia e senza area vuota
+        ok(pg5.locator('.aff-riepilogo .riep-freccia').count() == 1, 'riepilogo: freccia presente con punti aperti')
+        ok(pg5.locator('#aff-riep-elenco[hidden]').count() == 1, 'riepilogo chiuso di default: elenco nascosto')
+        pg5.click('.aff-dx button[aria-label="Cerca il cliente letto"]')
+        pg5.wait_for_selector('.aff-dx .ricerca-menu:not([hidden])')
+        ok(pg5.locator('.aff-dx .ricerca-menu:not([hidden])').count() == 1,
+           'il pulsante › apre la ricerca col nome letto')
+        ok(pg5.input_value('.aff-dx input[aria-label="Cerca cliente"]') == 'Agri Aggio SNC',
+           'il pulsante › mette il nome letto nella ricerca del cliente')
+        pg5.screenshot(path=str(USCITA / 'app-documenti-fornitore-letto-1440.png'))
+        pg5.close()
+
         # §7.9: la lista mostra i documenti in coda (stato «In coda», in cima) e il dettaglio offre
         # «Togli dalla coda» che usa lo scarto esistente. La lista e il dettaglio sono simulati.
         lista_coda = {
@@ -389,6 +453,76 @@ try:
         ok(scelti['n'] == 1, 'D-152: la scelta chiama la rotta scegli una volta')
         ok(scelti['dettaglio'] > prima, 'D-152: dopo la scelta la scheda si ricarica')
         pg6.close()
+
+        # D-152: la ricerca del fornitore guarda anche Integra: nella finestra compare la riga «Integra»
+        # sotto i risultati del CRM, dal ponte finto (/api/integra/cerca), e scegliendola si importa.
+        # Scheda simulata: il documento vero PROVA-<s> è stato scartato prima, quindi non è nell'elenco
+        # delle aperte; così il blocco non dipende dal suo stato (e la foto non serve al visore).
+        scheda_integra = dict(scheda_errore, id='999993', stato='da_controllare', tipo='fattura',
+                              livello='da_controllare', file_nome='prova-integra-cerca.jpg', file_tipo='jpg')
+        scheda_integra['testata'] = dict(scheda_errore['testata'], tipo='fattura', numero='PROVA-INTEGRA-CERCA',
+                                         fornitore='Fornitore da cercare')
+        int_ok = {'cerca': 0, 'importa': 0}
+        def cerca_integra(route):
+            int_ok['cerca'] += 1
+            risposta(route, json.dumps({'righe': [{'id_integra': 99001, 'codice': 'F99001', 'ragione_sociale': 'Fornitore Prova Integra', 'piva': '99999999991', 'attivo': True}], 'ms': 1}))
+        def importa_integra(route):
+            int_ok['importa'] += 1
+            risposta(route, json.dumps({'creato': True, 'id': '1', 'ragione_sociale': 'Fornitore Prova Integra'}))
+        pg7 = entra(S + '-ammi')
+        pg7.route(re.compile(r'^.*/api/documenti/999993$'), lambda r: risposta(r, json.dumps(scheda_integra)))
+        pg7.route(re.compile(r'^.*/api/fornitori$'), lambda r: risposta(r, '[]'))
+        pg7.route(re.compile(r'^.*/api/integra/cerca\?tipo=fornitore.*$'), cerca_integra)
+        pg7.route(re.compile(r'^.*/api/integra/importa$'), importa_integra)
+        pg7.goto(BASE + '/documenti/999993')
+        pg7.locator('button:has-text("Correggi i dati letti")').wait_for(timeout=15000)
+        pg7.click('button:has-text("Correggi i dati letti")'); pg7.wait_for_selector('.affiancata')
+        pg7.click('.ricerca-lente[title^="Apri la ricerca di fornitore"]')
+        pg7.wait_for_selector('.velo .modale:has-text("Cerca fornitore")')
+        pg7.fill('.velo .modale .filtri input[type="search"]', 'forn')
+        pg7.wait_for_selector('.velo .modale li.menu-titolo:has-text("Integra")', timeout=5000)
+        ok(int_ok['cerca'] >= 1, 'D-152: la ricerca del fornitore interroga anche Integra')
+        ok(pg7.locator('.velo .modale li.menu-titolo:has-text("Integra")').count() == 1, 'D-152: riga «Integra» nella finestra di ricerca')
+        ok('Fornitore Prova Integra' in pg7.locator('.velo .modale').inner_text(), 'D-152: la riga di Integra compare sotto i risultati del CRM')
+        pg7.close()
+
+        # D-154: «Somma righe» sopra l'Importo nella finestra Correggi (solo anteprima, mai salvata).
+        # Le righe hanno quantità×prezzo senza importo letto: la somma si aggiorna al cambio del prezzo.
+        scheda_somma = dict(scheda_errore, id='999994', stato='da_controllare', tipo='fattura',
+                            livello='da_controllare', file_nome='prova-somma.pdf')
+        scheda_somma['testata'] = dict(scheda_errore['testata'], tipo='fattura', numero='PROVA-SOMMA', importo=250)
+        scheda_somma['righe'] = [
+            {'i': 0, 'codice': 'ART-1', 'descrizione': 'Articolo di prova', 'quantita': 2, 'prezzo': 100,
+             'importo': None, 'numero_fattura': None, 'data_fattura': None, 'provvigione': None},
+            {'i': 1, 'codice': 'ART-2', 'descrizione': 'Secondo articolo', 'quantita': 1, 'prezzo': 50,
+             'importo': None, 'numero_fattura': None, 'data_fattura': None, 'provvigione': None},
+        ]
+        pgS = entra(S + '-ammi')
+        pgS.route(re.compile(r'^.*/api/documenti/999994$'), lambda r: risposta(r, json.dumps(scheda_somma)))
+        pgS.goto(BASE + '/documenti/999994')
+        pgS.locator('button:has-text("Correggi i dati letti")').wait_for(timeout=15000)
+        pgS.click('button:has-text("Correggi i dati letti")'); pgS.wait_for_selector('.affiancata')
+        ok(pgS.locator('.sopra-riga').count() == 1, 'somma righe: compare sopra l’Importo')
+        # correzioni 1: la «Somma righe» sta tutta dentro la colonna dell'Importo (a destra non esce)
+        dentro1440 = pgS.evaluate("""() => {
+          const s = document.querySelector('.sopra-riga'); if (!s) return null;
+          const c = s.closest('.campo-letto').getBoundingClientRect(), r = s.getBoundingClientRect();
+          return r.left >= c.left - 1 && r.right <= c.right + 1;
+        }""")
+        ok(dentro1440 is True, 'somma righe: dentro la colonna dell’Importo (a destra non esce)')
+        ok('Somma righe' in pgS.locator('.sopra-riga').inner_text(), 'somma righe: etichetta «Somma righe»')
+        ok('250,00' in pgS.locator('.sopra-riga').inner_text(), 'somma righe: 250,00 € all’apertura (2×100 + 1×50)')
+        ok(pgS.locator('.sopra-riga .spunta-ok').count() == 1, 'somma righe: spunta verde se uguale all’importo')
+        ok(pgS.locator('.sopra-riga .somma-righe-avviso').count() == 0, 'somma righe: nessun avviso se uguale')
+        pgS.fill('input[data-campo="righe[0].prezzo"]', '120'); pgS.wait_for_timeout(100)
+        ok('290,00' in pgS.locator('.sopra-riga').inner_text(), 'somma righe: si aggiorna al cambio del prezzo (2×120 + 50 = 290)')
+        ok(pgS.locator('.sopra-riga .somma-righe-avviso').count() == 1, 'somma righe: avviso se diversa dall’importo')
+        somma_avviso = pgS.locator('.sopra-riga .somma-righe-avviso').inner_text()
+        ok('diversa di' in somma_avviso and '40,00' in somma_avviso,
+           'somma righe: avviso con la differenza (40,00 €)')
+        ok('290,00' in pgS.locator('.tab-righe tfoot td.dx').inner_text(), 'somma righe: stesso numero del piede della tabella')
+        pgS.screenshot(path=str(USCITA.parents[1] / 'somma-1440.png'))
+        pgS.close()
 
         b.close()
 finally:

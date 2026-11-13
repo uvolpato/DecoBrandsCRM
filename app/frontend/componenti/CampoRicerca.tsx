@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { api } from '@/lib/api';
 import { caricaVoci, vociMenu, type Contesto, type Entita } from '@/lib/entita';
 import { DataTable, type Colonna } from './DataTable';
 import { FilterBar, type CampoFiltro } from './FilterBar';
 import { Icona } from './Icona';
 import { Modale } from './Modale';
+import { usePuo } from './Utente';
 
 // CampoRicerca e RicercaEntita come nel prototipo (componenti.js, D-20 D-21 D-22 §19), stesso markup.
 // Campo di ricerca su un'entità (fornitore, cliente, subagente, …): scrivendo compare un menu con le prime
@@ -14,6 +16,23 @@ import { Modale } from './Modale';
 //    onChange parte una volta sola, alla chiusura (Esc, Tab, clic fuori);
 //  - singola (nei moduli): pallino verde se il valore è in anagrafica, rosso se scritto a mano.
 // Le voci arrivano dall'entità (dal server, V12): qui non ci sono dati.
+
+/** Sigle societarie e congiunzioni tolte dalla ricerca per parole (D-153): «Arte Wohnaccessoires
+ *  GmbH & Co. KG» e «ARTE WOHNACCESSOIRES GMBH & CO.KG» si ritrovano per le parole vere, non per
+ *  il testo intero (punti, spazi e maiuscole diverse fra il documento e l'anagrafica). */
+const SIGLE_PAROLE = new Set(['srl', 'snc', 'spa', 'sas', 'gmbh', 'co', 'kg', 'sa', 'ltd', 'inc', 'llc', 'ag', 'ohg', 'ug', 'bv', 'nv', 'sarl', 'and', 'und']);
+/** Parole significative di una ricerca: minuscole, senza accenti né punteggiatura, ≥ 3 lettere,
+ *  senza le sigle societarie; al massimo 5. */
+const paroleDi = (q: string) => q.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .split(/[^a-z0-9]+/).filter((p) => p.length >= 3 && !SIGLE_PAROLE.has(p)).slice(0, 5);
+/** Tutte le parole significative della ricerca compaiono nel testo (D-153); con ricerca vuota o di
+ *  sole sigle vale tutto. */
+const cercaParole = (testo: string, q: string) => {
+  const parole = paroleDi(q);
+  if (!parole.length) return true;
+  const t = testo.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return parole.every((p) => t.includes(p));
+};
 
 /** Le voci dell'entità nel contesto: tutte (attive e non), come le restituisce il server. */
 export function useVoci<R>(ent: Entita<R>, ctx: Contesto) {
@@ -25,10 +44,74 @@ export function useVoci<R>(ent: Entita<R>, ctx: Contesto) {
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- il contesto si confronta per valore (k)
   }, [ent, k]);
-  return tutte;
+  // D-152: dopo un import da Integra la voce nuova non è nel cache (5 s): si ricarica subito
+  const ricarica = () => { caricaVoci(ent, ctx, true).then(setTutte).catch(() => {}); };
+  return { tutte, ricarica };
 }
 
-type Comuni = { entita: Entita; contesto?: Contesto; placeholder?: string; etichetta?: string; id?: string };
+// D-152: la ricerca guarda anche le viste di Integra, per fornitore e cliente. La ricerca la fa il
+// server (GET /api/integra/cerca, già esclude i già importati); qui arrivano solo tipo e testo (V12).
+type TipoIntegra = 'cliente' | 'fornitore';
+interface RigaIntegra { id_integra: number; codice: string; ragione_sociale: string; piva: string; attivo: boolean; }
+
+function useIntegra(tipo: TipoIntegra | undefined, q: string) {
+  const [righe, setRighe] = useState<RigaIntegra[]>([]);
+  const [stato, setStato] = useState<'vuoto' | 'attesa' | 'ok' | 'errore'>('vuoto');
+  useEffect(() => {
+    const testo = q.trim();
+    if (!tipo || testo.length < 2) { setRighe([]); setStato('vuoto'); return; }
+    let vivo = true;
+    setRighe([]); setStato('attesa');
+    const t = setTimeout(() => {
+      api<{ righe?: RigaIntegra[] }>('integra/cerca?tipo=' + tipo + '&q=' + encodeURIComponent(testo))
+        .then((r) => { if (!vivo) return; if (!r.ok) { setRighe([]); setStato(r.stato === 403 ? 'vuoto' : 'errore'); return; } setRighe(r.dati.righe ?? []); setStato('ok'); })
+        .catch(() => { if (vivo) { setRighe([]); setStato('errore'); } });
+    }, 350); // attesa breve fra un tasto e l'altro
+    return () => { vivo = false; clearTimeout(t); };
+  }, [tipo, q]);
+  return { righe, stato };
+}
+
+/** Risultati di Integra sotto a quelli del CRM: si sceglie una riga e si importa e sceglie in un passo.
+ *  Senza `dati.importa` le righe si vedono ma non si scelgono (nota). `onScelto` riceve id e nome. */
+function Integra({ tipo, q, onScelto }: { tipo: TipoIntegra | undefined; q: string; onScelto: (id: string, nome: string, piva?: string) => void | Promise<void> }) {
+  const puo = usePuo();
+  const consentito = puo('dati.importa');
+  const { righe, stato } = useIntegra(tipo, q);
+  const [nota, setNota] = useState('');
+  const [importando, setImportando] = useState(0);
+  if (!tipo || (stato !== 'errore' && !righe.length && !nota)) return null;
+  async function scegli(x: RigaIntegra) {
+    if (!consentito) { setNota('serve il permesso di importare'); return; }
+    setImportando(x.id_integra); setNota('');
+    const r = await api<{ id: string; ragione_sociale?: string }>('integra/importa', { tipo, id_integra: x.id_integra });
+    setImportando(0);
+    if (!r.ok) { setNota(r.messaggio); return; }
+    await onScelto(r.dati.id, r.dati.ragione_sociale ?? x.ragione_sociale ?? x.codice, x.piva);
+  }
+  return (
+    <>
+      <li className="menu-titolo" role="presentation">Integra</li>
+      {nota && <li className="nessuna" role="status">{nota}</li>}
+      {stato === 'errore' && <li className="nessuna" role="status">Integra non raggiungibile</li>}
+      {righe.map((x) => (
+        <li key={x.id_integra} role="option" onMouseDown={(e) => { e.preventDefault(); void scegli(x); }}>
+          <b>{x.ragione_sociale || '—'}</b>
+          <span>{[x.codice, x.piva, x.attivo ? '' : 'non attivo', importando === x.id_integra ? 'importo…' : ''].filter(Boolean).join(' · ')}</span>
+        </li>
+      ))}
+    </>
+  );
+}
+
+type Comuni = { entita: Entita; contesto?: Contesto; placeholder?: string; etichetta?: string; id?: string;
+  // nome letto dal documento (fornitore, cliente): quando il campo è vuoto si offre di cercarlo
+  testoIniziale?: { q: string; mostra?: string };
+  // D-153: quando si sceglie una voce del CRM si riceve il record intero (per riempire i campi, es. cliente)
+  onScelto?: (r: unknown) => void;
+  // D-154: comando dall'esterno (il pulsante › accanto al campo letto): al cambio di `n` fa quello
+  // che fa «Cerca questo» col testo attuale `q`, senza ref imperativi.
+  cerca?: { q: string; n: number } };
 export type CampoRicercaProps = Comuni & (
   | { multipla: true; valori: string[]; onChange: (v: string[]) => void }
   | { multipla?: false; valore: string; onChange: (v: string) => void }
@@ -51,7 +134,7 @@ function usePosizione(aperto: boolean, rif: React.RefObject<HTMLElement | null>,
 }
 
 function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valori, onChange }: Comuni & { valori: string[]; onChange: (v: string[]) => void }) {
-  const tutte = useVoci(ent, contesto);
+  const { tutte, ricarica } = useVoci(ent, contesto);
   const lid = useId(); // A7-08: collega input e menu per il lettore di schermo
   const box = useRef<HTMLDivElement>(null);
   const [bozza, setBozza] = useState(valori);
@@ -67,8 +150,8 @@ function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valo
   const nome = (k: string) => { const r = voce(k); return r ? ent.testo(r) : k; }; // una voce scelta resta riconoscibile anche se esce dal periodo
   const vuoto = placeholder ?? 'Scrivi per cercare';
   const ria = !bozza.length ? '' : bozza.length === 1 ? nome(bozza[0]) : 'Filtro multiplo (' + bozza.length + ')';
-  const qq = q.trim().toLowerCase();
-  const corrisponde = (r: unknown) => !qq || [ent.chiave(r), ent.testo(r), ent.cerca?.(r) ?? ''].join(' ').toLowerCase().includes(qq);
+  // D-153: la ricerca è per parole, non per testo intero (il nome letto può avere punti e sigle diverse)
+  const corrisponde = (r: unknown) => cercaParole([ent.chiave(r), ent.testo(r), ent.cerca?.(r) ?? ''].join(' '), q);
   const altre = vociMenu(ent, contesto, tutte).filter((r) => !bozza.includes(String(ent.chiave(r))) && corrisponde(r));
   const sotto = altre.slice(0, 8);
   const chiavi = [...bozza, ...sotto.map((r) => String(ent.chiave(r)))];
@@ -112,15 +195,16 @@ function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valo
         <li className="menu-titolo" role="presentation">{q ? 'Risultati' : bozza.length ? 'Aggiungi' : 'Scegli una o più voci'}</li>
         {sotto.length ? sotto.map((r, i) => li(String(ent.chiave(r)), bozza.length + i, false)) : <li className="nessuna">{q ? 'Nessun risultato' : 'Nessun’altra voce'}</li>}
         <li className="altre" onMouseDown={(e) => { e.preventDefault(); apriMaschera(); }}><Icona nome="cerca" />{altre.length > 8 ? `Altri ${altre.length - 8} risultati: ` : ''}apri la ricerca di {ent.titolo.toLowerCase()}</li>
+        <Integra tipo={ent.integra} q={q} onScelto={(id) => { setBozza((b) => (b.includes(id) ? b : [...b, id])); ricarica(); }} />
       </ul>
       {maschera && <RicercaEntita entita={ent} contesto={contesto} voci={vociMenu(ent, contesto, tutte)} testo={q} multipla scelte={bozza}
-        onChiudi={() => { dopo.current = true; setTimeout(() => { dopo.current = false; }, 150); setMaschera(false); }} onScelta={(v) => { dopo.current = true; setTimeout(() => { dopo.current = false; }, 150); setMaschera(false); setQ(''); setBozza(v.map((r) => String(ent.chiave(r)))); onChange(v.map((r) => String(ent.chiave(r)))); }} />}
+        onChiudi={() => { dopo.current = true; setTimeout(() => { dopo.current = false; }, 150); setMaschera(false); }} onScelta={(v) => { dopo.current = true; setTimeout(() => { dopo.current = false; }, 150); setMaschera(false); setQ(''); setBozza(v.map((r) => String(ent.chiave(r)))); onChange(v.map((r) => String(ent.chiave(r)))); }} onImportato={(id) => { const n = bozza.includes(id) ? bozza : [...bozza, id]; setBozza(n); setQ(''); setMaschera(false); ricarica(); onChange(n); }} />}
     </div>
   );
 }
 
-function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valore, onChange }: Comuni & { valore: string; onChange: (v: string) => void }) {
-  const tutte = useVoci(ent, contesto);
+function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valore, onChange, testoIniziale, onScelto, cerca }: Comuni & { valore: string; onChange: (v: string) => void }) {
+  const { tutte, ricarica } = useVoci(ent, contesto);
   const lid = useId(); // A7-08: collega input e menu per il lettore di schermo
   const box = useRef<HTMLDivElement>(null);
   const trova = (v: string) => { const x = v.trim().toLowerCase(); if (!x) return undefined; const m = vociMenu(ent, contesto, tutte); return m.find((r) => String(ent.chiave(r)).toLowerCase() === x) ?? m.find((r) => ent.testo(r).toLowerCase() === x); };
@@ -129,18 +213,27 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
   const [aperto, setAperto] = useState(false);
   const [attiva, setAttiva] = useState(0);
   const [maschera, setMaschera] = useState(false);
+  const [daLetto, setDaLetto] = useState(false); // testo messo da «Cerca questo»: al fuoco perso non diventa un valore
   const campo = useRef<HTMLInputElement>(null);
   // non si sovrascrive quello che l'utente sta scrivendo: le voci arrivano dal server e possono
   // atterrare dopo il primo tasto (prima si perdeva il testo digitato)
   useEffect(() => {
-    if (document.activeElement !== campo.current) setTesto(nota ? ent.testo(nota) : valore);
+    if (document.activeElement !== campo.current && !daLetto) setTesto(nota ? ent.testo(nota) : valore);
   }, [valore, tutte]); // eslint-disable-line react-hooks/exhaustive-deps -- da fuori
+  // D-154: il pulsante › (cerca) fa partire la ricerca da fuori, come cercaLetto ma col testo attuale.
+  useEffect(() => {
+    if (!cerca?.n) return;
+    setTesto(cerca.q); setDaLetto(true); setAperto(true); setAttiva(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scatta solo al cambio di `n`
+  }, [cerca?.n]);
   const pos = usePosizione(aperto, box, testo);
 
   // punteggio: inizia con il testo 0 · lo contiene 1 · lo contiene nel resto o nella chiave 2
   const punti = (r: unknown) => {
     const q = testo.trim().toLowerCase(), k = String(ent.chiave(r)).toLowerCase(), t = ent.testo(r).toLowerCase(), c = (ent.cerca?.(r) ?? '').toLowerCase();
-    if (!q) return 3; if (t.startsWith(q) || k.startsWith(q)) return 0; if (c.startsWith(q) || t.includes(q)) return 1; if (c.includes(q) || k.includes(q)) return 2; return -1;
+    if (!q) return 3; if (t.startsWith(q) || k.startsWith(q)) return 0; if (c.startsWith(q) || t.includes(q)) return 1; if (c.includes(q) || k.includes(q)) return 2;
+    // D-153: il testo intero non corrisponde (punti, spazi o sigle diverse): si ripiega sulle parole
+    return cercaParole(t + ' ' + c + ' ' + k, testo) ? 2 : -1;
   };
   const tutteMenu = vociMenu(ent, contesto, tutte).map((r) => ({ r, s: punti(r) })).filter((x) => x.s >= 0).sort((a, b) => a.s - b.s);
   const prime = tutteMenu.slice(0, 5).map((x) => x.r);
@@ -148,7 +241,7 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
   const imposta = (r: unknown | undefined, libero = '') => {
     setAperto(false);
     const nuovo = r ? String(ent.chiave(r)) : libero;
-    if (r) setTesto(ent.testo(r));
+    if (r) { setTesto(ent.testo(r)); onScelto?.(r); }
     if (nuovo !== valore) onChange(nuovo);
   };
   function tasto(e: KeyboardEvent) {
@@ -158,40 +251,55 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
     else if (e.key === 'F4') { e.preventDefault(); setAperto(false); setMaschera(true); }
   }
   const stato = nota ? 'ok' : valore ? 'ko' : 'vuoto';
+  // D-152: il nome letto dal documento diventa il testo della ricerca, senza sceglierlo da solo
+  const cercaLetto = () => {
+    if (!testoIniziale) return;
+    setTesto(testoIniziale.q); setDaLetto(true); setAperto(true); setAttiva(0);
+  };
   return (
-    <div ref={box} className="ricerca"
-      onBlur={(e) => { if (box.current?.contains(e.relatedTarget as Node) || maschera) return; setAperto(false); const t = testo.trim(); if (nota && ent.testo(nota) === t) return; const r = trova(t); imposta(r, t); }}>
-      <span className={'pallino ' + stato} title={nota ? ent.titolo + ' trovato in anagrafica' : valore ? 'Valore non trovato in anagrafica' : ''} />
-      <input ref={campo} className="ricerca-testo" id={id} type="text" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={aperto}
-        aria-controls={lid} aria-activedescendant={aperto && prime[attiva] ? lid + '-' + attiva : undefined}
-        aria-label={etichetta ?? 'Cerca ' + ent.titolo.toLowerCase()}
-        value={testo} placeholder={placeholder ?? 'Scrivi per cercare'} onChange={(e) => { setTesto(e.target.value); setAperto(true); setAttiva(0); }} onKeyDown={tasto} />
-      <button type="button" className="ricerca-lente" title={'Apri la ricerca di ' + ent.titolo.toLowerCase() + ' (F4)'} aria-label="Apri la ricerca" onClick={() => { setAperto(false); setMaschera(true); }}><Icona nome="cerca" /></button>
+    <div className="ricerca-riga"
+      onBlur={(e) => { if (e.currentTarget.contains(e.relatedTarget as Node) || maschera) return; if (daLetto) { setDaLetto(false); setTesto(valore); setAperto(false); return; } setAperto(false); const t = testo.trim(); if (nota && ent.testo(nota) === t) return; const r = trova(t); imposta(r, t); }}>
+      <div ref={box} className="ricerca">
+        <span className={'pallino ' + stato} title={nota ? ent.titolo + ' trovato in anagrafica' : valore ? 'Valore non trovato in anagrafica' : ''} />
+        <input ref={campo} className="ricerca-testo" id={id} type="text" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={aperto}
+          aria-controls={lid} aria-activedescendant={aperto && prime[attiva] ? lid + '-' + attiva : undefined}
+          aria-label={etichetta ?? 'Cerca ' + ent.titolo.toLowerCase()}
+          value={testo} placeholder={placeholder ?? 'Scrivi per cercare'} onChange={(e) => { setDaLetto(false); setTesto(e.target.value); setAperto(true); setAttiva(0); }} onKeyDown={tasto} />
+        <button type="button" className="ricerca-lente" title={'Apri la ricerca di ' + ent.titolo.toLowerCase() + ' (F4)'} aria-label="Apri la ricerca" onClick={() => { setAperto(false); setMaschera(true); }}><Icona nome="cerca" /></button>
+      </div>
+      {testoIniziale && !valore && (
+        <div className="ricerca-letto" title={testoIniziale.mostra ?? undefined}>
+          {testoIniziale.mostra ? <><span>Letto: <b>{testoIniziale.mostra}</b></span>{' · '}</> : null}
+          <button type="button" className="link-azzera" onClick={cercaLetto}>Cerca questo</button>
+        </div>
+      )}
       <ul className="ricerca-menu" id={lid} role="listbox" hidden={!aperto} style={pos}>
         {prime.length ? prime.map((r, i) => (
           <li key={String(ent.chiave(r))} id={lid + '-' + i} role="option" aria-selected={i === attiva} className={i === attiva ? 'attiva' : undefined} data-i={i} onMouseDown={(e) => { e.preventDefault(); imposta(r); }}>
             <b>{ent.testo(r)}</b><span>{ent.dettaglio?.(r) ?? ''}</span></li>
         )) : <li className="nessuna">Nessun risultato</li>}
         <li className="altre" onMouseDown={(e) => { e.preventDefault(); setAperto(false); setMaschera(true); }}><Icona nome="cerca" />{tutteMenu.length > 5 ? `Altri ${tutteMenu.length - 5} risultati: ` : ''}apri la ricerca di {ent.titolo.toLowerCase()}</li>
+        <Integra tipo={ent.integra} q={aperto ? testo : ''} onScelto={(id, nome, piva) => { setTesto(nome); setAperto(false); if (id !== valore) onChange(id); onScelto?.({ id, nome, piva }); ricarica(); }} />
       </ul>
       {maschera && <RicercaEntita entita={ent} contesto={contesto} voci={vociMenu(ent, contesto, tutte)} testo={nota ? '' : testo}
-        onChiudi={() => setMaschera(false)} onScelta={(v) => { setMaschera(false); imposta(v[0]); }} />}
+        onChiudi={() => setMaschera(false)} onScelta={(v) => { setMaschera(false); imposta(v[0]); }} onImportato={(id, nome) => { setMaschera(false); imposta({ id, nome }); ricarica(); }} />}
     </div>
   );
 }
 
 /** Maschera di ricerca: filtri e tabella. Multipla: casella per riga e "Applica"; singola: riga e "Seleziona". */
-export function RicercaEntita({ entita: ent, contesto = {}, voci, testo = '', multipla, scelte = [], onScelta, onChiudi }: {
+export function RicercaEntita({ entita: ent, contesto = {}, voci, testo = '', multipla, scelte = [], onScelta, onChiudi, onImportato }: {
   entita: Entita; contesto?: Contesto; voci: unknown[]; testo?: string; multipla?: boolean; scelte?: string[];
-  onScelta: (voci: unknown[]) => void; onChiudi: () => void;
+  onScelta: (voci: unknown[]) => void; onChiudi: () => void; onImportato: (id: string, nome: string) => void;
 }) {
   const [valori, setValori] = useState<Record<string, string | string[]>>({ q: testo });
   const [sel, setSel] = useState(() => new Set(scelte.map(String)));
   const [una, setUna] = useState<unknown>(null);
   const k = (r: unknown) => String(ent.chiave(r));
   const righe = useMemo(() => {
-    const q = String(valori.q ?? '').trim().toLowerCase();
-    return voci.filter((r) => (!q || [ent.chiave(r), ent.testo(r), ent.dettaglio?.(r) ?? '', ent.cerca?.(r) ?? ''].join(' ').toLowerCase().includes(q)) && (!ent.filtra || ent.filtra(r, valori)));
+    const q = String(valori.q ?? '').trim();
+    // D-153: anche nella maschera la ricerca è per parole, non per testo intero
+    return voci.filter((r) => cercaParole([ent.chiave(r), ent.testo(r), ent.dettaglio?.(r) ?? '', ent.cerca?.(r) ?? ''].join(' '), q) && (!ent.filtra || ent.filtra(r, valori)));
   }, [voci, valori, ent]);
   const alterna = (r: unknown) => setSel((s) => { const n = new Set(s); if (n.has(k(r))) n.delete(k(r)); else n.add(k(r)); return n; });
   const campi: CampoFiltro[] = [{ nome: 'q', tipo: 'cerca', placeholder: 'Cerca ' + ent.titolo.toLowerCase() }, ...(ent.filtri?.(contesto) ?? [])];
@@ -220,6 +328,9 @@ export function RicercaEntita({ entita: ent, contesto = {}, voci, testo = '', mu
           rowClass={(r) => (multipla ? sel.has(k(r)) : una === r) ? 'selezionata' : ''} onRowClick={multipla ? alterna : setUna}
           emptyText="Nessun risultato" emptyHint="Cambia la ricerca o i filtri." />
       </div>
+      {ent.integra && <ul className="ricerca-menu" style={{ position: 'static', width: '100%', boxShadow: 'none', maxHeight: 180 }}>
+        <Integra tipo={ent.integra} q={String(valori.q ?? '')} onScelto={(id, nome) => onImportato(id, nome)} />
+      </ul>}
     </Modale>
   );
 }

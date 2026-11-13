@@ -23,6 +23,7 @@ export interface Entita<R = any> {
   colonne: Colonna<R>[]; // della maschera di ricerca
   filtri?: (ctx: Contesto) => CampoFiltro[]; // filtri in più nella maschera (oltre alla ricerca)
   filtra?: (r: R, valori: Record<string, string | string[]>) => boolean;
+  integra?: 'fornitore' | 'cliente'; // D-152: la ricerca guarda anche le viste di Integra, solo per questi
 }
 
 // Le voci si chiedono una volta per contesto: più campi con la stessa entità (barra, riepilogo,
@@ -30,11 +31,11 @@ export interface Entita<R = any> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const CACHE = new WeakMap<Entita, Map<string, { t: number; p: Promise<any[]> }>>();
 
-export function caricaVoci<R>(ent: Entita<R>, ctx: Contesto = {}): Promise<R[]> {
+export function caricaVoci<R>(ent: Entita<R>, ctx: Contesto = {}, forza = false): Promise<R[]> {
   const mappa = CACHE.get(ent) ?? new Map();
   CACHE.set(ent, mappa);
   const k = JSON.stringify({ ...ctx, limita: undefined, tutti: undefined }), c = mappa.get(k);
-  if (c && Date.now() - c.t < 5000) return c.p;
+  if (!forza && c && Date.now() - c.t < 5000) return c.p;
   const p = Promise.resolve(ent.voci({ ...ctx, limita: null, tutti: true }));
   mappa.set(k, { t: Date.now(), p });
   p.catch(() => mappa.delete(k));
@@ -65,6 +66,7 @@ export const fornitore: Entita<any> = {
     { key: 'nome', header: 'Fornitore', grow: true },
     { key: 'piva', header: 'P.IVA' },
   ] as any,
+  integra: 'fornitore',
 };
 
 export const cliente: Entita<any> = {
@@ -82,6 +84,7 @@ export const cliente: Entita<any> = {
     { key: 'nome', header: 'Cliente', grow: true },
     { key: 'piva', header: 'P.IVA' },
   ] as any,
+  integra: 'cliente',
 };
 
 export const subagente: Entita<any> = {

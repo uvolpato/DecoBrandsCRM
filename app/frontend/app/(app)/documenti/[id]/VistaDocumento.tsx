@@ -29,7 +29,7 @@ const TIPO: Record<string, string> = {
   nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento', bollettino: 'Bollettino',
 };
 const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
-const NOME_CAMPO: Record<string, string> = { numero: 'Numero', data: 'Data', codice_cliente: 'Codice cliente', cliente: 'Cliente', importo_totale: 'Importo', mese: 'Mese', anno: 'Anno', riferimento_fattura: 'Fattura stornata' };
+const NOME_CAMPO: Record<string, string> = { numero: 'Numero', data: 'Data', codice_cliente: 'Codice cliente', cliente: 'Cliente', piva_cliente: 'P.IVA cliente', piva_fornitore: 'P.IVA fornitore', fornitore: 'Fornitore letto', importo_totale: 'Importo', mese: 'Mese', anno: 'Anno', riferimento_fattura: 'Fattura stornata' };
 const STATO_PRATICA: Record<string, { testo: string; v: Variante }> = {
   inviato: { testo: 'Attesa conferma', v: 'attesa' },
   confermato: { testo: 'Confermata', v: 'info' },
@@ -73,7 +73,7 @@ interface Riga {
 }
 interface Testata {
   tipo: string | null; numero: string | null; data: string | null; fornitore_id: string | null;
-  codice_cliente: string | null; cliente: string | null; importo: number | null;
+  codice_cliente: string | null; cliente: string | null; piva_cliente: string | null; piva_fornitore: string | null; fornitore: string | null; importo: number | null;
   mese: number | null; anno: number | null; riferimento_fattura: string | null;
 }
 interface Controllo { codice: string; campo: string; testo: string; grave: boolean }
@@ -273,8 +273,10 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
       <FormModal titolo="Apri la pratica" conferma="Apri la pratica" colonne={2}
         testo="La pratica nasce dall’ordine. Cliente e fornitore servono per l’agenzia e la provvigione."
         campi={[
-          { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: t.fornitore_id ?? '' },
-          { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? '' },
+          { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: t.fornitore_id ?? '',
+            testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined },
+          { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? '',
+            testoIniziale: t.cliente ? { q: t.cliente, mostra: t.cliente } : undefined },
         ]}
         onChiudi={chiudi}
         onConferma={async (v) => {
@@ -296,7 +298,8 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         conferma="Registra e verifica" colonne={2}
         testo="Dopo la registrazione lo confronti riga per riga con le nostre pratiche."
         campi={[
-          { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: t.fornitore_id ?? '' },
+          { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: t.fornitore_id ?? '',
+            testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined },
           { nome: 'mese', etichetta: 'Mese', tipo: 'select', valore: String(t.mese ?? ''), opzioni: MESI.map((m, i) => ({ value: String(i + 1), label: m })) },
           { nome: 'anno', etichetta: 'Anno', tipo: 'numero', valore: t.anno ?? '' },
         ]}
@@ -694,21 +697,31 @@ interface BozzaRiga {
   numero_fattura: string; data_fattura: string; provvigione: string;
 }
 interface Bozza {
-  testata: { tipo: string; numero: string; data: string; fornitore_id: string; codice_cliente: string; cliente: string; importo: string; mese: string; anno: string; riferimento_fattura: string };
+  testata: { tipo: string; numero: string; data: string; fornitore_id: string; codice_cliente: string; cliente: string; piva_cliente: string; piva_fornitore: string; fornitore: string; importo: string; mese: string; anno: string; riferimento_fattura: string };
   righe: BozzaRiga[];
 }
 const RIGA_KEYS = ['codice', 'descrizione', 'quantita', 'prezzo', 'importo', 'numero_fattura', 'data_fattura', 'provvigione'] as const;
 
+/** Importo di una riga come nel server (`importoRigaLetta`, proposta.ts): quello letto, altrimenti
+ *  quantità × prezzo. La «Somma righe» accanto all'Importo e il piede della tabella usano la stessa
+ *  funzione (D-153). */
+const importoRiga = (r: BozzaRiga) => {
+  if (r.importo.trim() !== '') return Number(r.importo) || 0;
+  return r.quantita.trim() !== '' && r.prezzo.trim() !== '' ? (Number(r.quantita) || 0) * (Number(r.prezzo) || 0) : 0;
+};
+/** Somma delle righe in centesimi interi (mai float), per la «Somma righe» e il piede della tabella. */
+const sommaRighe = (righe: BozzaRiga[]) => righe.reduce((s, r) => s + Math.round(importoRiga(r) * 100), 0) / 100;
+
 /** Campo con il bordo dell'affidabilità (giallo 0,70–0,90 · rosso < 0,70 · verde se confermato).
  *  Il ✓ accanto al campo conferma il valore letto: da lì non conta più fra i punti da controllare. */
-function CampoLetto({ x, etichetta, verificato, onConferma, soglie, children }: {
-  x: Campo | undefined; etichetta: string; verificato: boolean; onConferma?: () => void; soglie: Soglie; children: ReactNode;
+function CampoLetto({ x, etichetta, verificato, onConferma, soglie, sopra, children }: {
+  x: Campo | undefined; etichetta: string; verificato: boolean; onConferma?: () => void; soglie: Soglie; sopra?: ReactNode; children: ReactNode;
 }) {
   const a = x?.affidabilita ?? null;
   const incerto = a != null && !verificato && a < soglie.soglia_ok;
   return (
     <div className={'campo-letto ' + classeAff(a, verificato, soglie)}>
-      <label>{etichetta}{incerto && <span className="aff">{Math.round(a * 100)}%</span>}</label>
+      <label>{etichetta}{incerto && <span className="aff">{Math.round(a * 100)}%</span>}{sopra}</label>
       <div className="campo-riga">
         {children}
         {verificato && <span className="spunta-verde" title="Campo verificato" aria-label={'Verificato: ' + etichetta}>✓</span>}
@@ -723,7 +736,8 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
     testata: {
       tipo: d.testata.tipo ?? 'altro', numero: d.testata.numero ?? '', data: d.testata.data ?? '',
       fornitore_id: d.testata.fornitore_id ?? '', codice_cliente: d.testata.codice_cliente ?? '',
-      cliente: d.testata.cliente ?? '', importo: d.testata.importo == null ? '' : String(d.testata.importo),
+      cliente: d.testata.cliente ?? '', piva_cliente: d.testata.piva_cliente ?? '', piva_fornitore: d.testata.piva_fornitore ?? '', fornitore: d.testata.fornitore ?? '',
+      importo: d.testata.importo == null ? '' : String(d.testata.importo),
       mese: d.testata.mese == null ? '' : String(d.testata.mese), anno: d.testata.anno == null ? '' : String(d.testata.anno),
       riferimento_fattura: d.testata.riferimento_fattura ?? '',
     },
@@ -735,7 +749,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
     })),
   }));
   const [campo, setCampo] = useState<string | null>(null);
-  const [riepAperto, setRiepAperto] = useState(true);
+  const [riepAperto, setRiepAperto] = useState(false); // D-153: riepilogo chiuso di default
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
   const [nuovaRiga, setNuovaRiga] = useState<number | null>(null);
@@ -743,6 +757,12 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
   const [verificati, setVerificati] = useState<Set<string>>(() => new Set(d.campi.filter((c) => c.verificato).map((c) => c.campo)));
   const af = useMemo(() => new Map(d.campi.map((c) => [c.campo, c])), [d.campi]);
   const boll = b.testata.tipo === 'bollettino';
+  // D-154: il pulsante › accanto al campo letto porta il nome nella ricerca e apre il menu (comando
+  // esterno, prop `cerca`). Nei moduli (Apri la pratica, Registra il bollettino) il campo letto non c'è,
+  // quindi il nome compare come «Letto: … · Cerca questo» (testoIniziale, resta com'è).
+  const lettoFornitore = b.testata.fornitore ? { q: b.testata.fornitore } : undefined;
+  const [cercaCliente, setCercaCliente] = useState(0);
+  const [cercaFornitore, setCercaFornitore] = useState(0);
   const verificato = (k: string) => verificati.has(k);
   const conferma = (k: string) => setVerificati((s) => s.has(k) ? s : new Set(s).add(k));
   const campoSi = (k: string, etichetta: string, children: ReactNode, senzaAff = false) => (
@@ -775,6 +795,21 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
   const nPunti = d.controlli.length + restanti.length;
   const bassa = d.controlli.some((c) => c.grave) || restanti.some((c) => (c.affidabilita ?? 1) < d.soglie.soglia_bassa);
 
+  // D-154: «Somma righe» sopra l'Importo, sulla riga dell'etichetta, allineata a destra (solo anteprima,
+  // mai salvata). Stessa funzione del piede. Spunta verde se uguale, avviso con la differenza se diversa.
+  const somma = sommaRighe(b.righe);
+  const haImporto = b.testata.importo.trim() !== '';
+  const importo = haImporto ? Number(b.testata.importo) : 0;
+  const diff = Math.round((importo - somma) * 100) / 100;
+  const uguali = haImporto && Math.abs(diff) < 0.01;
+  const sommaSopra = (
+    <span className="sopra-riga" title={uguali ? 'Somma righe uguale all’importo' : 'Somma righe diversa dall’importo: controlla (può essere IVA inclusa)'}>
+      {uguali && <span className="spunta-ok" aria-label="Somma righe uguale all'importo">✓</span>}
+      Somma righe {euro(somma)}
+      {!uguali && <span className="somma-righe-avviso"> · diversa di {euro(Math.abs(diff))}</span>}
+    </span>
+  );
+
   // porta l'attenzione sul campo di un punto (controllo o campo incerto) selezionato dall'elenco
   const saltaAl = (nome: string) => {
     setCampo(nome);
@@ -789,9 +824,10 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
     setErrore(''); setAttesa(true);
     try {
       const testata = boll
-        ? { tipo: 'bollettino', fornitore_id: b.testata.fornitore_id || null, mese: b.testata.mese || null, anno: b.testata.anno || null }
+        ? { tipo: 'bollettino', fornitore_id: b.testata.fornitore_id || null, fornitore: b.testata.fornitore, mese: b.testata.mese || null, anno: b.testata.anno || null }
         : {
           tipo: b.testata.tipo, numero: b.testata.numero, data: b.testata.data, fornitore_id: b.testata.fornitore_id || null,
+          fornitore: b.testata.fornitore, piva_cliente: b.testata.piva_cliente, piva_fornitore: b.testata.piva_fornitore,
           codice_cliente: b.testata.codice_cliente, cliente: b.testata.cliente, importo: b.testata.importo,
           riferimento_fattura: b.testata.riferimento_fattura,
         };
@@ -831,40 +867,46 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                 : 'La foto resta ferma: la posizione del valore non si evidenzia.'}
             </p>
             <div className="aff-riepilogo">
-              <button type="button" className="riep-testa" aria-expanded={riepAperto} aria-controls="aff-riep-elenco" onClick={() => setRiepAperto((v) => !v)}>
+              <button type="button" className="riep-testa" aria-expanded={riepAperto} aria-controls="aff-riep-elenco"
+                disabled={!nPunti} onClick={() => setRiepAperto((v) => !v)}>
                 <Stato v={bassa ? 'errore' : nPunti ? 'attesa' : 'ok'}>
                   {bassa ? 'Affidabilità bassa' : nPunti ? 'Da controllare' : 'Lettura affidabile'}
                 </Stato>
                 <span>{nPunti ? nPunti + (nPunti === 1 ? ' punto da controllare' : ' punti da controllare') : 'tutti i campi sono controllati'}</span>
+                {nPunti > 0 && <span className="riep-freccia" aria-hidden="true">{riepAperto ? '▾' : '▸'}</span>}
               </button>
-              <ul id="aff-riep-elenco" hidden={!riepAperto}>
-                {d.controlli.map((c) => (
-                  <li key={c.codice + c.campo} className={c.grave ? 'grave' : ''}>
-                    <button type="button" className="btn testo" onClick={() => saltaAl(c.campo)}>{c.testo}</button>
-                  </li>
-                ))}
-                {restanti.map((c) => (
-                  <li key={c.campo}>
-                    <button type="button" className="btn testo" onClick={() => saltaAl(c.campo)}>{NOME_CAMPO[c.campo] ?? c.campo} · {Math.round((c.affidabilita ?? 0) * 100)}%</button>
-                  </li>
-                ))}
-              </ul>
+              {nPunti > 0 && (
+                <ul id="aff-riep-elenco" hidden={!riepAperto}>
+                  {d.controlli.map((c) => (
+                    <li key={c.codice + c.campo} className={c.grave ? 'grave' : ''}>
+                      <button type="button" className="btn testo" onClick={() => saltaAl(c.campo)}>{c.testo}</button>
+                    </li>
+                  ))}
+                  {restanti.map((c) => (
+                    <li key={c.campo}>
+                      <button type="button" className="btn testo" onClick={() => saltaAl(c.campo)}>{NOME_CAMPO[c.campo] ?? c.campo} · {Math.round((c.affidabilita ?? 0) * 100)}%</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <h3>Testata</h3>
-            <div className="griglia-letti">
-              {boll ? (
-                <>
-                  {campoSi('fornitore_id', 'Fornitore',
-                    <CampoRicerca entita={entitaFornitore} valore={b.testata.fornitore_id} onChange={(v) => t('fornitore_id', v)} />)}
-                  {campoSi('mese', 'Mese',
-                    <select data-campo="mese" value={b.testata.mese} onFocus={() => setCampo('mese')} onChange={(e) => t('mese', e.target.value)}>
-                      {MESI.map((m, i) => <option key={m} value={String(i + 1)}>{m}</option>)}
-                    </select>)}
-                  {campoSi('anno', 'Anno',
-                    <input data-campo="anno" type="number" value={b.testata.anno} onFocus={() => setCampo('anno')} onChange={(e) => t('anno', e.target.value)} />)}
-                </>
-              ) : (
-                <>
+            {boll ? (
+              <div className="griglia-letti">
+                {campoSi('fornitore_id', 'Fornitore',
+                  <CampoRicerca entita={entitaFornitore} valore={b.testata.fornitore_id} onChange={(v) => t('fornitore_id', v)} testoIniziale={lettoFornitore} />)}
+                {campoSi('fornitore', 'Fornitore letto',
+                  <input data-campo="fornitore" value={b.testata.fornitore} onFocus={() => setCampo('fornitore')} onChange={(e) => t('fornitore', e.target.value)} />)}
+                {campoSi('mese', 'Mese',
+                  <select data-campo="mese" value={b.testata.mese} onFocus={() => setCampo('mese')} onChange={(e) => t('mese', e.target.value)}>
+                    {MESI.map((m, i) => <option key={m} value={String(i + 1)}>{m}</option>)}
+                  </select>)}
+                {campoSi('anno', 'Anno',
+                  <input data-campo="anno" type="number" value={b.testata.anno} onFocus={() => setCampo('anno')} onChange={(e) => t('anno', e.target.value)} />)}
+              </div>
+            ) : (
+              <>
+                <div className="riga-letti tipo">
                   {campoSi('tipo', 'Tipo',
                     <select data-campo="tipo" value={b.testata.tipo} onFocus={() => setCampo('tipo')} onChange={(e) => t('tipo', e.target.value)}>
                       {Object.entries(TIPO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -873,20 +915,38 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                     <input data-campo="numero" value={b.testata.numero} onFocus={() => setCampo('numero')} onChange={(e) => t('numero', e.target.value)} />)}
                   {campoSi('data', 'Data',
                     <input data-campo="data" type="date" value={b.testata.data} onFocus={() => setCampo('data')} onChange={(e) => t('data', e.target.value)} />)}
-                  {campoSi('fornitore_id', 'Fornitore',
-                    <CampoRicerca entita={entitaFornitore} valore={b.testata.fornitore_id} onChange={(v) => t('fornitore_id', v)} />)}
-                  {campoSi('codice_cliente', 'Codice cliente',
-                    <input data-campo="codice_cliente" value={b.testata.codice_cliente} onFocus={() => setCampo('codice_cliente')} onChange={(e) => t('codice_cliente', e.target.value)} />)}
-                  {campoSi('cliente', 'Cliente letto',
-                    <input data-campo="cliente" value={b.testata.cliente} onFocus={() => setCampo('cliente')} onChange={(e) => t('cliente', e.target.value)} />)}
-                  {campoSi('importo_totale', 'Importo',
-                    <CampoEuro dataCampo="importo" valore={b.testata.importo} onFocus={() => setCampo('importo_totale')} onChange={(v) => t('importo', v)} />)}
+                  <CampoLetto x={af.get('importo_totale')} etichetta="Importo" verificato={verificato('importo_totale')} onConferma={() => conferma('importo_totale')} soglie={d.soglie} sopra={sommaSopra}>
+                    <CampoEuro dataCampo="importo" valore={b.testata.importo} onFocus={() => setCampo('importo_totale')} onChange={(v) => t('importo', v)} />
+                  </CampoLetto>
                   {b.testata.tipo === 'nota_credito' &&
                     campoSi('riferimento_fattura', 'Fattura stornata',
                       <input data-campo="riferimento_fattura" value={b.testata.riferimento_fattura} onFocus={() => setCampo('riferimento_fattura')} onChange={(e) => t('riferimento_fattura', e.target.value)} />)}
-                </>
-              )}
-            </div>
+                </div>
+                <div className="riga-letti cliente">
+                  {campoSi('cliente', 'Cliente letto',
+                    <input data-campo="cliente" value={b.testata.cliente} onFocus={() => setCampo('cliente')} onChange={(e) => t('cliente', e.target.value)} />)}
+                  <button type="button" className="btn-arrow" aria-label="Cerca il cliente letto" title="Cerca il cliente letto"
+                    disabled={!b.testata.cliente.trim()} onClick={() => setCercaCliente((n) => n + 1)}>›</button>
+                  {campoSi('cliente_id', 'Cliente',
+                    <CampoRicerca entita={entitaCliente} valore="" onChange={() => {}} cerca={{ q: b.testata.cliente, n: cercaCliente }}
+                      onScelto={(r) => { const c = r as { nome?: string; piva?: string }; t('cliente', c.nome ?? ''); t('piva_cliente', c.piva ?? ''); }} />)}
+                  {campoSi('codice_cliente', 'Codice cliente',
+                    <input data-campo="codice_cliente" value={b.testata.codice_cliente} onFocus={() => setCampo('codice_cliente')} onChange={(e) => t('codice_cliente', e.target.value)} />)}
+                  {campoSi('piva_cliente', 'P.IVA cliente',
+                    <input data-campo="piva_cliente" value={b.testata.piva_cliente} onFocus={() => setCampo('piva_cliente')} onChange={(e) => t('piva_cliente', e.target.value)} />)}
+                </div>
+                <div className="riga-letti fornitore">
+                  {campoSi('fornitore', 'Fornitore letto',
+                    <input data-campo="fornitore" value={b.testata.fornitore} onFocus={() => setCampo('fornitore')} onChange={(e) => t('fornitore', e.target.value)} />)}
+                  <button type="button" className="btn-arrow" aria-label="Cerca il fornitore letto" title="Cerca il fornitore letto"
+                    disabled={!b.testata.fornitore.trim() || !!b.testata.fornitore_id} onClick={() => setCercaFornitore((n) => n + 1)}>›</button>
+                  {campoSi('fornitore_id', 'Fornitore',
+                    <CampoRicerca entita={entitaFornitore} valore={b.testata.fornitore_id} onChange={(v) => t('fornitore_id', v)} cerca={{ q: b.testata.fornitore, n: cercaFornitore }} />)}
+                  {campoSi('piva_fornitore', 'P.IVA fornitore',
+                    <input data-campo="piva_fornitore" value={b.testata.piva_fornitore} onFocus={() => setCampo('piva_fornitore')} onChange={(e) => t('piva_fornitore', e.target.value)} />)}
+                </div>
+              </>
+            )}
             <div className="righe-testa">
               <h3>Righe <span className="testo-tenue">{b.righe.length}</span></h3>
               <button type="button" className="btn sec piccolo" onClick={() => {
@@ -946,7 +1006,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                 <tfoot>
                   <tr>
                     <td colSpan={boll ? 4 : 5} className="testo-tenue">Totale</td>
-                    <td className="dx">{euro(boll ? b.righe.reduce((s, r) => s + (Number(r.provvigione) || 0), 0) : b.righe.reduce((s, r) => s + (Number(r.importo) || 0), 0))}</td>
+                    <td className="dx">{euro(boll ? b.righe.reduce((s, r) => s + (Number(r.provvigione) || 0), 0) : sommaRighe(b.righe))}</td>
                     <td />
                   </tr>
                 </tfoot>

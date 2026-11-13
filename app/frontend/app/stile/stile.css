@@ -489,9 +489,7 @@ a.m-cella:hover { background: #f1f6ff; }
 .riep-testa { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; border: 0; background: none; font: inherit; font-weight: 600; color: inherit; text-align: left; cursor: pointer; border-radius: inherit; }
 .riep-testa:disabled { cursor: default; }
 .riep-testa:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; }
-.riep-freccia { margin-left: auto; display: inline-flex; color: var(--testo-tenue); transition: transform .15s; transform: rotate(-90deg); }
-.riep-testa[aria-expanded="true"] .riep-freccia { transform: rotate(90deg); }
-.riep-freccia svg { width: 18px; height: 18px; }
+.riep-freccia { margin-left: auto; display: inline-flex; color: var(--testo-tenue); font-size: 14px; }
 /* l'elenco si apre sotto la barra, sopra il contenuto (non lo spinge in basso) */
 .aff-riepilogo ul { position: absolute; top: calc(100% + 4px); left: -1px; right: -1px; margin: 0; padding: 8px 12px 8px 30px; font-size: 13px;
   background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-piccolo); box-shadow: 0 8px 24px rgba(16, 24, 40, .14); max-height: 50vh; overflow: auto; }
@@ -499,7 +497,30 @@ a.m-cella:hover { background: #f1f6ff; }
 .aff-riepilogo li .btn.testo { padding: 2px 0; text-align: left; }
 .aff-riepilogo li.grave .btn.testo { color: var(--errore-testo); }
 .griglia-letti { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; }
-.campo-letto label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--testo-tenue); margin-bottom: 3px; }
+/* D-154: testata di Correggi su tre righe; il pulsante › sta fra il campo letto e la ricerca.
+   Le colonne della ricerca sono le stesse nelle righe 2 e 3, così Cliente e Fornitore hanno la
+   stessa larghezza e stanno uno sopra l'altro (la riga 3 lascia vuota la colonna del codice). */
+.riga-letti { display: grid; gap: 12px 10px; align-items: end; margin-bottom: 12px; }
+.riga-letti.tipo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr); }
+.riga-letti.cliente, .riga-letti.fornitore { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "letto arrow ricerca codice piva"; }
+.riga-letti.cliente > :nth-child(1), .riga-letti.fornitore > :nth-child(1) { grid-area: letto; }
+.riga-letti.cliente > :nth-child(3), .riga-letti.fornitore > :nth-child(3) { grid-area: ricerca; }
+.riga-letti.cliente > :nth-child(4) { grid-area: codice; }
+.riga-letti.cliente > :nth-child(5), .riga-letti.fornitore > :nth-child(4) { grid-area: piva; }
+/* campi, ricerca, lente e › della stessa altezza: le etichette restano tutte sulla stessa linea */
+.riga-letti .campo-letto input, .riga-letti .campo-letto select,
+.riga-letti .campo-ricerca .ricerca-testo,
+.riga-letti .ricerca-lente,
+.riga-letti .btn-arrow { height: 32px; }
+.riga-letti .campo-letto .campo-ricerca { flex: 1 1 auto; min-width: 0; }
+.btn-arrow { grid-area: arrow; display: grid; place-items: center; width: 30px; height: 32px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; color: var(--testo-intest); cursor: pointer; padding: 0; font-size: 17px; line-height: 1; font-family: inherit; }
+.btn-arrow:disabled { color: var(--testo-tenue); background: var(--sfondo); cursor: default; }
+.btn-arrow:not(:disabled):hover, .btn-arrow:not(:disabled):focus-visible { border-color: var(--primario); color: var(--primario); outline: none; }
+@media (max-width: 768px) {
+  .riga-letti.cliente, .riga-letti.fornitore { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.2fr); grid-template-areas: "letto arrow ricerca" "codice codice piva"; }
+  .riga-letti.fornitore { grid-template-areas: "letto arrow ricerca" ". . piva"; }
+}
+.campo-letto label { display: flex; flex-wrap: wrap; row-gap: 1px; align-items: center; gap: 6px; font-size: 12.5px; color: var(--testo-tenue); margin-bottom: 3px; }
 .campo-letto .aff { font-weight: 700; font-size: 11.5px; }
 .campo-riga { display: flex; align-items: center; gap: 4px; }
 .campo-letto input, .campo-letto select { width: 100%; min-width: 0; font: inherit; padding: 6px 8px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; }
@@ -517,6 +538,10 @@ a.m-cella:hover { background: #f1f6ff; }
 .conferma-campo { flex: none; width: 26px; height: 26px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; color: var(--ok); font-weight: 700; cursor: pointer; padding: 0; }
 .spunta-verde { flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; color: var(--ok); font-weight: 700; }
 .conferma-campo:hover { background: var(--ok-tenue); border-color: var(--ok); }
+/* D-154: «Somma righe» sopra l'Importo, sulla riga dell'etichetta, allineata a destra */
+.sopra-riga { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--testo-tenue); white-space: nowrap; text-align: right; }
+.sopra-riga .spunta-ok { color: var(--ok); font-weight: 700; }
+.sopra-riga .somma-righe-avviso { color: var(--attesa-testo); }
 .righe-testa { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
 .righe-testa h3 { margin: 12px 0 8px; }
 .aff-dx .tab-righe-box { border: 1px solid var(--bordo); border-radius: var(--r-piccolo); overflow: auto; flex: 1 1 auto; min-height: 10rem; }
@@ -557,6 +582,10 @@ a.m-cella:hover { background: #f1f6ff; }
 .ricerca { position: relative; display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
 .ricerca > .pallino { flex: none; }
 .ricerca .ricerca-testo { flex: 1 1 auto; min-width: 0; }
+/* D-153: il campo e la lente stanno sempre sulla stessa riga; la riga «Letto: … · Cerca questo»
+   sta sotto, fuori dal flex, a tutta larghezza (ellissi se lunga). */
+.ricerca-riga { width: 100%; min-width: 0; }
+.ricerca-letto { font-size: 12px; color: var(--testo-tenue); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ricerca-lente { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: #fff; color: var(--testo-intest); cursor: pointer; padding: 0; }
 .ricerca-lente:hover, .ricerca-lente:focus-visible { border-color: var(--primario); color: var(--primario); outline: none; }
 .ricerca-lente .icona { width: 15px; height: 15px; }

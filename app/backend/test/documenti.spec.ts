@@ -698,6 +698,21 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
     expect(dopo).toEqual(prima);
   });
 
+  it('testata: il fornitore letto e le P.IVA di cliente e fornitore si correggono e tornano nel dettaglio', async () => {
+    const d = await creaArrivo('fornitore-letto.pdf', {
+      tipo: 'fattura',
+      campi: [['numero', 'FL-1'], ['data', '2026-09-01'], ['fornitore', 'Nome Vecchio'], ['piva_cliente', 'IT000'], ['piva_fornitore', 'DE000']],
+    });
+    const r = (await op.put(`/documenti/${d.id}`, {
+      testata: { tipo: 'fattura', fornitore: 'Gries GmbH', piva_cliente: 'DE123456', piva_fornitore: 'DE999888' },
+    }).expect(200)).body;
+    expect(r.testata.fornitore).toBe('Gries GmbH');
+    expect(r.testata.piva_cliente).toBe('DE123456');
+    expect(r.testata.piva_fornitore).toBe('DE999888');
+    const campi = await db.documenti_campi.findMany({ where: { documento_id: d.id, campo: { in: ['fornitore', 'piva_cliente', 'piva_fornitore'] } } });
+    expect(campi.map((c) => c.valore_finale).sort()).toEqual(['DE123456', 'DE999888', 'Gries GmbH']);
+  });
+
   it('documento senza codice cliente: lo storico con codice NULL si ritrova come prima (C1)', async () => {
     await db.interscambio_storico.create({ data: {
       fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7003n, fornitore_legacy_id: 7003n,
@@ -869,5 +884,35 @@ describe('scelta del fornitore o del cliente (D-152)', () => {
   it('fonte Integra senza dati.importa: 403', async () => {
     const d = await creaArrivo('scelta-403.pdf', [['fornitore', 'Nuovo Fornitore SRL']]);
     await op.post(`/documenti/${d.id}/scegli`, { ruolo: 'fornitore', fonte: 'integra', id: '1' }).expect(403);
+  });
+});
+
+describe('somma delle righe accanto all\'importo (D-153)', () => {
+  async function arrivo(file_nome: string) {
+    return db.documenti_in_arrivo.create({ data: {
+      origine: 'email', file_nome, stato: 'da_controllare',
+      file_hash: createHash('sha256').update(file_nome + Math.random()).digest('hex'), file_percorso: `in_arrivo/${file_nome}`,
+      tipo: 'fattura',
+    } });
+  }
+
+  it('importo uguale alla somma delle righe: nessun punto «totale»', async () => {
+    const d = await arrivo('somma-uguale.pdf');
+    const r = await op.put(`/documenti/${d.id}`, {
+      testata: { tipo: 'fattura', importo: '100' },
+      righe: [{ codice: 'A', importo: '40' }, { codice: 'B', importo: '60' }],
+    }).expect(200);
+    expect(r.body.controlli.some((c: any) => c.codice === 'totale')).toBe(false);
+  });
+
+  it('importo diverso dalla somma delle righe: punto «totale» da controllare', async () => {
+    const d = await arrivo('somma-diversa.pdf');
+    const r = await op.put(`/documenti/${d.id}`, {
+      testata: { tipo: 'fattura', importo: '100' },
+      righe: [{ codice: 'A', importo: '40' }, { codice: 'B', importo: '50' }],
+    }).expect(200);
+    const totale = r.body.controlli.find((c: any) => c.codice === 'totale');
+    expect(totale).toMatchObject({ campo: 'totale', grave: true });
+    expect(totale.testo).toContain('diverso dalla somma delle righe');
   });
 });

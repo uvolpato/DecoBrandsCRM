@@ -59,24 +59,43 @@ function paesePiva(r: Riga): { paese: string; piva: string | null } {
   return { paese, piva: pn && paese !== 'IT' && !/^[A-Z]{2}/.test(pn) ? paese + pn : pn || null };
 }
 
+/** Sigle societarie e congiunzioni tolte dalla ricerca per parole (D-153): «Arte Wohnaccessoires
+ *  GmbH & Co. KG» e «ARTE WOHNACCESSOIRES GMBH & CO.KG» si ritrovano per le parole vere, non per
+ *  il testo intero (punti, spazi e maiuscole diverse in Integra). */
+const SIGLE_PAROLE = new Set(['srl', 'snc', 'spa', 'sas', 'gmbh', 'co', 'kg', 'sa', 'ltd', 'inc', 'llc', 'ag', 'ohg', 'ug', 'bv', 'nv', 'sarl', 'and', 'und']);
+
+/** Parole significative di una ricerca (D-153): minuscole, senza punteggiatura, almeno 3 lettere,
+ *  senza le sigle societarie; al massimo 5. Gli accenti restano (l'ILIKE non li piega, e il testo
+ *  letto può averli). */
+function paroleDi(q: string): string[] {
+  return testo(q).toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u).filter((p) => p.length >= 3 && !SIGLE_PAROLE.has(p)).slice(0, 5);
+}
+
 /** La SQL della ricerca mirata sulla vista: la usano `cerca` e il controllo del documento (C1). */
 function sqlRicerca(schema: string, tipo: Tipo, q: string) {
   const v = VISTE[VISTA_DI[tipo]];
   const codice = testo(q).toUpperCase();
   const piva = normalizzaPiva(testo(q));
+  const valori: string[] = [codice, piva, `IT${piva}`];
+  // D-153: la ragione sociale si cerca per parole (tutte in AND, parametrizzate), non per il testo
+  // intero: il nome letto da «Cerca questo» è per intero ma in Integra è scritto in modo diverso.
+  const clausoleNome = paroleDi(q).map((p) => {
+    valori.push(`%${p}%`);
+    return `ragione_sociale ILIKE $${valori.length}`;
+  });
   return {
     // nessun conteggio e nessuna scansione completa: LIMIT 10 e ordine dal più preciso (§4.7.1)
     text: `
     SELECT ${v.colonne.join(', ')}
     FROM ${schema}.${v.vista}
     WHERE upper(COALESCE(codice, '')) = $1
-       OR regexp_replace(upper(COALESCE(piva, '')), '[^A-Z0-9]', '', 'g') IN ($2, $3)
-       OR ragione_sociale ILIKE $4
+       OR regexp_replace(upper(COALESCE(piva, '')), '[^A-Z0-9]', '', 'g') IN ($2, $3)${clausoleNome.length ? `\n       OR (${clausoleNome.join(' AND ')})` : ''}
     ORDER BY (upper(COALESCE(codice, '')) = $1) DESC,
              (regexp_replace(upper(COALESCE(piva, '')), '[^A-Z0-9]', '', 'g') IN ($2, $3)) DESC,
              ragione_sociale
     LIMIT 10`,
-    values: [codice, piva, `IT${piva}`, `%${testo(q)}%`],
+    values: valori,
   };
 }
 
@@ -309,7 +328,7 @@ export class AnagraficaIntegraController {
   constructor(private readonly integra: IntegraService, private readonly db: PrismaService) {}
 
   @Get('cerca')
-  @Richiede('dati.importa')
+  @Richiede('dati.consulta') // D-152: i risultati di Integra si vedono con la sola consultazione; l'import resta `dati.importa`
   async cerca(@Query() f: CercaFiltro) {
     const c = await this.integra.ponte();
     if (!c) throw new BadGatewayException('Sincronizzazione non configurata');

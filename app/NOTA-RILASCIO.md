@@ -11,6 +11,18 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.2 — 13/11/2026 — Correggi i dati letti più ordinata
+
+- **Testata su tre righe**: Tipo, Numero, Data, Importo; Cliente letto › Cliente, Codice e P.IVA cliente;
+  Fornitore letto › Fornitore, P.IVA fornitore. Il pulsante › porta il nome letto nella ricerca.
+- **Somma righe** sopra l’Importo: si aggiorna con le righe; se non coincide c’è un avviso (non blocca)
+  e il server lo mette fra i punti da controllare.
+- **P.IVA fornitore** letta dal documento (vale per i documenti letti da ora).
+- **Ricerca su Integra e nel CRM per parole**: «ARTE WOHNACCESSOIRES GMBH & CO.KG» trova «Arte
+  Wohnaccessoires GmbH & Co. KG» (sigle societarie e punteggiatura non contano).
+- **Cliente** cercabile anche in *Correggi i dati letti* e con il nome letto in *Apri la pratica*.
+- **Riepilogo dell’affidabilità** chiuso all’apertura, con la freccia; vuoto non occupa spazio.
+
 ### 0.2.1 — 13/11/2026 — correzioni dal primo giro con i documenti veri
 
 - **Coda visibile**: i file caricati compaiono subito in *Documenti* («In coda», «In lettura») e si

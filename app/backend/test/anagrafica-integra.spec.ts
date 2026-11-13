@@ -312,6 +312,13 @@ describe('cerca', () => {
     expect(r.righe![0].codice).toBe('SUPER');
   });
 
+  it('ritrova la ragione sociale per parole anche se scritta in modo diverso (D-153)', async () => {
+    await mettiFornitore({ id_integra: 90, codice: 'F00090', ragione_sociale: 'Arte Wohnaccessoires GmbH & Co. KG', piva: '90123456789' });
+    // il nome letto è per intero ma con punti, spazi e sigle diverse da quelle della vista
+    const r = await cerca(db, ponte, SCHEMA, 'fornitore', 'ARTE WOHNACCESSOIRES GMBH & CO.KG');
+    expect(r.righe!.map((x) => x.codice)).toContain('F00090');
+  });
+
   it('esclude chi è già in anagrafica', async () => {
     await mettiCliente({ id_integra: 70, codice: 'C00070', ragione_sociale: 'Già Importato' });
     await importa(db, ponte, SCHEMA, 'cliente', 70, {});
@@ -334,10 +341,11 @@ describe('cerca', () => {
 });
 
 describe('rotte', () => {
-  it('cerca e importa: 200 con dati.importa, 403 senza (D-111)', async () => {
+  it('cerca e importa: cerca con dati.consulta, importa solo con dati.importa (D-152)', async () => {
     await db.utenti.create({ data: { username: 'oper-ai', email: 'oper-ai' + DOMINIO, nome: 'Operatore', ruolo: 'utente', password_hash: await cifra(PW), deve_cambiare_password: false, aree: { create: [{ area: 'dati', livello: 'operatore' }] } } });
     await db.utenti.create({ data: { username: 'lett-ai', email: 'lett-ai' + DOMINIO, nome: 'Lettore', ruolo: 'utente', password_hash: await cifra(PW), deve_cambiare_password: false, aree: { create: [{ area: 'dati', livello: 'lettura' }] } } });
     await mettiCliente({ id_integra: 80, codice: 'C00080', ragione_sociale: 'Negozio Ottanta' });
+    await mettiCliente({ id_integra: 81, codice: 'C00081', ragione_sociale: 'Negozio Ottantuno' });
 
     const oper = request.agent(app.getHttpServer());
     const r1 = await oper.post('/api/accesso/entra').send({ utente: 'oper-ai', password: PW }).expect(200);
@@ -347,10 +355,12 @@ describe('rotte', () => {
     const imp = await oper.post('/api/integra/importa').set('x-csrf-token', csrf).send({ tipo: 'cliente', id_integra: 80 }).expect(200);
     expect(imp.body.creato).toBe(true);
 
+    // D-152: la lettura (dati.consulta) vede i risultati di Integra ma non può importare
     const lett = request.agent(app.getHttpServer());
     const r2 = await lett.post('/api/accesso/entra').send({ utente: 'lett-ai', password: PW }).expect(200);
-    await lett.get('/api/integra/cerca?tipo=cliente&q=Ottanta').set('x-csrf-token', r2.body.csrf).expect(403);
-    await lett.post('/api/integra/importa').set('x-csrf-token', r2.body.csrf).send({ tipo: 'cliente', id_integra: 80 }).expect(403);
+    const cl = await lett.get('/api/integra/cerca?tipo=cliente&q=Ottantuno').set('x-csrf-token', r2.body.csrf).expect(200);
+    expect(cl.body.righe).toHaveLength(1);
+    await lett.post('/api/integra/importa').set('x-csrf-token', r2.body.csrf).send({ tipo: 'cliente', id_integra: 81 }).expect(403);
   });
 
   it('ponte giù: cerca risponde 502 e non apre anomalie (C4)', async () => {

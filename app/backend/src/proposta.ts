@@ -52,6 +52,7 @@ export interface Letto {
   codice_cliente: string | null;
   cliente: string | null;
   piva_cliente: string | null;
+  piva_fornitore?: string | null; // D-154: campo letto nuovo, può mancare sui documenti letti prima
   importo: number | null; // importo_totale letto (imponibile stampato)
   mese: number | null;
   anno: number | null;
@@ -190,7 +191,7 @@ function componiLetto(tipo: string | null, fornitore_id: bigint | null, m: Map<s
   }
   return {
     tipo, fornitore_id, fornitore: valore('fornitore'),
-    numero: valore('numero'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'), piva_cliente: valore('piva_cliente'),
+    numero: valore('numero'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'), piva_cliente: valore('piva_cliente'), piva_fornitore: valore('piva_fornitore'),
     importo: num(valore('importo_totale')),
     mese: intero(valore('mese')), anno: intero(valore('anno')), riferimento_fattura: valore('riferimento_fattura'),
     righe,
