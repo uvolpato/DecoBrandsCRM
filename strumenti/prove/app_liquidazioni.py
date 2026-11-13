@@ -88,6 +88,9 @@ with sync_playwright() as p:
     ok('4 con documenti' in testo(pg, '.colonne > .pannello .pannello-nota'), 'testata dei subagenti: quanti con documenti e quanti senza')
     ok(numero(testo(pg, '.colonne > .pannello tfoot td.dx')) == 1986.38, 'totale da liquidare: 1.986,38 €')
     ok('Totale da liquidare' in testo(pg, destra + '.pannello-nota'), 'pannello: totale da liquidare e documenti in attesa')
+    tot_nota = numero(pg.locator(destra + '.pannello-nota b').inner_text())
+    ok(abs(numero(testo(pg, '.colonne > .pannello tfoot td.dx')) - tot_nota) < 0.01,
+       'piede e nota del pannello: stesso totale dal server (D-126)')
 
     # documenti: numero nella scheda, giallo con una riga in attesa, stato deciso dal server
     ok(scheda_documenti(pg).inner_text().split('\n')[0] == 'Documenti' and scheda_documenti(pg).locator('.schede-conta').inner_text() == '10',
@@ -346,6 +349,9 @@ with sync_playwright() as p:
        'sola lettura: i documenti si vedono, la chiusura no')
     esporta_btn = pg.locator('.testa-azioni button:has-text("Esporta")')
     ok(esporta_btn.count() == 1 and not esporta_btn.is_disabled(), 'sola lettura: il pulsante Esporta resta attivo')
+    # A7-07: i pulsanti spenti in sola lettura si annunciano spenti (aria-disabled), non solo al mouse
+    ok(chiudi.get_attribute('aria-disabled') == 'true', 'sola lettura: il pulsante spento è aria-disabled (A7-07)')
+    ok(not esporta_btn.get_attribute('aria-disabled'), 'sola lettura: il pulsante consentito (Esporta) non è aria-disabled')
     pg.close()
     b.close()
 

@@ -221,8 +221,9 @@ export async function giroCasella(db: PrismaService, config: ConfigCasella, apri
         let guasto = false;
         for (const a of msg.allegati) {
           try {
-            await riceviDocumento(db, { nome: a.nome, dati: a.dati, origine: 'email', email_da: msg.da, email_oggetto: msg.oggetto }, {});
-            presi++;
+            const esito = await riceviDocumento(db, { nome: a.nome, dati: a.dati, origine: 'email', email_da: msg.da, email_oggetto: msg.oggetto }, {});
+            if (esito.esito === 'ignorato') ignorati++; // U10/D-122: scartato rimandato per email, non si rianima
+            else presi++;
           } catch (e) {
             if (e instanceof ConflictException) {
               ignorati++; // doppione: stesso file già arrivato, nessuna anomalia

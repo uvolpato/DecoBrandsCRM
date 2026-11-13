@@ -487,7 +487,7 @@ try:
     pgA.close(); pgB.close()
 
     # ---------- 12. Anagrafiche ----------
-    pg.goto(BASE + '/fornitori'); pg.wait_for_selector('.dt tbody tr'); quieta(pg)
+    pg.goto(BASE + '/fornitori'); pg.wait_for_selector('.dt tbody tr.cliccabile'); quieta(pg)
     ok(testo(pg, '.testa h1') == 'Fornitori', 'Fornitori: elenco')
     ok(pg.locator('.dt tbody tr.cliccabile').count() == len(json(pg, 'fornitori')), 'Fornitori: righe come il server (D-101)')
     pg.fill('.filtri input[type=search]', 'Gries')

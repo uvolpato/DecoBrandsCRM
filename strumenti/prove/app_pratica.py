@@ -233,6 +233,26 @@ with sync_playwright() as p:
     pg.screenshot(path=str(USCITA / 'app-pratica-d60-768.png'), full_page=True)
     pg.set_viewport_size({'width': 1440, 'height': 900}); pg.wait_for_timeout(400)
 
+    # --- A5-02 (D-78, V12): il confronto della finestra è quello calcolato dal server ---
+    # una pratica senza variazioni (ordine = conferma = fattura): la finestra mostra tutte le righe,
+    # che coincidono con la risposta di GET /documenti/:did/confronto (il browser non ricalcola nulla)
+    cerca_e_apri(pg, 'OF/2026/038')
+    pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='F-2026-0907').click()
+    pg.wait_for_selector('.affiancata .dt tbody tr')
+    n_server = pg.evaluate("""async () => {
+      const pid = location.pathname.split('/').pop();
+      const d = await (await fetch('/api/pratiche/' + pid + '/documenti')).json();
+      const docs = [...d.altri, ...d.documenti];
+      const cur = docs.find((x) => x.numero === 'F-2026-0907');
+      const rif = docs.find((x) => x.numero === 'C-2026/0981');
+      const c = await (await fetch('/api/pratiche/' + pid + '/documenti/' + cur.id + '/confronto?rif=' + rif.id)).json();
+      return c.righe.length;
+    }""")
+    ok(pg.locator('.affiancata .dt tbody tr').count() == n_server,
+       'finestra: le righe a confronto sono quelle del server (%d)' % n_server)
+    ok('nessuna' in testo(pg, '.affiancata'), 'nessuna variazione: la differenza della finestra è quella del server')
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+
     # --- D-60: proforma al posto della conferma e più ordini nello stesso binario ---
     cerca_e_apri(pg, 'OF/2026/041')
     ok(pg.locator('.binario .tappa').nth(1).locator('h3').inner_text() == 'Conferma', 'prima della proforma: la fase è Conferma')

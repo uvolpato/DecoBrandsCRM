@@ -8,13 +8,15 @@ import { CercaInIntegra } from '@/componenti/CercaInIntegra';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
-import { avviso, Dettagli, quando } from '@/componenti/Piccoli';
+import { avviso, Dettagli, quando, Stato } from '@/componenti/Piccoli';
 import { SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
+import { euro } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
 import { fornitore, subagente } from '@/lib/entita';
+import { ETICHETTA_PRATICA, type StatoPratica } from '@/lib/stati';
 
 interface Cliente {
   id: string;
@@ -37,7 +39,7 @@ interface Pratica {
   fornitore_id: string;
   fornitore: string | null;
   importo_merce: number | null;
-  stato: string;
+  stato: StatoPratica;
 }
 
 interface Dettaglio {
@@ -142,10 +144,15 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
 
   const colonnePratiche: Colonna<Pratica>[] = [
     { key: 'numero_ordine', header: 'Pratica', cell: (p) => p.numero_ordine },
-    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (p) => p.fornitore ?? '-' },
+    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (p) => p.fornitore ?? '—' },
     { key: 'data_ordine', header: 'Data', cell: (p) => quando(p.data_ordine) },
-    { key: 'importo_merce', header: 'Importo', align: 'right', cell: (p) => (p.importo_merce === null ? '-' : p.importo_merce) },
-    { key: 'stato', header: 'Stato', cell: (p) => p.stato },
+    { key: 'importo_merce', header: 'Importo', tipo: 'euro', cell: (p) => (p.importo_merce === null ? '—' : euro(p.importo_merce)) },
+    {
+      key: 'stato', header: 'Stato', cell: (p) => {
+        const s = ETICHETTA_PRATICA[p.stato];
+        return <Stato v={s.v}>{s.testo}</Stato>;
+      },
+    },
   ];
 
   // filtri standard della scheda Pratiche (D-22): i conteggi dei segmenti valgono con gli altri filtri

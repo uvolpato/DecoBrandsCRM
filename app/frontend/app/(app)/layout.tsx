@@ -13,28 +13,89 @@ import { EventiProvider } from '@/lib/eventi';
 // senza sessione porta all'accesso e poi torna qui; con la password provvisoria solo il cambio.
 // Barra, "Pagina riservata", fascia "Profilo in sola lettura" e pulsanti spenti seguono i permessi del
 // server e l'area della pagina (D-45): il controllo è qui, una volta per tutte le pagine.
+// A7-07, D-45, §8.3: gli stessi selettori di stile.css che spengono i pulsanti in sola lettura. Il CSS
+// (pointer-events: none) ferma il mouse ma non la tastiera né il lettore di schermo: qui il guscio li blocca
+// anche dal clic da tastiera e li annuncia spenti con aria-disabled (WCAG 4.1.2).
+const SELETTORE_SPENTI = [
+  'body.sola-lettura .principale button.btn:not(.consentito):not(.torna)',
+  'body.sola-lettura .velo .modale-piede button.btn:not(.sec):not(.consentito)',
+  'body.sola-lettura .affiancata .aff-piede button.btn:not(.sec):not(.consentito)',
+  'body.sola-lettura .velo .modale-corpo .btn:not(.sec):not(.consentito)',
+].join(', ');
+
 export default function Guscio({ children }: { children: ReactNode }) {
   const router = useRouter();
   const percorso = usePathname();
   const [io, setIo] = useState<Io | null>(null);
+  const [errore, setErrore] = useState<string | null>(null);
+  const [tentativo, setTentativo] = useState(0); // A5-14: Riprova rilancia l'effetto di lettura di /accesso/io
+  const voce = voceDi(percorso);
+  const solaLettura = !!voce?.area && !!io && io.aree[voce.area] === 'lettura';
 
   useEffect(() => {
     let vivo = true;
     void api<Io>('accesso/io').then((r) => {
       if (!vivo) return;
-      // il 401 lo porta all'accesso lib/api.ts (sessione scaduta o assente)
-      if (r.ok && r.dati.cambia_password) router.replace('/accesso/cambia?dopo=' + encodeURIComponent(percorso));
+      if (!r.ok) {
+        // il 401 lo porta all'accesso lib/api.ts (sessione scaduta o assente); gli altri errori (server
+        // giù, 5xx) mostrano una pagina scura con Riprova, mai uno schermo bianco (A5-14)
+        if (r.stato !== 401) setErrore(r.messaggio);
+        return;
+      }
+      setErrore(null);
+      if (r.dati.cambia_password) router.replace('/accesso/cambia?dopo=' + encodeURIComponent(percorso));
       // Oggi (pagina d'arrivo) è di Provvigioni: chi non ha l'area va alla prima pagina che può aprire
-      else if (r.ok && percorso === '/' && !r.dati.permessi.includes('provvigioni.consulta')) router.replace(primaPagina((p) => r.dati.permessi.includes(p)));
-      else if (r.ok) setIo(r.dati);
+      else if (percorso === '/' && !r.dati.permessi.includes('provvigioni.consulta')) router.replace(primaPagina((p) => r.dati.permessi.includes(p)));
+      else setIo(r.dati);
     });
     return () => { vivo = false; };
-  }, [router, percorso]);
+  }, [router, percorso, tentativo]);
 
-  if (!io) return null;
+  // A7-07: in sola lettura si bloccano i pulsanti spenti anche dal clic da tastiera (cattura) e si
+  // segnano spenti con aria-disabled, anche quando compaiono dopo (finestre, righe di tabella).
+  useEffect(() => {
+    if (!solaLettura) return;
+    const blocca = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest(SELETTORE_SPENTI)) { e.preventDefault(); e.stopPropagation(); }
+    };
+    const segna = () => document.querySelectorAll(SELETTORE_SPENTI).forEach((el) => el.setAttribute('aria-disabled', 'true'));
+    segna();
+    const principale = document.getElementById('principale');
+    const osserva = new MutationObserver(segna);
+    if (principale) osserva.observe(principale, { childList: true, subtree: true });
+    document.addEventListener('click', blocca, true);
+    return () => {
+      document.removeEventListener('click', blocca, true);
+      osserva.disconnect();
+    };
+  }, [solaLettura]);
+
+  // A5-14: pagina scura come l'accesso (body:has(.accesso-scena)), con il messaggio e Riprova
+  if (errore) return (
+    <main className="principale">
+      <div className="accesso-scena aperta">
+        <div className="accesso">
+          <section className="pannello">
+            <div className="pannello-corpo">
+              <h1>Il server non risponde</h1>
+              <p className="nota" role="alert">{errore}</p>
+              <button type="button" className="btn largo" onClick={() => { setErrore(null); setTentativo((t) => t + 1); }}>Riprova</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+  // attesa del guscio: stesso fondo scuro della scena d'accesso (body:has(.accesso-scena)), mai un lampo chiaro
+  if (!io) return (
+    <main className="principale">
+      <div className="accesso-scena aperta">
+        <div className="avvio-gira" role="status" aria-label="Caricamento" />
+      </div>
+    </main>
+  );
   // D-45: la voce della pagina decide il permesso (le pagine di un'area con *.consulta) e la sola lettura
-  const voce = voceDi(percorso);
-  const solaLettura = !!voce?.area && io.aree[voce.area] === 'lettura';
   return (
     <UtenteCtx.Provider value={io}>
       <AggiornaUtenteCtx.Provider value={setIo}>

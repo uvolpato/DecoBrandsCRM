@@ -1,5 +1,6 @@
-import { Controller, Injectable, Logger, type MessageEvent, type OnModuleDestroy, Sse } from '@nestjs/common';
-import { Observable, Subject } from 'rxjs';
+import { Controller, Injectable, Logger, type MessageEvent, type OnModuleDestroy, Req, Sse } from '@nestjs/common';
+import { Observable, Subject, filter, interval, mergeMap, takeUntil } from 'rxjs';
+import type { Request } from 'express';
 import { Richiede } from './accesso';
 import { PrismaService } from './prisma.service';
 
@@ -44,23 +45,32 @@ export function areeDelleRighe(righe: { codice: string; entita: string | null }[
   return [...aree];
 }
 
-/** Un ciclo di lettura: righe con id > ultimo, il nuovo ultimo e le aree toccate. */
-export async function nuoveAree(db: Pick<PrismaService, 'registro' | '$queryRaw'>, ultimo: bigint) {
+/** Un ciclo di lettura: righe nuove della finestra, il nuovo ultimo e le aree toccate.
+ *  L'id (BIGSERIAL) si assegna all'INSERT, non al commit: una transazione lunga committa dopo una corta
+ *  con id più alto. La finestra rilegge gli ultimi 500 id e `visti` scarta quelli già emessi, così
+ *  l'evento committato fuori ordine arriva al giro dopo (A3-06). */
+export async function nuoveAree(db: Pick<PrismaService, 'registro' | '$queryRaw'>, ultimo: bigint, visti: Set<bigint>) {
   // take: un giro non deve portarsi dietro un registro cresciuto di colpo; il resto arriva al giro dopo
   const righe = await db.registro.findMany({
-    where: { id: { gt: ultimo } },
+    where: { id: { gt: ultimo - 500n } },
     orderBy: { id: 'asc' },
     take: 1000,
     select: { id: true, codice: true, entita: true },
   });
   if (!righe.length) {
     // registro riportato indietro (ripristino di un backup, dati di prova ricaricati): si riparte
-    // dall'ultimo id, altrimenti il flusso resterebbe zitto per sempre
+    // dall'ultimo id e si dimentica ciò che si era già visto, altrimenti il flusso resterebbe zitto
     const [r] = await db.$queryRaw<{ id: bigint | null }[]>`SELECT max(id) AS id FROM registro`;
     const max = r.id ?? 0n;
+    visti.clear();
     return { ultimo: max < ultimo ? max : ultimo, aree: [] as string[] };
   }
-  return { ultimo: righe[righe.length - 1].id, aree: areeDelleRighe(righe) };
+  const nuove = righe.filter((r) => !visti.has(r.id));
+  for (const r of righe) visti.add(r.id);
+  const nuovoUltimo = righe[righe.length - 1].id;
+  // ponytail: finestra di 500 id; LISTEN/NOTIFY se il registro cresce più di 500 righe in 4 s
+  for (const id of visti) if (id < nuovoUltimo - 500n) visti.delete(id);
+  return { ultimo: nuovoUltimo, aree: areeDelleRighe(nuove) };
 }
 
 @Injectable()
@@ -68,6 +78,7 @@ export class EventiService implements OnModuleDestroy {
   private readonly log = new Logger('Eventi');
   private readonly canale = new Subject<MessageEvent>();
   private ultimo: bigint | null = null;
+  private visti = new Set<bigint>();
   private inCorso = false;
   private clienti = 0;
   private ciclico?: ReturnType<typeof setInterval>;
@@ -75,12 +86,17 @@ export class EventiService implements OnModuleDestroy {
 
   constructor(private readonly db: PrismaService) {}
 
-  /** Un flusso per chi ascolta; il ciclo parte al primo e si ferma con l'ultimo. */
-  flusso(): Observable<MessageEvent> {
+  /** Un flusso per chi ascolta; il ciclo parte al primo e si ferma con l'ultimo. La sessione si
+   *  ricontrolla ogni minuto (A1-08, D-38): se la riga sparisce o scade, il flusso si chiude. */
+  flusso(sessionID: string, periodo = 60_000): Observable<MessageEvent> {
+    const chiuso = interval(periodo).pipe(
+      mergeMap(() => this.sessioneViva(sessionID)),
+      filter((viva) => !viva),
+    );
     return new Observable((sottoscrittore) => {
       this.clienti++;
       if (this.clienti === 1) void this.avvia();
-      const s = this.canale.subscribe(sottoscrittore);
+      const s = this.canale.pipe(takeUntil(chiuso)).subscribe(sottoscrittore);
       return () => {
         s.unsubscribe();
         this.clienti--;
@@ -98,7 +114,7 @@ export class EventiService implements OnModuleDestroy {
         this.ultimo = await this.maxId();
         return;
       }
-      const { ultimo, aree } = await nuoveAree(this.db, this.ultimo);
+      const { ultimo, aree } = await nuoveAree(this.db, this.ultimo, this.visti);
       this.ultimo = ultimo;
       if (aree.length) this.canale.next({ data: { aree } });
     } catch (e) {
@@ -112,6 +128,12 @@ export class EventiService implements OnModuleDestroy {
   onModuleDestroy() {
     this.ferma();
     this.canale.complete();
+  }
+
+  /** La riga di sessione c'è ancora e non è scaduta? (A1-08, D-38). */
+  private async sessioneViva(sid: string) {
+    const s = await this.db.sessioni.findUnique({ where: { sid }, select: { expire: true } });
+    return s != null && s.expire.getTime() > Date.now();
   }
 
   private async maxId() {
@@ -148,7 +170,7 @@ export class EventiController {
   /** Canale degli aggiornamenti (§16.4.2, D-23): solo per chi è entrato. */
   @Sse('flusso')
   @Richiede('collegato')
-  flusso(): Observable<MessageEvent> {
-    return this.eventi.flusso();
+  flusso(@Req() req: Request): Observable<MessageEvent> {
+    return this.eventi.flusso(req.sessionID);
   }
 }

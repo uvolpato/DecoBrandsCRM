@@ -119,6 +119,21 @@ describe('F6-A1 un giro della casella', () => {
     expect(await anomalia('casella.allegato')).toBe(0);
   });
 
+  it('uno scartato rimandato per email resta scartato e conta fra gli ignorati (U10/D-122)', async () => {
+    const dati = pdf('scartato-u10');
+    const prima = await documenti.riceviDocumento(db, { nome: 'u10.pdf', dati, origine: 'caricamento' }, {});
+    if (prima.esito !== 'in_coda') throw new Error('atteso in_coda');
+    const id = BigInt(prima.id);
+    await db.documenti_in_arrivo.update({ where: { id }, data: { stato: 'scartato', scartato_il: new Date(), motivo_scarto: 'Altro' } });
+    const { apri, sposta } = apriFinto([
+      msg(1, 'Promemoria', 'fornitore@x.it', [{ nome: 'u10.pdf', dati }]),
+    ]);
+    const r = await giroCasella(db, config, apri, ora);
+    expect(r).toMatchObject({ email: 1, presi: 0, ignorati: 1, esito: 'ok' });
+    expect(await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } })).toMatchObject({ stato: 'scartato' });
+    expect(sposta).toHaveBeenCalledTimes(1);
+  });
+
   it('email senza allegati: casella.vuota, nessuna riga', async () => {
     const { apri } = apriFinto([msg(1, 'Senza allegati', 'a@x.it', [])]);
     const r = await giroCasella(db, config, apri, ora);

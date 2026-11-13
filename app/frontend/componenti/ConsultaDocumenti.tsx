@@ -8,6 +8,7 @@ import { FilterBar } from './FilterBar';
 import { Icona } from './Icona';
 import { Dettagli } from './Piccoli';
 import { classeSegno, data as dataIt, euro, euroSegno } from '@/lib/formati';
+import { api } from '@/lib/api';
 
 const TIPO: Record<string, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura',
@@ -22,11 +23,15 @@ export interface RigaDoc {
 export interface DocPratica {
   id: string; tipo: string; numero: string | null; data: string; importo: number;
   arrivo_id: string | null; file_nome: string | null; note?: string | null;
-  righe?: RigaDoc[]; riferimento?: string | null;
+  righe?: RigaDoc[]; riferimento?: string | null; pratica_id?: string;
 }
-interface Confronto {
-  i: number; codice: string; descrizione: string | null; a: RigaDoc | null; b: RigaDoc | null; varia: boolean; delta: number;
+/** Riga già confrontata dal server (D-78, V12): `a` è il documento di confronto, `b` quello corrente. */
+interface RigaConfronto { quantita: number; prezzo: number; importo: number }
+interface ConfrontoRiga {
+  codice: string | null; descrizione: string | null;
+  a: RigaConfronto | null; b: RigaConfronto | null; varia: boolean; delta: number;
 }
+interface Confronto extends ConfrontoRiga { i: number }
 
 /** Il documento precedente: quello stornato per la nota di credito, altrimenti l'ultimo della fase prima. */
 function precedente(cur: DocPratica, docs: DocPratica[]): DocPratica | null {
@@ -42,25 +47,6 @@ function precedente(cur: DocPratica, docs: DocPratica[]): DocPratica | null {
   return null;
 }
 
-function confronto(cur: DocPratica, rif: DocPratica | null): Confronto[] {
-  if (!rif) return [];
-  // la nota di credito storna solo le righe che contiene: quelle assenti non sono "tolte"
-  const soloNC = cur.tipo === 'nota_credito' || rif.tipo === 'nota_credito';
-  const chiave = (r: RigaDoc) => r.codice ?? r.descrizione ?? '';
-  const fonti = (soloNC ? [rif, cur].filter((d) => d.tipo === 'nota_credito') : [rif, cur]);
-  const codici = [...new Set(fonti.flatMap((d) => (d.righe ?? []).map(chiave)))];
-  return codici.map((c, i) => {
-    const a = (rif.righe ?? []).find((r) => chiave(r) === c) ?? null;
-    const b = (cur.righe ?? []).find((r) => chiave(r) === c) ?? null;
-    const varia = !a || !b || a.quantita !== b.quantita || a.prezzo !== b.prezzo;
-    if (soloNC) {
-      const nc = cur.tipo === 'nota_credito' ? b : a;
-      return { i, codice: c, descrizione: (b ?? a)?.descrizione ?? null, a, b, varia: true, delta: nc?.importo ?? 0 };
-    }
-    return { i, codice: c, descrizione: (b ?? a)?.descrizione ?? null, a, b, varia, delta: (b?.importo ?? 0) - (a?.importo ?? 0) };
-  });
-}
-
 export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onChiudi }: {
   docs: DocPratica[]; iniziale?: DocPratica; pratica: { numero: string; cliente: string | null; fornitore: string | null };
   codiceIniziale?: string | null; onChiudi: () => void;
@@ -69,11 +55,23 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
   const [rif, setRif] = useState<DocPratica | null>(() => precedente(iniziale ?? docs[0], docs));
   const [vista, setVista] = useState(codiceIniziale ? 'tutte' : 'variate');
   const [segnata, setSegnata] = useState<string | null>(codiceIniziale ?? null);
+  const [confronto, setConfronto] = useState<{ righe: ConfrontoRiga[]; differenza: number } | null>(null);
+  const [caricando, setCaricando] = useState(false);
 
   function scegli(d: DocPratica | null) {
     if (!d) return;
     setCur(d); setRif(precedente(d, docs)); setSegnata(null);
   }
+
+  // il confronto lo calcola il server (D-78, V12): qui si chiedono solo le righe già allineate per codice
+  useEffect(() => {
+    if (!rif || !cur.pratica_id) { setConfronto(null); setCaricando(false); return; }
+    let attivo = true;
+    setCaricando(true);
+    api<{ righe: ConfrontoRiga[]; differenza: number }>(`pratiche/${cur.pratica_id}/documenti/${cur.id}/confronto?rif=${rif.id}`)
+      .then((r) => { if (attivo) { setConfronto(r.ok ? r.dati : null); setCaricando(false); } });
+    return () => { attivo = false; };
+  }, [cur, rif]);
 
   // ← → passano da un documento all'altro, come nel prototipo; Esc chiude
   useEffect(() => {
@@ -91,17 +89,17 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
     return () => document.removeEventListener('keydown', tasto);
   }, [cur, docs, onChiudi]);
 
-  const righe = confronto(cur, rif);
+  const righe = (confronto?.righe ?? []).map((r, i) => ({ ...r, i }));
   const variate = righe.filter((r) => r.varia);
   const mostra = rif && vista === 'variate' && variate.length ? variate : righe;
   const soloNC = cur.tipo === 'nota_credito' || rif?.tipo === 'nota_credito';
-  const diff = !rif ? 0 : soloNC ? (cur.tipo === 'nota_credito' ? cur.importo : rif.importo) : cur.importo - rif.importo;
+  const diff = !rif ? 0 : (confronto?.differenza ?? 0);
   const src = cur.arrivo_id ? '/api/documenti/' + cur.arrivo_id + '/file' : null;
   const foto = /\.(jpe?g|png)$/i.test(cur.file_nome ?? '');
   const nome = cur.numero || dataIt(cur.data);
 
-  const qp = (r: RigaDoc | null) => r
-    ? <>{r.quantita ?? '—'} × {euro(r.prezzo ?? 0)}<span className="sec-riga">{euro(r.importo ?? 0)}</span></>
+  const qp = (r: RigaConfronto | null) => r
+    ? <>{r.quantita} × {euro(r.prezzo)}<span className="sec-riga">{euro(r.importo)}</span></>
     : <span className="testo-tenue">assente</span>;
   const colonne: Colonna<Confronto>[] = [
     {
@@ -166,17 +164,17 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
               },
               {
                 etichetta: 'Differenza',
-                valore: rif ? (
+                valore: !rif ? '—' : caricando ? '…' : (
                   Math.abs(diff) < 0.01
                     ? <span className="testo-tenue">nessuna</span>
                     : <><b className={classeSegno(diff)}>{euroSegno(diff)}</b>
                       <span className="sec-riga">{variate.length} {variate.length === 1 ? 'riga ' + (soloNC ? 'stornata' : 'cambia') : 'righe ' + (soloNC ? 'stornate' : 'cambiano')}</span></>
-                ) : '—',
+                ),
               },
             ]} />
             {cur.note && <p className="testo-tenue">{cur.note}</p>}
             {src && <p><a href={src} target="_blank" rel="noreferrer">{foto ? 'Apri la foto in una scheda' : 'Apri il PDF in una scheda'}</a></p>}
-            {rif && variate.length > 0 && (
+            {rif && !caricando && variate.length > 0 && (
               <div style={{ margin: '14px 0 8px' }}>
                 <FilterBar
                   campi={[{
@@ -192,7 +190,7 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
               <DataTable righe={mostra} colonne={colonne} chiave={(r) => String(r.i)} naturale compatta
                 rowClass={(r) => (r.varia ? 'evidenzia ' : '') + (r.codice === segnata ? 'selezionata' : '')}
                 onRowClick={(r) => setSegnata(r.codice)}
-                emptyText="Nessuna riga" emptyHint={rif ? 'I due documenti non hanno righe in comune.' : 'Scegli un documento con cui confrontare.'} />
+                emptyText={caricando ? 'Caricamento…' : 'Nessuna riga'} emptyHint={rif ? 'I due documenti non hanno righe in comune.' : 'Scegli un documento con cui confrontare.'} />
             </div>
           </div>
         </div>
@@ -209,7 +207,6 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
  *  costruita dai dati del documento: articolo, quantità, prezzo e totale. */
 function AnteprimaDocumento({ d, fornitore }: { d: DocPratica; fornitore: string | null }) {
   const righe = d.righe ?? [];
-  const somma = righe.reduce((s, r) => s + (r.importo ?? (r.quantita ?? 0) * (r.prezzo ?? 0)), 0);
   return (
     <div className="doc-pagina">
       <div className="doc-intest">
@@ -233,7 +230,7 @@ function AnteprimaDocumento({ d, fornitore }: { d: DocPratica; fornitore: string
             </tr>
           )) : <tr><td colSpan={5} className="testo-tenue">Nessuna riga letta</td></tr>}
         </tbody>
-        <tfoot><tr><td colSpan={4}>Totale documento</td><td className="dx"><b>{euro(d.importo || somma)}</b></td></tr></tfoot>
+        <tfoot><tr><td colSpan={4}>Totale documento</td><td className="dx"><b>{euro(d.importo)}</b></td></tr></tfoot>
       </table>
       <p className="doc-nota">Anteprima del documento costruita dai dati. Il file originale non è disponibile.</p>
     </div>

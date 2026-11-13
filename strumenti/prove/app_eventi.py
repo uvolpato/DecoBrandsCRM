@@ -33,8 +33,14 @@ with sync_playwright() as p:
         pg.wait_for_selector('.accesso-scena.aperta')
 
     def entra(pg, utente):
-        pg.goto(BASE + '/pratiche'); pg.wait_for_function("location.pathname === '/accesso'")
-        apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
+        pg.goto(BASE + '/pratiche')
+        # due schede dello stesso utente condividono la sessione: la seconda è già dentro, salta l'accesso
+        try:
+            pg.wait_for_function("location.pathname === '/accesso'", timeout=5000)
+        except Exception:
+            pass
+        if pg.evaluate("location.pathname === '/accesso'"):
+            apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
         pg.wait_for_function("location.pathname === '/pratiche'")
         pg.wait_for_selector('.dt tbody tr')
 
@@ -157,6 +163,35 @@ with sync_playwright() as p:
 
     # pulizia di sicurezza: se una prova precedente ha lasciato la fattura, la toglie
     ok(not elimina(pgB, pratica['id'], NUMERO), 'pulizia: nessun documento di prova rimasto')
+
+    # A5-13: un documento caricato da un'altra scheda fa crescere il contatore Documenti della barra
+    # senza navigare (D-23): la barra si rilegge a ogni evento, non solo al cambio pagina.
+    barra_doc = lambda: pgA.locator('.barra a[href="/documenti"] .conta')
+    conta_doc = lambda: numero(barra_doc().inner_text()) if barra_doc().count() else 0
+    prima_doc = conta_doc()
+    csrf_b = pgB.request.get(BASE + '/api/accesso/io').json()['csrf']
+    pdf = (b'%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n'
+           b'3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Size 4/Root 1 0 R>>\n%%EOF\n'
+           b'% ' + NUMERO.encode() + b'\n')
+    risposta = pgB.request.post(BASE + '/api/documenti/carica',
+        multipart={'file': {'name': 'prova-eventi.pdf', 'mimeType': 'application/pdf', 'buffer': pdf}},
+        headers={'x-csrf-token': csrf_b})
+    ok(risposta.status == 201, 'scheda B: documento caricato (stato %d)' % risposta.status)
+    doc_id = risposta.json()['id']
+    for _ in range(30):
+        if conta_doc() == prima_doc + 1:
+            break
+        pgA.wait_for_timeout(500)
+    ok(conta_doc() == prima_doc + 1,
+       'A5-13: il contatore Documenti della barra cresce senza navigare (%d -> %d)' % (prima_doc, prima_doc + 1))
+    # pulizia: si scarta il documento di prova (aspetta se il lettore lo sta leggendo)
+    for _ in range(30):
+        scartato = pgB.request.post(BASE + '/api/documenti/' + doc_id + '/scarta',
+            data={'motivo': 'Doppione'}, headers={'x-csrf-token': csrf_b})
+        if scartato.status == 204:
+            break
+        pgB.wait_for_timeout(500)
+
     pgA.close(); pgB.close(); b.close()
 
 ok(not errori, 'nessun errore JavaScript')

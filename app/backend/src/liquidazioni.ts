@@ -101,10 +101,16 @@ export async function liquidazione(db: Db, a: number, t: number, oggi?: string) 
   const f = foto(t);
   // chiuso: le righe salvate con la fotografia (non si ricalcola, §4.2.19); aperto: quelle del motore
   // shortcut: le fotografie salvate prima di F4-A1 non hanno le righe, si ricalcolano finché non si rigenera il seed
-  const documenti = (l ? (f.documenti ?? righe(t)) : righe(t)).map((r) => rigaDocumento(S, r, st.chiave === 'chiusa'));
+  const righeDoc = l ? (f.documenti ?? righe(t)) : righe(t);
+  const documenti = righeDoc.map((r) => rigaDocumento(S, r, st.chiave === 'chiusa'));
+  // totali degli importi dal server (V12, D-126 §19): il piede delle tabelle li mostra senza sommare
+  const docPerSub = new Map<string, Prisma.Decimal>();
+  for (const r of righeDoc) docPerSub.set(r.subagente_id, (docPerSub.get(r.subagente_id) ?? new Dec(0)).plus(r.provvigione));
+  const totaleDocumenti = Number(r2([...docPerSub.values()].reduce((s, x) => s.plus(x), new Dec(0))));
   const subagenti = f.subagenti.map((s) => ({
     id: s.subagente_id, nome: s.nome, attivo: S.subagenti.get(s.subagente_id)?.attivo ?? true, documenti: s.documenti, liquidabili: s.liquidabili,
     imponibile: Number(s.imponibile), provvigione: Number(s.provvigione), in_attesa: Number(s.in_attesa), storni: s.storni,
+    totale_documenti: Number(r2(docPerSub.get(s.subagente_id) ?? new Dec(0))),
   }));
   const motivo = l ? 'Trimestre già liquidato' : bloccoChiusura(S, st, righe(t), a, t);
   return {
@@ -119,6 +125,10 @@ export async function liquidazione(db: Db, a: number, t: number, oggi?: string) 
     chiusura: { possibile: !motivo, motivo },
     chiusa_il: l ? giornoRoma(l.chiusa_il) : null, chiusa_da: l?.autore?.nome ?? null,
     documenti,
+    totali: {
+      subagenti: { provvigione: Number(f.totale.provvigione) },
+      documenti: { provvigione: totaleDocumenti },
+    },
   };
 }
 
@@ -210,7 +220,10 @@ export async function reportSubagenti(db: Db, a: number, t: number, subagente?: 
         delta: variazione(x.pagate, p?.pagate ?? new Dec(0)),
       };
     }).sort((x, y) => y.pagate - x.pagate);
-    return { anno: a, trimestre: t, precedente, subagenti };
+    return {
+      anno: a, trimestre: t, precedente, subagenti,
+      totali: { fatturato: Number(an.totale.fatturato), pagate: Number(an.totale.pagate), margine: Number(an.totale.margine) },
+    };
   }
   const s = S.subagenti.get(String(subagente));
   if (!s) throw new NotFoundException('Subagente non trovato');

@@ -151,12 +151,16 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 .dt th.ordinabile:hover { color: var(--testo); background: #dfe3e8; }
 .dt th .freccia { margin-left: 4px; font-size: 10px; opacity: .35; }
 .dt th.attivo .freccia { opacity: 1; color: var(--primario); }
+/* A7-04: l'intestazione ordinabile è un pulsante, raggiungibile da tastiera; il fuoco è interno (D-64) */
+.dt th .dt-ordina { display: inline-flex; align-items: center; padding: 0; border: 0; background: none; font: inherit; color: inherit; letter-spacing: inherit; cursor: pointer; }
+.dt th .dt-ordina:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; }
 .dt td { padding: 9px 14px; border-bottom: 1px solid var(--bordo-tenue); vertical-align: middle; white-space: nowrap; }
 .dt td.cresce { white-space: normal; min-width: 12rem; }
 .dt td.avvolgi { white-space: normal; }
 .dt tbody tr:last-child td { border-bottom: 0; }
 .dt tbody tr.cliccabile { cursor: pointer; }
 .dt tbody tr.cliccabile:hover td { background: #f1f6ff; }
+.dt tbody tr.cliccabile:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; } /* A7-05: fuoco interno (D-64) */
 .dt tbody tr.evidenzia td { background: var(--attesa-tenue); }
 .dt tfoot td { position: sticky; bottom: 0; background: var(--bordo-tenue); font-weight: 700; border-top: 1px solid var(--bordo); border-bottom: 0; }
 .dt .dx { text-align: right; }
@@ -986,6 +990,10 @@ body.in-accesso .principale, body:has(.accesso-scena) .principale { padding: 0; 
   .accesso-logo, .accesso-invito { animation: none; }
   .accesso-logo, .accesso-scena.aperta .accesso { transition: none; }
 }
+/* attesa del guscio: stesso fondo scuro della scena d'accesso, un cerchio che gira */
+.avvio-gira { width: 36px; height: 36px; border-radius: 50%; border: 3px solid rgba(255,255,255,.18); border-top-color: rgba(255,255,255,.75); animation: avvio-gira .8s linear infinite; }
+@keyframes avvio-gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .avvio-gira { animation-duration: 2.4s; } }
 .accesso .pannello-corpo { padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 14px; }
 .accesso h1 { font-size: 20px; font-weight: 700; }
 .accesso-marchio { width: 140px; display: block; margin-bottom: 6px; }
@@ -1024,6 +1032,7 @@ body.in-accesso .principale, body:has(.accesso-scena) .principale { padding: 0; 
 .barra-piede .menu-utente-voce.attiva { background: var(--primario-tenue); color: var(--primario); font-weight: 600; }
 .menu-utente-voce .icona { width: 17px; height: 17px; color: var(--testo-tenue); flex: none; }
 .menu-utente-voce.attiva .icona { color: var(--primario); }
+.barra-versione { padding: 2px 6px 0; color: rgba(255,255,255,.4); font-size: 11.5px; white-space: nowrap; }
 .menu-utente-spunta { display: inline-flex; margin-left: auto; }
 .menu-utente-spunta .icona { width: 15px; height: 15px; color: var(--primario); }
 .menu-sep { height: 1px; margin: 5px 6px; background: var(--bordo-tenue); }

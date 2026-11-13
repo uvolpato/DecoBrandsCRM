@@ -66,6 +66,13 @@ with sync_playwright() as p:
 
         pg = entra(S + '-ammi')
         ok(testo(pg, '.testa h1') == 'Stato del sistema', 'titolo della pagina: Stato del sistema')
+        # versione visibile (13/11/2026): numero dal package.json del backend, commit se c'è
+        versione = pg.evaluate("async () => (await (await fetch('/api/versione')).json())")
+        riga_versione = pg.locator('.pila.riempi > .testo-tenue', has_text='Versione')
+        ok(riga_versione.count() == 1 and versione['numero'] in riga_versione.first.inner_text(),
+           'la pagina mostra «Versione %s»' % versione['numero'])
+        ok(('v' + versione['numero']) in testo(pg, '.barra-versione'),
+           'la barra mostra «v%s»' % versione['numero'])
         # un controllo con i servizi spenti: i riquadri diventano verdi «Non configurata» e le
         # anomalie di connessione aperte prima si chiudono (§7.14.2)
         pg.evaluate("""async () => {

@@ -153,4 +153,31 @@ describe('modifica regole', () => {
   });
 });
 
+describe('tipo di provvigione fisso dopo la prima chiusura (D-121)', () => {
+  it('con una chiusura: cambio del tipo 409, giorni_incasso 200', async () => {
+    const a = await entra('ammi-forn');
+    const chiuso = await db.bollettini_testata.findFirstOrThrow({ where: { chiuso_il: { not: null } }, orderBy: { chiuso_il: 'desc' } });
+    const id = String(chiuso.fornitore_id);
+    const prima = (await a.get('/fornitori/' + id).expect(200)).body;
+    const nuovo = prima.tipo_provvigione === 'fatturato' ? 'maturato' : 'fatturato';
+    const r = await a.put('/fornitori/' + id, { tipo_provvigione: nuovo }).expect(409);
+    expect(r.body.message).toBe('Il tipo di provvigione non si cambia dopo la prima chiusura (bollettino verificato o trimestre liquidato)');
+    // giorni_incasso resta libero
+    const giorni = prima.giorni_incasso === 60 ? 90 : 60;
+    await a.put('/fornitori/' + id, { giorni_incasso: giorni }).expect(200);
+    await a.put('/fornitori/' + id, { giorni_incasso: prima.giorni_incasso }).expect(200);
+  });
+
+  it('senza chiusure: cambio del tipo 200', async () => {
+    const a = await entra('ammi-forn');
+    const f = await db.fornitori.create({ data: {} });
+    // le liquidazioni valgono per tutti i fornitori: si tolgono per avere ultimaChiusura null
+    await db.$executeRaw`UPDATE ordini_fornitore_documenti SET liquidazione_id = NULL`;
+    await db.$executeRaw`UPDATE bollettini_righe SET liquidazione_id = NULL`;
+    await db.liquidazioni.deleteMany();
+    const r = await a.put('/fornitori/' + f.id, { tipo_provvigione: 'maturato' }).expect(200);
+    expect(r.body.tipo_provvigione).toBe('maturato');
+  });
+});
+
 

@@ -1,5 +1,5 @@
 'use client';
-import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { useMemoria } from '@/lib/memoria';
 
 // Schede come CRM.Schede del prototipo (stesso markup .schede): barra con le etichette (e il
@@ -20,6 +20,15 @@ export function Schede({ schede, attiva: iniziale, onCambia, riempi, memoria }: 
   const barra = useRef<HTMLDivElement>(null);
   const [salvata, setAttiva] = useMemoria(memoria && memoria + '|scheda', schede.some((s) => s.id === iniziale) ? iniziale! : schede[0].id);
   const attiva = schede.some((s) => s.id === salvata) ? salvata : schede[0].id;
+  // scheda controllata: se il genitore cambia `attiva`, la scheda aperta lo segue (A5-01).
+  // Si seguono solo i cambi veri di `iniziale`: in sviluppo (StrictMode) l'effetto gira due volte
+  // al montaggio e il secondo giro sovrascriveva la scheda ricordata da `memoria` (§7.12).
+  const prima = useRef(iniziale);
+  useEffect(() => {
+    if (prima.current === iniziale) return;
+    prima.current = iniziale;
+    if (iniziale && schede.some((s) => s.id === iniziale)) setAttiva(iniziale);
+  }, [iniziale]);
   const vai = (id: string) => { setAttiva(id); onCambia?.(id); };
 
   function tasto(ev: KeyboardEvent) {

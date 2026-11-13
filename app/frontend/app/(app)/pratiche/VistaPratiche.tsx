@@ -6,13 +6,14 @@ import { Aggiornamenti } from '@/componenti/Aggiornamenti';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Pagina, Pannello } from '@/componenti/Pagina';
-import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
+import { avviso, Stato } from '@/componenti/Piccoli';
 import { useSagome } from '@/componenti/Sagoma';
 import { api } from '@/lib/api';
 import { cliente, fornitore, subagente } from '@/lib/entita';
 import { useEventi } from '@/lib/eventi';
 import { euro, euroSegno } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
+import { ETICHETTA_PRATICA, type StatoPratica } from '@/lib/stati';
 
 // Elenco pratiche (F2-A1, §7.2): filtri, conteggi dei segmenti, ordinamento e pagine arrivano dal
 // server (D-23, V12). Qui si compone soltanto: nessun calcolo nel browser.
@@ -27,7 +28,7 @@ interface Pratica {
   subagente: string | null;
   data: string;
   importo: number;
-  stato: 'scaduta' | 'attesa' | 'confermata' | 'fatturata';
+  stato: StatoPratica;
   nota: string | null;
   variazioni: boolean;
   variazione: number;
@@ -50,12 +51,6 @@ const STATI: { value: string; label: string }[] = [
   { value: 'fatturata', label: 'Fatturate' },
   { value: 'variazioni', label: 'Con variazioni' },
 ];
-const ETICHETTA: Record<Pratica['stato'], { testo: string; v: Variante }> = {
-  scaduta: { testo: 'Conferma in ritardo', v: 'errore' },
-  attesa: { testo: 'Attesa conferma', v: 'attesa' },
-  confermata: { testo: 'Confermata', v: 'info' },
-  fatturata: { testo: 'Fatturata', v: 'ok' },
-};
 
 export function VistaPratiche() {
   const router = useRouter();
@@ -131,7 +126,7 @@ export function VistaPratiche() {
     { key: 'importo', header: 'Importo', tipo: 'euro' },
     {
       key: 'stato', header: 'Stato', cell: (p) => {
-        const s = ETICHETTA[p.stato];
+        const s = ETICHETTA_PRATICA[p.stato];
         return <><Stato v={s.v}>{s.testo}</Stato>
           {p.nota && <span className="sec-riga">{p.nota}</span>}
           {p.variazioni && <span className="sec-riga">variazioni fra le fasi

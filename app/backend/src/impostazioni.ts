@@ -301,6 +301,11 @@ export async function applica(db: Db, chiave: string, valori: Record<string, unk
     }
   }
 
+  // D-125 §19: il connettore locale non esiste ancora: non si salva finché non c'è la macchina.
+  if (chiave === 'lettura' && nuovo.connettore === 'glm_ocr_locale') {
+    throw new BadRequestException('Il connettore locale non è ancora disponibile: si legge con LlamaCloud UE (D-67)');
+  }
+
   // §6.5, §7.15: le soglie si controllano sul valore finale (nuovo o quello rimasto)
   if (chiave === 'lettura') {
     const ok = Number(nuovo.soglia_ok), bassa = Number(nuovo.soglia_bassa);

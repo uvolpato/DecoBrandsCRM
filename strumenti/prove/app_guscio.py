@@ -116,6 +116,19 @@ with sync_playwright() as p:
     ok('computer o tablet' in pg.locator('body').inner_text() and not pg.locator('.principale').is_visible(), '700 px: c’è il blocco, nessuna app')
     pg.close()
 
+    # A5-14: se /accesso/io fallisce (500, server o database giù) niente schermo bianco: pagina scura
+    # con il messaggio e il pulsante Riprova
+    pg = b.new_page(viewport={'width': 1440, 'height': 900})
+    pg.on('pageerror', lambda e: errori.append(str(e)))
+    pg.route('**/api/accesso/io', lambda route: route.fulfill(status=500, content_type='application/json', body='{}'))
+    pg.goto(BASE + '/pratiche')
+    # la scena d'attesa mostra .accesso-scena con l'indicatore: si aspetta il pulsante della pagina d'errore
+    pg.wait_for_selector('.accesso-scena button:has-text("Riprova")')
+    ok('Qualcosa non ha funzionato' in pg.locator('body').inner_text(), 'server a 500: si vede il messaggio, niente schermo bianco')
+    ok(pg.locator('.accesso-scena button:has-text("Riprova")').count() == 1, 'server a 500: c’è il pulsante Riprova')
+    pg.screenshot(path=str(USCITA / 'guscio-errore-server-1440.png'))
+    pg.close()
+
     b.close()
 
 print('\n'.join(esiti)); print('errori della pagina:', errori or 'nessuno')

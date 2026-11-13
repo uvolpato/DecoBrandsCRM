@@ -95,6 +95,9 @@ describe('GET /api/liquidazioni', () => {
       expect(b.senza_documenti).toBe(M.S.subagenti.length - attesi.length);
       expect(b.riepilogo.bloccanti).toBe(loro.filter((r: any) => !r.liquidabile && !r.incasso).length);
       expect(b.trimestri[t - 1].totale).toBe(b.riepilogo.provvigione);
+      // totali degli importi dal server (D-126 §19): il piede li mostra senza sommare
+      expect(b.totali.subagenti.provvigione).toBe(b.riepilogo.provvigione);
+      expect(b.totali.documenti.provvigione).toBeCloseTo(M.r2(loro.reduce((s: number, r: any) => s + r.provvigione, 0)), 2);
       // i documenti del trimestre: stessi numeri del prototipo, nomi risolti e stato deciso dal server (V12)
       expect(b.documenti.map((x: any) => [x.numero, x.tipo, x.data, x.cliente, x.fornitore, x.subagente, x.codice_cliente, x.imponibile, x.pct, x.provvigione, x.liquidabile, x.incasso, x.voce]))
         .toEqual(loro.map((r: any) => [r.doc.numero, r.doc.tipo, r.doc.data, M.nomeCliente(r.cliente), r.fornitore.nome, M.subagente(r.subagente_id).nome, r.codice_cliente, r.importo, r.pct, r.provvigione, r.liquidabile, r.incasso, r.voce ?? null]));
@@ -196,6 +199,8 @@ describe('GET /api/liquidazione/report', () => {
     }).sort((x: any, y: any) => y[5] - x[5]);
     expect(b.precedente).toEqual({ anno: 2026, trimestre: 2 });
     expect(b.subagenti.map((s: any) => [s.nome, s.clienti, s.documenti, s.fatturato, s.prese, s.pagate, s.margine, s.quota, s.delta])).toEqual(j(attesi));
+    // totali degli importi dal server (D-126 §19), uguali alla sintesi del trimestre
+    expect(b.totali).toEqual({ fatturato: an.totale.fatturato, pagate: an.totale.pagate, margine: an.totale.margine });
   });
 
   it('un subagente: numeri con confronto, trimestri dell’anno senza i futuri, primi 5 clienti', async () => {
@@ -503,3 +508,22 @@ describe('chiusura del trimestre', () => {
   });
 });
 
+
+describe('due chiusure insieme (V13, D-36)', () => {
+  it('una 200 e una 409: una sola liquidazione, i documenti legati una volta', async () => {
+    // aprile 2027: il 4° trimestre 2026 è chiuso dalla prova sopra, il 1° 2027 si può chiudere
+    jest.useFakeTimers({ now: new Date('2027-04-10T10:00:00Z'), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance'] });
+    try {
+      const r = await entra('resp-liq');
+      const atteso = (await r.get('/liquidazioni?anno=2027&trimestre=1').expect(200)).body.riepilogo.liquidabili as number;
+      const esiti = await Promise.allSettled([r.post('/liquidazioni/2027/1/chiudi'), r.post('/liquidazioni/2027/1/chiudi')]);
+      const stati = esiti.map((e) => (e.status === 'fulfilled' ? e.value.status : 0)).sort();
+      expect(stati).toEqual([200, 409]);
+      const liq = await db.liquidazioni.findUniqueOrThrow({ where: { anno_trimestre: { anno: 2027, trimestre: 1 } } });
+      expect(await db.liquidazioni.count({ where: { anno: 2027, trimestre: 1 } })).toBe(1);
+      expect(await db.ordini_fornitore_documenti.count({ where: { liquidazione_id: liq.id } })).toBe(atteso);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

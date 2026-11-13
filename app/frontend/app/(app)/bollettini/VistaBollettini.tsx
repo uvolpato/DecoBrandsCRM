@@ -6,7 +6,7 @@ import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Caricamento, Matrice } from '@/componenti/Flussi';
 import { Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
-import { PeriodoMesi } from '@/componenti/PeriodoMesi';
+import { mpiu, PeriodoMesi } from '@/componenti/PeriodoMesi';
 import { SollecitiBollettino } from '@/componenti/Solleciti';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, SagomaMatrice, useSagome } from '@/componenti/Sagoma';
@@ -21,8 +21,6 @@ import { useMemoria } from '@/lib/memoria';
 // arrivano dal server (V12); qui si compone soltanto. Le celle arrivano/gia verificate portano al
 // dettaglio (F3-A2).
 const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
-const mk = (a: number, m: number) => a + '-' + String(m).padStart(2, '0');
-const mpiu = (k: string, n: number) => { const t = Number(k.slice(0, 4)) * 12 + Number(k.slice(5, 7)) - 1 + n; return mk(Math.floor(t / 12), (t % 12) + 1); };
 const etichetta = (k: string) => MESI[Number(k.slice(5, 7)) - 1] + ' ' + k.slice(0, 4);
 
 type StatoCella = 'arrivato' | 'verificato' | 'contestato' | 'atteso' | 'ritardo' | 'in_corso' | 'nessuno';

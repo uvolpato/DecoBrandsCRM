@@ -30,10 +30,21 @@ const MESSAGGI: Record<number, string> = {
   500: 'Qualcosa non ha funzionato. Riprova; se succede ancora, avvisa l’amministratore.',
 };
 
+// Esci in corso: niente ricaricamento all'accesso mentre la chiusura non è ancora arrivata (A6-02).
+let uscendo = false;
+
 /** Sessione scaduta (timeout o chiusa altrove): si torna all'accesso con il ritorno alla pagina (D-89). */
 function allAccesso() {
-  if (typeof window === 'undefined' || window.location.pathname.startsWith('/accesso')) return;
+  if (uscendo || typeof window === 'undefined' || window.location.pathname.startsWith('/accesso')) return;
   window.location.assign('/accesso?dopo=' + encodeURIComponent(window.location.pathname));
+}
+
+/** Esci (D-53): chiude la sessione sul server e solo dopo va all'accesso, così la richiesta di uscita
+ *  non corre con le altre richieste della pagina vecchia (A6-02). */
+export async function esci() {
+  uscendo = true;
+  await api('accesso/esci', {});
+  if (typeof window !== 'undefined') window.location.replace('/accesso');
 }
 
 /** GET senza corpo, POST con il corpo; PUT e DELETE si chiedono con `metodo`. `automatico` segna le
@@ -84,7 +95,17 @@ export async function caricaPdf(file: File): Promise<Risposta<{ id: string; file
   return { ok: r.ok, stato: r.status, dati: dati as never, messaggio: r.ok ? '' : MESSAGGI[r.status] ?? (testo || MESSAGGI[500]) };
 }
 
-/** Pagina a cui tornare dopo l'accesso: solo percorsi interni (niente //sito o /\sito, D-38). */
+/** Pagina a cui tornare dopo l'accesso: solo percorsi interni (D-38). Il parser degli URL del browser
+ *  toglie TAB e a capo, così `/\t/sito` diventa `//sito` (un altro dominio): si risolve e si confronta
+ *  l'origine, invece di fidarsi di una regex sul secondo carattere (A1-04). */
 export function dopo(valore: string | null) {
-  return valore && /^\/(?![/\\])/.test(valore) && !valore.startsWith('/accesso') ? valore : '/';
+  if (!valore) return '/';
+  try {
+    if (typeof window === 'undefined') return '/';
+    const u = new URL(valore, window.location.origin);
+    if (u.origin !== window.location.origin || u.pathname.startsWith('/accesso')) return '/';
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return '/';
+  }
 }

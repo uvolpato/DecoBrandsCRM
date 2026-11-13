@@ -28,6 +28,8 @@ with sync_playwright() as p:
         pg.goto(BASE + '/utenti'); pg.wait_for_function("location.pathname === '/accesso'")
         apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
         pg.wait_for_function("location.pathname === '/utenti'"); pg.wait_for_load_state('networkidle')
+        # il guscio mostra l'indicatore d'avvio finché /accesso/io non risponde: si aspetta la pagina vera
+        pg.wait_for_selector('.avvio-gira', state='detached'); pg.wait_for_selector('.principale h1')
         return pg
     testo = lambda pg, s: pg.locator(s).first.inner_text()
     righe = lambda pg: pg.locator('.dt tbody tr.cliccabile').count()
@@ -54,7 +56,7 @@ with sync_playwright() as p:
     pg.focus('.filtri input[type=search]')
     ok(pg.evaluate("getComputedStyle(document.activeElement).outlineStyle") == 'none' and 'inset' in pg.evaluate("getComputedStyle(document.activeElement).boxShadow"), 'campo di ricerca: contorno dentro il bordo')
     pg.click('.schede-barra [role=tab]:has-text("Permessi")'); pg.wait_for_timeout(200)
-    ok(pg.locator('.schede-corpo details.permessi-area').count() == 3 and pg.locator('.schede-corpo details.permessi-area[open]').count() == 2 and pg.locator('.schede-corpo td.col-evidenza').count() == 4 + 4 + 6 + 1, 'permessi: una sezione per Sistema e per area, aperte quelle dove ha accesso, evidenziati ruolo e livelli (D-45; 15 = 5 Sistema, 4 Dati con dati.importa F1-A11, 6 Provvigioni)')
+    ok(pg.locator('.schede-corpo details.permessi-area').count() == 3 and pg.locator('.schede-corpo details.permessi-area[open]').count() == 2 and pg.locator('.schede-corpo td.col-evidenza').count() == 6 + 4 + 6, 'permessi: una sezione per Sistema e per area, aperte quelle dove ha accesso, evidenziati ruolo e livelli (D-45; 16 = 6 Sistema, 4 Dati con dati.importa F1-A11, 6 Provvigioni)')
     pg.screenshot(path=str(USCITA / 'app-utenti-1440.png'))
     pg.click('.schede-barra [role=tab]:has-text("Dati")')
 

@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createHash } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { giornoRoma } from '../src/motore/dati';
 import request from 'supertest';
@@ -11,6 +11,7 @@ import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
+import { riceviDocumento } from '../src/documenti';
 import { IntegraService } from '../src/integra';
 import * as anagraficaIntegra from '../src/anagrafica-integra';
 import * as registro from '../src/registro';
@@ -228,6 +229,22 @@ describe('POST /api/documenti/carica (canale comune)', () => {
       expect(await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: BigInt(arrivo) } })).toMatchObject({ stato: 'in_coda', abbinato_pratica_id: null });
     });
 
+    it('annullare un documento letto lo rimanda da_controllare, con i campi corretti (A4-06)', async () => {
+      const dati = pdf('letto');
+      const arrivo = BigInt((await op.carica(dati, 'letto.pdf').expect(201)).body.id);
+      // simula una lettura già avvenuta e un campo corretto a mano
+      await db.documenti_in_arrivo.update({ where: { id: arrivo }, data: { letto_il: new Date() } });
+      await db.documenti_campi.createMany({ data: [
+        { documento_id: arrivo, campo: 'numero', valore_letto: 'FT-LETTA', valore_finale: 'FT-LETTA', verificato: true },
+      ] });
+      const r = await op.post(url(), { tipo: 'fattura', numero: 'FT-LETTA', data: '2026-09-01', importo: 10, arrivo_id: Number(arrivo) }).expect(201);
+      const did = r.body.documenti.find((x: any) => x.numero === 'FT-LETTA').id;
+      await op.del(`${url()}/${did}`).expect(204);
+      expect(await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: arrivo } })).toMatchObject({ stato: 'da_controllare', abbinato_pratica_id: null });
+      // i campi corretti restano
+      expect(await db.documenti_campi.findFirstOrThrow({ where: { documento_id: arrivo, campo: 'numero' } })).toMatchObject({ valore_finale: 'FT-LETTA' });
+    });
+
     it('un file già abbinato non si riusa: lo stesso arrivo su due documenti 409', async () => {
       await op.post(url(), { tipo: 'fattura', numero: 'FT-A1', data: '2026-09-01', importo: 10, arrivo_id: Number(arrivo) }).expect(201);
       await op.post(url(), { tipo: 'fattura', numero: 'FT-A2', data: '2026-09-01', importo: 10, arrivo_id: Number(arrivo) }).expect(409);
@@ -256,7 +273,8 @@ describe('POST /api/documenti/carica (canale comune)', () => {
 
     it('fattura su più ordini: numero e data cambiano su tutte le copie insieme', async () => {
       const a = (await op.post(`/pratiche/${altra.id}/documenti`, { tipo: 'fattura', numero: 'FT-MO', data: '2026-09-01', importo: 300 }).expect(201)).body;
-      await op.post(`/pratiche/${terza.id}/documenti`, { tipo: 'fattura', numero: 'FT-MO', data: '2026-09-01', importo: 200 }).expect(201);
+      // D-123: la stessa fattura su un'altra pratica richiede la conferma multi-ordine
+      await op.post(`/pratiche/${terza.id}/documenti`, { tipo: 'fattura', numero: 'FT-MO', data: '2026-09-01', importo: 200, multi_ordine: true }).expect(201);
       const id = a.documenti.find((x: any) => x.numero === 'FT-MO').id;
       await op.put(`/pratiche/${altra.id}/documenti/${id}`, { data: '2026-09-03', numero: 'FT-MO2' }).expect(200);
       const copie = await db.ordini_fornitore_documenti.findMany({ where: { testata_id: { in: [altra.id, terza.id] }, tipo: 'fattura', numero: { startsWith: 'FT-MO' } } });
@@ -294,6 +312,67 @@ describe('POST /api/documenti/carica (canale comune)', () => {
     it('pratica inesistente: 404', async () => {
       await op.get('/pratiche/999999999/documenti').expect(404);
     });
+  });
+});
+
+describe('arrivo dello stesso file: scartati, file parziali e righe sparite (onda 3)', () => {
+  it('un file parziale con lo stesso nome viene sostituito (A4-03)', async () => {
+    const dati = pdf('parziale');
+    const hash = createHash('sha256').update(dati).digest('hex');
+    await mkdir(dirname(suDisco(hash)), { recursive: true });
+    await writeFile(suDisco(hash), Buffer.from('contenuto troncato a metà'));
+    await op.carica(dati, 'parziale.pdf').expect(201);
+    expect(createHash('sha256').update(await readFile(suDisco(hash))).digest('hex')).toBe(hash);
+  });
+
+  it('il file rimosso durante la transazione viene rimesso dopo il commit (A3-05)', async () => {
+    const dati = pdf('rimesso');
+    const hash = createHash('sha256').update(dati).digest('hex');
+    const vero = db.$transaction.bind(db);
+    const spia = jest.spyOn(db, '$transaction').mockImplementation(async (fn: any) => {
+      const r = await vero(fn);
+      await rm(suDisco(hash), { force: true }); // un'eliminazione dello stesso file, subito dopo il commit
+      return r;
+    });
+    try {
+      await op.carica(dati, 'rimesso.pdf').expect(201);
+      expect(existsSync(suDisco(hash))).toBe(true); // la riscrittura dopo il commit lo ha rimesso
+    } finally {
+      spia.mockRestore();
+    }
+  });
+
+  it('una riga scartata sparita fra la lettura e la transazione: si rifà da capo (A4-14)', async () => {
+    const dati = pdf('sparita');
+    const hash = createHash('sha256').update(dati).digest('hex');
+    const spia = jest.spyOn(db.documenti_in_arrivo, 'findUnique')
+      .mockResolvedValueOnce({ id: 999999999n, stato: 'scartato', file_percorso: `in_arrivo/2000/20000101/${hash}.pdf` } as never)
+      .mockResolvedValueOnce(null as never);
+    try {
+      const r = await riceviDocumento(db, { nome: 'sparita.pdf', dati, origine: 'caricamento' }, {});
+      if (r.esito !== 'in_coda') throw new Error('atteso in_coda');
+      const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: BigInt(r.id) } });
+      expect(riga.file_hash).toBe(hash);
+      expect(riga.stato).toBe('in_coda');
+    } finally {
+      spia.mockRestore();
+    }
+  });
+
+  it('uno scartato rimandato per email resta scartato; ricaricato a mano torna in coda (U10/D-122)', async () => {
+    const dati = pdf('u10');
+    const id = BigInt((await op.carica(dati, 'u10.pdf').expect(201)).body.id);
+    await db.documenti_in_arrivo.update({ where: { id }, data: { stato: 'scartato', scartato_il: new Date(), motivo_scarto: 'Non riguarda Decobrands' } });
+
+    // dalla casella: si ignora, lo scarto resta
+    const esito = await riceviDocumento(db, { nome: 'u10.pdf', dati, origine: 'email', email_da: 'a@x.it', email_oggetto: 'U10' }, {});
+    expect(esito).toEqual({ esito: 'ignorato', motivo: 'scartato' });
+    expect(await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } })).toMatchObject({ stato: 'scartato' });
+
+    // dal caricamento: torna in coda sulla stessa riga (D-54)
+    const r = await riceviDocumento(db, { nome: 'u10.pdf', dati, origine: 'caricamento' }, {});
+    expect(r.esito).toBe('in_coda');
+    expect(await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id } })).toMatchObject({ stato: 'in_coda', scartato_il: null });
   });
 });
 

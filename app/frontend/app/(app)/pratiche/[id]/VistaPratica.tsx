@@ -125,6 +125,7 @@ export function VistaPratica({ id }: { id: string }) {
   const [errore, setErrore] = useState('');
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [vista, setVista] = useState<'variate' | 'tutte'>('variate');
+  const [scheda, setScheda] = useState('');
   const sagome = useSagome(!d || !fiscali);
 
   const carica = useCallback(async () => {
@@ -268,7 +269,7 @@ export function VistaPratica({ id }: { id: string }) {
   const righe = d.confronto.righe;
   const mostra = vista === 'variate' && variazioni.numero ? righe.filter((r) => r.varia) : righe;
   const fatture = fiscali.documenti.filter((x) => x.tipo === 'fattura');
-  const vediRighe = () => document.querySelector<HTMLElement>('.schede-barra [data-id="righe"]')?.click();
+  const vediRighe = () => setScheda('righe');
 
   const colonneRighe: Colonna<Riga>[] = [
     {
@@ -471,7 +472,7 @@ export function VistaPratica({ id }: { id: string }) {
       azioni={azioni}>
       <div className="pila riempi">
         <Pannello senzaMargine><Binario tappe={d.fasi} /></Pannello>
-        <Schede riempi memoria={daVariazioni ? undefined : 'pratica-' + d.id} attiva={daVariazioni ? 'righe' : undefined} schede={[
+        <Schede riempi memoria={daVariazioni ? undefined : 'pratica-' + d.id} attiva={daVariazioni && !scheda ? 'righe' : scheda || undefined} onCambia={setScheda} schede={[
           { id: 'riepilogo', etichetta: 'Riepilogo', contenuto: riepilogo },
           {
             id: 'righe', etichetta: 'Righe a confronto',
@@ -499,6 +500,7 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, onChiudi
   const [attesa, setAttesa] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [arrivoId, setArrivoId] = useState<number | null>(null);
+  const [multi, setMulti] = useState<{ messaggio: string; corpo: Record<string, unknown> } | null>(null);
   const modifica = !!documento;
 
   async function invia(ev: React.FormEvent<HTMLFormElement>) {
@@ -529,10 +531,25 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, onChiudi
         corpo.storno_totale = fd.get('storno_totale') === 'on';
       }
       if (arrivo) corpo.arrivo_id = arrivo;
+      await manda(corpo);
+    } finally {
+      setAttesa(false);
+    }
+  }
+
+  async function manda(corpo: Record<string, unknown>, conferma = false) {
+    const c = conferma ? { ...corpo, multi_ordine: true } : corpo;
+    setErrore('');
+    setAttesa(true);
+    try {
       const r = modifica
-        ? await api<Fiscali>('pratiche/' + pratica + '/documenti/' + documento.id, corpo, 'PUT')
-        : await api<Fiscali>('pratiche/' + pratica + '/documenti', corpo);
-      if (!r.ok) { setErrore(r.messaggio); return; }
+        ? await api<Fiscali>('pratiche/' + pratica + '/documenti/' + documento.id, c, 'PUT')
+        : await api<Fiscali>('pratiche/' + pratica + '/documenti', c);
+      if (!r.ok) {
+        // D-123: la stessa fattura su un'altra pratica chiede la conferma multi-ordine
+        if (!modifica && r.stato === 409 && r.messaggio.includes('su più ordini')) { setMulti({ messaggio: r.messaggio, corpo }); return; }
+        setErrore(r.messaggio); return;
+      }
       await onSalvato(r.dati);
     } finally {
       setAttesa(false);
@@ -544,41 +561,45 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, onChiudi
       : tipo === 'nota_credito' ? 'Registra la nota di credito' : 'Registra un documento';
 
   return (
-    <Modale titolo={titolo} onChiudi={() => { if (!attesa) onChiudi(); }} piede={<>
-      <button type="button" className="btn sec" onClick={onChiudi} disabled={attesa}>Annulla</button>
-      <button type="submit" form={id} className="btn" disabled={attesa}>{attesa ? 'Attendi…' : modifica ? 'Salva' : 'Registra'}</button>
-    </>}>
-      <form id={id} className="modulo modulo-2" onSubmit={invia} noValidate>
-        {scelta && (
-          <Campo nome="tipo" etichetta="Tipo di documento" tipo="select" largo valore={tipo}
-            opzioni={scelta.map((t) => ({ value: t, label: TIPO[t] }))}
-            aiuto="Numero e data sono obbligatori solo per l'ordine; per gli altri numero facoltativo, data di oggi." />
-        )}
-        {!modifica && tipo === 'nota_credito' && (
-          <Campo nome="fattura_id" etichetta="Fattura stornata" tipo="select" largo valore={fatture[0]?.id}
-            opzioni={fatture.map((f) => ({ value: f.id, label: f.numero + ' del ' + dataIt(f.data) + ' · residuo ' + euro(f.residuo ?? 0) }))} />
-        )}
-        <Campo nome="numero" etichetta="Numero" valore={documento?.numero ?? ''} />
-        <Campo nome="data" etichetta="Data" tipo="data" valore={documento?.data ?? oggi()} />
-        <Campo nome="importo" etichetta="Importo in €" valore={documento ? String(Math.abs(documento.importo)) : ''}
-          aiuto={scelta ? 'Facoltativo: non tocca il netto né la provvigione.'
-            : tipo === 'nota_credito' ? 'Positivo: il server lo registra come storno.' : 'Lordo della fattura.'} />
-        {!modifica && tipo === 'nota_credito' && (
-          <Campo nome="storno_totale" etichetta="Storna tutta la fattura" tipo="casella" largo
-            aiuto="L'importo lo calcola il server su quello che resta da stornare." />
-        )}
-        <Campo nome="note" etichetta="Note" valore={documento?.note ?? ''} largo />
-        {!modifica && (
-          <div className="campo largo">
-            <label>PDF o foto (facoltativo)</label>
-            <Caricamento titolo="Allega il file" testo="Un PDF o una foto (JPEG, PNG); il server controlla che sia un documento."
-              accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => { setFile(f[0] ?? null); setArrivoId(null); }} />
-            {file && <span className="aiuto">{file.name}</span>}
-          </div>
-        )}
-        <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
-      </form>
-    </Modale>
+    <>
+      <Modale titolo={titolo} onChiudi={() => { if (!attesa) onChiudi(); }} piede={<>
+        <button type="button" className="btn sec" onClick={onChiudi} disabled={attesa}>Annulla</button>
+        <button type="submit" form={id} className="btn" disabled={attesa}>{attesa ? 'Attendi…' : modifica ? 'Salva' : 'Registra'}</button>
+      </>}>
+        <form id={id} className="modulo modulo-2" onSubmit={invia} noValidate>
+          {scelta && (
+            <Campo nome="tipo" etichetta="Tipo di documento" tipo="select" largo valore={tipo}
+              opzioni={scelta.map((t) => ({ value: t, label: TIPO[t] }))}
+              aiuto="Numero e data sono obbligatori solo per l'ordine; per gli altri numero facoltativo, data di oggi." />
+          )}
+          {!modifica && tipo === 'nota_credito' && (
+            <Campo nome="fattura_id" etichetta="Fattura stornata" tipo="select" largo valore={fatture[0]?.id}
+              opzioni={fatture.map((f) => ({ value: f.id, label: f.numero + ' del ' + dataIt(f.data) + ' · residuo ' + euro(f.residuo ?? 0) }))} />
+          )}
+          <Campo nome="numero" etichetta="Numero" valore={documento?.numero ?? ''} />
+          <Campo nome="data" etichetta="Data" tipo="data" valore={documento?.data ?? oggi()} />
+          <Campo nome="importo" etichetta="Importo in €" valore={documento ? String(Math.abs(documento.importo)) : ''}
+            aiuto={scelta ? 'Facoltativo: non tocca il netto né la provvigione.'
+              : tipo === 'nota_credito' ? 'Positivo: il server lo registra come storno.' : 'Lordo della fattura.'} />
+          {!modifica && tipo === 'nota_credito' && (
+            <Campo nome="storno_totale" etichetta="Storna tutta la fattura" tipo="casella" largo
+              aiuto="L'importo lo calcola il server su quello che resta da stornare." />
+          )}
+          <Campo nome="note" etichetta="Note" valore={documento?.note ?? ''} largo />
+          {!modifica && (
+            <div className="campo largo">
+              <label>PDF o foto (facoltativo)</label>
+              <Caricamento titolo="Allega il file" testo="Un PDF o una foto (JPEG, PNG); il server controlla che sia un documento."
+                accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => { setFile(f[0] ?? null); setArrivoId(null); }} />
+              {file && <span className="aiuto">{file.name}</span>}
+            </div>
+          )}
+          <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
+        </form>
+      </Modale>
+      {multi && <Conferma titolo={'La ' + TIPO[tipo].toLowerCase() + ' è già su un’altra pratica'} testo={multi.messaggio}
+        etichetta="Conferma" onRisposta={(si) => { setMulti(null); if (si) void manda(multi.corpo, true); }} />}
+    </>
   );
 }
 

@@ -172,6 +172,8 @@ with sync_playwright() as p:
             pg.locator('.dt tbody tr.cliccabile').nth(i).click(); break
     pg.wait_for_timeout(600); scheda(pg, 'Pratiche'); pg.wait_for_timeout(400)
     ok(pg.locator('.schede-corpo .dt tbody tr.cliccabile, .schede-corpo .dt tbody tr').count() >= 1 and 'Nessuna pratica' not in testo(pg, '.schede-corpo'), 'cliente con pratiche aperte: la scheda Pratiche le mostra')
+    # A5-18: importo in euro e stato con l'etichetta, non il codice interno
+    ok('€' in testo(pg, '.schede-corpo .dt tbody'), 'scheda Pratiche: importo formattato in euro')
     pg.screenshot(path=str(USCITA / 'app-clienti-pratiche-1440.png'))
 
     # elimina le due agenzie di prova

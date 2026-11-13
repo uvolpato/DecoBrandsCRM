@@ -95,7 +95,7 @@ describe('GET /api/bollettini/:id', () => {
     for (const [i, id] of ids.entries()) {
       const b = (await lett.get(`/bollettini/${id}`).expect(200)).body;
       const pb = M.S.bollettini[i], x = M.riconcilia(pb);
-      const forma = (y: any) => [y.numero, y.categoria, y.loro?.importo ?? null, y.noi?.importo ?? null, y.differenza ?? null, !!y.aperta, !!y.incasso, !!y.pagamento];
+      const forma = (y: any) => [y.numero, y.categoria, y.loro?.importo ?? null, y.noi?.importo ?? null, y.differenza ?? y.loro?.importo ?? null, !!y.aperta, !!y.incasso, !!y.pagamento];
       expect([b.mese, b.anno, b.stato, b.totali.riconosciuto, b.totali.calcolato, b.totali.differenza, b.totali.aperte])
         .toEqual([pb.mese, pb.anno, pb.stato, x.riconosciuto, x.atteso, x.differenza, x.aperte]);
       expect(b.righe.map(forma)).toEqual(JSON.parse(JSON.stringify(x.righe.map(forma))));
@@ -108,6 +108,11 @@ describe('GET /api/bollettini/:id', () => {
     const gasper = (await lett.get(`/bollettini/${await bollettino('Gasper', 8)}`).expect(200)).body;
     expect(riga(gasper, 'F-2026-0822')).toMatchObject({ categoria: 'storno', gruppo: 'incassi', scelte: [] });
     expect(riga(gasper, 'F-2026-0933')).toMatchObject({ categoria: 'mancante', id: null, scelte: ['attendere', 'contestato'] });
+    // D-126: la differenza riga per riga arriva dal server; su una riga sconosciuta vale l'importo del fornitore
+    const ing = (await lett.get(`/bollettini/${await bollettino('Ing', 8)}`).expect(200)).body;
+    const sconosciuta = ing.righe.find((x: any) => x.categoria === 'sconosciuta');
+    expect(sconosciuta).toBeDefined();
+    expect(sconosciuta.differenza).toBe(sconosciuta.loro.importo);
   });
 
   it('caricamento solo del bollettino = caricamento completo', async () => {
@@ -306,10 +311,29 @@ describe('contestazione (Ing\'s agosto)', () => {
     await op.put(`/bollettini/${id}/stato`, { stato: 'verificato' }).expect(409);
     const b = (await op.put(`/bollettini/${id}/stato`, { stato: 'contestato' }).expect(200)).body;
     expect([b.stato, b.azione.tipo]).toEqual(['contestato', 'chiuso']);
+    // D-119 §19: il contestato non aspetta un bollettino rettificato, ma le correzioni nel bollettino del mese dopo
+    expect(b.azione.testo).toBe('Bollettino contestato: le correzioni del fornitore arrivano nel bollettino di settembre 2026.');
     expect(await ultimaChiusura(db, await fornitore('Ing'))).toBe('2026-08-31');
   });
 
   it('dopo le scritture il caricamento parziale resta uguale al completo', async () => {
     expect(await coerenza()).toBe(7);
+  });
+});
+
+describe('due chiusure insieme (V13, D-36)', () => {
+  it('una 200 e una 409: il bollettino si chiude una volta, con un solo evento', async () => {
+    const gries = await fornitore('Gries');
+    const f = await db.fornitori.findUniqueOrThrow({ where: { id: gries } });
+    // ottobre 2026: nessuna riga e nessun documento, si chiude senza decisioni (i bollettini del seed restano 7)
+    const id = (await db.bollettini_testata.create({ data: { fornitore_id: gries, fornitore_versione_id: f.versione_corrente_id!, mese: 10, anno: 2026 } })).id;
+    const esiti = await Promise.allSettled([
+      op.put(`/bollettini/${id}/stato`, { stato: 'verificato' }),
+      op.put(`/bollettini/${id}/stato`, { stato: 'verificato' }),
+    ]);
+    const stati = esiti.map((e) => (e.status === 'fulfilled' ? e.value.status : 0)).sort();
+    expect(stati).toEqual([200, 409]);
+    expect((await db.bollettini_testata.findUniqueOrThrow({ where: { id } })).stato).toBe('verificato');
+    expect(await eventi('stato.change_state', id)).toBe(1);
   });
 });

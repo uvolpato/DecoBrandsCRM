@@ -34,7 +34,7 @@ export interface DataTableProps<R> {
   rowClass?: (r: R) => string;
   onRowClick?: (r: R) => void;
   compatta?: boolean;
-  naturale?: boolean; // altezza del contenuto, senza pagine (tabelle brevi impilate)
+  naturale?: boolean; // altezza del contenuto; la paginazione resta (§16.4: sempre attiva)
   emptyText?: string;
   emptyHint?: string;
   perPagina?: number | false; // false: senza pagine
@@ -42,6 +42,10 @@ export interface DataTableProps<R> {
   piede?: ReactNode;
   etichettaTotale?: string;
   memoria?: string;
+  // Totali delle colonne importo calcolati dal server (V12, D-126 §19): con questo prop il piede li
+  // mostra senza sommare; `totale:'somma'` resta solo il segnaposto della colonna e il `reduce` vale
+  // per le colonne che non sono importi.
+  totali?: Record<string, number>;
   // ordinamento e pagine decisi dal server (elenchi grandi): con onOrdine, `ordine` è quello del
   // server e le intestazioni chiedono il nuovo ordine invece di ordinare la pagina mostrata; con
   // paginaServer il piede usa totale e pagine del server.
@@ -57,9 +61,9 @@ const FORMATI: Record<TipoColonna, (v: unknown) => string> = {
 };
 const ordinale = (v: unknown) => (typeof v === 'number' ? v : String(v ?? '').toLowerCase());
 
-export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp, filtro, naturale, piede, etichettaTotale, memoria, ordine, onOrdine, paginaServer, onPagina, caricando }: DataTableProps<R>) {
+export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowClass, onRowClick, compatta, emptyText = 'Nessun elemento', emptyHint = '', perPagina: pp, filtro, naturale, piede, etichettaTotale, memoria, totali, ordine, onOrdine, paginaServer, onPagina, caricando }: DataTableProps<R>) {
   const io = useUtente();
-  const perPagina = naturale || pp === false ? Number.MAX_SAFE_INTEGER : (pp ?? io.righe_pagina ?? 25); // §7.15: righe per pagina dalle impostazioni
+  const perPagina = pp === false ? Number.MAX_SAFE_INTEGER : (pp ?? io.righe_pagina ?? 25); // §7.15: righe per pagina dalle impostazioni; `naturale` cambia solo l'altezza (A5-07)
   const [ord, setOrd] = useMemoria(memoria && memoria + '|ord', ordinamentoIniziale ?? null);
   const [pag, setPag] = useMemoria(memoria && memoria + '|pagina', 0);
   const scorri = useScorrimento<HTMLDivElement>(memoria, righe.length > 0);
@@ -98,16 +102,22 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
           <tr>
             {colonne.map((c) => {
               const ordinabile = c.sortable !== false, attivo = o?.key === c.key;
+              const ordina = () => {
+                const nuovo = { key: c.key, dir: attivo && o!.dir === 'asc' ? 'desc' as const : 'asc' as const };
+                if (onOrdine) onOrdine(nuovo);
+                else { setOrd(nuovo); setPag(0); }
+              };
               return (
                 <th key={c.key} className={[al(c), ordinabile ? 'ordinabile' : '', attivo ? 'attivo' : ''].join(' ')}
                   aria-sort={ordinabile ? (attivo ? (o!.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
-                  onClick={ordinabile ? () => {
-                    const nuovo = { key: c.key, dir: attivo && o!.dir === 'asc' ? 'desc' as const : 'asc' as const };
-                    if (onOrdine) onOrdine(nuovo);
-                    else { setOrd(nuovo); setPag(0); }
-                  } : undefined}>
-                  {c.header}
-                  {ordinabile && <span className="freccia" aria-hidden="true">{attivo ? (o!.dir === 'asc' ? '▲' : '▼') : '▲▼'}</span>}
+                  onClick={ordinabile ? ordina : undefined}>
+                  {/* A7-04: il pulsante porta l'ordinamento anche da tastiera; il clic sul th resta per il mouse */}
+                  {ordinabile
+                    ? <button type="button" className="dt-ordina" onClick={(e) => { e.stopPropagation(); ordina(); }}>
+                        {c.header}
+                        <span className="freccia" aria-hidden="true">{attivo ? (o!.dir === 'asc' ? '▲' : '▼') : '▲▼'}</span>
+                      </button>
+                    : <>{c.header}</>}
                 </th>
               );
             })}
@@ -121,8 +131,12 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
               </td>)}
             </tr>
           )) : lista.length ? lista.map((r) => (
-            <tr key={chiave(r)} className={[onRowClick ? 'cliccabile' : '', rowClass?.(r) ?? ''].join(' ')}
-              onClick={onRowClick ? (e) => { if (!(e.target as Element).closest('a, button')) onRowClick(r); } : undefined}>
+            <tr key={chiave(r)} tabIndex={onRowClick ? 0 : undefined}
+              className={[onRowClick ? 'cliccabile' : '', rowClass?.(r) ?? ''].join(' ')}
+              onClick={onRowClick ? (e) => { if (!(e.target as Element).closest('a, button')) onRowClick(r); } : undefined}
+              onKeyDown={onRowClick ? (e) => { // A7-05: Invio o Spazio aprono la riga, come `Elenco`
+                if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onRowClick(r); }
+              } : undefined}>
               {colonne.map((c) => <td key={c.key} className={[al(c), c.grow ? 'cresce' : '', c.classe?.(r) ?? ''].join(' ')}>
                 {c.cell ? c.cell(r) : FORMATI[tipo(c)](val(c, r))}
               </td>)}
@@ -132,7 +146,7 @@ export function DataTable<R>({ righe, colonne, chiave, ordinamentoIniziale, rowC
         {tutte.length > 0 && primoTotale >= 0 && <tfoot><tr>
           <td colSpan={Math.max(1, primoTotale)}>{etichettaTotale ?? 'Totale'}</td>
           {colonne.slice(Math.max(1, primoTotale)).map((c) => <td key={c.key} className={al(c)}>
-            {c.totale ? FORMATI[tipo(c) === 'testo' ? 'numero' : tipo(c)](tutte.reduce((s, r) => s + (Number(val(c, r)) || 0), 0)) : ''}
+            {c.totale ? FORMATI[tipo(c) === 'testo' ? 'numero' : tipo(c)](totali?.[c.key] ?? tutte.reduce((s, r) => s + (Number(val(c, r)) || 0), 0)) : ''}
           </td>)}
         </tr></tfoot>}
       </table>

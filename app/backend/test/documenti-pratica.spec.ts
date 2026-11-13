@@ -166,6 +166,16 @@ describe('abbinamento a mano (POST /api/documenti/:id/abbina)', () => {
     await op.post(`/documenti/${g.id}/abbina`, { tipo: 'fattura', numero: 'RE-900', data: '2026-09-03', importo: 1, pratica_id: Number(pid) }).expect(409);
   });
 
+  it('la stessa fattura su un\'altra pratica: 409 senza conferma, 201 con multi_ordine (D-123)', async () => {
+    const corpo = { tipo: 'fattura', numero: 'RE-900', data: '2026-09-03', importo: 100 };
+    const no = (await op.post(`/pratiche/${base.id}/documenti`, corpo).expect(409)).body;
+    expect(no.message).toMatch(/su più ordini/);
+    await op.post(`/pratiche/${base.id}/documenti`, { ...corpo, multi_ordine: true }).expect(201);
+    // pulizia: la fattura multi-ordine non deve restare sulla pratica del seed
+    const creata = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { testata_id: base.id, tipo: 'fattura', numero: 'RE-900' } });
+    await op.elimina(`/pratiche/${base.id}/documenti/${creata.id}`).expect(204);
+  });
+
   it('proforma: fa avanzare la pratica a confermata, senza effetto su importo e provvigioni', async () => {
     const a = (await op.carica(pdf('ordine C'), 'c.pdf').expect(201)).body;
     const n = (await op.post(`/documenti/${a.id}/abbina`, {
@@ -352,5 +362,43 @@ describe('correzioni dopo la revisione (D-60)', () => {
     const t = await db.ordini_fornitore_testata.findUniqueOrThrow({ where: { id: BigInt(pid) } });
     const ordini = await db.ordini_fornitore_documenti.findMany({ where: { testata_id: t.id, tipo: 'ordine' }, orderBy: { data: 'asc' } });
     expect(t.data_ordine.toISOString().slice(0, 10)).toBe(ordini[0].data.toISOString().slice(0, 10));
+  });
+});
+
+describe('lo stesso file abbinato a due pratiche insieme (V13, D-36)', () => {
+  it('uno solo riesce: una 201 e una 409, il file va su una pratica sola', async () => {
+    const pratiche = await db.ordini_fornitore_testata.findMany({ where: { fornitore_id: base.fornitore_id }, orderBy: { id: 'asc' }, take: 2, select: { id: true } });
+    expect(pratiche.length).toBeGreaterThan(1);
+    const a = (await op.carica(pdf('ordine conteso'), 'conteso.pdf').expect(201)).body;
+    const corpo = (pratica_id: bigint) => ({ tipo: 'ordine', numero: 'AB 9999/26', data: '2026-09-02', importo: 10, pratica_id: Number(pratica_id) });
+    const esiti = await Promise.allSettled([
+      op.post(`/documenti/${a.id}/abbina`, corpo(pratiche[0].id)),
+      op.post(`/documenti/${a.id}/abbina`, corpo(pratiche[1].id)),
+    ]);
+    const stati = esiti.map((e) => (e.status === 'fulfilled' ? e.value.status : 0)).sort();
+    expect(stati).toEqual([201, 409]);
+    expect(await db.ordini_fornitore_documenti.count({ where: { arrivo_id: BigInt(a.id) } })).toBe(1);
+    const x = await arrivo(a.id);
+    expect(x.stato).toBe('abbinato');
+    expect([pratiche[0].id, pratiche[1].id]).toContain(x.abbinato_pratica_id!);
+  });
+});
+
+describe('totali delle righe dal server (D-126)', () => {
+  it('il dettaglio porta importo e provvigione sommati dal server, non dal browser', async () => {
+    const d = await db.documenti_in_arrivo.create({ data: {
+      origine: 'caricamento', file_nome: 'totali.pdf', file_hash: 'c'.repeat(64), file_percorso: 'in_arrivo/totali.pdf',
+      stato: 'da_controllare', tipo: 'fattura', livello: 'affidabile',
+    } });
+    await db.documenti_campi.createMany({ data: [
+      { documento_id: d.id, campo: 'numero', valore_letto: 'F-TOT' },
+      { documento_id: d.id, campo: 'righe[0].importo', valore_letto: '10' },
+      { documento_id: d.id, campo: 'righe[0].provvigione', valore_letto: '1' },
+      { documento_id: d.id, campo: 'righe[1].importo', valore_letto: '0.5' },
+      { documento_id: d.id, campo: 'righe[1].provvigione', valore_letto: '0.25' },
+    ] });
+    const r = (await op.get(`/documenti/${d.id}`).expect(200)).body;
+    expect(r.totali).toEqual({ importo: 10.5, provvigione: 1.25 });
+    expect(r.righe).toHaveLength(2);
   });
 });

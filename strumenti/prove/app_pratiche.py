@@ -91,6 +91,17 @@ with sync_playwright() as p:
     pg.wait_for_function("() => document.querySelector('.dt th.attivo')?.getAttribute('aria-sort') === 'descending'")
     pg.wait_for_function("""() => { const v = [...document.querySelectorAll('.dt tbody tr.cliccabile')].map(r => Number((r.children[4]?.textContent || '').replace(/[^0-9,-]/g, '').replace('.', '').replace(',', '.'))); return v.length && v.every((x, i) => i === 0 || v[i-1] >= x); }""")
     ok(importi(pg) == sorted(importi(pg), reverse=True), 'secondo clic: importo decrescente')
+
+    # A7-04: intestazione ordinabile da tastiera (WCAG 2.1.1): fuoco sul pulsante, Invio ordina
+    testa = pg.locator('.dt th:has-text("Importo") .dt-ordina')
+    with pg.expect_request(lambda r: '/api/pratiche?' in r.url and 'ordina=importo' in r.url):
+        testa.focus(); pg.keyboard.press('Enter')
+    pg.wait_for_function("() => document.querySelector('.dt th.attivo')?.getAttribute('aria-sort') === 'ascending'")
+    ok(pg.locator('.dt th.attivo:has-text("Importo")').count() == 1, 'intestazione da tastiera: Invio ordina per importo crescente')
+    pg.keyboard.press('Enter')
+    pg.wait_for_function("() => document.querySelector('.dt th.attivo')?.getAttribute('aria-sort') === 'descending'")
+    ok(pg.locator('.dt th.attivo:has-text("Importo")').get_attribute('aria-sort') == 'descending',
+       'intestazione da tastiera: secondo Invio, decrescente')
     prima_dec = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
 
     # pagina successiva, sempre sull'ordinamento scelto
@@ -109,6 +120,19 @@ with sync_playwright() as p:
     pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(900)
     ok(pg.url == url and testo(pg, '.dt-piede > span:first-child').startswith('26–'), 'indietro: stessa pagina dell’elenco')
     ok(pg.locator('.dt th.attivo:has-text("Importo")').get_attribute('aria-sort') == 'descending', 'indietro: stesso ordinamento')
+
+    # A7-05: le righe si aprono da tastiera (WCAG 2.1.1): Tab fino a una riga, Invio apre la pratica
+    pg.locator('.testa h1').click()  # il fuoco riparte dal principio della pagina
+    raggiunta = False
+    for _ in range(80):
+        pg.keyboard.press('Tab')
+        if pg.evaluate("() => !!document.activeElement?.matches('tr.cliccabile')"):
+            raggiunta = True; break
+    ok(raggiunta, 'Tab raggiunge una riga dell’elenco')
+    pg.keyboard.press('Enter')
+    pg.wait_for_function("/^\\/pratiche\\/\\d+/.test(location.pathname)"); pg.wait_for_selector('.binario')
+    ok(re.search(r'/pratiche/\d+', pg.url) is not None, 'Invio su una riga: si apre la pratica')
+    pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(900)
 
     # 768 px
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(500)

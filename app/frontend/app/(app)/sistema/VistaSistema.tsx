@@ -65,10 +65,21 @@ export function VistaSistema() {
   const [caricando, setCaricando] = useState(true);
   const [controllando, setControllando] = useState(false);
   const [versione, setVersione] = useState(0);
+  const [versioneApp, setVersioneApp] = useState<{ numero: string; commit: string | null } | null>(null);
   const sagome = useSagome(caricando && !dati);
   const stretto = useStretto();
 
   const poll = useRef(false);
+
+  // la versione dell'app (13/11/2026): numero e commit letti dal server, così si sa su quale
+  // versione è arrivata una segnalazione
+  useEffect(() => {
+    let vivo = true;
+    void api<{ numero: string; commit: string | null }>('versione').then((r) => {
+      if (vivo && r.ok) setVersioneApp(r.dati);
+    });
+    return () => { vivo = false; };
+  }, []);
 
   const ricarica = () => setVersione((v) => v + 1);
 
@@ -202,6 +213,7 @@ export function VistaSistema() {
             </Pannello>
           </div>
         </div>
+        {versioneApp && <div className="testo-tenue piccolo">Versione {versioneApp.numero}{versioneApp.commit ? ` (${versioneApp.commit})` : ''}</div>}
       </div>
     </Pagina>
   );

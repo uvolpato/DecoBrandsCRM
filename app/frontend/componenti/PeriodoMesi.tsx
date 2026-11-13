@@ -7,8 +7,8 @@ import { Icona } from './Icona';
 // mesi con dati (primo…ultimo). Mesi come 'aaaa-mm'. `da` lo tiene chi usa il componente (con
 // useMemoria si ritrova tornando alla pagina, §7.12).
 const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
-const mk = (a: number, m: number) => a + '-' + String(m).padStart(2, '0');
-const mpiu = (k: string, n: number) => { const t = Number(k.slice(0, 4)) * 12 + Number(k.slice(5, 7)) - 1 + n; return mk(Math.floor(t / 12), t % 12 + 1); };
+export const mk = (a: number, m: number) => a + '-' + String(m).padStart(2, '0');
+export const mpiu = (k: string, n: number) => { const t = Number(k.slice(0, 4)) * 12 + Number(k.slice(5, 7)) - 1 + n; return mk(Math.floor(t / 12), t % 12 + 1); };
 const etichetta = (k: string) => MESI[Number(k.slice(5, 7)) - 1] + ' ' + k.slice(0, 4);
 
 export function completaPeriodo(da: string, n: number, primo: string, ultimo: string) {

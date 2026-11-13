@@ -55,6 +55,7 @@ with sync_playwright() as p:
     pg.wait_for_function("location.pathname === '/'"); pg.wait_for_selector('.barra-piede .io b')
     ok(pg.locator('.barra-piede .io b').inner_text() == 'Prova Nuovo', 'dopo il cambio si entra')
     esci(pg)
+    ok(pg.evaluate("async () => (await fetch('/api/accesso/io')).status") == 401, 'dopo Esci la sessione è chiusa subito (401 senza attese)')
     pg.goto(BASE + '/'); pg.wait_for_function('f => (location.pathname + location.search).includes(f)', arg='/accesso?dopo=')
     ok(True, 'dopo Esci la sessione non vale più')
     entra(U + '@prova-e2e.it', 'nuova-password-1'); pg.wait_for_function("location.pathname === '/'")
@@ -85,6 +86,11 @@ with sync_playwright() as p:
     esci(pg)
     pg.goto(BASE + '/accesso?dopo=//esempio.com'); entra(U, 'nuova-password-2'); pg.wait_for_function("location.pathname === '/'")
     ok(pg.url == BASE + '/', 'ritorno verso un altro sito ignorato')
+    # A1-04: anche i caratteri che il parser del browser toglie (TAB, a capo, barra rovescia) non escono dall'app
+    for cattivo in ['%2F%09%2Fexample.com', '%2F%0A%2Fexample.com', '%2F%5C%2Fexample.com']:
+        esci(pg)
+        pg.goto(BASE + '/accesso?dopo=' + cattivo); entra(U, 'nuova-password-2'); pg.wait_for_function("location.pathname === '/'")
+        ok(pg.url == BASE + '/', 'ritorno malizioso ignorato (%s): resta nell\'app' % cattivo)
     pg.goto(BASE + '/accesso'); pg.wait_for_function("location.pathname === '/'")
     ok(True, "già dentro: /accesso porta all'app")
     pg.goto(BASE + '/accesso/esci'); pg.wait_for_function("location.pathname === '/accesso'")

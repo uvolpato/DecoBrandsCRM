@@ -1,8 +1,8 @@
 # Prova della pagina Impostazioni dell'app (F5-A6, §7.15, D-65) con Playwright: sei sezioni,
 # salvataggio e rilettura, password mai nel DOM né nelle risposte, errore del server per un numero
 # fuori limite, *Prova la connessione* senza 500, 1440 e 768 px.
-# Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi e <s>-lett
-# (password-di-prova, da utenti_prova.js crea <s>).
+# Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi, <s>-super
+# e <s>-lett (password-di-prova; <s>-super lo crea prep.js, gli altri utenti_prova.js).
 # Uso: python strumenti/prove/app_impostazioni.py <suffisso> <cartella schermate> [base]
 import sys, pathlib
 from playwright.sync_api import sync_playwright
@@ -28,7 +28,6 @@ with sync_playwright() as p:
     def entra(utente, percorso='/impostazioni/azienda', larghezza=1440):
         pg = b.new_page(viewport={'width': larghezza, 'height': 900 if larghezza > 800 else 1024})
         pg.on('pageerror', lambda e: errori.append(str(e)))
-        pg.on('response', lambda r: risposte.append((r.url, r.text())) if '/api/impostazioni' in r.url else None)
         pg.goto(BASE + percorso)
         pg.wait_for_function("location.pathname === '/accesso'")
         apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
@@ -49,12 +48,11 @@ with sync_playwright() as p:
     nomi = [sez.nth(i).inner_text() for i in range(6)]
     ok('Dati dell’azienda' in nomi[0] and 'Conservazione dei dati' in nomi[5], 'sezioni in ordine: azienda … conservazione')
 
-    # *Prova la connessione* su una casella non configurata: messaggio chiaro, non un 500
+    # D-115: casella, posta e Integra le cambia solo il superutente; l’amministratore le vede in sola lettura
     pg.goto(BASE + '/impostazioni/casella'); pg.wait_for_load_state('networkidle')
-    pg.locator('button:has-text("Prova la connessione")').click(); pg.wait_for_timeout(1500)
-    r = testo(pg, 'p.nota[role=status]')
-    ok('non configurata' in r or 'non riuscita' in r, 'prova casella non configurata: %s' % r)
-    ok('500' not in r and 'Qualcosa non ha funzionato' not in r, 'la prova non è un 500')
+    ok(pg.locator('button:has-text("Prova la connessione")').count() == 0, 'ammi: la casella non ha il tasto *Prova la connessione*')
+    ok(pg.locator('button:has-text("Salva casella dei documenti")').count() == 0, 'ammi: la casella non ha il tasto Salva')
+    ok(pg.locator('p.nota', has_text='Solo il superutente').count() == 1, 'ammi: la nota dice che la modifica è del solo superutente')
 
     # salvataggio dei dati dell’azienda e rilettura dopo il ricaricamento
     pg.goto(BASE + '/impostazioni/azienda'); pg.wait_for_load_state('networkidle')
@@ -70,23 +68,19 @@ with sync_playwright() as p:
     pg.fill('#c-indirizzo', 'Via dell’Industria 12, 24040 Bergamo')
     pg.locator('button:has-text("Salva dati dell’azienda")').click(); pg.wait_for_timeout(1200)
 
-    # una password salvata compare «impostata» e il valore non è nel DOM né nelle risposte
-    pg.goto(BASE + '/impostazioni/casella'); pg.wait_for_load_state('networkidle')
-    pg.fill('#c-password', 'SEGRETA-PROVA-E2E')
-    pg.locator('button:has-text("Salva casella dei documenti")').click(); pg.wait_for_timeout(1200)
-    ok('Impostazioni salvate' in testo(pg, '.avviso'), 'password salvata')
-    pg.reload(); pg.wait_for_load_state('networkidle')
-    ok('impostata' in pg.get_attribute('#c-password', 'placeholder'), 'la password salvata compare «impostata»')
-    dom = pg.content()
-    corpi = '\n'.join(b for _, b in risposte)
-    ok('SEGRETA-PROVA-E2E' not in dom and 'SEGRETA-PROVA-E2E' not in corpi,
-       'il valore della password non è nel DOM né nelle risposte')
-
     # un numero fuori limite: l’errore del server, non un salvataggio silenzioso
     pg.goto(BASE + '/impostazioni/conservazione'); pg.wait_for_load_state('networkidle')
     pg.fill('#c-righe_pagina', '500')
     pg.locator('button:has-text("Salva conservazione dei dati")').click(); pg.wait_for_timeout(1200)
     ok('da 5 a 200' in testo(pg, '.avviso'), 'numero fuori limite: l’avviso dice il limite')
+
+    # D-125: il connettore locale si vede ma è spento, col motivo; si legge con LlamaCloud UE
+    pg.goto(BASE + '/impostazioni/lettura'); pg.wait_for_load_state('networkidle')
+    opz = pg.locator('#c-connettore option[value="glm_ocr_locale"]')
+    opz.first.wait_for(state='attached')
+    ok(opz.count() == 1, 'lettura: il connettore locale resta in elenco')
+    ok(opz.first.is_disabled(), 'lettura: il connettore locale è spento')
+    ok('LlamaCloud UE (D-67)' in testo(pg, '.campo:has(#c-connettore) .aiuto'), 'lettura: l’aiuto dice perché è spento')
 
     # 1440 e 768 px: nessuno scorrimento orizzontale, nessun errore JavaScript
     pg.goto(BASE + '/impostazioni/azienda'); pg.wait_for_load_state('networkidle')
@@ -95,6 +89,30 @@ with sync_playwright() as p:
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
     ok(pg.locator('.selezionabile a').count() == 6, '768 px: le sei sezioni restano a sinistra')
     pg.screenshot(path=str(USCITA / 'app-impostazioni-768.png'), full_page=True)
+    pg.close()
+
+    # le connessioni le prova e le salva il superutente (D-115)
+    pg = entra(S + '-super', '/impostazioni/casella')
+
+    # *Prova la connessione* su una casella non configurata: messaggio chiaro, non un 500
+    pg.locator('button:has-text("Prova la connessione")').click(); pg.wait_for_timeout(1500)
+    r = testo(pg, 'p.nota[role=status]')
+    ok('non configurata' in r or 'non riuscita' in r, 'prova casella non configurata: %s' % r)
+    ok('500' not in r and 'Qualcosa non ha funzionato' not in r, 'la prova non è un 500')
+
+    # una password salvata compare «impostata» e il valore non è nel DOM né nelle risposte
+    pg.fill('#c-password', 'SEGRETA-PROVA-E2E')
+    with pg.expect_response(lambda r: '/api/impostazioni' in r.url and r.request.method == 'PUT') as attesa:
+        pg.locator('button:has-text("Salva casella dei documenti")').click()
+    risposte.append(attesa.value.text())
+    pg.wait_for_timeout(1200)
+    ok('Impostazioni salvate' in testo(pg, '.avviso'), 'password salvata')
+    pg.reload(); pg.wait_for_load_state('networkidle')
+    ok('impostata' in pg.get_attribute('#c-password', 'placeholder'), 'la password salvata compare «impostata»')
+    dom = pg.content()
+    corpi = '\n'.join(risposte)
+    ok('SEGRETA-PROVA-E2E' not in dom and 'SEGRETA-PROVA-E2E' not in corpi,
+       'il valore della password non è nel DOM né nelle risposte')
     pg.close()
 
     # chi non è amministratore vede «Pagina riservata» e non ha la voce Impostazioni

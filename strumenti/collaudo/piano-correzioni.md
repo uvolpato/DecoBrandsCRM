@@ -233,6 +233,7 @@ python3 strumenti/genera-pagine-doc.py
 - Pacchetti che rileggono codice cambiato dall'onda 0 bis (scritto nel loro «Dipende da»): 1-02, 1-03, 1-05, 1-07, 1-11, 1-19, 1-22.
 
 ### Onda 2
+- **Chiusa il 13/11/2026** (2-01…2-13; 2-14 dipendenze-lint rimandato). Fatti anche, per i documenti veri, 3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01 (e le loro documentazioni nella spec 8.80, D-115…D-126, D-150). Restano da fare: 2-14, onda 3 (3-02…3-06, 3-08, 3-10), onda 4, onda 5 (5-02, 5-03), onda 6 (6-02), onde 7 e 8. Versione 0.2.0 (tag `v0.2.0`).
 
 - `npm test` 0 KO; prove nel browser: `app_accesso.py`, `app_analisi.py`, `app_bollettini.py`, `app_clienti.py`, `app_componenti.py`, `app_documenti.py`, `app_eventi.py`, `app_fornitori.py`, `app_guscio.py`, `app_impostazioni.py`, `app_liquidazioni.py`, `app_oggi.py`, `app_pratica.py`, `app_pratiche.py`, `app_sistema.py`, `app_utenti.py`, più `app_flusso.py` e `app_f7_collaudo.py` come rete di sicurezza.
 - KO noto ammesso: `app_flusso.py:469` (A6-04 → 5-03). `app_accesso.py` lanciata 5 volte di fila senza fermarsi; `app_oggi.py` verde.

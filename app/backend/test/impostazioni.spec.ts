@@ -35,7 +35,9 @@ async function entra(utente: string) {
 let ammi: Awaited<ReturnType<typeof entra>>;
 let oper: Awaited<ReturnType<typeof entra>>;
 let lett: Awaited<ReturnType<typeof entra>>;
+let supert: Awaited<ReturnType<typeof entra>>;
 let csrf: string;
+let csrfSuper: string;
 
 beforeAll(async () => {
   process.env.SEGRETI_CHIAVE = 'chiave-di-prova-impostazioni';
@@ -48,8 +50,10 @@ beforeAll(async () => {
   await creaUtente('ammi-imp', 'amministratore', [{ area: 'provvigioni', livello: 'responsabile' }, { area: 'dati', livello: 'responsabile' }]);
   await creaUtente('oper-imp', 'utente', [{ area: 'provvigioni', livello: 'operatore' }]);
   await creaUtente('lett-imp', 'utente', [{ area: 'provvigioni', livello: 'lettura' }]);
-  [ammi, oper, lett] = await Promise.all([entra('ammi-imp'), entra('oper-imp'), entra('lett-imp')]);
+  await creaUtente('super-imp', 'superutente', []);
+  [ammi, oper, lett, supert] = await Promise.all([entra('ammi-imp'), entra('oper-imp'), entra('lett-imp'), entra('super-imp')]);
   csrf = (await ammi.get('/api/accesso/io').expect(200)).body.csrf as string;
+  csrfSuper = (await supert.get('/api/accesso/io').expect(200)).body.csrf as string;
 }, 120_000);
 
 afterAll(async () => {
@@ -78,6 +82,23 @@ describe('F5-A6 segreti', () => {
 });
 
 describe('F5-A6 rotte delle impostazioni', () => {
+  it('le connessioni (posta, casella, integra) si toccano solo dal superutente (D-115)', async () => {
+    await db.impostazioni.upsert({
+      where: { chiave: 'posta' },
+      update: { valore: { server: 'smtp.x', porta: 587, utente: 'u', password: cifra('segreta'), mittente: 'Decobrands' } },
+      create: { chiave: 'posta', valore: { server: 'smtp.x', porta: 587, utente: 'u', password: cifra('segreta'), mittente: 'Decobrands' } },
+    });
+    // un amministratore ha sistema.impostazioni ma non sistema.connessioni: 403 su ogni connessione
+    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { server: 'smtp.attaccante.example' } }).expect(403);
+    await ammi.put('/api/impostazioni/casella').set('x-csrf-token', csrf).send({ valori: { server: 'imap.attaccante.example' } }).expect(403);
+    await ammi.put('/api/impostazioni/integra').set('x-csrf-token', csrf).send({ valori: { server: 'ponte.attaccante.example' } }).expect(403);
+    // il segreto non parte: resta quello di prima
+    expect(await postaConfig(db)).toMatchObject({ server: 'smtp.x', password: 'segreta' });
+    // il superutente sì
+    await supert.put('/api/impostazioni/posta').set('x-csrf-token', csrfSuper).send({ valori: { server: 'smtp.nuovo.example', password: 'altra' } }).expect(200);
+    expect(await postaConfig(db)).toMatchObject({ server: 'smtp.nuovo.example', password: 'altra' });
+  });
+
   it('permesso: amministratore sì, operatore e sola lettura no', async () => {
     await ammi.get('/api/impostazioni').expect(200);
     for (const a of [oper, lett]) {
@@ -132,11 +153,13 @@ describe('F5-A6 rotte delle impostazioni', () => {
   it('PUT: ogni limite violato è 400 (porta, minuti, secondi, soglie, righe, eventi_mesi)', async () => {
     const put = (chiave: string, valori: Record<string, unknown>) =>
       ammi.put('/api/impostazioni/' + chiave).set('x-csrf-token', csrf).send({ valori });
-    await put('casella', { porta: 0 }).expect(400);
-    await put('casella', { porta: 70000 }).expect(400);
-    await put('casella', { minuti: 0 }).expect(400);
-    await put('casella', { minuti: 61 }).expect(400);
-    await put('integra', { secondi: 5 }).expect(400);
+    const putConn = (chiave: string, valori: Record<string, unknown>) =>
+      supert.put('/api/impostazioni/' + chiave).set('x-csrf-token', csrfSuper).send({ valori });
+    await putConn('casella', { porta: 0 }).expect(400);
+    await putConn('casella', { porta: 70000 }).expect(400);
+    await putConn('casella', { minuti: 0 }).expect(400);
+    await putConn('casella', { minuti: 61 }).expect(400);
+    await putConn('integra', { secondi: 5 }).expect(400);
     await put('lettura', { soglia_ok: 1.5 }).expect(400);
     await put('lettura', { soglia_bassa: 0.9, soglia_ok: 0.7 }).expect(400); // bassa < affidabile
     await put('lettura', { soglia_ok: 0.855 }).expect(400); // al massimo due decimali
@@ -155,13 +178,13 @@ describe('F5-A6 rotte delle impostazioni', () => {
       create: { chiave: 'casella', valore: { server: 'imap.x', porta: 993, utente: 'u', password: cifra('vecchia'), cartella: 'A', cartella_lette: 'B', minuti: 2 } },
     });
     // cambio del server senza riscrivere la password: 400 e il segreto resta (D-115 §19)
-    await ammi.put('/api/impostazioni/casella').set('x-csrf-token', csrf).send({ valori: { server: 'imap2.x', password: '' } }).expect(400);
+    await supert.put('/api/impostazioni/casella').set('x-csrf-token', csrfSuper).send({ valori: { server: 'imap2.x', password: '' } }).expect(400);
     expect((await casellaConfig(db))).toMatchObject({ server: 'imap.x', password: 'vecchia' });
     // password vuota su un campo che non individua il server: conserva la precedente
-    await ammi.put('/api/impostazioni/casella').set('x-csrf-token', csrf).send({ valori: { cartella: 'Altro', password: '' } }).expect(200);
+    await supert.put('/api/impostazioni/casella').set('x-csrf-token', csrfSuper).send({ valori: { cartella: 'Altro', password: '' } }).expect(200);
     expect((await casellaConfig(db))).toMatchObject({ server: 'imap.x', password: 'vecchia', cartella: 'Altro' });
 
-    await ammi.put('/api/impostazioni/casella').set('x-csrf-token', csrf).send({ valori: { password: 'nuova' } }).expect(200);
+    await supert.put('/api/impostazioni/casella').set('x-csrf-token', csrfSuper).send({ valori: { password: 'nuova' } }).expect(200);
     expect((await casellaConfig(db))!.password).toBe('nuova');
   });
 
@@ -171,13 +194,13 @@ describe('F5-A6 rotte delle impostazioni', () => {
       update: { valore: { server: 'smtp.x', porta: 587, utente: 'u', password: cifra('segreta'), mittente: 'Decobrands' } },
       create: { chiave: 'posta', valore: { server: 'smtp.x', porta: 587, utente: 'u', password: cifra('segreta'), mittente: 'Decobrands' } },
     });
-    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { server: 'smtp.attaccante.example' } }).expect(400);
+    await supert.put('/api/impostazioni/posta').set('x-csrf-token', csrfSuper).send({ valori: { server: 'smtp.attaccante.example' } }).expect(400);
     expect(await postaConfig(db)).toMatchObject({ server: 'smtp.x', password: 'segreta' });
-    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { porta: 2525 } }).expect(400);
-    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { utente: 'altro' } }).expect(400);
+    await supert.put('/api/impostazioni/posta').set('x-csrf-token', csrfSuper).send({ valori: { porta: 2525 } }).expect(400);
+    await supert.put('/api/impostazioni/posta').set('x-csrf-token', csrfSuper).send({ valori: { utente: 'altro' } }).expect(400);
     expect(await postaConfig(db)).toMatchObject({ server: 'smtp.x', porta: 587, utente: 'u', password: 'segreta' });
     // con la password nello stesso salvataggio il cambio passa
-    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf).send({ valori: { server: 'smtp.nuovo.example', password: 'altra' } }).expect(200);
+    await supert.put('/api/impostazioni/posta').set('x-csrf-token', csrfSuper).send({ valori: { server: 'smtp.nuovo.example', password: 'altra' } }).expect(200);
     expect(await postaConfig(db)).toMatchObject({ server: 'smtp.nuovo.example', password: 'altra' });
   });
 
@@ -191,7 +214,7 @@ describe('F5-A6 rotte delle impostazioni', () => {
 
   it('evento crud/update: entita impostazione, prima/dopo coi soli campi cambiati, mai il segreto', async () => {
     const prima = await db.registro.count({ where: { entita: 'impostazione' } });
-    await ammi.put('/api/impostazioni/posta').set('x-csrf-token', csrf)
+    await supert.put('/api/impostazioni/posta').set('x-csrf-token', csrfSuper)
       .send({ valori: { server: 'smtp.x', password: 'SEGRETISSIMO' } }).expect(200);
     const eventi = await db.registro.findMany({ where: { entita: 'impostazione' }, orderBy: { id: 'asc' } });
     expect(eventi).toHaveLength(prima + 1);
@@ -212,7 +235,7 @@ describe('F5-A6 rotte delle impostazioni', () => {
     await ammi.post('/api/impostazioni/azienda/prova').set('x-csrf-token', csrf).send({}).expect(400);
     // integra senza campi di connessione: la prova non tenta nulla e risponde 200 {ok:false}
     await db.impostazioni.update({ where: { chiave: 'integra' }, data: { valore: { server: '', database: '', utente: '', password: null, schema: 'public', secondi: 60 } } });
-    const r = await ammi.post('/api/impostazioni/integra/prova').set('x-csrf-token', csrf).send({}).expect(200);
+    const r = await supert.post('/api/impostazioni/integra/prova').set('x-csrf-token', csrfSuper).send({}).expect(200);
     expect(r.body.ok).toBe(false);
     expect(r.body.testo).toContain('non configurata');
     // lettura senza chiave: non tenta nessuna connessione
@@ -228,16 +251,17 @@ describe('F5-A6 rotte delle impostazioni', () => {
     expect(chiave).toMatchObject({ valore: null, impostata: true });
     expect(JSON.stringify(r.body)).not.toContain('llx-di-prova');
     expect(await letturaConfig(db)).toMatchObject({ connettore: 'llamacloud_eu', chiave: 'llx-di-prova', progetto: 'p1', modo: 'agentic' });
-    // il modello locale ha i suoi parametri, separati, e la prova dice che non è ancora disponibile
-    await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf)
-      .send({ valori: { connettore: 'glm_ocr_locale', locale_indirizzo: 'http://gpu:8080/v1', locale_modello: 'zai-org/GLM-OCR' } }).expect(200);
-    expect(await letturaConfig(db)).toMatchObject({ connettore: 'glm_ocr_locale', indirizzo: 'http://gpu:8080/v1', modello: 'zai-org/GLM-OCR' });
+    // D-125 §19: il connettore locale non si salva finché non esiste (400 con il motivo); resta il cloud
+    const rifiuto = await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf)
+      .send({ valori: { connettore: 'glm_ocr_locale', locale_indirizzo: 'http://gpu:8080/v1', locale_modello: 'zai-org/GLM-OCR' } }).expect(400);
+    expect(rifiuto.body.message).toContain('Il connettore locale non è ancora disponibile');
+    expect(await letturaConfig(db)).toMatchObject({ connettore: 'llamacloud_eu', chiave: 'llx-di-prova' });
+    await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf).send({ valori: { connettore: 'llamacloud_eu' } }).expect(200);
+    // uno stato vecchio col locale salvato: la prova dice che non è disponibile, senza tentare la rete
+    await db.impostazioni.update({ where: { chiave: 'lettura' }, data: { valore: { connettore: 'glm_ocr_locale', soglia_ok: 0.9, soglia_bassa: 0.7 } } });
     const prova = await ammi.post('/api/impostazioni/lettura/prova').set('x-csrf-token', csrf).send({}).expect(200);
     expect(prova.body.ok).toBe(false);
     expect(prova.body.testo).toContain('locale non è ancora disponibile');
-    // tornando al cloud la chiave salvata c'è ancora
-    await ammi.put('/api/impostazioni/lettura').set('x-csrf-token', csrf).send({ valori: { connettore: 'llamacloud_eu' } }).expect(200);
-    expect((await letturaConfig(db)) as { chiave?: string }).toMatchObject({ connettore: 'llamacloud_eu', chiave: 'llx-di-prova' });
     await db.impostazioni.delete({ where: { chiave: 'lettura' } });
     expect(await letturaConfig(db)).toBeNull();
   });
@@ -245,7 +269,7 @@ describe('F5-A6 rotte delle impostazioni', () => {
   it('GET e prova non scrivono eventi (§15.1)', async () => {
     const prima = await db.registro.count();
     await ammi.get('/api/impostazioni').expect(200);
-    await ammi.post('/api/impostazioni/integra/prova').set('x-csrf-token', csrf).send({}).expect(200);
+    await supert.post('/api/impostazioni/integra/prova').set('x-csrf-token', csrfSuper).send({}).expect(200);
     expect(await db.registro.count()).toBe(prima);
   });
 });

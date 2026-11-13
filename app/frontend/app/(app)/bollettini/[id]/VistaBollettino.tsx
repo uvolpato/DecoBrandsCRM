@@ -231,7 +231,7 @@ export function VistaBollettino({ id }: { id: string }) {
       </>,
       sinistra: x.loro ? { importo: x.loro.importo, dett: pct(x.loro.pct) + ' di ' + euro(x.loro.imponibile) } : null,
       destra: x.noi ? { importo: x.noi.importo, dett: pct(x.noi.pct) + ' di ' + euro(x.noi.imponibile) } : null,
-      differenza: x.loro && x.noi ? x.loro.importo - x.noi.importo : x.loro ? x.loro.importo : -(x.noi?.importo ?? 0),
+      differenza: x.differenza ?? 0, // D-126 §19: la differenza arriva dal server, non si calcola qui (V12)
       quadra: x.categoria === 'quadra' || x.incasso,
       esito: x.incasso ? esitoIncasso(x) : esitoDecisione,
       azioni,

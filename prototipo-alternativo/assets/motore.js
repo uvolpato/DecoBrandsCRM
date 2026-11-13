@@ -458,14 +458,23 @@
       let liquidabile = true, motivo = '', incasso = false;
       if (f.maturazione === 'maturato') {
         // maturato→maturato (§5.14): entra nel trimestre del bollettino che la riconosce (il mese in cui il cliente paga)
-        const b = M.riconosciutoIn(d.numero);
-        if (b) { if (!nelTrimestre(b.anno + '-' + String(b.mese).padStart(2, '0') + '-01')) return; }
+        // D-118 §19: sul maturato la nota di credito segue la sua fattura (entra col suo riconoscimento)
+        const rifNumero = d.tipo === 'nota_credito' && d.riferimento ? d.riferimento : d.numero;
+        const b = M.riconosciutoIn(rifNumero);
+        if (b) {
+          const meseRif = b.anno + '-' + String(b.mese).padStart(2, '0') + '-01';
+          // D-118 + D-150 (D-11): la NC non torna in un trimestre chiuso (D-33): il riferimento è
+          // il più tardo fra la NC e il riconoscimento della fattura.
+          const iso = d.tipo === 'nota_credito' && d.data > meseRif ? d.data : meseRif;
+          if (!nelTrimestre(iso)) return;
+        }
         else {
           if (!nelTrimestre(d.data)) return;
           liquidabile = false;
           const bm = M.bollettinoDi(p.fornitore_id, Number(d.data.slice(0, 4)), Number(d.data.slice(5, 7)));
-          const ric = M.righeBollettinoDi(d.numero)[0];
-          if (bm && bm.stato === 'verificato' && !ric) { incasso = true; motivo = 'In attesa di incasso: ' + f.breve + ' la riconosce quando il cliente paga'; }
+          const ric = M.righeBollettinoDi(rifNumero)[0];
+          // il motivo «in attesa di incasso» vale solo per le fatture (D-118 §19)
+          if (bm && bm.stato === 'verificato' && !ric && d.tipo === 'fattura') { incasso = true; motivo = 'In attesa di incasso: ' + f.breve + ' la riconosce quando il cliente paga'; }
           else motivo = ric ? 'Il bollettino di ' + M.meseMin(ric.b.mese) + ' di ' + f.breve + ' non è ancora verificato' : bm ? 'Il bollettino di ' + M.meseMin(bm.mese) + ' di ' + f.breve + ' non è ancora verificato' : 'Non ancora riconosciuto da ' + f.breve;
         }
       } else if (!nelTrimestre(d.data)) return;

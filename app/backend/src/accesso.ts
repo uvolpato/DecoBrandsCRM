@@ -50,6 +50,9 @@ export const PERMESSI = {
   'sistema.utenti': { area: 'sistema', testo: 'Utenti (non amministratori): creare, modificare, livelli nelle aree, disattivare', ruoli: ['superutente', 'amministratore'] },
   'sistema.amministratori': { area: 'sistema', testo: 'Amministratori: creare, modificare, disattivare', ruoli: ['superutente'] },
   'sistema.impostazioni': { area: 'sistema', testo: 'Impostazioni del portale (casella, posta, sincronizzazione, conservazione)', ruoli: ['superutente', 'amministratore'] },
+  // D-115 §19: le connessioni (casella, posta, Integra) si cambiano solo dal superutente: chi le
+  // dirotta su un server suo leggerebbe i segreti e i link di reset.
+  'sistema.connessioni': { area: 'sistema', testo: 'Connessioni (casella, posta, Integra) nelle Impostazioni', ruoli: ['superutente'] },
   'sistema.stato': { area: 'sistema', testo: 'Stato del sistema, segnare i problemi come visti', ruoli: ['superutente', 'amministratore'], ancheOperatore: true },
   // Permesso suo del registro (F5-A2, Ugo 06/11/2026): non si riusa `sistema.utenti`.
   'sistema.registro': { area: 'sistema', testo: 'Registro di eventi e anomalie: consultare ed esportare', ruoli: ['superutente', 'amministratore'] },

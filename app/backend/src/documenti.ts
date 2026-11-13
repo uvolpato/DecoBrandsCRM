@@ -7,16 +7,16 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, link, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import type { Request, Response } from 'express';
 import { permessiDi, Richiede, TentativiGuard, contesto } from './accesso';
 import { Data, Facoltativo } from './fornitori';
 import { righePagina } from './impostazioni';
 import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
-import { netto, r2 } from './motore/motore';
+import { chiaveRiga, netto, perCodice, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
 import { cerca } from './anagrafica-integra';
 import { IntegraService } from './integra';
@@ -66,56 +66,88 @@ function formato(dati: Buffer, nome: string) {
   throw new UnsupportedMediaTypeException('Il file non è un PDF né una foto (JPEG, PNG)');
 }
 
+export type EsitoArrivo =
+  | { esito: 'in_coda'; id: string; file_nome: string; stato: string; ricevuto_il: string }
+  | { esito: 'ignorato'; motivo: 'scartato' };
+
+/** Scrive il file in modo idempotente e atomico (A4-03): prima su un temporaneo, poi `link` sul percorso
+ *  finale, che fallisce se c'è già. Se il percorso esiste, ne confronta l'impronta: diversa = un file
+ *  scritto a metà o con un contenuto diverso, si sostituisce con `rename`; uguale = il temporaneo si butta.
+ *  La stessa scrittura rimette il file anche dopo il commit (A3-05). */
+async function scriviFile(radice: string, file_percorso: string, dati: Buffer, hash: string): Promise<void> {
+  await mkdir(dirname(join(radice, file_percorso)), { recursive: true });
+  const destinazione = join(radice, file_percorso);
+  const tmp = `${destinazione}.${randomUUID()}.tmp`;
+  await writeFile(tmp, dati, { flag: 'wx' });
+  try {
+    await link(tmp, destinazione);
+    await rm(tmp);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code !== 'EEXIST') { await rm(tmp, { force: true }).catch(() => undefined); throw e; }
+    const esistente = await readFile(destinazione).catch(() => null);
+    if (esistente && createHash('sha256').update(esistente).digest('hex') === hash) await rm(tmp, { force: true });
+    else await rename(tmp, destinazione);
+  }
+}
+
 /** Unico ingresso dei file (caricamento ora, casella email in F6-A1). Il file va su disco **prima** della transazione,
  *  con l'impronta SHA-256 come nome; la riga in coda e l'evento nella stessa transazione (D-36). Se la transazione
  *  fallisce il file resta orfano: stesso contenuto = stesso nome, un nuovo invio lo riusa (ponytail: la pulizia dei
  *  file senza riga arriva con la pulizia notturna, F5-A5). */
-export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: Contesto) {
+export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: Contesto): Promise<EsitoArrivo> {
   if (f.dati.length > MAX_BYTE) throw new PayloadTooLargeException(`Il file supera ${MB} MB`);
   const est = formato(f.dati, f.nome);
   const hash = createHash('sha256').update(f.dati).digest('hex');
   const doppione = () => new ConflictException('Documento già caricato: è lo stesso file di uno già arrivato');
-  // lo stesso file scartato si può ricaricare: torna in coda sulla stessa riga (D-54)
-  const gia = await db.documenti_in_arrivo.findUnique({ where: { file_hash: hash }, select: { id: true, stato: true, file_percorso: true } });
-  if (gia && gia.stato !== 'scartato') throw doppione();
 
   const radice = process.env.DOCUMENTI_DIR;
   if (!radice) throw new Error('DOCUMENTI_DIR non definita in .env');
   // D-60: in coda in_arrivo/AAAA/AAAAMMGG/<impronta>.<est> (giorno di Roma); all'abbinamento va nella cartella della
   // pratica (archivia). Un file scartato ricaricato resta dove era
   const g = giornoRoma(new Date()).replace(/-/g, '');
-  const file_percorso = gia?.file_percorso ?? `in_arrivo/${g.slice(0, 4)}/${g}/${hash}.${est}`;
-  await mkdir(dirname(join(radice, file_percorso)), { recursive: true });
-  await writeFile(join(radice, file_percorso), f.dati, { flag: 'wx' }).catch((e: NodeJS.ErrnoException) => {
-    if (e.code !== 'EEXIST') throw e; // già scritto da un invio non andato a buon fine: stesso contenuto
-  });
-
   const file_nome = basename(f.nome.replace(/\\/g, '/')).replace(/[\x00-\x1f]/g, '').slice(0, 255) || `documento.${est}`;
-  try {
-    const d = await db.$transaction(async (tx) => {
-      const dati = { origine: f.origine, email_da: f.email_da ?? null, email_oggetto: f.email_oggetto ?? null, file_nome, utente_id: ctx.utente_id ?? null };
-      let d;
-      if (gia) {
-        await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${gia.id} FOR UPDATE`;
-        if ((await tx.documenti_in_arrivo.findUniqueOrThrow({ where: { id: gia.id } })).stato !== 'scartato') throw doppione();
-        d = await tx.documenti_in_arrivo.update({
-          where: { id: gia.id },
-          data: { ...dati, stato: 'in_coda', tentativi: 0, errore: null, ricevuto_il: new Date(), scartato_il: null, scartato_da: null, motivo_scarto: null, nota_scarto: null },
-        });
-      } else {
-        d = await tx.documenti_in_arrivo.create({ data: { ...dati, file_hash: hash, file_percorso } });
+  // A4-14: se la riga con la stessa impronta sparisce fra la lettura e la transazione, si rifà da capo una volta
+  for (let tentativo = 0; ; tentativo++) {
+    const gia = await db.documenti_in_arrivo.findUnique({ where: { file_hash: hash }, select: { id: true, stato: true, file_percorso: true } });
+    if (gia && gia.stato !== 'scartato') throw doppione();
+    // U10/D-122: un file scartato non si rianima da solo: dalla casella si ignora (D-54 lo ricarica a mano)
+    if (gia && f.origine !== 'caricamento') return { esito: 'ignorato', motivo: 'scartato' };
+    const file_percorso = gia?.file_percorso ?? `in_arrivo/${g.slice(0, 4)}/${g}/${hash}.${est}`;
+    await scriviFile(radice, file_percorso, f.dati, hash);
+    try {
+      const d = await db.$transaction(async (tx) => {
+        const dati = { origine: f.origine, email_da: f.email_da ?? null, email_oggetto: f.email_oggetto ?? null, file_nome, utente_id: ctx.utente_id ?? null };
+        let d;
+        if (gia) {
+          await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${gia.id} FOR UPDATE`;
+          const riga = await tx.documenti_in_arrivo.findUnique({ where: { id: gia.id } });
+          if (!riga) return null; // A4-14: la riga è stata eliminata fra la lettura e la transazione
+          if (riga.stato !== 'scartato') throw doppione();
+          d = await tx.documenti_in_arrivo.update({
+            where: { id: gia.id },
+            data: { ...dati, stato: 'in_coda', tentativi: 0, errore: null, ricevuto_il: new Date(), scartato_il: null, scartato_da: null, motivo_scarto: null, nota_scarto: null },
+          });
+        } else {
+          d = await tx.documenti_in_arrivo.create({ data: { ...dati, file_hash: hash, file_percorso } });
+        }
+        await logEvent(tx, {
+          tipo: 'documento', azione: 'upload', entita: 'documento', entita_id: d.id, esito: 'successo',
+          dettaglio: { etichetta: file_nome, documento_id: String(d.id), file_nome, dimensione: f.dati.length, origine: f.origine, recuperato: !!gia },
+        }, ctx);
+        return d;
+      });
+      if (!d) {
+        if (tentativo === 0) continue; // A4-14: si rifà da capo con una riga e un percorso nuovi
+        throw new Error('riga del documento sparita due volte di seguito');
       }
-      await logEvent(tx, {
-        tipo: 'documento', azione: 'upload', entita: 'documento', entita_id: d.id, esito: 'successo',
-        dettaglio: { etichetta: file_nome, documento_id: String(d.id), file_nome, dimensione: f.dati.length, origine: f.origine, recuperato: !!gia },
-      }, ctx);
-      return d;
-    });
-    // F6-A2: qui, dopo il commit, si sveglia il lettore (stato in_coda = da leggere, §6.5)
-    return { id: String(d.id), file_nome: d.file_nome, stato: d.stato, ricevuto_il: d.ricevuto_il.toISOString() };
-  } catch (e) {
-    if ((e as { code?: string }).code === 'P2002') throw doppione(); // stesso file arrivato insieme da due parti
-    throw e;
+      await scriviFile(radice, file_percorso, f.dati, hash); // A3-05: rimette il file se un'eliminazione dello stesso file l'ha tolto dopo il commit
+      // F6-A2: qui, dopo il commit, si sveglia il lettore (stato in_coda = da leggere, §6.5)
+      return { esito: 'in_coda', id: String(d.id), file_nome: d.file_nome, stato: d.stato, ricevuto_il: d.ricevuto_il.toISOString() };
+    } catch (e) {
+      if ((e as { code?: string }).code === 'P2002') throw doppione(); // stesso file arrivato insieme da due parti
+      throw e;
+    }
   }
 }
 
@@ -458,6 +490,11 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
       mese: letto.mese, anno: letto.anno, riferimento_fattura: letto.riferimento_fattura,
     },
     righe: letto.righe.map((r, i) => ({ i, ...r })),
+    // D-126 §19: i totali del piede della tabella delle righe dal server, non sommati nel browser (V12)
+    totali: {
+      importo: Number(r2(letto.righe.reduce((s, r) => s + (r.importo ?? 0), 0))),
+      provvigione: Number(r2(letto.righe.reduce((s, r) => s + (r.provvigione ?? 0), 0))),
+    },
     controlli, proposta, bollettino,
   };
 }
@@ -939,6 +976,7 @@ class NuovoDocumento {
   @IsOptional() @IsString() @MaxLength(2000) note?: string;
   @Facoltativo() @IsInt() @Min(1) fattura_id?: number; // nota di credito: la fattura stornata (D-34)
   @Facoltativo() @IsInt() @Min(1) arrivo_id?: number; // file in coda dal canale comune
+  @Facoltativo() @IsBoolean() multi_ordine?: boolean; // D-123: la persona conferma la stessa fattura su più ordini
 }
 /** Abbinamento a mano di un file in coda (D-60): pratica esistente, oppure cliente e fornitore per un ordine che apre una pratica nuova. */
 class AbbinaDocumento extends NuovoDocumento {
@@ -1084,14 +1122,14 @@ function documentiPratica(t: Testata) {
     pratica: { id: String(t.id), numero: t.numero_ordine, stato: t.stato, importo: Number(t.importo) },
     // D-60: ordini, conferme, proforma, pagamenti e altri, solo tracciati
     altri: t.documenti.filter((d) => !fiscale(d.tipo)).map((d) => ({
-      id: String(d.id), tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: Number(d.importo),
+      id: String(d.id), pratica_id: String(t.id), tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: Number(d.importo),
       arrivo_id: d.arrivo_id ? String(d.arrivo_id) : null, file_nome: d.arrivo?.file_nome ?? null, note: d.note,
       righe: righeDi(d), riferimento: riferimento(d),
     })),
     documenti: t.documenti.filter((d) => fiscale(d.tipo)).map((d) => {
       const s = stornato.get(d.id) ?? new Dec(0);
       return {
-        id: String(d.id), tipo: d.tipo, numero: d.numero, data: iso(d.data),
+        id: String(d.id), pratica_id: String(t.id), tipo: d.tipo, numero: d.numero, data: iso(d.data),
         importo: Number(d.importo), // negativo per la nota di credito
         storno_totale: d.storno_totale, fattura_id: d.fattura_id ? String(d.fattura_id) : null,
         // fattura: quanto stornano le sue note di credito e quanto si può ancora stornare
@@ -1106,6 +1144,38 @@ function documentiPratica(t: Testata) {
   };
 }
 
+/** Confronto fra due documenti della pratica (D-78, V12): le righe dello stesso codice si sommano
+ *  (D-60, come `perCodice` del motore) e si allineano; i delta e la differenza al centesimo. Con una
+ *  nota di credito si mostrano solo le righe stornate e la differenza è l'importo stornato (§7.3). */
+function confrontoDocumenti(t: Testata, cur: bigint, rif: bigint) {
+  const trova = (id: bigint) => t.documenti.find((d) => d.id === id);
+  const curD = trova(cur), rifD = trova(rif);
+  if (!curD || !rifD) throw new NotFoundException('Documento non trovato');
+  // righe del documento sommate per codice (D-60), con la stessa regola di `perCodice` del motore (V12)
+  const righe = (id: bigint) => perCodice(
+    t.righe.filter((r) => r.documento_id === id).map((r) => {
+      const qta = r.quantita ?? new Dec(0), prezzo = r.prezzo_unitario ?? new Dec(0);
+      return { codice: r.codice, descrizione: r.descrizione, qta, prezzo, importo: r.importo ?? qta.times(prezzo).toDecimalPlaces(2, Dec.ROUND_HALF_UP) };
+    }),
+  );
+  const CUR = righe(cur), RIF = righe(rif);
+  const soloNC = curD.tipo === 'nota_credito' || rifD.tipo === 'nota_credito';
+  const nc = soloNC ? [curD, rifD].filter((d) => d.tipo === 'nota_credito') : [curD, rifD];
+  const codici = [...new Set(nc.flatMap((d) => righe(d.id).map(chiaveRiga)))];
+  const num = (r: { qta: Prisma.Decimal; prezzo: Prisma.Decimal; importo: Prisma.Decimal }) => ({ quantita: Number(r.qta), prezzo: Number(r.prezzo), importo: Number(r.importo) });
+  return {
+    righe: codici.map((c) => {
+      const x = RIF.find((r) => chiaveRiga(r) === c) ?? null; // a: il documento di confronto
+      const y = CUR.find((r) => chiaveRiga(r) === c) ?? null; // b: il documento corrente
+      let varia: boolean, delta: Prisma.Decimal;
+      if (soloNC) { const n = curD.tipo === 'nota_credito' ? y : x; varia = true; delta = n?.importo ?? new Dec(0); }
+      else { varia = !x || !y || !x.qta.equals(y.qta) || !x.prezzo.equals(y.prezzo); delta = (y?.importo ?? new Dec(0)).minus(x?.importo ?? new Dec(0)); }
+      return { codice: (y ?? x)?.codice ?? null, descrizione: (y ?? x)?.descrizione ?? null, a: x ? num(x) : null, b: y ? num(y) : null, varia, delta: Number(r2(delta)) };
+    }),
+    differenza: Number(soloNC ? (curD.tipo === 'nota_credito' ? curD.importo : rifD.importo) : r2(curD.importo.minus(rifD.importo))),
+  };
+}
+
 @Controller('pratiche/:id/documenti')
 export class DocumentiPraticaController {
   constructor(private readonly db: PrismaService) {}
@@ -1116,6 +1186,16 @@ export class DocumentiPraticaController {
     const t = await this.db.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, include: CON_PRATICA });
     if (!t) throw new NotFoundException('Pratica non trovata');
     return documentiPratica(t);
+  }
+
+  /** Confronto fra due documenti della pratica (D-78, V12): il browser manda solo i due id, le righe
+   *  sommate per codice e i delta li calcola il server (D-60, A5-02). */
+  @Get(':did/confronto')
+  @Richiede('provvigioni.consulta')
+  async confronto(@Param('id', ParseIntPipe) id: number, @Param('did', ParseIntPipe) did: number, @Query('rif', ParseIntPipe) rif: number) {
+    const t = await this.db.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, include: CON_PRATICA });
+    if (!t) throw new NotFoundException('Pratica non trovata');
+    return confrontoDocumenti(t, BigInt(did), BigInt(rif));
   }
 
   /** Registra a mano un documento della pratica (D-60: ogni tipo), con il file facoltativo in coda dal canale. */
@@ -1224,7 +1304,8 @@ export class DocumentiPraticaController {
   }
 
   /** Annullamento di un documento registrato per errore: non se liquidato, stornato da una nota, corretto per il
-   *  subagente o già in un bollettino (niente cancellazioni a cascata silenziose). Il suo file torna in coda. */
+   *  subagente o già in un bollettino (niente cancellazioni a cascata silenziose). Il suo file torna in coda
+   *  (da_controllare se era già letto, A4-06), se nessun altro documento lo usa. */
   @Delete(':did')
   @HttpCode(204)
   @Richiede('provvigioni.modifica')
@@ -1238,10 +1319,12 @@ export class DocumentiPraticaController {
       const quale = `${nomeDi(d.tipo)} ${d.numero}`;
       await togliibile(tx, pid, d, quale, 'non si annulla');
       await tx.ordini_fornitore_documenti.delete({ where: { id: d.id } });
-      // il file torna in coda, se nessun altro documento lo usa
+      // il file torna in coda, se nessun altro documento lo usa (A4-06: da_controllare se era già letto,
+      // così i campi corretti restano e non si paga una nuova lettura)
       if (d.arrivo_id && !(await tx.ordini_fornitore_documenti.count({ where: { arrivo_id: d.arrivo_id } }))) {
         await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${d.arrivo_id} FOR UPDATE`;
-        await tx.documenti_in_arrivo.update({ where: { id: d.arrivo_id }, data: { stato: 'in_coda', abbinato_pratica_id: null } });
+        const a = await tx.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.arrivo_id }, select: { letto_il: true } });
+        await tx.documenti_in_arrivo.update({ where: { id: d.arrivo_id }, data: { stato: a.letto_il ? 'da_controllare' : 'in_coda', abbinato_pratica_id: null } });
       }
       await logEvent(tx, {
         tipo: 'documento', azione: 'delete', entita: 'documento', entita_id: d.id, esito: 'successo',
@@ -1276,6 +1359,14 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
   const fattura_id = b.fattura_id ? BigInt(b.fattura_id) : null;
   const storno_totale = b.storno_totale ?? false;
   await controllaNumero(tx, fid, pid, b.tipo, numero, data);
+  // D-123/U11: la stessa fattura o nota di credito su un'altra pratica solo con la conferma multi-ordine (precisa D-54)
+  if (fiscale(b.tipo) && !b.multi_ordine) {
+    const altra = await tx.ordini_fornitore_documenti.findFirst({
+      where: { tipo: b.tipo, numero, testata: { fornitore_id: fid }, testata_id: { not: pid } },
+      select: { testata: { select: { numero_ordine: true } } },
+    });
+    if (altra) throw new ConflictException(`${nomeDi(b.tipo)} ${numero} è già registrata in ${altra.testata.numero_ordine}: se è una ${nomeDi(b.tipo).toLowerCase()} su più ordini conferma`);
+  }
   const importo = await importoValido(tx, pid, { tipo: b.tipo, importo: b.importo, storno_totale, fattura_id });
   let arrivo_id: bigint | null = null;
   if (b.arrivo_id) {

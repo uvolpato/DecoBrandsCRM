@@ -6,6 +6,7 @@ import { ElencoSelezionabile } from '@/componenti/Flussi';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
+import { usePuo } from '@/componenti/Utente';
 import { api } from '@/lib/api';
 
 // Impostazioni (§7.15, D-65), come vistaImpostazioni del prototipo (viste-gestione.js): sezioni a
@@ -19,9 +20,14 @@ interface Sezione { chiave: string; titolo: string; sotto: string; campi: CampoR
 interface ParametroServer { nome: string; uso: string; sezioni: string[]; obbligatorio: boolean; impostato: boolean; valore: string | null }
 
 const PROVABILE = ['casella', 'lettura', 'posta', 'integra'];
+// D-115 §19: casella, posta e Integra sono connessioni e si modificano solo dal superutente.
+const CONNESSIONI = ['casella', 'posta', 'integra'];
+// D-125 §19: il connettore locale non esiste ancora: resta in elenco ma spento, col motivo.
+const MOTIVO_LOCALE = 'Il connettore locale non è ancora disponibile: si legge con LlamaCloud UE (D-67)';
 
 export function VistaImpostazioni() {
   const { sezione } = useParams<{ sezione: string }>();
+  const puo = usePuo();
   const [sezioni, setSezioni] = useState<Sezione[] | null>(null);
   const [ambiente, setAmbiente] = useState<ParametroServer[]>([]);
   const [errore, setErrore] = useState('');
@@ -45,8 +51,18 @@ export function VistaImpostazioni() {
     const scelto = sez?.campi.find((c) => c.nome === 'connettore')?.valore;
     setConnettore(typeof scelto === 'string' ? scelto : '');
   }, [sez?.chiave]); // eslint-disable-line react-hooks/exhaustive-deps -- solo al cambio sezione
+  // il Campo non spegne le singole voci del select: l'opzione locale si disabilita qui (D-125).
+  useEffect(() => {
+    if (sez?.chiave !== 'lettura') return;
+    for (const o of document.querySelectorAll<HTMLOptionElement>('#c-connettore option')) {
+      if (o.value === 'glm_ocr_locale') { o.disabled = true; o.title = MOTIVO_LOCALE; }
+    }
+  }, [sez?.chiave]); // eslint-disable-line react-hooks/exhaustive-deps -- una volta per sezione
+
   const visibili = sez ? sez.campi.filter((c) => !c.gruppo || c.gruppo === connettore) : [];
   const parametri = sez ? ambiente.filter((p) => p.sezioni.includes(sez.chiave)) : [];
+  // D-115 §19: un amministratore vede le connessioni ma non le modifica né le prova.
+  const soloLettura = !!sez && CONNESSIONI.includes(sez.chiave) && !puo('sistema.connessioni');
 
   const salva = async (ev: FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
@@ -97,22 +113,31 @@ export function VistaImpostazioni() {
           <form key={sez.chiave} className="modulo modulo-2" onSubmit={salva} noValidate>
             {visibili.map((c) => c.tipo === 'password' ? (
               <Campo key={c.nome} nome={c.nome} etichetta={c.etichetta} tipo="password" completa="new-password" valore=""
-                segnaposto={c.impostata ? '•••••••• impostata · scrivi per sostituirla' : 'non impostata'} aiuto="Lascia vuoto per non cambiarla." />
+                segnaposto={c.impostata ? '•••••••• impostata · scrivi per sostituirla' : 'non impostata'} aiuto="Lascia vuoto per non cambiarla."
+                disabilitato={soloLettura} />
             ) : (
               <Campo key={c.nome} nome={c.nome} etichetta={c.etichetta} tipo={c.tipo as 'testo' | 'numero' | 'email' | 'select'}
                 valore={typeof c.valore === 'number' || typeof c.valore === 'string' ? c.valore : undefined}
-                opzioni={c.opzioni} aiuto={c.aiuto} largo={c.largo} min={c.min} max={c.max} step={c.step}
+                opzioni={c.opzioni} aiuto={c.nome === 'connettore' ? MOTIVO_LOCALE : c.aiuto}
+                largo={c.largo} min={c.min} max={c.max} step={c.step}
+                disabilitato={soloLettura}
                 onCambia={c.nome === 'connettore' ? setConnettore : undefined} />
             ))}
             <div className="modulo-errore" style={{ gridColumn: '1 / -1' }}>
-              <div className="azioni-riga">
-                <button type="submit" className="btn" disabled={attesa}>{attesa ? 'Attendi…' : 'Salva ' + sez.titolo.toLowerCase()}</button>
-                {PROVABILE.includes(sez.chiave) && (
-                  <button type="button" className="btn sec" onClick={() => void provaConnessione()}>Prova la connessione</button>
-                )}
-              </div>
-              {PROVABILE.includes(sez.chiave) && <Nota>La prova usa i valori salvati.</Nota>}
-              {prova && <p className={'nota' + (prova.ok ? '' : ' nota-errore')} role="status">{prova.testo}</p>}
+              {soloLettura ? (
+                <Nota>Solo il superutente può modificare le connessioni (casella, posta, sincronizzazione da Integra): tu puoi vederle ma non cambiarle né provarle.</Nota>
+              ) : (
+                <>
+                  <div className="azioni-riga">
+                    <button type="submit" className="btn" disabled={attesa}>{attesa ? 'Attendi…' : 'Salva ' + sez.titolo.toLowerCase()}</button>
+                    {PROVABILE.includes(sez.chiave) && (
+                      <button type="button" className="btn sec" onClick={() => void provaConnessione()}>Prova la connessione</button>
+                    )}
+                  </div>
+                  {PROVABILE.includes(sez.chiave) && <Nota>La prova usa i valori salvati.</Nota>}
+                  {prova && <p className={'nota' + (prova.ok ? '' : ' nota-errore')} role="status">{prova.testo}</p>}
+                </>
+              )}
             </div>
           </form>
           {parametri.length > 0 && (

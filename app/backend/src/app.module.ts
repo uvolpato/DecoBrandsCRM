@@ -30,6 +30,7 @@ import { ScartatiController } from './scartati';
 import { PersoneController, SoggettiController } from './soggetti';
 import { StoricoController } from './storico';
 import { SistemaController, SistemaService } from './sistema';
+import { VersioneController } from './versione';
 
 @Controller('salute')
 class SaluteController {
@@ -63,7 +64,7 @@ export function limiti(env = process.env) {
   controllers: [SaluteController, AccessoController, UtentiController, FornitoriController, EccezioniController, AgentiController, SubagentiController, ClientiController, SoggettiController, PersoneController, PraticheController, DocumentiController, DocumentiAbbinaController, DocumentiPraticaController, DocumentiFiscaliController, IntegraController,
     BollettiniController, // F3-A1: matrice e caricamento (rotte fisse) prima di GET /bollettini/:id
     BollettinoController, LiquidazioniController, LiquidazioneReportController, LiquidazioneExportController, AnalisiController, IncassiController, OggiController, SollecitiController, EventiController, RegistroController, ImpostazioniController,
-    ScartatiController, SistemaController, StoricoController, AnagraficaIntegraController],
+    ScartatiController, SistemaController, StoricoController, AnagraficaIntegraController, VersioneController],
   providers: [
     IntegraService,
     CasellaService,

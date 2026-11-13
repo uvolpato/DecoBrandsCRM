@@ -331,6 +331,10 @@ export class FornitoriController {
         const codice = await tx.codici_esterni.findFirst({ where: { sistema: 'integra', tipo: 'fornitore', entita_id: BigInt(id) } });
         return { ...mappaFornitore(prima as never, codice?.codice ?? null) };
       }
+      // D-121 §19: il tipo di provvigione non cambia dopo la prima chiusura (bollettino verificato o trimestre liquidato)
+      if (dopoDiff.tipo_provvigione !== undefined && await ultimaChiusura(tx, prima.id)) {
+        throw new ConflictException('Il tipo di provvigione non si cambia dopo la prima chiusura (bollettino verificato o trimestre liquidato)');
+      }
       const dopo = await tx.fornitori.update({ where: { id: BigInt(id) }, data: aggiornamenti, include: { corrente: { select: { ragione_sociale: true, piva: true, paese: true } } } });
       await logEvent(tx, {
         tipo: 'crud', azione: 'update', entita: 'fornitore', entita_id: prima.id, esito: 'successo',

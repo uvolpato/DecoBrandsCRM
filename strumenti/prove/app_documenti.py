@@ -50,6 +50,7 @@ try:
             return pg
         testo = lambda pg, s: pg.locator(s).first.inner_text()
         voce = '.selezionabile a:has-text("PROVA-%s")' % S.upper()
+        voceSenza = '.selezionabile a:has-text("PROVA-SENZA-%s")' % S.upper()
 
         pg = entra(S + '-ammi')
         pg.wait_for_selector('.selezionabile a')
@@ -73,6 +74,23 @@ try:
         ok('Codice cliente' in testo(pg, '.dettagli') and 'Importo' in testo(pg, '.dettagli'), 'dettaglio: testata con codice cliente e importo')
         ok(pg.locator('.schede-barra [role=tab]').count() == 2, 'due schede: azione proposta e righe lette')
         ok('Scegli la pratica' in testo(pg, '.schede-barra') or 'Pratica proposta' in testo(pg, '.schede-barra'), 'scheda dell’azione proposta')
+
+        # A5-04: cambiando documento il dettaglio riparte da «azioni» e non conserva la scelta fatta prima
+        pg.fill('.abbina-altra input', 'pratica scelta sul primo documento')
+        pg.click(voceSenza); pg.wait_for_selector('.dettagli'); pg.wait_for_timeout(300)
+        ok(pg.locator('.schede-barra [role=tab]').first.get_attribute('aria-selected') == 'true',
+           'A5-04: cambiando documento la scheda torna ad «azioni»')
+        pg.click(voce); pg.wait_for_selector('.abbina-altra input')
+        ok(pg.input_value('.abbina-altra input') == '',
+           'A5-04: tornando al documento il campo di abbinamento è vuoto')
+        ok(pg.locator('.abbina-altra input').count() == 1, 'A5-04: il campo di abbinamento c’è ancora')
+        pg.locator(voce + '[aria-current=true]').wait_for()
+
+        # A5-01: «Vedi le righe» nell'avviso apre davvero la scheda Righe lette (scheda controllata)
+        pg.click('button:has-text("Vedi le righe")'); pg.wait_for_timeout(200)
+        ok(pg.locator('.schede-barra [role=tab]:has-text("Righe lette")').get_attribute('aria-selected') == 'true',
+           'A5-01: «Vedi le righe» apre la scheda Righe lette')
+        ok('di non riconosciuto' not in pg.locator('body').inner_text(), 'A6-16: niente «di non riconosciuto» nei testi')
         pg.click('.schede-barra [role=tab]:has-text("Righe lette")'); pg.wait_for_timeout(200)
         ok(pg.locator('.dt tbody tr').count() == 2, 'righe lette: due righe')
         pg.wait_for_selector('.schede-conta')
@@ -255,7 +273,22 @@ try:
         pg3.locator('button:has-text("Rileggi il documento")').wait_for(timeout=15000)
         ok(pg3.locator('button:has-text("Rileggi il documento")').count() == 1, 'errore: pulsante Rileggi il documento')
         ok(pg3.locator('button:has-text("Correggi i dati letti")').count() == 1, 'errore: pulsante Correggi i dati letti per inserire i dati a mano')
+        ok('di non riconosciuto' not in pg3.locator('body').inner_text(), 'A6-16: nessun documento senza fornitore dice «di non riconosciuto»')
         pg3.close()
+
+        # A6-16: ordine senza fornitore riconosciuto → testi pensati per un documento senza nome fornitore
+        scheda_ordine = dict(scheda_errore, id='999997', stato='da_controllare', tipo='ordine', livello='da_controllare',
+                             file_nome='prova-ordine.pdf')
+        scheda_ordine['testata'] = dict(scheda_errore['testata'], tipo='ordine', numero='PROVA-ORDINE', codice_cliente='K-9')
+        pg4 = entra(S + '-ammi')
+        pg4.route(re.compile(r'^.*/api/documenti/999997$'), lambda r: risposta(r, json.dumps(scheda_ordine)))
+        pg4.goto(BASE + '/documenti/999997')
+        pg4.locator('.abbina-altra').wait_for(timeout=15000)
+        corpo4 = pg4.locator('body').inner_text()
+        ok('di non riconosciuto' not in corpo4, 'A6-16: il testo non usa «non riconosciuto» come nome del fornitore')
+        ok('Fornitore e codice cliente non letti' in corpo4, 'A6-16: avviso per fornitore e codice non letti')
+        ok('Oppure abbina a un’altra pratica:' in corpo4, 'A6-16: «Oppure abbina a un’altra pratica» senza il nome')
+        pg4.close()
 
         b.close()
 finally:

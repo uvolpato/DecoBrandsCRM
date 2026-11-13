@@ -141,6 +141,10 @@ describe('GET /api/analisi', () => {
     expect(sub.tabella.raggruppa).toBe('subagente');
     const sommaRighe = (b: any) => M.r2(b.tabella.righe.reduce((s: number, r: any) => s + r.fatturato, 0));
     expect(sommaRighe(sub)).toBe(sub.numeri.fatturato);
+    // totali degli importi dal server (D-126 §19), uguali ai 4 numeri
+    expect(sub.tabella.totali).toEqual({
+      fatturato: sub.numeri.fatturato, prese: sub.numeri.prese, pagate: sub.numeri.pagate, margine: sub.numeri.margine,
+    });
     expect(sub.tabella.righe.map((r: any) => r.nome)).toEqual(['Elisa Ravelli', 'Stefano Bastasin', 'Marco Nista', 'Giorgio Pontoglio']);
     expect(sub.tabella.righe.reduce((s: number, r: any) => s + r.quota, 0)).toBeCloseTo(100, 1);
 

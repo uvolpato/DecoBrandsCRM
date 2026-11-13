@@ -5,7 +5,7 @@
 # Servono backend e frontend accesi (base: terzo argomento) e gli utenti di prova <s>-ammi, <s>-lett
 # (password-di-prova, da utenti_prova.js crea <s>). Nel database di prova c'è il seed.
 # Uso: python strumenti/prove/app_analisi.py <suffisso> <cartella schermate> [base]
-import sys, pathlib, time
+import sys, pathlib, time, json
 from playwright.sync_api import sync_playwright
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
@@ -147,6 +147,26 @@ with sync_playwright() as p:
     pg.wait_for_function("document.querySelectorAll('.pannello-bi .dt tbody tr').length === 21"); quieta(pg)
     ok(pg.locator('.pannello-bi .dt tbody tr a').count() == 21, 'documenti: 21 righe con il collegamento alla pratica')
     pg.screenshot(path=str(USCITA / 'app-analisi-documenti-1440.png'))
+
+    # A5-07: con naturale la paginazione resta (spec §16.4). Il seed ha 21 documenti: la risposta del
+    # server viene allargata al volo per superare le 25 righe di una pagina.
+    def tanti_documenti(route):
+        if 'raggruppa=documento' not in route.request.url:
+            return route.continue_()
+        risposta = route.fetch(); corpo = risposta.json()
+        base = corpo['tabella']['righe'] or [{}]
+        finte = [dict(base[i % len(base)], chiave='prova-%d' % i) for i in range(60)]
+        corpo['tabella']['righe'] = finte
+        corpo['tabella']['totale'] = len(finte)
+        route.fulfill(status=200, content_type='application/json', body=json.dumps(corpo))
+    pg.route('**/api/analisi?*', tanti_documenti)
+    tab(pg, 'Per mese').click(); quieta(pg)
+    tab(pg, 'Documenti').click()
+    pg.wait_for_function("() => (document.querySelector('.pannello-bi .dt-piede > span')?.textContent || '').startsWith('1–25 di 60')")
+    ok(pg.locator('.pannello-bi .dt-pagine').count() == 1 and righe(pg).count() == 25,
+       'documenti con naturale: 25 per pagina e paginazione presente (A5-07)')
+    pg.unroute('**/api/analisi?*', tanti_documenti)
+    tab(pg, 'Per fornitore').click(); quieta(pg)
 
     # esportazione: Excel e CSV, file scaricati
     xlsx = scarica(pg, 'xlsx')

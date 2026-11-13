@@ -7,7 +7,7 @@ import { COLORI_GRAFICI, Grafico, type SerieGrafico } from '@/componenti/Grafico
 import { KpiRow, type Kpi } from '@/componenti/Kpi';
 import { Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
-import { PeriodoMesi } from '@/componenti/PeriodoMesi';
+import { mpiu, PeriodoMesi } from '@/componenti/PeriodoMesi';
 import { avviso } from '@/componenti/Piccoli';
 import { Sagoma, SagomaRiquadri, SagomaTabella, useSagome } from '@/componenti/Sagoma';
 import { api } from '@/lib/api';
@@ -22,7 +22,6 @@ import { useMemoria } from '@/lib/memoria';
 
 const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
 const TUTTI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
-const mpiu = (k: string, n: number) => { const t = Number(k.slice(0, 4)) * 12 + Number(k.slice(5, 7)) - 1 + n; return Math.floor(t / 12) + '-' + String((t % 12) + 1).padStart(2, '0'); };
 const etichetta = (k: string) => (TUTTI[Number(k.slice(5, 7)) - 1] ?? '') + ' ' + k.slice(0, 4);
 const etichettaBreve = (k: string) => MESI[Number(k.slice(5, 7)) - 1] + ' ' + k.slice(2, 4);
 const corto = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
@@ -52,7 +51,7 @@ interface Risposta {
     subagenti: { etichette: string[]; chiavi: string[]; serie: SerieGrafico[] };
     clienti: GraficoBarre;
   };
-  tabella: { raggruppa: string; totale: number; righe: Riga[] };
+  tabella: { raggruppa: string; totale: number; totali: { fatturato: number; prese: number; pagate: number; margine: number }; righe: Riga[] };
 }
 
 const RAGGRUPPA = [
@@ -267,6 +266,7 @@ export function VistaAnalisi() {
                       }]} />
                       <DataTable naturale righe={dati.tabella.righe} chiave={(r) => r.chiave}
                         colonne={raggruppa === 'documento' ? colonneDocumenti : colonneGruppo(raggruppa)}
+                        totali={dati.tabella.totali}
                         ordinamentoIniziale={raggruppa === 'documento' ? { key: 'data', dir: 'desc' } : raggruppa === 'mese' ? { key: 'chiave', dir: 'asc' } : { key: 'fatturato', dir: 'desc' }}
                         memoria="tabella" caricando={caricando}
                         filtro={JSON.stringify({ valori, periodo, raggruppa })}

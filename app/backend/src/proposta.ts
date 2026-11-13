@@ -246,16 +246,23 @@ export const normalizzaPiva = (s: string) => pivaNormalizzata((s || '').replace(
 
 export type ClienteConCorrente = { id: bigint; corrente: { piva: string | null; ragione_sociale: string } | null };
 
-/** Risolve il cliente per P.IVA o ragione sociale (D-92): vince la P.IVA (univoca), poi la ragione
- *  sociale normalizzata accettata solo con un solo candidato. I clienti si passano già caricati, così
- *  l'elenco li legge una volta sola per pagina (D-106). null = cliente non riconosciuto. */
+/** Risolve il cliente per P.IVA o ragione sociale (D-92, D-124): vince la P.IVA; se più clienti
+ *  hanno quella P.IVA (sedi di una catena in Integra) decide la ragione sociale normalizzata, e solo
+ *  quando il candidato è uno solo. Senza P.IVA vale la ragione sociale, con un solo candidato.
+ *  I clienti si passano già caricati, così l'elenco li legge una volta sola per pagina (D-106).
+ *  null = cliente non riconosciuto. */
 export function riconosciClienteDai(clienti: ClienteConCorrente[], piva_cliente: string | null, cliente: string | null): { cliente_id: bigint; ragione: string | null } | null {
   const piva = normalizzaPiva(piva_cliente ?? '');
-  if (piva.length >= 11) {
-    const c = clienti.find((x) => x.corrente?.piva != null && normalizzaPiva(x.corrente.piva) === piva);
-    if (c) return { cliente_id: c.id, ragione: c.corrente!.ragione_sociale };
-  }
   const nome = normalizzaNome(cliente ?? '');
+  if (piva.length >= 11) {
+    const perPiva = clienti.filter((x) => x.corrente?.piva != null && normalizzaPiva(x.corrente.piva) === piva);
+    if (perPiva.length === 1) return { cliente_id: perPiva[0].id, ragione: perPiva[0].corrente!.ragione_sociale };
+    // P.IVA condivisa: fra i soli clienti con quella P.IVA, un solo nome uguale → quello, altrimenti niente (D-124)
+    if (perPiva.length > 1) {
+      const scelti = nome ? perPiva.filter((x) => normalizzaNome(x.corrente!.ragione_sociale) === nome) : [];
+      return scelti.length === 1 ? { cliente_id: scelti[0].id, ragione: scelti[0].corrente!.ragione_sociale } : null;
+    }
+  }
   if (nome) {
     const cc = clienti.filter((x) => x.corrente && normalizzaNome(x.corrente.ragione_sociale) === nome);
     if (cc.length === 1) return { cliente_id: cc[0].id, ragione: cc[0].corrente!.ragione_sociale };

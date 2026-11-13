@@ -2,7 +2,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { api, type Io } from '@/lib/api';
+import { api, esci, type Io } from '@/lib/api';
+import { useEventi } from '@/lib/eventi';
 import { Icona } from './Icona';
 import { ruoloBreve, usePuo, useUtente } from './Utente';
 
@@ -74,6 +75,16 @@ export function Barra() {
   // qualcosa da fare. Il browser non calcola niente (V12).
   const [conteggi, setConteggi] = useState<{ oggi: number; documenti: number; pratiche: number; bollettini: number } | null>(null);
   const [problemi, setProblemi] = useState<{ problemi: number; errore: boolean } | null>(null);
+  // versione dell'app in fondo alla barra (13/11/2026): numero letto dal server una volta
+  const [versione, setVersione] = useState('');
+  useEffect(() => {
+    let vivo = true;
+    void api<{ numero: string }>('versione').then((r) => { if (vivo && r.ok) setVersione(r.dati.numero); });
+    return () => { vivo = false; };
+  }, []);
+  // D-23, U20: i contatori si rileggono a ogni cambio pagina e a ogni evento delle aree della barra.
+  const eventi = useEventi();
+  const vEventi = (eventi.documenti ?? 0) + (eventi.pratiche ?? 0) + (eventi.bollettini ?? 0) + (eventi.sistema ?? 0);
   useEffect(() => {
     let vivo = true;
     if (puo('provvigioni.consulta')) {
@@ -87,9 +98,9 @@ export function Barra() {
       });
     } else setProblemi(null);
     return () => { vivo = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- i contatori si rileggono a ogni cambio pagina
-  }, [percorso]);
-  const conta = (n?: number, urgente?: boolean) => (n ? <span className={'conta' + (urgente ? ' urgente' : '')}>{n}</span> : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a ogni pagina e a ogni evento (D-23, U20)
+  }, [percorso, vEventi]);
+  const conta = (n?: number, urgente?: boolean, stile?: React.CSSProperties) => (n ? <span className={'conta' + (urgente ? ' urgente' : '')} style={stile}>{n}</span> : null);
   const contaVoce = (href: string) => {
     if (href === '/') return conta(conteggi?.oggi);
     if (href === '/documenti') return conta(conteggi?.documenti, true);
@@ -155,7 +166,7 @@ export function Barra() {
       <div className="barra-menu">
         {qui?.gruppi.map((g) => (
           <nav key={g.gruppo} className="gruppo" aria-label={g.gruppo}>
-            <div className="gruppo-nome">{g.gruppo}{qui.id === 'gestione' && conta(problemi?.problemi, problemi?.errore)}</div>
+            <div className="gruppo-nome">{g.gruppo}{qui.id === 'gestione' && conta(problemi?.problemi, problemi?.errore, { marginLeft: '.4rem' })}</div>
             {g.voci.map(voce)}
           </nav>
         ))}
@@ -180,7 +191,7 @@ export function Barra() {
             <Link href="/accesso/cambia" role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="chiave" /><span>Cambia la password</span></Link>
             <Link href={GUIDA.href} role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="guida" /><span>Guida</span></Link>
             <div className="menu-sep" />
-            <Link href="/accesso/esci" role="menuitem" className="menu-utente-voce" onClick={() => setMenuUtente(false)}><Icona nome="esci" /><span>Esci</span></Link>
+            <button type="button" role="menuitem" className="menu-utente-voce" onClick={() => { setMenuUtente(false); void esci(); }}><Icona nome="esci" /><span>Esci</span></button>
           </div>
         )}
         <button ref={pulsanteUtente} type="button" className="io io-btn" aria-haspopup="menu" aria-expanded={menuUtente}
@@ -189,6 +200,7 @@ export function Barra() {
           <span><b>{io.nome}</b>{ruoloBreve(io)}</span>
           <Icona nome="giu" />
         </button>
+        {versione && <div className="barra-versione">v{versione}</div>}
       </div>
     </aside>
   );

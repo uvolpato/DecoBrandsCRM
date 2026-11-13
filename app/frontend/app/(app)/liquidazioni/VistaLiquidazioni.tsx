@@ -21,7 +21,7 @@ import { useMemoria } from '@/lib/memoria';
 // si legge dalla fotografia e non si modifica più (D-33, D-57). La scheda *Report subagenti* arriva con F4-A4.
 
 interface Trimestre { trimestre: number; nome: string; da: string; a: string; chiave: string; etichetta: string; avanzamento: number | null; totale: number | null }
-interface Subagente { id: string; nome: string; attivo: boolean; documenti: number; liquidabili: number; imponibile: number; provvigione: number; in_attesa: number; storni: number }
+interface Subagente { id: string; nome: string; attivo: boolean; documenti: number; liquidabili: number; imponibile: number; provvigione: number; in_attesa: number; storni: number; totale_documenti: number }
 interface Documento {
   documento_id: string; numero: string; tipo: string; data: string; origine: string | null; pratica_id: string;
   cliente: string; codice_cliente: string; fornitore: string; subagente: string; subagente_id: string;
@@ -43,6 +43,7 @@ interface Report {
   numeri?: NumeriReport;
   trimestri?: { trimestre: number; pagate: number; margine: number; attivo: boolean }[];
   primi_clienti?: { nome: string; fatturato: number; provvigione: number }[];
+  totali?: { fatturato: number; pagate: number; margine: number };
 }
 interface Risposta {
   anno: number; trimestre: number;
@@ -52,6 +53,7 @@ interface Risposta {
   chiusura: { possibile: boolean; motivo: string | null };
   chiusa_il: string | null; chiusa_da: string | null;
   documenti: Documento[];
+  totali: { subagenti: { provvigione: number }; documenti: { provvigione: number } };
 }
 
 export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre: number }) {
@@ -185,6 +187,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
             nota={`${b.subagenti.length} con documenti${b.senza_documenti ? ` · ${b.senza_documenti} senza` : ''}`}>
             <DataTable compatta righe={b.subagenti} chiave={(s) => s.id}
               ordinamentoIniziale={{ key: 'provvigione', dir: 'desc' }}
+              totali={b.totali.subagenti}
               rowClass={(s) => (s.id === subSel ? 'selezionata' : '')}
               onRowClick={(s) => setSubSel(s.id === subSel ? null : s.id)}
               colonne={[
@@ -217,6 +220,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
               contenuto: () => (
                 <div className="riempi">
                   <DataTable righe={visibili} chiave={(d) => d.documento_id + '|' + (d.voce ?? '')} filtro={subSel ?? 'tutti'}
+                    totali={scelto ? { provvigione: scelto.totale_documenti } : b.totali.documenti}
                     ordinamentoIniziale={{ key: 'stato', dir: 'asc' }}
                     colonne={[
                       {
@@ -301,7 +305,7 @@ function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
             { nome: 'Margine Decobrands', valori: r.subagenti.map((x) => x.margine), colore: COLORI_GRAFICI.ok },
           ]} />
         <DataTable naturale compatta perPagina={false} righe={r.subagenti} chiave={(x) => x.id}
-          ordinamentoIniziale={{ key: 'pagate', dir: 'desc' }} etichettaTotale="Totale"
+          ordinamentoIniziale={{ key: 'pagate', dir: 'desc' }} etichettaTotale="Totale" totali={r.totali}
           colonne={[
             {
               key: 'nome', header: 'Subagente', grow: true,
@@ -388,7 +392,7 @@ function FinestraEsporta({ anno, trimestre, chiusa, subagenti, scelto, onChiudi,
       onChiudi={() => { if (!attesa) onChiudi(); }}
       piede={<>
         <button type="button" className="btn sec" onClick={onChiudi} disabled={attesa}>Annulla</button>
-        <button type="button" className="btn" onClick={scarica} disabled={attesa}>{attesa ? 'Attendi…' : 'Scarica'}</button>
+        <button type="button" className="btn consentito" onClick={scarica} disabled={attesa}>{attesa ? 'Attendi…' : 'Scarica'}</button>
       </>}>
       <div className="scelte-esporta" role="radiogroup" aria-label="Cosa esportare">
         {scelte.map((x) => (

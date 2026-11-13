@@ -22,3 +22,4 @@ Valgono per ogni sessione di OpenCode che esegue un pacchetto `collaudo-<onda>-N
 ## Comandi della shell (13/11/2026)
 - Niente `cd` nei comandi: `opencode run` rifiuta da solo i permessi per le cartelle esterne e un `cd` fuori posto ferma la sessione senza lavoro. Percorsi sempre dalla radice del progetto (`npx --prefix app/backend …`); per cercare file gli strumenti glob/grep, non `find`.
 - Niente `/tmp` né cartelle fuori dal progetto (anche questo ferma la sessione): file temporanei e log in `strumenti/collaudo/e2e/uscita/` (ignorata da git). Niente processi lanciati in background con `&`: i comandi lunghi si lanciano in primo piano con un timeout lungo.
+- Il frontend di prova (8071) gira da una **copia fuori dal progetto**: non leggerla e non toccarla (permesso rifiutato, la sessione si ferma, 13/11/2026). Il codice vero è `app/frontend`; `prepara.sh` lo ricopia.

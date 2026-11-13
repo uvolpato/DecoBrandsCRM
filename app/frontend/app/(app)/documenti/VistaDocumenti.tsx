@@ -171,7 +171,7 @@ export function VistaDocumenti() {
         </Pannello>
 
         {selezionato ? (
-          <VistaDocumento id={selezionato} onFatto={ricarica} />
+          <VistaDocumento key={selezionato} id={selezionato} onFatto={ricarica} />
         ) : (
           <Pannello titolo="Come entrano i documenti" riempi>
             <Elenco voci={[

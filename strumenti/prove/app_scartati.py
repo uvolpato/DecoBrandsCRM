@@ -103,6 +103,7 @@ with sync_playwright() as p:
         pg.goto(BASE + '/documenti')
         pg.wait_for_load_state('networkidle')
         link = pg.locator('.pannello-nota a[href="/scartati"]')
+        link.first.wait_for()  # il numero degli scartati arriva dal server, dopo la pagina
         ok(link.count() == 1, 'in Documenti c’è il link «N scartati»')
         ok('scartati' in link.first.inner_text(), 'il link dice quanti sono: %s' % link.first.inner_text())
         pg.goto(BASE + '/scartati')

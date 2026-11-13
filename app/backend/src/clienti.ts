@@ -6,6 +6,7 @@ import { IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength,
 import type { Request } from 'express';
 import { Richiede, contesto, permessiDi } from './accesso';
 import { ForbiddenException } from '@nestjs/common';
+import { giornoRoma } from './motore/dati';
 import { dopoChiusura } from './fornitori';
 import { PrismaService } from './prisma.service';
 import { normalizzaNome } from './proposta';
@@ -189,19 +190,27 @@ export class ClientiController {
   async pratiche(@Param('id', ParseIntPipe) id: number) {
     const c = await this.db.clienti.findUnique({ where: { id: BigInt(id) } });
     if (!c) throw new NotFoundException('Cliente non trovato');
-    const ps = await this.db.ordini_fornitore_testata.findMany({
-      where: { cliente_id: BigInt(id) },
-      include: {
-        fornitore: { select: { ragione_sociale: true } },
-      },
-      orderBy: { data_ordine: 'desc' },
-    });
+    // stato come nell'elenco Pratiche (§7.2): il DB tiene la fase (inviato/confermato/fatturato), qui la si
+    // traduce in scaduta/attesa/confermata/fatturata con la scadenza del fornitore. Stessa regola di pratiche.ts.
+    const oggi = giornoRoma(new Date());
+    const ps = await this.db.$queryRaw<{
+      id: bigint; numero_ordine: string; data_ordine: Date; fornitore_id: bigint;
+      fornitore: string; importo_merce: Prisma.Decimal | null; stato: string;
+    }[]>`
+      SELECT t.id, t.numero_ordine, t.data_ordine, t.fornitore_id, fv.ragione_sociale AS fornitore, t.importo_merce,
+             CASE t.stato WHEN 'fatturato' THEN 'fatturata' WHEN 'confermato' THEN 'confermata'
+               ELSE CASE WHEN f.giorni_attesa_conferma > 0 AND t.data_ordine + f.giorni_attesa_conferma < ${oggi}::date THEN 'scaduta' ELSE 'attesa' END END AS stato
+      FROM ordini_fornitore_testata t
+      JOIN fornitori f ON f.id = t.fornitore_id
+      JOIN fornitori_versioni fv ON fv.fornitore_id = t.fornitore_id AND fv.id = t.fornitore_versione_id
+      WHERE t.cliente_id = ${BigInt(id)}
+      ORDER BY t.data_ordine DESC, t.id DESC`;
     return ps.map((p) => ({
       id: String(p.id),
       numero_ordine: p.numero_ordine,
       data_ordine: iso(p.data_ordine)!,
       fornitore_id: String(p.fornitore_id),
-      fornitore: p.fornitore?.ragione_sociale ?? null,
+      fornitore: p.fornitore,
       importo_merce: p.importo_merce === null ? null : Number(p.importo_merce),
       stato: p.stato,
     }));

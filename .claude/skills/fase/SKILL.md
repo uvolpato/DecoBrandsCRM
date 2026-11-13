@@ -55,6 +55,7 @@ A Ugo si scrive in mezza riga quale modello e perché.
      "Sei l'esecutore del Decobrands CRM (c:\Progetti\Decobrands_CRM). Leggi strumenti/opencode/regole-onda-parallela.md e poi esegui strumenti/opencode/<pacchetto>.md. Rispondi con il riepilogo di massimo 10 righe chiesto dalle regole." \
      > "<scratchpad>/oc-<pacchetto>.log" 2>&1
    ```
+   - Dopo pochi secondi prendi l'id della sessione (`curl -s http://127.0.0.1:4097/session`, la prima con il titolo del pacchetto) e **scrivi sempre a Ugo il link**: `http://127.0.0.1:4097/QzpcUHJvZ2V0dGlcRGVjb2JyYW5kc19DUk0/session/<id>`.
    - Bash con `run_in_background: true`; la notifica arriva quando il processo esce. Non inventare
      il risultato, non leggere il log a ogni minuto.
    - Più pacchetti insieme solo se i **file ammessi non si toccano** (stesso albero, niente worktree);

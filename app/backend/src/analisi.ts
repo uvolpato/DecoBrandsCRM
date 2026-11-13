@@ -242,6 +242,8 @@ function pagina(S: Dati, c: Calcolo, q: Filtri) {
     tabella: {
       raggruppa: q.raggruppa ?? 'subagente',
       totale: c.sel.length,
+      // totali degli importi dal server (V12, D-126 §19): il piede li mostra senza sommare
+      totali: { fatturato: n(t.fatturato), prese: n(t.prese), pagate: n(t.pagate), margine: n(t.margine) },
       righe: righe
         ? righe.map((x) => ({
           chiave: x.chiave, nome: x.nome, documenti: x.documenti, clienti: x.clienti,

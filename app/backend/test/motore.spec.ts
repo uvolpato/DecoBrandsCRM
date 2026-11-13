@@ -161,6 +161,18 @@ describe('motore §10 = prototipo', () => {
     expect(agosto.righe.find((r) => r.numero === 'F-2026-0858')!.pagamento).toBe(true);
   });
 
+  it('D-119: riga del mese dopo con documento_id di un documento del mese prima si riconcilia (provvigione, non sconosciuta)', () => {
+    const gries = fornitore('Gries').id;
+    const { pratica: p, doc: d } = doc('F-2026-0858'); // Gries (maturato), giugno
+    const base = S.bollettini.find((x) => x.fornitore_id === gries && x.mese === 7)!;
+    const prese = m.provvigioneDoc(S, p, d)!.prese;
+    const riga = { ...base.righe[0], id: 'riga-d119', documento_id: d.id, liquidazione_id: null, numero: d.numero, data: d.data, imponibile: d.importo, pct: null, importo: prese, tipo: null, pct_calcolata: null, importo_calcolato: null, decisione: null };
+    const b = { ...base, id: 'b-d119', righe: [riga], attese: [] };
+    const S2 = { ...S, bollettini: [...S.bollettini, b] };
+    const x = m.riconcilia(S2, b).righe.find((y) => y.numero === d.numero)!;
+    expect([x.categoria, n(x.noi!.importo), n(x.differenza)]).toEqual(['quadra', n(prese), 0]);
+  });
+
   it('stato d\'incasso di ogni fattura (§5.14)', () => {
     const nostri = S.pratiche.flatMap((p) => p.documenti.map((d) => { const st = m.statoIncasso(S, p, d); return [d.numero, st?.stato ?? null, st && !st.manuale ? st.dal : null, st?.giorni ?? null]; }));
     // la data della segnalazione a mano nel prototipo è un segnaposto ('%d-%02d-15'): si confronta lo stato
@@ -231,6 +243,26 @@ describe('motore §10 = prototipo', () => {
     // F-2026-0891 (luglio) è nel bollettino di luglio non ancora verificato: in attesa
     const r = m.righeLiquidazione(S, 2026, 3).find((x) => x.numero === 'F-2026-0891')!;
     expect([r.liquidabile, r.motivo]).toEqual([false, 'bollettino_da_verificare']);
+  });
+
+  it('maturato: la nota di credito entra con la sua fattura riconosciuta (D-118)', () => {
+    // F-2026-0858 (Gries, maturato) riconosciuta nel bollettino di agosto verificato → 3° trimestre
+    const { pratica: p, doc: f } = doc('F-2026-0858');
+    const nc = { ...f, id: 'nc-maturato-500', numero: 'NC-2026-500', tipo: 'nota_credito' as const, data: '2026-06-10', importo: dec(-500), fattura_id: f.id, liquidazione_id: null, incasso: null, correzione: null };
+    const p2 = { ...p, id: 'p-nc-maturato-500', documenti: [...p.documenti, nc] };
+    const S2 = { ...S, pratiche: [...S.pratiche, p2] };
+    // la NC non è riconosciuta di per sé, ma segue la fattura: entra nel trimestre del bollettino che la riconosce (3°), liquidabile
+    expect(m.righeLiquidazione(S2, 2026, 2).some((r) => r.numero === 'NC-2026-500')).toBe(false);
+    const r = m.righeLiquidazione(S2, 2026, 3).find((x) => x.numero === 'NC-2026-500')!;
+    expect([r.liquidabile, r.motivo, r.incasso, n(r.importo), n(r.provvigione)]).toEqual([true, null, false, -500, -50]);
+  });
+
+  it('maturato: la nota di credito di una fattura liquidata in un trimestre chiuso va nella liquidazione successiva (D-150)', () => {
+    // NC-2026-005 (agosto) segue F-2026-0815 (riconosciuta a maggio, liquidata nel 2° trimestre chiuso):
+    // la provvigione tolta non riapre il chiuso (D-33), va nel 3° trimestre come voce negativa (D-11).
+    expect(m.righeLiquidazione(S, 2026, 2).some((r) => r.numero === 'NC-2026-005')).toBe(false);
+    const r = m.righeLiquidazione(S, 2026, 3).find((x) => x.numero === 'NC-2026-005')!;
+    expect([r.liquidabile, n(r.provvigione)]).toEqual([true, -131.1]);
   });
 
   it('storno: al subagente nella prima liquidazione aperta dopo la chiusura del bollettino (D-11)', () => {

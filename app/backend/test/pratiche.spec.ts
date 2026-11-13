@@ -263,3 +263,28 @@ describe('GET /api/pratiche/cerca (D-60: il campo di ricerca dello Sposta)', () 
     await senzaPermesso.get('/pratiche/cerca?fornitore_id=1').expect(403);
   });
 });
+
+describe('GET /api/pratiche/:id/documenti/:did/confronto (A5-02, D-78, V12)', () => {
+  it('le righe con lo stesso codice si sommano: nessuna variazione e delta zero (D-60)', async () => {
+    // ordine con l'articolo X su due righe (10 + 5 pezzi), fattura con X su una riga (15 pezzi)
+    const base = await db.ordini_fornitore_testata.findFirstOrThrow();
+    const t = await db.ordini_fornitore_testata.create({ data: {
+      fornitore_id: base.fornitore_id, fornitore_versione_id: base.fornitore_versione_id,
+      cliente_id: base.cliente_id, cliente_versione_id: base.cliente_versione_id,
+      numero_ordine: 'OF/2026/999', data_ordine: new Date('2026-09-01'),
+    } });
+    const ordine = await db.ordini_fornitore_documenti.create({ data: { testata_id: t.id, tipo: 'ordine', numero: 'AB 999', data: new Date('2026-09-01'), importo: 75 } });
+    const fattura = await db.ordini_fornitore_documenti.create({ data: { testata_id: t.id, tipo: 'fattura', numero: 'RE-999', data: new Date('2026-09-03'), importo: 75 } });
+    await db.ordini_fornitore_righe.createMany({ data: [
+      { testata_id: t.id, documento_id: ordine.id, fase: 'ordine', numero_riga: 1, codice: 'X', descrizione: 'X', quantita: 10, prezzo_unitario: 5, importo: 50 },
+      { testata_id: t.id, documento_id: ordine.id, fase: 'ordine', numero_riga: 2, codice: 'X', descrizione: 'X', quantita: 5, prezzo_unitario: 5, importo: 25 },
+      { testata_id: t.id, documento_id: fattura.id, fase: 'fattura', numero_riga: 1, codice: 'X', descrizione: 'X', quantita: 15, prezzo_unitario: 5, importo: 75 },
+    ] });
+    const r = (await resp.get(`/pratiche/${t.id}/documenti/${fattura.id}/confronto?rif=${ordine.id}`).expect(200)).body;
+    expect(r.righe).toHaveLength(1);
+    expect(r.righe[0]).toMatchObject({ codice: 'X', varia: false, delta: 0 });
+    expect(r.righe[0].a).toEqual({ quantita: 15, prezzo: 5, importo: 75 }); // ordine: X sulle due righe, sommate
+    expect(r.righe[0].b).toEqual({ quantita: 15, prezzo: 5, importo: 75 }); // fattura
+    expect(r.differenza).toBe(0);
+  });
+});

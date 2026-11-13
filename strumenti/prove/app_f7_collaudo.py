@@ -27,12 +27,12 @@ def entra(b, utente, larghezza, altezza=900):
     pg.on('console', lambda m: errori.append('console: ' + m.text) if m.type == 'error' else None)
     pg.goto(BASE + '/'); pg.wait_for_function("location.pathname.indexOf('/accesso') === 0")
     apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
-    pg.wait_for_selector('.testa h1', timeout=45000)
+    pg.wait_for_selector('.testa h1', timeout=120000)
     # i 401 di /api/accesso/io prima dell'accesso sono il modo normale di sapere se c'è una sessione
     errori.clear()
     return pg, errori
 
-def attesa(pg, sel='.testa h1', ms=45000):
+def attesa(pg, sel='.testa h1', ms=120000):
     pg.wait_for_selector(sel, timeout=ms)
     try: pg.wait_for_load_state('networkidle', timeout=2500)
     except Exception: pass

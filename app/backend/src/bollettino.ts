@@ -53,8 +53,11 @@ export function riconciliazione(S: Dati, id: string) {
   const lato = (l: Riconciliata['loro']) => l && { imponibile: num(l.imponibile), pct: num(l.pct), importo: Number(l.importo) };
   const contestate = r.righe.filter((x) => x.decisione?.esito === 'contestato').length;
   const n = (k: number, uno: string, piu: string) => `${k} ${k === 1 ? uno : piu}`;
+  // D-119 §19: le correzioni di un bollettino contestato arrivano nel bollettino del mese dopo
+  // (non si riapre né si sostituisce il mese contestato, D-56: uno per fornitore e mese)
+  const meseDopo = b.mese === 12 ? { mese: 1, anno: b.anno + 1 } : { mese: b.mese + 1, anno: b.anno };
   const azione = !aperto
-    ? { tipo: 'chiuso', testo: b.stato === 'verificato' ? 'Bollettino verificato. Le provvigioni riconosciute sono acquisite.' : `Bollettino contestato: in attesa del bollettino rettificato da ${f.nome}.` }
+    ? { tipo: 'chiuso', testo: b.stato === 'verificato' ? 'Bollettino verificato. Le provvigioni riconosciute sono acquisite.' : `Bollettino contestato: le correzioni del fornitore arrivano nel bollettino di ${MESI[meseDopo.mese - 1]} ${meseDopo.anno}.` }
     : r.aperte ? { tipo: 'decidi', testo: `${n(r.aperte, 'riga da decidere', 'righe da decidere')} prima di chiudere il bollettino.` }
       : contestate ? { tipo: 'contesta', testo: `${n(contestate, 'riga da contestare', 'righe da contestare')} a ${f.nome}.` }
         : { tipo: 'verifica', testo: 'Tutte le righe sono quadrate o decise.' };
@@ -68,7 +71,10 @@ export function riconciliazione(S: Dati, id: string) {
       pratica_id: x.pratica_id, cliente_id: x.cliente_id, cliente: x.cliente_id ? (S.clienti.get(x.cliente_id)?.nome ?? null) : null,
       categoria: x.categoria, // quadra · differenza · mancante · sconosciuta · storno · riaccredito · attesa_incasso · pagata_dopo
       gruppo: x.aperta ? 'da_decidere' : x.decisione ? 'decise' : x.incasso ? 'incassi' : 'quadrano',
-      loro: lato(x.loro), noi: lato(x.noi), differenza: num(x.differenza),
+      loro: lato(x.loro), noi: lato(x.noi),
+      // D-126 §19: la differenza riga per riga arriva dal server; per una riga sconosciuta il motore non la
+      // calcola (noi = null) e vale l'importo riconosciuto dal fornitore, come mostrava il prototipo (V12).
+      differenza: num(x.differenza ?? (x.loro ? x.loro.importo : null)),
       aperta: x.aperta, incasso: x.incasso, pagamento: x.pagamento, giorni: x.giorni,
       pagata_in: x.pagata_in ? (({ id, mese, anno }) => ({ id, mese, anno }))(S.bollettini.find((o) => o.id === x.pagata_in)!) : null,
       decisione: x.decisione, // {esito, motivo, da, il}; il nome di chi ha deciso lo aggiunge la rotta
@@ -161,7 +167,7 @@ export class BollettinoController {
     if (!righe.length) throw new ConflictException('Nessuna riga contestata');
     const mese = MESI[r.mese - 1] + ' ' + r.anno;
     const conDifferenza = righe.filter((x) => x.differenza != null);
-    const totale = conDifferenza.reduce((s, x) => s + (x.differenza ?? 0), 0);
+    const totale = conDifferenza.reduce((s, x) => s.plus(x.differenza ?? 0), new Prisma.Decimal(0)).toNumber(); // A2-09: Decimal
     const riga = (x: (typeof righe)[number]) => {
       const chi = x.cliente ? ` (${x.cliente})` : '';
       const quando = x.data ? ` del ${dataIt(x.data)}` : '';
@@ -271,6 +277,7 @@ export class BollettinoController {
   @Richiede('provvigioni.modifica')
   async chiudi(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() c: Chiusura) {
     const ctx = contesto(req);
+    // ponytail: un UPDATE per riga; updateMany per gruppi se i bollettini superano qualche centinaio di righe
     await this.db.$transaction(async (tx) => {
       const { S, b, r } = await blocca(tx, BigInt(id));
       const contestate = r.righe.filter((x) => x.decisione?.esito === 'contestato').length;
@@ -297,7 +304,7 @@ export class BollettinoController {
         tipo: 'stato', azione: 'change_state', entita: 'bollettino', entita_id: BigInt(id), esito: 'successo',
         dettaglio: { etichetta: et, prima: { stato: b.stato }, dopo: { stato: c.stato }, motivo: note ?? null },
       }, ctx);
-    });
+    }, { timeout: 30_000 }); // A3-08
     return this.dettaglio(id);
   }
 }

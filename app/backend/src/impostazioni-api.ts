@@ -1,9 +1,9 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/common';
 import { IsObject } from 'class-validator';
 import { Prisma } from '@prisma/client';
 import { ImapFlow } from 'imapflow';
 import type { Request } from 'express';
-import { Richiede, contesto } from './accesso';
+import { Richiede, contesto, permessiDi } from './accesso';
 import { creaPonte, pulisci } from './integra';
 import {
   applica, casellaConfig, integraConfig, letturaConfig, postaConfig, sezionePubblica, sezioneDi,
@@ -38,9 +38,22 @@ const TESTO_PROVA: Record<string, string> = {
   integra: 'Sincronizzazione non configurata: completa server, database, utente e password.',
 };
 
+// D-115 §19: le sezioni che individuano una connessione (casella, posta, Integra) si modificano e si
+// provano solo dal superutente (permesso `sistema.connessioni`). Il controllo del guard vale per tutta
+// la pagina (`sistema.impostazioni`); qui si stringe per le singole sezioni di connessione.
+const CONNESSIONI = ['casella', 'posta', 'integra'] as const;
+
 @Controller('impostazioni')
 export class ImpostazioniController {
   constructor(private readonly db: PrismaService) {}
+
+  /** Le connessioni sono del solo superutente (D-115): chi non ha `sistema.connessioni` non le tocca. */
+  private controllaConnessione(req: Request, chiave: string) {
+    if ((CONNESSIONI as readonly string[]).includes(chiave) && req.utente
+      && !permessiDi(req.utente.ruolo, req.livelli ?? {}).includes('sistema.connessioni')) {
+      throw new ForbiddenException();
+    }
+  }
 
   /** Le sei sezioni, in ordine fisso, con metadati e valori; i segreti solo `impostata`. */
   @Get()
@@ -59,6 +72,7 @@ export class ImpostazioniController {
   @Put(':chiave')
   @Richiede('sistema.impostazioni')
   async salva(@Req() req: Request, @Param('chiave') chiave: string, @Body() b: Salva) {
+    this.controllaConnessione(req, chiave);
     const ctx = contesto(req);
     const utenteId = ctx.utente_id ?? null;
     // una transazione: upsert della riga + evento, tutto da tx (V13); sezione sconosciuta → 404
@@ -83,8 +97,9 @@ export class ImpostazioniController {
   @Post(':chiave/prova')
   @HttpCode(200)
   @Richiede('sistema.impostazioni')
-  async prova(@Param('chiave') chiave: string) {
+  async prova(@Req() req: Request, @Param('chiave') chiave: string) {
     sezioneDi(chiave); // 404 per chiave sconosciuta
+    this.controllaConnessione(req, chiave);
     if (chiave === 'azienda' || chiave === 'conservazione') {
       throw new BadRequestException('Questa sezione non ha una connessione da provare');
     }

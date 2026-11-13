@@ -164,6 +164,19 @@ describe('riconosciCliente (D-92)', () => {
     expect(await riconosciCliente(db, L({ piva_cliente: 'DE 01234567890' }))).toEqual({ cliente_id: c.id, ragione: 'Orti Riuniti snc' });
   });
 
+  it('P.IVA condivisa da più clienti: decide la ragione sociale, altrimenti null (D-124)', async () => {
+    // due sedi della stessa catena in Integra, stessa P.IVA scritta con e senza prefisso
+    const bergamo = await creaCliente('Garden Rossi Bergamo srl', '01234567890');
+    const brescia = await creaCliente('Garden Rossi Brescia srl', 'IT 01234567890');
+    expect(await riconosciCliente(db, L({ piva_cliente: 'IT01234567890', cliente: 'Garden Rossi Brescia srl' })))
+      .toEqual({ cliente_id: brescia.id, ragione: 'Garden Rossi Brescia srl' });
+    expect(await riconosciCliente(db, L({ piva_cliente: 'DE 01234567890', cliente: ' Garden Rossi Bergamo SRL ' })))
+      .toEqual({ cliente_id: bergamo.id, ragione: 'Garden Rossi Bergamo srl' });
+    // P.IVA condivisa e ragione sociale assente o diversa: non riconosciuto, niente cliente a caso
+    expect(await riconosciCliente(db, L({ piva_cliente: 'IT01234567890' }))).toBeNull();
+    expect(await riconosciCliente(db, L({ piva_cliente: 'IT01234567890', cliente: 'Garden Rossi Verona srl' }))).toBeNull();
+  });
+
   it('ragione sociale riconosciuta senza P.IVA', async () => {
     expect(await riconosciCliente(db, L({ cliente: 'Verde Vita snc' }))).toEqual({ cliente_id: c1.id, ragione: 'Verde Vita snc' });
   });

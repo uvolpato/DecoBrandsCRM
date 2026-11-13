@@ -1,6 +1,7 @@
 import { BadRequestException, Controller, Get, Query, Req, Res, ServiceUnavailableException, StreamableFile } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -50,7 +51,8 @@ const COL_DETTAGLIO: Col[] = [
   { t: 'Importo provvigionale', w: 21, tipo: 'euro', al: 'right' },
 ];
 
-const somma = (rr: Doc[], k: 'imponibile' | 'provvigione') => Number(r2(rr.reduce((s, x) => s + x[k], 0)));
+const somma = (rr: Doc[], k: 'imponibile' | 'provvigione') => Number(r2(rr.reduce((s, x) => s.plus(x[k]), new Prisma.Decimal(0)))); // A2-09: Decimal, mai virgola mobile
+const sommaDi = (gg: Gruppo[], k: 'imponibile' | 'provvigione', che: 'liq' | 'att' = 'liq') => Number(r2(gg.reduce((s, g) => s.plus(somma(g[che], k)), new Prisma.Decimal(0))));
 const numDoc = (x: Doc) => (x.voce === 'storno' ? 'Storno ' : x.voce === 'riaccredito' ? 'Riaccredito ' : '') + x.numero;
 const docs = (n: number) => n + (n === 1 ? ' documento' : ' documenti');
 
@@ -157,10 +159,10 @@ function bloccoRiepilogo(m: Modello): Tabella {
     .concat(conAttesa ? [somma(g.att, 'provvigione')] : []));
   const valori: Record<number, number> = {
     1: m.gruppi.reduce((n, g) => n + g.liq.length, 0),
-    2: Number(r2(m.gruppi.reduce((s, g) => s + somma(g.liq, 'imponibile'), 0))),
-    3: Number(r2(m.gruppi.reduce((s, g) => s + somma(g.liq, 'provvigione'), 0))),
+    2: sommaDi(m.gruppi, 'imponibile'),
+    3: sommaDi(m.gruppi, 'provvigione'),
   };
-  if (conAttesa) valori[4] = Number(r2(m.gruppi.reduce((s, g) => s + somma(g.att, 'provvigione'), 0)));
+  if (conAttesa) valori[4] = sommaDi(m.gruppi, 'provvigione', 'att');
   return {
     tipo: 'tabella', colonne: col, righe,
     totale: { etichetta: 'Totale · ' + m.gruppi.length + (m.gruppi.length === 1 ? ' subagente' : ' subagenti'), valori },
@@ -386,7 +388,7 @@ export class LiquidazioneExportController {
         : await excel(m);
     const totale = contenuto === 'subagente'
       ? somma(m.gruppi[0].liq, 'provvigione')
-      : Number(r2(m.gruppi.reduce((s, g) => s + somma(g.liq, 'provvigione'), 0)));
+      : sommaDi(m.gruppi, 'provvigione');
     await logEvent(this.db, {
       tipo: 'export', azione: 'export', entita: 'liquidazione', esito: 'successo',
       dettaglio: {

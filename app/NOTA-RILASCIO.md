@@ -5,6 +5,35 @@ Informativo Aziendale: qui ci sono documenti dei fornitori, pratiche, bollettini
 subagenti, incassi dei clienti, analisi, anagrafiche (da Integra), gestione di utenti, ruoli,
 impostazioni, registro, scarti e guida in linea.
 
+## Versioni
+
+La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo alla barra. Ogni
+consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
+cosa è cambiato.
+
+### 0.2.0 — 13/11/2026 — primi documenti veri
+
+Collaudo delle onde 0, 0 bis, 1 e 2 e dei pacchetti 3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01
+(spec 8.80). In breve:
+- **Documenti**: lo stesso file arrivato due volte non crea doppioni; uno scartato torna solo a mano;
+  annullare un documento letto lo rimette da controllare con i dati corretti conservati.
+- **Fattura su più pratiche**: la stessa fattura su una seconda pratica si accetta solo confermando
+  «fattura su più ordini».
+- **Soldi**: totali di documenti, bollettini, liquidazioni e Analisi calcolati dal server; somme in
+  decimali esatti; il motore prende l'agenzia alla data dell'ordine (D-146).
+- **Nota di credito sul maturato** di una fattura già liquidata: va nella liquidazione successiva
+  come voce negativa, il trimestre chiuso non si riapre (D-150, Ugo).
+- **Rettifiche di un bollettino contestato** nel mese dopo; tipo di provvigione bloccato dopo la
+  prima chiusura.
+- **Sicurezza**: casella, posta e Integra le cambia solo il superutente (D-115); il flusso degli
+  aggiornamenti si chiude quando la sessione scade; segreti d'esempio rifiutati in esercizio.
+- **Interfaccia**: avvisi letti dal lettore di schermo, tabelle da tastiera, schede che si
+  ricordano, pagina d'avvio scura con indicatore di caricamento, versione visibile.
+
+**Da verificare con i documenti veri**: lettura dei PDF dei fornitori (connettore cloud), abbinamento
+alle pratiche, bollettini mensili in tedesco (*Provisionsabrechnung*). Excel ed email `.msg` non
+si caricano: vanno convertiti in PDF.
+
 ## Cosa serve sul server
 
 | Componente | Versione / nota |

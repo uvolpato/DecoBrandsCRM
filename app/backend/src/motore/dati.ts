@@ -61,6 +61,9 @@ export const praticaDaDb = (t: Testata) => {
   };
 };
 
+export type Pratica = ReturnType<typeof praticaDaDb>;
+export type Documento = Pratica['documenti'][number];
+
 const CON_RIGHE = { righe: { orderBy: { id: 'asc' } }, attese: { orderBy: { id: 'asc' } } } satisfies Prisma.bollettini_testataInclude;
 type Righe = {
   fornitori: Prisma.fornitoriGetPayload<{ include: { corrente: true } }>[];
@@ -171,8 +174,73 @@ export async function caricaDatiBollettino(db: Db, bollettino: bigint, oggi = gi
 const decisione = (r: { decisione: string | null; decisione_motivo: string | null; deciso_da: bigint | null; deciso_il: Date | null }) =>
   r.decisione ? { esito: r.decisione, motivo: r.decisione_motivo, da: r.deciso_da ? id(r.deciso_da) : null, il: r.deciso_il ? giornoRoma(r.deciso_il) : null } : null;
 
+/** Un bollettino nella forma del motore (M.S.bollettini). */
+const bollettinoDaDb = (b: Righe['bollettini'][number]) => ({
+  id: id(b.id), fornitore_id: id(b.fornitore_id), anno: b.anno, mese: b.mese, stato: b.stato,
+  ricevuto: giornoRoma(b.creato_il), chiuso_il: b.chiuso_il ? giornoRoma(b.chiuso_il) : null,
+  righe: b.righe.map((r) => ({
+    id: id(r.id), documento_id: r.documento_id ? id(r.documento_id) : null, liquidazione_id: r.liquidazione_id ? id(r.liquidazione_id) : null, // D-34, D-11
+    numero: r.fattura_numero, data: r.fattura_data ? iso(r.fattura_data) : null, imponibile: r.importo_merce, pct: r.pct_riconosciuta, importo: r.importo_riconosciuto,
+    tipo: r.tipo_riga === 'provvigione' ? null : r.tipo_riga, // storno | riaccredito (§5.14)
+    pct_calcolata: r.pct_calcolata, importo_calcolato: r.importo_calcolato, // congelati alla verifica (§5.11)
+    decisione: decisione(r), // riga che non quadra (D-49)
+  })),
+  // decisioni sui documenti che mancano nel bollettino (D-56): nostre, non righe del fornitore
+  attese: b.attese.map((a) => ({ documento_id: id(a.documento_id), decisione: decisione(a)! })),
+});
+export type Bollettino = ReturnType<typeof bollettinoDaDb>;
+
+const fineMese = (a: number, m: number) => new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+
+/** Scelta di un documento fra i candidati (A7-21), stessa semantica di trovaDocumento: con `data` vince il
+ *  documento dello stesso giorno, con `entro` il più recente entro la fine del mese, altrimenti il primo. */
+export const scegliDocumento = <T extends { doc: { data: string } }>(candidati: T[], data?: string | null, entro?: string): T | null => {
+  if (!candidati.length) return null;
+  if (data) { const esatto = candidati.find((c) => c.doc.data === data); if (esatto) return esatto; }
+  if (entro) { const nelMese = candidati.filter((c) => c.doc.data <= entro); if (nelMese.length) return nelMese.reduce((a, c) => (c.doc.data > a.doc.data ? c : a)); }
+  return candidati[0];
+};
+
+/** Indici del motore (A7-21): costruiti una volta per caricaDati e riusati dalle funzioni di motore.ts, così
+ *  niente scansioni quadratiche sui documenti. Stessa semantica e stesso ordine di prima (`suDocumento` resta
+ *  il criterio d'uguaglianza). */
+export function costruisciIndici(pratiche: Pratica[], bollettini: Bollettino[]) {
+  const perDocumento = new Map<string, { pratica: Pratica; doc: Documento }>();
+  const perNumero = new Map<string, { pratica: Pratica; doc: Documento }[]>();
+  const fattureDi = new Map<string, Documento[]>();
+  for (const p of pratiche) {
+    const visti = new Set<string>();
+    for (const d of p.documenti) {
+      if (!perDocumento.has(d.id)) perDocumento.set(d.id, { pratica: p, doc: d });
+      if (!visti.has(d.numero)) { // trovaDocumento prende il primo documento col numero, per pratica
+        visti.add(d.numero);
+        const a = perNumero.get(d.numero); if (a) a.push({ pratica: p, doc: d }); else perNumero.set(d.numero, [{ pratica: p, doc: d }]);
+      }
+      if (d.tipo === 'fattura') {
+        const k = `${p.cliente_id}|${p.fornitore_id}|${d.data.slice(0, 7)}`;
+        const a = fattureDi.get(k); if (a) a.push(d); else fattureDi.set(k, [d]);
+      }
+    }
+  }
+  const bollettiniDi = new Map<string, Bollettino[]>();
+  for (const b of bollettini) { const a = bollettiniDi.get(b.fornitore_id); if (a) a.push(b); else bollettiniDi.set(b.fornitore_id, [b]); }
+  const righeSuDocumento = new Map<string, { b: Bollettino; r: Bollettino['righe'][number] }[]>();
+  for (const b of bollettini) {
+    const entro = fineMese(b.anno, b.mese);
+    for (const r of b.righe) {
+      const n = r.documento_id ? (perDocumento.get(r.documento_id) ?? null)
+        : scegliDocumento((perNumero.get(r.numero) ?? []).filter((c) => c.pratica.fornitore_id === b.fornitore_id), r.data, entro);
+      if (!n) continue;
+      const a = righeSuDocumento.get(n.doc.id); if (a) a.push({ b, r }); else righeSuDocumento.set(n.doc.id, [{ b, r }]);
+    }
+  }
+  return { perDocumento, perNumero, bollettiniDi, righeSuDocumento, fattureDi, praticaPerId: new Map(pratiche.map((p) => [p.id, p])) };
+}
+
 /** Dalle righe del database alla forma del motore: una sola copia delle conversioni. */
 function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccezioni, interscambio, testate, bollettini, liquidazioni }: Righe) {
+  const pratiche = testate.map(praticaDaDb);
+  const bol = bollettini.map(bollettinoDaDb);
   return {
     oggi,
     fornitori: new Map(fornitori.map((f) => [id(f.id), {
@@ -193,26 +261,17 @@ function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccez
       codice: a.codice_cliente_fornitore, sconto: a.sconto, pct_subagente: a.pct_subagente, regola_mensile: a.regola_mensile,
       valido_dal: iso(a.valido_dal), valido_al: a.valido_al ? iso(a.valido_al) : null,
     })),
-    pratiche: testate.map(praticaDaDb),
-    bollettini: bollettini.map((b) => ({
-      id: id(b.id), fornitore_id: id(b.fornitore_id), anno: b.anno, mese: b.mese, stato: b.stato,
-      ricevuto: giornoRoma(b.creato_il), chiuso_il: b.chiuso_il ? giornoRoma(b.chiuso_il) : null,
-      righe: b.righe.map((r) => ({
-        id: id(r.id), documento_id: r.documento_id ? id(r.documento_id) : null, liquidazione_id: r.liquidazione_id ? id(r.liquidazione_id) : null, // D-34, D-11
-        numero: r.fattura_numero, data: r.fattura_data ? iso(r.fattura_data) : null, imponibile: r.importo_merce, pct: r.pct_riconosciuta, importo: r.importo_riconosciuto,
-        tipo: r.tipo_riga === 'provvigione' ? null : r.tipo_riga, // storno | riaccredito (§5.14)
-        pct_calcolata: r.pct_calcolata, importo_calcolato: r.importo_calcolato, // congelati alla verifica (§5.11)
-        decisione: decisione(r), // riga che non quadra (D-49)
-      })),
-      // decisioni sui documenti che mancano nel bollettino (D-56): nostre, non righe del fornitore
-      attese: b.attese.map((a) => ({ documento_id: id(a.documento_id), decisione: decisione(a)! })),
-    })),
+    pratiche,
+    bollettini: bol,
     liquidazioni_chiuse: liquidazioni.map((l) => ({ id: id(l.id), anno: l.anno, trimestre: l.trimestre, chiusa_il: giornoRoma(l.chiusa_il) })),
     // Fotografia delle liquidazioni chiuse (D-33, A2-01): per documento liquidato, subagente e provvigione pagati
     // alla chiusura. Gli storni e i riaccrediti la rileggono, così un cambio d'agenzia non sposta le provvigioni passate.
     fotografie: new Map(liquidazioni.flatMap((l) => ((l.totali as { documenti?: FotoDoc[] } | null)?.documenti ?? [])
       .filter((r) => !r.voce)
       .map((r) => [r.documento_id, { subagente_id: r.subagente_id, provvigione: new Dec(r.provvigione), pct: new Dec(r.pct), importo: new Dec(r.importo) }]))),
+    ...costruisciIndici(pratiche, bol),
+    // riferimenti ai quali gli indici sono stati costruiti: indici() in motore.ts li usa per capire se rigenerarli
+    _pratiche: pratiche, _bollettini: bol,
   };
 }
 

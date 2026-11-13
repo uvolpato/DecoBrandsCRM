@@ -98,6 +98,8 @@ interface Dettaglio {
   fornitore: { id: string; nome: string | null } | null;
   campi: Campo[]; testata: Testata; righe: Riga[]; controlli: Controllo[];
   proposta: Proposta; bollettino: { esiste: boolean } | null;
+  // D-126 §19: totali del piede della tabella delle righe dal server, non sommati nel browser (V12)
+  totali: { importo: number; provvigione: number };
 }
 
 /** Punti da controllare (come M.statoLettura): controlli falliti + campi incerti con un valore. */
@@ -143,8 +145,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     const r = await api<Dettaglio>('documenti/' + id);
     if (r.ok) { setD(r.dati); setErrore(''); } else setErrore(r.messaggio);
   }, [id]);
-  // al cambio di documento si azzera il dettaglio, così ricompare il caricamento (sagome)
-  useEffect(() => { setD(null); setErrore(''); }, [id]);
+  // il dettaglio si rimonta al cambio di documento (`key` in VistaDocumenti, D-94): niente azzeramento qui
   useEffect(() => { void carica(); }, [carica]);
 
   // il bollettino già registrato: serve solo il collegamento alla verifica (D-71)
@@ -195,9 +196,21 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
   const etichettaTipo = t.tipo ? TIPO[t.tipo] ?? t.tipo : 'Documento';
   const ab = doc.proposta.abbinamento;
 
-  async function inviaAbbina(corpo: Record<string, unknown>) {
-    const r = await api<{ pratica: { id: string; numero: string } }>('documenti/' + id + '/abbina', corpo);
-    if (!r.ok) { avviso(r.messaggio, true); return false; }
+  async function inviaAbbina(corpo: Record<string, unknown>, multi_ordine = false) {
+    const c = multi_ordine ? { ...corpo, multi_ordine: true } : corpo;
+    const r = await api<{ pratica: { id: string; numero: string } }>('documenti/' + id + '/abbina', c);
+    if (!r.ok) {
+      // D-123: la stessa fattura su un'altra pratica chiede la conferma multi-ordine
+      if (r.stato === 409 && r.messaggio.includes('su più ordini')) {
+        const si = await new Promise<boolean>((ok) => setFinestra(
+          <Conferma titolo={'La ' + (TIPO[t.tipo ?? ''] ?? 'fattura').toLowerCase() + ' è già su un’altra pratica'}
+            testo={r.messaggio} etichetta="Conferma" onRisposta={(x) => { chiudi(); ok(x); }} />,
+        ));
+        if (!si) return false;
+        return inviaAbbina(corpo, true);
+      }
+      avviso(r.messaggio, true); return false;
+    }
     avviso('Documento abbinato alla pratica ' + r.dati.pratica.numero);
     router.push('/pratiche/' + r.dati.pratica.id);
     return true;
@@ -477,7 +490,9 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
               <>
                 {!ab && (doc.proposta.cliente_riconosciuto
                   ? <Nota>Il codice {t.codice_cliente ?? '—'} non è abbinato a {nomeFornitore}, ma il cliente è <b>{doc.proposta.cliente_riconosciuto.ragione ?? ''}</b>. Aggiungi l’agenzia nella <Link href={'/clienti/' + doc.proposta.cliente_riconosciuto.cliente_id}>scheda del cliente</Link>, oppure scegli cliente e fornitore qui sotto.</Nota>
-                  : <Nota>Il codice {t.codice_cliente ?? '—'} non corrisponde a nessun cliente di {nomeFornitore}. Correggi il codice letto oppure scegli cliente e fornitore qui sotto.</Nota>)}
+                  : doc.fornitore
+                    ? <Nota>Il codice {t.codice_cliente ?? '—'} non corrisponde a nessun cliente di {nomeFornitore}. Correggi il codice letto oppure scegli cliente e fornitore qui sotto.</Nota>
+                    : <Nota>Fornitore e codice cliente non letti: correggi i dati letti oppure scegli cliente e fornitore qui sotto.</Nota>)}
                 <Scelte voci={[{
                   titolo: (t.numero ?? 'Ordine') + ' · ' + (ab?.cliente ?? 'cliente da scegliere'),
                   sottotitolo: <Stato v="attesa">Nuova pratica</Stato>,
@@ -495,10 +510,12 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
           <>
             {doc.proposta.esito === 'nessuno' && <h3>A quale pratica appartiene?</h3>}
             {doc.proposta.esito === 'nessuno' && (
-              <Nota>Il codice {t.codice_cliente ?? '—'} non corrisponde a nessun cliente di {nomeFornitore}. Scegli la pratica a mano oppure correggi il codice.</Nota>
+              <Nota>{doc.fornitore
+                ? <>Il codice {t.codice_cliente ?? '—'} non corrisponde a nessun cliente di {nomeFornitore}. Scegli la pratica a mano oppure correggi il codice.</>
+                : <>Fornitore e codice cliente non letti: scegli la pratica a mano oppure correggi il codice.</>}</Nota>
             )}
             {doc.proposta.esito === 'doppio' && <Nota>Questo documento risulta già registrato: controlla il numero letto o scarta il documento.</Nota>}
-            <Scelte vuoto={'Nessuna pratica aperta di ' + nomeFornitore + ' a cui abbinarlo.'} voci={doc.proposta.candidati.map((c, i) => {
+            <Scelte vuoto={doc.fornitore ? 'Nessuna pratica aperta di ' + nomeFornitore + ' a cui abbinarlo.' : 'Nessuna pratica aperta a cui abbinarlo.'} voci={doc.proposta.candidati.map((c, i) => {
               const s = STATO_PRATICA[c.pratica.stato] ?? { testo: c.pratica.stato, v: 'neutro' as Variante };
               return {
                 titolo: c.pratica.numero + ' · ' + (c.pratica.cliente ?? ''),
@@ -515,7 +532,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         )}
         {!boll && doc.stato === 'da_controllare' && !['manca_agenzia', 'manca_rappresentanza', 'fornitore_da_integra', 'cliente_da_integra'].includes(doc.proposta.esito) && (
           <div className="abbina-altra">
-            <span className="testo-tenue">Oppure abbina a un’altra pratica di {nomeFornitore}:</span>
+            <span className="testo-tenue">{doc.fornitore ? 'Oppure abbina a un’altra pratica di ' + nomeFornitore + ':' : 'Oppure abbina a un’altra pratica:'}</span>
             <CampoRicerca entita={PRATICA} contesto={{ fornitore_id: t.fornitore_id }} valore={altra} onChange={setAltra} />
             <button type="button" className="btn sec" disabled={!altra} onClick={() => { setAltra(''); void seAffidabile(() => abbinaPratica(altra)); }}>Abbina</button>
           </div>
@@ -543,6 +560,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
           : 'Righe come lette dal documento. Per cambiarle usa Correggi i dati letti.'}</Nota>
         <div className="riempi">
           <DataTable righe={doc.righe} colonne={colonne} chiave={(r) => String(r.i)} compatta
+            totali={doc.totali}
             etichettaTotale={boll ? 'Totale provvigioni' : 'Totale documento'}
             rowClass={(r) => incerte.has(r.i) ? 'evidenzia' : ''}
             emptyText="Nessuna riga letta" emptyHint="Correggi i dati letti per aggiungerle." />
@@ -579,7 +597,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         azioni={azioni}>
         <div className="pila riempi">
           <Dettagli inColonne voci={testata} />
-          <Schede schede={schede} attiva={scheda} onCambia={setScheda} riempi />
+          <Schede schede={schede} attiva={scheda} onCambia={setScheda} memoria={'documento-' + id} riempi />
         </div>
       </Pannello>
       {finestra}
