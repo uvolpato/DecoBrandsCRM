@@ -73,7 +73,7 @@ interface Riga {
 }
 interface Testata {
   tipo: string | null; numero: string | null; data: string | null; fornitore_id: string | null;
-  codice_cliente: string | null; cliente: string | null; piva_cliente: string | null; piva_fornitore: string | null; fornitore: string | null; importo: number | null;
+  codice_cliente: string | null; cliente: string | null; cliente_id: string | null; piva_cliente: string | null; piva_fornitore: string | null; fornitore: string | null; importo: number | null;
   mese: number | null; anno: number | null; riferimento_fattura: string | null;
 }
 interface Controllo { codice: string; campo: string; testo: string; grave: boolean }
@@ -270,26 +270,8 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
 
   function apriNuova() {
     setFinestra(
-      <FormModal titolo="Apri la pratica" conferma="Apri la pratica" colonne={2}
-        testo="La pratica nasce dall’ordine. Cliente e fornitore servono per l’agenzia e la provvigione."
-        campi={[
-          { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: t.fornitore_id ?? '',
-            testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined },
-          { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? '',
-            testoIniziale: t.cliente ? { q: t.cliente, mostra: t.cliente } : undefined },
-        ]}
-        onChiudi={chiudi}
-        onConferma={async (v) => {
-          const fornitoreId = v.fornitore_id || t.fornitore_id;
-          if (!v.cliente_id || !fornitoreId) return 'Scegli cliente e fornitore.';
-          const r = await api<{ pratica: { id: string; numero: string } }>('documenti/' + id + '/abbina', {
-            tipo: 'ordine', numero: t.numero, data: t.data, importo: t.importo ?? undefined,
-            cliente_id: Number(v.cliente_id), fornitore_id: Number(fornitoreId),
-          });
-          if (!r.ok) return r.messaggio;
-          avviso('Aperta la pratica ' + r.dati.pratica.numero);
-          router.push('/pratiche/' + r.dati.pratica.id);
-        }} />);
+      <ApriPratica id={id} t={t} clienteIniziale={t.cliente_id ?? ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? ''} onChiudi={chiudi} />,
+    );
   }
 
   function apriBollettino() {
@@ -692,12 +674,42 @@ function FileDocumento({ d, pagina, posizione }: { d: Dettaglio; pagina?: number
 
 /* ---------- Correggi i dati letti (F6-A4b, §6.5 punto 7) ---------- */
 
+/** D-157 §19: la ricerca del cliente nella modale «Apri la pratica» riceve il fornitore scelto lì
+ *  come contesto, così la colonna «Cod. cliente» mostra il codice presso quel fornitore. */
+function ApriPratica({ id, t, clienteIniziale, onChiudi }: { id: string; t: Testata; clienteIniziale: string; onChiudi: () => void }) {
+  const router = useRouter();
+  const [fornitoreId, setFornitoreId] = useState(t.fornitore_id ?? '');
+  return (
+    <FormModal titolo="Apri la pratica" conferma="Apri la pratica" colonne={2}
+      testo="La pratica nasce dall’ordine. Cliente e fornitore servono per l’agenzia e la provvigione."
+      campi={[
+        { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: fornitoreId,
+          testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined,
+          onCambia: (v) => setFornitoreId(v) },
+        { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: clienteIniziale,
+          contesto: { fornitore_id: fornitoreId, codice_cliente: t.codice_cliente },
+          testoIniziale: t.cliente ? { q: t.cliente, mostra: t.cliente } : undefined },
+      ]}
+      onChiudi={onChiudi}
+      onConferma={async (v) => {
+        const fornitoreIdFinale = v.fornitore_id || t.fornitore_id;
+        if (!v.cliente_id || !fornitoreIdFinale) return 'Scegli cliente e fornitore.';
+        const r = await api<{ pratica: { id: string; numero: string } }>('documenti/' + id + '/abbina', {
+          tipo: 'ordine', numero: t.numero, data: t.data, importo: t.importo ?? undefined,
+          cliente_id: Number(v.cliente_id), fornitore_id: Number(fornitoreIdFinale),
+        });
+        if (!r.ok) return r.messaggio;
+        avviso('Aperta la pratica ' + r.dati.pratica.numero);
+        router.push('/pratiche/' + r.dati.pratica.id);
+      }} />);
+}
+
 interface BozzaRiga {
   i: number | null; codice: string; descrizione: string; quantita: string; prezzo: string; importo: string;
   numero_fattura: string; data_fattura: string; provvigione: string;
 }
 interface Bozza {
-  testata: { tipo: string; numero: string; data: string; fornitore_id: string; codice_cliente: string; cliente: string; piva_cliente: string; piva_fornitore: string; fornitore: string; importo: string; mese: string; anno: string; riferimento_fattura: string };
+  testata: { tipo: string; numero: string; data: string; fornitore_id: string; codice_cliente: string; cliente: string; cliente_id: string; piva_cliente: string; piva_fornitore: string; fornitore: string; importo: string; mese: string; anno: string; riferimento_fattura: string };
   righe: BozzaRiga[];
 }
 const RIGA_KEYS = ['codice', 'descrizione', 'quantita', 'prezzo', 'importo', 'numero_fattura', 'data_fattura', 'provvigione'] as const;
@@ -736,7 +748,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
     testata: {
       tipo: d.testata.tipo ?? 'altro', numero: d.testata.numero ?? '', data: d.testata.data ?? '',
       fornitore_id: d.testata.fornitore_id ?? '', codice_cliente: d.testata.codice_cliente ?? '',
-      cliente: d.testata.cliente ?? '', piva_cliente: d.testata.piva_cliente ?? '', piva_fornitore: d.testata.piva_fornitore ?? '', fornitore: d.testata.fornitore ?? '',
+      cliente: d.testata.cliente ?? '', cliente_id: d.testata.cliente_id ?? '', piva_cliente: d.testata.piva_cliente ?? '', piva_fornitore: d.testata.piva_fornitore ?? '', fornitore: d.testata.fornitore ?? '',
       importo: d.testata.importo == null ? '' : String(d.testata.importo),
       mese: d.testata.mese == null ? '' : String(d.testata.mese), anno: d.testata.anno == null ? '' : String(d.testata.anno),
       riferimento_fattura: d.testata.riferimento_fattura ?? '',
@@ -828,7 +840,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
         : {
           tipo: b.testata.tipo, numero: b.testata.numero, data: b.testata.data, fornitore_id: b.testata.fornitore_id || null,
           fornitore: b.testata.fornitore, piva_cliente: b.testata.piva_cliente, piva_fornitore: b.testata.piva_fornitore,
-          codice_cliente: b.testata.codice_cliente, cliente: b.testata.cliente, importo: b.testata.importo,
+          codice_cliente: b.testata.codice_cliente, cliente: b.testata.cliente, cliente_id: b.testata.cliente_id || null, importo: b.testata.importo,
           riferimento_fattura: b.testata.riferimento_fattura,
         };
       const righe = b.righe
@@ -926,10 +938,10 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                   {campoSi('cliente', 'Cliente letto',
                     <input data-campo="cliente" value={b.testata.cliente} onFocus={() => setCampo('cliente')} onChange={(e) => t('cliente', e.target.value)} />)}
                   <button type="button" className="btn-arrow" aria-label="Cerca il cliente letto" title="Cerca il cliente letto"
-                    disabled={!b.testata.cliente.trim()} onClick={() => setCercaCliente((n) => n + 1)}>›</button>
+                    disabled={!b.testata.cliente.trim() || !!b.testata.cliente_id} onClick={() => setCercaCliente((n) => n + 1)}>›</button>
                   {campoSi('cliente_id', 'Cliente',
-                    <CampoRicerca entita={entitaCliente} valore="" onChange={() => {}} cerca={{ q: b.testata.cliente, n: cercaCliente }}
-                      onScelto={(r) => { const c = r as { nome?: string; piva?: string }; t('cliente', c.nome ?? ''); t('piva_cliente', c.piva ?? ''); }} />)}
+                    <CampoRicerca entita={entitaCliente} contesto={{ fornitore_id: b.testata.fornitore_id, codice_cliente: b.testata.codice_cliente }} valore={b.testata.cliente_id} onChange={(v) => t('cliente_id', v)} cerca={{ q: b.testata.cliente, n: cercaCliente }}
+                      onScelto={(r) => { const c = r as { piva?: string }; if (!b.testata.piva_cliente.trim()) t('piva_cliente', c.piva ?? ''); }} />)}
                   {campoSi('codice_cliente', 'Codice cliente',
                     <input data-campo="codice_cliente" value={b.testata.codice_cliente} onFocus={() => setCampo('codice_cliente')} onChange={(e) => t('codice_cliente', e.target.value)} />)}
                   {campoSi('piva_cliente', 'P.IVA cliente',

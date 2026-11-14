@@ -530,3 +530,53 @@ describe('agenzia nel periodo chiuso (D-114)', () => {
     creati.push(BigInt(r.body.id));
   });
 });
+
+describe('ricerca cliente con codice fornitore (D-157)', () => {
+  let c: bigint, f: bigint;
+  const agenzia = (cliente: bigint, codice: string, dal: string, al: string | null) =>
+    db.interscambio.create({ data: { subagente_id: BigInt(subagenteId), cliente_id: cliente, fornitore_id: f,
+      codice_cliente_fornitore: codice, sconto: 0, valido_dal: new Date(dal), valido_al: al ? new Date(al) : null } });
+
+  beforeAll(async () => {
+    c = (await db.clienti.create({ data: {} })).id;
+    f = (await db.fornitori.create({ data: {} })).id;
+  });
+
+  it('con fornitore_id porta il codice dell’agenzia valida oggi', async () => {
+    await agenzia(c, 'COD-OGGI', '2020-01-01', null);
+    const a = await entra('ammi-cli');
+    const el = await a.get('/clienti?fornitore_id=' + f).expect(200);
+    expect(el.body.find((x: { id: string }) => x.id === String(c)).codice_fornitore).toBe('COD-OGGI');
+  });
+
+  it('agenzia chiusa: vale l’ultima (codice più recente)', async () => {
+    const c2 = (await db.clienti.create({ data: {} })).id;
+    await agenzia(c2, 'COD-ULTIMA', '2021-01-01', '2021-12-31');
+    const a = await entra('ammi-cli');
+    const el = await a.get('/clienti?fornitore_id=' + f).expect(200);
+    expect(el.body.find((x: { id: string }) => x.id === String(c2)).codice_fornitore).toBe('COD-ULTIMA');
+  });
+
+  it('senza agenzia per quel fornitore: codice_fornitore null', async () => {
+    const c3 = (await db.clienti.create({ data: {} })).id;
+    const a = await entra('ammi-cli');
+    const el = await a.get('/clienti?fornitore_id=' + f).expect(200);
+    expect(el.body.find((x: { id: string }) => x.id === String(c3)).codice_fornitore).toBeNull();
+  });
+
+  it('senza fornitore_id la proprietà non c’è', async () => {
+    const a = await entra('ammi-cli');
+    const el = await a.get('/clienti').expect(200);
+    expect(el.body.find((x: { id: string }) => x.id === String(c))).not.toHaveProperty('codice_fornitore');
+  });
+
+  it('fornitore_id non numerico: 400', async () => {
+    const a = await entra('ammi-cli');
+    await a.get('/clienti?fornitore_id=abc').expect(400);
+  });
+
+  it('lettura consulta anche con fornitore_id', async () => {
+    const a = await entra('lett-cli');
+    await a.get('/clienti?fornitore_id=' + f).expect(200);
+  });
+});

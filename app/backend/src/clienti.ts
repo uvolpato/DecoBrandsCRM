@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseIntPipe, Post, Put, Req,
+  BadRequestException, Body, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseIntPipe, Post, Put, Query, Req,
 } from '@nestjs/common';
 import { Prisma, type clienti, type clienti_versioni, type interscambio, type interscambio_storico } from '@prisma/client';
 import { IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
@@ -122,7 +122,7 @@ export class ClientiController {
 
   @Get()
   @Richiede('dati.consulta')
-  async elenco() {
+  async elenco(@Query('fornitore_id', new ParseIntPipe({ optional: true })) fornitore_id?: number) {
     const clienti = await this.db.clienti.findMany({
       include: {
         corrente: { select: { ragione_sociale: true, piva: true, citta: true } },
@@ -144,6 +144,29 @@ export class ClientiController {
     }
     const pratiche = await this.db.ordini_fornitore_testata.groupBy({ by: ['cliente_id'], _count: { _all: true }, where: { stato: { not: 'fatturato' } } });
     const pratichePer = new Map(pratiche.map((p) => [String(p.cliente_id), p._count._all]));
+    // D-157 §19: con fornitore_id la ricerca del cliente porta anche il codice cliente presso quel
+    // fornitore (l'agenzia valida oggi, o l'ultima), per confrontarlo col «Codice cliente» letto.
+    let codiceFornitorePer: Map<string, string | null> | null = null;
+    if (fornitore_id !== undefined) {
+      const oggi = giornoRoma(new Date());
+      const ag = await this.db.interscambio.findMany({
+        where: { fornitore_id: BigInt(fornitore_id) },
+        select: { cliente_id: true, codice_cliente_fornitore: true, valido_dal: true, valido_al: true },
+        orderBy: { valido_dal: 'asc' },
+      });
+      const perCliente = new Map<string, { codice: string | null; dal: string; al: string | null }[]>();
+      for (const a of ag) {
+        const v = { codice: a.codice_cliente_fornitore, dal: iso(a.valido_dal)!, al: a.valido_al ? iso(a.valido_al) : null };
+        const k = String(a.cliente_id);
+        const arr = perCliente.get(k); if (arr) arr.push(v); else perCliente.set(k, [v]);
+      }
+      codiceFornitorePer = new Map();
+      for (const [k, arr] of perCliente) {
+        const valida = arr.find((a) => a.dal <= oggi && (a.al == null || a.al > oggi));
+        const scelta = valida ?? arr.reduce((m, a) => (a.dal > m.dal ? a : m));
+        codiceFornitorePer.set(k, scelta.codice);
+      }
+    }
     return clienti.map((c) => ({
       id: String(c.id),
       ragione_sociale: c.corrente?.ragione_sociale ?? null,
@@ -157,6 +180,7 @@ export class ClientiController {
       fornitori_ids: [...(fornPer.get(String(c.id)) ?? [])],
       subagenti_ids: [...(subPer.get(String(c.id)) ?? [])],
       pratiche_aperte: pratichePer.get(String(c.id)) ?? 0,
+      ...(codiceFornitorePer ? { codice_fornitore: codiceFornitorePer.get(String(c.id)) ?? null } : {}),
     }));
   }
 

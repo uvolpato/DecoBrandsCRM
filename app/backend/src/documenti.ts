@@ -498,7 +498,8 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
     testata: {
       tipo: letto.tipo, numero: letto.numero, data: letto.data,
       fornitore_id: letto.fornitore_id != null ? String(letto.fornitore_id) : null,
-      codice_cliente: letto.codice_cliente, cliente: letto.cliente, piva_cliente: letto.piva_cliente,
+      codice_cliente: letto.codice_cliente, cliente: letto.cliente, cliente_id: letto.cliente_id,
+      piva_cliente: letto.piva_cliente,
       piva_fornitore: letto.piva_fornitore,
       fornitore: letto.fornitore, importo: letto.importo,
       mese: letto.mese, anno: letto.anno, riferimento_fattura: letto.riferimento_fattura,
@@ -582,6 +583,7 @@ const TESTATA_CAMPI: Record<string, { campo: string; tipo: 'testo' | 'data' | 'n
   data: { campo: 'data', tipo: 'data' },
   codice_cliente: { campo: 'codice_cliente', tipo: 'testo' },
   cliente: { campo: 'cliente', tipo: 'testo' },
+  cliente_id: { campo: 'cliente_id', tipo: 'testo' },
   piva_cliente: { campo: 'piva_cliente', tipo: 'testo' },
   piva_fornitore: { campo: 'piva_fornitore', tipo: 'testo' },
   fornitore: { campo: 'fornitore', tipo: 'testo' },
@@ -881,6 +883,18 @@ export class DocumentiController {
           if (!fornitore?.versione_corrente_id) throw new BadRequestException('Fornitore non valido');
           fornitore_id = BigInt(f);
           fornitore_versione_id = fornitore.versione_corrente_id;
+        }
+      }
+
+      // cliente scelto a mano (campo `cliente_id`): deve esistere con la versione corrente, come il fornitore.
+      // Si salva fra i campi letti (TESTATA_CAMPI) perché il documento non ha una colonna cliente (da documentare, §19).
+      if ('cliente_id' in testata) {
+        const f = testoO(testata.cliente_id);
+        if (f != null) {
+          const n = Number(f);
+          if (!Number.isInteger(n) || n < 1) throw new BadRequestException('Cliente non valido');
+          const cliente = await tx.clienti.findUnique({ where: { id: BigInt(f) }, select: { versione_corrente_id: true } });
+          if (!cliente?.versione_corrente_id) throw new BadRequestException('Cliente non valido');
         }
       }
 

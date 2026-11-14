@@ -713,6 +713,17 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
     expect(campi.map((c) => c.valore_finale).sort()).toEqual(['DE123456', 'DE999888', 'Gries GmbH']);
   });
 
+  it('cliente scelto a mano: si salva nel campo `cliente_id` e torna nel dettaglio; id inesistente → 400', async () => {
+    const d = await creaArrivo('cliente-scelto.pdf', { tipo: 'fattura', campi: [['numero', 'CLI-1'], ['data', '2026-09-01']] });
+    await op.put(`/documenti/${d.id}`, { testata: { tipo: 'fattura', cliente_id: '999999' } }).expect(400);
+    const r = (await op.put(`/documenti/${d.id}`, { testata: { tipo: 'fattura', cliente_id: Number(senza.id) } }).expect(200)).body;
+    expect(r.testata.cliente_id).toBe(String(senza.id));
+    expect((await db.documenti_campi.findFirstOrThrow({ where: { documento_id: d.id, campo: 'cliente_id' } })).valore_finale).toBe(String(senza.id));
+    // un valore vuoto toglie il campo
+    await op.put(`/documenti/${d.id}`, { testata: { tipo: 'fattura', cliente_id: null } }).expect(200);
+    expect(await db.documenti_campi.findFirst({ where: { documento_id: d.id, campo: 'cliente_id' } })).toBeNull();
+  });
+
   it('documento senza codice cliente: lo storico con codice NULL si ritrova come prima (C1)', async () => {
     await db.interscambio_storico.create({ data: {
       fonte: 'vecchio_crm', estratto_il: ESTRATTO, cliente_legacy_id: 7003n, fornitore_legacy_id: 7003n,

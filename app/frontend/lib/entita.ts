@@ -20,7 +20,7 @@ export interface Entita<R = any> {
   dettaglio?: (r: R) => string; // seconda riga nel menu
   cerca?: (r: R) => string; // testo in più su cui cercare
   attiva?: (r: R) => boolean; // false: la voce sta nel menu solo con contesto.tutti
-  colonne: Colonna<R>[]; // della maschera di ricerca
+  colonne: Colonna<R>[] | ((ctx: Contesto) => Colonna<R>[]); // della maschera di ricerca (funzione se dipende dal contesto)
   filtri?: (ctx: Contesto) => CampoFiltro[]; // filtri in più nella maschera (oltre alla ricerca)
   filtra?: (r: R, valori: Record<string, string | string[]>) => boolean;
   integra?: 'fornitore' | 'cliente'; // D-152: la ricerca guarda anche le viste di Integra, solo per questi
@@ -71,17 +71,20 @@ export const fornitore: Entita<any> = {
 
 export const cliente: Entita<any> = {
   titolo: 'Cliente',
-  voci: async () => {
-    const r = await api<any[]>('clienti');
+  voci: async (ctx) => {
+    // D-157 §19: con fornitore_id le voci portano anche il codice cliente presso quel fornitore
+    const q = ctx.fornitore_id ? '?fornitore_id=' + String(ctx.fornitore_id) : '';
+    const r = await api<any[]>('clienti' + q);
     if (!r.ok) return [];
-    return r.dati.map((c: any) => ({ id: c.id, nome: c.ragione_sociale ?? c.id, piva: c.piva }));
+    return r.dati.map((c: any) => ({ id: c.id, nome: c.ragione_sociale ?? c.id, piva: c.piva, codice_fornitore: c.codice_fornitore ?? '' }));
   },
   chiave: (r: any) => r.id,
   testo: (r: any) => r.nome ?? '',
-  dettaglio: (r: any) => (r.piva ? 'P.IVA ' + r.piva : ''),
-  cerca: (r: any) => (r.nome ?? '') + ' ' + (r.piva ?? ''),
-  colonne: [
+  dettaglio: (r: any) => [r.codice_fornitore ? 'Cod. ' + r.codice_fornitore : '', r.piva ? 'P.IVA ' + r.piva : ''].filter(Boolean).join(' · '),
+  cerca: (r: any) => [r.nome ?? '', r.piva ?? '', r.codice_fornitore ?? ''].join(' '),
+  colonne: (ctx) => [
     { key: 'nome', header: 'Cliente', grow: true },
+    ...(ctx.fornitore_id ? [{ key: 'codice_fornitore', header: 'Cod. cliente', cell: (r: any) => r.codice_fornitore || '' }] : []),
     { key: 'piva', header: 'P.IVA' },
   ] as any,
   integra: 'cliente',

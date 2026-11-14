@@ -11,6 +11,17 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.3 — 14/11/2026 — anagrafica del vecchio CRM e cliente nella correzione
+
+- **Vecchio CRM, per ora** (D-156): fornitori, clienti, subagenti e collegamenti (codice cliente, sconti,
+  subagente) aggiunti al database senza toccare i dati presenti (`import:vecchio-crm -- --db decobrands_db
+  --aggiungi`, idempotente). Cosa manca in Integra: `dati-crm-legacy/import/da-inserire-in-integra.csv`.
+  In esercizio un cliente o fornitore nuovo si inserisce prima in Integra.
+- **Cliente scelto** in *Correggi i dati letti*: resta nel campo (pallino verde), si salva e la pratica parte
+  con quello; «Cliente letto» non si sovrascrive.
+- **Codice cliente nella ricerca del cliente**: con il fornitore scelto si vede il codice cliente presso quel
+  fornitore; quello uguale al codice letto va in cima.
+
 ### 0.2.2 — 13/11/2026 — Correggi i dati letti più ordinata
 
 - **Testata su tre righe**: Tipo, Numero, Data, Importo; Cliente letto › Cliente, Codice e P.IVA cliente;

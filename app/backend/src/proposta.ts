@@ -51,6 +51,8 @@ export interface Letto {
   data: string | null;
   codice_cliente: string | null;
   cliente: string | null;
+  /** Cliente scelto a mano nella correzione (campo `cliente_id`): certo, vince su codice/P.IVA/nome. */
+  cliente_id: string | null;
   piva_cliente: string | null;
   piva_fornitore?: string | null; // D-154: campo letto nuovo, può mancare sui documenti letti prima
   importo: number | null; // importo_totale letto (imponibile stampato)
@@ -191,7 +193,7 @@ function componiLetto(tipo: string | null, fornitore_id: bigint | null, m: Map<s
   }
   return {
     tipo, fornitore_id, fornitore: valore('fornitore'),
-    numero: valore('numero'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'), piva_cliente: valore('piva_cliente'), piva_fornitore: valore('piva_fornitore'),
+    numero: valore('numero'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'), cliente_id: valore('cliente_id'), piva_cliente: valore('piva_cliente'), piva_fornitore: valore('piva_fornitore'),
     importo: num(valore('importo_totale')),
     mese: intero(valore('mese')), anno: intero(valore('anno')), riferimento_fattura: valore('riferimento_fattura'),
     righe,
@@ -474,11 +476,16 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
     if (tutti.length) return { ...base, esito: 'fornitore_da_scegliere', candidati_fornitore: tutti };
   }
 
-  const ab = await abbinamentoPerCodice(db, l);
+  // Cliente scelto a mano nella correzione: certo, vince su codice/P.IVA/nome (come il fornitore scelto).
+  const scelto = l.cliente_id != null && /^\d+$/.test(l.cliente_id)
+    ? await db.clienti.findUnique({ where: { id: BigInt(l.cliente_id) }, select: { versione_corrente_id: true, corrente: { select: { ragione_sociale: true } } } })
+    : null;
+  const clienteScelto = scelto?.versione_corrente_id != null ? { cliente_id: BigInt(l.cliente_id!), ragione: scelto.corrente?.ragione_sociale ?? null } : null;
+  const ab = clienteScelto ? null : await abbinamentoPerCodice(db, l);
   // D-92 + D-106: cliente riconosciuto (codice del fornitore, altrimenti P.IVA/ragione sociale).
   // D-152: i clienti con la versione corrente si leggono una volta sola, per riconoscimento e candidati.
-  const clienti = ab ? [] : await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
-  const cliente_riconosciuto = ab ? null : riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
+  const clienti = (ab || clienteScelto) ? [] : await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
+  const cliente_riconosciuto = clienteScelto ?? (ab ? null : riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente));
   const storico = contesto.storico ?? [];
   // D-112: la coppia cliente-fornitore nello storico, con o senza subagente
   const coppiaCon = storico.find((s) => s.rappresentato) ?? null;

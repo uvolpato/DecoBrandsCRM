@@ -367,6 +367,72 @@ try:
         pg5.screenshot(path=str(USCITA / 'app-documenti-fornitore-letto-1440.png'))
         pg5.close()
 
+        # cliente scelto: la ricerca «Cliente» è controllata (cliente_id), il pallino diventa verde
+        # alla scelta e «Cliente letto» resta il dato del documento. La scheda e i clienti sono simulati.
+        clienti_simulati = [{'id': '1001', 'ragione_sociale': 'Agri Aggio SNC', 'piva': 'IT000000'}]
+        scheda_cliente = {
+            'id': '999995', 'file_nome': 'prova-cliente.jpg', 'file_tipo': 'jpg', 'stato': 'da_controllare',
+            'tipo': 'fattura', 'livello': 'da_controllare', 'ricevuto_il': '2026-09-15T09:00:00.000Z',
+            'letto_il': '2026-09-15T09:01:00.000Z', 'errore': None, 'scaglioni_mancanti': False, 'fornitore': None,
+            'campi': [], 'controlli': [],
+            'testata': {'tipo': 'fattura', 'numero': 'PROVA-CLIENTE', 'data': '2026-09-15', 'fornitore_id': None,
+                        'codice_cliente': None, 'cliente': 'Agri Aggio SNC', 'cliente_id': None,
+                        'piva_cliente': None, 'piva_fornitore': None, 'fornitore': None, 'importo': None,
+                        'mese': None, 'anno': None, 'riferimento_fattura': None},
+            'righe': [],
+            'proposta': {'esito': 'nessuno', 'candidati': [], 'importo': 0, 'abbinamento': None,
+                         'cliente_riconosciuto': None, 'agenzia_mancante': None, 'cliente_da_integra': None,
+                         'manca_rappresentanza': None, 'fornitore_da_integra': None,
+                         'candidati_fornitore': [], 'candidati_cliente': [], 'integra_non_raggiungibile': False},
+            'bollettino': None,
+            'soglie': {'soglia_ok': 0.8, 'soglia_bassa': 0.7},
+        }
+        pg6 = entra(S + '-oper')
+        pg6.route(re.compile(r'^.*/api/documenti/999995$'), lambda r: risposta(r, json.dumps(scheda_cliente)))
+        pg6.route(re.compile(r'^.*/api/clienti$'), lambda r: risposta(r, json.dumps(clienti_simulati)))
+        pg6.goto(BASE + '/documenti/999995')
+        pg6.locator('button:has-text("Correggi i dati letti")').wait_for(timeout=15000)
+        pg6.click('button:has-text("Correggi i dati letti")'); pg6.wait_for_selector('.affiancata')
+        campo_cli = pg6.locator('.aff-dx input[aria-label="Cerca cliente"]')
+        pallino = campo_cli.locator('xpath=..').locator('span.pallino')
+        ok(pg6.input_value('input[data-campo="cliente"]') == 'Agri Aggio SNC',
+           'cliente scelto: «Cliente letto» parte col nome letto')
+        ok('ok' not in pallino.get_attribute('class'),
+           'cliente scelto: prima della scelta il pallino non è verde')
+        campo_cli.fill('Agri')
+        menu_cli = pg6.locator('.aff-dx .ricerca-menu:not([hidden])')
+        menu_cli.wait_for()
+        menu_cli.locator('li[role=option]').first.click()
+        pg6.wait_for_function("document.querySelectorAll('.aff-dx .ricerca-menu:not([hidden])').length === 0")
+        ok('ok' in pg6.locator('.aff-dx input[aria-label="Cerca cliente"]').locator('xpath=..').locator('span.pallino').get_attribute('class'),
+           'cliente scelto: alla scelta il pallino diventa verde')
+        ok(pg6.input_value('input[data-campo="cliente"]') == 'Agri Aggio SNC',
+           'cliente scelto: «Cliente letto» resta il nome letto (non sovrascritto)')
+        pg6.screenshot(path=str(USCITA / 'app-documenti-cliente-scelto-1440.png'))
+        pg6.close()
+
+        # D-157: con fornitore scelto la ricerca del cliente mostra il «Cod. cliente» (il codice presso
+        # quel fornitore) e la voce col codice uguale a quello letto sale in testa col segno «coincide».
+        clienti_cod = [{'id': '1002', 'ragione_sociale': 'Vivai Prova SNC', 'piva': 'IT111111', 'codice_fornitore': '45172'}]
+        scheda_cod = dict(scheda_errore, id='999992', stato='da_controllare', tipo='fattura',
+                          livello='da_controllare', file_nome='prova-cod.jpg', file_tipo='jpg')
+        scheda_cod['testata'] = dict(scheda_errore['testata'], tipo='fattura', numero='PROVA-COD',
+                                     fornitore_id='5', codice_cliente='45172', cliente='Vivai Prova SNC')
+        pgC = entra(S + '-oper')
+        pgC.route(re.compile(r'^.*/api/documenti/999992$'), lambda r: risposta(r, json.dumps(scheda_cod)))
+        pgC.route(re.compile(r'^.*/api/clienti\?fornitore_id=5$'), lambda r: risposta(r, json.dumps(clienti_cod)))
+        pgC.goto(BASE + '/documenti/999992')
+        pgC.locator('button:has-text("Correggi i dati letti")').wait_for(timeout=15000)
+        pgC.click('button:has-text("Correggi i dati letti")'); pgC.wait_for_selector('.affiancata')
+        campo_cod = pgC.locator('.aff-dx input[aria-label="Cerca cliente"]')
+        campo_cod.fill('45172')
+        menu_cod = pgC.locator('.aff-dx .ricerca-menu:not([hidden])')
+        menu_cod.wait_for()
+        ok('Cod. 45172' in menu_cod.inner_text(), 'con fornitore: il menu cliente mostra «Cod. 45172»')
+        ok('coincide con il codice letto' in menu_cod.inner_text(), 'con codice letto uguale: il segno «coincide con il codice letto»')
+        pgC.screenshot(path=str(USCITA / 'app-documenti-codice-cliente-1440.png'))
+        pgC.close()
+
         # §7.9: la lista mostra i documenti in coda (stato «In coda», in cima) e il dettaglio offre
         # «Togli dalla coda» che usa lo scarto esistente. La lista e il dettaglio sono simulati.
         lista_coda = {

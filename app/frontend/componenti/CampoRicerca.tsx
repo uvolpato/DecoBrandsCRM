@@ -235,7 +235,11 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
     // D-153: il testo intero non corrisponde (punti, spazi o sigle diverse): si ripiega sulle parole
     return cercaParole(t + ' ' + c + ' ' + k, testo) ? 2 : -1;
   };
-  const tutteMenu = vociMenu(ent, contesto, tutte).map((r) => ({ r, s: punti(r) })).filter((x) => x.s >= 0).sort((a, b) => a.s - b.s);
+  // D-157 §19: se il contesto porta il codice letto, la voce col codice cliente uguale va in testa
+  // e porta il segno «coincide con il codice letto».
+  const letto = String(contesto.codice_cliente ?? '').trim().toLowerCase();
+  const coincide = (r: unknown) => !!letto && String((r as { codice_fornitore?: string }).codice_fornitore ?? '').trim().toLowerCase() === letto;
+  const tutteMenu = vociMenu(ent, contesto, tutte).map((r) => ({ r, s: punti(r), c: coincide(r) })).filter((x) => x.s >= 0 || x.c).sort((a, b) => (a.c === b.c ? a.s - b.s : a.c ? -1 : 1));
   const prime = tutteMenu.slice(0, 5).map((x) => x.r);
 
   const imposta = (r: unknown | undefined, libero = '') => {
@@ -276,7 +280,8 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
       <ul className="ricerca-menu" id={lid} role="listbox" hidden={!aperto} style={pos}>
         {prime.length ? prime.map((r, i) => (
           <li key={String(ent.chiave(r))} id={lid + '-' + i} role="option" aria-selected={i === attiva} className={i === attiva ? 'attiva' : undefined} data-i={i} onMouseDown={(e) => { e.preventDefault(); imposta(r); }}>
-            <b>{ent.testo(r)}</b><span>{ent.dettaglio?.(r) ?? ''}</span></li>
+            <b>{ent.testo(r)}</b><span>{ent.dettaglio?.(r) ?? ''}</span>
+            {coincide(r) && <span style={{ color: 'var(--ok)' }}>✓ coincide con il codice letto</span>}</li>
         )) : <li className="nessuna">Nessun risultato</li>}
         <li className="altre" onMouseDown={(e) => { e.preventDefault(); setAperto(false); setMaschera(true); }}><Icona nome="cerca" />{tutteMenu.length > 5 ? `Altri ${tutteMenu.length - 5} risultati: ` : ''}apri la ricerca di {ent.titolo.toLowerCase()}</li>
         <Integra tipo={ent.integra} q={aperto ? testo : ''} onScelto={(id, nome, piva) => { setTesto(nome); setAperto(false); if (id !== valore) onChange(id); onScelto?.({ id, nome, piva }); ricarica(); }} />
@@ -303,9 +308,10 @@ export function RicercaEntita({ entita: ent, contesto = {}, voci, testo = '', mu
   }, [voci, valori, ent]);
   const alterna = (r: unknown) => setSel((s) => { const n = new Set(s); if (n.has(k(r))) n.delete(k(r)); else n.add(k(r)); return n; });
   const campi: CampoFiltro[] = [{ nome: 'q', tipo: 'cerca', placeholder: 'Cerca ' + ent.titolo.toLowerCase() }, ...(ent.filtri?.(contesto) ?? [])];
+  const colonneEnt = typeof ent.colonne === 'function' ? ent.colonne(contesto) : ent.colonne;
   const colonne: Colonna<unknown>[] = multipla
-    ? [{ key: '_sel', header: '', sortable: false, cell: (r) => <input type="checkbox" checked={sel.has(k(r))} readOnly aria-label={'Scegli ' + ent.testo(r)} /> }, ...ent.colonne]
-    : ent.colonne;
+    ? [{ key: '_sel', header: '', sortable: false, cell: (r) => <input type="checkbox" checked={sel.has(k(r))} readOnly aria-label={'Scegli ' + ent.testo(r)} /> }, ...colonneEnt]
+    : colonneEnt;
   const applica = () => onScelta(multipla ? voci.filter((r) => sel.has(k(r))) : [una]);
 
   return (

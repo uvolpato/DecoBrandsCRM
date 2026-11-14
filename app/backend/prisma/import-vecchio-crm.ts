@@ -1,8 +1,18 @@
-// Import one-shot del vecchio CRM nell'anagrafica a soggetti (F1-A9, D-102; specifica-anagrafica-soggetti.md §7).
+// Import del vecchio CRM nell'anagrafica a soggetti (F1-A9, D-102; specifica-anagrafica-soggetti.md §7).
 // Un solo comando, una sola transazione (V13, D-36), idempotente. Si esegue con ts-node:
-//   npm run import:vecchio-crm -- --db decobrands_import [--prova] [--sostituisci]
-// Oppure passando DATABASE_URL per comando (puntata a decobrands_import).
-// Scrive SOLO anagrafica e legami + un evento nel registro. Mai decobrands_db né decobrands_test.
+//   npm run import:vecchio-crm -- --db decobrands_import [--prova] [--sostituisci]   (import one-shot su un database vuoto)
+//   npm run import:vecchio-crm -- --db decobrands_db --aggiungi [--prova]            (modalità additiva in esercizio)
+// Oppure passando DATABASE_URL per comando (puntata a decobrands_import, o a un database di prova
+// decobrands_test_… con --aggiungi).
+//
+// --db decobrands_import (default): import one-shot, assume il database vuoto, --sostituisci fa TRUNCATE.
+// --db decobrands_db --aggiungi: import additivo sull'esercizio. Mai TRUNCATE, mai cancellare o
+//   modificare ciò che c'è già: stessa P.IVA/CF → stesso soggetto (aggiunge il ruolo se manca, D-102);
+//   stesso codice esterno del vecchio CRM già presente → salta (idempotente). I soggetti/ruoli creati
+//   portano il codice esterno con fonte `vecchio_crm` (codici_esterni). Persone e contatti non si
+//   importano (restano quelli già presenti). A fine import scrive dati-crm-legacy/import/da-inserire-in-integra.csv
+//   con i soggetti presi dal vecchio CRM che mancano nelle viste di Integra.
+// Scrive SOLO anagrafica e legami + un evento nel registro. Mai decobrands_test (quello delle prove jest).
 import 'dotenv/config';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,6 +32,7 @@ const DAL = new Date(`${ESTRAZIONE}T00:00:00Z`);
 const args = process.argv.slice(2);
 const PROVA = args.includes('--prova');
 const SOSTITUISCI = args.includes('--sostituisci');
+const AGGIUNGI = args.includes('--aggiungi');
 const iDb = args.indexOf('--db');
 const nomeDb = iDb >= 0 ? args[iDb + 1] : null;
 
@@ -34,11 +45,26 @@ function urlDatabase(nome: string) {
 }
 
 if (nomeDb) {
-  if (nomeDb !== 'decobrands_import') throw new Error('Questo import scrive solo su decobrands_import');
-  process.env.DATABASE_URL = urlDatabase(nomeDb);
+  if (nomeDb === 'decobrands_import') {
+    if (AGGIUNGI) throw new Error('--aggiungi non si usa con decobrands_import');
+    process.env.DATABASE_URL = urlDatabase(nomeDb);
+  } else if (nomeDb === 'decobrands_db') {
+    if (!AGGIUNGI) throw new Error('Su decobrands_db serve --aggiungi (l\'import one-shot va su decobrands_import)');
+    process.env.DATABASE_URL = urlDatabase(nomeDb);
+  } else {
+    throw new Error('Questo import scrive solo su decobrands_import o, con --aggiungi, su decobrands_db');
+  }
 }
-if (!/\/decobrands_import\b/.test(process.env.DATABASE_URL!)) {
-  throw new Error('Rifiuto: DATABASE_URL non punta a decobrands_import');
+if (AGGIUNGI) {
+  if (SOSTITUISCI) throw new Error('--aggiungi e --sostituisci non vanno insieme');
+  if (/\/decobrands_import\b/.test(process.env.DATABASE_URL!)) throw new Error('--aggiungi non scrive su decobrands_import');
+  if (!/\/decobrands_(db|test)/.test(process.env.DATABASE_URL!)) {
+    throw new Error('Rifiuto: --aggiungi richiede decobrands_db (o un database di prova decobrands_test…)');
+  }
+} else {
+  if (!/\/decobrands_import\b/.test(process.env.DATABASE_URL!)) {
+    throw new Error('Rifiuto: DATABASE_URL non punta a decobrands_import');
+  }
 }
 
 // ---------- Lettura dei file ----------
@@ -99,6 +125,14 @@ const subagentiSorgente: { elenco: Record<string, unknown>; scheda: Record<strin
 const agentiSorgente: { elenco: Record<string, unknown>; scheda: Record<string, unknown> }[] = json('agenti.json');
 const gruppiSorgente: { elenco: Record<string, unknown> }[] = json('gruppi.json');
 const settoriSorgente: { elenco: Record<string, unknown> }[] = json('settori.json');
+const collegamenti = csvColonne('collegamenti.csv');
+const schede: SchedaCliente[] = [];
+for (const riga of leggi('clienti.jsonl').split('\n')) {
+  if (!riga.trim()) continue;
+  const o = JSON.parse(riga);
+  if (o.scheda_errore) continue; // scartata in importa
+  schede.push(o);
+}
 
 // ---------- Report ----------
 interface RigheFusione { chiave: string; codici: string[]; n: number }
@@ -107,9 +141,14 @@ interface RigheConflitto { tipo: string; dettaglio: string }
 const report = {
   letti_clienti: 0, fornitori: 0, subagenti: 0, agenti: 0, gruppi: 0, settori: 0,
   contatti_persona: 0, collegamenti: 0,
-  soggetti: 0, ruoli_cliente: 0, ruoli_fornitore: 0, ruoli_subagente: 0, ruoli_agente: 0,
+  soggetti: 0, gia_soggetti: 0,
+  ruoli_cliente: 0, gia_clienti: 0,
+  ruoli_fornitore: 0, gia_fornitori: 0,
+  ruoli_subagente: 0, gia_subagenti: 0,
+  ruoli_agente: 0, gia_agenti: 0,
   sedi: 0, recapiti: 0, persone: 0, persone_contatti: 0, fatturazione: 0,
-  interscambio: 0, sconti: 0, codici_esterni: 0,
+  interscambio: 0, gia_interscambio: 0, sconti: 0, codici_esterni: 0,
+  da_inserire_in_integra: -1,
   piva_valide: 0, piva_invalide: 0, senza_piva_cf: 0, senza_piva_senza_cf: 0,
   fusioni: [] as RigheFusione[],
   scarti: [] as RigheScarto[],
@@ -124,7 +163,58 @@ function scriviCsv(nome: string, testa: string[], righe: (string | number)[][]) 
   writeFileSync(join(OUT, nome), [testa.join(','), ...righe.map((r) => r.map(csv).join(','))].join('\n') + '\n', 'utf8');
 }
 
-// ---------- Svuota (solo --sostituisci) ----------
+// ---------- Stato condiviso dell'import (riempito anche da ciò che c'è già, in --aggiungi) ----------
+const soggettoPer = new Map<string, bigint>(); // chiave p:paese:piva_norm | c:paese:cf_norm → soggetti.id
+const soggettiNuovi = new Set<bigint>(); // soggetti creati in questo giro
+const soggettiConLegale = new Set<bigint>(); // già con sede legale predefinita (evita il doppione D-101)
+const gruppoDb: Record<number, bigint> = {};
+const settoreDb: Record<number, bigint> = {};
+const clientePerSoggetto = new Map<bigint, bigint>(); // soggetti.id → clienti.id
+const fornitorePerSoggetto = new Map<bigint, bigint>(); // soggetti.id → fornitori.id
+const fornitorePerNome = new Map<string, bigint>(); // nome normalizzato → fornitori.id
+const agentePerNome = new Map<string, bigint>();
+const subagentePerNome = new Map<string, bigint>();
+const codiciVisti = new Set<string>(); // `vecchio_crm:tipo:codice` già presenti
+const codiceRuolo = new Map<string, bigint>(); // `tipo:codice` → entita_id (per saltare chi è già importato)
+let agenteDeco: bigint | null = null;
+
+/** Carica lo stato già presente nel database (solo --aggiungi): si riusa, mai si riscrive. */
+async function caricaEsistente(tx: Tx) {
+  for (const s of await tx.soggetti.findMany({ select: { id: true, paese: true, piva_norm: true, cf_norm: true } })) {
+    if (s.piva_norm) soggettoPer.set(`p:${s.paese}:${s.piva_norm}`, s.id);
+    if (s.cf_norm) soggettoPer.set(`c:${s.paese}:${s.cf_norm}`, s.id);
+  }
+  for (const g of await tx.gruppi.findMany({ select: { id: true, codice: true } })) {
+    const m = /^G(\d+)$/.exec(g.codice); if (m) gruppoDb[Number(m[1])] = g.id;
+  }
+  for (const s of await tx.settori.findMany({ select: { id: true, codice: true } })) {
+    const m = /^S(\d+)$/.exec(s.codice); if (m) settoreDb[Number(m[1])] = s.id;
+  }
+  for (const c of await tx.clienti.findMany({ select: { id: true, soggetto_id: true } })) {
+    if (c.soggetto_id != null) clientePerSoggetto.set(c.soggetto_id, c.id);
+  }
+  for (const f of await tx.fornitori.findMany({ include: { corrente: { select: { ragione_sociale: true } } } })) {
+    if (f.corrente?.ragione_sociale) fornitorePerNome.set(normalizza(f.corrente.ragione_sociale), f.id);
+    if (f.soggetto_id != null) fornitorePerSoggetto.set(f.soggetto_id, f.id);
+  }
+  for (const a of await tx.agenti.findMany({ select: { id: true, nome: true, cognome: true } })) {
+    const nome = normalizza(`${a.nome} ${a.cognome}`);
+    agentePerNome.set(nome, a.id);
+    if (nome === normalizza('DECOBRANDS SRL')) agenteDeco = a.id;
+  }
+  for (const s of await tx.subagenti.findMany({ select: { id: true, nome: true, cognome: true } })) {
+    subagentePerNome.set(normalizza(`${s.nome} ${s.cognome}`), s.id);
+  }
+  for (const c of await tx.codici_esterni.findMany({ where: { sistema: 'vecchio_crm' }, select: { tipo: true, codice: true, entita_id: true } })) {
+    codiciVisti.add(`vecchio_crm:${c.tipo}:${c.codice}`);
+    codiceRuolo.set(`${c.tipo}:${c.codice}`, c.entita_id);
+  }
+  for (const s of await tx.sedi.findMany({ where: { tipo: 'legale' }, select: { soggetto_id: true } })) {
+    soggettiConLegale.add(s.soggetto_id);
+  }
+}
+
+// ---------- Svuota (solo --sostituisci, mai con --aggiungi) ----------
 async function svuotaImport(db: PrismaClient) {
   await db.$executeRawUnsafe(`ALTER TABLE clienti_versioni DISABLE TRIGGER USER; ALTER TABLE fornitori_versioni DISABLE TRIGGER USER; ALTER TABLE registro DISABLE TRIGGER USER`);
   try {
@@ -140,50 +230,39 @@ async function svuotaImport(db: PrismaClient) {
 
 // ---------- Import ----------
 async function importa(tx: Tx) {
-  // 1. Gruppi e settori (§7.1)
-  const gruppoDb: Record<number, bigint> = {};
+  if (AGGIUNGI) await caricaEsistente(tx);
+
+  // 1. Gruppi e settori (§7.1): get-or-create (in --aggiungi riusa chi c'è già)
   for (const g of gruppiSorgente) {
     const id = Number(g.elenco.Id);
-    gruppoDb[id] = (await tx.gruppi.create({ data: { codice: `G${id}`, descrizione: testo(g.elenco.Name), attivo: true } })).id;
+    if (!gruppoDb[id]) gruppoDb[id] = (await tx.gruppi.create({ data: { codice: `G${id}`, descrizione: testo(g.elenco.Name), attivo: true } })).id;
   }
-  const settoreDb: Record<number, bigint> = {};
   for (const s of settoriSorgente) {
     const id = Number(s.elenco.Id);
-    settoreDb[id] = (await tx.settori.create({ data: { codice: `S${id}`, descrizione: testo(s.elenco.Name), attivo: true } })).id;
+    if (!settoreDb[id]) settoreDb[id] = (await tx.settori.create({ data: { codice: `S${id}`, descrizione: testo(s.elenco.Name), attivo: true } })).id;
   }
   report.gruppi = gruppiSorgente.length;
   report.settori = settoriSorgente.length;
 
   // Identità → soggetto: un solo master condiviso per clienti, fornitori, agenti e subagenti
   // (D-101: la stessa P.IVA/CF non fa due soggetti). Chiave = p:paese:piva_norm | c:paese:cf_norm.
-  const soggettoPer = new Map<string, bigint>();
   const schedePerSoggetto = new Map<bigint, SchedaCliente[]>();
   async function nuovoSoggetto(natura: string, piva: string | null, cf: string | null, pn: string, cn: string, paese: string): Promise<bigint> {
     const chiave = pn ? `p:${paese}:${pn}` : `c:${paese}:${cn}`;
     const gia = soggettoPer.get(chiave);
-    if (gia) return gia;
+    if (gia) { report.gia_soggetti++; return gia; }
     const s = await tx.soggetti.create({ data: {
       natura, paese, piva: piva || null, piva_norm: pn, codice_fiscale: cf || null, cf_norm: cn, sorgente: 'vecchio_crm',
     } });
     soggettoPer.set(chiave, s.id);
+    soggettiNuovi.add(s.id);
     report.soggetti++;
     return s.id;
   }
 
   // 2. Clienti: identità normalizzata, deduplica (un soggetto per P.IVA/CF)
-  const schede: SchedaCliente[] = [];
-  for (const riga of leggi('clienti.jsonl').split('\n')) {
-    if (!riga.trim()) continue;
-    const o = JSON.parse(riga);
-    if (o.scheda_errore) { scarta('scheda_non_leggibile', String(o.id), 'errore 500 nel vecchio CRM, solo dati d\'elenco'); continue; }
-    schede.push(o);
-  }
-  report.letti_clienti = schede.length;
   const schedaPerId = new Map(schede.map((c) => [c.id, c])); // ricerca O(1) nei legami e nei contatti
-
-  const clientePerSoggetto = new Map<bigint, bigint>(); // soggetto → clienti.id
   const cardPrincipale = new Map<bigint, SchedaCliente>(); // soggetto → scheda principale (legale)
-  const soggettiConLegale = new Set<bigint>(); // già con sede legale predefinita (evita il doppione D-101)
 
   for (const c of schede) {
     const amm = c.dati_amministrativi ?? {};
@@ -215,13 +294,17 @@ async function importa(tx: Tx) {
     schedePerSoggetto.set(soggettoId, elenco);
     if (!cardPrincipale.has(soggettoId)) cardPrincipale.set(soggettoId, c);
   }
+  report.letti_clienti = schede.length;
 
   // Ruoli cliente + sedi + recapiti + fatturazione
   for (const [soggettoId, schedeSoggetto] of schedePerSoggetto) {
+    // --aggiungi: il cliente c'è già (stesso soggetto) → non si tocca
+    if (AGGIUNGI && clientePerSoggetto.has(soggettoId)) { report.gia_clienti++; continue; }
     const prin = cardPrincipale.get(soggettoId)!;
     const amm = prin.dati_amministrativi ?? {};
     const pivaRawPrin = testo(amm['PARTITA IVA'] ?? prin.elenco.VatNumber);
     const pnPrin = normPiva(pivaRawPrin);
+    const soggettoNuovo = soggettiNuovi.has(soggettoId);
     const ruolo = await tx.clienti.create({ data: { attivo: true, soggetto_id: soggettoId } });
     const v = await tx.clienti_versioni.create({ data: {
       cliente_id: ruolo.id, fonte: 'crm', valido_dal: DAL,
@@ -232,6 +315,9 @@ async function importa(tx: Tx) {
     await tx.clienti.update({ where: { id: ruolo.id }, data: { versione_corrente_id: v.id } });
     clientePerSoggetto.set(soggettoId, ruolo.id);
     report.ruoli_cliente++;
+
+    // --aggiungi: su un soggetto già presente si aggiunge solo il ruolo, niente sedi/recapiti/fatturazione
+    if (!soggettoNuovo) continue;
 
     // Sedi: la scheda principale è legale (predefinita), le altre punto_vendita (catena, D-102)
     const sediData: Prisma.sediCreateManyInput[] = [];
@@ -293,18 +379,36 @@ async function importa(tx: Tx) {
     }
   }
 
-  // 3. Fornitori: ruolo + soggetto (quando c'è P.IVA) + sede legale. I 7 senza P.IVA restano come ruolo
+  // 3. Fornitori: ruolo + soggetto (quando c'è P.IVA) + sede legale. I senza P.IVA restano come ruolo
   // senza master: sono fornitori veri, servono ai legami; niente P.IVA inventata (D-102, come i subagenti senza P.IVA).
-  const fornitorePerNome = new Map<string, bigint>();
   for (const f of fornitoriSorgente) {
     const nome = testo(f.elenco.Name);
+    const nomeNorm = normalizza(nome);
+    const codiceLegacy = String(f.elenco.Id);
+    // --aggiungi: codice esterno già presente → riusa il ruolo, non si ricrea
+    if (AGGIUNGI) {
+      const gia = codiceRuolo.get(`fornitore:${codiceLegacy}`);
+      if (gia !== undefined) { fornitorePerNome.set(nomeNorm, gia); report.gia_fornitori++; continue; }
+    }
     const pivaRaw = testo(f.scheda['Company.VATNumber'] ?? f.elenco.PIva);
     const pn = normPiva(pivaRaw);
     const paese = paeseDi(pn);
     let soggettoId: bigint | null = null;
-    if (pn && pivaValida(pn)) soggettoId = await nuovoSoggetto('azienda', pivaRaw, null, pn, '', paese);
-    else if (pn) scarta('piva_non_valida', String(f.elenco.Id), `P.IVA fornitore "${pivaRaw}" non valida`, nome);
-    else conflitto('fornitore_senza_piva', `"${nome}" importato come fornitore senza soggetto (nessuna P.IVA)`);
+    if (pn && pivaValida(pn)) {
+      soggettoId = await nuovoSoggetto('azienda', pivaRaw, null, pn, '', paese);
+      // --aggiungi: il fornitore c'è già per questo soggetto → riusa il ruolo
+      if (AGGIUNGI && fornitorePerSoggetto.has(soggettoId)) {
+        fornitorePerNome.set(nomeNorm, fornitorePerSoggetto.get(soggettoId)!);
+        report.gia_fornitori++;
+        continue;
+      }
+    } else if (pn) {
+      scarta('piva_non_valida', String(f.elenco.Id), `P.IVA fornitore "${pivaRaw}" non valida`, nome);
+    } else {
+      // --aggiungi: fornitore senza P.IVA già presente per nome → riusa
+      if (AGGIUNGI && fornitorePerNome.has(nomeNorm)) { report.gia_fornitori++; continue; }
+      conflitto('fornitore_senza_piva', `"${nome}" importato come fornitore senza soggetto (nessuna P.IVA)`);
+    }
     const ruolo = await tx.fornitori.create({ data: { soggetto_id: soggettoId, attivo: Number(f.elenco.State) === 0 } });
     const vers = await tx.fornitori_versioni.create({ data: {
       fornitore_id: ruolo.id, fonte: 'crm', valido_dal: DAL,
@@ -325,50 +429,108 @@ async function importa(tx: Tx) {
       soggettiConLegale.add(soggettoId);
       report.sedi++;
     }
-    fornitorePerNome.set(normalizza(nome), ruolo.id);
+    fornitorePerNome.set(nomeNorm, ruolo.id);
+    if (soggettoId !== null) fornitorePerSoggetto.set(soggettoId, ruolo.id);
     report.ruoli_fornitore++;
   }
   report.fornitori = fornitoriSorgente.length;
 
   // 4. Agenti e subagenti: il subagente sta sull'agente Decobrands (come oggi)
   const nomeSplit = (n: string): [string, string] => { const i = n.indexOf(' '); return i < 0 ? [n, ''] : [n.slice(0, i), n.slice(i + 1)]; };
-  let agenteDeco: bigint | null = null;
   for (const [i, a] of agentiSorgente.entries()) {
     const nome = testo(a.elenco.Name);
+    const nomeNorm = normalizza(nome);
+    if (AGGIUNGI && agentePerNome.has(nomeNorm)) {
+      if (nomeNorm === normalizza('DECOBRANDS SRL')) agenteDeco = agentePerNome.get(nomeNorm)!;
+      report.gia_agenti++;
+      continue;
+    }
     const pivaRaw = testo(a.elenco.PIva ?? a.scheda['Company.VATNumber']);
     const pn = normPiva(pivaRaw);
     let soggettoId: bigint | null = null;
     if (pn && pivaValida(pn)) soggettoId = await nuovoSoggetto('persona', pivaRaw, null, pn, '', paeseDi(pn));
     const [nomeP, cognome] = nomeSplit(nome);
     const ruolo = await tx.agenti.create({ data: { codice: `AGE${String(i + 1).padStart(2, '0')}`, nome: nomeP, cognome, email: testo(a.elenco.Mail) || null, attivo: true, soggetto_id: soggettoId } });
-    if (normalizza(nome) === normalizza('DECOBRANDS SRL')) agenteDeco = ruolo.id;
+    agentePerNome.set(nomeNorm, ruolo.id);
+    if (nomeNorm === normalizza('DECOBRANDS SRL')) agenteDeco = ruolo.id;
     report.ruoli_agente++;
   }
   report.agenti = agentiSorgente.length;
-  if (agenteDeco === null) throw new Error('Agente DECOBRANDS SRL non trovato nell\'estratto');
+  if (agenteDeco === null) throw new Error('Agente DECOBRANDS SRL non trovato né nell\'estratto né nel database');
 
-  const subagentePerNome = new Map<string, bigint>();
   for (const [i, s] of subagentiSorgente.entries()) {
     const nome = testo(s.elenco.Name);
+    const nomeNorm = normalizza(nome);
+    const codiceLegacy = String(s.elenco.Id);
+    if (AGGIUNGI) {
+      const giaCodice = codiceRuolo.get(`subagente:${codiceLegacy}`);
+      if (giaCodice !== undefined) { subagentePerNome.set(nomeNorm, giaCodice); report.gia_subagenti++; continue; }
+      // già presente per nome (senza codice del vecchio CRM): si riusa, non si duplica
+      if (subagentePerNome.has(nomeNorm)) { report.gia_subagenti++; continue; }
+    }
     const pivaRaw = testo(s.elenco.PIva ?? s.scheda['Company.VATNumber']);
     const pn = normPiva(pivaRaw);
     let soggettoId: bigint | null = null;
     if (pn && pivaValida(pn)) soggettoId = await nuovoSoggetto('persona', pivaRaw, null, pn, '', paeseDi(pn));
     const [nomeP, cognome] = nomeSplit(nome);
-    const ruolo = await tx.subagenti.create({ data: { agente_id: agenteDeco, codice: `SUB${String(i + 1).padStart(2, '0')}`, nome: nomeP, cognome, email: testo(s.elenco.Mail) || null, attivo: true, soggetto_id: soggettoId } });
-    subagentePerNome.set(normalizza(nome), ruolo.id);
+    const ruolo = await tx.subagenti.create({ data: { agente_id: agenteDeco!, codice: `SUB${String(i + 1).padStart(2, '0')}`, nome: nomeP, cognome, email: testo(s.elenco.Mail) || null, attivo: true, soggetto_id: soggettoId } });
+    subagentePerNome.set(nomeNorm, ruolo.id);
     report.ruoli_subagente++;
   }
   report.subagenti = subagentiSorgente.length;
 
-  // 5. Persone e contatti (91) → persone + persone_contatti + recapiti persona (§7.1)
-  const contattiRighe = csvColonne('contatti_clienti.csv');
-  const persIdPerRiga: bigint[] = [];
-  for (const riga of contattiRighe) {
-    const [nomeP, cognome] = nomeSplit(riga.nome || '');
-    const persona = await tx.persone.create({ data: { nome: nomeP || '—', cognome: cognome || '', attivo: true } });
-    persIdPerRiga.push(persona.id);
-    report.persone++;
+  // 5. Persone e contatti: solo nell'import one-shot. In --aggiungi restano quelli già presenti
+  // (non sono necessari ai documenti e il secondo giro li duplicherebbe).
+  if (!AGGIUNGI) {
+    const contattiRighe = csvColonne('contatti_clienti.csv');
+    const persIdPerRiga: bigint[] = [];
+    for (const riga of contattiRighe) {
+      const [nomeP, cognome] = nomeSplit(riga.nome || '');
+      const persona = await tx.persone.create({ data: { nome: nomeP || '—', cognome: cognome || '', attivo: true } });
+      persIdPerRiga.push(persona.id);
+      report.persone++;
+    }
+    const soggettoDellaScheda = (scheda: SchedaCliente | undefined): bigint | null => {
+      if (!scheda) return null;
+      const amm = scheda.dati_amministrativi ?? {};
+      const pn = normPiva(testo(amm['PARTITA IVA'] ?? scheda.elenco.VatNumber));
+      const cn = normalizza(testo(amm['Codice fiscale']));
+      if (pn && pivaValida(pn)) return soggettoPer.get(`p:${paeseDi(pn)}:${pn}`) ?? null;
+      if (cn && cfValido(cn)) return soggettoPer.get(`c:IT:${cn}`) ?? null;
+      return null;
+    };
+    const personeContatti: Prisma.persone_contattiCreateManyInput[] = [];
+    const recapitiPersone: Prisma.recapitiCreateManyInput[] = [];
+    for (const [i, riga] of contattiRighe.entries()) {
+      const scheda = schedaPerId.get(Number(riga.cliente_id));
+      const soggettoId = soggettoDellaScheda(scheda);
+      if (!soggettoId) { scarta('contatto_senza_soggetto', riga.cliente_id, 'contatto di una scheda non diventata soggetto', riga.cliente); continue; }
+      const mansione = (riga.mansione || '').toLowerCase();
+      const ruolo = mansione.includes('acquist') ? 'acquisti'
+        : mansione.includes('titol') ? 'titolare'
+        : mansione.includes('amministraz') ? 'amministrazione'
+        : mansione.includes('magazzin') ? 'magazzino' : null;
+      personeContatti.push({ persona_id: persIdPerRiga[i], soggetto_id: soggettoId, sede_id: null, ruolo, referente: false, valido_dal: DAL });
+      if (riga.email) recapitiPersone.push({ persona_id: persIdPerRiga[i], soggetto_id: null, sede_id: null, tipo: 'email', valore: riga.email.toLowerCase(), valido_dal: DAL });
+      if (riga.telefono) recapitiPersone.push({ persona_id: persIdPerRiga[i], soggetto_id: null, sede_id: null, tipo: 'telefono', valore: riga.telefono, valido_dal: DAL });
+      if (riga.cellulare) recapitiPersone.push({ persona_id: persIdPerRiga[i], soggetto_id: null, sede_id: null, tipo: 'cellulare', valore: riga.cellulare, valido_dal: DAL });
+    }
+    report.contatti_persona = contattiRighe.length;
+    if (personeContatti.length) await tx.persone_contatti.createMany({ data: personeContatti });
+    report.persone_contatti = personeContatti.length;
+    if (recapitiPersone.length) await tx.recapiti.createMany({ data: recapitiPersone });
+    report.recapiti += recapitiPersone.length;
+  }
+
+  // 6. Legami (4022) → interscambio + sconti: solo con subagente riconosciuto e cliente diventato soggetto
+  const scontiData: Prisma.scontiCreateManyInput[] = [];
+  const coppiaVista = new Set<string>(); // cliente×fornitore già viste in questo giro: il vincolo EXCLUDE ammette un solo subagente al giorno (D-35)
+  // --aggiungi: un'agenzia (aperta o chiusa) già presente per la coppia non si tocca → conflitto
+  const coppieDb = new Set<string>();
+  if (AGGIUNGI) {
+    for (const it of await tx.interscambio.findMany({ select: { cliente_id: true, fornitore_id: true } })) {
+      coppieDb.add(`${it.cliente_id}:${it.fornitore_id}`);
+    }
   }
   const soggettoDellaScheda = (scheda: SchedaCliente | undefined): bigint | null => {
     if (!scheda) return null;
@@ -379,33 +541,7 @@ async function importa(tx: Tx) {
     if (cn && cfValido(cn)) return soggettoPer.get(`c:IT:${cn}`) ?? null;
     return null;
   };
-  const personeContatti: Prisma.persone_contattiCreateManyInput[] = [];
-  const recapitiPersone: Prisma.recapitiCreateManyInput[] = [];
-  for (const [i, riga] of contattiRighe.entries()) {
-    const scheda = schedaPerId.get(Number(riga.cliente_id));
-    const soggettoId = soggettoDellaScheda(scheda);
-    if (!soggettoId) { scarta('contatto_senza_soggetto', riga.cliente_id, 'contatto di una scheda non diventata soggetto', riga.cliente); continue; }
-    const mansione = (riga.mansione || '').toLowerCase();
-    const ruolo = mansione.includes('acquist') ? 'acquisti'
-      : mansione.includes('titol') ? 'titolare'
-      : mansione.includes('amministraz') ? 'amministrazione'
-      : mansione.includes('magazzin') ? 'magazzino' : null;
-    personeContatti.push({ persona_id: persIdPerRiga[i], soggetto_id: soggettoId, sede_id: null, ruolo, referente: false, valido_dal: DAL });
-    if (riga.email) recapitiPersone.push({ persona_id: persIdPerRiga[i], soggetto_id: null, sede_id: null, tipo: 'email', valore: riga.email.toLowerCase(), valido_dal: DAL });
-    if (riga.telefono) recapitiPersone.push({ persona_id: persIdPerRiga[i], soggetto_id: null, sede_id: null, tipo: 'telefono', valore: riga.telefono, valido_dal: DAL });
-    if (riga.cellulare) recapitiPersone.push({ persona_id: persIdPerRiga[i], soggetto_id: null, sede_id: null, tipo: 'cellulare', valore: riga.cellulare, valido_dal: DAL });
-  }
-  report.contatti_persona = contattiRighe.length;
-  if (personeContatti.length) await tx.persone_contatti.createMany({ data: personeContatti });
-  report.persone_contatti = personeContatti.length;
-  if (recapitiPersone.length) await tx.recapiti.createMany({ data: recapitiPersone });
-  report.recapiti += recapitiPersone.length;
-
-  // 6. Legami (4022) → interscambio + sconti: solo con subagente riconosciuto e cliente diventato soggetto
-  const collegamenti = csvColonne('collegamenti.csv');
   report.collegamenti = collegamenti.length;
-  const scontiData: Prisma.scontiCreateManyInput[] = [];
-  const coppiaVista = new Set<string>(); // cliente×fornitore: il vincolo EXCLUDE ammette un solo subagente al giorno (D-35)
   for (const leg of collegamenti) {
     const scheda = schedaPerId.get(Number(leg.cliente_id));
     const soggettoId = soggettoDellaScheda(scheda);
@@ -417,7 +553,15 @@ async function importa(tx: Tx) {
     if (!clienteRuolo) { conflitto('cliente_non_soggetto', `cliente ${leg.cliente} (${leg.cliente_id}) senza P.IVA/CF: legame non importato`); continue; }
     if (!fornitoreRuolo) { conflitto('fornitore_non_trovato', `fornitore "${leg.fornitore}" non trovato`); continue; }
     const chiaveCoppia = `${clienteRuolo}:${fornitoreRuolo}`;
-    if (coppiaVista.has(chiaveCoppia)) { conflitto('legame_doppio', `cliente ${leg.cliente} (${leg.cliente_id}) · fornitore ${leg.fornitore} · subagente ${leg.subagente}`); continue; }
+    if (AGGIUNGI && coppieDb.has(chiaveCoppia)) {
+      conflitto('agenzia_esistente', `cliente ${leg.cliente} (${leg.cliente_id}) · fornitore ${leg.fornitore}: agenzia già presente, non toccata`);
+      report.gia_interscambio++;
+      continue;
+    }
+    if (coppiaVista.has(chiaveCoppia)) {
+      conflitto('legame_doppio', `cliente ${leg.cliente} (${leg.cliente_id}) · fornitore ${leg.fornitore} · subagente ${leg.subagente}`);
+      continue;
+    }
     coppiaVista.add(chiaveCoppia);
     const sconto1 = Number(leg.sconto1 || 0);
     const sconto2 = Number(leg.sconto2 || 0);
@@ -432,9 +576,9 @@ async function importa(tx: Tx) {
   if (scontiData.length) await tx.sconti.createMany({ data: scontiData });
   report.sconti = scontiData.length;
 
-  // 7. Codici esterni (§5.4): una riga per scheda (tipo soggetto) e una per ruolo
+  // 7. Codici esterni (§5.4): una riga per scheda (tipo soggetto) e una per ruolo. I codici già
+  // presenti (--aggiungi, giro successivo) non si riscrivono (codiciVisti è pre-caricato).
   const codiciData: Prisma.codici_esterniCreateManyInput[] = [];
-  const codiciVisti = new Set<string>();
   const accodaCodice = (tipo: string, codice: string, entita_id: bigint, etichetta: string | null = null) => {
     const k = `vecchio_crm:${tipo}:${codice}`;
     if (codiciVisti.has(k)) return;
@@ -465,9 +609,10 @@ async function importa(tx: Tx) {
   if (codiciData.length) await tx.codici_esterni.createMany({ data: codiciData });
   report.codici_esterni = codiciData.length;
 
-  // 8. Fusione registrata in modifiche (§7.5)
+  // 8. Fusione registrata in modifiche (§7.5): solo per i soggetti nuovi di questo giro
   const fusioniData: Prisma.modificheCreateManyInput[] = [];
   for (const [soggettoId, schedeSoggetto] of schedePerSoggetto) {
+    if (!soggettiNuovi.has(soggettoId)) continue;
     if (schedeSoggetto.length > 1) {
       report.fusioni.push({ chiave: `soggetto ${soggettoId}`, codici: schedeSoggetto.map((s) => String(s.id)), n: schedeSoggetto.length });
       fusioniData.push({ entita: 'soggetto', entita_id: soggettoId, campo: 'fusione', valore_dopo: schedeSoggetto.map((s) => String(s.id)).join(',') });
@@ -479,11 +624,54 @@ async function importa(tx: Tx) {
   await logEvent(tx, {
     tipo: 'crud', azione: 'create', entita: 'import', esito: 'successo',
     dettaglio: {
-      etichetta: 'Import vecchio CRM',
+      etichetta: AGGIUNGI ? 'Import vecchio CRM (aggiungi)' : 'Import vecchio CRM',
       soggetti: report.soggetti, clienti: report.ruoli_cliente, fornitori: report.ruoli_fornitore,
       subagenti: report.ruoli_subagente, agenti: report.ruoli_agente, interscambio: report.interscambio,
     },
   });
+}
+
+// ---------- Cosa manca in Integra (solo --aggiungi) ----------
+async function scriviDaInserireInIntegra(db: PrismaClient) {
+  const fPiva = new Set<string>(), fNome = new Set<string>();
+  const cPiva = new Set<string>(), cNome = new Set<string>();
+  let visteAssenti = false;
+  try {
+    const rf = await db.$queryRaw<{ piva: string | null; ragione_sociale: string | null }[]>`SELECT piva, ragione_sociale FROM public.integra_v_fornitori`;
+    const rc = await db.$queryRaw<{ piva: string | null; ragione_sociale: string | null }[]>`SELECT piva, ragione_sociale FROM public.integra_v_clienti`;
+    for (const r of rf) { const p = r.piva ? normPiva(r.piva) : ''; if (p && pivaValida(p)) fPiva.add(p); if (r.ragione_sociale) fNome.add(normalizza(r.ragione_sociale)); }
+    for (const r of rc) { const p = r.piva ? normPiva(r.piva) : ''; if (p && pivaValida(p)) cPiva.add(p); if (r.ragione_sociale) cNome.add(normalizza(r.ragione_sociale)); }
+  } catch {
+    visteAssenti = true;
+  }
+  if (visteAssenti) {
+    scriviCsv('da-inserire-in-integra.csv', ['tipo', 'ragione_sociale', 'piva', 'citta', 'codice_vecchio_crm', 'n_collegamenti'], [['', 'viste di Integra assenti', '', '', '', '']]);
+    report.da_inserire_in_integra = -1;
+    return;
+  }
+  const nF = new Map<string, number>(), nC = new Map<number, number>();
+  for (const leg of collegamenti) {
+    nF.set(testo(leg.fornitore), (nF.get(testo(leg.fornitore)) ?? 0) + 1);
+    nC.set(Number(leg.cliente_id), (nC.get(Number(leg.cliente_id)) ?? 0) + 1);
+  }
+  const righe: (string | number)[][] = [];
+  for (const f of fornitoriSorgente) {
+    const nome = testo(f.elenco.Name);
+    const piva = normPiva(testo(f.scheda['Company.VATNumber'] ?? f.elenco.PIva));
+    const inIntegra = (piva && pivaValida(piva)) ? fPiva.has(piva) : fNome.has(normalizza(nome));
+    if (inIntegra) continue;
+    righe.push(['fornitore', nome, piva, testo(f.scheda['Company.Address.City']), Number(f.elenco.Id), nF.get(testo(f.elenco.Name)) ?? 0]);
+  }
+  for (const c of schede) {
+    const amm = c.dati_amministrativi ?? {};
+    const nome = testo(c.ragione_sociale) || testo(c.elenco.Name);
+    const piva = normPiva(testo(amm['PARTITA IVA'] ?? c.elenco.VatNumber));
+    const inIntegra = (piva && pivaValida(piva)) ? cPiva.has(piva) : cNome.has(normalizza(nome));
+    if (inIntegra) continue;
+    righe.push(['cliente', nome, piva, testo(c.elenco.City), c.id, nC.get(c.id) ?? 0]);
+  }
+  scriviCsv('da-inserire-in-integra.csv', ['tipo', 'ragione_sociale', 'piva', 'citta', 'codice_vecchio_crm', 'n_collegamenti'], righe);
+  report.da_inserire_in_integra = righe.length;
 }
 
 // ---------- Scrittura dei report ----------
@@ -506,10 +694,12 @@ async function main() {
   const t0 = Date.now();
   const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
   try {
-    const gia = await db.codici_esterni.findFirst({ where: { sistema: 'vecchio_crm' } });
-    if (gia && !SOSTITUISCI) {
-      console.log('Import già fatto (c\'è un codice esterno sistema=vecchio_crm): non faccio niente. Per rifarlo: --sostituisci');
-      return;
+    if (!AGGIUNGI) {
+      const gia = await db.codici_esterni.findFirst({ where: { sistema: 'vecchio_crm' } });
+      if (gia && !SOSTITUISCI) {
+        console.log('Import già fatto (c\'è un codice esterno sistema=vecchio_crm): non faccio niente. Per rifarlo: --sostituisci');
+        return;
+      }
     }
     if (SOSTITUISCI) {
       if (!(await chiediConferma())) { console.log('Annullato.'); return; }
@@ -530,9 +720,10 @@ async function main() {
     }
     if (seq) await db.$queryRaw`SELECT setval('soggetti_codice_seq', ${seq.last_value}, ${seq.is_called})`;
     report.tempi.import = Date.now() - tImport;
+    if (AGGIUNGI) await scriviDaInserireInIntegra(db);
     const totale = Date.now() - t0;
     scriviReport(totale);
-    console.log(`${PROVA ? 'PROVA (rollback)' : 'Import completato'}: ${report.soggetti} soggetti, ${report.ruoli_cliente} clienti, ${report.ruoli_fornitore} fornitori, ${report.ruoli_subagente} subagenti, ${report.ruoli_agente} agenti, ${report.interscambio} interscambio in ${(totale / 1000).toFixed(1)} s`);
+    console.log(`${PROVA ? 'PROVA (rollback)' : AGGIUNGI ? 'Aggiunta completata' : 'Import completato'}: ${report.soggetti} soggetti nuovi (${report.gia_soggetti} già presenti), ${report.ruoli_cliente} clienti nuovi (${report.gia_clienti} già presenti), ${report.ruoli_fornitore} fornitori nuovi (${report.gia_fornitori} già presenti), ${report.ruoli_subagente} subagenti nuovi (${report.gia_subagenti} già presenti), ${report.interscambio} interscambio nuovi (${report.gia_interscambio} già presenti) in ${(totale / 1000).toFixed(1)} s`);
   } catch (e) {
     console.error('errore:', (e instanceof Error ? e.message : String(e)).replace(/postgres(?:ql)?:\/\/\S+/gi, '[indirizzo rimosso]').replace(/password\s*=\s*\S+/gi, 'password=[rimossa]'));
     process.exitCode = 1;

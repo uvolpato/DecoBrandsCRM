@@ -27,7 +27,7 @@ let c1: { id: bigint; versione_id: bigint };
 let c2: { id: bigint; versione_id: bigint };
 
 const L = (over: Partial<Letto>): Letto => ({
-  tipo: null, fornitore_id: null, fornitore: null, numero: null, data: null, codice_cliente: null, cliente: null, piva_cliente: null,
+  tipo: null, fornitore_id: null, fornitore: null, numero: null, data: null, codice_cliente: null, cliente: null, cliente_id: null, piva_cliente: null,
   importo: null, mese: null, anno: null, riferimento_fattura: null, righe: [],
   ...over,
 });
@@ -527,6 +527,17 @@ describe('proposta — import da Integra e storico (D-111/D-112)', () => {
 });
 
 describe('proposta — candidati da scegliere (D-152)', () => {
+  it('cliente scelto a mano: certo, vince su codice/P.IVA/nome (come il fornitore scelto)', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gries.id, numero: 'OF-SCELTO', cliente_id: String(c1.id), piva_cliente: 'IT00000000002' }));
+    expect(p.cliente_riconosciuto).toEqual({ cliente_id: c1.id, ragione: 'Verde Vita snc' });
+    expect(p.abbinamento).toBeNull(); // il codice non si usa: vale la scelta a mano
+  });
+
+  it('cliente scelto a mano inesistente o senza versione: si ignora e si riconosce per P.IVA', async () => {
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gries.id, numero: 'OF-SCELTO2', cliente_id: '999999', piva_cliente: 'IT00000000001' }));
+    expect(p.cliente_riconosciuto).toEqual({ cliente_id: c1.id, ragione: 'Verde Vita snc' });
+  });
+
   it('cliente riconosciuto per P.IVA unica: certo, nessun candidato', async () => {
     const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: gasper.id, numero: 'OF-152', piva_cliente: 'IT00000000001' }));
     expect(p.cliente_riconosciuto).toMatchObject({ cliente_id: c1.id });
