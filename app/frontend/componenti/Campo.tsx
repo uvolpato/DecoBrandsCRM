@@ -27,6 +27,8 @@ export interface CampoProps {
   contesto?: Contesto;
   // ricerca: nome letto dal documento, per offrire «Cerca questo» quando il campo è vuoto
   testoIniziale?: { q: string; mostra: string };
+  // ricerca: nome già noto al chiamante, mostrato al posto dell'id finché le voci non arrivano (D-161 §19)
+  nomeIniziale?: string;
   onCambia?: (valore: string) => void; // per chi deve ricaricare altri campi della finestra (es. gli sconti del fornitore)
 }
 
@@ -63,7 +65,7 @@ export function CampoEuro({ valore, onChange, dataCampo, onFocus, valuta = true,
   );
 }
 
-export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, segnaposto, min, max, step, disabilitato, entita, multipla, contesto, onCambia, testoIniziale }: CampoProps) {
+export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, segnaposto, min, max, step, disabilitato, entita, multipla, contesto, onCambia, testoIniziale, nomeIniziale }: CampoProps) {
   const [vedi, setVedi] = useState(false);
   const id = 'c-' + nome;
   const [ricerca, setRicerca] = useState<string | string[]>(multipla ? (Array.isArray(valore) ? valore : []) : typeof valore === 'string' ? valore : '');
@@ -74,7 +76,7 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
         <input type="hidden" name={nome} value={multipla ? JSON.stringify(ricerca) : (ricerca as string)} />
         {multipla
           ? <CampoRicerca entita={entita} contesto={contesto} id={id} multipla valori={ricerca as string[]} onChange={setRicerca} />
-          : <CampoRicerca entita={entita} contesto={contesto} id={id} valore={ricerca as string} onChange={(v) => { setRicerca(v); onCambia?.(v); }} testoIniziale={testoIniziale} />}
+          : <CampoRicerca entita={entita} contesto={contesto} id={id} valore={ricerca as string} onChange={(v) => { setRicerca(v); onCambia?.(v); }} testoIniziale={testoIniziale} nomeIniziale={nomeIniziale} />}
         {aiuto && <span className="aiuto">{aiuto}</span>}
       </div>
     );

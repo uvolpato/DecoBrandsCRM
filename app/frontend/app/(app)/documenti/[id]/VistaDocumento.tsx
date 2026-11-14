@@ -8,6 +8,7 @@ import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { Scelte, Elenco } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
 import { FormAgenzia, type Agenzia } from '@/componenti/FormAgenzia';
+import { FormPercentuali } from '@/componenti/FormPercentuali';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pannello, type Azione } from '@/componenti/Pagina';
@@ -281,7 +282,8 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         testo="Dopo la registrazione lo confronti riga per riga con le nostre pratiche."
         campi={[
           { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: t.fornitore_id ?? '',
-            testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined },
+            testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined,
+            nomeIniziale: t.fornitore ?? undefined },
           { nome: 'mese', etichetta: 'Mese', tipo: 'select', valore: String(t.mese ?? ''), opzioni: MESI.map((m, i) => ({ value: String(i + 1), label: m })) },
           { nome: 'anno', etichetta: 'Anno', tipo: 'numero', valore: t.anno ?? '' },
         ]}
@@ -678,9 +680,19 @@ function FileDocumento({ d, pagina, posizione }: { d: Dettaglio; pagina?: number
  *  come contesto, così la colonna «Cod. cliente» mostra il codice presso quel fornitore.
  *  D-158: se all'apertura manca l'agenzia, un pulsante la crea qui senza uscire dal flusso.
  *  D-159: un'agenzia del vecchio CRM da confermare non apre da sola la pratica: si conferma o si configura. */
+/** D-162: dati del 409 `scaglione_mancante` (server), per aprire la finestra delle percentuali lì. */
+interface ScaglioneMancante {
+  fornitore_id: string;
+  fornitore: string;
+  sconto: number;
+  data: string;
+  ha_percentuali: boolean;
+}
+
 function ApriPratica({ id, t, clienteIniziale, onChiudi, onFatto }: { id: string; t: Testata; clienteIniziale: string; onChiudi: () => void; onFatto?: () => void }) {
   const router = useRouter();
   const puoAgenzia = usePuo()('dati.modifica'); // D-106: l'agenzia si salva con dati.modifica
+  const puoPercentuali = usePuo()('dati.condizioni'); // D-162: le percentuali sono del responsabile in Dati
   const [fornitoreId, setFornitoreId] = useState(t.fornitore_id ?? '');
   const [clienteId, setClienteId] = useState(clienteIniziale);
   // D-158: coppia senza agenzia (dall'errore di abbina): il pulsante apre FormAgenzia
@@ -689,6 +701,9 @@ function ApriPratica({ id, t, clienteIniziale, onChiudi, onFatto }: { id: string
   // D-159: agenzia del vecchio CRM da confermare, con la coppia scelta per confermarla o configurarla
   const [daConfermare, setDaConfermare] = useState<{ agenzia: Agenzia; cliente_id: string; fornitore_id: string } | null>(null);
   const [modifica, setModifica] = useState<{ agenzia: Agenzia; cliente_id: string; cliente: string | null; fornitore_id: string; fornitore: string } | null>(null);
+  // D-162: scaglione del fornitore mancante, con la coppia scelta per configurare le percentuali lì
+  const [scaglione, setScaglione] = useState<{ d: ScaglioneMancante; cliente_id: string; fornitore_id: string } | null>(null);
+  const [configuraPct, setConfiguraPct] = useState<{ d: ScaglioneMancante; cliente_id: string; fornitore_id: string } | null>(null);
 
   async function apriAgenzia() {
     if (!manca) return;
@@ -705,9 +720,13 @@ function ApriPratica({ id, t, clienteIniziale, onChiudi, onFatto }: { id: string
       cliente_id: Number(cliente), fornitore_id: Number(fornitore),
     });
     if (!r.ok) {
-      const d = r.dati as { code?: string; agenzia?: Agenzia } | null;
+      const d = r.dati as { code?: string; agenzia?: Agenzia; scaglione?: ScaglioneMancante } | null;
       if (r.stato === 409 && d?.code === 'agenzia_da_confermare' && d.agenzia) {
         setDaConfermare({ agenzia: d.agenzia, cliente_id: cliente, fornitore_id: fornitore });
+        return r.messaggio;
+      }
+      if (r.stato === 409 && d?.code === 'scaglione_mancante' && d.scaglione) {
+        setScaglione({ d: d.scaglione, cliente_id: cliente, fornitore_id: fornitore });
         return r.messaggio;
       }
       if (r.stato === 409 && /agenzia/.test(r.messaggio)) setManca({ cliente_id: cliente, fornitore_id: fornitore });
@@ -766,16 +785,37 @@ function ApriPratica({ id, t, clienteIniziale, onChiudi, onFatto }: { id: string
     );
   }
 
+  // D-162: le percentuali del fornitore si configurano qui, poi si riprova ad aprire la pratica
+  if (configuraPct) {
+    return (
+      <FormPercentuali
+        idFornitore={configuraPct.d.fornitore_id}
+        ragioneSociale={configuraPct.d.fornitore}
+        validoDalProposta={configuraPct.d.data}
+        nonOltre={configuraPct.d.data}
+        scontoAgenzia={configuraPct.d.sconto}
+        onSalvata={() => {
+          const s = configuraPct;
+          setConfiguraPct(null); setScaglione(null); setManca(null); onFatto?.();
+          void apri(s.cliente_id, s.fornitore_id);
+        }}
+        onChiudi={() => setConfiguraPct(null)}
+      />
+    );
+  }
+
   return (
     <FormModal titolo="Apri la pratica" conferma="Apri la pratica" colonne={2}
       testo="La pratica nasce dall’ordine. Cliente e fornitore servono per l’agenzia e la provvigione."
       campi={[
         { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: fornitoreId,
           testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined,
+          nomeIniziale: t.fornitore ?? undefined,
           onCambia: (v) => setFornitoreId(v) },
         { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: clienteId,
           contesto: { fornitore_id: fornitoreId, codice_cliente: t.codice_cliente },
           testoIniziale: t.cliente ? { q: t.cliente, mostra: t.cliente } : undefined,
+          nomeIniziale: t.cliente ?? undefined,
           onCambia: (v) => setClienteId(v) },
       ]}
       erroreExtra={(errore) => daConfermare ? (
@@ -794,6 +834,12 @@ function ApriPratica({ id, t, clienteIniziale, onChiudi, onFatto }: { id: string
               title={!puoAgenzia ? 'Serve il livello operatore in Dati' : undefined}
               onClick={configura}>Configura</button>
           </div>
+        </div>
+      ) : scaglione ? (
+        <div className="azioni-riga">
+          <button type="button" className="btn primario" disabled={!puoPercentuali}
+            title={!puoPercentuali ? 'Serve il livello responsabile in Dati' : undefined}
+            onClick={() => setConfiguraPct(scaglione)}>Configura le percentuali</button>
         </div>
       ) : (manca && /agenzia/.test(errore)) ? (
         <div className="azioni-riga">

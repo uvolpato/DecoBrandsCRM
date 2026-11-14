@@ -1,11 +1,11 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import type { CampoProps } from '@/componenti/Campo';
 import { CercaInIntegra } from '@/componenti/CercaInIntegra';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
+import { FormPercentuali, type Percentuali, type Scaglione, type ScaglioneVersione, type Versione } from '@/componenti/FormPercentuali';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, Pulsante, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli } from '@/componenti/Piccoli';
@@ -32,13 +32,6 @@ interface Fornitore {
   attivo: boolean;
   scaglioni: number;
 }
-interface Scaglione {
-  id: string;
-  sconto_min: number;
-  pct_agente: number;
-  pct_subagente: number;
-  valido_dal: string;
-}
 interface ClienteSeguito {
   id: string;
   subagente_id: string | null;
@@ -58,46 +51,8 @@ type Dettaglio = Omit<Fornitore, 'scaglioni'> & {
   clienti_seguiti: ClienteSeguito[];
 };
 
-// Percentuali datate (§4.2.2, §5.11, D-25, D-51): il server restituisce le versioni e, per ogni
-// scaglione, le eccezioni personali valide in qualche giorno della versione.
-interface EccezioneScaglione {
-  id: string;
-  subagente_id: string;
-  subagente: string;
-  pct_personale: number;
-  valido_dal: string;
-  valido_al: string | null;
-}
-interface ScaglioneVersione extends Scaglione {
-  dal_fornitore: number;
-  clienti: number;
-  eccezioni: EccezioneScaglione[];
-}
-interface Versione {
-  valido_dal: string;
-  in_vigore: boolean;
-  modificabile: boolean; // D-51: dopo l'ultima chiusura del fornitore
-  scaglioni: ScaglioneVersione[];
-}
-interface Percentuali {
-  in_vigore: string | null;
-  versioni: Versione[];
-}
-
-interface RigaBozza {
-  sconto_min: string;
-  pct_agente: string;
-  pct_subagente: string;
-  nuova: boolean;
-}
-interface Bozza {
-  modo: 'nuova' | 'correggi';
-  idFornitore: string;
-  valido_dal: string; // nuova: campo; correggi: la data della versione
-  righe: RigaBozza[];
-}
-
-const oggi = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+// Percentuali datate (§4.2.2, §5.11, D-25, D-51): i tipi stanno in FormPercentuali, condiviso
+// con «Apri la pratica» (D-162); qui si mostra solo la scheda e si apre la finestra.
 
 export function VistaFornitori({ idSel }: { idSel?: string }) {
   const puo = usePuo();
@@ -108,7 +63,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   const [valori, setValori] = useMemoria<Valori>('filtri', { q: '' });
   const [valoriCl, setValoriCl] = useMemoria<Valori>('filtri-clienti', { subagenti: [] });
   const [finestra, setFinestra] = useState<ReactNode>(null);
-  const [bozza, setBozza] = useState<Bozza | null>(null);
+  // D-162: la finestra delle percentuali è FormPercentuali (condivisa con «Apri la pratica»)
+  const [formPct, setFormPct] = useState<{ versione?: Versione } | null>(null);
   const [errore, setErrore] = useState('');
   const [errorePercentuali, setErrorePercentuali] = useState(false);
   const sagome = useSagome(!fornitori);
@@ -193,24 +149,11 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   }
 
   function nuovePercentuali() {
-    if (!u) return;
-    // righe precompilate dalla versione più recente; le soglie si aggiungono, non si tolgono (D-25)
-    const ultima = percentuali?.versioni[0];
-    setBozza({
-      modo: 'nuova', idFornitore: u.id, valido_dal: oggi(),
-      righe: [
-        ...(ultima?.scaglioni ?? []).map((s) => ({ sconto_min: String(s.sconto_min), pct_agente: String(s.pct_agente), pct_subagente: String(s.pct_subagente), nuova: false })),
-        { sconto_min: '', pct_agente: '', pct_subagente: '', nuova: true },
-      ],
-    });
+    setFormPct({});
   }
 
   function correggi(v: Versione) {
-    if (!u) return;
-    setBozza({
-      modo: 'correggi', idFornitore: u.id, valido_dal: v.valido_dal,
-      righe: v.scaglioni.map((s) => ({ sconto_min: String(s.sconto_min), pct_agente: String(s.pct_agente), pct_subagente: String(s.pct_subagente), nuova: false })),
-    });
+    setFormPct({ versione: v });
   }
 
   async function eliminaVersione(v: Versione) {
@@ -221,48 +164,6 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
     avviso('Versione eliminata');
     const p = await api<Percentuali>('fornitori/' + u.id + '/percentuali');
     if (p.ok) setPercentuali(p.dati); else avviso(p.messaggio, true);
-  }
-
-  function campiBozza(b: Bozza): CampoProps[] {
-    const campi: CampoProps[] = [{
-      nome: 'valido_dal', etichetta: 'Valide dal', tipo: 'data', valore: b.valido_dal, largo: true,
-      disabilitato: b.modo === 'correggi',
-      aiuto: b.modo === 'nuova' ? 'Deve venire dopo l’ultima chiusura (bollettino verificato o trimestre liquidato); può cadere fra due versioni.' : undefined,
-    }];
-    b.righe.forEach((r, i) => {
-      if (r.nuova) {
-        campi.push({ nome: 'sconto' + i, etichetta: 'Aggiungi uno sconto %', valore: r.sconto_min, largo: true, aiuto: 'Facoltativo: le soglie esistenti non si tolgono.' });
-        campi.push({ nome: 'agente' + i, etichetta: 'A Decobrands % (nuovo sconto)', valore: r.pct_agente });
-        campi.push({ nome: 'sub' + i, etichetta: 'Al subagente % (nuovo sconto)', valore: r.pct_subagente });
-      } else {
-        const sconto = pct(Number(r.sconto_min));
-        campi.push({ nome: 'agente' + i, etichetta: 'Sconto ' + sconto + ' · a Decobrands %', valore: r.pct_agente });
-        campi.push({ nome: 'sub' + i, etichetta: 'Sconto ' + sconto + ' · al subagente %', valore: r.pct_subagente });
-      }
-    });
-    return campi;
-  }
-
-  async function salvaBozza(v: Record<string, string>) {
-    const b = bozza;
-    if (!b) return;
-    if (b.modo === 'nuova' && !v.valido_dal) return 'Indica la data da cui valgono.';
-    const scaglioni: { sconto_min: number; pct_agente: number; pct_subagente: number }[] = [];
-    for (let i = 0; i < b.righe.length; i++) {
-      const sconto = b.righe[i].nuova ? v['sconto' + i] : b.righe[i].sconto_min;
-      if (b.righe[i].nuova && !sconto) continue;
-      if (v['agente' + i] === '' || v['sub' + i] === '') return 'Indica le due percentuali per lo sconto ' + sconto + ' %.';
-      scaglioni.push({ sconto_min: Number(sconto), pct_agente: Number(v['agente' + i]), pct_subagente: Number(v['sub' + i]) });
-    }
-    if (!scaglioni.length) return 'Indica almeno uno scaglione.';
-    const r = b.modo === 'nuova'
-      ? await api<Percentuali>('fornitori/' + b.idFornitore + '/percentuali', { valido_dal: v.valido_dal, scaglioni })
-      : await api<Percentuali>('fornitori/' + b.idFornitore + '/percentuali/' + b.valido_dal, { scaglioni }, 'PUT');
-    if (!r.ok) return r.messaggio;
-    setPercentuali(r.dati);
-    avviso(b.modo === 'nuova' ? 'Percentuali salvate: valgono dal ' + dataIt(v.valido_dal) : 'Percentuali corrette');
-    setBozza(null);
-    return undefined;
   }
 
   // in vigore in alto, poi le future dalla più vicina, poi le passate dalla più recente
@@ -308,11 +209,11 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
       sottotitolo="Anagrafica da Integra (sola lettura). Qui si modificano solo le regole del CRM: giorni di attesa della conferma, bollettino, tipo di provvigione, giorni per l’incasso, note.">
       {corpo}
       {finestra}
-      {bozza && (
-        <FormModal titolo={(bozza.modo === 'nuova' ? 'Nuove percentuali di ' : 'Correggi le percentuali di ') + (u?.ragione_sociale ?? '')}
-          testo={bozza.modo === 'nuova' ? 'Valgono per i documenti con data uguale o successiva a quella indicata.' : 'La correzione sostituisce le percentuali di questa versione.'}
-          conferma={bozza.modo === 'nuova' ? 'Salva le nuove percentuali' : 'Salva la correzione'} colonne={2}
-          campi={campiBozza(bozza)} onChiudi={() => setBozza(null)} onConferma={salvaBozza} />
+      {formPct && u && (
+        <FormPercentuali idFornitore={u.id} ragioneSociale={u.ragione_sociale}
+          correzione={formPct.versione ?? null}
+          onSalvata={(p) => { setPercentuali(p); setFormPct(null); }}
+          onChiudi={() => setFormPct(null)} />
       )}
     </Pagina>
   );

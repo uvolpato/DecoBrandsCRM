@@ -156,7 +156,13 @@ with sync_playwright() as p:
     pg.go_back()
     pg.wait_for_function("location.pathname === '/componenti'")
     pg.wait_for_selector('.catalogo-voci h2')
-    ok(sezione(pg, 'Schede').locator('.schede-barra [role=tab][aria-selected=true]').inner_text().startswith('Errori'), 'memoria: la scheda aperta si ritrova')
+    # §7.12: la memoria si ripristina al re-render della navigazione morbida; si attende il giro,
+    # non il momento intermedio (prima la scheda ricordata poteva non essere ancora selezionata)
+    try:
+        pg.wait_for_function("(document.querySelector('.schede-barra [role=tab][aria-selected=true]')?.textContent ?? '').startsWith('Errori')", timeout=5000)
+        ok(True, 'memoria: la scheda aperta si ritrova')
+    except Exception:
+        ok(False, 'memoria: la scheda aperta si ritrova')
     ok('310,20' in sezione(pg, 'DataTable').locator('tbody tr').first.inner_text(), 'memoria: l’ordinamento della tabella si ritrova')
     pg.screenshot(path=str(USCITA / 'componenti-1440.png'), full_page=False)
     pg.close()

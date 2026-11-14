@@ -30,6 +30,7 @@ import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registr
 
 type Tx = Prisma.TransactionClient;
 const Dec = Prisma.Decimal;
+const dataIt = (s: string) => s.split('-').reverse().join('/');
 const NOME: Record<TipoDocumento, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura', nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento',
 };
@@ -1529,6 +1530,23 @@ function agenziaDaConfermare(ag: {
   });
 }
 
+/** D-162: il fornitore non ha uno scaglione per lo sconto dell'agenzia alla data dell'ordine: senza, la provvigione
+ *  sarebbe zero. 409 con il codice `scaglione_mancante` e i dati per la finestra delle percentuali dentro
+ *  «Apri la pratica» (stessa idea dell'agenzia da confermare, D-159). */
+function scaglioneMancante(f: { fornitore_id: bigint; fornitore: string; sconto: number; data: string; ha_percentuali: boolean }) {
+  throw new ConflictException({
+    code: 'scaglione_mancante',
+    message: `${f.fornitore} non ha ancora le percentuali delle provvigioni valide al ${dataIt(f.data)} (sconto ${f.sconto} %): senza, la provvigione sarebbe zero.`,
+    scaglione: {
+      fornitore_id: String(f.fornitore_id),
+      fornitore: f.fornitore,
+      sconto: f.sconto,
+      data: f.data,
+      ha_percentuali: f.ha_percentuali,
+    },
+  });
+}
+
 /** Pratica nuova dal primo ordine (D-60): numero OF/AAAA/NNN, AAAA = anno dell'ordine, NNN = il più alto dell'anno + 1.
  *  Il blocco consultivo fa passare una alla volta le pratiche nuove: niente numeri doppi. Cliente e fornitore con la
  *  versione corrente (D-46). Evento crud.create. */
@@ -1538,7 +1556,7 @@ async function nuovaPratica(tx: Tx, b: AbbinaDocumento, ctx: Contesto) {
   const fid = BigInt(b.fornitore_id), cid = BigInt(b.cliente_id);
   await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${fid} FOR UPDATE`;
   const [f, c] = await Promise.all([
-    tx.fornitori.findUnique({ where: { id: fid }, select: { versione_corrente_id: true } }),
+    tx.fornitori.findUnique({ where: { id: fid }, select: { versione_corrente_id: true, corrente: { select: { ragione_sociale: true } } } }),
     tx.clienti.findUnique({ where: { id: cid }, select: { versione_corrente_id: true } }),
   ]);
   if (!f?.versione_corrente_id) throw new BadRequestException('Fornitore non trovato');
@@ -1559,7 +1577,11 @@ async function nuovaPratica(tx: Tx, b: AbbinaDocumento, ctx: Contesto) {
     where: { fornitore_id: fid, sconto_min: { lte: ag.sconto }, valido_dal: { lte: new Date(b.data) } },
     select: { id: true },
   });
-  if (!sc) throw new ConflictException(`Il fornitore non ha uno scaglione per lo sconto ${Number(ag.sconto)}% alla data dell'ordine: configuralo in Fornitori`);
+  if (!sc) {
+    // D-162: 409 con i dati per configurare le percentuali lì, invece di rimandare in Fornitori
+    const haPercentuali = !!(await tx.provvigioni_scaglioni.findFirst({ where: { fornitore_id: fid }, select: { id: true } }));
+    scaglioneMancante({ fornitore_id: fid, fornitore: f.corrente?.ragione_sociale ?? 'Il fornitore', sconto: Number(ag.sconto), data: b.data, ha_percentuali: haPercentuali });
+  }
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ordini_fornitore_testata.numero_ordine'))`;
   const anno = b.data.slice(0, 4);
   const [m] = await tx.$queryRaw<{ n: number | null }[]>`

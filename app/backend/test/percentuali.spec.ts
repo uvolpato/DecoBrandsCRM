@@ -263,6 +263,43 @@ describe('percentuali datate', () => {
   });
 });
 
+describe('correzione: scaglioni aggiunti e tolti (D-163)', () => {
+  let f: string; // fornitore nuovo, senza chiusura
+  const SC = [
+    { sconto_min: 0, pct_agente: 20, pct_subagente: 11 },
+    { sconto_min: 10, pct_agente: 6, pct_subagente: 2 },
+  ];
+  const p = () => `/fornitori/${f}/percentuali`;
+  const righeDi = (r: { body: { versioni: { valido_dal: string; scaglioni: { sconto_min: number }[] }[] } }) =>
+    r.body.versioni.find((v) => v.valido_dal === '2026-09-01')!.scaglioni.map((s) => s.sconto_min);
+
+  beforeAll(async () => {
+    f = String((await db.fornitori.create({ data: {} })).id);
+    await resp.post(p(), { valido_dal: '2026-09-01', scaglioni: SC }).expect(201);
+  });
+
+  it('aggiunge uno scaglione alla versione', async () => {
+    const r = await resp.put(p() + '/2026-09-01', { scaglioni: [...SC, { sconto_min: 20, pct_agente: 4, pct_subagente: 1 }] }).expect(200);
+    expect(righeDi(r)).toEqual([0, 10, 20]);
+    expect(scaglioneDi(r, '2026-09-01', 20)).toMatchObject({ pct_agente: 4, pct_subagente: 1 });
+    const ev = await db.registro.findFirstOrThrow({ where: { codice: 'crud.update', entita: 'scaglione', entita_id: BigInt(f) }, orderBy: { id: 'desc' } });
+    expect((ev.dettaglio as { dopo: { scaglioni: unknown[] } }).dopo.scaglioni).toHaveLength(3);
+  });
+
+  it('toglie uno scaglione (non usato)', async () => {
+    const r = await resp.put(p() + '/2026-09-01', { scaglioni: SC }).expect(200);
+    expect(righeDi(r)).toEqual([0, 10]);
+  });
+
+  it('rifiuta se toglie uno scaglione usato da un\'eccezione', async () => {
+    await resp.put(p() + '/2026-09-01', { scaglioni: [...SC, { sconto_min: 20, pct_agente: 4, pct_subagente: 1 }] }).expect(200);
+    const e = await resp.post('/eccezioni', { subagente_id: Number(bastasin), fornitore_id: Number(f), sconto_min: 20, pct_personale: 3, valido_dal: '2026-09-01' }).expect(201);
+    const r = await resp.put(p() + '/2026-09-01', { scaglioni: SC }).expect(409);
+    expect(r.body.message).toMatch(/Ci sono eccezioni personali sullo sconto 20 %/);
+    await resp.del('/eccezioni/' + e.body.id).expect(204);
+  });
+});
+
 describe('eccezioni personali (D-51)', () => {
   let id: string;
   const corpo = () => ({ subagente_id: Number(bastasin), fornitore_id: Number(gries), sconto_min: 5, pct_personale: 9.5, valido_dal: '2026-10-01' });

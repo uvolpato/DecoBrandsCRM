@@ -306,7 +306,7 @@ try:
         scheda_ordine = dict(scheda_errore, id='999997', stato='da_controllare', tipo='ordine', livello='da_controllare',
                              file_nome='prova-ordine.pdf')
         scheda_ordine['testata'] = dict(scheda_errore['testata'], tipo='ordine', numero='PROVA-ORDINE', codice_cliente='K-9')
-        pg4 = entra(S + '-ammi')
+        pg4 = entra(S + '-oper')
         pg4.route(re.compile(r'^.*/api/documenti/999997$'), lambda r: risposta(r, json.dumps(scheda_ordine)))
         pg4.goto(BASE + '/documenti/999997')
         pg4.locator('.abbina-altra').wait_for(timeout=15000)
@@ -613,7 +613,7 @@ try:
         def crea_agenzia(route):
             stati_apri['crea'] += 1
             route.fulfill(status=201, content_type='application/json', body=json.dumps({'id': '999'}))
-        pgA = entra(S + '-ammi')
+        pgA = entra(S + '-oper')
         pgA.route(re.compile(r'^.*/api/documenti/999991$'), lambda r: risposta(r, json.dumps(scheda_apri)))
         pgA.route(re.compile(r'^.*/api/documenti/999991/abbina$'), abbina_apri)
         pgA.route(re.compile(r'^.*/api/clienti/1001/agenzia-nuova\?fornitore_id=5$'), agenzia_nuova)
@@ -706,6 +706,159 @@ try:
         ok(stati_conf['conferma'] == 1, 'D-159: «Usa questa» conferma l’agenzia')
         ok(True, 'D-159: dopo la conferma la pratica si apre')
         pgD.close()
+
+        # D-162: senza scaglione del fornitore per lo sconto dell'agenzia, «Apri la pratica» risponde 409
+        # scaglione_mancante e il pulsante «Configura le percentuali» apre FormPercentuali (fornitore fisso,
+        # «Valide dal» = data dell'ordine); dopo il salvataggio si riprova ad aprire la pratica.
+        scaglione_manc = {'fornitore_id': '5', 'fornitore': 'Arte Wohnaccessoires GmbH', 'sconto': 0,
+                          'data': '2026-09-15', 'ha_percentuali': False}
+        scheda_scag = dict(scheda_errore, id='999988', stato='da_controllare', tipo='ordine', livello='affidabile', file_nome='prova-scag.pdf')
+        scheda_scag['testata'] = dict(scheda_errore['testata'], tipo='ordine', numero='PROVA-SCAG', data='2026-09-15',
+                                      fornitore_id='5', fornitore='Arte Wohnaccessoires GmbH',
+                                      codice_cliente='45172', cliente='Agri Aggio SNC')
+        scheda_scag['proposta'] = dict(scheda_errore['proposta'], esito='nuova')
+        stati_scag = {'abbina': 0, 'salvate': 0}
+        def abbina_scag(route):
+            stati_scag['abbina'] += 1
+            if stati_scag['salvate'] == 0:
+                route.fulfill(status=409, content_type='application/json', body=json.dumps({
+                    'code': 'scaglione_mancante',
+                    'message': 'Arte Wohnaccessoires GmbH non ha ancora le percentuali delle provvigioni valide al 15/09/2026 (sconto 0 %): senza, la provvigione sarebbe zero.',
+                    'scaglione': scaglione_manc}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=json.dumps({'pratica': {'id': '77', 'numero': 'OF/2026/077'}}))
+        def percentuali_scag(route):
+            if route.request.method == 'POST':
+                stati_scag['salvate'] += 1
+                route.fulfill(status=201, content_type='application/json', body=json.dumps({'in_vigore': '2026-09-15', 'versioni': []}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=json.dumps({'in_vigore': None, 'versioni': []}))
+        pgSC = entra(S + '-ammi')
+        pgSC.route(re.compile(r'^.*/api/documenti/999988$'), lambda r: risposta(r, json.dumps(scheda_scag)))
+        pgSC.route(re.compile(r'^.*/api/documenti/999988/abbina$'), abbina_scag)
+        pgSC.route(re.compile(r'^.*/api/fornitori$'), lambda r: risposta(r, json.dumps(fornitori_mock)))
+        pgSC.route(re.compile(r'^.*/api/fornitori/5/percentuali$'), percentuali_scag)
+        pgSC.route(re.compile(r'^.*/api/clienti\?fornitore_id=5$'), lambda r: risposta(r, json.dumps(clienti_mock)))
+        pgSC.goto(BASE + '/documenti/999988')
+        pgSC.locator('.scelte button:has-text("Apri la pratica")').wait_for(timeout=15000)
+        pgSC.locator('.scelte button:has-text("Apri la pratica")').click()
+        pgSC.wait_for_selector('.velo .modale:has-text("Apri la pratica")')
+        pgSC.fill('#c-cliente_id', 'Agri')
+        pgSC.locator('.velo .ricerca-menu:not([hidden]) li[role=option]').first.wait_for()
+        pgSC.locator('.velo .ricerca-menu:not([hidden]) li[role=option]').first.click()
+        pgSC.wait_for_function("document.querySelectorAll('.velo .ricerca-menu:not([hidden])').length === 0")
+        pgSC.click('.velo .modale-piede button:has-text("Apri la pratica")')
+        pgSC.locator('.velo button:has-text("Configura le percentuali")').wait_for(timeout=10000)
+        ok(pgSC.locator('.velo button:has-text("Configura le percentuali")').count() == 1, 'D-162: senza scaglione compare «Configura le percentuali»')
+        ok('percentuali delle provvigioni' in pgSC.locator('.velo .modulo-errore').inner_text(), 'D-162: il riquadro mostra il messaggio del fornitore')
+        ok(stati_scag['abbina'] == 1, 'D-162: l’apertura ha risposto 409 una volta')
+        pgSC.screenshot(path=str(USCITA / 'app-documento-scaglione-mancante-1440.png'))
+        pgSC.locator('.velo button:has-text("Configura le percentuali")').click()
+        pgSC.wait_for_selector('.velo .modale:has-text("Nuove percentuali di")')
+        ok(pgSC.input_value('.velo input[name=valido_dal]') == '2026-09-15', 'D-162: «Valide dal» = data dell’ordine')
+        pgSC.fill('#c-sconto0', '0'); pgSC.fill('#c-agente0', '10'); pgSC.fill('#c-sub0', '5')
+        pgSC.click('.velo .modale-piede button:has-text("Salva le nuove percentuali")')
+        pgSC.wait_for_function("location.pathname.startsWith('/pratiche/')")
+        ok(stati_scag['salvate'] == 1, 'D-162: le percentuali si salvano dalla finestra')
+        ok(stati_scag['abbina'] == 2, 'D-162: dopo il salvataggio si riprova ad aprire la pratica')
+        pgSC.close()
+
+        # D-163: se alla data dell'ordine esiste già una versione, «Configura le percentuali» apre la
+        # correzione di quella versione (non «Nuove percentuali»), con lo sconto dell'agenzia già proposto.
+        pct_esistente = {'in_vigore': '2026-09-15', 'versioni': [{
+            'valido_dal': '2026-09-15', 'in_vigore': True, 'modificabile': True,
+            'scaglioni': [{'id': '1', 'sconto_min': 10, 'pct_agente': 6, 'pct_subagente': 2, 'valido_dal': '2026-09-15',
+                           'dal_fornitore': 8, 'clienti': 0, 'eccezioni': []}],
+        }]}
+        scaglione_corr = {'fornitore_id': '5', 'fornitore': 'Arte Wohnaccessoires GmbH', 'sconto': 0,
+                          'data': '2026-09-15', 'ha_percentuali': True}
+        scheda_corr = dict(scheda_errore, id='999987', stato='da_controllare', tipo='ordine', livello='affidabile', file_nome='prova-corr.pdf')
+        scheda_corr['testata'] = dict(scheda_errore['testata'], tipo='ordine', numero='PROVA-CORR', data='2026-09-15',
+                                      fornitore_id='5', fornitore='Arte Wohnaccessoires GmbH',
+                                      codice_cliente='45172', cliente='Agri Aggio SNC')
+        scheda_corr['proposta'] = dict(scheda_errore['proposta'], esito='nuova')
+        stati_corr = {'abbina': 0, 'put': 0}
+        def abbina_corr(route):
+            stati_corr['abbina'] += 1
+            if stati_corr['put'] == 0:
+                route.fulfill(status=409, content_type='application/json', body=json.dumps({
+                    'code': 'scaglione_mancante',
+                    'message': 'Arte Wohnaccessoires GmbH non ha ancora le percentuali delle provvigioni valide al 15/09/2026 (sconto 0 %): senza, la provvigione sarebbe zero.',
+                    'scaglione': scaglione_corr}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=json.dumps({'pratica': {'id': '77', 'numero': 'OF/2026/077'}}))
+        def pct_corr(route):
+            if route.request.method == 'PUT':
+                stati_corr['put'] += 1
+            risposta(route, json.dumps(pct_esistente))
+        pgCR = entra(S + '-ammi')
+        pgCR.route(re.compile(r'^.*/api/documenti/999987$'), lambda r: risposta(r, json.dumps(scheda_corr)))
+        pgCR.route(re.compile(r'^.*/api/documenti/999987/abbina$'), abbina_corr)
+        pgCR.route(re.compile(r'^.*/api/fornitori$'), lambda r: risposta(r, json.dumps(fornitori_mock)))
+        pgCR.route(re.compile(r'^.*/api/fornitori/5/percentuali$'), pct_corr)
+        pgCR.route(re.compile(r'^.*/api/fornitori/5/percentuali/2026-09-15$'), pct_corr)
+        pgCR.route(re.compile(r'^.*/api/clienti\?fornitore_id=5$'), lambda r: risposta(r, json.dumps(clienti_mock)))
+        pgCR.goto(BASE + '/documenti/999987')
+        pgCR.locator('.scelte button:has-text("Apri la pratica")').wait_for(timeout=15000)
+        pgCR.locator('.scelte button:has-text("Apri la pratica")').click()
+        pgCR.wait_for_selector('.velo .modale:has-text("Apri la pratica")')
+        pgCR.fill('#c-cliente_id', 'Agri')
+        pgCR.locator('.velo .ricerca-menu:not([hidden]) li[role=option]').first.wait_for()
+        pgCR.locator('.velo .ricerca-menu:not([hidden]) li[role=option]').first.click()
+        pgCR.wait_for_function("document.querySelectorAll('.velo .ricerca-menu:not([hidden])').length === 0")
+        pgCR.click('.velo .modale-piede button:has-text("Apri la pratica")')
+        pgCR.locator('.velo button:has-text("Configura le percentuali")').wait_for(timeout=10000)
+        pgCR.locator('.velo button:has-text("Configura le percentuali")').click()
+        pgCR.wait_for_selector('.velo .modale:has-text("Correggi le percentuali di")', timeout=10000)
+        ok(pgCR.locator('.velo .modale:has-text("Correggi le percentuali di")').count() == 1,
+           'D-163: con una versione alla data dell’ordine si apre la correzione (non «Nuove percentuali»)')
+        ok(pgCR.input_value('.velo input[name=valido_dal]') == '2026-09-15'
+           and pgCR.locator('.velo input[name=valido_dal]').get_attribute('disabled') is not None,
+           'D-163: «Valide dal» bloccato alla data della versione')
+        nuova_corr = pgCR.locator('.velo .modale input[placeholder="Aggiungi uno sconto %"]')
+        ok(nuova_corr.count() == 1 and nuova_corr.input_value() == '0',
+           'D-163: lo sconto dell’agenzia (0 %) è già proposto come riga nuova')
+        idx_corr = nuova_corr.get_attribute('id')[len('c-sconto'):]
+        pgCR.fill('#c-agente' + idx_corr, '10'); pgCR.fill('#c-sub' + idx_corr, '5')
+        pgCR.click('.velo .modale-piede button:has-text("Salva la correzione")')
+        pgCR.wait_for_function("location.pathname.startsWith('/pratiche/')")
+        ok(stati_corr['put'] == 1, 'D-163: la correzione salva con la rotta PUT della versione')
+        ok(stati_corr['abbina'] == 2, 'D-163: dopo il salvataggio si riprova ad aprire la pratica')
+        pgCR.close()
+
+        # D-161: finché le voci (fornitori, clienti) non arrivano, il campo di ricerca non mostra l'id
+        # né il pallino rosso: mostra il nome già noto (nomeIniziale) e un pallino grigio. Le rotte delle
+        # voci restano in attesa 1,5 s (rotta lenta): il campo non deve mai mostrare un numero né il rosso.
+        scheda_nr = dict(scheda_errore, id='999989', stato='da_controllare', tipo='ordine', livello='affidabile', file_nome='prova-nr.pdf')
+        scheda_nr['testata'] = dict(scheda_errore['testata'], tipo='ordine', numero='PROVA-NR', data='2026-09-15',
+                                    fornitore_id='5', fornitore='Arte Wohnaccessoires GmbH', codice_cliente='45172',
+                                    cliente='Agri Aggio SNC', cliente_id='1001')
+        scheda_nr['proposta'] = dict(scheda_errore['proposta'], esito='nuova')
+        attese = []
+        def trattieni(route, corpo):
+            attese.append((route, corpo))
+        pgN = entra(S + '-oper')
+        pgN.route(re.compile(r'^.*/api/documenti/999989$'), lambda r: risposta(r, json.dumps(scheda_nr)))
+        pgN.route(re.compile(r'^.*/api/fornitori$'), lambda r: trattieni(r, json.dumps(fornitori_mock)))
+        pgN.route(re.compile(r'^.*/api/clienti\?fornitore_id=5$'), lambda r: trattieni(r, json.dumps(clienti_mock)))
+        pgN.goto(BASE + '/documenti/999989')
+        pgN.locator('.scelte button:has-text("Apri la pratica")').wait_for(timeout=15000)
+        pgN.locator('.scelte button:has-text("Apri la pratica")').click()
+        pgN.wait_for_selector('.velo .modale:has-text("Apri la pratica")')
+        f_nr = pgN.locator('.velo #c-fornitore_id')
+        c_nr = pgN.locator('.velo #c-cliente_id')
+        ok(pgN.input_value('#c-fornitore_id') == 'Arte Wohnaccessoires GmbH', 'D-161: fornitore col nome, non l’id, mentre le voci caricano')
+        ok(pgN.input_value('#c-cliente_id') == 'Agri Aggio SNC', 'D-161: cliente col nome, non l’id, mentre le voci caricano')
+        ok(pgN.locator('.velo .pallino.ko').count() == 0, 'D-161: niente pallino rosso mentre le voci caricano')
+        pgN.screenshot(path=str(USCITA / 'app-documento-numeri-rossi-attesa.png'))
+        pgN.wait_for_timeout(1500)  # il ritardo delle voci (rotta lenta)
+        for route, corpo in attese:
+            route.fulfill(status=200, content_type='application/json', body=corpo)
+        pgN.wait_for_function("() => document.querySelectorAll('.velo .pallino.ok').length >= 2", timeout=5000)
+        ok('ok' in f_nr.locator('xpath=..').locator('span.pallino').get_attribute('class'), 'D-161: fornitore trovato, pallino verde')
+        ok('ok' in c_nr.locator('xpath=..').locator('span.pallino').get_attribute('class'), 'D-161: cliente trovato, pallino verde')
+        pgN.screenshot(path=str(USCITA / 'app-documento-numeri-rossi-caricato.png'))
+        pgN.close()
 
         b.close()
 finally:

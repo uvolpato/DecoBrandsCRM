@@ -585,6 +585,47 @@ describe('agenzia da confermare (D-159)', () => {
   });
 });
 
+describe('scaglione mancante (D-162)', () => {
+  let fornitore: { id: bigint; versione_id: bigint };
+  let cliente: { id: bigint };
+
+  beforeAll(async () => {
+    const f = await db.fornitori.create({ data: {} });
+    const fv = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'ARTE WOHNACCESSORIES' } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: fv.id } });
+    fornitore = { id: f.id, versione_id: fv.id };
+    const c = await db.clienti.create({ data: {} });
+    const cv = await db.clienti_versioni.create({ data: { cliente_id: c.id, fonte: 'integra', ragione_sociale: 'Cliente Scaglione', valido_dal: new Date('2025-01-01') } });
+    await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: cv.id } });
+    cliente = { id: c.id };
+    const sub = await db.subagenti.findFirstOrThrow();
+    await db.interscambio.create({ data: { subagente_id: sub.id, cliente_id: c.id, fornitore_id: f.id, sconto: 0, valido_dal: new Date('2025-01-01') } });
+  });
+
+  it('abbina un ordine senza scaglioni: 409 con codice scaglione_mancante, dati e ha_percentuali false', async () => {
+    const b = (await op.carica(pdf('ordine senza scaglioni'), 'ordine-no-scaglioni.pdf').expect(201)).body;
+    const r = await op.post(`/documenti/${b.id}/abbina`, { tipo: 'ordine', numero: 'SC-ORD-1', data: '2026-02-17', cliente_id: Number(cliente.id), fornitore_id: Number(fornitore.id) }).expect(409);
+    expect(r.body.code).toBe('scaglione_mancante');
+    expect(r.body.scaglione).toMatchObject({ fornitore_id: String(fornitore.id), fornitore: 'ARTE WOHNACCESSORIES', sconto: 0, data: '2026-02-17', ha_percentuali: false });
+    expect(r.body.message).toContain('ARTE WOHNACCESSORIES');
+    expect(await db.ordini_fornitore_testata.count({ where: { fornitore_id: fornitore.id } })).toBe(0);
+  });
+
+  it('con uno scaglione futuro alla data dell\'ordine: ha_percentuali true, sempre 409', async () => {
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id: fornitore.id, sconto_min: 0, pct_agente: 10, pct_subagente: 5, valido_dal: new Date('2026-03-01') } });
+    const b = (await op.carica(pdf('ordine scaglione futuro'), 'ordine-scaglione-futuro.pdf').expect(201)).body;
+    const r = await op.post(`/documenti/${b.id}/abbina`, { tipo: 'ordine', numero: 'SC-ORD-2', data: '2026-02-17', cliente_id: Number(cliente.id), fornitore_id: Number(fornitore.id) }).expect(409);
+    expect(r.body.scaglione.ha_percentuali).toBe(true);
+  });
+
+  it('creato lo scaglione valido alla data dell\'ordine, l\'ordine apre la pratica', async () => {
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id: fornitore.id, sconto_min: 0, pct_agente: 10, pct_subagente: 5, valido_dal: new Date('2026-02-01') } });
+    const b = (await op.carica(pdf('ordine con scaglione'), 'ordine-con-scaglione.pdf').expect(201)).body;
+    const r = await op.post(`/documenti/${b.id}/abbina`, { tipo: 'ordine', numero: 'SC-ORD-3', data: '2026-02-17', cliente_id: Number(cliente.id), fornitore_id: Number(fornitore.id) }).expect(201);
+    expect(r.body.pratica.numero).toMatch(/^OF\/2026\//);
+  });
+});
+
 describe('proposta con import da Integra e storico (D-111/D-112)', () => {
   const ESTRATTO = new Date('2026-11-08T00:00:00Z');
   let fornitore: { id: bigint; versione_id: bigint; ragione: string; piva: string | null };

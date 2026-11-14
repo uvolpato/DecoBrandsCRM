@@ -37,16 +37,17 @@ const cercaParole = (testo: string, q: string) => {
 /** Le voci dell'entità nel contesto: tutte (attive e non), come le restituisce il server. */
 export function useVoci<R>(ent: Entita<R>, ctx: Contesto) {
   const [tutte, setTutte] = useState<R[]>([]);
+  const [caricate, setCaricate] = useState(false);
   const k = JSON.stringify(ctx);
   useEffect(() => {
     let vivo = true;
-    caricaVoci(ent, ctx).then((v) => { if (vivo) setTutte(v); }).catch(() => { if (vivo) setTutte([]); });
+    caricaVoci(ent, ctx).then((v) => { if (vivo) { setTutte(v); setCaricate(true); } }).catch(() => { if (vivo) { setTutte([]); setCaricate(true); } });
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- il contesto si confronta per valore (k)
   }, [ent, k]);
   // D-152: dopo un import da Integra la voce nuova non è nel cache (5 s): si ricarica subito
   const ricarica = () => { caricaVoci(ent, ctx, true).then(setTutte).catch(() => {}); };
-  return { tutte, ricarica };
+  return { tutte, caricate, ricarica };
 }
 
 // D-152: la ricerca guarda anche le viste di Integra, per fornitore e cliente. La ricerca la fa il
@@ -107,6 +108,8 @@ function Integra({ tipo, q, onScelto }: { tipo: TipoIntegra | undefined; q: stri
 type Comuni = { entita: Entita; contesto?: Contesto; placeholder?: string; etichetta?: string; id?: string;
   // nome letto dal documento (fornitore, cliente): quando il campo è vuoto si offre di cercarlo
   testoIniziale?: { q: string; mostra?: string };
+  // nome già noto al chiamante: mostrato al posto dell'id finché le voci non arrivano (D-161 §19)
+  nomeIniziale?: string;
   // D-153: quando si sceglie una voce del CRM si riceve il record intero (per riempire i campi, es. cliente)
   onScelto?: (r: unknown) => void;
   // D-154: comando dall'esterno (il pulsante › accanto al campo letto): al cambio di `n` fa quello
@@ -203,13 +206,14 @@ function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valo
   );
 }
 
-function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valore, onChange, testoIniziale, onScelto, cerca }: Comuni & { valore: string; onChange: (v: string) => void }) {
-  const { tutte, ricarica } = useVoci(ent, contesto);
+function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valore, onChange, testoIniziale, nomeIniziale, onScelto, cerca }: Comuni & { valore: string; onChange: (v: string) => void }) {
+  const { tutte, caricate, ricarica } = useVoci(ent, contesto);
   const lid = useId(); // A7-08: collega input e menu per il lettore di schermo
   const box = useRef<HTMLDivElement>(null);
   const trova = (v: string) => { const x = v.trim().toLowerCase(); if (!x) return undefined; const m = vociMenu(ent, contesto, tutte); return m.find((r) => String(ent.chiave(r)).toLowerCase() === x) ?? m.find((r) => ent.testo(r).toLowerCase() === x); };
   const nota = trova(valore);
-  const [testo, setTesto] = useState(valore);
+  // D-161: finché le voci non arrivano il campo non mostra l'id né il pallino rosso: nome già noto o vuoto
+  const [testo, setTesto] = useState(valore && nomeIniziale ? nomeIniziale : '');
   const [aperto, setAperto] = useState(false);
   const [attiva, setAttiva] = useState(0);
   const [maschera, setMaschera] = useState(false);
@@ -218,8 +222,9 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
   // non si sovrascrive quello che l'utente sta scrivendo: le voci arrivano dal server e possono
   // atterrare dopo il primo tasto (prima si perdeva il testo digitato)
   useEffect(() => {
+    if (!caricate) return;
     if (document.activeElement !== campo.current && !daLetto) setTesto(nota ? ent.testo(nota) : valore);
-  }, [valore, tutte]); // eslint-disable-line react-hooks/exhaustive-deps -- da fuori
+  }, [valore, tutte, caricate]); // eslint-disable-line react-hooks/exhaustive-deps -- da fuori
   // D-154: il pulsante › (cerca) fa partire la ricerca da fuori, come cercaLetto ma col testo attuale.
   useEffect(() => {
     if (!cerca?.n) return;
@@ -254,7 +259,7 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
     else if (e.key === 'Escape' && aperto) { e.stopPropagation(); setAperto(false); }
     else if (e.key === 'F4') { e.preventDefault(); setAperto(false); setMaschera(true); }
   }
-  const stato = nota ? 'ok' : valore ? 'ko' : 'vuoto';
+  const stato = !caricate && valore ? 'vuoto' : nota ? 'ok' : valore ? 'ko' : 'vuoto';
   // D-152: il nome letto dal documento diventa il testo della ricerca, senza sceglierlo da solo
   const cercaLetto = () => {
     if (!testoIniziale) return;
@@ -264,7 +269,7 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
     <div className="ricerca-riga"
       onBlur={(e) => { if (e.currentTarget.contains(e.relatedTarget as Node) || maschera) return; if (daLetto) { setDaLetto(false); setTesto(valore); setAperto(false); return; } setAperto(false); const t = testo.trim(); if (nota && ent.testo(nota) === t) return; const r = trova(t); imposta(r, t); }}>
       <div ref={box} className="ricerca">
-        <span className={'pallino ' + stato} title={nota ? ent.titolo + ' trovato in anagrafica' : valore ? 'Valore non trovato in anagrafica' : ''} />
+        <span className={'pallino ' + stato} title={!caricate ? '' : nota ? ent.titolo + ' trovato in anagrafica' : valore ? 'Valore non trovato in anagrafica' : ''} />
         <input ref={campo} className="ricerca-testo" id={id} type="text" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={aperto}
           aria-controls={lid} aria-activedescendant={aperto && prime[attiva] ? lid + '-' + attiva : undefined}
           aria-label={etichetta ?? 'Cerca ' + ent.titolo.toLowerCase()}

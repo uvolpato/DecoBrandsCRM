@@ -11,6 +11,15 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.5 — 14/11/2026 — percentuali dentro Apri la pratica
+
+- **Percentuali mancanti** (D-162): *Apri la pratica* spiega che il fornitore non ha percentuali valide alla
+  data dell’ordine e offre «Configura le percentuali» (la stessa finestra di Fornitori, ora componente comune).
+- **Correzione delle percentuali** (D-163): si aggiungono e si tolgono scaglioni; da *Apri la pratica*, se la
+  versione con quella data c’è già, si apre la sua correzione con lo sconto dell’agenzia pronto.
+- **Campi di ricerca** (D-161): mentre i nomi arrivano niente numeri né pallino rosso.
+- Nel vecchio CRM non ci sono percentuali: vanno inserite per fornitore.
+
 ### 0.2.4 — 14/11/2026 — agenzie del vecchio CRM da confermare
 
 - **Agenzie del vecchio CRM** valgono da sempre (dal 01/01/2000: il vecchio CRM non ha la data d’inizio,

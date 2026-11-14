@@ -37,6 +37,9 @@ with sync_playwright() as p:
         apri(pg); pg.fill('#c-utente', utente); pg.fill('#c-password', PW); pg.click('button.btn.largo')
         pg.wait_for_function("location.pathname.startsWith('/fornitori')"); pg.wait_for_load_state('networkidle')
         pg.wait_for_selector('.dt tbody tr.cliccabile')
+        # il primo fornitore si apre da solo (router.replace nell'effetto di VistaFornitori): si attende
+        # che l'indirizzo sia /fornitori/<id> prima di tornare, così i clic successivi non corrono il giro
+        pg.wait_for_function("/^\\/fornitori\\/\\d+/.test(location.pathname)")
         return pg
     testo = lambda pg, s: pg.locator(s).first.inner_text()
     righe = lambda pg: pg.locator('.dt tbody tr.cliccabile').count()
@@ -76,6 +79,15 @@ with sync_playwright() as p:
     nuovo.locator('button:has-text("Correggi")').click(); finestra(pg).wait_for()
     pg.fill('#c-agente0', '21'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(500)
     ok('21%' in pg.locator('[data-versione="2050-01-01"]').inner_text(), 'correzione salvata: la percentuale cambia')
+    # D-163: la correzione aggiunge uno scaglione con la riga «Aggiungi uno sconto %»
+    pg.locator('[data-versione="2050-01-01"] button:has-text("Correggi")').click(); finestra(pg).wait_for()
+    nuova = pg.locator('.velo .modale input[placeholder="Aggiungi uno sconto %"]')
+    nuova.wait_for(timeout=8000)
+    ok(nuova.count() == 1, 'D-163: correzione con la riga «Aggiungi uno sconto %»')
+    idx = nuova.get_attribute('id')[len('c-sconto'):]
+    nuova.fill('25'); pg.fill('#c-agente' + idx, '3'); pg.fill('#c-sub' + idx, '1')
+    pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(500)
+    ok('25%' in pg.locator('[data-versione="2050-01-01"]').inner_text(), 'D-163: scaglione aggiunto salvato (sconto 25 %)')
     pg.locator('[data-versione="2050-01-01"] button:has-text("Elimina")').click(); pg.wait_for_selector('.velo .modale')
     pg.click('.velo .modale button.pericolo')
     pg.wait_for_function("!document.querySelector('[data-versione=\"2050-01-01\"]')", timeout=8000)
@@ -108,7 +120,13 @@ with sync_playwright() as p:
     pg.fill('.filtri input[type=search]', 'Gries'); scheda(pg, 'Clienti seguiti'); pg.wait_for_timeout(300)  # il ricaricamento azzera la memoria: si riscrive
     url = pg.url
     vai(pg, "Subagenti"); ok('/subagenti' in pg.url, 'vado a Subagenti')
-    pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(500)
+    pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile')
+    # §7.12: la memoria si ripristina al re-render della navigazione morbida; il dettaglio ricarica, quindi
+    # si attende che la scheda ricordata sia riselezionata (non il momento intermedio, come in app_componenti)
+    try:
+        pg.wait_for_function("(document.querySelector('.schede-barra [role=tab][aria-selected=true]')?.textContent ?? '').startsWith('Clienti seguiti')", timeout=8000)
+    except Exception:
+        pass
     ok(pg.url == url and pg.input_value('.filtri input[type=search]') == 'Gries', 'indietro: stesso fornitore e ricerca ricordata')
     ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Clienti seguiti")').count() == 1, 'indietro: stessa scheda')
     # D-111: Cerca in Integra — la ricerca parte solo al clic, l'import aggiunge il fornitore all'elenco

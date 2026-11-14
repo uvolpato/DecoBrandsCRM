@@ -131,6 +131,7 @@ export const GUIDA: Argomento[] = [
       ['Scarta il documento', 'Per doppioni o documenti che non riguardano Decobrands.'],
       ['Togli dalla coda', 'Per un documento in coda non ancora letto: lo toglie prima della lettura (va fra gli scartati) con il motivo «Tolto dalla coda».'],
       ['Configura l’agenzia', 'Quando un documento è di un cliente che non ha l’agenzia con quel fornitore alla data che serve (l’ordine della pratica, o la data del documento se la pratica è nuova): apre il form dell’agenzia (cliente e fornitore già fissi). Senza, il documento non entra in una pratica. Serve il livello operatore in Dati: senza, il pulsante è spento e il suggerimento dice perché.'],
+      ['Configura le percentuali', 'Quando un ordine è di un fornitore che non ha uno scaglione per lo sconto dell’agenzia alla data dell’ordine (senza, la provvigione sarebbe zero): apre la finestra delle percentuali (fornitore fisso, «Valide dal» proposto alla data dell’ordine) e poi riprova ad aprire la pratica. Se a quella data esiste già una versione, si apre la sua correzione con lo sconto dell’agenzia già proposto come riga nuova. Serve il livello responsabile in Dati: senza, il pulsante è spento e il suggerimento dice perché.'],
       ['Importa da Integra', 'Sul documento: quando il fornitore (o il cliente) non è in anagrafica ma esiste in Integra, lo importa e collega il documento nella stessa operazione. I dati letti e le righe restano come sono; se il nome letto non corrisponde a un solo soggetto, l’import si ferma e chiede di correggere il nome. Mentre importa il pulsante dice «Importo…» ed è spento.'],
       ['Importa dal vecchio CRM', 'Spento: l’import dei legami del vecchio CRM si fa a mano con il comando dello storico (D-112).'],
       ['Segni in elenco', 'Accanto a ogni documento: Affidabile · Da controllare · Affidabilità bassa · Fornitore in Integra (non è in anagrafica ma esiste in Integra) · Cliente in Integra (la stessa cosa per il cliente) · Non rappresentato · Manca l’agenzia. Aprendo il documento i segni diventano i pulsanti per importare l’anagrafica mancante.'],
@@ -173,6 +174,7 @@ export const GUIDA: Argomento[] = [
       'Se il servizio di lettura non risponde (chiave scaduta, crediti finiti, rete giù o errore del servizio), i documenti restano in coda senza consumare i tentativi e si apre l’anomalia <b>Lettura non raggiungibile</b>.',
       'Un documento entra in una pratica già aperta se il cliente aveva l’agenzia con quel fornitore <b>alla data dell’ordine</b>; se l’agenzia si è chiusa dopo, il documento entra lo stesso (D-137). L’agenzia alla data del documento serve solo quando il documento apre una pratica nuova. Per un documento non ancora abbinato l’elenco segnala con la pillola «Manca l’agenzia» la coppia senza agenzia a quella data.',
       'Se <b>Apri la pratica</b> risponde che manca l’agenzia, il pulsante <b>Aggiungi l’agenzia</b> la crea lì, con cliente, fornitore e codice già compilati e la data dell’ordine proposta: non serve uscire dal documento (D-158).',
+      'Se <b>Apri la pratica</b> risponde che manca lo scaglione del fornitore (le percentuali per quello sconto e quella data), il pulsante <b>Configura le percentuali</b> le crea lì, con il fornitore fisso e «Valide dal» proposto alla data dell’ordine: non serve uscire in Fornitori (D-162).',
       'Le agenzie importate dal vecchio CRM restano «da confermare» finché non le usi la prima volta: <b>Apri la pratica</b> le propone con codice, sconto, subagente e data, e tu scegli <b>Usa questa</b> (le prende così come sono) o <b>Configura</b> (le correggi prima). Da Clienti, scheda Agenzie, hanno il segno «da confermare» e l’azione <b>Conferma</b> (D-159).',
       '«Importa da Integra» dal documento crea il fornitore e lo collega al documento senza toccare le righe lette: testata, righe, affidabilità e controlli restano (D-133).',
       'Quando fornitore o cliente non si riconoscono in modo univoco (nessun candidato, più di uno, o solo nomi simili), il documento mostra l’elenco dei candidati con la fonte (CRM o Integra) e il motivo: scegline uno, oppure «Nessuno di questi» per cercarlo a mano. Se Integra non risponde compaiono solo i candidati del CRM, con la nota (D-152).',
@@ -534,7 +536,7 @@ export const GUIDA: Argomento[] = [
       ['Modifica condizioni', 'Giorni attesa conferma, giorno del bollettino, pagamento sul maturato o sul fatturato, giorni per l’incasso dal cliente.'],
       ['Schede Percentuali · Clienti seguiti', 'Percentuali per versione: quella in vigore in alto, poi le future e le passate, con le eccezioni personali sotto la percentuale al subagente; clienti seguiti per quel fornitore (si modificano dal cliente), con filtro a scelta multipla per subagente.'],
       ['Nuove percentuali', 'Inserisce una nuova versione delle percentuali da una data: le righe partono da quelle più recenti e si possono aggiungere sconti, non togliere.'],
-      ['Correggi · Elimina', 'Sulla singola versione. Valgono solo dopo l’ultima chiusura del fornitore (bollettino verificato o contestato, trimestre liquidato); altrimenti il server rifiuta e la finestra lo spiega.'],
+      ['Correggi · Elimina', 'Sulla singola versione. Correggi cambia le percentuali e può aggiungere o togliere uno scaglione (la ✕ sulla riga, non sull’ultima); il server rifiuta se lo scaglione tolto è usato da un’eccezione o da un periodo chiuso. Valgono solo dopo l’ultima chiusura del fornitore (bollettino verificato o contestato, trimestre liquidato); altrimenti il server rifiuta e la finestra lo spiega.'],
       ['Configura gli scaglioni', 'Compare quando il fornitore non ha percentuali: apre il form degli scaglioni (sconto, % a Decobrands, % al subagente). Finché mancano, la pratica non si apre e la card del documento lo dice (D-113).'],
     ],
     finestre: [
@@ -563,7 +565,7 @@ export const GUIDA: Argomento[] = [
         ],
         azioni: [
           ['Salva le nuove percentuali', 'Crea la nuova versione.'],
-          ['Salva la correzione', 'Con Correggi: sostituisce le percentuali di quella versione.'],
+          ['Salva la correzione', 'Con Correggi: sostituisce le percentuali di quella versione, con gli scaglioni aggiunti o tolti.'],
         ] }
     ],
     sapere: [
