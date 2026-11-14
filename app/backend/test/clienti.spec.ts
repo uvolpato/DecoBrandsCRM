@@ -116,6 +116,14 @@ describe('elenco e dettaglio', () => {
     expect(Array.isArray(r.body)).toBe(true);
   });
 
+  it('agenzia-nuova: nomi della coppia cliente-fornitore (D-158)', async () => {
+    const a = await entra('ammi-cli');
+    const r = await a.get('/clienti/' + clienteId + '/agenzia-nuova?fornitore_id=' + fornitoreId).expect(200);
+    const f = await db.fornitori.findUniqueOrThrow({ where: { id: BigInt(fornitoreId) }, include: { corrente: { select: { ragione_sociale: true } } } });
+    expect(r.body.fornitore).toBe(f.corrente?.ragione_sociale);
+    await a.get('/clienti/' + clienteId + '/agenzia-nuova?fornitore_id=999999').expect(404);
+  });
+
   it('lettura: può consultare', async () => {
     const a = await entra('lett-cli');
     await a.get('/clienti').expect(200);
@@ -467,6 +475,43 @@ describe('agenzie CRUD', () => {
     }).expect(201);
     const id = r.body.id;
     await a.del('/clienti/' + clienteId + '/agenzie/' + id).expect(204);
+  });
+});
+
+describe('agenzia da confermare (D-159)', () => {
+  it('conferma: mette da_confermare=false e scrive nel registro', async () => {
+    const a = await entra('ammi-cli');
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreId), sconto: 2, valido_dal: '2045-01-01', valido_al: '2045-12-31',
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    await db.interscambio.update({ where: { id: BigInt(r.body.id) }, data: { da_confermare: true } });
+    const c = await a.post('/clienti/' + clienteId + '/agenzie/' + r.body.id + '/conferma', {}).expect(201);
+    expect(c.body.da_confermare).toBe(false);
+    expect((await db.interscambio.findUniqueOrThrow({ where: { id: BigInt(r.body.id) } })).da_confermare).toBe(false);
+    const ev = await db.registro.findFirst({ where: { codice: 'crud.update', entita: 'interscambio', entita_id: BigInt(r.body.id) }, orderBy: { id: 'desc' } });
+    expect(ev).not.toBeNull();
+  });
+
+  it('modifica di una da confermare la conferma anche (D-159)', async () => {
+    const a = await entra('ammi-cli');
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreId), sconto: 2, valido_dal: '2046-01-01', valido_al: '2046-12-31',
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    await db.interscambio.update({ where: { id: BigInt(r.body.id) }, data: { da_confermare: true } });
+    const m = await a.put('/clienti/' + clienteId + '/agenzie/' + r.body.id, { sconto: 3 }).expect(200);
+    expect(m.body.da_confermare).toBe(false);
+    expect((await db.interscambio.findUniqueOrThrow({ where: { id: BigInt(r.body.id) } })).da_confermare).toBe(false);
+  });
+
+  it('conferma di un agenzia di un altro cliente: 404', async () => {
+    const a = await entra('ammi-cli');
+    const altro = await db.clienti.findFirstOrThrow({ where: { id: { not: BigInt(clienteId) } } });
+    const f = await db.fornitori.create({ data: {} });
+    const ag = await db.interscambio.create({ data: { subagente_id: BigInt(subagenteId), cliente_id: altro.id, fornitore_id: f.id, sconto: 1, valido_dal: new Date('2047-01-01'), da_confermare: true } });
+    creati.push(ag.id);
+    await a.post('/clienti/' + clienteId + '/agenzie/' + ag.id + '/conferma', {}).expect(404);
   });
 });
 

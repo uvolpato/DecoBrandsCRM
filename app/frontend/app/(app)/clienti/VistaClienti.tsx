@@ -65,7 +65,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   const [dettaglio, setDettaglio] = useState<Dettaglio | null>(null);
   const [pratiche, setPratiche] = useState<Pratica[] | null>(null);
   const [valori, setValori] = useMemoria<Valori>('filtri', { vista: 'tutti', q: '', fornitori: [], subagenti: [] });
-  const [valoriAg, setValoriAg] = useMemoria<Valori>('filtri-agenzie', { fornitori: [], subagenti: [] });
+  const [valoriAg, setValoriAg] = useMemoria<Valori>('filtri-agenzie', { fornitori: [], subagenti: [], da_confermare: 'tutte' });
   const [valoriPr, setValoriPr] = useMemoria<Valori>('filtri-pratiche', { vista: 'aperte', fornitori: [], q: '' });
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [errore, setErrore] = useState('');
@@ -108,8 +108,11 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   const righe = cercati.filter((x) => (valori.vista === 'con' ? x.agenzie > 0 : valori.vista === 'senza' ? x.agenzie === 0 : true));
   const agenzieFiltrate = useMemo(() => {
     const fs = valoriAg.fornitori as string[], ss = valoriAg.subagenti as string[];
-    return (dettaglio?.agenzie ?? []).filter((a) => (!fs.length || fs.includes(a.fornitore_id)) && (!ss.length || ss.includes(a.subagente_id)));
-  }, [dettaglio, valoriAg.fornitori, valoriAg.subagenti]);
+    const dc = valoriAg.da_confermare === 'da_confermare';
+    return (dettaglio?.agenzie ?? []).filter((a) => (!fs.length || fs.includes(a.fornitore_id)) && (!ss.length || ss.includes(a.subagente_id)) && (!dc || a.da_confermare));
+  }, [dettaglio, valoriAg.fornitori, valoriAg.subagenti, valoriAg.da_confermare]);
+  // D-159: il filtro «Da confermare» compare solo se c'è almeno un'agenzia da confermare
+  const nDaConfermare = useMemo(() => (dettaglio?.agenzie ?? []).filter((a) => a.da_confermare).length, [dettaglio]);
 
   const u = dettaglio;
   const chiudi = () => setFinestra(null);
@@ -127,6 +130,13 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
     await caricaDettaglio(x.id);
   }
 
+  async function confermaAgenzia(x: Dettaglio, a: Agenzia) {
+    const r = await api('clienti/' + x.id + '/agenzie/' + a.id + '/conferma', {});
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    avviso('Agenzia confermata');
+    await caricaDettaglio(x.id);
+  }
+
   const colonneClienti: Colonna<Cliente>[] = [
     { key: 'ragione_sociale', header: 'Cliente', grow: true, cell: (x) => <><b>{x.ragione_sociale ?? '—'}</b><span className="sec-riga">{[x.soggetto_codice, x.piva, x.codice_integra, x.citta].filter(Boolean).join(' · ')}</span></> },
     { key: 'agenzie', header: 'Agenzie', align: 'center', cell: (x) => String(x.agenzie) },
@@ -134,7 +144,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   ];
 
   const colonneAgenzie: Colonna<Agenzia>[] = [
-    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (a) => <><b>{a.fornitore ?? '—'}</b><span className="sec-riga">{a.subagente ? 'seguito da ' + a.subagente : ''}</span></> },
+    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (a) => <><b>{a.fornitore ?? '—'}</b>{a.da_confermare && <Stato v="attesa">da confermare</Stato>}<span className="sec-riga">{a.subagente ? 'seguito da ' + a.subagente : ''}</span></> },
     { key: 'codice_cliente_fornitore', header: 'Codice cliente', cell: (a) => a.codice_cliente_fornitore ?? '—' },
     { key: 'sconto', header: 'Sconto', align: 'center', cell: (a) => a.sconto + ' %' },
     { key: 'pct_subagente', header: '% subagente', align: 'center', cell: (a) => (a.pct_subagente === null ? '—' : a.pct_subagente + ' %') },
@@ -223,6 +233,10 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
                       onClick={() => setFinestra(<FormAgenzia cliente={{ id: u.id, nome: u.ragione_sociale }} onSalvata={async () => { await carica(); await caricaDettaglio(u.id); }} onChiudi={chiudi} />)}>
                       <Icona nome="piu" /> Aggiungi agenzia</button></div>}
                     <FilterBar valori={valoriAg} onChange={setValoriAg} riepilogo campi={[
+                      ...(nDaConfermare > 0 ? [{ nome: 'da_confermare', tipo: 'segmenti' as const, opzioni: [
+                        { value: 'tutte', label: 'Tutte' },
+                        { value: 'da_confermare', label: 'Da confermare', n: nDaConfermare },
+                      ] }] : []),
                       { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, placeholder: 'Tutti i fornitori' },
                       { nome: 'subagenti', tipo: 'ricerca', entita: subagente, multipla: true, placeholder: 'Tutti i subagenti' },
                     ]} />
@@ -231,6 +245,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
                         key: 'azioni', header: '', align: 'center' as const, sortable: false,
                         cell: (a: Agenzia) => (
                           <span className="azioni-riga">
+                            {a.da_confermare && <button type="button" className="btn primario piccolo" onClick={(e) => { e.stopPropagation(); void confermaAgenzia(u, a); }}>Conferma</button>}
                             <button type="button" className="btn sec piccolo" onClick={(e) => { e.stopPropagation(); setFinestra(<FormAgenzia cliente={{ id: u.id, nome: u.ragione_sociale }} agenzia={a} onSalvata={async () => { await caricaDettaglio(u.id); }} onChiudi={chiudi} />); }}>Modifica</button>
                             <button type="button" className="btn pericolo piccolo" onClick={(e) => { e.stopPropagation(); void eliminaAgenzia(u, a); }}>Elimina</button>
                           </span>

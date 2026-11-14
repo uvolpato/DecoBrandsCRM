@@ -590,6 +590,123 @@ try:
         pgS.screenshot(path=str(USCITA.parents[1] / 'somma-1440.png'))
         pgS.close()
 
+        # D-158: in «Apri la pratica» senza agenzia il pulsante «Aggiungi l'agenzia» apre FormAgenzia con
+        # cliente, fornitore e codice bloccati; «Crea» fa sparire l'avviso e si apre la pratica senza uscire.
+        fornitori_mock = [{'id': '5', 'ragione_sociale': 'Arte Wohnaccessoires GmbH', 'piva': 'DE123456'}]
+        clienti_mock = [{'id': '1001', 'ragione_sociale': 'Agri Aggio SNC', 'piva': 'IT000000', 'codice_fornitore': '45172'}]
+        subagenti_mock = [{'id': '9', 'codice': 'SUB09', 'nome': 'Maurizio', 'cognome': 'Bastasin', 'email': 'm@x.it', 'attivo': True}]
+        scheda_apri = dict(scheda_errore, id='999991', stato='da_controllare', tipo='ordine', livello='affidabile', file_nome='prova-apri.pdf')
+        scheda_apri['testata'] = dict(scheda_errore['testata'], tipo='ordine', numero='PROVA-APRI', data='2026-09-15',
+                                      fornitore_id='5', fornitore='Arte Wohnaccessoires GmbH',
+                                      codice_cliente='45172', cliente='Agri Aggio SNC')
+        scheda_apri['proposta'] = dict(scheda_errore['proposta'], esito='nuova')
+        stati_apri = {'abbina': 0, 'agenzia_nuova': 0, 'crea': 0}
+        def abbina_apri(route):
+            stati_apri['abbina'] += 1
+            if stati_apri['crea'] == 0:
+                route.fulfill(status=409, content_type='application/json', body=json.dumps({'message': "Il cliente non ha un'agenzia con questo fornitore alla data dell'ordine"}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=json.dumps({'pratica': {'id': '77', 'numero': 'OF/2026/077'}}))
+        def agenzia_nuova(route):
+            stati_apri['agenzia_nuova'] += 1
+            risposta(route, json.dumps({'cliente': 'Agri Aggio SNC', 'fornitore': 'Arte Wohnaccessoires GmbH'}))
+        def crea_agenzia(route):
+            stati_apri['crea'] += 1
+            route.fulfill(status=201, content_type='application/json', body=json.dumps({'id': '999'}))
+        pgA = entra(S + '-ammi')
+        pgA.route(re.compile(r'^.*/api/documenti/999991$'), lambda r: risposta(r, json.dumps(scheda_apri)))
+        pgA.route(re.compile(r'^.*/api/documenti/999991/abbina$'), abbina_apri)
+        pgA.route(re.compile(r'^.*/api/clienti/1001/agenzia-nuova\?fornitore_id=5$'), agenzia_nuova)
+        pgA.route(re.compile(r'^.*/api/clienti/1001/agenzie$'), crea_agenzia)
+        pgA.route(re.compile(r'^.*/api/fornitori$'), lambda r: risposta(r, json.dumps(fornitori_mock)))
+        pgA.route(re.compile(r'^.*/api/fornitori/sconti-in-vigore$'), lambda r: risposta(r, '[]'))
+        pgA.route(re.compile(r'^.*/api/subagenti$'), lambda r: risposta(r, json.dumps(subagenti_mock)))
+        pgA.route(re.compile(r'^.*/api/clienti\?fornitore_id=5$'), lambda r: risposta(r, json.dumps(clienti_mock)))
+        pgA.goto(BASE + '/documenti/999991')
+        pgA.locator('.scelte button:has-text("Apri la pratica")').wait_for(timeout=15000)
+        pgA.locator('.scelte button:has-text("Apri la pratica")').click()
+        pgA.wait_for_selector('.velo .modale:has-text("Apri la pratica")')
+        pgA.fill('#c-cliente_id', 'Agri')
+        pgA.locator('.velo .ricerca-menu:not([hidden]) li[role=option]').first.wait_for()
+        pgA.locator('.velo .ricerca-menu:not([hidden]) li[role=option]').first.click()
+        pgA.wait_for_function("document.querySelectorAll('.velo .ricerca-menu:not([hidden])').length === 0")
+        pgA.click('.velo .modale-piede button:has-text("Apri la pratica")')
+        pgA.locator('.velo button:has-text("Aggiungi l’agenzia")').wait_for(timeout=10000)
+        ok(pgA.locator('.velo button:has-text("Aggiungi l’agenzia")').count() == 1, 'D-158: senza agenzia compare «Aggiungi l’agenzia»')
+        ok(stati_apri['abbina'] == 1, 'D-158: l’apertura ha risposto 409 una volta')
+        pgA.screenshot(path=str(USCITA / 'app-documento-aggiungi-agenzia-1440.png'))
+        pgA.locator('.velo button:has-text("Aggiungi l’agenzia")').click()
+        pgA.wait_for_selector('.velo .modale:has-text("Nuova agenzia per")')
+        ok(stati_apri['agenzia_nuova'] == 1, 'D-158: i nomi della coppia si leggono dalla rotta nuova')
+        ok(pgA.locator('.velo input[name=fornitore_id]').get_attribute('disabled') is not None, 'D-158: fornitore bloccato')
+        ok(pgA.locator('.velo input[name=codice_cliente_fornitore]').get_attribute('disabled') is not None, 'D-158: codice cliente bloccato')
+        ok(pgA.input_value('.velo input[name=codice_cliente_fornitore]') == '45172', 'D-158: codice cliente precompilato dal documento')
+        ok(pgA.input_value('.velo input[name=valido_dal]') == '2026-09-15', 'D-158: «Valido dal» = data dell’ordine')
+        s_apri, sid_apri = scegli(pgA, 'subagente_id', 'Bastasin')
+        ok('Bastasin' in s_apri and sid_apri.isdigit(), 'D-158: subagente scelto: %s (id %s)' % (s_apri, sid_apri))
+        pgA.click('.velo .modale-piede button:has-text("Crea")')
+        pgA.wait_for_selector('.velo .modale:has-text("Apri la pratica")', timeout=10000)
+        ok(stati_apri['crea'] == 1, 'D-158: Crea ha creato l’agenzia')
+        ok(pgA.locator('.velo button:has-text("Aggiungi l’agenzia")').count() == 0, 'D-158: dopo Crea l’avviso sparisce')
+        pgA.click('.velo .modale-piede button:has-text("Apri la pratica")')
+        pgA.wait_for_function("location.pathname.startsWith('/pratiche/')")
+        ok(True, 'D-158: l’agenzia creata dal flusso apre la pratica senza uscire')
+        pgA.close()
+
+        # D-159: un'agenzia dal vecchio CRM da confermare non apre da sola la pratica: il riquadro
+        # propone «Usa questa» (conferma e riprova) e «Configura». Si prova «Usa questa».
+        agenzia_conf = {'id': '77', 'subagente_id': '9', 'subagente': 'Bastasin Maurizio', 'subagente_codice': 'SUB09',
+                        'fornitore_id': '5', 'fornitore': 'Arte Wohnaccessoires GmbH',
+                        'codice_cliente_fornitore': '45172', 'sconto': 0, 'pct_subagente': None, 'regola_mensile': None,
+                        'valido_dal': '2000-01-01', 'valido_al': None, 'da_confermare': True}
+        scheda_conf = dict(scheda_errore, id='999990', stato='da_controllare', tipo='ordine', livello='affidabile', file_nome='prova-conf.pdf')
+        scheda_conf['testata'] = dict(scheda_errore['testata'], tipo='ordine', numero='PROVA-CONF', data='2026-09-15',
+                                      fornitore_id='5', fornitore='Arte Wohnaccessoires GmbH',
+                                      codice_cliente='45172', cliente='Agri Aggio SNC')
+        scheda_conf['proposta'] = dict(scheda_errore['proposta'], esito='nuova')
+        stati_conf = {'abbina': 0, 'conferma': 0}
+        def abbina_conf(route):
+            stati_conf['abbina'] += 1
+            if stati_conf['conferma'] == 0:
+                route.fulfill(status=409, content_type='application/json',
+                              body=json.dumps({'code': 'agenzia_da_confermare', 'agenzia': agenzia_conf,
+                                               'message': 'Questa agenzia viene dal vecchio CRM: confermala o configurala prima di aprire la pratica.'}))
+            else:
+                route.fulfill(status=200, content_type='application/json', body=json.dumps({'pratica': {'id': '77', 'numero': 'OF/2026/077'}}))
+        def conferma_conf(route):
+            stati_conf['conferma'] += 1
+            risposta(route, json.dumps({**agenzia_conf, 'da_confermare': False}))
+        pgD = entra(S + '-oper')
+        pgD.route(re.compile(r'^.*/api/documenti/999990$'), lambda r: risposta(r, json.dumps(scheda_conf)))
+        pgD.route(re.compile(r'^.*/api/documenti/999990/abbina$'), abbina_conf)
+        pgD.route(re.compile(r'^.*/api/clienti/1001/agenzie/77/conferma$'), conferma_conf)
+        pgD.route(re.compile(r'^.*/api/fornitori$'), lambda r: risposta(r, json.dumps(fornitori_mock)))
+        pgD.route(re.compile(r'^.*/api/fornitori/sconti-in-vigore$'), lambda r: risposta(r, '[]'))
+        pgD.route(re.compile(r'^.*/api/subagenti$'), lambda r: risposta(r, json.dumps(subagenti_mock)))
+        pgD.route(re.compile(r'^.*/api/clienti\?fornitore_id=5$'), lambda r: risposta(r, json.dumps(clienti_mock)))
+        pgD.goto(BASE + '/documenti/999990')
+        pgD.locator('.scelte button:has-text("Apri la pratica")').wait_for(timeout=15000)
+        pgD.locator('.scelte button:has-text("Apri la pratica")').click()
+        pgD.wait_for_selector('.velo .modale:has-text("Apri la pratica")')
+        pgD.fill('#c-cliente_id', 'Agri')
+        pgD.locator('.velo .ricerca-menu:not([hidden]) li[role=option]').first.wait_for()
+        pgD.locator('.velo .ricerca-menu:not([hidden]) li[role=option]').first.click()
+        pgD.wait_for_function("document.querySelectorAll('.velo .ricerca-menu:not([hidden])').length === 0")
+        pgD.click('.velo .modale-piede button:has-text("Apri la pratica")')
+        pgD.locator('.velo .nota:has-text("dal vecchio CRM")').wait_for(timeout=10000)
+        ok(pgD.locator('.velo button:has-text("Usa questa")').count() == 1, 'D-159: con agenzia da confermare compare «Usa questa»')
+        ok(pgD.locator('.velo button:has-text("Configura")').count() == 1, 'D-159: ... e «Configura»')
+        ok('codice 45172' in pgD.locator('.velo .nota').inner_text() and 'sconto 0 %' in pgD.locator('.velo .nota').inner_text()
+           and 'subagente Bastasin Maurizio' in pgD.locator('.velo .nota').inner_text() and 'dal 2000-01-01' in pgD.locator('.velo .nota').inner_text(),
+           'D-159: il riquadro mostra codice, sconto, subagente e data')
+        ok(stati_conf['abbina'] == 1, 'D-159: l’apertura ha risposto 409 una volta')
+        pgD.screenshot(path=str(USCITA / 'app-documento-da-confermare-1440.png'))
+        pgD.locator('.velo button:has-text("Usa questa")').click()
+        pgD.wait_for_function("location.pathname.startsWith('/pratiche/')")
+        ok(stati_conf['conferma'] == 1, 'D-159: «Usa questa» conferma l’agenzia')
+        ok(True, 'D-159: dopo la conferma la pratica si apre')
+        pgD.close()
+
         b.close()
 finally:
     prova_documento('togli')

@@ -1500,6 +1500,35 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
   return d;
 }
 
+/** D-159: un'agenzia del vecchio CRM ancora da confermare non vale da sola: l'apertura della pratica
+ *  risponde 409 con il codice `agenzia_da_confermare` e i dati dell'agenzia (per il riquadro «Usa questa /
+ *  Configura»), così il documento la conferma o la configura prima di usarla. */
+function agenziaDaConfermare(ag: {
+  id: bigint; subagente_id: bigint; fornitore_id: bigint; codice_cliente_fornitore: string | null; sconto: Prisma.Decimal;
+  pct_subagente: Prisma.Decimal | null; regola_mensile: string | null; valido_dal: Date; valido_al: Date | null;
+  subagente: { nome: string; cognome: string };
+}) {
+  throw new ConflictException({
+    code: 'agenzia_da_confermare',
+    message: 'Questa agenzia viene dal vecchio CRM: confermala o configurala prima di aprire la pratica.',
+    agenzia: {
+      id: String(ag.id),
+      subagente_id: String(ag.subagente_id),
+      subagente: `${ag.subagente.cognome} ${ag.subagente.nome}`,
+      subagente_codice: null,
+      fornitore_id: String(ag.fornitore_id),
+      fornitore: null,
+      codice_cliente_fornitore: ag.codice_cliente_fornitore,
+      sconto: Number(ag.sconto),
+      pct_subagente: ag.pct_subagente === null ? null : Number(ag.pct_subagente),
+      regola_mensile: ag.regola_mensile,
+      valido_dal: iso(ag.valido_dal),
+      valido_al: ag.valido_al ? iso(ag.valido_al) : null,
+      da_confermare: true,
+    },
+  });
+}
+
 /** Pratica nuova dal primo ordine (D-60): numero OF/AAAA/NNN, AAAA = anno dell'ordine, NNN = il più alto dell'anno + 1.
  *  Il blocco consultivo fa passare una alla volta le pratiche nuove: niente numeri doppi. Cliente e fornitore con la
  *  versione corrente (D-46). Evento crud.create. */
@@ -1517,9 +1546,14 @@ async function nuovaPratica(tx: Tx, b: AbbinaDocumento, ctx: Contesto) {
   // l'agenzia cliente × fornitore alla data dell'ordine dà il subagente e l'agente (D-60): senza, la pratica non si apre
   const ag = await tx.interscambio.findFirst({
     where: { cliente_id: cid, fornitore_id: fid, valido_dal: { lte: new Date(b.data) }, OR: [{ valido_al: null }, { valido_al: { gt: new Date(b.data) } }] },
-    select: { sconto: true, subagente: { select: { agente_id: true } } },
+    select: {
+      id: true, subagente_id: true, fornitore_id: true, codice_cliente_fornitore: true, sconto: true,
+      pct_subagente: true, regola_mensile: true, valido_dal: true, valido_al: true, da_confermare: true,
+      subagente: { select: { agente_id: true, nome: true, cognome: true } },
+    },
   });
-  if (!ag) throw new ConflictException("Il cliente non ha un'agenzia con questo fornitore alla data dell'ordine: aggiungila in Clienti");
+  if (!ag) throw new ConflictException("Il cliente non ha un'agenzia con questo fornitore alla data dell'ordine");
+  if (ag.da_confermare) agenziaDaConfermare(ag); // D-159: dal vecchio CRM, da confermare prima dell'uso
   // D-87: serve anche lo scaglione del fornitore per lo sconto dell'agenzia, altrimenti la provvigione sarebbe 0% in silenzio
   const sc = await tx.provvigioni_scaglioni.findFirst({
     where: { fornitore_id: fid, sconto_min: { lte: ag.sconto }, valido_dal: { lte: new Date(b.data) } },

@@ -113,6 +113,7 @@ function mappaAgenzia(a: interscambio & {
     regola_mensile: a.regola_mensile,
     valido_dal: iso(a.valido_dal)!,
     valido_al: iso(a.valido_al),
+    da_confermare: a.da_confermare,
   };
 }
 
@@ -256,6 +257,20 @@ export class ClientiController {
     return ag.map((a) => mappaAgenzia(a as never));
   }
 
+  /** D-158: per il pulsante «Aggiungi l'agenzia» in Apri la pratica restituisce i nomi della coppia
+   *  cliente-fornitore da mostrare nel FormAgenzia (i dati veri li rilegge il server alla creazione, V12). */
+  @Get(':id/agenzia-nuova')
+  @Richiede('dati.consulta')
+  async nomiAgenzia(@Param('id', ParseIntPipe) id: number, @Query('fornitore_id', new ParseIntPipe()) fornitore_id: number) {
+    const [c, f] = await Promise.all([
+      this.db.clienti.findUnique({ where: { id: BigInt(id) }, include: { corrente: { select: { ragione_sociale: true } } } }),
+      this.db.fornitori.findUnique({ where: { id: BigInt(fornitore_id) }, include: { corrente: { select: { ragione_sociale: true } } } }),
+    ]);
+    if (!c) throw new NotFoundException('Cliente non trovato');
+    if (!f) throw new NotFoundException('Fornitore non trovato');
+    return { cliente: c.corrente?.ragione_sociale ?? null, fornitore: f.corrente?.ragione_sociale ?? null };
+  }
+
   @Post(':id/agenzie')
   @Richiede('dati.modifica')
   async creaAgenzia(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: DatiAgenzia) {
@@ -386,7 +401,7 @@ export class ClientiController {
           dopoDiff[c] = dv;
         }
       }
-      if (Object.keys(dopoDiff).length === 0) {
+      if (Object.keys(dopoDiff).length === 0 && !prima.da_confermare) {
         const ag = await tx.interscambio.findUnique({
           where: { id: prima.id },
           include: {
@@ -423,6 +438,7 @@ export class ClientiController {
           regola_mensile: dopoData.regola_mensile,
           valido_dal: dopoData.valido_dal,
           valido_al: dopoData.valido_al,
+          da_confermare: false, // D-159: modificarla la conferma
         },
         include: {
           subagente: { select: { id: true, codice: true, nome: true, cognome: true } },
@@ -435,10 +451,47 @@ export class ClientiController {
           etichetta: `${prima.cliente?.corrente?.ragione_sociale ?? ''} · ${prima.fornitore?.corrente?.ragione_sociale ?? ''}`,
           prima: primaDiff,
           dopo: dopoDiff,
+          ...(prima.da_confermare ? { confermata: true } : {}),
         },
       }, contesto(req));
       return mappaAgenzia(dopo as never);
     }));
+  }
+
+  /** D-159: conferma un'agenzia del vecchio CRM così com'è (diventa un'agenzia normale). */
+  @Post(':id/agenzie/:aid/conferma')
+  @Richiede('dati.modifica')
+  async confermaAgenzia(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Param('aid', ParseIntPipe) aid: number) {
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM interscambio WHERE id = ${BigInt(aid)} FOR UPDATE`;
+      const prima = await tx.interscambio.findUnique({
+        where: { id: BigInt(aid) },
+        include: {
+          subagente: { select: { id: true, codice: true, nome: true, cognome: true } },
+          fornitore: { include: { corrente: { select: { ragione_sociale: true } } } },
+          cliente: { include: { corrente: { select: { ragione_sociale: true } } } },
+        },
+      });
+      if (!prima || prima.cliente_id !== BigInt(id)) throw new NotFoundException('Agenzia non trovata');
+      if (!prima.da_confermare) return mappaAgenzia(prima as never);
+      const dopo = await tx.interscambio.update({
+        where: { id: prima.id },
+        data: { da_confermare: false },
+        include: {
+          subagente: { select: { id: true, codice: true, nome: true, cognome: true } },
+          fornitore: { include: { corrente: { select: { ragione_sociale: true } } } },
+        },
+      });
+      await logEvent(tx, {
+        tipo: 'crud', azione: 'update', entita: 'interscambio', entita_id: prima.id, esito: 'successo',
+        dettaglio: {
+          etichetta: `${prima.cliente?.corrente?.ragione_sociale ?? ''} · ${prima.fornitore?.corrente?.ragione_sociale ?? ''}`,
+          prima: { da_confermare: true },
+          dopo: { da_confermare: false },
+        },
+      }, contesto(req));
+      return mappaAgenzia(dopo as never);
+    });
   }
 
   @Delete(':id/agenzie/:aid')

@@ -194,6 +194,7 @@ model interscambio {
   regola_mensile           String?   @db.VarChar(10) // prima | piu_alta
   valido_dal               DateTime  @db.Date // il documento va al subagente valido alla sua data (D-35)
   valido_al                DateTime? @db.Date // escluso; NULL = segue il cliente oggi
+  da_confermare            Boolean   @default(false) // dal vecchio CRM, da confermare al primo uso (D-159)
   creato_il                DateTime  @default(now()) @db.Timestamptz(6)
 
   subagente subagenti @relation(fields: [subagente_id], references: [id], onDelete: Restrict)

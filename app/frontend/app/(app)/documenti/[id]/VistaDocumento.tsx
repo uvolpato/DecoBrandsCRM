@@ -7,7 +7,7 @@ import { CampoRicerca } from '@/componenti/CampoRicerca';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { Scelte, Elenco } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
-import { FormAgenzia } from '@/componenti/FormAgenzia';
+import { FormAgenzia, type Agenzia } from '@/componenti/FormAgenzia';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { Nota, Pannello, type Azione } from '@/componenti/Pagina';
@@ -270,7 +270,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
 
   function apriNuova() {
     setFinestra(
-      <ApriPratica id={id} t={t} clienteIniziale={t.cliente_id ?? ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? ''} onChiudi={chiudi} />,
+      <ApriPratica id={id} t={t} clienteIniziale={t.cliente_id ?? ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? ''} onChiudi={chiudi} onFatto={onFatto} />,
     );
   }
 
@@ -675,10 +675,97 @@ function FileDocumento({ d, pagina, posizione }: { d: Dettaglio; pagina?: number
 /* ---------- Correggi i dati letti (F6-A4b, §6.5 punto 7) ---------- */
 
 /** D-157 §19: la ricerca del cliente nella modale «Apri la pratica» riceve il fornitore scelto lì
- *  come contesto, così la colonna «Cod. cliente» mostra il codice presso quel fornitore. */
-function ApriPratica({ id, t, clienteIniziale, onChiudi }: { id: string; t: Testata; clienteIniziale: string; onChiudi: () => void }) {
+ *  come contesto, così la colonna «Cod. cliente» mostra il codice presso quel fornitore.
+ *  D-158: se all'apertura manca l'agenzia, un pulsante la crea qui senza uscire dal flusso.
+ *  D-159: un'agenzia del vecchio CRM da confermare non apre da sola la pratica: si conferma o si configura. */
+function ApriPratica({ id, t, clienteIniziale, onChiudi, onFatto }: { id: string; t: Testata; clienteIniziale: string; onChiudi: () => void; onFatto?: () => void }) {
   const router = useRouter();
+  const puoAgenzia = usePuo()('dati.modifica'); // D-106: l'agenzia si salva con dati.modifica
   const [fornitoreId, setFornitoreId] = useState(t.fornitore_id ?? '');
+  const [clienteId, setClienteId] = useState(clienteIniziale);
+  // D-158: coppia senza agenzia (dall'errore di abbina): il pulsante apre FormAgenzia
+  const [manca, setManca] = useState<{ cliente_id: string; fornitore_id: string } | null>(null);
+  const [agenzia, setAgenzia] = useState<{ cliente_id: string; cliente: string | null; fornitore_id: string; fornitore: string } | null>(null);
+  // D-159: agenzia del vecchio CRM da confermare, con la coppia scelta per confermarla o configurarla
+  const [daConfermare, setDaConfermare] = useState<{ agenzia: Agenzia; cliente_id: string; fornitore_id: string } | null>(null);
+  const [modifica, setModifica] = useState<{ agenzia: Agenzia; cliente_id: string; cliente: string | null; fornitore_id: string; fornitore: string } | null>(null);
+
+  async function apriAgenzia() {
+    if (!manca) return;
+    const r = await api<{ cliente: string | null; fornitore: string | null }>('clienti/' + manca.cliente_id + '/agenzia-nuova?fornitore_id=' + manca.fornitore_id);
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    setAgenzia({ cliente_id: manca.cliente_id, cliente: r.dati.cliente, fornitore_id: manca.fornitore_id, fornitore: r.dati.fornitore ?? 'Fornitore' });
+  }
+
+  /** Apre la pratica (abbina l'ordine). Ritorna il messaggio d'errore o niente; al 409 dell'agenzia
+   *  da confermare salva l'agenzia e la coppia per il riquadro, senza aprire. */
+  async function apri(cliente: string, fornitore: string) {
+    const r = await api<{ pratica: { id: string; numero: string } }>('documenti/' + id + '/abbina', {
+      tipo: 'ordine', numero: t.numero, data: t.data, importo: t.importo ?? undefined,
+      cliente_id: Number(cliente), fornitore_id: Number(fornitore),
+    });
+    if (!r.ok) {
+      const d = r.dati as { code?: string; agenzia?: Agenzia } | null;
+      if (r.stato === 409 && d?.code === 'agenzia_da_confermare' && d.agenzia) {
+        setDaConfermare({ agenzia: d.agenzia, cliente_id: cliente, fornitore_id: fornitore });
+        return r.messaggio;
+      }
+      if (r.stato === 409 && /agenzia/.test(r.messaggio)) setManca({ cliente_id: cliente, fornitore_id: fornitore });
+      return r.messaggio;
+    }
+    avviso('Aperta la pratica ' + r.dati.pratica.numero);
+    router.push('/pratiche/' + r.dati.pratica.id);
+  }
+
+  async function usaQuesta() {
+    if (!daConfermare) return;
+    const r = await api('clienti/' + daConfermare.cliente_id + '/agenzie/' + daConfermare.agenzia.id + '/conferma', {});
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    setDaConfermare(null);
+    await apri(daConfermare.cliente_id, daConfermare.fornitore_id);
+  }
+
+  function configura() {
+    if (!daConfermare) return;
+    setModifica({
+      agenzia: daConfermare.agenzia,
+      cliente_id: daConfermare.cliente_id,
+      cliente: null,
+      fornitore_id: daConfermare.fornitore_id,
+      fornitore: t.fornitore ?? 'Fornitore',
+    });
+  }
+
+  if (modifica) {
+    return (
+      <FormAgenzia
+        cliente={{ id: modifica.cliente_id, nome: modifica.cliente }}
+        agenzia={modifica.agenzia}
+        fornitoreFisso={{ id: modifica.fornitore_id, nome: modifica.fornitore }}
+        bloccati={['cliente', 'fornitore', 'codice']}
+        onSalvata={() => {
+          const dc = modifica;
+          setModifica(null); setDaConfermare(null); setManca(null); onFatto?.();
+          void apri(dc.cliente_id, dc.fornitore_id);
+        }}
+        onChiudi={() => setModifica(null)}
+      />
+    );
+  }
+
+  if (agenzia) {
+    return (
+      <FormAgenzia
+        cliente={{ id: agenzia.cliente_id, nome: agenzia.cliente }}
+        fornitoreFisso={{ id: agenzia.fornitore_id, nome: agenzia.fornitore }}
+        iniziali={{ codice_cliente_fornitore: t.codice_cliente, valido_dal: t.data }}
+        bloccati={['cliente', 'fornitore', 'codice']}
+        onSalvata={() => { setAgenzia(null); setManca(null); onFatto?.(); }}
+        onChiudi={() => setAgenzia(null)}
+      />
+    );
+  }
+
   return (
     <FormModal titolo="Apri la pratica" conferma="Apri la pratica" colonne={2}
       testo="La pratica nasce dall’ordine. Cliente e fornitore servono per l’agenzia e la provvigione."
@@ -686,21 +773,40 @@ function ApriPratica({ id, t, clienteIniziale, onChiudi }: { id: string; t: Test
         { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: fornitoreId,
           testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined,
           onCambia: (v) => setFornitoreId(v) },
-        { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: clienteIniziale,
+        { nome: 'cliente_id', etichetta: 'Cliente', tipo: 'ricerca', entita: entitaCliente, largo: true, valore: clienteId,
           contesto: { fornitore_id: fornitoreId, codice_cliente: t.codice_cliente },
-          testoIniziale: t.cliente ? { q: t.cliente, mostra: t.cliente } : undefined },
+          testoIniziale: t.cliente ? { q: t.cliente, mostra: t.cliente } : undefined,
+          onCambia: (v) => setClienteId(v) },
       ]}
+      erroreExtra={(errore) => daConfermare ? (
+        <div className="pila">
+          <Nota>Agenzia dal vecchio CRM, da confermare: {[
+            daConfermare.agenzia.codice_cliente_fornitore ? 'codice ' + daConfermare.agenzia.codice_cliente_fornitore : null,
+            'sconto ' + daConfermare.agenzia.sconto + ' %',
+            daConfermare.agenzia.subagente ? 'subagente ' + daConfermare.agenzia.subagente : null,
+            'dal ' + daConfermare.agenzia.valido_dal,
+          ].filter(Boolean).join(' · ')}</Nota>
+          <div className="azioni-riga">
+            <button type="button" className="btn primario" disabled={!puoAgenzia}
+              title={!puoAgenzia ? 'Serve il livello operatore in Dati' : undefined}
+              onClick={() => void usaQuesta()}>Usa questa</button>
+            <button type="button" className="btn sec" disabled={!puoAgenzia}
+              title={!puoAgenzia ? 'Serve il livello operatore in Dati' : undefined}
+              onClick={configura}>Configura</button>
+          </div>
+        </div>
+      ) : (manca && /agenzia/.test(errore)) ? (
+        <div className="azioni-riga">
+          <button type="button" className="btn primario" disabled={!puoAgenzia}
+            title={!puoAgenzia ? 'Serve il livello operatore in Dati' : undefined}
+            onClick={() => void apriAgenzia()}>Aggiungi l’agenzia</button>
+        </div>
+      ) : null}
       onChiudi={onChiudi}
       onConferma={async (v) => {
         const fornitoreIdFinale = v.fornitore_id || t.fornitore_id;
         if (!v.cliente_id || !fornitoreIdFinale) return 'Scegli cliente e fornitore.';
-        const r = await api<{ pratica: { id: string; numero: string } }>('documenti/' + id + '/abbina', {
-          tipo: 'ordine', numero: t.numero, data: t.data, importo: t.importo ?? undefined,
-          cliente_id: Number(v.cliente_id), fornitore_id: Number(fornitoreIdFinale),
-        });
-        if (!r.ok) return r.messaggio;
-        avviso('Aperta la pratica ' + r.dati.pratica.numero);
-        router.push('/pratiche/' + r.dati.pratica.id);
+        return apri(v.cliente_id, fornitoreIdFinale);
       }} />);
 }
 

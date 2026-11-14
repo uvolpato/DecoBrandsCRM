@@ -2,6 +2,7 @@
 // Un solo comando, una sola transazione (V13, D-36), idempotente. Si esegue con ts-node:
 //   npm run import:vecchio-crm -- --db decobrands_import [--prova] [--sostituisci]   (import one-shot su un database vuoto)
 //   npm run import:vecchio-crm -- --db decobrands_db --aggiungi [--prova]            (modalità additiva in esercizio)
+//   npm run import:vecchio-crm -- --db decobrands_db --aggiungi --correggi-date      (additiva + riporta a 2000-01-01 le agenzie vecchie, D-158)
 // Oppure passando DATABASE_URL per comando (puntata a decobrands_import, o a un database di prova
 // decobrands_test_… con --aggiungi).
 //
@@ -20,6 +21,7 @@ import { createInterface } from 'node:readline';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { logEvent } from '../src/registro';
+import { ultimaChiusura } from '../src/motore/dati';
 
 type Tx = Prisma.TransactionClient;
 
@@ -28,11 +30,14 @@ const LEGACY = join(__dirname, '..', '..', '..', 'dati-crm-legacy');
 const OUT = join(LEGACY, 'import');
 const ESTRAZIONE = '2026-11-08'; // data dell'estratto (riepilogo.json)
 const DAL = new Date(`${ESTRAZIONE}T00:00:00Z`);
+// D-158 §19: il vecchio CRM non ha la data d'inizio dell'agenzia: le agenzie valgono da sempre
+const DAL_SEMPRE = new Date('2000-01-01T00:00:00Z');
 
 const args = process.argv.slice(2);
 const PROVA = args.includes('--prova');
 const SOSTITUISCI = args.includes('--sostituisci');
 const AGGIUNGI = args.includes('--aggiungi');
+const CORREGGI_DATE = args.includes('--correggi-date');
 const iDb = args.indexOf('--db');
 const nomeDb = iDb >= 0 ? args[iDb + 1] : null;
 
@@ -55,6 +60,7 @@ if (nomeDb) {
     throw new Error('Questo import scrive solo su decobrands_import o, con --aggiungi, su decobrands_db');
   }
 }
+if (CORREGGI_DATE && !AGGIUNGI) throw new Error('--correggi-date si usa solo con --aggiungi (su decobrands_db)');
 if (AGGIUNGI) {
   if (SOSTITUISCI) throw new Error('--aggiungi e --sostituisci non vanno insieme');
   if (/\/decobrands_import\b/.test(process.env.DATABASE_URL!)) throw new Error('--aggiungi non scrive su decobrands_import');
@@ -148,6 +154,7 @@ const report = {
   ruoli_agente: 0, gia_agenti: 0,
   sedi: 0, recapiti: 0, persone: 0, persone_contatti: 0, fatturazione: 0,
   interscambio: 0, gia_interscambio: 0, sconti: 0, codici_esterni: 0,
+  date_corrette: 0,
   da_inserire_in_integra: -1,
   piva_valide: 0, piva_invalide: 0, senza_piva_cf: 0, senza_piva_senza_cf: 0,
   fusioni: [] as RigheFusione[],
@@ -229,6 +236,45 @@ async function svuotaImport(db: PrismaClient) {
 }
 
 // ---------- Import ----------
+/** D-158: porta a "da sempre" il valido_dal delle agenzie del vecchio CRM già importate con la data
+ *  dell'estratto. Salta chi ha righe successive per la stessa coppia, chi è stato toccato dopo l'import
+ *  (l'import non scrive eventi per le singole agenzie) e chi sta in un periodo chiuso o liquidato. */
+async function correggiDate(tx: Tx) {
+  const daCorreggere = await tx.interscambio.findMany({
+    where: { valido_dal: DAL },
+    select: { id: true, cliente_id: true, fornitore_id: true },
+  });
+  if (!daCorreggere.length) return;
+
+  const perCoppia = new Map<string, number>();
+  for (const a of await tx.interscambio.findMany({ select: { cliente_id: true, fornitore_id: true } })) {
+    const k = `${a.cliente_id}:${a.fornitore_id}`;
+    perCoppia.set(k, (perCoppia.get(k) ?? 0) + 1);
+  }
+  const toccate = new Set((await tx.registro.findMany({
+    where: { entita: 'interscambio', entita_id: { in: daCorreggere.map((a) => a.id) } },
+    select: { entita_id: true },
+  })).map((e) => String(e.entita_id)));
+
+  const chiusa = new Map<string, string | null>();
+  const ultima = async (fid: bigint) => {
+    const k = String(fid);
+    if (!chiusa.has(k)) chiusa.set(k, await ultimaChiusura(tx, fid));
+    return chiusa.get(k)!;
+  };
+
+  let corrette = 0;
+  for (const a of daCorreggere) {
+    const k = `${a.cliente_id}:${a.fornitore_id}`;
+    if ((perCoppia.get(k) ?? 0) > 1) continue; // righe successive per la stessa coppia
+    if (toccate.has(String(a.id))) continue; // modificata dopo l'import
+    if (await ultima(a.fornitore_id)) continue; // periodo chiuso o liquidazione
+    await tx.interscambio.update({ where: { id: a.id }, data: { valido_dal: DAL_SEMPRE } });
+    corrette++;
+  }
+  report.date_corrette = corrette;
+}
+
 async function importa(tx: Tx) {
   if (AGGIUNGI) await caricaEsistente(tx);
 
@@ -567,7 +613,8 @@ async function importa(tx: Tx) {
     const sconto2 = Number(leg.sconto2 || 0);
     const it = await tx.interscambio.create({ data: {
       subagente_id: sub, cliente_id: clienteRuolo, fornitore_id: fornitoreRuolo,
-      codice_cliente_fornitore: leg.codice_cliente || null, sconto: sconto1, valido_dal: DAL,
+      codice_cliente_fornitore: leg.codice_cliente || null, sconto: sconto1, valido_dal: DAL_SEMPRE,
+      da_confermare: true, // D-159: dal vecchio CRM, da confermare al primo uso
     } });
     report.interscambio++;
     if (sconto1 > 0) scontiData.push({ interscambio_id: it.id, ordine: 1, tipo: 'commerciale', percentuale: sconto1, valido_dal: DAL });
@@ -575,6 +622,10 @@ async function importa(tx: Tx) {
   }
   if (scontiData.length) await tx.sconti.createMany({ data: scontiData });
   report.sconti = scontiData.length;
+
+  // D-158: --correggi-date porta a "da sempre" le agenzie del vecchio CRM già importate con la data
+  // dell'estratto (2026-11-08), se nessuno le ha toccate né usate in un periodo chiuso.
+  if (CORREGGI_DATE) await correggiDate(tx);
 
   // 7. Codici esterni (§5.4): una riga per scheda (tipo soggetto) e una per ruolo. I codici già
   // presenti (--aggiungi, giro successivo) non si riscrivono (codiciVisti è pre-caricato).
@@ -627,6 +678,7 @@ async function importa(tx: Tx) {
       etichetta: AGGIUNGI ? 'Import vecchio CRM (aggiungi)' : 'Import vecchio CRM',
       soggetti: report.soggetti, clienti: report.ruoli_cliente, fornitori: report.ruoli_fornitore,
       subagenti: report.ruoli_subagente, agenti: report.ruoli_agente, interscambio: report.interscambio,
+      ...(CORREGGI_DATE ? { date_corrette: report.date_corrette } : {}),
     },
   });
 }
@@ -723,7 +775,7 @@ async function main() {
     if (AGGIUNGI) await scriviDaInserireInIntegra(db);
     const totale = Date.now() - t0;
     scriviReport(totale);
-    console.log(`${PROVA ? 'PROVA (rollback)' : AGGIUNGI ? 'Aggiunta completata' : 'Import completato'}: ${report.soggetti} soggetti nuovi (${report.gia_soggetti} già presenti), ${report.ruoli_cliente} clienti nuovi (${report.gia_clienti} già presenti), ${report.ruoli_fornitore} fornitori nuovi (${report.gia_fornitori} già presenti), ${report.ruoli_subagente} subagenti nuovi (${report.gia_subagenti} già presenti), ${report.interscambio} interscambio nuovi (${report.gia_interscambio} già presenti) in ${(totale / 1000).toFixed(1)} s`);
+    console.log(`${PROVA ? 'PROVA (rollback)' : AGGIUNGI ? 'Aggiunta completata' : 'Import completato'}: ${report.soggetti} soggetti nuovi (${report.gia_soggetti} già presenti), ${report.ruoli_cliente} clienti nuovi (${report.gia_clienti} già presenti), ${report.ruoli_fornitore} fornitori nuovi (${report.gia_fornitori} già presenti), ${report.ruoli_subagente} subagenti nuovi (${report.gia_subagenti} già presenti), ${report.interscambio} interscambio nuovi (${report.gia_interscambio} già presenti)${CORREGGI_DATE ? `, ${report.date_corrette} date agenzie corrette` : ''} in ${(totale / 1000).toFixed(1)} s`);
   } catch (e) {
     console.error('errore:', (e instanceof Error ? e.message : String(e)).replace(/postgres(?:ql)?:\/\/\S+/gi, '[indirizzo rimosso]').replace(/password\s*=\s*\S+/gi, 'password=[rimossa]'));
     process.exitCode = 1;

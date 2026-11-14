@@ -26,6 +26,7 @@ export interface Agenzia {
   regola_mensile: string | null;
   valido_dal: string;
   valido_al: string | null;
+  da_confermare: boolean;
 }
 
 interface Fornitore { id: string; ragione_sociale: string | null; }
@@ -49,11 +50,13 @@ export interface FormAgenziaProps {
   agenzia?: Agenzia | null; // null = nuova
   fornitoreFisso?: { id: string; nome: string } | null; // dal documento: il fornitore non si cambia
   iniziali?: { codice_cliente_fornitore?: string | null; valido_dal?: string | null };
+  // D-158: campi non modificabili (dal documento); il cliente è già fisso per rotta, il fornitore via fornitoreFisso
+  bloccati?: ('cliente' | 'fornitore' | 'codice')[];
   onSalvata: () => void | Promise<void>;
   onChiudi: () => void;
 }
 
-export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, iniziali, onSalvata, onChiudi }: FormAgenziaProps) {
+export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, iniziali, bloccati, onSalvata, onChiudi }: FormAgenziaProps) {
   const resp = usePuo()('dati.condizioni');
   const [fornitori, setFornitori] = useState<Fornitore[] | null>(null);
   const [subagenti, setSubagenti] = useState<Subagente[] | null>(null);
@@ -118,14 +121,14 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
     return conResp([
       campoFornitore,
       { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: agenzia?.subagente_id ?? pro?.subagente_id ?? '' },
-      { nome: 'codice_cliente_fornitore', etichetta: 'Codice cliente presso il fornitore', tipo: 'testo', valore: agenzia?.codice_cliente_fornitore ?? iniziali?.codice_cliente_fornitore ?? pro?.cliente_codice_fornitore ?? '' },
+      { nome: 'codice_cliente_fornitore', etichetta: 'Codice cliente presso il fornitore', tipo: 'testo', disabilitato: bloccati?.includes('codice'), valore: agenzia?.codice_cliente_fornitore ?? iniziali?.codice_cliente_fornitore ?? pro?.cliente_codice_fornitore ?? '' },
       { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: agenzia ? String(agenzia.sconto) : pro ? String(pro.sconto_1) : '0', aiuto: aiutoSconto },
       { nome: 'pct_subagente', etichetta: 'Al subagente per questo cliente % (vuoto = scaglione)', tipo: 'testo', valore: agenzia ? (agenzia.pct_subagente === null ? '' : String(agenzia.pct_subagente)) : '' },
       { nome: 'regola_mensile', etichetta: 'Provvigione al subagente', tipo: 'select', valore: agenzia?.regola_mensile ?? '', opzioni: [{ value: '', label: 'Su ogni fattura' }, { value: 'prima', label: 'Una fattura al mese: la prima' }, { value: 'piu_alta', label: 'Una fattura al mese: la più alta' }] },
       { nome: 'valido_dal', etichetta: 'Valido dal', tipo: 'testo', valore: agenzia?.valido_dal ?? iniziali?.valido_dal ?? oggi },
       { nome: 'valido_al', etichetta: 'Valido al (vuoto = oggi)', tipo: 'testo', valore: agenzia?.valido_al ?? '' },
     ]);
-  }, [fornitori, subagenti, agenzia, fornitoreFisso, iniziali, aiutoSconto, resp, oggi, legame]);
+  }, [fornitori, subagenti, agenzia, fornitoreFisso, iniziali, aiutoSconto, resp, oggi, legame, bloccati]);
 
   const testoStorico = legame
     ? legame.rappresentato
@@ -148,7 +151,8 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
         const corpo: Record<string, unknown> = {
           fornitore_id: Number(fornitoreFisso?.id ?? v.fornitore_id),
           subagente_id: Number(v.subagente_id),
-          codice_cliente_fornitore: v.codice_cliente_fornitore || null,
+          // D-158: il campo bloccato non è nel form (disabilitato): si riprende il valore iniziale
+          codice_cliente_fornitore: (bloccati?.includes('codice') ? (agenzia?.codice_cliente_fornitore ?? iniziali?.codice_cliente_fornitore) : v.codice_cliente_fornitore) || null,
           sconto: Number(v.sconto ?? 0),
           valido_dal: v.valido_dal,
           valido_al: v.valido_al || null,

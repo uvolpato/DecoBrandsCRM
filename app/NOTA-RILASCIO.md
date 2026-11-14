@@ -11,6 +11,15 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.4 — 14/11/2026 — agenzie del vecchio CRM da confermare
+
+- **Agenzie del vecchio CRM** valgono da sempre (dal 01/01/2000: il vecchio CRM non ha la data d’inizio,
+  D-158) e sono **da confermare** (D-159): aprendo la pratica si sceglie «Usa questa» o «Configura».
+  Migrazione `20261114090000_agenzie_da_confermare`; `import:vecchio-crm -- --aggiungi --correggi-date`.
+- **Agenzia mancante**: «Aggiungi l’agenzia» apre *Nuova agenzia per …* con cliente, fornitore e codice
+  già compilati e bloccati, senza uscire da *Apri la pratica*.
+- Clienti, scheda Agenzie: segno «da confermare» e azione «Conferma».
+
 ### 0.2.3 — 14/11/2026 — anagrafica del vecchio CRM e cliente nella correzione
 
 - **Vecchio CRM, per ora** (D-156): fornitori, clienti, subagenti e collegamenti (codice cliente, sconti,

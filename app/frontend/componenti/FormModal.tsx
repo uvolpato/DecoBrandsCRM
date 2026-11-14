@@ -15,11 +15,13 @@ export interface FormModalProps {
   pericolo?: boolean;
   // azioni oltre ad Annulla e Salva (es. Disattiva nel recapito), come `azioniExtra` del prototipo
   azioniExtra?: { etichetta: string; variante?: 'sec' | 'pericolo'; onClick: () => void }[];
+  // contenuto accanto all'errore, quando onConferma restituisce un messaggio (es. «Aggiungi l'agenzia», D-158)
+  erroreExtra?: (errore: string) => ReactNode;
   onConferma: (valori: Record<string, string>) => Promise<string | void>;
   onChiudi: () => void;
 }
 
-export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva', pericolo, azioniExtra, onConferma, onChiudi }: FormModalProps) {
+export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva', pericolo, azioniExtra, erroreExtra, onConferma, onChiudi }: FormModalProps) {
   const id = useId();
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
@@ -48,6 +50,7 @@ export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva
       <form id={id} className={'modulo modulo-' + colonne} onSubmit={invia} noValidate>
         {campi.map((c) => <Campo key={c.nome} {...c} />)}
         <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
+        {errore && erroreExtra?.(errore)}
       </form>
     </Modale>
   );

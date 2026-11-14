@@ -549,6 +549,42 @@ describe('agenzia mancante: il documento non entra in pratica (D-106)', () => {
   });
 });
 
+describe('agenzia da confermare (D-159)', () => {
+  let fornitore: { id: bigint; versione_id: bigint };
+  let cliente: { id: bigint; versione_id: bigint };
+  let agenziaId: bigint;
+
+  beforeAll(async () => {
+    const fv = await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } });
+    const f = await db.fornitori.findUniqueOrThrow({ where: { id: fv.fornitore_id } });
+    fornitore = { id: fv.fornitore_id, versione_id: f.versione_corrente_id! };
+    const c = await db.clienti.create({ data: {} });
+    const cv = await db.clienti_versioni.create({ data: { cliente_id: c.id, fonte: 'integra', ragione_sociale: 'Cliente Da Confermare', valido_dal: new Date('2025-01-01') } });
+    await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: cv.id } });
+    cliente = { id: c.id, versione_id: cv.id };
+    const sub = await db.subagenti.findFirstOrThrow();
+    agenziaId = (await db.interscambio.create({ data: { subagente_id: sub.id, cliente_id: c.id, fornitore_id: fornitore.id, sconto: 5, valido_dal: new Date('2025-01-01'), da_confermare: true } })).id;
+  });
+
+  it('abbina un ordine: 409 con il codice agenzia_da_confermare e i dati, nessuna pratica', async () => {
+    const b = (await op.carica(pdf('ordine da confermare'), 'ordine-da-conf.pdf').expect(201)).body;
+    const r = await op.post(`/documenti/${b.id}/abbina`, { tipo: 'ordine', numero: 'DC-ORD-1', data: '2026-09-01', cliente_id: Number(cliente.id), fornitore_id: Number(fornitore.id) }).expect(409);
+    expect(r.body.code).toBe('agenzia_da_confermare');
+    expect(r.body.agenzia.id).toBe(String(agenziaId));
+    expect(r.body.agenzia.sconto).toBe(5);
+    expect(r.body.agenzia.valido_dal).toBe('2025-01-01');
+    expect(await db.ordini_fornitore_testata.count({ where: { cliente_id: cliente.id } })).toBe(0);
+  });
+
+  it("dopo la conferma l'ordine apre la pratica", async () => {
+    await senzaArea.post(`/clienti/${cliente.id}/agenzie/${agenziaId}/conferma`, {}).expect(201);
+    expect((await db.interscambio.findUniqueOrThrow({ where: { id: agenziaId } })).da_confermare).toBe(false);
+    const b = (await op.carica(pdf('ordine dopo conferma'), 'ordine-dopo-conf.pdf').expect(201)).body;
+    const r = await op.post(`/documenti/${b.id}/abbina`, { tipo: 'ordine', numero: 'DC-ORD-2', data: '2026-09-01', cliente_id: Number(cliente.id), fornitore_id: Number(fornitore.id) }).expect(201);
+    expect(r.body.pratica.numero).toMatch(/^OF\/2026\//);
+  });
+});
+
 describe('proposta con import da Integra e storico (D-111/D-112)', () => {
   const ESTRATTO = new Date('2026-11-08T00:00:00Z');
   let fornitore: { id: bigint; versione_id: bigint; ragione: string; piva: string | null };
