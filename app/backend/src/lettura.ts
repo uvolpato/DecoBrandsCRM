@@ -8,6 +8,7 @@ import { pulisci } from './integra';
 import { leggiDocumento, LetturaFallita, type Lettura } from './lettore';
 import { TIPI_DOCUMENTO } from './motore/dati';
 import { PrismaService } from './prisma.service';
+import { logEvent } from './registro';
 import { risolviFornitore, valutaLettura, type Soglie } from './proposta';
 
 // Servizio di lettura dei documenti (F6-A2, §6.5 punti 3–4): consuma la coda, chiama il connettore
@@ -89,7 +90,7 @@ export const PROMPT_DOCUMENTO = [
 async function salva(db: PrismaService, id: bigint, r: Lettura, soglie: Soglie, ora = new Date()): Promise<void> {
   await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${id} FOR UPDATE`;
-    const riga = await tx.documenti_in_arrivo.findUnique({ where: { id }, select: { stato: true } });
+    const riga = await tx.documenti_in_arrivo.findUnique({ where: { id }, select: { stato: true, file_nome: true } });
     if (!riga || riga.stato !== 'in_lettura') return;
     await tx.documenti_campi.deleteMany({ where: { documento_id: id } });
     const campi = r.campi
@@ -122,6 +123,11 @@ async function salva(db: PrismaService, id: bigint, r: Lettura, soglie: Soglie, 
         livello: val.livello, controlli: { falliti: val.controlli } as unknown as Prisma.InputJsonValue,
       },
     });
+    // D-164 §19: il cambio di stato è un evento, così la pagina Documenti si aggiorna da sola (SSE)
+    await logEvent(tx, {
+      tipo: 'documento', azione: 'stato', entita: 'documento', entita_id: id, esito: 'successo',
+      dettaglio: { etichetta: riga.file_nome, documento_id: String(id), prima: { stato: 'in_lettura' }, dopo: { stato: 'da_controllare' } },
+    }, {});
   });
 }
 

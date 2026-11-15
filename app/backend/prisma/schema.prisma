@@ -102,6 +102,21 @@ model clienti_versioni {
   @@index([ragione_sociale(ops: raw("gin_trgm_ops"))], type: Gin) // ricerca delle Pratiche (A7-24)
 }
 
+/// D-164: nomi letti che l'operatore ha già abbinato a mano a un fornitore o a un cliente. Il documento
+/// successivo con lo stesso nome letto (normalizzato) si riconosce subito. `ruolo_id` è clienti.id o
+/// fornitori.id secondo il tipo: niente FK, come codici_esterni.
+model alias_letti {
+  id                BigInt   @id @default(autoincrement())
+  tipo              String   @db.VarChar(12) // fornitore | cliente (CHECK)
+  nome_normalizzato String   @db.VarChar(255)
+  nome_letto        String   @db.VarChar(255) // com'era scritto sul documento, per la scheda
+  ruolo_id          BigInt
+  creato_da         BigInt?
+  creato_il         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([tipo, nome_normalizzato])
+}
+
 /// Codice di un'entità in un sistema esterno (Integra, …). Due codici possono puntare alla stessa
 /// entità (fusione o cambio di codice). entita_id punta a clienti o fornitori secondo il tipo: niente FK.
 model codici_esterni {

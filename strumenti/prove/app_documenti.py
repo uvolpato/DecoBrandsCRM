@@ -482,6 +482,56 @@ try:
         ok(scarti['n'] == 1, 'Togli dalla coda: chiama lo scarto esistente (una volta)')
         pg5.close()
 
+        # D-164 §19: la coda si aggiorna da sola (SSE, area «documenti») senza toccare il documento
+        # aperto a destra. L'elenco si rifà, il dettaglio (stessa chiave) non si rimonta. L'ordine
+        # della coda (dal più vecchio) è quello che manda il server: qui si verifica la resa.
+        righe_auto = {
+            'documenti': [
+                {'id': '999970', 'file_nome': 'coda-vecchio.pdf', 'file_tipo': 'pdf', 'tipo': None, 'numero': None,
+                 'data': None, 'fornitore_id': None, 'fornitore': None, 'codice_cliente': None, 'cliente': None,
+                 'importo': None, 'livello': None, 'stato': 'in_coda', 'ricevuto_il': '2026-09-01T08:00:00.000Z',
+                 'letto_il': None, 'controlli_n': 0, 'manca_agenzia': False, 'manca_rappresentanza': False,
+                 'fornitore_da_integra': False, 'cliente_da_integra': False},
+                {'id': '999971', 'file_nome': 'coda-nuovo.pdf', 'file_tipo': 'pdf', 'tipo': None, 'numero': None,
+                 'data': None, 'fornitore_id': None, 'fornitore': None, 'codice_cliente': None, 'cliente': None,
+                 'importo': None, 'livello': None, 'stato': 'in_coda', 'ricevuto_il': '2026-09-02T08:00:00.000Z',
+                 'letto_il': None, 'controlli_n': 0, 'manca_agenzia': False, 'manca_rappresentanza': False,
+                 'fornitore_da_integra': False, 'cliente_da_integra': False},
+            ],
+            'conteggi': {'da_controllare': 0, 'in_coda': 2, 'in_lettura': 0, 'errore': 0},
+            'totale': 2, 'pagina': 1, 'per_pagina': 200, 'lettura_configurata': False,
+        }
+        scheda_auto = dict(scheda_coda, id='999970', file_nome='coda-vecchio.pdf')
+        conti = {'lista': 0, 'dettaglio': 0}
+        def lista_auto(route):
+            conti['lista'] += 1
+            risposta(route, json.dumps(righe_auto))
+        def dettaglio_auto(route):
+            conti['dettaglio'] += 1
+            risposta(route, json.dumps(scheda_auto))
+        def flusso_auto(route):
+            route.fulfill(status=200, content_type='text/event-stream', body='data: {"aree":["documenti"]}\n\n')
+        pgQ = entra(S + '-ammi')
+        pgQ.route(re.compile(r'^.*/api/documenti\?stato=aperte.*'), lista_auto)
+        pgQ.route(re.compile(r'^.*/api/documenti/999970$'), dettaglio_auto)
+        pgQ.route(re.compile(r'^.*/api/eventi/flusso$'), flusso_auto)
+        pgQ.goto(BASE + '/documenti/999970')
+        pgQ.wait_for_selector('.selezionabile a')
+        voci_coda = pgQ.locator('.selezionabile a')
+        ok('coda-vecchio.pdf' in voci_coda.first.inner_text(), 'coda: il documento più vecchio è il primo')
+        pgQ.wait_for_selector('.dettagli')
+        pgQ.wait_for_timeout(800)
+        # StrictMode in sviluppo monta due volte: il dettaglio si richiede più di una volta al primo
+        # caricamento; qui si prende la base DOPO il primo caricamento e si guarda solo il delta
+        liste_prima, dettagli_prima = conti['lista'], conti['dettaglio']
+        ok(dettagli_prima >= 1, 'coda: il dettaglio a destra si carica')
+        # l'evento SSE per l'area documenti rifà solo l'elenco (senza sagome), non il dettaglio
+        pgQ.wait_for_timeout(2500)
+        ok(conti['lista'] > liste_prima, 'coda: l’elenco si aggiorna da solo (SSE), senza ricaricare')
+        ok(conti['dettaglio'] == dettagli_prima, 'coda: il documento aperto a destra non si ricarica')
+        pgQ.screenshot(path=str(USCITA / 'app-documenti-coda-auto-1440.png'))
+        pgQ.close()
+
         # D-152: fornitore non univoco → elenco dei candidati con la fonte (CRM/Integra) e il pulsante
         # «Scegli»; scegliendo un candidato il server ricollega e la scheda si ricarica. Scheda simulata.
         scheda_scegli = dict(scheda_errore, id='999995', stato='da_controllare', tipo='ordine', livello='da_controllare',

@@ -85,6 +85,8 @@ export interface CandidatoSoggetto {
   piva: string | null;
   citta: string | null;
   motivo: 'P.IVA uguale' | 'nome simile';
+  /** D-164: somiglianza del nome (0–1) per i candidati proposti per nome simile. */
+  punteggio?: number | null;
 }
 
 /** D-106: cliente e fornitore riconosciuti ma senza agenzia valida alla data del documento. */
@@ -222,6 +224,12 @@ export function normalizzaNome(s: string): string {
 export async function risolviFornitore(db: Db, nome: string): Promise<{ fornitore_id: bigint; fornitore_versione_id: bigint } | null> {
   const t = normalizzaNome(nome ?? '');
   if (!t) return null;
+  // D-164: vocabolario imparato (l'operatore ha già scelto questo nome a mano per un fornitore)
+  const alias = await db.alias_letti.findUnique({ where: { tipo_nome_normalizzato: { tipo: 'fornitore', nome_normalizzato: t } } });
+  if (alias) {
+    const f = await db.fornitori.findUnique({ where: { id: alias.ruolo_id }, select: { versione_corrente_id: true } });
+    if (f?.versione_corrente_id) return { fornitore_id: alias.ruolo_id, fornitore_versione_id: f.versione_corrente_id };
+  }
   const fornitori = await db.fornitori.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
   const esatti = fornitori.filter((f) => f.corrente && normalizzaNome(f.corrente.ragione_sociale) === t);
   const scelti = esatti.length ? esatti : [];
@@ -235,6 +243,12 @@ export async function risolviFornitore(db: Db, nome: string): Promise<{ fornitor
       });
       if (larga.length === 1) return { fornitore_id: larga[0].id, fornitore_versione_id: larga[0].versione_corrente_id! };
     }
+    // D-164: somiglianza pg_trgm — un solo candidato sopra soglia, o il primo ben distaccato, si riconosce
+    const simili = await fornitoriSimili(db, nome);
+    if (simili.length === 1) return { fornitore_id: simili[0].fornitore_id, fornitore_versione_id: simili[0].fornitore_versione_id };
+    if (simili.length >= 2 && simili[0].sim - simili[1].sim >= DISTACCO_SIM) {
+      return { fornitore_id: simili[0].fornitore_id, fornitore_versione_id: simili[0].fornitore_versione_id };
+    }
     return null;
   }
   return scelti.length === 1 ? { fornitore_id: scelti[0].id, fornitore_versione_id: scelti[0].versione_corrente_id! } : null;
@@ -243,6 +257,52 @@ export async function risolviFornitore(db: Db, nome: string): Promise<{ fornitor
 /** Sigle societarie che il modello può saltare o aggiungere (D-71): fuori dal confronto del ripiego. */
 const SIGLE = new Set(['gmbh', 'co', 'kg', 'srl', 'spa', 'snc', 'sas', 'sarl', 'sa', 'ltd', 'inc', 'ag', 'ohg', 'ug', 'bv', 'nv', 'llc']);
 const senzaSigle = (s: string) => normalizzaNome(s).split(' ').filter((p) => p && !SIGLE.has(p)).join(' ').trim();
+
+/* ---------- Vocabolario imparato (D-164) ---------- */
+/** Salva (o aggiorna) il legame nome letto normalizzato → ruolo scelto. Si chiama quando l'operatore
+ *  sceglie a mano un fornitore o un cliente (Correggi, Apri la pratica, scegli D-152): i documenti
+ *  successivi con lo stesso nome letto si riconoscono subito, senza passare dalla somiglianza. */
+export async function ricordaAlias(tx: Db, tipo: 'fornitore' | 'cliente', nomeLetto: string | null, ruoloId: bigint, creato_da: bigint | null | undefined) {
+  const nome = normalizzaNome(nomeLetto ?? '').slice(0, 255);
+  if (!nome || !ruoloId) return;
+  const nome_letto = (nomeLetto ?? '').trim().slice(0, 255);
+  await tx.alias_letti.upsert({
+    where: { tipo_nome_normalizzato: { tipo, nome_normalizzato: nome } },
+    create: { tipo, nome_normalizzato: nome, nome_letto, ruolo_id: ruoloId, creato_da: creato_da ?? null },
+    update: { nome_letto, ruolo_id: ruoloId, creato_da: creato_da ?? null },
+  });
+}
+
+/** Cliente dal vocabolario (D-164): il nome letto è già stato scelto a mano in passato per questo cliente. */
+async function clienteDaVocabolario(db: Db, nome: string | null): Promise<{ cliente_id: bigint; ragione: string | null } | null> {
+  const n = normalizzaNome(nome ?? '');
+  if (!n) return null;
+  const alias = await db.alias_letti.findUnique({ where: { tipo_nome_normalizzato: { tipo: 'cliente', nome_normalizzato: n } } });
+  if (!alias) return null;
+  const c = await db.clienti.findUnique({ where: { id: alias.ruolo_id }, include: { corrente: true } });
+  return c?.corrente ? { cliente_id: c.id, ragione: c.corrente.ragione_sociale } : null;
+}
+
+/* ---------- Somiglianza del nome (pg_trgm, D-164) ---------- */
+/** Soglia di `similarity` per riconoscere un fornitore dal nome letto (costante, D-164 §19). */
+const SOGLIA_SIM = 0.6;
+/** Distacco minimo del primo candidato dal secondo perché la scelta automatica sia sicura (D-111: mai a caso). */
+const DISTACCO_SIM = 0.2;
+
+/** Fornitori il cui nome corrente somiglia a quello letto (pg_trgm, indice gin_trgm su ragione_sociale),
+ *  dal più simile. `nome` arriva già normalizzato (minuscole, punteggiatura via). */
+async function fornitoriSimili(db: Db, nome: string, limite = 10): Promise<{ fornitore_id: bigint; fornitore_versione_id: bigint; ragione_sociale: string; piva: string | null; sim: number }[]> {
+  const t = normalizzaNome(nome ?? '');
+  if (t.length < 3) return [];
+  return db.$queryRaw<{ fornitore_id: bigint; fornitore_versione_id: bigint; ragione_sociale: string; piva: string | null; sim: number }[]>`
+    SELECT f.id AS fornitore_id, f.versione_corrente_id AS fornitore_versione_id, fv.ragione_sociale, fv.piva,
+           similarity(${t}, lower(regexp_replace(fv.ragione_sociale, '[^a-zA-Z0-9]+', ' ', 'g'))) AS sim
+    FROM fornitori f
+    JOIN fornitori_versioni fv ON fv.id = f.versione_corrente_id
+    WHERE similarity(${t}, lower(regexp_replace(fv.ragione_sociale, '[^a-zA-Z0-9]+', ' ', 'g'))) > ${SOGLIA_SIM}
+    ORDER BY sim DESC
+    LIMIT ${limite}`;
+}
 
 /* ---------- Codice cliente → cliente (interscambio valido alla data, D-71) ---------- */
 async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | null> {
@@ -294,6 +354,9 @@ export function riconosciClienteDai(clienti: ClienteConCorrente[], piva_cliente:
 
 /** Riconosce il cliente del documento quando il codice del fornitore non è abbinato (D-92). */
 export async function riconosciCliente(db: Db, l: Letto): Promise<{ cliente_id: bigint; ragione: string | null } | null> {
+  // D-164: vocabolario imparato, poi P.IVA o ragione sociale
+  const vocabolario = await clienteDaVocabolario(db, l.cliente);
+  if (vocabolario) return vocabolario;
   // una sola lettura dei clienti con la versione corrente (P.IVA e ragione sociale stanno sulla versione, §4.6)
   const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
   return riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
@@ -319,6 +382,12 @@ async function candidatiFornitoreCrm(db: Db, nome: string): Promise<CandidatoSog
       visti.add(f.id);
       out.push({ fonte: 'crm', id: String(f.id), ragione_sociale: f.corrente.ragione_sociale, piva: f.corrente.piva ?? null, citta: null, motivo: 'nome simile' });
     }
+  }
+  // D-164: i nomi solo simili (una lettera diversa) si propongono con il punteggio, mai una scelta a caso
+  for (const s of await fornitoriSimili(db, nome)) {
+    if (visti.has(s.fornitore_id)) continue;
+    visti.add(s.fornitore_id);
+    out.push({ fonte: 'crm', id: String(s.fornitore_id), ragione_sociale: s.ragione_sociale, piva: s.piva, citta: null, motivo: 'nome simile', punteggio: Number(s.sim) });
   }
   return out.slice(0, 10);
 }
@@ -482,10 +551,12 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
     : null;
   const clienteScelto = scelto?.versione_corrente_id != null ? { cliente_id: BigInt(l.cliente_id!), ragione: scelto.corrente?.ragione_sociale ?? null } : null;
   const ab = clienteScelto ? null : await abbinamentoPerCodice(db, l);
+  // D-164: cliente per vocabolario (nome letto già scelto a mano in passato)
+  const clienteVocabolario = !clienteScelto && !ab ? await clienteDaVocabolario(db, l.cliente) : null;
   // D-92 + D-106: cliente riconosciuto (codice del fornitore, altrimenti P.IVA/ragione sociale).
   // D-152: i clienti con la versione corrente si leggono una volta sola, per riconoscimento e candidati.
-  const clienti = (ab || clienteScelto) ? [] : await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
-  const cliente_riconosciuto = clienteScelto ?? (ab ? null : riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente));
+  const clienti = (ab || clienteScelto || clienteVocabolario) ? [] : await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
+  const cliente_riconosciuto = clienteScelto ?? clienteVocabolario ?? (ab ? null : riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente));
   const storico = contesto.storico ?? [];
   // D-112: la coppia cliente-fornitore nello storico, con o senza subagente
   const coppiaCon = storico.find((s) => s.rappresentato) ?? null;

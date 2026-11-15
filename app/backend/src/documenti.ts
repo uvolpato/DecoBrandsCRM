@@ -21,7 +21,7 @@ import { aggiornaPratica } from './pratiche';
 import { cerca, importa } from './anagrafica-integra';
 import { IntegraService } from './integra';
 import { cercaLegame } from './storico';
-import { type ClienteConCorrente, type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, riconosciClienteDai, soglieLettura, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
+import { type ClienteConCorrente, type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, ricordaAlias, riconosciClienteDai, soglieLettura, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -165,6 +165,11 @@ export async function prelevaDocumento(db: PrismaService): Promise<{ id: bigint;
     if (!d) return null;
     const tentativi = d.tentativi + 1;
     await tx.documenti_in_arrivo.update({ where: { id: d.id }, data: { stato: 'in_lettura', tentativi } });
+    // D-164 §19: il cambio di stato è un evento, così la pagina Documenti si aggiorna da sola (SSE)
+    await logEvent(tx, {
+      tipo: 'documento', azione: 'stato', entita: 'documento', entita_id: d.id, esito: 'successo',
+      dettaglio: { etichetta: d.file_nome, documento_id: String(d.id), prima: { stato: 'in_coda' }, dopo: { stato: 'in_lettura' } },
+    }, {});
     return { id: d.id, file_nome: d.file_nome, file_percorso: d.file_percorso, tentativi };
   });
 }
@@ -308,6 +313,11 @@ class ScegliSoggetto {
   @IsIn(['fornitore', 'cliente']) ruolo!: 'fornitore' | 'cliente';
   @IsIn(['crm', 'integra']) fonte!: 'crm' | 'integra';
   @IsString() @IsNotEmpty() @MaxLength(30) id!: string;
+}
+
+/** D-165: salva nel CRM la P.IVA letta dal documento per il soggetto riconosciuto che non ne ha una. */
+class SalvaPiva {
+  @IsIn(['fornitore', 'cliente']) ruolo!: 'fornitore' | 'cliente';
 }
 
 /** Correzione dei dati letti: testata e righe arrivano come oggetti, validati qui campo per campo
@@ -486,6 +496,8 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
       where: { fornitore_id: letto.fornitore_id, valido_dal: { lte: new Date(letto.data ?? giornoRoma(new Date())) } }, select: { id: true },
     }))
     : false;
+  // D-165: P.IVA letta valida e soggetto riconosciuto senza P.IVA → suggerimento «Salva la P.IVA»
+  const piva_da_salvare = await suggerimentoPiva(db, letto, p.abbinamento?.cliente_id ?? null, p.cliente_riconosciuto?.cliente_id ?? null);
   return {
     id: String(d.id), file_nome: d.file_nome, file_tipo: fileTipo(d.file_percorso), stato: d.stato,
     tipo: d.tipo, livello: d.livello, ricevuto_il: d.ricevuto_il.toISOString(),
@@ -513,7 +525,7 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
     },
     // D-151 §19: le soglie in vigore viaggiano col documento (V12): il browser non ha soglie fisse
     soglie: await soglieLettura(db),
-    controlli, proposta, bollettino,
+    controlli, proposta, bollettino, piva_da_salvare,
   };
 }
 
@@ -542,6 +554,45 @@ async function collegaClienteDocumento(tx: Tx, did: bigint, ragione: string, piv
     tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
     dettaglio: { etichetta: fileNome, documento_id: String(did), pratica_id: null, prima: { cliente: null }, dopo: { cliente: ragione } },
   }, ctx);
+}
+
+/* ---------- Vocabolario imparato (D-164) e P.IVA dal documento (D-165) ---------- */
+
+/** P.IVA canonica come la salva il CRM: maiuscola, senza spazi e punti; il prefisso IT cade (D-124). */
+const pivaCanonica = (s: string | null): string => {
+  if (!s) return '';
+  const t = s.replace(/[\s.]/g, '').toUpperCase();
+  return /^IT\d{11}$/.test(t) ? t.slice(2) : t;
+};
+/** P.IVA letta valida (controllo formale, D-165): 11 cifre (IT) oppure prefisso estero + codice. */
+const pivaValidaDoc = (s: string | null): boolean => {
+  const p = pivaCanonica(s);
+  return /^\d{11}$/.test(p) || /^[A-Z]{2}[A-Z0-9]{2,}$/.test(p);
+};
+
+/** D-164: impara il nome letto → ruolo scelto, dopo una scelta a mano (Correggi, Apri la pratica, scegli).
+ *  Il nome è quello del campo letto (finale se corretto, altrimenti letto). */
+async function imparaAlias(tx: Tx, did: bigint, tipo: 'fornitore' | 'cliente', ruoloId: bigint | null, creato_da: bigint | null | undefined) {
+  if (ruoloId == null) return;
+  const c = await tx.documenti_campi.findFirst({ where: { documento_id: did, campo: tipo } });
+  const nome = c?.valore_finale ?? c?.valore_letto ?? null;
+  if (nome) await ricordaAlias(tx, tipo, nome, ruoloId, creato_da);
+}
+
+/** D-165: fornitore o cliente riconosciuti senza P.IVA nel CRM, e il documento ha una P.IVA valida
+ *  → suggerimento «Salva la P.IVA». Mai sovrascrivere una P.IVA già presente. */
+async function suggerimentoPiva(db: DbLetto, letto: Letto, abbinamentoCliente: bigint | null, riconosciutoCliente: bigint | null) {
+  const out: { ruolo: 'cliente' | 'fornitore'; soggetto_id: string; ragione_sociale: string; piva: string }[] = [];
+  if (letto.fornitore_id != null && pivaValidaDoc(letto.piva_fornitore ?? null)) {
+    const f = await db.fornitori.findUnique({ where: { id: letto.fornitore_id }, include: { corrente: true } });
+    if (f?.corrente && !f.corrente.piva) out.push({ ruolo: 'fornitore', soggetto_id: String(f.id), ragione_sociale: f.corrente.ragione_sociale, piva: pivaCanonica(letto.piva_fornitore ?? null) });
+  }
+  const clienteId = abbinamentoCliente ?? riconosciutoCliente;
+  if (clienteId != null && pivaValidaDoc(letto.piva_cliente)) {
+    const c = await db.clienti.findUnique({ where: { id: clienteId }, include: { corrente: true } });
+    if (c?.corrente && !c.corrente.piva) out.push({ ruolo: 'cliente', soggetto_id: String(c.id), ragione_sociale: c.corrente.ragione_sociale, piva: pivaCanonica(letto.piva_cliente) });
+  }
+  return out;
 }
 
 /* ---------- Valori della correzione (V12: il server valida e scrive) ---------- */
@@ -648,7 +699,12 @@ export class DocumentiController {
       LEFT JOIN campi c ON c.documento_id = d.id
       LEFT JOIN fornitori_versioni fv ON fv.fornitore_id = d.fornitore_id AND fv.id = d.fornitore_versione_id
       WHERE d.stato IN (${Prisma.join(stati.map((s) => Prisma.sql`${s}`))}) AND ${altro}
-      ORDER BY CASE WHEN d.stato IN ('in_coda', 'in_lettura') THEN 0 ELSE 1 END, d.ricevuto_il DESC, d.id DESC
+      -- D-164 §19: la coda (in_coda/in_lettura) va dal più vecchio al più recente (è l'ordine del lettore);
+      -- il resto dell'elenco resta dal più recente
+      ORDER BY CASE WHEN d.stato IN ('in_coda', 'in_lettura') THEN 0 ELSE 1 END,
+               CASE WHEN d.stato IN ('in_coda', 'in_lettura') THEN d.ricevuto_il END ASC,
+               CASE WHEN d.stato IN ('in_coda', 'in_lettura') THEN d.id END ASC,
+               d.ricevuto_il DESC, d.id DESC
       LIMIT ${perPagina} OFFSET ${(pagina - 1) * perPagina}`;
     const conti = await this.db.$queryRaw<{ stato: string; n: bigint }[]>`
       WITH ${campi}
@@ -824,6 +880,7 @@ export class DocumentiController {
         const f = await tx.fornitori.findUnique({ where: { id: BigInt(n) }, select: { versione_corrente_id: true, corrente: { select: { ragione_sociale: true } } } });
         if (!f?.versione_corrente_id) throw new BadRequestException('Fornitore non valido');
         await tx.documenti_in_arrivo.update({ where: { id: did }, data: { fornitore_id: BigInt(n), fornitore_versione_id: f.versione_corrente_id } });
+        await imparaAlias(tx, did, 'fornitore', BigInt(n), ctx.utente_id); // D-164
         await logEvent(tx, {
           tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
           dettaglio: { etichetta: d.file_nome, documento_id: String(did), pratica_id: null, prima: { fornitore_id: null }, dopo: { fornitore_id: String(n), fornitore: f.corrente?.ragione_sociale ?? null } },
@@ -831,7 +888,56 @@ export class DocumentiController {
       } else {
         const cli = await tx.clienti.findUnique({ where: { id: BigInt(n) }, include: { corrente: true } });
         if (!cli?.corrente) throw new BadRequestException('Cliente non valido');
+        await imparaAlias(tx, did, 'cliente', BigInt(n), ctx.utente_id); // D-164: prima che il campo venga riscritto
         await collegaClienteDocumento(tx, did, cli.corrente.ragione_sociale, cli.corrente.piva, ctx, d.file_nome);
+      }
+      return dettaglioDocumento(tx, did);
+    });
+  }
+
+  /** D-165: salva nel CRM la P.IVA letta dal documento (solo se il soggetto riconosciuto non ne ha
+   *  una). Nuova versione del cliente/fornitore come le altre modifiche (D-46), una transazione (V13),
+   *  registro. Se un altro soggetto ha già quella P.IVA → rifiuto con il nome. Integra non si tocca
+   *  (D-100): la nota del frontend ricorda di aggiornarla anche lì. */
+  @Post(':id/piva')
+  @HttpCode(200)
+  @Richiede('dati.modifica')
+  async salvaPiva(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: SalvaPiva) {
+    const ctx = contesto(req);
+    const did = BigInt(id);
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
+      const d = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
+      if (!d) throw new NotFoundException('Documento non trovato');
+      // V12: si ricalcola tutto dal database, mai fidarsi di ciò che propone il frontend
+      const letto = await lettoDaCampi(tx, did);
+      const p = await propostaDocumento(tx, letto);
+      const suggerimenti = await suggerimentoPiva(tx, letto, p.abbinamento?.cliente_id ?? null, p.cliente_riconosciuto?.cliente_id ?? null);
+      const s = suggerimenti.find((x) => x.ruolo === b.ruolo);
+      if (!s) throw new ConflictException('P.IVA già presente, soggetto non riconosciuto o documento senza P.IVA valida: niente da salvare');
+      const ora = new Date();
+      if (b.ruolo === 'cliente') {
+        const c = await tx.clienti.findUnique({ where: { id: BigInt(s.soggetto_id) }, include: { corrente: true } });
+        if (!c?.corrente) throw new NotFoundException('Cliente non trovato');
+        if (c.corrente.piva) throw new ConflictException('Il cliente ha già una P.IVA');
+        const altri = await tx.clienti.findMany({ where: { versione_corrente_id: { not: null }, id: { not: c.id } }, include: { corrente: true } });
+        const doppio = altri.find((x) => x.corrente && pivaCanonica(x.corrente.piva) === s.piva);
+        if (doppio) throw new ConflictException(`La P.IVA ${s.piva} è già di ${doppio.corrente!.ragione_sociale}`);
+        const v = c.corrente;
+        const nuova = await tx.clienti_versioni.create({ data: { cliente_id: c.id, fonte: v.fonte, valido_dal: ora, creato_da: ctx.utente_id ?? null, piva: s.piva, ragione_sociale: v.ragione_sociale, indirizzo: v.indirizzo, cap: v.cap, citta: v.citta, provincia: v.provincia, email: v.email } });
+        await tx.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: nuova.id } });
+        await logEvent(tx, { tipo: 'crud', azione: 'update', entita: 'cliente', entita_id: c.id, esito: 'successo', dettaglio: { etichetta: v.ragione_sociale, prima: { piva: null }, dopo: { piva: s.piva }, documento_id: String(did) } }, ctx);
+      } else {
+        const f = await tx.fornitori.findUnique({ where: { id: BigInt(s.soggetto_id) }, include: { corrente: true } });
+        if (!f?.corrente) throw new NotFoundException('Fornitore non trovato');
+        if (f.corrente.piva) throw new ConflictException('Il fornitore ha già una P.IVA');
+        const altri = await tx.fornitori.findMany({ where: { versione_corrente_id: { not: null }, id: { not: f.id } }, include: { corrente: true } });
+        const doppio = altri.find((x) => x.corrente && pivaCanonica(x.corrente.piva) === s.piva);
+        if (doppio) throw new ConflictException(`La P.IVA ${s.piva} è già di ${doppio.corrente!.ragione_sociale}`);
+        const v = f.corrente;
+        const nuova = await tx.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: v.fonte, valido_dal: ora, creato_da: ctx.utente_id ?? null, piva: s.piva, ragione_sociale: v.ragione_sociale, paese: v.paese } });
+        await tx.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: nuova.id } });
+        await logEvent(tx, { tipo: 'crud', azione: 'update', entita: 'fornitore', entita_id: f.id, esito: 'successo', dettaglio: { etichetta: v.ragione_sociale, prima: { piva: null }, dopo: { piva: s.piva }, documento_id: String(did) } }, ctx);
       }
       return dettaglioDocumento(tx, did);
     });
@@ -992,6 +1098,10 @@ export class DocumentiController {
         data: { livello: val.livello, controlli: { falliti: val.controlli } as unknown as Prisma.InputJsonValue },
       });
       if (daErrore) await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(did));
+      // D-164: il fornitore o il cliente scelti a mano qui si imparano per i documenti successivi
+      await imparaAlias(tx, did, 'fornitore', fornitore_id, ctx.utente_id);
+      const cid = 'cliente_id' in testata ? Number(testoO(testata.cliente_id) ?? '') : NaN;
+      if (Number.isInteger(cid) && cid > 0) await imparaAlias(tx, did, 'cliente', BigInt(cid), ctx.utente_id);
       await logEvent(tx, {
         tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
         dettaglio: {
@@ -1619,6 +1729,9 @@ export class DocumentiAbbinaController {
         ({ fid, pid } = await nuovaPratica(tx, b, ctx));
       } else throw new BadRequestException('Scegli la pratica: solo un ordine apre una pratica nuova');
       const d = await registra(tx, fid, pid, { ...b, arrivo_id: id }, ctx);
+      // D-164: fornitore e cliente scelti a mano si imparano per i documenti successivi
+      await imparaAlias(tx, BigInt(id), 'fornitore', fid, ctx.utente_id);
+      if (b.cliente_id) await imparaAlias(tx, BigInt(id), 'cliente', BigInt(b.cliente_id), ctx.utente_id);
       await logEvent(tx, {
         tipo: 'documento', azione: 'match', entita: 'documento', entita_id: d.id, esito: 'successo',
         dettaglio: { etichetta: `${nomeDi(d.tipo)} ${d.numero}`.trim(), documento_id: String(d.id), arrivo_id: String(id), pratica_id: String(pid), tipo: d.tipo, pratica_nuova: !b.pratica_id },

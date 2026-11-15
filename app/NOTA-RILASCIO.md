@@ -11,6 +11,16 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.6 — 15/11/2026 — riconoscimento più furbo e coda che si aggiorna
+
+- **Coda**: in coda e in lettura dal più vecchio al più recente (ordine di lettura); l’elenco si aggiorna da solo
+  (evento `documento.stato`), il documento aperto a destra non si ricarica.
+- **Riconoscimento** (D-164): vocabolario dei nomi letti (tabella `alias_letti`, migrazione
+  `20261115090000_alias_letti`) imparato dalle scelte a mano; somiglianza dei nomi (pg_trgm, soglia 0,6, mai a
+  caso); poi il codice cliente del fornitore, anche con agenzia da confermare.
+- **P.IVA dal documento** (D-165): se manca nel CRM si propone «Salva la P.IVA» (solo CRM, da aggiornare in Integra).
+- Prove: `giro.sh` avvia il backend di prova con `TENTATIVI=1000`.
+
 ### 0.2.5 — 14/11/2026 — percentuali dentro Apri la pratica
 
 - **Percentuali mancanti** (D-162): *Apri la pratica* spiega che il fornitore non ha percentuali valide alla

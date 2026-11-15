@@ -86,6 +86,7 @@ interface Candidato {
 interface CandidatoSoggetto {
   fonte: 'crm' | 'integra'; id: string; ragione_sociale: string | null;
   piva: string | null; citta: string | null; motivo: string;
+  punteggio?: number | null;
 }
 interface Proposta {
   esito: string; candidati: Candidato[]; importo: number;
@@ -109,6 +110,8 @@ interface Dettaglio {
   // D-126 §19: totali del piede della tabella delle righe dal server, non sommati nel browser (V12)
   totali: { importo: number; provvigione: number };
   soglie: Soglie;
+  // D-165: soggetto riconosciuto senza P.IVA e documento con P.IVA valida → suggerimento «Salva la P.IVA»
+  piva_da_salvare: { ruolo: 'cliente' | 'fornitore'; soggetto_id: string; ragione_sociale: string; piva: string }[];
 }
 
 /** Punti da controllare (come M.statoLettura): controlli falliti + campi incerti con un valore. */
@@ -271,7 +274,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
 
   function apriNuova() {
     setFinestra(
-      <ApriPratica id={id} t={t} clienteIniziale={t.cliente_id ?? ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? ''} onChiudi={chiudi} onFatto={onFatto} />,
+      <ApriPratica id={id} t={t} clienteIniziale={t.cliente_id ?? ab?.cliente_id ?? doc.proposta.cliente_riconosciuto?.cliente_id ?? ''} pivaDaSalvare={doc.piva_da_salvare} onChiudi={chiudi} onFatto={onFatto} />,
     );
   }
 
@@ -459,7 +462,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         <Nota>{ruolo === 'fornitore' ? 'Il fornitore letto non è univoco' : 'Il cliente letto non è univoco'}: scegli fra i candidati.</Nota>
         {doc.proposta.integra_non_raggiungibile && <Nota>Integra non raggiungibile: i candidati sono solo del CRM.</Nota>}
         <Elenco voci={candidati.map((c) => ({
-          testo: <><b>{c.ragione_sociale ?? '—'}</b><span className="sec-riga">{[c.piva, c.citta, c.motivo].filter(Boolean).join(' · ')}</span></>,
+          testo: <><b>{c.ragione_sociale ?? '—'}</b><span className="sec-riga">{[c.piva, c.citta, c.motivo, c.punteggio != null ? 'somiglianza ' + Math.round(c.punteggio * 100) + '%' : null].filter(Boolean).join(' · ')}</span></>,
           destra: <>
             <Stato v={c.fonte === 'crm' ? 'info' : 'neutro'}>{c.fonte === 'crm' ? 'CRM' : 'Integra'}</Stato>
             <button type="button" className="btn sec piccolo" disabled={importando || (c.fonte === 'integra' && !puoImporta)}
@@ -674,6 +677,37 @@ function FileDocumento({ d, pagina, posizione }: { d: Dettaglio; pagina?: number
   return <PdfEvidenziato src={src} pagina={pagina ?? 1} posizione={p} />;
 }
 
+/** D-165: soggetto riconosciuto senza P.IVA nel CRM e documento con P.IVA valida → «Salva la P.IVA».
+ *  Il server salva una versione nuova del soggetto; la nota ricorda di aggiornare anche Integra (mai
+ *  toccato dal CRM, D-100). Il suggerimento sparisce dopo il salvataggio. */
+function PivaSuggerita({ id, suggerimenti }: { id: string; suggerimenti: Dettaglio['piva_da_salvare'] }) {
+  const [attesa, setAttesa] = useState<string | null>(null);
+  const [salvate, setSalvate] = useState<Set<string>>(new Set());
+  const visibili = (suggerimenti ?? []).filter((s) => !salvate.has(s.ruolo));
+  if (!visibili.length) return null;
+  return (
+    <div className="pila">
+      {visibili.map((s) => (
+        <div key={s.ruolo} className="avviso-variazioni" role="status">
+          <Icona nome="avviso" />
+          <span>Il {s.ruolo === 'cliente' ? 'cliente' : 'fornitore'} <b>{s.ragione_sociale}</b> non ha la P.IVA nel CRM: il documento riporta <b>{s.piva}</b>.</span>
+          <button type="button" className="btn sec piccolo" disabled={attesa === s.ruolo}
+            onClick={() => void (async () => {
+              setAttesa(s.ruolo);
+              const r = await api('documenti/' + id + '/piva', { ruolo: s.ruolo });
+              setAttesa(null);
+              if (!r.ok) { avviso(r.messaggio, true); return; }
+              setSalvate((x) => new Set(x).add(s.ruolo));
+              avviso('P.IVA salvata nel CRM: aggiornala anche in Integra');
+            })()}>
+            {attesa === s.ruolo ? 'Salvo…' : 'Salva la P.IVA'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ---------- Correggi i dati letti (F6-A4b, §6.5 punto 7) ---------- */
 
 /** D-157 §19: la ricerca del cliente nella modale «Apri la pratica» riceve il fornitore scelto lì
@@ -689,7 +723,7 @@ interface ScaglioneMancante {
   ha_percentuali: boolean;
 }
 
-function ApriPratica({ id, t, clienteIniziale, onChiudi, onFatto }: { id: string; t: Testata; clienteIniziale: string; onChiudi: () => void; onFatto?: () => void }) {
+function ApriPratica({ id, t, clienteIniziale, pivaDaSalvare, onChiudi, onFatto }: { id: string; t: Testata; clienteIniziale: string; pivaDaSalvare: Dettaglio['piva_da_salvare']; onChiudi: () => void; onFatto?: () => void }) {
   const router = useRouter();
   const puoAgenzia = usePuo()('dati.modifica'); // D-106: l'agenzia si salva con dati.modifica
   const puoPercentuali = usePuo()('dati.condizioni'); // D-162: le percentuali sono del responsabile in Dati
@@ -806,7 +840,10 @@ function ApriPratica({ id, t, clienteIniziale, onChiudi, onFatto }: { id: string
 
   return (
     <FormModal titolo="Apri la pratica" conferma="Apri la pratica" colonne={2}
-      testo="La pratica nasce dall’ordine. Cliente e fornitore servono per l’agenzia e la provvigione."
+      testo={<>
+        La pratica nasce dall’ordine. Cliente e fornitore servono per l’agenzia e la provvigione.
+        <PivaSuggerita id={id} suggerimenti={pivaDaSalvare} />
+      </>}
       campi={[
         { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: entitaFornitore, largo: true, valore: fornitoreId,
           testoIniziale: t.fornitore ? { q: t.fornitore, mostra: t.fornitore } : undefined,
@@ -1054,6 +1091,7 @@ function FinestraCorreggi({ d, onChiudi, onSalvato }: { d: Dettaglio; onChiudi: 
                 </ul>
               )}
             </div>
+            <PivaSuggerita id={d.id} suggerimenti={d.piva_da_salvare} />
             <h3>Testata</h3>
             {boll ? (
               <div className="griglia-letti">
