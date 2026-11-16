@@ -44,8 +44,16 @@ with sync_playwright() as p:
     sovr = lambda pg: pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth')
     cerca = lambda pg, t: (pg.fill('.filtri input[type=search]', t), pg.wait_for_timeout(1400))
     def vai(pg, voce):  # voce del menu: navigazione dentro l'app, senza ricaricare
-        pg.click('.barra a.voce:has-text("%s")' % voce)
-        pg.wait_for_function("location.pathname.startsWith('/%s')" % voce.lower()); pg.wait_for_load_state('networkidle')
+        # 16/11/2026: in `next dev` un clic può perdersi durante la compilazione della rotta: si riprova
+        for _ in range(3):
+            pg.click('.barra a.voce:has-text("%s")' % voce)
+            try:
+                pg.wait_for_function("location.pathname.startsWith('/%s')" % voce.lower(), timeout=15000)
+                pg.wait_for_load_state('networkidle')
+                return
+            except Exception:
+                pg.wait_for_timeout(500)
+        raise AssertionError('Il menu non apre ' + voce)
     def invia(pg): pg.click('.modale-piede button[type=submit]')
     def errore(pg):
         pg.wait_for_selector('.modulo-errore:not([hidden])', timeout=8000)

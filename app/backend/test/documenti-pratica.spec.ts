@@ -231,6 +231,24 @@ describe('abbinamento a mano (POST /api/documenti/:id/abbina)', () => {
     expect(f.body).toEqual(png('bonifico 1'));
   });
 
+  it('un pagamento con riferimento lungo o assente si abbina: il riferimento lungo si tronca a 50', async () => {
+    const a = (await op.carica(png('riferimento lungo'), 'pagamento-riferimento.png').expect(201)).body;
+    await op.post(`/documenti/${a.id}/abbina`, { tipo: 'pagamento', numero: 'R'.repeat(80), data: '2026-09-04', pratica_id: Number(pid) }).expect(201);
+    const doc = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { arrivo_id: BigInt(a.id) } });
+    expect(doc.numero).toBe('R'.repeat(50));
+
+    const b = (await op.carica(png('senza riferimento'), 'pagamento-senza-riferimento.png').expect(201)).body;
+    await op.post(`/documenti/${b.id}/abbina`, { tipo: 'pagamento', numero: null, data: '2026-09-04', pratica_id: Number(pid) }).expect(201);
+    const doc2 = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { arrivo_id: BigInt(b.id) } });
+    expect(doc2.numero).toBe('');
+  });
+
+  it('un campo troppo lungo risponde con un messaggio in italiano', async () => {
+    const a = (await op.carica(png('note lunghe'), 'pagamento-note.png').expect(201)).body;
+    const r = await op.post(`/documenti/${a.id}/abbina`, { tipo: 'pagamento', data: '2026-09-04', pratica_id: Number(pid), note: 'N'.repeat(2001) }).expect(400);
+    expect(r.body.message[0]).toBe('Il campo Note è troppo lungo (al massimo 2000 caratteri)');
+  });
+
   it('spostamento del file fallito (file assente): abbinamento salvato, percorso invariato', async () => {
     const a = await db.documenti_in_arrivo.findFirstOrThrow({ where: { stato: 'da_controllare' } }); // seed: il file non c'è
     await op.post(`/documenti/${a.id}/abbina`, { tipo: 'altro', pratica_id: Number(pid) }).expect(201);

@@ -26,6 +26,19 @@ def apri(pg):
         pg.keyboard.press('Enter'); pg.wait_for_timeout(250)
     pg.wait_for_selector('.accesso-scena.aperta')
 
+# Indietro fino alla pagina lasciata (16/11/2026): alla prima visita di una rotta `next dev` la compila
+# e la navigazione può restare appesa; si riprova invece di fermarsi al primo timeout.
+def torna_indietro(pg, atteso, tentativi=3):
+    for _ in range(tentativi):
+        pg.go_back()
+        try:
+            pg.wait_for_function("location.pathname === '" + atteso + "'", timeout=15000)
+            pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.binario')
+            return
+        except Exception:
+            pg.wait_for_timeout(500)
+    raise AssertionError('Indietro non torna a ' + atteso)
+
 # un PDF diverso a ogni giro e per ogni caricamento: il server rifiuta un file già arrivato (impronta)
 marca = str(int(time.time() * 1000))
 PDF = USCITA / ('prova-' + marca + '.pdf')
@@ -72,16 +85,21 @@ with sync_playwright() as p:
         # la lista arriva dal server: si aspetta la prima riga con lo stato che il filtro promette
         pg.wait_for_function("(t) => { const r = document.querySelector('.dt tbody tr.cliccabile'); return !!r && r.innerText.includes(t) }", arg=attesa)
     def mano(pg):
-        # D-186: la finestra Registra apre sulla coda se c'è un documento compatibile; si passa a mano
+        # D-186: la finestra Registra apre sulla coda se c'è un documento compatibile; si passa a mano.
+        # 16/11/2026: la coda arriva dal server, quindi il segmento compare dopo: si aspetta prima di
+        # decidere, e si aspetta che il modulo a mano sia davvero lì.
         b = pg.locator('.modale button:has-text("Inserisci a mano")')
-        if not b.count():
-            return
         try:
-            pg.wait_for_function("() => !document.querySelector('.modale')?.innerText.includes('Caricamento dei documenti in coda')", timeout=8000)
+            b.wait_for(timeout=15000)
+            b.click()
         except Exception:
             pass
-        b.click()
-        pg.wait_for_timeout(100)
+        try:
+            pg.wait_for_selector('.modale #c-numero', timeout=10000)
+        except Exception:
+            pg.screenshot(path=str(USCITA / ('mano-fallito-' + marca + '.png')), full_page=True)
+            print('DIAG finestra:', pg.locator('.velo .modale').inner_text()[:400].replace('\n', ' | '))
+            raise
 
     # --- amministratore: dettaglio di una pratica con variazioni ---
     pg = entra(S + '-ammi', 1440)
@@ -421,14 +439,14 @@ with sync_playwright() as p:
     pg.wait_for_selector('.pannello-testa h2'); pg.wait_for_timeout(400)
     ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Percentuali")').count() == 1,
        'catena: dal fornitore della pratica si apre la scheda Percentuali')
-    pg.go_back(); pg.wait_for_function("location.pathname === '" + url_pratica + "'"); pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.binario')
+    torna_indietro(pg, url_pratica)
     ok('OF/2026/038' in testo(pg, '.testa h1'), 'catena: Indietro torna alla pratica')
     cliente_link = pg.locator('.testa .sotto a[href^="/clienti/"]').first
     cliente_link.click(); pg.wait_for_function("location.pathname.startsWith('/clienti/')"); pg.wait_for_load_state('networkidle')
     pg.wait_for_selector('.pannello-testa h2'); pg.wait_for_timeout(400)
     ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Agenzie")').count() == 1,
        'catena: dal cliente della pratica si apre la scheda Agenzie')
-    pg.go_back(); pg.wait_for_function("location.pathname === '" + url_pratica + "'"); pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.binario')
+    torna_indietro(pg, url_pratica)
     ok('OF/2026/038' in testo(pg, '.testa h1'), 'catena: Indietro torna ancora alla pratica')
     pg.close()
 

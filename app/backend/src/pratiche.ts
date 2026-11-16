@@ -5,7 +5,7 @@ import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 
 import { Richiede } from './accesso';
 import { righePagina } from './impostazioni';
 import { CON_PRATICA, type Dati, caricaDatiPratica, giornoRoma, iso, praticaDaDb } from './motore/dati';
-import { abbinamento, anomaliaScontoMedio, basePratica, calcoloDocumento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, statoIncasso, statoPratica } from './motore/motore';
+import { abbinamento, anomaliaScontoMedio, basePratica, calcoloDocumento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, scontoMedioFase, statoIncasso, statoPratica } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -243,16 +243,19 @@ export class PraticheController {
     // D-177 §19: il filtro per stato lo applica il server; il browser invia solo la scelta (V12)
     const stato = q.stato ? Prisma.sql`AND t.stato = ${STATO_DB[q.stato]}` : Prisma.empty;
     const cliente = q.cliente_id != null ? Prisma.sql`AND t.cliente_id = ${BigInt(q.cliente_id)}` : Prisma.empty;
-    const righe = await this.db.$queryRaw<{ id: bigint; numero: string; cliente: string; data: string; stato: string }[]>`
+    // §16.4: colonna Importo della ricerca = importoPratica (l'ultima fase: fatture − note, conferme, ordini),
+    // salvato da aggiornaPratica sulla testata (D-52); il server non ricalcola qui (V12).
+    const righe = await this.db.$queryRaw<{ id: bigint; numero: string; cliente: string; data: string; stato: string; importo: Prisma.Decimal }[]>`
       SELECT t.id, t.numero_ordine AS numero, coalesce(cv.ragione_sociale, '') AS cliente,
              to_char(t.data_ordine, 'YYYY-MM-DD') AS data,
-             CASE t.stato WHEN 'fatturato' THEN 'fatturata' WHEN 'confermato' THEN 'confermata' ELSE 'attesa' END AS stato
+             CASE t.stato WHEN 'fatturato' THEN 'fatturata' WHEN 'confermato' THEN 'confermata' ELSE 'attesa' END AS stato,
+             t.importo AS importo
       FROM ordini_fornitore_testata t
       JOIN clienti c ON c.id = t.cliente_id
       LEFT JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
       WHERE t.fornitore_id = ${BigInt(q.fornitore_id)} ${cliente} ${stato}
       ORDER BY t.data_ordine DESC, t.id DESC`;
-    return righe.map((r) => ({ id: String(r.id), numero: r.numero, cliente: r.cliente, data: r.data, stato: r.stato }));
+    return righe.map((r) => ({ id: String(r.id), numero: r.numero, cliente: r.cliente, data: r.data, stato: r.stato, importo: Number(r.importo) }));
   }
 
   /** Dettaglio della pratica (§7.3, §8.1): testata, stato, binario delle fasi, righe a confronto,
@@ -342,6 +345,15 @@ export function dettaglioPratica(S: Dati, id: string) {
     : bicchiere?.sconto_medio != null
       ? { valore: Number(bicchiere.sconto_medio), scaglione: Number(bicchiere.scaglione.sconto), documento: null, oltre: false, ultimo_scaglione: null }
       : null;
+  // D-197 §19: lo sconto medio della differenza (fattura − nota) quando cambia rispetto a quello della
+  // fattura: sulla riga della nota si mostra «sconto medio dopo la nota X% → scaglione Y».
+  const sconto_dopo_nota = note.length && bicchiere?.sconto_medio != null && !anomalia
+    ? (() => {
+        const prima = scontoMedioFase(p);
+        if (prima == null || prima.equals(bicchiere.sconto_medio)) return null;
+        return { valore: Number(bicchiere.sconto_medio), scaglione: Number(bicchiere.scaglione.sconto), fattura: Number(prima) };
+      })()
+    : null;
   const provvigione = bicchiere ? (() => {
     // D-166 §19: dal fornitore = base × pct_agente; al subagente = quota dei documenti; margine = differenza
     const aDecobrands = r2(base.times(bicchiere.dal_fornitore).div(100));
@@ -395,6 +407,6 @@ export function dettaglioPratica(S: Dati, id: string) {
       })),
       variazioni: { numero: variate.length, totale: deltaVariazioni },
     },
-    provvigione, sconto_medio, azione,
+    provvigione, sconto_medio, sconto_dopo_nota, azione,
   };
 }

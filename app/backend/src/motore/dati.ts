@@ -46,9 +46,11 @@ export type CalcoloDocumento = {
   scaglione: string | null; // soglia dello scaglione; null se oltre l'ultimo (anomalia)
   pct_agente: string | null; // % che il fornitore riconosce a Decobrands
   pct_subagente: string | null; // % al subagente (la regola applicata)
-  provvigione_agente: string | null; // base × pct_agente
-  provvigione_subagente: string | null; // quota del subagente sulla base
+  provvigione_agente: string | null; // base × pct_agente; per la nota su fattura congelata è la differenza (D-197)
+  provvigione_subagente: string | null; // quota del subagente sulla base; per la nota su fattura congelata la differenza (D-197)
   regola: string;
+  // D-197 §19: come è calcolata la provvigione di una nota su fattura congelata (differenza della coppia)
+  differenza_nota?: { base_coppia: string; agente_coppia: string; subagente_coppia: string; agente_fissata: string; subagente_fissata: string } | null;
 };
 
 /** Una pratica nella forma del motore (M.S.pratiche). */

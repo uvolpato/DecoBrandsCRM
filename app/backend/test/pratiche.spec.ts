@@ -6,7 +6,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { caricaDati, caricaDatiPratica, giornoRoma } from '../src/motore/dati';
-import { dettaglioPratica } from '../src/pratiche';
+import { aggiornaPratica, dettaglioPratica } from '../src/pratiche';
 import { confronto, haVariazioni, importoPratica, statoPratica } from '../src/motore/motore';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
@@ -256,6 +256,36 @@ describe('GET /api/pratiche/cerca (D-60: il campo di ricerca dello Sposta)', () 
     const attese = M.S.pratiche.filter((p: any) => String(p.fornitore_id) === String(f));
     expect(b.map((x) => x.numero).sort()).toEqual(attese.map((p: any) => p.numero).sort());
     expect(b.every((x) => x.cliente !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(x.data) && ['attesa', 'confermata', 'fatturata'].includes(x.stato))).toBe(true);
+  });
+
+  // §16.4 §19: colonna Importo = importoPratica (l'ultima fase: fatture − note, conferme, ordini)
+  it('importo = importoPratica: fatture − note di credito, conferme o ordini', async () => {
+    const f = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
+    const b = (await resp.get(`/pratiche/cerca?fornitore_id=${f}`).expect(200)).body as { numero: string; importo: number }[];
+    const attese = new Map<string, number>(M.S.pratiche.filter((p: any) => String(p.fornitore_id) === String(f)).map((p: any) => [p.numero, Number(M.importoPratica(p))] as [string, number]));
+    expect(b.every((x) => attese.has(x.numero))).toBe(true);
+    for (const x of b) expect(x.importo).toBeCloseTo(attese.get(x.numero)!, 2);
+    // la pratica con nota di credito: fatture − note, non la sola fattura
+    const nota = M.S.pratiche.find((p: any) => String(p.fornitore_id) === String(f) && p.documenti.some((d: any) => d.tipo === 'nota_credito'));
+    expect(nota).toBeTruthy();
+    expect(b.find((x) => x.numero === nota.numero)!.importo).toBeCloseTo(Number(M.importoPratica(nota)), 2);
+  });
+
+  it('due ordini senza conferma: importo = somma degli ordini', async () => {
+    const base = await db.ordini_fornitore_testata.findFirstOrThrow();
+    const t = await db.ordini_fornitore_testata.create({ data: {
+      fornitore_id: base.fornitore_id, fornitore_versione_id: base.fornitore_versione_id,
+      cliente_id: base.cliente_id, cliente_versione_id: base.cliente_versione_id,
+      numero_ordine: 'OF/2026/998', data_ordine: new Date('2026-09-01'),
+    } });
+    await db.ordini_fornitore_documenti.createMany({ data: [
+      { testata_id: t.id, tipo: 'ordine', numero: 'AB 998a', data: new Date('2026-09-01'), importo: 100 },
+      { testata_id: t.id, tipo: 'ordine', numero: 'AB 998b', data: new Date('2026-09-02'), importo: 50 },
+    ] });
+    await db.$transaction(async (tx) => { await aggiornaPratica(tx, t.id); });
+    const b = (await resp.get(`/pratiche/cerca?fornitore_id=${base.fornitore_id}`).expect(200)).body as { id: string; importo: number }[];
+    expect(b.find((x) => x.id === String(t.id))!.importo).toBeCloseTo(150, 2);
+    await db.ordini_fornitore_testata.delete({ where: { id: t.id } }); // pulizia: non deve pesare sulle prove dopo
   });
 
   it('senza fornitore_id: elenco vuoto, non un errore; senza l\'area Provvigioni: 403', async () => {

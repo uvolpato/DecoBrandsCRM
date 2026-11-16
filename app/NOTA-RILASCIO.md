@@ -11,6 +11,19 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.8 — 16/11/2026 — note di credito più precise e pratica in una scheda a parte
+
+- **La nota di credito porta le sue righe**: quelle lette dal documento si salvano come quelle della
+  fattura. Così lo sconto medio si calcola sulla **differenza** fra fattura e nota: se la nota toglie
+  le righe meno scontate, lo sconto medio sale e può cambiare lo scaglione (e quindi la provvigione).
+- **Fattura già chiusa**: i suoi numeri non si toccano più; la nota di credito porta la **differenza**
+  fra la provvigione ricalcolata sulla coppia fattura − nota e quella già fissata, per Decobrands e
+  per il subagente. Una nota senza righe resta in attesa; lo storno totale azzera la provvigione.
+- **Cerca pratica più utile**: nella ricerca della pratica, dal documento, c'è la colonna **Importo**
+  (il valore dell'ultima fase della pratica) e un pulsante su ogni riga che apre la pratica in una
+  **nuova scheda**, senza barra né menu, con «Chiudi la scheda». Così si controlla la pratica giusta
+  senza perdere il documento che si sta lavorando.
+
 ### 0.2.7 — 16/11/2026 — sconto medio, spese e numeri che si fissano
 
 - **La percentuale si sceglie dallo sconto medio dei documenti** (lo sconto reale che il fornitore

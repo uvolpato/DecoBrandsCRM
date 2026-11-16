@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useId, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Campo } from '@/componenti/Campo';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar } from '@/componenti/FilterBar';
@@ -64,6 +64,7 @@ interface Dettaglio {
   confronto: { fasi: FaseRiga[]; righe: Riga[]; variazioni: { numero: number; totale: number } };
   provvigione: Provvigione | null;
   sconto_medio: { valore: number; scaglione: number | null; documento: string | null; oltre: boolean; ultimo_scaglione: number | null } | null;
+  sconto_dopo_nota: { valore: number; scaglione: number; fattura: number } | null;
   azione: { tipo: string; testo: string };
   incassi: Incasso[];
 }
@@ -101,6 +102,7 @@ const PRATICA: Entita = {
     { key: 'cliente', header: 'Cliente', grow: true },
     { key: 'data', header: 'Data', tipo: 'data' },
     { key: 'stato', header: 'Stato' },
+    { key: 'importo', header: 'Importo', tipo: 'euro' },
   ],
 };
 
@@ -145,6 +147,7 @@ interface DocumentoInCoda {
 export function VistaPratica({ id }: { id: string }) {
   const puo = usePuo();
   const cerca = useSearchParams();
+  const vistaSola = cerca.get('vista') === 'sola'; // §16.4 §19: pagina aperta in una scheda a parte, senza cornice
   const puoModifica = puo('provvigioni.modifica');
   const [d, setD] = useState<Dettaglio | null>(null);
   const [fiscali, setFiscali] = useState<Fiscali | null>(null);
@@ -328,6 +331,11 @@ export function VistaPratica({ id }: { id: string }) {
         <span className="sec-riga">
           {TIPO[x.tipo]} del {dataIt(x.data)}{x.residuo != null ? ' · residuo ' + euro(x.residuo) : ''}{x.note ? ' · ' + x.note : ''}
         </span>
+        {x.tipo === 'nota_credito' && d.sconto_dopo_nota && (
+          <span className="testo-tenue">
+            sconto medio dopo la nota {pct(d.sconto_dopo_nota.valore)} → scaglione {pct(d.sconto_dopo_nota.scaglione)}
+          </span>
+        )}
       </>,
       destra: <span className="azioni-cella">
         {euro(x.importo)}
@@ -511,6 +519,7 @@ export function VistaPratica({ id }: { id: string }) {
   // Testata (§7.3): il sollecito di conferma solo finché la conferma è attesa o in ritardo; la copia
   // non scrive nel database, quindi resta disponibile anche in sola lettura.
   const azioni: Azione[] = [
+    ...(vistaSola ? [{ etichetta: 'Chiudi la scheda', icona: 'chiudi', variante: 'sec' as const, consentito: true, onClick: () => window.close() }] : []),
     ...(d.stato === 'attesa' || d.stato === 'scaduta' ? [{
       etichetta: 'Prepara il sollecito', icona: 'posta', variante: 'sec' as const, consentito: true,
       onClick: () => setFinestra(<SollecitiConferme onChiudi={chiudi} />),
@@ -565,6 +574,9 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, coda, on
   const modifica = !!documento;
   // «Prendi dalla coda»: i documenti compatibili e la scelta fra coda e mano (predefinita sulla coda se ce n'è uno)
   const [modo, setModo] = useState<'coda' | 'mano'>('coda');
+  // La scelta «coda / a mano» della persona non si sovrascrive quando la coda arriva (o si rilegge):
+  // capitava che il modulo tornasse sulla coda mentre si stava compilando a mano (16/11/2026).
+  const sceltaFatta = useRef(false);
   const [codaDocs, setCodaDocs] = useState<DocumentoInCoda[] | null>(null);
   const [scelto, setScelto] = useState<string | null>(null);
   const [fatturaSel, setFatturaSel] = useState<string>('');
@@ -577,7 +589,7 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, coda, on
       const tutto = r.dati.documenti.filter((x) => x.stato !== 'in_lettura' && (!x.cliente_id || x.cliente_id === coda.cliente));
       setCodaDocs(tutto);
       // predefinito sulla coda solo se c'è un documento del tipo giusto (il tipo incerto non si può ancora abbinare)
-      setModo(tutto.some((x) => !coda.tipo || x.tipo === coda.tipo) ? 'coda' : 'mano');
+      setModo((m) => sceltaFatta.current ? m : tutto.some((x) => !coda.tipo || x.tipo === coda.tipo) ? 'coda' : 'mano');
     });
   }, [coda]);
 
@@ -688,8 +700,8 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, coda, on
       </>}>
         {coda && (
           <div className="segmenti" role="radiogroup" aria-label="Origine del documento">
-            <button type="button" role="radio" aria-checked={modo === 'coda'} aria-selected={modo === 'coda'} onClick={() => setModo('coda')}>Prendi dalla coda</button>
-            <button type="button" role="radio" aria-checked={modo === 'mano'} aria-selected={modo === 'mano'} onClick={() => setModo('mano')}>Inserisci a mano</button>
+            <button type="button" role="radio" aria-checked={modo === 'coda'} aria-selected={modo === 'coda'} onClick={() => { sceltaFatta.current = true; setModo('coda'); }}>Prendi dalla coda</button>
+            <button type="button" role="radio" aria-checked={modo === 'mano'} aria-selected={modo === 'mano'} onClick={() => { sceltaFatta.current = true; setModo('mano'); }}>Inserisci a mano</button>
           </div>
         )}
         {inCoda ? (

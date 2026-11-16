@@ -335,7 +335,7 @@ model ordini_fornitore_righe {
   id              BigInt   @id @default(autoincrement())
   testata_id      BigInt
   documento_id    BigInt? // null solo per le righe di fattura di prima di D-60 con più fatture nella pratica
-  fase            String   @default("ordine") @db.VarChar(20) // ordine | conferma | fattura
+  fase            String   @default("ordine") @db.VarChar(20) // ordine | conferma | fattura | nota_credito
   numero_riga     Int
   codice          String?  @db.VarChar(100)
   descrizione     String?  @db.VarChar(255)

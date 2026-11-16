@@ -1,5 +1,5 @@
 'use client';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Barra, primaPagina, voceDi } from '@/componenti/Barra';
 import { ClasseBody } from '@/componenti/ClasseBody';
@@ -31,6 +31,10 @@ export default function Guscio({ children }: { children: ReactNode }) {
   const [tentativo, setTentativo] = useState(0); // A5-14: Riprova rilancia l'effetto di lettura di /accesso/io
   const voce = voceDi(percorso);
   const solaLettura = !!voce?.area && !!io && io.aree[voce.area] === 'lettura';
+  // §16.4 §19: ?vista=sola toglie la cornice (barra, avvisi, navigazione) per aprire una pagina in una
+  // scheda a parte (es. la pratica dal pulsante «apri in una nuova scheda» della ricerca). Stessa
+  // sessione e stessi permessi: cambia solo l'involucro, non l'accesso.
+  const vistaSola = useSearchParams().get('vista') === 'sola';
 
   useEffect(() => {
     let vivo = true;
@@ -102,8 +106,8 @@ export default function Guscio({ children }: { children: ReactNode }) {
         <EventiProvider>
           {/* stile.css: body.sola-lettura mostra la fascia e spegne i pulsanti che modificano (§8.3) */}
           {solaLettura && <ClasseBody classe="sola-lettura" />}
-          <Barra />
-          <RegioneAvvisi />
+          {vistaSola && <ClasseBody classe="vista-sola" />}
+          {!vistaSola && <><Barra /><RegioneAvvisi /></>}
           <main className="principale" id="principale">
             {voce?.permesso ? <Riservata permesso={voce.permesso} titolo={voce.t}>{children}</Riservata> : children}
           </main>

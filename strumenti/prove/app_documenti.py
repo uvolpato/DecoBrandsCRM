@@ -185,6 +185,31 @@ try:
 
         # D-106: documento senza agenzia → pillola in lista → Configura l'agenzia → il documento si registra
         pg.reload(); pg.wait_for_selector('.selezionabile a')
+        # ripetibile: l'agenzia creata qui sotto resta nel database; un giro dopo la stessa coppia ce l'ha
+        # già e il server rifiuta. Si tolgono quelle del 15/09/2026 (la data del documento di prova).
+        togl = pg.evaluate("""async (nome) => {
+          const io = await (await fetch('/api/accesso/io')).json();
+          const el = await (await fetch('/api/documenti?stato=aperte&pagina=1&per_pagina=200')).json();
+          const doc = (el.documenti ?? []).find((x) => x.file_nome === nome);
+          if (!doc) return 'documento non trovato';
+          // il cliente del documento di prova non ha `cliente_id` (è riconosciuto per nome o P.IVA): si cerca
+          let cid = doc.cliente_id;
+          if (!cid && doc.cliente) {
+            const cl = await (await fetch('/api/clienti')).json();
+            cid = (cl.find((x) => x.ragione_sociale === doc.cliente) ?? {}).id;
+          }
+          if (!cid) return 'cliente non trovato';
+          const c = await (await fetch('/api/clienti/' + cid)).json();
+          let n = 0;
+          for (const a of (c.agenzie ?? [])) {
+            if (a.valido_dal !== '2026-09-15') continue;
+            const r = await fetch('/api/clienti/' + cid + '/agenzie/' + a.id,
+              { method: 'DELETE', headers: { 'x-csrf-token': io.csrf } });
+            if (r.status === 204) n++;
+          }
+          return n;
+        }""", 'Prova-senza_%s.pdf' % S)
+        print('agenzie di prova tolte prima del flusso:', togl)
         voceSenza = '.selezionabile a:has-text("PROVA-SENZA-%s")' % S.upper()
         pg.wait_for_selector(voceSenza)
         ok(pg.locator(voceSenza + ' .stato:has-text("Manca l’agenzia")').count() == 1, 'lista: pillola Manca l’agenzia sul documento senza agenzia')
@@ -988,11 +1013,29 @@ try:
         pgPF = entra(S + '-oper')
         pgPF.route(re.compile(r'^.*/api/documenti/999984$'), lambda r: risposta(r, json.dumps(scheda_pf)))
         pgPF.route(re.compile(r'^.*/api/documenti/999984/abbina$'), abbina_pf)
-        # 15/11/2026: la conferma dell'abbinamento mostra i dati veri della pratica (stato, «Confermato X di Y»)
-        pgPF.route(re.compile(r'^.*/api/pratiche/1$'), lambda r: risposta(r, json.dumps({
-            'numero': 'OF/2026/001', 'cliente': 'Agri Aggio SNC', 'fornitore': 'Gries', 'stato': 'confermato',
-            'numero_ordine_fornitore': 'AU276839', 'progresso': {'x': 2117.3, 'y': 2154.5},
-        })))
+        # 15/11/2026: la conferma dell'abbinamento mostra i dati veri della pratica (stato, «Confermato X di Y»).
+        # 16/11/2026: dopo l'abbinamento l'app apre la pratica: lo stesso indirizzo serve anche il dettaglio,
+        # quindi il finto server risponde con un dettaglio completo (senza `confronto` la pagina andava in errore).
+        pratica_pf = {
+            'id': '1', 'numero': 'OF/2026/001', 'numero_ordine_fornitore': 'AU276839',
+            'cliente_id': '1001', 'cliente': 'Agri Aggio SNC', 'fornitore_id': '2', 'fornitore': 'Gries',
+            'subagente_id': None, 'subagente': None, 'data': '2026-09-02', 'importo': 2154.5,
+            'stato': 'confermata', 'nota': None, 'scadenza': None, 'pagato': False, 'pagamenti': [],
+            'fasi': [
+                {'titolo': 'Ordine', 'fatta': True, 'numero': 'AU276839', 'numeri': ['AU276839'], 'data': '2026-09-02', 'importo': 2154.5},
+                {'titolo': 'Conferma', 'fatta': True, 'numero': 'C 1', 'numeri': ['C 1'], 'data': '2026-09-03', 'importo': 2154.5, 'delta': 0},
+                {'titolo': 'Fattura', 'assente': True, 'testo': 'Nessuna'},
+            ],
+            'progresso': {'x': 2117.3, 'y': 2154.5},
+            'confronto': {'fasi': [], 'righe': [], 'variazioni': {'numero': 0, 'totale': 0}},
+            'provvigione': None, 'sconto_medio': None, 'sconto_dopo_nota': None,
+            'azione': {'tipo': 'nessuna', 'testo': 'Pratica confermata: attesa la fattura.'},
+            'incassi': [],
+        }
+        pgPF.route(re.compile(r'^.*/api/pratiche/1$'), lambda r: risposta(r, json.dumps(pratica_pf)))
+        pgPF.route(re.compile(r'^.*/api/pratiche/1/documenti$'), lambda r: risposta(r, json.dumps({
+            'pratica': {'id': '1', 'numero': 'OF/2026/001', 'stato': 'confermata', 'importo': 2154.5},
+            'altri': [], 'documenti': [], 'totali': {'fatture': 0, 'note_credito': 0, 'netto': 0}})))
         pgPF.goto(BASE + '/documenti/999984')
         pgPF.locator('.scelte button:has-text("Abbina a OF/2026/001")').wait_for(timeout=15000)
         pgPF.locator('.scelte button:has-text("Abbina a OF/2026/001")').click()
@@ -1009,10 +1052,84 @@ try:
            'proforma non si annulla dalla pratica: casella da spuntare (D-172)')
         pgPF.locator('.velo .casella-grave input[type=checkbox]').check()
         pgPF.click('.velo .modale-piede button:has-text("Abbina")')
-        pgPF.wait_for_timeout(700)
+        # 16/11/2026: dopo l'abbinamento l'app apre la pratica abbinata
+        pgPF.wait_for_function("location.pathname === '/pratiche/1'", timeout=20000)
         ok(visti_pf['abbina'] == 1 and visti_pf['ruolo'] == 'sostituisce', 'D-174: l’abbinamento manda il ruolo scelto')
+        pgPF.wait_for_selector('.binario', timeout=20000)
+        ok('OF/2026/001' in pgPF.locator('.testa h1').inner_text(), 'dopo l’abbinamento si apre la pratica')
         pgPF.screenshot(path=str(USCITA / 'app-documento-ruolo-1440.png'))
         pgPF.close()
+
+        # §16.4: la ricerca «Oppure abbina a un’altra pratica» mostra la colonna Importo (l’ultima fase,
+        # dal server) e il pulsante «apri in una nuova scheda» con l’indirizzo ?vista=sola.
+        pratiche_ric = [{'id': '123', 'numero': 'OF/2026/001', 'cliente': 'Cliente Prova', 'data': '2026-09-01', 'stato': 'fatturata', 'importo': 1234.56}]
+        scheda_ric = dict(scheda_errore, id='999983', stato='da_controllare', tipo='fattura',
+                          livello='da_controllare', file_nome='prova-ricerca.pdf')
+        scheda_ric['testata'] = dict(scheda_errore['testata'], tipo='fattura', numero='PROVA-RIC', fornitore_id='5', cliente='Cliente Prova')
+        # §16.4: la pratica in vista sola (aperta dalla ricerca, in una scheda a parte): niente cornice
+        pratica_sola = {
+            'id': '123', 'numero': 'OF/2026/001', 'numero_ordine_fornitore': None,
+            'cliente_id': '1001', 'cliente': 'Cliente Prova', 'fornitore_id': '5', 'fornitore': 'Arte Wohnaccessoires GmbH',
+            'subagente_id': None, 'subagente': None,
+            'data': '2026-09-01', 'importo': 1234.56, 'stato': 'fatturata', 'nota': None, 'scadenza': None,
+            'pagato': False, 'pagamenti': [],
+            'fasi': [
+                {'titolo': 'Ordine', 'fatta': True, 'numero': 'AB 1', 'numeri': ['AB 1'], 'data': '2026-09-01', 'importo': 1234.56},
+                {'titolo': 'Conferma', 'fatta': True, 'numero': 'C 1', 'numeri': ['C 1'], 'data': '2026-09-02', 'importo': 1234.56, 'delta': 0},
+                {'titolo': 'Fattura', 'fatta': True, 'numero': 'F 1', 'numeri': ['F 1'], 'data': '2026-09-03', 'importo': 1234.56, 'delta': 0},
+                {'titolo': 'Nota di credito', 'assente': True, 'testo': 'Nessuna'},
+            ],
+            'progresso': None,
+            'confronto': {'fasi': [], 'righe': [], 'variazioni': {'numero': 0, 'totale': 0}},
+            'provvigione': None, 'sconto_medio': None, 'sconto_dopo_nota': None,
+            'azione': {'tipo': 'nessuna', 'testo': 'Pratica fatturata: non serve altro.'},
+            'incassi': [],
+        }
+        fiscali_sola = {'pratica': {'id': '123', 'numero': 'OF/2026/001', 'stato': 'fatturata', 'importo': 1234.56},
+                        'altri': [], 'documenti': [], 'totali': {'fatture': 1234.56, 'note_credito': 0, 'netto': 1234.56}}
+        pgR = entra(S + '-ammi')
+        pgR.route(re.compile(r'^.*/api/documenti/999983$'), lambda r: risposta(r, json.dumps(scheda_ric)))
+        pgR.route(re.compile(r'^.*/api/pratiche/cerca\?.*$'), lambda r: risposta(r, json.dumps(pratiche_ric)))
+        # il pulsante apre una scheda nuova: le finte risposte valgono per tutte le schede della sessione
+        pgR.context.route(re.compile(r'^.*/api/pratiche/123$'), lambda r: risposta(r, json.dumps(pratica_sola)))
+        pgR.context.route(re.compile(r'^.*/api/pratiche/123/documenti$'), lambda r: risposta(r, json.dumps(fiscali_sola)))
+        pgR.goto(BASE + '/documenti/999983')
+        pgR.locator('.abbina-altra').wait_for(timeout=15000)
+        pgR.click('.abbina-altra .ricerca-lente')
+        pgR.wait_for_selector('.velo .modale:has-text("Cerca pratica")')
+        ok('Importo' in pgR.locator('.velo .modale thead').inner_text(), 'ricerca pratica: colonna Importo')
+        apri_btn = pgR.locator('.velo .modale tbody a.btn-riga').first
+        ok(apri_btn.count() == 1, 'ricerca pratica: pulsante apri in una nuova scheda su ogni riga')
+        ok(apri_btn.get_attribute('href') == '/pratiche/123?vista=sola', 'pulsante: indirizzo /pratiche/123?vista=sola')
+        ok(apri_btn.get_attribute('target') == '_blank' and apri_btn.get_attribute('rel') == 'noopener', 'pulsante: nuova scheda (target _blank, rel noopener)')
+        ok(apri_btn.get_attribute('aria-label') == 'Apri la pratica in una nuova scheda', 'pulsante: aria-label')
+        pgR.screenshot(path=str(USCITA / 'app-documenti-ricerca-pratica-1440.png'))
+        # il clic sull’icona apre davvero la scheda a parte, e non sceglie la riga nella ricerca
+        with pgR.expect_popup() as nuova:
+            apri_btn.click()
+        pgN = nuova.value
+        pgN.on('pageerror', lambda e: errori.append(str(e)))
+        pgN.wait_for_function("location.pathname === '/pratiche/123' && location.search === '?vista=sola'", timeout=20000)
+        pgN.locator('button:has-text("Chiudi la scheda")').wait_for(timeout=20000)
+        ok(pgN.locator('.barra').count() == 0, 'scheda nuova: niente barra di navigazione')
+        ok(pgN.locator('button:has-text("Torna")').count() == 0, 'scheda nuova: niente «Torna a…»')
+        ok(pgR.locator('.velo .modale-piede button:has-text("Seleziona")').is_disabled(),
+           'scheda nuova: il clic sull’icona non seleziona la riga')
+        pgN.close()
+        pgR.close()
+
+        # §16.4: ?vista=sola apre la pratica senza cornice (niente barra né «Torna a…») con «Chiudi la scheda».
+        pgV = entra(S + '-ammi')
+        pgV.route(re.compile(r'^.*/api/pratiche/123$'), lambda r: risposta(r, json.dumps(pratica_sola)))
+        pgV.route(re.compile(r'^.*/api/pratiche/123/documenti$'), lambda r: risposta(r, json.dumps(fiscali_sola)))
+        pgV.goto(BASE + '/pratiche/123?vista=sola')
+        pgV.locator('button:has-text("Chiudi la scheda")').wait_for(timeout=15000)
+        ok(pgV.locator('.barra').count() == 0, 'vista sola: niente barra laterale né menu')
+        ok(pgV.locator('button:has-text("Chiudi la scheda")').count() == 1, 'vista sola: pulsante Chiudi la scheda')
+        ok('OF/2026/001' in pgV.locator('.testa h1').inner_text(), 'vista sola: il titolo della pratica c’è')
+        ok(pgV.locator('button:has-text("Torna")').count() == 0, 'vista sola: niente «Torna a…»')
+        pgV.screenshot(path=str(USCITA / 'app-documenti-vista-sola-1440.png'))
+        pgV.close()
 
         b.close()
 finally:

@@ -34,9 +34,10 @@ const dataIt = (s: string) => s.split('-').reverse().join('/');
 const NOME: Record<TipoDocumento, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura', nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento',
 };
-/** Fase della fotografia delle righe (§4.2.8) per tipo di documento: gli altri tipi non hanno righe (come il seed). */
-export const faseDi = (tipo: TipoDocumento): 'ordine' | 'conferma' | 'fattura' | null =>
-  tipo === 'ordine' ? 'ordine' : (tipo === 'conferma' || tipo === 'proforma') ? 'conferma' : tipo === 'fattura' ? 'fattura' : null;
+/** Fase della fotografia delle righe (§4.2.8) per tipo di documento: gli altri tipi non hanno righe (come il seed).
+ *  D-197 §19: anche la nota di credito salva le sue righe, in una fase propria. */
+export const faseDi = (tipo: TipoDocumento): 'ordine' | 'conferma' | 'fattura' | 'nota_credito' | null =>
+  tipo === 'ordine' ? 'ordine' : (tipo === 'conferma' || tipo === 'proforma') ? 'conferma' : tipo === 'fattura' ? 'fattura' : tipo === 'nota_credito' ? 'nota_credito' : null;
 
 /* ---------- Canale comune: file → disco → coda (§6.5 punti 1–2, D-34, D-36) ---------- */
 
@@ -1319,8 +1320,9 @@ class ModificaDocumento {
 }
 class NuovoDocumento {
   @IsIn(TIPI_DOCUMENTO) tipo!: TipoDocumento; // D-60
-  // obbligatori per ordine, fattura e nota di credito (registra); un pagamento può non avere numero
-  @Facoltativo() @Testo() @IsString() @IsNotEmpty() @MaxLength(50) numero?: string;
+  // obbligatorio per ordine, fattura e nota di credito (registra); per il pagamento è il riferimento
+  // facoltativo. La lunghezza la limita il server in `registra` (campo DB VarChar 50), qui solo testo (V12).
+  @IsOptional() @Testo() @IsString() numero?: string;
   @Facoltativo() @Data() data?: string;
   @Facoltativo() @Importo() importo?: number;
   @Facoltativo() @IsBoolean() storno_totale?: boolean;
@@ -1713,7 +1715,7 @@ async function richiediAgenzia(tx: Tx, pid: bigint) {
 async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx: Contesto) {
   if ((fiscale(b.tipo) || b.tipo === 'ordine') && (!b.numero || !b.data)) throw new BadRequestException(`${nomeDi(b.tipo)}: numero e data sono obbligatori`);
   if (b.tipo !== 'nota_credito' && b.fattura_id) throw new BadRequestException('Solo la nota di credito storna una fattura');
-  const numero = b.numero ?? '', data = b.data ?? giornoRoma(new Date());
+  const numero = (b.numero ?? '').slice(0, 50), data = b.data ?? giornoRoma(new Date()); // tronca al campo DB (VarChar 50), V12
   await richiediAgenzia(tx, pid); // D-137: pratica già aperta → agenzia alla data del suo ordine
   const fattura_id = b.fattura_id ? BigInt(b.fattura_id) : null;
   const storno_totale = b.storno_totale ?? false;

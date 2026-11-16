@@ -1166,3 +1166,7 @@ body.in-accesso .principale, body:has(.accesso-scena) .principale { padding: 0; 
 /* Segmenti → tendina quando non ci stanno (FilterBar): i segmenti restano nel DOM fuori dal flusso,
    così il componente ne misura la larghezza naturale per capire quando tornare ai segmenti. */
 .segmenti-misura { position: absolute; left: -9999px; top: -9999px; visibility: hidden; pointer-events: none; width: max-content; flex-wrap: nowrap; }
+
+/* §16.4: ?vista=sola — pagina senza cornice (niente barra né guida) aperta in una scheda a parte. */
+body.vista-sola { grid-template-columns: 1fr; }
+body.vista-sola .testa-azioni a[href^="/guida"] { display: none; }

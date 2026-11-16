@@ -121,18 +121,46 @@ export const haVariazioni = (p: Pratica) => (['ordine', 'conferma', 'fattura'] a
 /** Una riga con quantità e prezzo e non di spesa: senza, non contribuisce allo sconto medio (fuori dal calcolo). */
 const utilePerSconto = (r: Riga) => !r.spesa && !r.qta.isZero() && !r.prezzo.isZero();
 
+/** Lordo (Σ quantità × prezzo) e netto (Σ importo, già scontato, D-49) delle sole righe utili. */
+const lordoNetto = (rr: Riga[]) => {
+  let lordo = ZERO, netto = ZERO;
+  for (const r of rr) if (utilePerSconto(r)) { lordo = lordo.plus(r.qta.times(r.prezzo)); netto = netto.plus(r.importo); }
+  return { lordo, netto };
+};
+
+/** 1 − netto/lordo, in %, a 2 decimali. */
+const scontoDa = (lordo: Dec, netto: Dec) => r2(new Dec(1).minus(netto.div(lordo)).times(100));
+
+/** La fase con righe utili che comanda lo sconto medio: fattura → conferma/proforma → ordine. */
+const fasePerSconto = (p: Pratica) => p.righe.fattura.some(utilePerSconto) ? p.righe.fattura
+  : p.righe.conferma.some(utilePerSconto) ? p.righe.conferma
+    : p.righe.ordine.some(utilePerSconto) ? p.righe.ordine : null;
+
+/** Sconto medio della sola fase che comanda, senza le note di credito: è lo sconto «prima della nota». */
+export function scontoMedioFase(p: Pratica): Dec | null {
+  const fase = fasePerSconto(p);
+  if (!fase) return null;
+  const { lordo, netto } = lordoNetto(fase);
+  return lordo.isZero() ? null : scontoDa(lordo, netto);
+}
+
 /** Sconto medio del documento che comanda la pratica (ordine → conferma/proforma → fattura, l'ultimo
  *  arrivato): 1 − netto/lordo, in %, a 2 decimali. lordo = Σ quantità × prezzo, netto = Σ importo della
- *  riga (già scontato, D-49). null se nessuna riga utile: si usa lo sconto dell'agenzia (riserva, D-182). */
+ *  riga (già scontato, D-49). D-197 §19: le righe della nota di credito si **sottraggono** a quelle della
+ *  fattura, così lo sconto medio è quello della differenza (fattura − nota): una nota che toglie le righe
+ *  meno scontate alza la media e può cambiare lo scaglione. null se nessuna riga utile o lordo 0 (storno
+ *  totale): si usa lo sconto dell'agenzia (riserva, D-182). */
 export function scontoMedio(p: Pratica): Dec | null {
-  const fase = p.righe.fattura.some(utilePerSconto) ? p.righe.fattura
-    : p.righe.conferma.some(utilePerSconto) ? p.righe.conferma
-      : p.righe.ordine.some(utilePerSconto) ? p.righe.ordine : null;
+  const fase = fasePerSconto(p);
   if (!fase) return null;
-  let lordo = ZERO, netto = ZERO;
-  for (const r of fase) if (utilePerSconto(r)) { lordo = lordo.plus(r.qta.times(r.prezzo)); netto = netto.plus(r.importo); }
-  if (lordo.isZero()) return null;
-  return r2(new Dec(1).minus(netto.div(lordo)).times(100));
+  let { lordo, netto } = lordoNetto(fase);
+  if (fase === p.righe.fattura) {
+    for (const d of p.documenti) if (d.tipo === 'nota_credito') {
+      const { lordo: ln, netto: nn } = lordoNetto(d.righe ?? []);
+      lordo = lordo.minus(ln); netto = netto.minus(nn);
+    }
+  }
+  return lordo.isZero() ? null : scontoDa(lordo, netto);
 }
 
 /* ---------- Percentuali (§5.1, §5.2, §5.11) ---------- */
@@ -253,13 +281,48 @@ export function quotaSub(S: Dati, p: Pratica, d: Documento, base?: Dec) {
   return q(perc.sub, perc.eccezione ? 'eccezione' : 'standard');
 }
 
-/** Provvigioni di un documento: dal fornitore (prese), al subagente (pagate), margine di Decobrands. */
+/** Provvigioni di un documento: dal fornitore (prese), al subagente (pagate), margine di Decobrands.
+ *  D-197 §19: per una nota su fattura congelata prese e pagate sono la differenza della coppia. */
 export function provvigioneDoc(S: Dati, p: Pratica, d: Documento, base?: Dec) {
   const perc = percentuali(S, p, d.data);
   if (!perc) return null;
   const imp = base ?? baseDoc(d); // D-183: sulla base (netto − spese escluse)
-  const prese = quota(imp, perc.dal_fornitore), sub = quotaSub(S, p, d, imp)!;
-  return { perc, importo: imp, prese, sub, pagate: sub.provvigione, margine: r2(prese.minus(sub.provvigione)) };
+  const diff = differenzaNotaCongelata(S, p, d);
+  const prese = diff ? diff.agente : quota(imp, perc.dal_fornitore);
+  const sub = quotaSub(S, p, d, imp)!;
+  const pagate = diff ? diff.subagente : sub.provvigione;
+  return { perc, importo: imp, prese, sub, pagate, margine: r2(prese.minus(pagate)) };
+}
+
+/** D-197 §19: una nota di credito su una fattura **congelata** porta la **differenza** fra la provvigione
+ *  della coppia (fattura − note, con lo scaglione della differenza) e i valori già fissati (fattura + note
+ *  già congelate), per Decobrands e per il subagente. Null se non è una nota, se la fattura non è congelata
+ *  o se mancano le percentuali. La base della coppia usa la base della nota (netto + spese, D-197) e le basi
+ *  salvate degli altri documenti. */
+export function differenzaNotaCongelata(S: Dati, p: Pratica, d: Documento) {
+  if (d.tipo !== 'nota_credito' || !d.fattura_id) return null;
+  // la fattura stornata è sempre nella stessa pratica (D-54: fattura_id di una fattura della pratica)
+  const fattura = p.documenti.find((x) => x.id === d.fattura_id) ?? null;
+  if (!fattura?.congelato_il) return null;
+  const perc = percentuali(S, p, d.data);
+  if (!perc) return null;
+  const baseNota = r2(d.importo.plus(speseEscluse(S, p, d))); // D-197: netto + spese (le spese tornano dentro)
+  const baseCoppia = r2(somma(p.documenti.map((x) => (x.id === d.id ? baseNota : baseDoc(x)))));
+  const agenteCoppia = quota(baseCoppia, perc.dal_fornitore);
+  const subagenteCoppia = quotaSub(S, p, d, baseCoppia)?.provvigione ?? ZERO;
+  // già fissati: la fattura congelata e le eventuali note già congelate (non la nota corrente)
+  const fissati = p.documenti.filter((x) => x.id !== d.id && x.congelato_il);
+  const agenteFissata = somma(fissati.map((x) => (x.calcolo?.provvigione_agente != null ? new Dec(x.calcolo.provvigione_agente) : ZERO)));
+  const subagenteFissata = somma(fissati.map((x) => (x.calcolo?.provvigione_subagente != null ? new Dec(x.calcolo.provvigione_subagente) : ZERO)));
+  return {
+    agente: r2(agenteCoppia.minus(agenteFissata)),
+    subagente: r2(subagenteCoppia.minus(subagenteFissata)),
+    base_coppia: baseCoppia,
+    agente_coppia: agenteCoppia,
+    subagente_coppia: subagenteCoppia,
+    agente_fissata: agenteFissata,
+    subagente_fissata: subagenteFissata,
+  };
 }
 
 /** Punto unico di calcolo dei valori salvati di un documento fiscale (D-183 §19): base = netto − spese
@@ -269,9 +332,14 @@ export function provvigioneDoc(S: Dati, p: Pratica, d: Documento, base?: Dec) {
 export function calcoloDocumento(S: Dati, p: Pratica, d: Documento): CalcoloDocumento {
   const perc = percentuali(S, p, d.data);
   const spese = speseEscluse(S, p, d);
-  const base = r2(d.importo.minus(spese));
+  // D-197 §19: le spese della nota riducono quelle della fattura, quindi la base della nota è netto + spese
+  // (netto negativo + spese escluse che tornano dentro). Per la fattura resta netto − spese. La somma delle
+  // basi dà la base della differenza (coppia fattura + note).
+  const base = d.tipo === 'nota_credito' ? r2(d.importo.plus(spese)) : r2(d.importo.minus(spese));
   const sm = scontoMedio(p);
   const q = perc ? quotaSub(S, p, d, base) : null;
+  // D-197 §19: nota su fattura congelata → la provvigione è la differenza (coppia − fissato), non base × pct
+  const diff = differenzaNotaCongelata(S, p, d);
   return {
     base: base.toFixed(2),
     spese: spese.toFixed(2),
@@ -280,9 +348,18 @@ export function calcoloDocumento(S: Dati, p: Pratica, d: Documento): CalcoloDocu
     scaglione: perc ? perc.scaglione.sconto.toFixed(2) : null,
     pct_agente: perc ? perc.dal_fornitore.toFixed(2) : null,
     pct_subagente: q ? q.pct.toFixed(2) : null,
-    provvigione_agente: perc ? quota(base, perc.dal_fornitore).toFixed(2) : null,
-    provvigione_subagente: q ? q.provvigione.toFixed(2) : null,
+    provvigione_agente: perc ? (diff ? diff.agente : quota(base, perc.dal_fornitore)).toFixed(2) : null,
+    provvigione_subagente: q ? (diff ? diff.subagente : q.provvigione).toFixed(2) : null,
     regola: REGOLA_CALCOLO,
+    ...(diff ? {
+      differenza_nota: {
+        base_coppia: diff.base_coppia.toFixed(2),
+        agente_coppia: diff.agente_coppia.toFixed(2),
+        subagente_coppia: diff.subagente_coppia.toFixed(2),
+        agente_fissata: diff.agente_fissata.toFixed(2),
+        subagente_fissata: diff.subagente_fissata.toFixed(2),
+      },
+    } : {}),
   };
 }
 
@@ -334,7 +411,9 @@ export function riconcilia(S: Dati, b: Bollettino) {
     }
     const imp = baseDoc(n.doc);
     // mese verificato: valgono i valori congelati (§5.11)
-    riga.noi = r.importo_calcolato != null ? { imponibile: imp, pct: r.pct_calcolata, importo: r.importo_calcolato } : { imponibile: imp, pct, importo: perc ? quota(imp, pct) : ZERO };
+    // D-197 §19: nota su fattura congelata → il «noi» della nota è la differenza della coppia
+    const diff = differenzaNotaCongelata(S, n.pratica, n.doc);
+    riga.noi = r.importo_calcolato != null ? { imponibile: imp, pct: r.pct_calcolata, importo: r.importo_calcolato } : { imponibile: imp, pct, importo: perc ? (diff ? diff.agente : quota(imp, pct)) : ZERO };
     riga.differenza = r2(r.importo.minus(riga.noi.importo));
     riga.categoria = riga.differenza.isZero() && r.imponibile?.equals(imp) ? 'quadra' : 'differenza';
     // maturato: fattura di un mese precedente riconosciuta nel mese in cui il cliente ha pagato
@@ -343,7 +422,8 @@ export function riconcilia(S: Dati, b: Bollettino) {
   });
   for (const x of nostri.filter((x) => !b.righe.some((r) => suDocumento(S, b, r, x.doc)))) {
     const perc = percentuali(S, x.pratica, x.doc.data), pct = perc ? perc.dal_fornitore : ZERO;
-    const atteso = perc ? quota(baseDoc(x.doc), pct) : ZERO;
+    // D-197 §19: nota su fattura congelata → l'atteso della nota è la differenza della coppia
+    const atteso = perc ? (differenzaNotaCongelata(S, x.pratica, x.doc)?.agente ?? quota(baseDoc(x.doc), pct)) : ZERO;
     // la decisione su un documento assente sta in bollettini_attese (D-56 §19); vale solo qui, finché manca
     const attesa = b.attese.find((a) => a.documento_id === x.doc.id) ?? null;
     const riga = {
@@ -426,10 +506,13 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
   const out = [];
   const riga = (p: Pratica, d: Documento, segno: 1 | -1) => {
     const perc = percentuali(S, p, d.data)!, q = quotaSub(S, p, d)!;
+    // D-197 §19: nota su fattura congelata → al subagente va la differenza, non base × pct
+    const diff = differenzaNotaCongelata(S, p, d);
+    const prov = diff ? diff.subagente : q.provvigione;
     return {
       pratica_id: p.id, documento_id: d.id, numero: d.numero, tipo: d.tipo, data: d.data, origine: null as string | null,
       fornitore_id: p.fornitore_id, subagente_id: perc.subagente_id, cliente_id: p.cliente_id, codice_cliente: perc.ab.codice,
-      importo: segno < 0 ? baseDoc(d).neg() : baseDoc(d), pct: q.pct, provvigione: segno < 0 ? q.provvigione.neg() : q.provvigione,
+      importo: segno < 0 ? baseDoc(d).neg() : baseDoc(d), pct: q.pct, provvigione: segno < 0 ? prov.neg() : prov,
       regola: q.regola, eccezione: q.regola === 'eccezione',
       liquidabile: true, incasso: false, motivo: null as string | null, voce: null as string | null, bollettino_id: null as string | null, riga_bollettino_id: null as string | null,
     };

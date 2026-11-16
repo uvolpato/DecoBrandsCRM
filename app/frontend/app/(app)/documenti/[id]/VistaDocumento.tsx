@@ -91,6 +91,7 @@ const FILTRO_DAL_TIPO: Record<string, string> = { nota_credito: 'fatturata', pag
 
 const PRATICA: Entita = {
   titolo: 'Pratica',
+  apriEtichetta: 'Apri la pratica in una nuova scheda',
   voci: async (ctx) => {
     if (!ctx.fornitore_id) return [];
     const p = new URLSearchParams({ fornitore_id: String(ctx.fornitore_id) });
@@ -108,6 +109,7 @@ const PRATICA: Entita = {
     { key: 'cliente', header: 'Cliente', grow: true },
     { key: 'data', header: 'Data', tipo: 'data' },
     { key: 'stato', header: 'Stato' },
+    { key: 'importo', header: 'Importo', tipo: 'euro' },
   ],
 };
 
@@ -774,6 +776,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
             <CampoRicerca entita={PRATICA} contesto={{ fornitore_id: t.fornitore_id, cliente_id: clienteAssociato?.id, stato: statoFiltro || undefined }}
               vincoli={t.fornitore_id ? (clienteAssociato?.id ? `Pratiche di ${clienteAssociato.nome} con ${nomeFornitore}` : `Pratiche con ${nomeFornitore} · cliente non ancora scelto`) : undefined}
               valore={altra} onChange={setAltra}
+              apriVoce={(id) => '/pratiche/' + id + '?vista=sola'}
               segmenti={{ voci: STATI_ABBUNA, valore: statoFiltro, onCambia: setStatoFiltro }} />
             <button type="button" className="btn sec" disabled={!altra} onClick={() => { setAltra(''); void seAffidabile(() => abbinaPratica(altra)); }}>Abbina</button>
           </div>

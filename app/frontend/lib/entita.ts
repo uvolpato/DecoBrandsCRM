@@ -21,6 +21,7 @@ export interface Entita<R = any> {
   cerca?: (r: R) => string; // testo in più su cui cercare
   attiva?: (r: R) => boolean; // false: la voce sta nel menu solo con contesto.tutti
   colonne: Colonna<R>[] | ((ctx: Contesto) => Colonna<R>[]); // della maschera di ricerca (funzione se dipende dal contesto)
+  apriEtichetta?: string; // a11y del pulsante «apri in una nuova scheda» nella maschera (es. «Apri la pratica in una nuova scheda»)
   filtri?: (ctx: Contesto) => CampoFiltro[]; // filtri in più nella maschera (oltre alla ricerca)
   filtra?: (r: R, valori: Record<string, string | string[]>) => boolean;
   integra?: 'fornitore' | 'cliente'; // D-152: la ricerca guarda anche le viste di Integra, solo per questi

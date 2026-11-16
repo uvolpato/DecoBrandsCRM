@@ -19,7 +19,24 @@ async function errore(sql: string, p: unknown[] = []): Promise<string> {
   }
 }
 
-beforeAll(() => db.connect());
+beforeAll(async () => {
+  await db.connect();
+  // Le prove partono da un database vuoto: altri file (in ordine diverso) lasciano dati del seed (es. l'utente
+  // «ugo»), e i vincoli univoci (utenti_username_key) farebbero fallire ogni caso. Stessa pulizia di svuota.ts.
+  await q(`ALTER TABLE clienti_versioni DISABLE TRIGGER USER; ALTER TABLE fornitori_versioni DISABLE TRIGGER USER; ALTER TABLE registro DISABLE TRIGGER USER`);
+  try {
+    await q(`TRUNCATE bollettini_righe, bollettini_testata, ordini_fornitore_righe, provvigioni_correzioni, ordini_fornitore_documenti, ordini_fornitore_testata,
+      documenti_campi, documenti_in_arrivo, liquidazioni, interscambio, provvigioni_eccezioni, provvigioni_scaglioni, subagenti, agenti,
+      codici_esterni, alias_letti, servizi_esecuzioni, impostazioni, registro, clienti, clienti_versioni, fornitori, fornitori_versioni,
+      modifiche, sconti, recapiti, persone_contatti, fatturazione, sedi, persone, soggetti, gruppi, settori,
+      interscambio_storico, soggetti_storico RESTART IDENTITY CASCADE`);
+  } finally {
+    await q(`ALTER TABLE clienti_versioni ENABLE TRIGGER USER; ALTER TABLE fornitori_versioni ENABLE TRIGGER USER; ALTER TABLE registro ENABLE TRIGGER USER`);
+  }
+  await q(`ALTER SEQUENCE soggetti_codice_seq RESTART WITH 1`);
+  await q(`DELETE FROM sessioni WHERE utente_id IN (SELECT id FROM utenti WHERE email LIKE '%@prova-%' OR username IN ('ugo','matteo','giulia','luca','servizi'))`);
+  await q(`DELETE FROM utenti WHERE email LIKE '%@prova-%' OR username IN ('ugo','matteo','giulia','luca','servizi')`);
+});
 afterAll(() => db.end());
 beforeEach(async () => {
   await q('BEGIN');
