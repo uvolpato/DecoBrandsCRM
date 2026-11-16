@@ -54,7 +54,7 @@ export function ListaDaFare({ voci, vuoto }: { voci: DaFare[]; vuoto: { titolo: 
       {voci.length ? voci.map((x) => (
         <li key={x.titolo + '|' + x.href} className={'t-' + x.tipo}>
           <span className="segno" aria-hidden="true" />
-          <div><b>{x.titolo}{x.extra}</b><span>{x.dettaglio}</span></div>
+          <div><b>{x.titolo}{x.extra}</b><span title={x.dettaglio}>{x.dettaglio}</span></div>
           <Link className="btn sec piccolo" href={x.href}>{x.azione}</Link>
         </li>)) : <li className="vuoto"><b>{vuoto.titolo}</b>{vuoto.testo}</li>}
     </ul>

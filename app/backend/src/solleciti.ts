@@ -17,11 +17,21 @@ import { logEvent } from './registro';
 const euro = (n: Prisma.Decimal) => Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 const dataIt = (s: string) => s.split('-').reverse().join('/');
 
-function testoFornitore(fornitore: string, voci: ReturnType<typeof confermeInRitardo>) {
-  const elenco = voci.map((v) =>
-    `- ${v.numero} del ${dataIt(v.data)} · ${v.cliente} (vostro codice ${v.codice}) · ${euro(v.importo)} · attesa entro il ${dataIt(v.scadenza)}`).join('\n');
-  return `Gentili colleghi di ${fornitore},\n\nnon abbiamo ancora ricevuto la conferma ${voci.length === 1 ? 'del seguente ordine' : 'dei seguenti ordini'}:\n\n${elenco}` +
-    '\n\nVi chiediamo di inviarcele appena possibile, indicando eventuali articoli non disponibili.\n\nGrazie,\nDecobrands SRL';
+type Scaduta = ReturnType<typeof confermeInRitardo>[number];
+type VoceConRiferimento = Scaduta & { ordine_fornitore: string | null };
+
+/** Testo del sollecito di conferma (§7.1, §5.12): in testa il numero d'ordine del fornitore (quello
+ *  che lui conosce, D-169), il nostro numero di pratica solo in fondo come «nostro rif.». Se il numero
+ *  del fornitore manca, si usa il nostro numero d'ordine con data e cliente, senza inventare. */
+function testoFornitore(fornitore: string, voci: VoceConRiferimento[]) {
+  const elenco = voci.map((v) => {
+    const riferimento = v.ordine_fornitore ?? v.numero;
+    const nostro = v.ordine_fornitore ? ` · nostro rif. ${v.numero}` : '';
+    return `- Ordine ${riferimento} del ${dataIt(v.data)} · ${v.cliente} (vostro codice cliente ${v.codice}) · ${euro(v.importo)} · conferma attesa entro il ${dataIt(v.scadenza)}${nostro}`;
+  }).join('\n');
+  const singolo = voci.length === 1;
+  return `Gentili colleghi di ${fornitore},\n\nnon abbiamo ancora ricevuto la conferma ${singolo ? 'del seguente ordine' : 'dei seguenti ordini'}:\n\n${elenco}` +
+    `\n\nVi chiediamo di ${singolo ? 'inviarcela' : 'inviarcele'} appena possibile, indicando eventuali articoli non disponibili.\n\nGrazie,\nDecobrands SRL`;
 }
 
 class SollecitoConferme {
@@ -60,11 +70,13 @@ export function sollecitoBollettino(S: Dati, b: { fornitore_id: number; anno: nu
 export class SollecitiController {
   constructor(private readonly db: PrismaService) {}
 
-  /** Testi pronti per fornitore (§7.1): numero, data, cliente, codice del fornitore, importo e data attesa. */
+  /** Testi pronti per fornitore (§7.1): numero d'ordine del fornitore, data, cliente con il suo codice,
+   *  importo e data attesa; il nostro numero di pratica in fondo come «nostro rif.». */
   @Get('conferme')
   @Richiede('provvigioni.consulta')
   async conferme() {
-    return sollecitiConferme(await caricaDati(this.db, giornoRoma(new Date())));
+    const S = await caricaDati(this.db, giornoRoma(new Date()));
+    return sollecitiConferme(S, await numeriOrdineFornitore(this.db, S));
   }
 
   /** Testo del sollecito del bollettino di un mese (§7.7): il fornitore non l'ha ancora mandato. */
@@ -102,8 +114,9 @@ export class SollecitiController {
   }
 }
 
-/** I solleciti di conferma per fornitore; esportata per le prove con il giorno del prototipo. */
-export function sollecitiConferme(S: Dati) {
+/** I solleciti di conferma per fornitore; esportata per le prove con il giorno del prototipo.
+ *  `numeriFornitore`: numero d'ordine del fornitore per pratica (D-169), letto dal database. */
+export function sollecitiConferme(S: Dati, numeriFornitore: ReadonlyMap<string, string> = new Map()) {
   const voci = confermeInRitardo(S);
   const per = new Map<string, typeof voci>();
   for (const v of voci) {
@@ -114,11 +127,21 @@ export function sollecitiConferme(S: Dati) {
   return {
     totale: voci.length,
     per_fornitore: [...per.entries()].map(([fornitore_id, vv]) => ({
-      fornitore_id, fornitore: vv[0].fornitore, pratiche: vv.length, testo: testoFornitore(vv[0].fornitore, vv),
+      fornitore_id, fornitore: vv[0].fornitore, pratiche: vv.length,
+      testo: testoFornitore(vv[0].fornitore, vv.map((v) => ({ ...v, ordine_fornitore: numeriFornitore.get(v.id) ?? null }))),
       voci: vv.map((v) => ({
         id: v.id, numero: v.numero, data: v.data, cliente: v.cliente, codice: v.codice,
         importo: Number(v.importo), attesa: v.scadenza, giorni: v.giorni,
       })),
     })),
   };
+}
+
+/** Numero d'ordine del fornitore (D-169) per le pratiche in ritardo: il riferimento che il fornitore
+ *  conosce, letto dal database (V12). Il nostro numero di pratica non è il suo riferimento. */
+async function numeriOrdineFornitore(db: PrismaService, S: Dati): Promise<Map<string, string>> {
+  const ids = confermeInRitardo(S).map((v) => BigInt(v.id));
+  if (!ids.length) return new Map();
+  const righe = await db.ordini_fornitore_testata.findMany({ where: { id: { in: ids } }, select: { id: true, numero_ordine_fornitore: true } });
+  return new Map(righe.filter((r) => r.numero_ordine_fornitore).map((r) => [String(r.id), r.numero_ordine_fornitore!]));
 }

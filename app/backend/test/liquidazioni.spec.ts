@@ -184,6 +184,30 @@ describe('GET /api/liquidazioni', () => {
     await resp.get('/liquidazioni?anno=abc').expect(400);
     await dati.get('/liquidazioni').expect(403);
   });
+
+  it('tendina degli anni: dal primo anno con dati all’anno corrente, sempre l’anno corrente', async () => {
+    const { anni } = (await resp.get('/liquidazioni/anni').expect(200)).body as { anni: number[] };
+    expect(anni[anni.length - 1]).toBe(Number(OGGI.slice(0, 4))); // termina con l'anno corrente
+    expect(anni).toEqual(Array.from({ length: anni.length }, (_, i) => anni[0] + i)); // consecutivi
+    const annoDi = (d: Date | null) => (d ? Number(d.toISOString().slice(0, 4)) : null);
+    const [doc, pra, liq] = await Promise.all([
+      db.ordini_fornitore_documenti.aggregate({ _min: { data: true } }),
+      db.ordini_fornitore_testata.aggregate({ _min: { data_ordine: true } }),
+      db.liquidazioni.aggregate({ _min: { anno: true } }),
+    ]);
+    const atteso = Math.min(annoDi(doc._min.data) ?? Number(OGGI.slice(0, 4)), annoDi(pra._min.data_ordine) ?? Number(OGGI.slice(0, 4)), liq._min.anno ?? Number(OGGI.slice(0, 4)));
+    expect(anni[0]).toBe(atteso);
+  });
+
+  it('anno passato: i trimestri di quell’anno, non quelli di oggi; anno fuori range 400', async () => {
+    const b = await pagina(2025, 2);
+    expect(b.anno).toBe(2025);
+    expect(b.trimestre).toBe(2);
+    expect(b.trimestri.map((q: any) => q.trimestre)).toEqual([1, 2, 3, 4]);
+    expect(b.trimestri.every((q: any) => q.chiave === 'da_liquidare')).toBe(true);
+    await resp.get('/liquidazioni?anno=1900').expect(400);
+    await resp.get('/liquidazioni?anno=3000').expect(400);
+  });
 });
 
 describe('GET /api/liquidazione/report', () => {
@@ -284,7 +308,7 @@ describe('GET /api/liquidazione/export', () => {
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Riepilogo', ...b.subagenti.map((s: any) => s.nome)]);
 
     const rip = wb.getWorksheet('Riepilogo')!;
-    expect(rip.getRow(5).values).toEqual([undefined, 'Subagente', 'Documenti', 'Imponibile', 'Provvigione da liquidare', 'In attesa dei bollettini']);
+    expect(rip.getRow(5).values).toEqual([undefined, 'Subagente', 'Documenti', 'Base provvigione', 'Provvigione da liquidare', 'In attesa dei bollettini']);
     expect(rip.getRow(5).getCell(1).fill).toMatchObject({ fgColor: { argb: 'FFE9F0FD' } });
     expect(rip.views[0]).toMatchObject({ state: 'frozen', ySplit: 5, showGridLines: false });
     expect(rip.pageSetup).toMatchObject({ orientation: 'landscape', fitToPage: true, fitToWidth: 1, printTitlesRow: '5:5' });
@@ -359,7 +383,7 @@ describe('GET /api/liquidazione/export', () => {
 
     const rip = (await file('anno=2026&trimestre=3&contenuto=riepilogo&formato=csv').expect(200)).body as Buffer;
     const righeRip = rip.toString('utf8').slice(1).split('\r\n');
-    expect(righeRip[0]).toBe('Subagente;Documenti;Imponibile;Provvigione da liquidare;In attesa dei bollettini');
+    expect(righeRip[0]).toBe('Subagente;Documenti;Base provvigione;Provvigione da liquidare;In attesa dei bollettini');
     expect(righeRip.length - 1).toBe(b.subagenti.length);
     expect(righeRip[1].split(';')[0]).toBe(b.subagenti[0].nome);
   });

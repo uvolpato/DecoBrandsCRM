@@ -1,11 +1,13 @@
 'use client';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
-import { Modale } from '@/componenti/Modale';
+import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Pagina } from '@/componenti/Pagina';
-import { avviso, Dettagli, quando } from '@/componenti/Piccoli';
+import { avviso, quando } from '@/componenti/Piccoli';
 import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
 import { data } from '@/lib/formati';
@@ -32,6 +34,12 @@ interface Risposta {
 }
 
 const FILTRI: Valori = { motivo: '', q: '' };
+
+// D-171: azioni di riga a icone in colonne fisse
+const AZIONI_SCARTATI: AzioneRiga[] = [
+  { nome: 'recupera', icona: 'indietro', etichetta: 'Recupera' },
+  { nome: 'elimina', icona: 'cestino', etichetta: 'Elimina', variante: 'pericolo' },
+];
 
 export function VistaScartati() {
   const router = useRouter();
@@ -95,7 +103,8 @@ export function VistaScartati() {
       key: 'documento', header: 'Documento', grow: true, cell: (x) => <>
         <b>{TIPO[x.tipo ?? 'altro'] ?? 'Documento'} {x.numero ?? ''}</b>
         <span className="sec-riga">
-          {[x.fornitore, x.cliente, x.file_nome].filter(Boolean).join(' · ')}
+          {x.fornitore_id ? <Link href={'/fornitori/' + x.fornitore_id}>{x.fornitore}</Link> : x.fornitore}
+          {x.cliente ? ' · ' + x.cliente : ''}{x.file_nome ? ' · ' + x.file_nome : ''}
         </span>
       </>,
     },
@@ -106,10 +115,13 @@ export function VistaScartati() {
     },
     { key: 'elimina_il', header: 'Eliminato il', sortable: false, cell: (x) => data(x.elimina_il) },
     {
-      key: 'az', header: '', sortable: false, cell: (x) => <span className="azioni-cella">
-        <button type="button" className="btn sec piccolo" onClick={() => void recupera(x)}>Recupera</button>
-        {elimina && <button type="button" className="btn testo piccolo pericolo-testo" onClick={() => setConferma(x)}>Elimina</button>}
-      </span>,
+      key: 'az', header: '', align: 'center', sortable: false, cell: (x) => (
+        <AzioniRiga azioni={AZIONI_SCARTATI} oggetto={'il documento ' + (x.numero ?? x.file_nome)}
+          riga={[
+            { nome: 'recupera', onClick: () => void recupera(x) },
+            ...(elimina ? [{ nome: 'elimina', onClick: () => setConferma(x) }] : []),
+          ]} />
+      ),
     },
   ];
 
@@ -150,20 +162,14 @@ export function VistaScartati() {
         </div>
       </div>
       {conferma && (
-        <Modale titolo={`Eliminare definitivamente ${(TIPO[conferma.tipo ?? 'altro'] ?? 'documento').toLowerCase()} ${conferma.numero ?? ''}?`}
-          testo="Il file e i dati letti vengono cancellati e non si possono più recuperare."
-          onChiudi={() => setConferma(null)}
-          piede={<>
-            <button type="button" className="btn sec" onClick={() => setConferma(null)}>Annulla</button>
-            <button type="button" className="btn pericolo" onClick={() => void eliminaDavvero()}>Elimina</button>
-          </>}>
-          <Dettagli voci={[
-            { etichetta: 'Documento', valore: `${TIPO[conferma.tipo ?? 'altro'] ?? 'Documento'} ${conferma.numero ?? ''}` },
-            { etichetta: 'Fornitore', valore: conferma.fornitore ?? '—' },
-            { etichetta: 'File', valore: conferma.file_nome },
-            { etichetta: 'Scartato il', valore: quando(conferma.scartato_il) },
-          ]} />
-        </Modale>
+        <ConfermaGrave titolo={`Eliminare definitivamente ${(TIPO[conferma.tipo ?? 'altro'] ?? 'documento').toLowerCase()} ${conferma.numero ?? ''}?`}
+          punti={[
+            'Il file e i dati letti vengono cancellati e non si possono più recuperare.',
+            <>Fornitore: {conferma.fornitore ?? '—'} · File: {conferma.file_nome} · Scartato il {quando(conferma.scartato_il)}</>,
+          ]}
+          etichettaCasella="Ho capito: non si può più recuperare"
+          etichetta="Elimina"
+          onRisposta={(si) => (si ? void eliminaDavvero() : setConferma(null))} />
       )}
     </Pagina>
   );

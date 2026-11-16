@@ -13,8 +13,10 @@ export interface Scheda {
   contenuto: () => ReactNode;
 }
 
-export function Schede({ schede, attiva: iniziale, onCambia, riempi, memoria }: {
+export function Schede({ schede, attiva: iniziale, onCambia, riempi, memoria, azioni }: {
   schede: Scheda[]; attiva?: string; onCambia?: (id: string) => void; riempi?: boolean; memoria?: string;
+  /** Azioni a destra della barra delle schede, sulla stessa riga (D-178 §19). */
+  azioni?: ReactNode;
 }) {
   const uid = useId();
   const barra = useRef<HTMLDivElement>(null);
@@ -52,6 +54,7 @@ export function Schede({ schede, attiva: iniziale, onCambia, riempi, memoria }: 
             {s.conta != null && s.conta !== '' && <span className={`schede-conta c-${s.contaVariante ?? 'neutro'}`}>{s.conta}</span>}
           </button>
         ))}
+        {azioni != null && <div className="schede-azioni">{azioni}</div>}
       </div>
       <div className="schede-corpo" role="tabpanel" id={uid + 'corpo'} aria-labelledby={uid + scheda.id}>{scheda.contenuto()}</div>
     </div>

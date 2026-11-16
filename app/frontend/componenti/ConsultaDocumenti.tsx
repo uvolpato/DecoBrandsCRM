@@ -31,7 +31,14 @@ interface ConfrontoRiga {
   codice: string | null; descrizione: string | null;
   a: RigaConfronto | null; b: RigaConfronto | null; varia: boolean; delta: number;
 }
-interface Confronto extends ConfrontoRiga { i: number }
+/** Una riga mostrata a destra: senza confronto è una riga del documento aperto (quantità/prezzo/
+ *  importo), con il confronto ha le due colonne a/b e la differenza (calcolate dal server, D-78). */
+interface RigaMostrata extends ConfrontoRiga {
+  i: number;
+  quantita: number | null;
+  prezzo: number | null;
+  importo: number | null;
+}
 
 /** Il documento precedente: quello stornato per la nota di credito, altrimenti l'ultimo della fase prima. */
 function precedente(cur: DocPratica, docs: DocPratica[]): DocPratica | null {
@@ -89,9 +96,23 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
     return () => document.removeEventListener('keydown', tasto);
   }, [cur, docs, onChiudi]);
 
-  const righe = (confronto?.righe ?? []).map((r, i) => ({ ...r, i }));
+  const altri = docs.filter((d) => d.id !== cur.id);
+
+  // righe del documento aperto, sempre dal server (già in DocPratica.righe, V12); l'importo mancante
+  // si ricava da quantità × prezzo come nell'anteprima
+  const righeDoc: RigaMostrata[] = (cur.righe ?? []).map((r, i) => ({
+    i, codice: r.codice, descrizione: r.descrizione,
+    quantita: r.quantita, prezzo: r.prezzo, importo: r.importo ?? (r.quantita ?? 0) * (r.prezzo ?? 0),
+    a: null, b: null, varia: false, delta: 0,
+  }));
+  // righe del confronto (D-78, V12): allineate per codice dal server
+  const righe: RigaMostrata[] = (confronto?.righe ?? []).map((r, i) => ({
+    i, codice: r.codice, descrizione: r.descrizione,
+    quantita: null, prezzo: null, importo: null,
+    a: r.a, b: r.b, varia: r.varia, delta: r.delta,
+  }));
   const variate = righe.filter((r) => r.varia);
-  const mostra = rif && vista === 'variate' && variate.length ? variate : righe;
+  const mostra = rif ? (vista === 'variate' && variate.length ? variate : righe) : righeDoc;
   const soloNC = cur.tipo === 'nota_credito' || rif?.tipo === 'nota_credito';
   const diff = !rif ? 0 : (confronto?.differenza ?? 0);
   const src = cur.arrivo_id ? '/api/documenti/' + cur.arrivo_id + '/file' : null;
@@ -101,19 +122,25 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
   const qp = (r: RigaConfronto | null) => r
     ? <>{r.quantita} × {euro(r.prezzo)}<span className="sec-riga">{euro(r.importo)}</span></>
     : <span className="testo-tenue">assente</span>;
-  const colonne: Colonna<Confronto>[] = [
+  const colonne: Colonna<RigaMostrata>[] = rif ? [
     {
       key: 'codice', header: 'Articolo', grow: true,
       cell: (r) => <><b>{r.codice || '—'}</b><span className="sec-riga">{r.descrizione ?? ''}</span></>,
     },
-    ...(rif ? [{ key: 'a', header: TIPO[rif.tipo] + ' ' + (rif.numero ?? ''), align: 'right' as const, cell: (r: Confronto) => qp(r.a) }] : []),
-    { key: 'b', header: TIPO[cur.tipo] + ' ' + (cur.numero ?? ''), align: 'right' as const, cell: (r) => qp(r.b) },
-    ...(rif ? [{
+    { key: 'a', header: TIPO[rif.tipo] + ' ' + (rif.numero ?? ''), align: 'right', cell: (r) => qp(r.a) },
+    { key: 'b', header: TIPO[cur.tipo] + ' ' + (cur.numero ?? ''), align: 'right', cell: (r) => qp(r.b) },
+    {
       key: 'delta', header: 'Differenza',
-      cell: (r: Confronto) => Math.abs(r.delta) < 0.01
+      cell: (r) => Math.abs(r.delta) < 0.01
         ? <span className="testo-tenue">—</span>
         : <b className={classeSegno(r.delta)}>{euroSegno(r.delta)}</b>,
-    }] : []),
+    },
+  ] : [
+    { key: 'codice', header: 'Articolo', cell: (r) => <b>{r.codice || '—'}</b> },
+    { key: 'descrizione', header: 'Descrizione', grow: true, cell: (r) => <span>{r.descrizione ?? '—'}</span> },
+    { key: 'quantita', header: 'Quantità', align: 'right', tipo: 'numero', cell: (r) => r.quantita == null ? '—' : String(r.quantita) },
+    { key: 'prezzo', header: 'Prezzo', align: 'right', tipo: 'euro', cell: (r) => r.prezzo == null ? '—' : euro(r.prezzo) },
+    { key: 'importo', header: 'Importo', align: 'right', tipo: 'euro', totale: 'somma', valore: (r) => r.importo ?? 0, cell: (r) => euro(r.importo ?? 0) },
   ];
 
   return (
@@ -155,9 +182,10 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
               {
                 etichetta: 'Confrontato con',
                 valore: <select className="filtro-select" aria-label="Documento con cui confrontare" value={rif?.id ?? ''}
+                  disabled={altri.length === 0} title={altri.length === 0 ? "Nella pratica c'è un solo documento" : undefined}
                   onChange={(e) => setRif(docs.find((d) => d.id === e.target.value) ?? null)}>
                   <option value="">Nessun confronto</option>
-                  {docs.filter((d) => d.id !== cur.id).map((d) => (
+                  {altri.map((d) => (
                     <option key={d.id} value={d.id}>{TIPO[d.tipo] + ' ' + (d.numero ?? '')}</option>
                   ))}
                 </select>,
@@ -186,11 +214,13 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
                   valori={{ vista }} onChange={(v) => setVista(String(v.vista))} />
               </div>
             )}
+            {!rif && altri.length > 0 && <p className="testo-tenue">Scegli un documento con cui confrontare.</p>}
             <div className="riempi">
               <DataTable righe={mostra} colonne={colonne} chiave={(r) => String(r.i)} naturale compatta
                 rowClass={(r) => (r.varia ? 'evidenzia ' : '') + (r.codice === segnata ? 'selezionata' : '')}
                 onRowClick={(r) => setSegnata(r.codice)}
-                emptyText={caricando ? 'Caricamento…' : 'Nessuna riga'} emptyHint={rif ? 'I due documenti non hanno righe in comune.' : 'Scegli un documento con cui confrontare.'} />
+                emptyText={caricando ? 'Caricamento…' : 'Nessuna riga'}
+                emptyHint={rif ? 'I due documenti non hanno righe in comune.' : 'Il documento non ha righe lette.'} />
             </div>
           </div>
         </div>

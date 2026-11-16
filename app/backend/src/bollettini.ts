@@ -55,10 +55,13 @@ export class BollettiniController {
   async matrice(@Query() q: FiltroBollettini) {
     const oggi = giornoRoma(new Date());
     const ultimo = oggi.slice(0, 7);
+    // Si torna indietro fino al primo bollettino o al primo documento: un mese con fatture e senza
+    // bollettino va raggiunto, è proprio quello da caricare.
     const [{ primo, ultimo: fine }] = await this.db.$queryRaw<{ primo: string; ultimo: string }[]>`
-      SELECT coalesce(to_char(min(make_date(anno, mese, 1)), 'YYYY-MM'), ${ultimo}::text) AS primo,
+      SELECT coalesce(to_char(min(m), 'YYYY-MM'), ${ultimo}::text) AS primo,
              ${ultimo}::text AS ultimo
-      FROM bollettini_testata`;
+      FROM (SELECT make_date(anno, mese, 1) AS m FROM bollettini_testata
+            UNION ALL SELECT min(data) FROM ordini_fornitore_documenti) t`;
     const al = q.al ?? fine;
     const da = mese(al, -(MESI - 1));
     const fornitori = q.fornitori ? q.fornitori.split(',').map((x) => BigInt(x)) : [];

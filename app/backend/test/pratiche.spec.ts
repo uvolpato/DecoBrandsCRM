@@ -262,6 +262,47 @@ describe('GET /api/pratiche/cerca (D-60: il campo di ricerca dello Sposta)', () 
     expect((await resp.get('/pratiche/cerca').expect(200)).body).toEqual([]);
     await senzaPermesso.get('/pratiche/cerca?fornitore_id=1').expect(403);
   });
+
+  // D-177 §19: il filtro per stato è del server; un caso per ogni stato
+  it.each(['attesa', 'confermata', 'fatturata'] as const)('filtro per stato %s: solo le pratiche in quello stato', async (stato) => {
+    const f = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
+    const b = (await resp.get(`/pratiche/cerca?fornitore_id=${f}&stato=${stato}`).expect(200)).body as { id: string; stato: string }[];
+    const nomeDb = { fatturata: 'fatturato', confermata: 'confermato', attesa: 'inviato', scaduta: 'inviato' } as const;
+    const attese = M.S.pratiche.filter((p: any) => String(p.fornitore_id) === String(f) && nomeDb[M.statoPratica(p).chiave as keyof typeof nomeDb] === nomeDb[stato]);
+    expect(b.map((x) => x.stato)).toEqual(Array(b.length).fill(stato));
+    expect(b).toHaveLength(attese.length);
+  });
+
+  it('stato non ammesso: 400 (lista chiusa, V12)', async () => {
+    const f = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
+    await resp.get(`/pratiche/cerca?fornitore_id=${f}&stato=qualsiasi`).expect(400);
+  });
+
+  it('con cliente_id filtra per cliente e fornitore: esclude le pratiche di altri clienti (15/11/2026)', async () => {
+    const pratiche = await db.ordini_fornitore_testata.findMany({ select: { id: true, fornitore_id: true, cliente_id: true } });
+    const clientiPer = new Map<string, Set<string>>();
+    for (const p of pratiche) {
+      const k = String(p.fornitore_id);
+      if (!clientiPer.has(k)) clientiPer.set(k, new Set());
+      clientiPer.get(k)!.add(String(p.cliente_id));
+    }
+    const coppia = [...clientiPer.entries()].find(([, c]) => c.size > 1);
+    expect(coppia).toBeTruthy(); // il seed ha un fornitore con più clienti
+    const [f, clienti] = coppia!;
+    const cliente = [...clienti][0];
+    const attese = pratiche.filter((p) => String(p.fornitore_id) === f && String(p.cliente_id) === cliente).map((p) => String(p.id));
+    const b = (await resp.get(`/pratiche/cerca?fornitore_id=${f}&cliente_id=${cliente}`).expect(200)).body as { id: string }[];
+    expect(attese.length).toBeGreaterThan(0);
+    expect(b.map((x) => x.id).sort()).toEqual(attese.sort());
+    // senza il vincolo sul cliente il risultato è più ampio
+    const tutte = (await resp.get(`/pratiche/cerca?fornitore_id=${f}`).expect(200)).body as { id: string }[];
+    expect(tutte.length).toBeGreaterThan(b.length);
+  });
+
+  it('cliente_id non valido: 400 (15/11/2026)', async () => {
+    const f = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
+    await resp.get(`/pratiche/cerca?fornitore_id=${f}&cliente_id=abc`).expect(400);
+  });
 });
 
 describe('GET /api/pratiche/:id/documenti/:did/confronto (A5-02, D-78, V12)', () => {

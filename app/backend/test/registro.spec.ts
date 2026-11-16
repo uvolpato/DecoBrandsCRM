@@ -5,7 +5,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { apriAnomalia, logEvent, logEventSicuro } from '../src/registro';
 
 
-const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL!, options: '-c TimeZone=UTC' }) });
 const annulla = new Error('annulla');
 const login = {
   tipo: 'auth',
@@ -74,4 +74,20 @@ it('apriAnomalia atomica: due aperture insieme fanno una riga con volte = 2 (A3-
   } finally {
     await db.registro.deleteMany({ where: { genere: 'anomalia', codice: 'lettura.fallita', chiave: 'conflitto-a3-09' } });
   }
+});
+
+it('l\'ora letta dal database coincide con l\'ora vera, senza scarto di fuso (D-181 §19)', async () => {
+  await inTransazione(async (tx) => {
+    const prima = Date.now();
+    // ts è il CURRENT_TIMESTAMP del database: con la sessione UTC riletto senza perdere né guadagnare un'ora
+    const r = await logEvent(tx, login, {});
+    const dopo = Date.now();
+    expect(r.ts.getTime()).toBeGreaterThanOrEqual(prima - 2000);
+    expect(r.ts.getTime()).toBeLessThanOrEqual(dopo + 2000);
+    // ultimo/chiusa_il scritti da Node non perdono un'ora nel database (D-181 §19)
+    await apriAnomalia(tx, { servizio: 'app', codice: 'prova.ora-d181', chiave: 'x', messaggio: 'prova', dettaglio: {} });
+    const an = await tx.registro.findFirstOrThrow({ where: { codice: 'prova.ora-d181' } });
+    expect(an.ultimo!.getTime()).toBeGreaterThanOrEqual(prima - 2000);
+    expect(an.ultimo!.getTime()).toBeLessThanOrEqual(dopo + 2000);
+  });
 });

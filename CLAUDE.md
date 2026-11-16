@@ -127,6 +127,15 @@ Regole del codice del prototipo:
 
 ## 4. Regole di lavoro (obbligatorie)
 
+> ⚠ **Claude il meno possibile** (Ugo, 15/11/2026). Claude Code fa solo **supervisione e
+> orchestrazione**: scrive i prompt, lancia OpenCode, controlla i risultati, decide con Ugo, fa i
+> commit. Tutto il resto lo fanno i modelli DeepSeek tramite OpenCode, secondo la suddivisione della
+> skill `fase` (V4 pro per il lavoro sensibile, Flash per il resto): codice, prove, diagnosi,
+> lettura dei log e del database, documentazione. Claude interviene da sé solo su quello che i
+> modelli DeepSeek non riescono a fare (dopo un tentativo fallito) o su richiesta esplicita di Ugo.
+> Il ruolo completo è nella skill `orchestratore` (`.claude/skills/orchestratore/SKILL.md`), che
+> l'hook `SessionStart` di `.claude/settings.json` carica all'inizio di ogni sessione.
+
 0. ⚠ **Tutto sul backend, MAI dai dati del frontend** (spec V12, D-28): ogni calcolo (provvigioni, bollettini, liquidazione, Analisi, totali, esportazioni) e ogni operazione sensibile (stati, verifiche, chiusure, abbinamenti, correzioni, permessi, eventi) si esegue sul server partendo dal database; il frontend mostra e invia solo le scelte (id, valori digitati, motivo); il server ricarica, ricontrolla e ricalcola, e non salva mai un valore calcolato arrivato dal browser. Il prototipo calcola nel browser solo perché è una dimostrazione.
 0b. ⚠ **Una operazione, una transazione** (spec V13, D-36): se un'operazione scrive su più tabelle (o più righe legate) si usa **una sola transazione** (`prisma.$transaction(async (tx) => …)`, tutto da `tx`, registro compreso); chiusure, verifiche e abbinamenti bloccano la riga con `SELECT … FOR UPDATE`; email e lettura dei documenti solo dopo il commit, il file su disco prima.
 1. **Lingua**: si scrive in italiano, semplice e conciso, senza parole inglesi inutili:

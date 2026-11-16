@@ -30,6 +30,11 @@ const intero = (v: string | null): number | null => {
   const n = num(v);
   return n != null && Number.isInteger(n) ? n : null;
 };
+const bool = (v: string | null): boolean | null => {
+  if (v == null) return null;
+  const t = String(v).trim().toLowerCase();
+  return t === 'true' || t === '1' ? true : t === 'false' || t === '0' ? false : null;
+};
 
 /* ---------- Forma del documento letto ---------- */
 export interface RigaLetta {
@@ -38,9 +43,12 @@ export interface RigaLetta {
   quantita: number | null;
   prezzo: number | null;
   importo: number | null;
+  sconto: number | null; // sconto di riga in percentuale (es. 10 = 10%); null se assente
   numero_fattura: string | null;
   data_fattura: string | null;
   provvigione: number | null;
+  /** True se la riga è una spesa (trasporto, imballo, «Fracht») e non un articolo: si copia come riga ma non è merce. */
+  spesa?: boolean | null;
 }
 
 export interface Letto {
@@ -48,6 +56,8 @@ export interface Letto {
   fornitore_id: bigint | null;
   fornitore: string | null; // nome del fornitore letto (D-152: per i candidati dal CRM quando non è riconosciuto)
   numero: string | null;
+  /** D-169: numero d'ordine del fornitore: per l'ordine è il suo numero, per proforma/conferma/fattura/nota il riferimento all'ordine. */
+  numero_ordine_fornitore: string | null;
   data: string | null;
   codice_cliente: string | null;
   cliente: string | null;
@@ -73,9 +83,47 @@ export interface Candidato {
   punteggio: number;
   motivi: string[];
   delta: number;
+  /** D-174: suggerimento per conferma/proforma su una pratica che ne ha già una (null = prima conferma, nessuna scelta). */
+  ruolo: 'parziale' | 'sostituisce' | null;
+}
+
+/** D-169: la pratica trovata per numero d'ordine del fornitore (chiave fornitore + numero, mai il numero da solo). */
+export interface PraticaOrdine {
+  id: string;
+  numero: string; // numero della pratica (OF/2026/001)
+  numero_ordine_fornitore: string; // es. AU276839
+  cliente: string | null;
+  cliente_id: bigint;
+  fornitore: string | null;
+  fornitore_id: bigint;
+  stato: string;
+  data_ordine: string;
 }
 
 export type Esito = 'doppio' | 'bollettino' | 'nuova' | 'certo' | 'probabile' | 'ambiguo' | 'nessuno' | 'manca_agenzia' | 'manca_rappresentanza' | 'fornitore_da_integra' | 'cliente_da_integra' | 'fornitore_da_scegliere' | 'cliente_da_scegliere';
+
+/** Filtro per stato delle pratiche suggerite nella scheda «Pratica proposta» (D-178 §19): il browser
+ *  manda solo la scelta (lista chiusa), il server filtra le candidate prima di ordinarle (V12). */
+export const STATI_PRATICHE = ['aperte', 'tutte', 'solo_ordine', 'confermata', 'fatturata'] as const;
+export type FiltroPratiche = (typeof STATI_PRATICHE)[number];
+// lo stato del candidato è il valore della colonna (inviato|confermato|fatturato, §4.2.7): «aperte» = non fatturate
+const STATO_FILTRO: Record<FiltroPratiche, string[]> = {
+  aperte: ['inviato', 'confermato'],
+  tutte: [],
+  solo_ordine: ['inviato'],
+  confermata: ['confermato'],
+  fatturata: ['fatturato'],
+};
+export const filtraPratiche = (c: Candidato[], filtro: FiltroPratiche) => {
+  const stati = STATO_FILTRO[filtro];
+  return stati.length ? c.filter((x) => stati.includes(x.pratica.stato)) : c;
+};
+
+/** Filtro per stato predefinito per tipo di documento (15/11/2026): una nota di credito storna una
+ *  fattura e un pagamento ne salda una, quindi cercano le pratiche già fatturate; gli altri tipi
+ *  cercano le aperte. Il server lo sceglie dal tipo quando il browser non manda `filtro` (V12). */
+export const filtroDalTipo = (tipo: string | null): FiltroPratiche =>
+  tipo === 'nota_credito' || tipo === 'pagamento' ? 'fatturata' : 'aperte';
 
 /** Un soggetto candidato da scegliere per il documento (D-152): dal CRM o dalle viste di Integra. */
 export interface CandidatoSoggetto {
@@ -147,6 +195,9 @@ export interface Proposta {
   candidati_cliente: CandidatoSoggetto[];
   /** D-152: il ponte di Integra non ha risposto (i candidati sono solo del CRM). */
   integra_non_raggiungibile: boolean;
+  /** D-169: la pratica trovata per numero d'ordine del fornitore; `cliente_coincide` dice se il cliente
+   *  del documento è quello della pratica (false/null → punto da controllare, mai un abbinamento al cliente da solo). */
+  pratica_ordine: { pratica: PraticaOrdine; cliente_coincide: boolean | null } | null;
 }
 
 export interface Controllo {
@@ -154,6 +205,8 @@ export interface Controllo {
   campo: string;
   testo: string;
   grave: boolean;
+  /** D-176: distingue i punti sui dati letti da quelli sull'abbinamento, per separarli nell'elenco e in Correggi. */
+  gruppo: 'lettura' | 'confronto';
 }
 
 export interface Soglie {
@@ -185,25 +238,35 @@ function componiLetto(tipo: string | null, fornitore_id: bigint | null, m: Map<s
   const righe: RigaLetta[] = [];
   for (let i = 0; ; i++) {
     const p = `righe[${i}].`;
+    const quantita = num(valore(p + 'quantita'));
+    const prezzo = num(valore(p + 'prezzo'));
+    let importo = num(valore(p + 'importo'));
+    // D-179 §19: importo 0 su una riga che vale (quantità × prezzo > 0) è uno 0 del lettore (colonna
+    // non letta riempita con 0), non un importo vero: resta vuoto e la riga risulta calcolata. Uno 0
+    // vero (riga omaggio con prezzo 0) si tiene.
+    if (importo === 0 && quantita != null && prezzo != null && quantita * prezzo > 0) importo = null;
     const r: RigaLetta = {
       codice: valore(p + 'codice'), descrizione: valore(p + 'descrizione'),
-      quantita: num(valore(p + 'quantita')), prezzo: num(valore(p + 'prezzo')), importo: num(valore(p + 'importo')),
+      quantita, prezzo, importo, sconto: num(valore(p + 'sconto')),
       numero_fattura: valore(p + 'numero_fattura'), data_fattura: dataValida(valore(p + 'data_fattura')), provvigione: num(valore(p + 'provvigione')),
+      spesa: bool(valore(p + 'spesa')),
     };
     if (Object.values(r).every((x) => x == null)) break;
     righe.push(r);
   }
   return {
     tipo, fornitore_id, fornitore: valore('fornitore'),
-    numero: valore('numero'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'), cliente_id: valore('cliente_id'), piva_cliente: valore('piva_cliente'), piva_fornitore: valore('piva_fornitore'),
+    numero: valore('numero'), numero_ordine_fornitore: valore('numero_ordine_fornitore'), data: dataValida(valore('data')), codice_cliente: valore('codice_cliente'), cliente: valore('cliente'), cliente_id: valore('cliente_id'), piva_cliente: valore('piva_cliente'), piva_fornitore: valore('piva_fornitore'),
     importo: num(valore('importo_totale')),
     mese: intero(valore('mese')), anno: intero(valore('anno')), riferimento_fattura: valore('riferimento_fattura'),
     righe,
   };
 }
 
-/** Importo della riga come nel prototipo (M.importoRiga): quello letto, altrimenti quantità × prezzo. */
-const importoRigaLetta = (r: RigaLetta) => r.importo ?? (r.quantita != null && r.prezzo != null ? round2(r.quantita * r.prezzo) : 0);
+/** Fattore di sconto di riga (es. sconto 10 → 0,9): senza sconto resta 1. */
+export const fattoreSconto = (r: RigaLetta) => 1 - (r.sconto ?? 0) / 100;
+/** Importo della riga come nel prototipo (M.importoRiga): quello letto, altrimenti quantità × prezzo × (1 − sconto/100). */
+const importoRigaLetta = (r: RigaLetta) => r.importo ?? (r.quantita != null && r.prezzo != null ? round2(r.quantita * r.prezzo * fattoreSconto(r)) : 0);
 /** Somma delle righe (M.importoDoc). Per il bollettino il **totale riconosciuto** è la somma delle
  *  provvigioni delle fatture del mese (§7.9), non degli imponibili (D-73). */
 const importoDocumento = (l: Letto) =>
@@ -244,11 +307,8 @@ export async function risolviFornitore(db: Db, nome: string): Promise<{ fornitor
       if (larga.length === 1) return { fornitore_id: larga[0].id, fornitore_versione_id: larga[0].versione_corrente_id! };
     }
     // D-164: somiglianza pg_trgm — un solo candidato sopra soglia, o il primo ben distaccato, si riconosce
-    const simili = await fornitoriSimili(db, nome);
-    if (simili.length === 1) return { fornitore_id: simili[0].fornitore_id, fornitore_versione_id: simili[0].fornitore_versione_id };
-    if (simili.length >= 2 && simili[0].sim - simili[1].sim >= DISTACCO_SIM) {
-      return { fornitore_id: simili[0].fornitore_id, fornitore_versione_id: simili[0].fornitore_versione_id };
-    }
+    const scelto = unicoPerDistacco(await fornitoriSimili(db, nome));
+    if (scelto) return { fornitore_id: scelto.fornitore_id, fornitore_versione_id: scelto.fornitore_versione_id };
     return null;
   }
   return scelti.length === 1 ? { fornitore_id: scelti[0].id, fornitore_versione_id: scelti[0].versione_corrente_id! } : null;
@@ -284,28 +344,69 @@ async function clienteDaVocabolario(db: Db, nome: string | null): Promise<{ clie
 }
 
 /* ---------- Somiglianza del nome (pg_trgm, D-164) ---------- */
-/** Soglia di `similarity` per riconoscere un fornitore dal nome letto (costante, D-164 §19). */
+/** Soglia di `similarity` per riconoscere un soggetto dal nome letto (costante, D-164 §19). */
 const SOGLIA_SIM = 0.6;
 /** Distacco minimo del primo candidato dal secondo perché la scelta automatica sia sicura (D-111: mai a caso). */
 const DISTACCO_SIM = 0.2;
 
-/** Fornitori il cui nome corrente somiglia a quello letto (pg_trgm, indice gin_trgm su ragione_sociale),
- *  dal più simile. `nome` arriva già normalizzato (minuscole, punteggiatura via). */
+/** Nome netto in SQL per la somiglianza (D-164): minuscole, punteggiatura via e **senza le sigle
+ *  societarie** da entrambi i lati (stessa lista di `senzaSigle`). Parole intere, per non confondere
+ *  «co» dentro «company». `col` è un nome di colonna costante (mai un valore dell'utente). */
+const NOME_NETTO = (col: string) => Prisma.raw(
+  `regexp_replace(regexp_replace(lower(${col}), '[^a-z0-9]+', ' ', 'g'), '(^| )(${[...SIGLE].join('|')})(?= |$)', '', 'g')`
+);
+
+/** Un solo candidato, o il primo ben distaccato dal secondo, si riconosce; più candidati vicini → null
+ *  (si propongono con il punteggio, mai una scelta a caso, D-111/D-164). */
+function unicoPerDistacco<T extends { sim: number }>(simili: T[]): T | null {
+  if (simili.length === 1) return simili[0];
+  if (simili.length >= 2 && simili[0].sim - simili[1].sim >= DISTACCO_SIM) return simili[0];
+  return null;
+}
+
+/** Fornitori il cui nome corrente somiglia a quello letto (pg_trgm), dal più simile, senza le sigle
+ *  societarie dai due lati (D-164). `nome` può essere il testo grezzo letto. */
 async function fornitoriSimili(db: Db, nome: string, limite = 10): Promise<{ fornitore_id: bigint; fornitore_versione_id: bigint; ragione_sociale: string; piva: string | null; sim: number }[]> {
-  const t = normalizzaNome(nome ?? '');
+  const t = senzaSigle(nome);
   if (t.length < 3) return [];
   return db.$queryRaw<{ fornitore_id: bigint; fornitore_versione_id: bigint; ragione_sociale: string; piva: string | null; sim: number }[]>`
     SELECT f.id AS fornitore_id, f.versione_corrente_id AS fornitore_versione_id, fv.ragione_sociale, fv.piva,
-           similarity(${t}, lower(regexp_replace(fv.ragione_sociale, '[^a-zA-Z0-9]+', ' ', 'g'))) AS sim
+           similarity(${t}, ${NOME_NETTO('fv.ragione_sociale')}) AS sim
     FROM fornitori f
     JOIN fornitori_versioni fv ON fv.id = f.versione_corrente_id
-    WHERE similarity(${t}, lower(regexp_replace(fv.ragione_sociale, '[^a-zA-Z0-9]+', ' ', 'g'))) > ${SOGLIA_SIM}
+    WHERE similarity(${t}, ${NOME_NETTO('fv.ragione_sociale')}) > ${SOGLIA_SIM}
     ORDER BY sim DESC
     LIMIT ${limite}`;
 }
 
-/* ---------- Codice cliente → cliente (interscambio valido alla data, D-71) ---------- */
-async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | null> {
+/** Clienti il cui nome corrente somiglia a quello letto (D-164): stesse regole del fornitore. */
+async function clientiSimili(db: Db, nome: string, limite = 10): Promise<{ cliente_id: bigint; ragione_sociale: string; piva: string | null; sim: number }[]> {
+  const t = senzaSigle(nome);
+  if (t.length < 3) return [];
+  return db.$queryRaw<{ cliente_id: bigint; ragione_sociale: string; piva: string | null; sim: number }[]>`
+    SELECT c.id AS cliente_id, cv.ragione_sociale, cv.piva,
+           similarity(${t}, ${NOME_NETTO('cv.ragione_sociale')}) AS sim
+    FROM clienti c
+    JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
+    WHERE similarity(${t}, ${NOME_NETTO('cv.ragione_sociale')}) > ${SOGLIA_SIM}
+    ORDER BY sim DESC
+    LIMIT ${limite}`;
+}
+
+/** Cliente riconosciuto per somiglianza del nome (D-164): un solo candidato, o il primo ben distaccato.
+ *  Più candidati vicini → null (si propongono con il punteggio, mai a caso). */
+async function clientePerSomiglianza(db: Db, nome: string | null): Promise<{ cliente_id: bigint; ragione: string | null } | null> {
+  const s = unicoPerDistacco(await clientiSimili(db, nome ?? ''));
+  return s ? { cliente_id: s.cliente_id, ragione: s.ragione_sociale } : null;
+}
+
+/* ---------- Codice cliente → agenzia (interscambio valido alla data, D-71/D-159) ---------- */
+/** Agenzia per il codice del documento (fornitore + codice, valida alla data), con il cliente, il
+ *  codice effettivo, `da_confermare` e il nome del fornitore. `abbinamentoPerCodice` e il controllo
+ *  del codice in `controlliFissi` usano la stessa lettura (una query sola, D-71). */
+async function agenziaPerCodice(db: Db, l: Letto): Promise<{
+  cliente_id: bigint; cliente: string | null; codice: string; da_confermare: boolean; fornitore: string | null;
+} | null> {
   if (l.fornitore_id == null || !l.codice_cliente) return null;
   const giorno = l.data ? new Date(l.data + 'T00:00:00Z') : new Date(); // oggi se manca (§6.5 punto 5)
   const a = await db.interscambio.findFirst({
@@ -315,10 +416,45 @@ async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | nul
       valido_dal: { lte: giorno },
       OR: [{ valido_al: null }, { valido_al: { gt: giorno } }],
     },
-    select: { cliente_id: true, codice_cliente_fornitore: true, cliente: { select: { corrente: { select: { ragione_sociale: true } } } } },
+    select: {
+      cliente_id: true, codice_cliente_fornitore: true, da_confermare: true,
+      cliente: { select: { corrente: { select: { ragione_sociale: true } } } },
+      fornitore: { select: { corrente: { select: { ragione_sociale: true } } } },
+    },
   });
   if (!a) return null;
-  return { cliente_id: a.cliente_id, cliente: a.cliente.corrente?.ragione_sociale ?? null, codice: a.codice_cliente_fornitore };
+  return {
+    cliente_id: a.cliente_id,
+    cliente: a.cliente.corrente?.ragione_sociale ?? null,
+    codice: a.codice_cliente_fornitore ?? l.codice_cliente,
+    da_confermare: a.da_confermare,
+    fornitore: a.fornitore.corrente?.ragione_sociale ?? null,
+  };
+}
+
+async function abbinamentoPerCodice(db: Db, l: Letto): Promise<Abbinamento | null> {
+  const a = await agenziaPerCodice(db, l);
+  return a ? { cliente_id: a.cliente_id, cliente: a.cliente, codice: a.codice } : null;
+}
+
+/* ---------- Corrispondenza codice cliente ↔ cliente associato (D-175) ---------- */
+/** Stato della corrispondenza fra il codice cliente letto e il cliente associato al documento, per la
+ *  spunta verde / avviso giallo dell'intestazione (V12). Riusa `agenziaPerCodice`, la stessa lettura di
+ *  `controlliFissi`: un solo calcolo del codice. `associato` = cliente dell'abbinamento o riconosciuto. */
+export type EsitoCodice =
+  | { stato: 'assente' }
+  | { stato: 'corrisponde'; cliente: string | null }
+  | { stato: 'altro_cliente'; cliente: string | null; fornitore: string | null }
+  | { stato: 'senza_agenzia' }
+  | { stato: 'da_confermare'; cliente: string | null };
+
+export async function esitoCodiceCliente(db: Db, l: Letto, associato: bigint | null): Promise<EsitoCodice> {
+  if (!l.codice_cliente || l.fornitore_id == null) return { stato: 'assente' };
+  const a = await agenziaPerCodice(db, l);
+  if (!a) return { stato: 'senza_agenzia' };
+  if (a.da_confermare) return { stato: 'da_confermare', cliente: a.cliente };
+  if (associato != null && a.cliente_id === associato) return { stato: 'corrisponde', cliente: a.cliente };
+  return { stato: 'altro_cliente', cliente: a.cliente, fornitore: a.fornitore };
 }
 
 /* ---------- Cliente per P.IVA o ragione sociale (D-92) ---------- */
@@ -354,12 +490,13 @@ export function riconosciClienteDai(clienti: ClienteConCorrente[], piva_cliente:
 
 /** Riconosce il cliente del documento quando il codice del fornitore non è abbinato (D-92). */
 export async function riconosciCliente(db: Db, l: Letto): Promise<{ cliente_id: bigint; ragione: string | null } | null> {
-  // D-164: vocabolario imparato, poi P.IVA o ragione sociale
+  // D-164: vocabolario imparato, poi P.IVA o ragione sociale, infine la somiglianza del nome
   const vocabolario = await clienteDaVocabolario(db, l.cliente);
   if (vocabolario) return vocabolario;
   // una sola lettura dei clienti con la versione corrente (P.IVA e ragione sociale stanno sulla versione, §4.6)
   const clienti = await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
-  return riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
+  const esatto = riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
+  return esatto ?? await clientePerSomiglianza(db, l.cliente);
 }
 
 /* ---------- Candidati da scegliere (D-152) ---------- */
@@ -413,8 +550,9 @@ const candidatoIntegra = (x: RigaIntegra): CandidatoSoggetto => ({ fonte: 'integ
 
 /* ---------- Agenzia mancante (D-106) ---------- */
 
-/** Tipi che entrano in una pratica: l'ordine la apre, gli altri si abbinano (§6.5). */
-const ENTRA_IN_PRATICA = new Set(['ordine', 'conferma', 'fattura', 'nota_credito']);
+/** Tipi che entrano in una pratica: l'ordine la apre, gli altri si abbinano (§6.5).
+ *  La proforma è come la conferma (D-60: l'una o l'altra porta a «confermata»). */
+const ENTRA_IN_PRATICA = new Set(['ordine', 'conferma', 'proforma', 'fattura', 'nota_credito']);
 
 /** Interscambio (agenzia) valido alla data del documento: lo stesso controllo di `documenti.ts` (D-106). */
 async function agenziaValida(db: Db, cliente_id: bigint, fornitore_id: bigint, data: string | null): Promise<boolean> {
@@ -516,21 +654,134 @@ export async function mancaRappresentanzaRighe(db: Db, righe: RigaAgenzia[], sen
 }
 
 /* ---------- Proposta di abbinamento (M.proposta, §6.5) ---------- */
+
+/** D-169: il documento cita un numero d'ordine del fornitore → cerca la pratica (o le pratiche) con
+ *  quel numero. La chiave è fornitore + numero, mai il numero da solo; se il fornitore non è
+ *  riconosciuto si cerca fra tutte le pratiche (da proporre, mai da agganciare da solo). */
+async function praticaPerOrdine(db: Db, l: Letto): Promise<PraticaOrdine[]> {
+  const numero = (l.numero_ordine_fornitore ?? '').trim();
+  if (!numero) return [];
+  const pratiche = await db.ordini_fornitore_testata.findMany({
+    where: { numero_ordine_fornitore: numero, ...(l.fornitore_id != null ? { fornitore_id: l.fornitore_id } : {}) },
+    select: {
+      id: true, numero_ordine: true, numero_ordine_fornitore: true, fornitore_id: true, cliente_id: true, stato: true, data_ordine: true,
+      fornitore: { select: { ragione_sociale: true } },
+      cliente: { select: { ragione_sociale: true } },
+    },
+    orderBy: { id: 'asc' },
+  });
+  return pratiche.map((p) => ({
+    id: String(p.id), numero: p.numero_ordine, numero_ordine_fornitore: p.numero_ordine_fornitore ?? numero,
+    cliente: p.cliente?.ragione_sociale ?? null, cliente_id: p.cliente_id,
+    fornitore: p.fornitore?.ragione_sociale ?? null, fornitore_id: p.fornitore_id,
+    stato: p.stato, data_ordine: iso(p.data_ordine),
+  }));
+}
+
+/** D-169 (4b): il cliente del documento coincide con quello della pratica trovata per numero d'ordine?
+ *  Per codice cliente del fornitore, P.IVA o nome letto; false quando non coincide o il documento non
+ *  permette di dirlo (in quel caso non si abbina il cliente da solo, resta un punto da controllare). */
+async function clienteCoincideOrdine(db: Db, l: Letto, p: PraticaOrdine): Promise<boolean | null> {
+  // 1. codice cliente del fornitore → agenzia → cliente, confrontato con il cliente della pratica
+  if (l.fornitore_id != null && l.codice_cliente) {
+    const a = await agenziaPerCodice(db, l);
+    if (a) return a.cliente_id === p.cliente_id;
+  }
+  // 2. P.IVA del documento contro la P.IVA del cliente della pratica
+  if (l.piva_cliente) {
+    const c = await db.clienti.findUnique({ where: { id: p.cliente_id }, select: { versione_corrente_id: true, corrente: { select: { piva: true } } } });
+    const piva = c?.corrente?.piva ?? null;
+    if (piva) return normalizzaPiva(piva) === normalizzaPiva(l.piva_cliente);
+  }
+  // 3. nome letto contro la ragione sociale della pratica
+  const nome = normalizzaNome(l.cliente ?? '');
+  const pratica = normalizzaNome(p.cliente ?? '');
+  if (nome && pratica) return nome === pratica;
+  return null; // il documento non permette di dirlo
+}
+
+/** Candidato della proposta dal numero d'ordine del fornitore (D-169): il motivo dice l'ordine e il fornitore. */
+const candidatoOrdine = (p: PraticaOrdine): Candidato => ({
+  pratica: { id: p.id, numero: p.numero, cliente: p.cliente, stato: p.stato, data_ordine: p.data_ordine },
+  punteggio: 1,
+  motivi: [`ordine ${p.numero_ordine_fornitore}` + (p.fornitore ? ` di ${p.fornitore}` : '')],
+  delta: 0,
+  ruolo: null,
+});
+
+/* ---------- Ruolo di una conferma/proforma in più (D-174) ---------- */
+/** Tolleranza dell'1 % per dire che due importi «coincidono» (parziale/sostituisce, D-174 §19). */
+export const TOLLERANZA_CONFERME = 0.01;
+const vicinoConferme = (a: number, b: number) => b > 0 && Math.abs(a - b) / b <= TOLLERANZA_CONFERME;
+
+/** Documenti da marcare superati quando l'operatore sceglie «sostituisce» (D-174): se l'importo è ≈
+ *  al totale dell'ordine sostituisce tutte le conferme/proforme valide, se ≈ a una sola sostituisce
+ *  quella; altrimenti (non corrisponde a nulla di preciso) sostituisce comunque tutto. */
+export function superatiConferma(imp: number, ordine: number, validi: { id: bigint; importo: number }[]): bigint[] {
+  if (vicinoConferme(imp, ordine)) return validi.map((v) => v.id);
+  const uno = validi.find((v) => vicinoConferme(imp, v.importo));
+  if (uno) return [uno.id];
+  return validi.map((v) => v.id);
+}
+
+/** Suggerisce il ruolo di una conferma/proforma che arriva su una pratica che ne ha già una (D-174):
+ *  «parziale» se la somma resta entro l'importo dell'ordine, «sostituisce» se l'importo è ≈ al totale
+ *  dell'ordine o ≈ a quello di una conferma già presente (o se la somma supererebbe l'ordine). */
+export function ruoloConferma(imp: number, ordine: number, validi: { id: bigint; importo: number }[]): { ruolo: 'parziale' | 'sostituisce' | null; supera: bigint[] } {
+  if (!validi.length) return { ruolo: null, supera: [] }; // prima conferma/proforma: nessuna scelta
+  if (vicinoConferme(imp, ordine) || validi.some((v) => vicinoConferme(imp, v.importo))) {
+    return { ruolo: 'sostituisce', supera: superatiConferma(imp, ordine, validi) };
+  }
+  const somma = validi.reduce((s, v) => s + v.importo, 0);
+  if (somma + imp <= ordine * (1 + TOLLERANZA_CONFERME)) return { ruolo: 'parziale', supera: [] };
+  return { ruolo: 'sostituisce', supera: superatiConferma(imp, ordine, validi) };
+}
+
 const CON_PROP = {
   righe: { orderBy: { numero_riga: 'asc' as const } },
-  documenti: { select: { tipo: true, numero: true } },
+  documenti: { select: { id: true, tipo: true, numero: true, importo: true, superato_da: true } },
   cliente: { select: { ragione_sociale: true } },
 } satisfies Prisma.ordini_fornitore_testataInclude;
 
-export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {}): Promise<Proposta> {
+export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {}, filtro: FiltroPratiche = 'tutte'): Promise<Proposta> {
   const imp = importoDocumento(l);
   // base della risposta: i campi nuovi (D-111/D-112) sono null finché un esito non li riempie
-  const base: Proposta = { esito: 'nessuno', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null, fornitore_da_integra: null, cliente_da_integra: null, manca_rappresentanza: null, candidati_fornitore: [], candidati_cliente: [], integra_non_raggiungibile: !!contesto.integra_non_raggiungibile };
+  const base: Proposta = { esito: 'nessuno', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null, fornitore_da_integra: null, cliente_da_integra: null, manca_rappresentanza: null, candidati_fornitore: [], candidati_cliente: [], integra_non_raggiungibile: !!contesto.integra_non_raggiungibile, pratica_ordine: null };
   if (l.tipo === 'bollettino') {
     const gia = l.fornitore_id != null && l.mese != null && l.anno != null
       ? await db.bollettini_testata.findFirst({ where: { fornitore_id: l.fornitore_id, mese: l.mese, anno: l.anno }, select: { id: true } })
       : null;
     return { ...base, esito: gia ? 'doppio' : 'bollettino' };
+  }
+
+  // D-164: il fornitore si ri-risolve a ogni apertura (vocabolario + somiglianza): i documenti letti
+  // prima del riconoscimento furbo, o con un nome storpiato, si riconoscono senza rileggere il file.
+  if (l.fornitore_id == null && l.fornitore) {
+    const f = await risolviFornitore(db, l.fornitore);
+    if (f) l = { ...l, fornitore_id: f.fornitore_id };
+  }
+
+  // D-169: il numero d'ordine del fornitore è il primo aggancio, prima di tutto il resto. Per proforma,
+  // conferma, fattura e nota di credito che citano l'ordine: una sola pratica → aggancio certo (cliente,
+  // fornitore e agenzia si ereditano dalla pratica); più pratiche → da scegliere (D-111); fornitore non
+  // riconosciuto → si propone, mai da solo. Per l'ordine il numero è suo e apre la pratica (più sotto).
+  if (l.tipo !== 'ordine' && l.numero_ordine_fornitore) {
+    const perOrdine = await praticaPerOrdine(db, l);
+    if (perOrdine.length === 1) {
+      const p = perOrdine[0];
+      const coincide = await clienteCoincideOrdine(db, l, p);
+      return {
+        ...base, esito: 'certo', candidati: [candidatoOrdine(p)],
+        pratica_ordine: { pratica: p, cliente_coincide: coincide },
+        // D-169 (4b): solo se il cliente coincide l'abbinamento è fatto; altrimenti resta da verificare
+        abbinamento: coincide === true ? { cliente_id: p.cliente_id, cliente: p.cliente, codice: null } : null,
+        cliente_riconosciuto: coincide === true ? { cliente_id: p.cliente_id, ragione: p.cliente } : null,
+      };
+    }
+    if (perOrdine.length > 1) {
+      return { ...base, esito: 'ambiguo', candidati: perOrdine.map(candidatoOrdine) };
+    }
+    // nessuna pratica con quel numero: si prosegue col riconoscimento normale
   }
 
   // D-152: fornitore non in anagrafica → candidati dal CRM (nome) e da Integra; una sola riga di
@@ -556,7 +807,15 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   // D-92 + D-106: cliente riconosciuto (codice del fornitore, altrimenti P.IVA/ragione sociale).
   // D-152: i clienti con la versione corrente si leggono una volta sola, per riconoscimento e candidati.
   const clienti = (ab || clienteScelto || clienteVocabolario) ? [] : await db.clienti.findMany({ where: { versione_corrente_id: { not: null } }, include: { corrente: true } });
-  const cliente_riconosciuto = clienteScelto ?? clienteVocabolario ?? (ab ? null : riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente));
+  let cliente_riconosciuto = clienteScelto ?? clienteVocabolario ?? (ab ? null : riconosciClienteDai(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente));
+  // D-164: somiglianza del nome anche per il cliente (stesse regole del fornitore): un solo candidato
+  // (o il primo ben distaccato) si riconosce, più candidati vicini → da scegliere più sotto.
+  if (cliente_riconosciuto == null && !clienteScelto && !clienteVocabolario && !ab) {
+    cliente_riconosciuto = await clientePerSomiglianza(db, l.cliente);
+  }
+  // D-60/proforma: il cliente certo (agenzia per codice, scelto a mano o vocabolario) filtra le pratiche
+  // della coppia; il riconosciuto per P.IVA/nome non filtra (resta il confronto per articoli di prima).
+  const clientePratica = ab?.cliente_id ?? clienteScelto?.cliente_id ?? clienteVocabolario?.cliente_id ?? null;
   const storico = contesto.storico ?? [];
   // D-112: la coppia cliente-fornitore nello storico, con o senza subagente
   const coppiaCon = storico.find((s) => s.rappresentato) ?? null;
@@ -565,13 +824,19 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   // D-111/D-112/D-152: cliente non riconosciuto ma proposto dallo storico (subagente + sconto), da una
   // sola riga di Integra (certo, come oggi) o da un elenco di candidati da scegliere.
   // Vale per i tipi che entrano in pratica, prima dell'ordine (il doppione di un ordine vince comunque, vedi sotto).
-  const clienteDaIntegra = (): Proposta | null => {
+  const clienteDaIntegra = async (): Promise<Proposta | null> => {
     if (l.fornitore_id == null || ab != null || cliente_riconosciuto != null) return null;
     if (coppiaCon) {
       return { ...base, esito: 'cliente_da_integra', cliente_da_integra: { id_integra: null, ragione_sociale: coppiaCon.cliente_ragione_sociale, piva: coppiaCon.cliente_piva, subagente: coppiaCon.subagente_nome, sconto: coppiaCon.sconto } };
     }
     const c = (contesto.cliente_su_integra ?? []).filter((x) => x.id_integra != null);
     const crm = candidatiClienteCrm(clienti as ClienteConCorrente[], l.piva_cliente, l.cliente);
+    // D-164: i clienti con nome simile si propongono con il punteggio (mai a caso), come il fornitore
+    for (const s of await clientiSimili(db, l.cliente ?? '')) {
+      if (!crm.some((x) => x.id === String(s.cliente_id))) {
+        crm.push({ fonte: 'crm', id: String(s.cliente_id), ragione_sociale: s.ragione_sociale, piva: s.piva, citta: null, motivo: 'nome simile', punteggio: Number(s.sim) });
+      }
+    }
     if (crm.length === 0 && c.length === 1) {
       return { ...base, esito: 'cliente_da_integra', cliente_da_integra: { id_integra: c[0].id_integra, ragione_sociale: c[0].ragione_sociale, piva: c[0].piva, subagente: null, sconto: null } };
     }
@@ -587,7 +852,7 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
       ? await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'ordine', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } })
       : null;
     if (gia) return { ...base, esito: 'doppio' };
-    const cd = clienteDaIntegra();
+    const cd = await clienteDaIntegra();
     if (cd) return cd;
     const manca = await agenziaMancante(db, l, ab, cliente_riconosciuto);
     if (manca) {
@@ -598,8 +863,10 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
     }
     return { ...base, esito: ab ? 'nuova' : 'nessuno', abbinamento: ab, cliente_riconosciuto };
   }
-  if (l.tipo !== 'conferma' && l.tipo !== 'fattura' && l.tipo !== 'nota_credito') {
-    return { ...base, esito: 'nessuno', abbinamento: ab, cliente_riconosciuto: null }; // proforma, pagamento, altro o tipo non letto
+  if (l.tipo !== 'conferma' && l.tipo !== 'proforma' && l.tipo !== 'fattura' && l.tipo !== 'nota_credito') {
+    // pagamento, altro o tipo non letto: non entrano in una pratica, ma il cliente scelto o
+    // riconosciuto (codice del fornitore, P.IVA, nome) resta quello del documento (D-169, E di Ugo).
+    return { ...base, esito: 'nessuno', abbinamento: ab, cliente_riconosciuto };
   }
   // una fattura già registrata in una pratica è un doppione
   if (l.tipo === 'fattura' && l.fornitore_id != null && l.numero) {
@@ -607,7 +874,7 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
     if (gia) return { ...base, esito: 'doppio', abbinamento: ab, cliente_riconosciuto: null };
   }
 
-  const cd = clienteDaIntegra();
+  const cd = await clienteDaIntegra();
   if (cd) return cd;
 
   // D-106: cliente e fornitore riconosciuti ma senza agenzia valida alla data → non si abbina
@@ -623,13 +890,15 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   const codiciDoc = l.righe.map((r) => r.codice).filter((c): c is string => !!c);
   const testate = l.fornitore_id != null
     ? await db.ordini_fornitore_testata.findMany({
-      where: { fornitore_id: l.fornitore_id, ...(ab ? { cliente_id: ab.cliente_id } : {}) },
+      where: { fornitore_id: l.fornitore_id, ...(clientePratica != null ? { cliente_id: clientePratica } : {}) },
       include: CON_PROP,
     })
     : [];
-  // conferma: esclude le pratiche che hanno già una conferma o documenti fiscali; fattura: quelle che hanno già quella fattura
+  // D-174: conferma e proforma non escludono più le pratiche già confermate (più conferme/proforme
+  // si agganciano alla stessa pratica); escludono solo quelle fiscali (già fatturate).
+  // fattura: esclude le pratiche che hanno già quella fattura
   const pool = testate.filter((t) => {
-    if (l.tipo === 'conferma') return !t.documenti.some((d) => d.tipo === 'conferma') && !t.documenti.some((d) => fiscale(d.tipo));
+    if (l.tipo === 'conferma' || l.tipo === 'proforma') return !t.documenti.some((d) => fiscale(d.tipo));
     if (l.tipo === 'fattura') return !t.documenti.some((d) => fiscale(d.tipo) && d.numero === l.numero);
     return true;
   });
@@ -650,33 +919,51 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
     const giaFatt = t.documenti.some((d) => d.tipo === 'fattura');
     if (giaFatt) motivi.push('pratica già fatturata');
     const importoRif = round2(Number(rif.reduce((s, r) => s.plus(r.importo ?? ZERO), ZERO)));
+    // D-174: per conferma/proforma il suggerimento parziale/sostituisce con i numeri (somma attuale, importo ordine)
+    let ruolo: 'parziale' | 'sostituisce' | null = null;
+    if (l.tipo === 'conferma' || l.tipo === 'proforma') {
+      const impOrdine = round2(Number(t.documenti.filter((d) => d.tipo === 'ordine').reduce((s, d) => s.plus(d.importo ?? ZERO), ZERO)));
+      const validi = t.documenti.filter((d) => (d.tipo === 'conferma' || d.tipo === 'proforma') && d.superato_da == null)
+        .map((d) => ({ id: d.id, importo: Number(d.importo ?? ZERO) }));
+      ruolo = ruoloConferma(imp, impOrdine, validi).ruolo;
+      if (ruolo) {
+        const somma = round2(validi.reduce((s, v) => s + v.importo, 0));
+        motivi.push(`confermato ${euro(somma)} su ordine ${euro(impOrdine)}: ${ruolo === 'parziale' ? 'parziale (si somma)' : 'sostituisce'}`);
+      }
+    }
     return {
       pratica: { id: String(t.id), numero: t.numero_ordine, cliente: t.cliente?.ragione_sociale ?? null, stato: t.stato, data_ordine: iso(t.data_ordine) },
       punteggio: quota - (giaFatt ? 0.5 : 0),
       motivi,
       delta: round2(imp - importoRif),
+      ruolo,
     };
   }).sort((a, b) => b.punteggio - a.punteggio);
 
-  // nota di credito con riferimento alla fattura stornata: la pratica di quella fattura è certa e va prima
+  // nota di credito con riferimento alla fattura stornata: la pratica di quella fattura è certa e va prima,
+  // anche se il filtro per stato la escluderebbe (è per forza già fatturata, D-178 §19)
   if (l.tipo === 'nota_credito' && l.riferimento_fattura) {
     const k = candidati.findIndex((c) => (fiscaliNumeri.get(c.pratica.id) ?? []).includes(l.riferimento_fattura!));
     if (k >= 0) {
       const c = candidati.splice(k, 1)[0];
       c.motivi.unshift(`storna la fattura ${l.riferimento_fattura} di questa pratica`);
-      candidati.unshift(c);
-      return { ...base, esito: 'certo', candidati, abbinamento: ab, cliente_riconosciuto };
+      return { ...base, esito: 'certo', candidati: [c, ...filtraPratiche(candidati, filtro)], abbinamento: ab, cliente_riconosciuto };
     }
   }
 
+  // D-178 §19: il filtro per stato si applica qui, prima dell'esito, così la prima candidata è la proposta fra quelle filtrate
+  const proposti = filtraPratiche(candidati, filtro);
   let esito: Esito = 'nessuno';
-  if (candidati.length && !ab) esito = candidati[0].punteggio > 0 ? 'probabile' : 'nessuno';
-  else if (candidati.length === 1) esito = 'certo';
-  else if (candidati.length > 1) esito = candidati[0].punteggio - candidati[1].punteggio >= 0.5 ? 'probabile' : 'ambiguo';
-  return { ...base, esito, candidati, abbinamento: ab, cliente_riconosciuto };
+  if (proposti.length && clientePratica == null) esito = proposti[0].punteggio > 0 ? 'probabile' : 'nessuno';
+  else if (proposti.length === 1) esito = 'certo';
+  else if (proposti.length > 1) esito = proposti[0].punteggio - proposti[1].punteggio >= 0.5 ? 'probabile' : 'ambiguo';
+  return { ...base, esito, candidati: proposti, abbinamento: ab, cliente_riconosciuto };
 }
 
 /* ---------- Controlli fissi (§6.5 punto 5) ---------- */
+/** Codice articolo per il confronto (D-176): spazi via; gli zeri iniziali restano, sono parte del codice. */
+const normalizzaCodice = (c: string) => c.replace(/\s+/g, '');
+
 export async function controlliFissi(db: Db, l: Letto, proposta: Proposta): Promise<Controllo[]> {
   const out: Controllo[] = [];
   const f = l.fornitore_id != null;
@@ -684,42 +971,81 @@ export async function controlliFissi(db: Db, l: Letto, proposta: Proposta): Prom
   if (l.tipo === 'bollettino') {
     if (f && l.mese != null && l.anno != null
       && await db.bollettini_testata.findFirst({ where: { fornitore_id: l.fornitore_id!, mese: l.mese, anno: l.anno }, select: { id: true } })) {
-      out.push({ codice: 'bollettino', campo: 'mese', testo: 'Bollettino già registrato per questo fornitore e mese', grave: true });
+      out.push({ codice: 'bollettino', campo: 'mese', testo: 'Bollettino già registrato per questo fornitore e mese', grave: true, gruppo: 'lettura' });
     }
     return out; // gli altri controlli non valgono per il bollettino
   }
 
+  // D-169 (4b): trovata la pratica per numero d'ordine, il cliente del documento va verificato. Coincide
+  // → nessun punto; non coincide o il documento non lo dice → punto da controllare, mai un abbinamento al
+  // cliente da solo (il cliente della pratica non si sovrascrive da un documento).
+  if (proposta.pratica_ordine && proposta.pratica_ordine.cliente_coincide !== true) {
+    const p = proposta.pratica_ordine.pratica;
+    out.push({
+      codice: 'cliente_ordine', campo: 'cliente',
+      testo: `Il cliente del documento non coincide con quello della pratica ${p.numero_ordine_fornitore} (${p.cliente ?? ''}): cerca il cliente giusto`,
+      grave: false, gruppo: 'confronto',
+    });
+  }
+
   if (f && l.codice_cliente && proposta.abbinamento == null) {
-    out.push({ codice: 'codice_cliente', campo: 'codice_cliente', testo: `Codice cliente ${l.codice_cliente} non presente fra i clienti del fornitore`, grave: true });
+    // Quando il cliente è scelto a mano `abbinamento` resta null anche se l'agenzia per quel codice
+    // esiste (D-159): il controllo non deve dire «non presente». L'agenzia del codice si rilegge e
+    // si distingue fra: del cliente scelto (niente), di un altro cliente, da confermare.
+    const ag = await agenziaPerCodice(db, l);
+    const scelto = l.cliente_id != null && /^\d+$/.test(l.cliente_id) ? BigInt(l.cliente_id) : null;
+    if (!ag) {
+      out.push({ codice: 'codice_cliente', campo: 'codice_cliente', testo: `Codice cliente ${l.codice_cliente} non presente fra i clienti del fornitore`, grave: true, gruppo: 'lettura' });
+    } else if (ag.da_confermare) {
+      out.push({ codice: 'codice_cliente', campo: 'codice_cliente', testo: `Codice cliente ${l.codice_cliente}: agenzia dal vecchio CRM, da confermare`, grave: false, gruppo: 'lettura' });
+    } else if (scelto != null && ag.cliente_id === scelto) {
+      // il codice è del cliente scelto a mano: nessun rilievo
+    } else {
+      out.push({ codice: 'codice_cliente', campo: 'codice_cliente', testo: `Il codice ${l.codice_cliente} presso ${ag.fornitore ?? ''} è di ${ag.cliente ?? ''}`, grave: true, gruppo: 'lettura' });
+    }
   }
 
   const somma = round2(l.righe.reduce((s, r) => s + importoRigaLetta(r), 0));
   if (l.importo != null && Math.abs(l.importo - somma) >= 0.01) {
-    out.push({ codice: 'totale', campo: 'totale', testo: `Totale del documento ${euro(l.importo)} diverso dalla somma delle righe ${euro(somma)}`, grave: true });
+    out.push({ codice: 'totale', campo: 'totale', testo: `Totale del documento ${euro(l.importo)} diverso dalla somma delle righe ${euro(somma)}`, grave: true, gruppo: 'lettura' });
   }
 
   l.righe.forEach((r, i) => {
     if (r.quantita != null && r.prezzo != null && r.importo != null) {
-      const atteso = round2(r.quantita * r.prezzo);
+      const atteso = round2(r.quantita * r.prezzo * fattoreSconto(r));
       if (Math.abs(atteso - r.importo) >= 0.01) {
-        out.push({ codice: 'riga', campo: `righe[${i}]`, testo: `Riga ${i + 1}: quantità × prezzo ${euro(atteso)} diverso dall'importo ${euro(r.importo)}`, grave: false });
+        out.push({ codice: 'riga', campo: `righe[${i}]`, testo: `Riga ${i + 1}: quantità × prezzo ${euro(atteso)} diverso dall'importo ${euro(r.importo)}`, grave: false, gruppo: 'lettura' });
       }
     }
   });
 
-  // pratica proposta = la prima candidata: articoli assenti e data prima dell'ordine
+  // pratica proposta = la prima candidata: articoli assenti e data prima dell'ordine.
+  // D-176: l'articolo assente è un avviso (non grave) sul confronto con l'ordine, non sulla lettura;
+  // quando ne mancano più della metà un solo punto riassuntivo, non un punto per riga.
   const prima = proposta.candidati[0];
   if (f && prima) {
-    const t = await db.ordini_fornitore_testata.findUnique({ where: { id: BigInt(prima.pratica.id) }, include: { righe: true } });
+    const t = await db.ordini_fornitore_testata.findUnique({
+      where: { id: BigInt(prima.pratica.id) },
+      include: {
+        righe: true,
+        documenti: { where: { tipo: 'ordine' }, select: { numero: true } },
+      },
+    });
     if (t) {
-      const codiciPratica = new Set(t.righe.map((r) => r.codice).filter((c): c is string => !!c));
-      l.righe.forEach((r, i) => {
-        if (r.codice && !codiciPratica.has(r.codice)) {
-          out.push({ codice: 'articolo', campo: `righe[${i}]`, testo: `Articolo ${r.codice} assente fra le righe della pratica proposta`, grave: false });
+      const numOrdine = t.documenti[0]?.numero ?? prima.pratica.numero;
+      const codiciOrdine = new Set(t.righe.filter((r) => r.fase === 'ordine').map((r) => r.codice).filter((c): c is string => !!c).map(normalizzaCodice));
+      const assenti = l.righe.map((r, i) => ({ r, i })).filter(({ r }) => r.codice && !codiciOrdine.has(normalizzaCodice(r.codice)));
+      if (assenti.length) {
+        if (assenti.length > 1 && assenti.length * 2 > l.righe.filter((r) => r.codice).length) {
+          out.push({ codice: 'articolo', campo: 'righe', testo: `Nessuna riga in comune con l'ordine ${numOrdine}: forse la pratica non è quella giusta`, grave: false, gruppo: 'confronto' });
+        } else {
+          for (const { r, i } of assenti) {
+            out.push({ codice: 'articolo', campo: `righe[${i}]`, testo: `L'articolo ${r.codice} non c'è nell'ordine ${numOrdine}: controlla se è un'aggiunta del fornitore`, grave: false, gruppo: 'confronto' });
+          }
         }
-      });
+      }
       if (l.data && t.data_ordine && l.data < iso(t.data_ordine)) {
-        out.push({ codice: 'data', campo: 'data', testo: `Data del documento ${l.data} precedente alla data dell'ordine ${iso(t.data_ordine)}`, grave: false });
+        out.push({ codice: 'data', campo: 'data', testo: `Data del documento ${l.data} precedente alla data dell'ordine ${iso(t.data_ordine)}`, grave: false, gruppo: 'confronto' });
       }
     }
   }
@@ -755,7 +1081,10 @@ export async function valutaLettura(db: Db, documento_id: bigint, soglie?: Sogli
       if (aff != null && aff < s.soglia_bassa) bassa = true;
     }
   }
-  if (controlli.some((c) => c.grave)) bassa = true;
-  const n = incerti.length + controlli.length;
+  // D-176: il livello riguarda la sola lettura; i punti sull'abbinamento (gruppo «confronto») non lo
+  // abbassano: si mostrano separati nell'elenco e in Correggi.
+  const lettura = controlli.filter((c) => c.gruppo !== 'confronto');
+  if (lettura.some((c) => c.grave)) bassa = true;
+  const n = incerti.length + lettura.length;
   return { campi: incerti, controlli, n, livello: bassa ? 'bassa' : n ? 'da_controllare' : 'affidabile' };
 }

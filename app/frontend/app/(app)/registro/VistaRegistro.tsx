@@ -9,6 +9,7 @@ import type { VoceRiepilogo } from '@/componenti/RiepilogoFiltri';
 import { useSagome } from '@/componenti/Sagoma';
 import { api } from '@/lib/api';
 import { utente } from '@/lib/entita';
+import { oggi } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
 
 // Pagina del registro (F5-A2, §7.11, §15.6, D-31): elenco in sola lettura, filtro *Stessa
@@ -59,8 +60,6 @@ const mostra = (v: unknown): string => {
   return String(v);
 };
 
-const giornoRoma = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
-
 export function VistaRegistro() {
   const [valori, setValori] = useMemoria<Valori>('filtri', FILTRI);
   const [operazione, setOperazione] = useState('');
@@ -93,8 +92,8 @@ export function VistaRegistro() {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('da') === 'oggi') {
-      const oggi = giornoRoma();
-      setValori({ ...FILTRI, vista: 'errori', dal: oggi, al: oggi });
+      const oggiRoma = oggi();
+      setValori({ ...FILTRI, vista: 'errori', dal: oggiRoma, al: oggiRoma });
       setPagina(0);
     }
     if (p.toString()) window.history.replaceState(null, '', window.location.pathname);

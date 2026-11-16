@@ -34,7 +34,7 @@ export function Modale({ titolo, testo, onChiudi, piede, larga, corpoClasse, chi
   return (
     <div className="velo" onClick={(e) => { if (e.target === e.currentTarget) onChiudi(); }}>
       <div ref={finestra} className={'modale' + (larga ? ' larga' : '')} role="dialog" aria-modal="true" aria-labelledby={id}>
-        <div className="modale-testa"><h2 id={id}>{titolo}</h2>{testo && <p>{testo}</p>}</div>
+        <div className="modale-testa"><h2 id={id}>{titolo}</h2>{testo && <div>{testo}</div>}</div>
         {children && <div className={'modale-corpo' + (corpoClasse ? ' ' + corpoClasse : '')}>{children}</div>}
         <div className="modale-piede">
           {piede ?? <button type="button" className="btn sec" onClick={onChiudi}>Chiudi</button>}
@@ -44,13 +44,13 @@ export function Modale({ titolo, testo, onChiudi, piede, larga, corpoClasse, chi
   );
 }
 
-/** Conferma come CRM.Conferma: Annulla o il pulsante d'azione (rosso se pericolo). */
-export function Conferma({ titolo, testo, etichetta, pericolo, onRisposta }: {
-  titolo: string; testo?: ReactNode; etichetta: string; pericolo?: boolean; onRisposta: (si: boolean) => void;
+/** Conferma come CRM.Conferma: Annulla (o `annulla`) o il pulsante d'azione (rosso se pericolo). */
+export function Conferma({ titolo, testo, etichetta, pericolo, annulla, onRisposta }: {
+  titolo: string; testo?: ReactNode; etichetta: string; pericolo?: boolean; annulla?: string; onRisposta: (si: boolean) => void;
 }) {
   return (
     <Modale titolo={titolo} testo={testo} onChiudi={() => onRisposta(false)} piede={<>
-      <button type="button" className="btn sec" onClick={() => onRisposta(false)}>Annulla</button>
+      <button type="button" className="btn sec" onClick={() => onRisposta(false)}>{annulla ?? 'Annulla'}</button>
       <button type="button" className={'btn' + (pericolo ? ' pericolo' : '')} onClick={() => onRisposta(true)}>{etichetta}</button>
     </>} />
   );

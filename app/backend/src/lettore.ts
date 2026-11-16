@@ -44,6 +44,9 @@ export interface Lettura {
   risultato: Record<string, unknown>;
   modello: string;
   crediti: number | null;
+  /** D-170: risposta completa del lettore (compresi i testi citati dai campi), salvata in
+   *  `lettura_grezza` per ricavare campi nuovi dai documenti già letti senza rileggerli. */
+  grezza?: unknown;
 }
 
 interface Citazione {
@@ -189,7 +192,7 @@ async function leggiConLlamaCloud(c: ConfigCloud, nome: string, dati: Buffer, sc
     foglie(risultato, '', meta, campi);
     const uso = (ultimo as { usage?: { credits_used?: unknown; credits?: unknown } }).usage;
     const crediti = Number(uso?.credits_used ?? uso?.credits);
-    return { campi, risultato, modello: `llamacloud:extract:2.5:${c.modo}`, crediti: Number.isFinite(crediti) ? crediti : null };
+    return { campi, risultato, modello: `llamacloud:extract:2.5:${c.modo}`, crediti: Number.isFinite(crediti) ? crediti : null, grezza: ultimo };
   } catch (e) {
     if (e instanceof LetturaFallita) throw e;
     throw new LetturaFallita(`Lettura non riuscita: ${pulisci(e)}`, undefined, rete(e));

@@ -106,7 +106,7 @@ describe('GET /api/analisi', () => {
       pagate: variazione(ora.pagate, prima.pagate), margine: variazione(ora.margine, prima.margine),
     });
     // i numeri del prototipo sul seed (§12)
-    expect(numeri(b)).toEqual(j({ fatturato: 79534.06, prese: 12976.26, pagate: 4127.34, margine: 8848.92, documenti: 19, clienti: 7 }));
+    expect(numeri(b)).toEqual(j({ fatturato: 79534.06, prese: 9045.12, pagate: 4127.34, margine: 4917.78, documenti: 19, clienti: 7 }));
   });
 
   it('durata di 6 mesi: periodo precedente della stessa durata', async () => {
@@ -280,7 +280,7 @@ describe('GET /api/analisi/esporta', () => {
     const buf = r.body as Buffer;
     expect([buf[0], buf[1], buf[2]]).toEqual([0xef, 0xbb, 0xbf]);
     const righe = buf.toString('utf8').slice(1).split('\r\n');
-    expect(righe[0]).toBe('Data;Documento;Tipo;Fornitore;Partita IVA cliente;Cliente;Subagente;Fatturato;Dai fornitori;Ai subagenti;Margine');
+    expect(righe[0]).toBe('Data;Documento;Tipo;Fornitore;Partita IVA cliente;Cliente;Subagente;Base provvigione;Dai fornitori;Ai subagenti;Margine');
     const b = await pagina('?dal=2025-10&al=2026-09&fornitori=' + (await fornitoreId('Gries')));
     expect(righe.length - 1).toBe(b.tabella.totale);
     const totale = righe.slice(1).reduce((s, x) => s + Number(x.split(';')[7].replace(',', '.')), 0);

@@ -133,7 +133,7 @@ describe('percentuali datate', () => {
     expect(date(r)).toEqual(['2025-01-01']);
     expect(scaglioneDi(r, '2025-01-01', 1).eccezioni)
       .toEqual([expect.objectContaining({ subagente_id: bastasin, pct_personale: 3, valido_dal: '2025-01-01', valido_al: null })]);
-    expect(r.body.versioni[0].scaglioni[0]).toHaveProperty('dal_fornitore', 28);
+    expect(r.body.versioni[0].scaglioni[0]).toHaveProperty('dal_fornitore', 18); // D-166: solo la % di Decobrands (non più 18 + 10)
     expect(r.body.versioni[0].modificabile).toBe(false); // D-51: 2025 è prima dell'ultima chiusura (2026-08-31)
   });
 
@@ -160,8 +160,14 @@ describe('percentuali datate', () => {
 
   it('data nel periodo chiuso: 409', async () => {
     const r = await resp.post(p(), { valido_dal: '2026-08-31', scaglioni: GRIES_NUOVE }).expect(409);
-    expect(r.body.message).toMatch(/fino al 2026-08-31/);
+    expect(r.body.message).toMatch(/fino al 31\/08\/2026/);
     await resp.post(p(), { valido_dal: '2026-03-01', scaglioni: GRIES_NUOVE }).expect(409);
+  });
+
+  it('D-166: la % del subagente non supera la % dal fornitore (400)', async () => {
+    const viola = GRIES_NUOVE.map((s) => (s.sconto_min === 0 ? { ...s, pct_subagente: 21 } : s)); // 21 > 20
+    const r = await resp.post(p(), { valido_dal: '2026-10-01', scaglioni: viola }).expect(400);
+    expect(r.body.message).toMatch(/supera/);
   });
 
   it('rollback: se il registro fallisce non resta niente', async () => {
@@ -197,7 +203,7 @@ describe('percentuali datate', () => {
 
   it('versione fra due: la successiva deve avere tutte le sue soglie, 400', async () => {
     const r = await resp.post(p(), { valido_dal: '2026-12-15', scaglioni: [...GRIES_NUOVE, { sconto_min: 50, pct_agente: 1, pct_subagente: 0 }] }).expect(400);
-    expect(r.body.message).toMatch(/La versione dal 2027-01-01 non ha lo sconto 50 %/);
+    expect(r.body.message).toMatch(/La versione dal 01\/01\/2027 non ha lo sconto 50 %/);
     await resp.put(p() + '/2026-12-01', { scaglioni: [...GRIES_NUOVE, { sconto_min: 50, pct_agente: 1, pct_subagente: 0 }] }).expect(400);
   });
 
@@ -209,7 +215,7 @@ describe('percentuali datate', () => {
     const ev = await db.registro.findFirstOrThrow({ where: { codice: 'crud.update', entita: 'scaglione', entita_id: BigInt(gries) }, orderBy: { id: 'desc' } });
     expect(ev.dettaglio).toMatchObject({ valido_dal: '2026-12-01', dopo: { scaglioni: expect.arrayContaining([{ sconto_min: 0, pct_agente: 21, pct_subagente: 11 }]) } });
     const c = await resp.put(p() + '/2025-01-01', { scaglioni: GRIES_NUOVE }).expect(409);
-    expect(c.body.message).toBe('Le percentuali dal 2025-01-01 sono già usate in un periodo chiuso (fino al 2026-08-31): crea una versione nuova da una data successiva');
+    expect(c.body.message).toBe('Le percentuali dal 01/01/2025 sono già usate in un periodo chiuso (fino al 31/08/2026): crea una versione nuova da una data successiva');
     await resp.put(p() + '/2026-12-01', { scaglioni: GRIES_NUOVE.slice(1) }).expect(400); // manca lo sconto 0
     await resp.put(p() + '/2026-12-01', { valido_dal: '2026-12-02', scaglioni: GRIES_NUOVE }).expect(400); // la data sta nella rotta
     await resp.put(p() + '/2026-11-15', { scaglioni: GRIES_NUOVE }).expect(404);
@@ -313,6 +319,8 @@ describe('eccezioni personali (D-51)', () => {
     await resp.post('/eccezioni', { ...corpo(), valido_dal: undefined }).expect(400);
     await resp.post('/eccezioni', { ...corpo(), sconto_min: 7 }).expect(400); // sconto che il fornitore non ha
     await resp.post('/eccezioni', { ...corpo(), sconto_min: 3 }).expect(400); // soglia 3 solo dal 2026-12-01
+    const d166 = await resp.post('/eccezioni', { ...corpo(), pct_personale: 50 }).expect(400); // D-166: 50 > 13 (pct_agente dello sconto 5)
+    expect(d166.body.message).toMatch(/supera/);
     await resp.post('/eccezioni', { ...corpo(), subagente_id: 999999 }).expect(404);
     await resp.post('/eccezioni', { ...corpo(), fornitore_id: 999999 }).expect(404);
     await lett.get('/eccezioni').expect(400); // serve un filtro
@@ -398,7 +406,7 @@ describe('eccezioni personali (D-51)', () => {
     const vecchio = SCHEMI['crud.create'];
     SCHEMI['crud.create'] = ['chiave_che_manca'];
     try {
-      await resp.post('/eccezioni', { ...corpo(), sconto_min: 10, valido_dal: '2026-10-01' }).expect(500);
+      await resp.post('/eccezioni', { ...corpo(), sconto_min: 10, pct_personale: 2, valido_dal: '2026-10-01' }).expect(500);
       await resp.post(`/eccezioni/${id}/cambia`, { pct_personale: 2, dal: '2026-11-01' }).expect(500);
     } finally {
       SCHEMI['crud.create'] = vecchio;

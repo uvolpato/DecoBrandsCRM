@@ -82,18 +82,22 @@ with sync_playwright() as p:
     ok('6,5%' in pg.locator('.elenco li:has-text("Gasper")').inner_text(), 'eccezione modificata: nuova percentuale')
     pg.click('.elenco li:has-text("Gasper")'); pg.wait_for_selector('.velo .modale')
     pg.click('.velo .modale button.pericolo'); pg.wait_for_selector('.velo .modale h2:has-text("Eliminare l’eccezione")')
-    pg.click('.velo .modale button.pericolo'); pg.wait_for_function("() => ![...document.querySelectorAll('.elenco li')].some(l => l.textContent.includes('Gasper'))")
+    pg.click('.velo .casella-grave input')
+    pg.click('.velo .modale-piede button.pericolo'); pg.wait_for_function("() => ![...document.querySelectorAll('.elenco li')].some(l => l.textContent.includes('Gasper'))")
     ok(pg.locator('.elenco li:has-text("Gasper")').count() == 0, 'eccezione eliminata')
     pg.click('.schede-barra [role=tab]:has-text("Dati")'); pg.wait_for_timeout(300)
 
     # eliminare chi ha agenzie: rifiutato
     pg.click('.testa-azioni button:has-text("Elimina"), .pannello-testa button:has-text("Elimina")'); pg.wait_for_selector('.velo .modale')
+    pg.click('.velo .casella-grave input')
     pg.click('.velo .modale button.pericolo, .velo .modale button:has-text("Elimina")')
     m = avviso(pg)
     ok('abbinamenti' in m and righe(pg) >= 4 and 'Bastasin' in testo(pg, '.pannello-testa h2'), 'elimina chi ha agenzie: rifiutato col messaggio («%s»)' % m)
 
     # nuovo subagente: campi mancanti, codice doppio, poi creazione
     pg.click('.testa-azioni button:has-text("Nuovo subagente")'); finestra(pg).wait_for()
+    # il campo mostra il nome dell'agente quando le voci arrivano dal server (D-161: mai l'id)
+    pg.wait_for_function("document.querySelector('#c-agente_id') && document.querySelector('#c-agente_id').value !== ''", timeout=5000)
     ok(pg.input_value('#c-agente_id') != '', 'nuovo: l’agente è già proposto')
     invia(pg); pg.wait_for_selector('.modulo-errore:not([hidden])')
     ok(finestra(pg).count() == 1 and 'Scrivi' in testo(pg, '.modulo-errore'), 'nuovo senza dati: messaggio del server, finestra aperta')
@@ -128,6 +132,7 @@ with sync_playwright() as p:
        'indietro: stesso subagente, ricerca e segmento ricordati')
     # elimina quello creato (non ha agenzie)
     pg.click('.pannello-testa button:has-text("Elimina")'); pg.wait_for_selector('.velo .modale')
+    pg.click('.velo .casella-grave input')
     pg.click('.velo .modale button.pericolo, .velo .modale button:has-text("Elimina")')
     pg.wait_for_function("!document.body.innerText.includes('%s')" % COD, timeout=8000)
     ok(True, 'eliminato il subagente di prova')

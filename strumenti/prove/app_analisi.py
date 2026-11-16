@@ -88,7 +88,7 @@ with sync_playwright() as p:
     # periodo fisso del seed: qui i numeri coincidono con il prototipo
     pg.goto(BASE + '/analisi?dal=2025-10&al=2026-09'); pg.wait_for_selector('.kpi .kpi-valore'); quieta(pg)
     ok(periodo(pg) == 'ott 2025 → set 2026', 'periodo fisso del seed: ott 2025 → set 2026')
-    ok(kpi(pg)[:4] == ['79.534,06 €', '12.976,26 €', '4.127,34 €', '8.848,92 €'], 'i 4 numeri del periodo di 12 mesi')
+    ok(kpi(pg)[:4] == ['79.534,06 €', '9.045,12 €', '4.127,34 €', '4.917,78 €'], 'i 4 numeri del periodo di 12 mesi')
     ok('+333%' in testo(pg, '.kpi-riga'), 'confronto con il periodo precedente')
     pg.screenshot(path=str(USCITA / 'app-analisi-1440.png'))
 

@@ -1,4 +1,6 @@
 'use client';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { api } from '@/lib/api';
 import { caricaVoci, vociMenu, type Contesto, type Entita } from '@/lib/entita';
@@ -105,13 +107,24 @@ function Integra({ tipo, q, onScelto }: { tipo: TipoIntegra | undefined; q: stri
   );
 }
 
+// Filtro di stato nella finestra di ricerca (es. stato della pratica), tendina a destra del campo:
+// il chiamante tiene il valore e ricarica le voci dal server col contesto. Senza il parametro resta com'è.
+type SegmentiRicerca = { voci: { valore: string; etichetta: string }[]; valore: string; onCambia: (v: string) => void; etichetta?: string };
 type Comuni = { entita: Entita; contesto?: Contesto; placeholder?: string; etichetta?: string; id?: string;
+  segmenti?: SegmentiRicerca;
+  // vincoli della ricerca (es. «Pratiche di … con …»): mostrati sotto il titolo della finestra
+  vincoli?: string;
   // nome letto dal documento (fornitore, cliente): quando il campo è vuoto si offre di cercarlo
   testoIniziale?: { q: string; mostra?: string };
   // nome già noto al chiamante: mostrato al posto dell'id finché le voci non arrivano (D-161 §19)
   nomeIniziale?: string;
   // D-153: quando si sceglie una voce del CRM si riceve il record intero (per riempire i campi, es. cliente)
   onScelto?: (r: unknown) => void;
+  // Il pallino verde (valore scelto e trovato) diventa un link alla scheda della voce (15/11/2026)
+  link?: (id: string) => string;
+  // D-170 §19: il pallino verde apre nella stessa scheda; se il chiamante ha dati non salvati chiede
+  // conferma qui (true = procedi). Senza questa prop il link naviga direttamente.
+  linkConferma?: () => boolean | Promise<boolean>;
   // D-154: comando dall'esterno (il pulsante › accanto al campo letto): al cambio di `n` fa quello
   // che fa «Cerca questo» col testo attuale `q`, senza ref imperativi.
   cerca?: { q: string; n: number } };
@@ -136,7 +149,7 @@ function usePosizione(aperto: boolean, rif: React.RefObject<HTMLElement | null>,
   return pos;
 }
 
-function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valori, onChange }: Comuni & { valori: string[]; onChange: (v: string[]) => void }) {
+function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, segmenti, vincoli, valori, onChange }: Comuni & { valori: string[]; onChange: (v: string[]) => void }) {
   const { tutte, ricarica } = useVoci(ent, contesto);
   const lid = useId(); // A7-08: collega input e menu per il lettore di schermo
   const box = useRef<HTMLDivElement>(null);
@@ -200,13 +213,14 @@ function Multipla({ entita: ent, contesto = {}, placeholder, etichetta, id, valo
         <li className="altre" onMouseDown={(e) => { e.preventDefault(); apriMaschera(); }}><Icona nome="cerca" />{altre.length > 8 ? `Altri ${altre.length - 8} risultati: ` : ''}apri la ricerca di {ent.titolo.toLowerCase()}</li>
         <Integra tipo={ent.integra} q={q} onScelto={(id) => { setBozza((b) => (b.includes(id) ? b : [...b, id])); ricarica(); }} />
       </ul>
-      {maschera && <RicercaEntita entita={ent} contesto={contesto} voci={vociMenu(ent, contesto, tutte)} testo={q} multipla scelte={bozza}
+      {maschera && <RicercaEntita entita={ent} contesto={contesto} voci={vociMenu(ent, contesto, tutte)} segmenti={segmenti} vincoli={vincoli} testo={q} multipla scelte={bozza}
         onChiudi={() => { dopo.current = true; setTimeout(() => { dopo.current = false; }, 150); setMaschera(false); }} onScelta={(v) => { dopo.current = true; setTimeout(() => { dopo.current = false; }, 150); setMaschera(false); setQ(''); setBozza(v.map((r) => String(ent.chiave(r)))); onChange(v.map((r) => String(ent.chiave(r)))); }} onImportato={(id) => { const n = bozza.includes(id) ? bozza : [...bozza, id]; setBozza(n); setQ(''); setMaschera(false); ricarica(); onChange(n); }} />}
     </div>
   );
 }
 
-function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valore, onChange, testoIniziale, nomeIniziale, onScelto, cerca }: Comuni & { valore: string; onChange: (v: string) => void }) {
+function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, segmenti, vincoli, valore, onChange, testoIniziale, nomeIniziale, onScelto, cerca, link, linkConferma }: Comuni & { valore: string; onChange: (v: string) => void }) {
+  const router = useRouter();
   const { tutte, caricate, ricarica } = useVoci(ent, contesto);
   const lid = useId(); // A7-08: collega input e menu per il lettore di schermo
   const box = useRef<HTMLDivElement>(null);
@@ -269,7 +283,18 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
     <div className="ricerca-riga"
       onBlur={(e) => { if (e.currentTarget.contains(e.relatedTarget as Node) || maschera) return; if (daLetto) { setDaLetto(false); setTesto(valore); setAperto(false); return; } setAperto(false); const t = testo.trim(); if (nota && ent.testo(nota) === t) return; const r = trova(t); imposta(r, t); }}>
       <div ref={box} className="ricerca">
-        <span className={'pallino ' + stato} title={!caricate ? '' : nota ? ent.titolo + ' trovato in anagrafica' : valore ? 'Valore non trovato in anagrafica' : ''} />
+        {nota && link ? (
+          <Link className="pallino-link" href={link(String(ent.chiave(nota)))}
+            title={'Apri la scheda del ' + ent.titolo.toLowerCase() + ' ' + ent.testo(nota)}
+            aria-label={'Apri la scheda del ' + ent.titolo.toLowerCase() + ' ' + ent.testo(nota)}
+            onClick={async (e) => {
+              if (!linkConferma) return; // naviga nella stessa scheda
+              e.preventDefault();
+              if (await linkConferma()) router.push(link(String(ent.chiave(nota))));
+            }}>
+            <span className="pallino ok" />
+          </Link>
+        ) : <span className={'pallino ' + stato} title={!caricate ? '' : nota ? ent.titolo + ' trovato in anagrafica' : valore ? 'Valore non trovato in anagrafica' : ''} />}
         <input ref={campo} className="ricerca-testo" id={id} type="text" autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={aperto}
           aria-controls={lid} aria-activedescendant={aperto && prime[attiva] ? lid + '-' + attiva : undefined}
           aria-label={etichetta ?? 'Cerca ' + ent.titolo.toLowerCase()}
@@ -291,15 +316,15 @@ function Singola({ entita: ent, contesto = {}, placeholder, etichetta, id, valor
         <li className="altre" onMouseDown={(e) => { e.preventDefault(); setAperto(false); setMaschera(true); }}><Icona nome="cerca" />{tutteMenu.length > 5 ? `Altri ${tutteMenu.length - 5} risultati: ` : ''}apri la ricerca di {ent.titolo.toLowerCase()}</li>
         <Integra tipo={ent.integra} q={aperto ? testo : ''} onScelto={(id, nome, piva) => { setTesto(nome); setAperto(false); if (id !== valore) onChange(id); onScelto?.({ id, nome, piva }); ricarica(); }} />
       </ul>
-      {maschera && <RicercaEntita entita={ent} contesto={contesto} voci={vociMenu(ent, contesto, tutte)} testo={nota ? '' : testo}
+      {maschera && <RicercaEntita entita={ent} contesto={contesto} voci={vociMenu(ent, contesto, tutte)} segmenti={segmenti} vincoli={vincoli} testo={nota ? '' : testo}
         onChiudi={() => setMaschera(false)} onScelta={(v) => { setMaschera(false); imposta(v[0]); }} onImportato={(id, nome) => { setMaschera(false); imposta({ id, nome }); ricarica(); }} />}
     </div>
   );
 }
 
 /** Maschera di ricerca: filtri e tabella. Multipla: casella per riga e "Applica"; singola: riga e "Seleziona". */
-export function RicercaEntita({ entita: ent, contesto = {}, voci, testo = '', multipla, scelte = [], onScelta, onChiudi, onImportato }: {
-  entita: Entita; contesto?: Contesto; voci: unknown[]; testo?: string; multipla?: boolean; scelte?: string[];
+export function RicercaEntita({ entita: ent, contesto = {}, voci, segmenti, vincoli, testo = '', multipla, scelte = [], onScelta, onChiudi, onImportato }: {
+  entita: Entita; contesto?: Contesto; voci: unknown[]; segmenti?: SegmentiRicerca; vincoli?: string; testo?: string; multipla?: boolean; scelte?: string[];
   onScelta: (voci: unknown[]) => void; onChiudi: () => void; onImportato: (id: string, nome: string) => void;
 }) {
   const [valori, setValori] = useState<Record<string, string | string[]>>({ q: testo });
@@ -321,12 +346,20 @@ export function RicercaEntita({ entita: ent, contesto = {}, voci, testo = '', mu
 
   return (
     <Modale titolo={'Cerca ' + ent.titolo.toLowerCase()} larga corpoClasse="ricerca-corpo" onChiudi={onChiudi}
-      testo={multipla ? 'Spunta una o più righe (clic sulla riga), poi premi Applica.' : 'Filtra e scegli una riga, poi premi Seleziona.'}
+      testo={<>{vincoli && <div className="testo-tenue">{vincoli}</div>}{multipla ? 'Spunta una o più righe (clic sulla riga), poi premi Applica.' : 'Filtra e scegli una riga, poi premi Seleziona.'}</>}
       piede={<>
         <button type="button" className="btn sec" onClick={onChiudi}>Annulla</button>
         <button type="button" className="btn" disabled={!multipla && !una} onClick={applica}>{multipla ? 'Applica' + (sel.size ? ` (${sel.size})` : '') : 'Seleziona'}</button>
       </>}>
-      <FilterBar campi={campi} valori={valori}onChange={setValori} />
+      <div className="ricerca-filtri">
+        <FilterBar campi={campi} valori={valori} onChange={setValori} />
+        {segmenti && (
+          <select className="filtro-select" aria-label={segmenti.etichetta ?? 'Stato'} value={segmenti.valore}
+            onChange={(e) => segmenti.onCambia(e.target.value)}>
+            {segmenti.voci.map((o) => <option key={o.valore} value={o.valore}>{o.etichetta}</option>)}
+          </select>
+        )}
+      </div>
       {multipla && <div className="ricerca-scelta-barra">
         <span className="testo-tenue">{sel.size ? sel.size + (sel.size === 1 ? ' scelta' : ' scelte') : 'Nessuna scelta: vale come “tutti”'}</span>
         <span>

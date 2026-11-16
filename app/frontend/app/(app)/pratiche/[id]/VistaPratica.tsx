@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react';
 import { Campo } from '@/componenti/Campo';
@@ -8,6 +9,8 @@ import { Binario, Caricamento, Elenco } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
 import { Cifre } from '@/componenti/Kpi';
 import { Conferma, Modale } from '@/componenti/Modale';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
+import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
@@ -15,9 +18,10 @@ import { Schede } from '@/componenti/Schede';
 import { SollecitiConferme, SollecitiPagamento } from '@/componenti/Solleciti';
 import { usePuo } from '@/componenti/Utente';
 import { ConsultaDocumenti } from '@/componenti/ConsultaDocumenti';
+import { Copiabile } from '@/componenti/Copiabile';
 import { api, caricaPdf } from '@/lib/api';
 import type { Entita } from '@/lib/entita';
-import { data as dataIt, euro, euroSegno, pct } from '@/lib/formati';
+import { data as dataIt, euro, euroSegno, oggi, pct } from '@/lib/formati';
 
 // Dettaglio pratica (F2-A2, §7.3): binario, riepilogo della provvigione, righe a confronto e
 // documenti fiscali. Stato, importi, variazioni e provvigioni arrivano già calcolati dal server
@@ -35,9 +39,10 @@ interface Riga {
   per: ({ qta: number; prezzo: number; importo: number } | null)[];
 }
 interface Provvigione {
-  imponibile: number; sconto: number; valido_dal: string; agente: number; sub_standard: number;
+  imponibile: number; netto: number; spese: number; congelato: string | null;
+  sconto: number; valido_dal: string; agente: number; sub_standard: number;
   sub: number; eccezione: boolean; da_fornitore: number; a_decobrands: number; a_subagente: number;
-  maturazione: string | null; regole: string[];
+  margine: number; margine_pct: number; maturazione: string | null; regole: string[];
 }
 interface Incasso {
   documento_id: string; numero: string; data: string; importo: number;
@@ -48,14 +53,17 @@ interface Incasso {
 }
 interface Dettaglio {
   id: string; numero: string;
+  numero_ordine_fornitore: string | null;
   cliente_id: string; cliente: string; fornitore_id: string; fornitore: string;
   subagente_id: string | null; subagente: string | null;
   data: string; importo: number; stato: Chiave; nota: string | null; scadenza: string | null;
   pagato: boolean;
   pagamenti: { id: string; numero: string; data: string; importo: number }[];
   fasi: Tappa[];
+  progresso: { x: number; y: number; parziale: boolean } | null;
   confronto: { fasi: FaseRiga[]; righe: Riga[]; variazioni: { numero: number; totale: number } };
   provvigione: Provvigione | null;
+  sconto_medio: { valore: number; scaglione: number | null; documento: string | null; oltre: boolean; ultimo_scaglione: number | null } | null;
   azione: { tipo: string; testo: string };
   incassi: Incasso[];
 }
@@ -64,6 +72,7 @@ interface Documento {
   storno_totale?: boolean; fattura_id?: string | null; stornato?: number; residuo?: number;
   arrivo_id: string | null; file_nome: string | null; stato_incasso?: string | null;
   liquidato?: boolean; note: string | null;
+  ruolo?: 'parziale' | 'sostituisce' | null; superato?: boolean; superato_da?: string | null;
   righe: { codice: string | null; descrizione: string | null; quantita: number | null; prezzo: number | null; importo: number | null }[];
   riferimento: string | null;
 }
@@ -112,9 +121,26 @@ const TIPO: Record<Tipo, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura',
   nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento',
 };
+// D-171, D-172: anche gli elenchi non DataTable (Elenco, incassi) hanno le azioni a icone in slot fissi
+const AZIONI_FISCALE: AzioneRiga[] = [
+  { nome: 'correggi', icona: 'matita', etichetta: 'Correggi' },
+  { nome: 'annulla', icona: 'cestino', etichetta: 'Annulla', variante: 'pericolo' },
+  { nome: 'sposta', icona: 'sposta', etichetta: 'Sposta' },
+];
+const AZIONI_ALTRO: AzioneRiga[] = [{ nome: 'sposta', icona: 'sposta', etichetta: 'Sposta' }];
+const AZIONI_INCASSO: AzioneRiga[] = [
+  { nome: 'sollecita', icona: 'posta', etichetta: 'Sollecita' },
+  { nome: 'pagata', icona: 'spunta', etichetta: 'Segna come pagata' },
+  { nome: 'nonpagata', icona: 'avviso', etichetta: 'Segna come non pagata' },
+];
 // D-60: i tipi che si registrano a mano dalla tendina, oltre a fattura e nota di credito
 const ALTRI: Tipo[] = ['ordine', 'conferma', 'proforma', 'pagamento', 'altro'];
-const oggi = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+
+// «Prendi dalla coda» (D-186 §19): un documento in coda compatibile con la pratica, come lo restituisce l'elenco.
+interface DocumentoInCoda {
+  id: string; tipo: Tipo | null; numero: string | null; data: string | null;
+  importo: number | null; file_nome: string; cliente_id: string | null; stato: string;
+}
 
 export function VistaPratica({ id }: { id: string }) {
   const puo = usePuo();
@@ -198,12 +224,14 @@ export function VistaPratica({ id }: { id: string }) {
   function registra(tipo: 'fattura' | 'nota_credito') {
     setFinestra(<FinestraDocumento pratica={id} documento={null} tipo={tipo}
       fatture={(fiscali?.documenti ?? []).filter((x) => x.tipo === 'fattura' && (x.residuo ?? 0) > 0.005)}
+      coda={{ fornitore: d!.fornitore_id, cliente: d!.cliente_id, tipo }}
       onChiudi={chiudi} onSalvato={(f) => salvato(f, tipo === 'fattura' ? 'Fattura registrata' : 'Nota di credito registrata')} />);
   }
 
   // D-60 §19: ordini, conferme, proforma, pagamenti e allegati si registrano a mano scegliendo il tipo
   function registraAltro() {
     setFinestra(<FinestraDocumento pratica={id} documento={null} tipo="altro" scelta={ALTRI} fatture={[]}
+      coda={{ fornitore: d!.fornitore_id, cliente: d!.cliente_id }}
       onChiudi={chiudi} onSalvato={(f) => salvato(f, 'Documento registrato')} />);
   }
 
@@ -215,9 +243,10 @@ export function VistaPratica({ id }: { id: string }) {
 
   async function annulla(doc: Documento) {
     const si = await new Promise<boolean>((ok) => setFinestra(
-      <Conferma titolo={'Annullare la ' + (doc.tipo === 'fattura' ? 'fattura' : 'nota di credito') + ' ' + doc.numero + '?'}
-        testo="Il documento viene tolto dalla pratica; se aveva un file, torna fra i documenti da controllare."
-        etichetta="Annulla il documento" pericolo onRisposta={(x) => { chiudi(); ok(x); }} />,
+      <ConfermaGrave titolo={'Annullare la ' + (doc.tipo === 'fattura' ? 'fattura' : 'nota di credito') + ' ' + doc.numero + '?'}
+        punti={['Il documento viene tolto dalla pratica.', 'Se aveva un file, torna fra i documenti da controllare.']}
+        etichettaCasella="Ho capito: il documento esce dalla pratica"
+        etichetta="Annulla il documento" onRisposta={(x) => { chiudi(); ok(x); }} />,
     ));
     if (!si) return;
     const r = await api('pratiche/' + id + '/documenti/' + doc.id, { note: null }, 'DELETE');
@@ -302,11 +331,14 @@ export function VistaPratica({ id }: { id: string }) {
       </>,
       destra: <span className="azioni-cella">
         {euro(x.importo)}
-        {x.liquidato ? <Stato v="neutro">liquidato</Stato> : <>
-          {puoModifica && <button type="button" className="btn testo piccolo" onClick={() => correggi(x)}>Correggi</button>}
-          {puoModifica && <button type="button" className="btn testo piccolo" onClick={() => void annulla(x)}>Annulla</button>}
-          {puoModifica && <button type="button" className="btn testo piccolo" onClick={() => sposta(x)}>Sposta</button>}
-        </>}
+        {x.liquidato ? <Stato v="neutro">liquidato</Stato> : puoModifica && (
+          <AzioniRiga azioni={AZIONI_FISCALE} oggetto={(x.tipo === 'fattura' ? 'la fattura ' : 'la nota di credito ') + x.numero}
+            riga={[
+              { nome: 'correggi', onClick: () => correggi(x) },
+              { nome: 'annulla', onClick: () => void annulla(x) },
+              { nome: 'sposta', onClick: () => sposta(x) },
+            ]} />
+        )}
       </span>,
     }))} vuoto="Nessun documento fiscale" />
   );
@@ -316,15 +348,17 @@ export function VistaPratica({ id }: { id: string }) {
     <Elenco voci={fiscali.altri.map((x) => ({
       onClick: () => apriDoc(x),
       titolo: 'Apri ' + TIPO[x.tipo].toLowerCase() + ' ' + x.numero + ' accanto al confronto',
-      testo: <>
+      testo: <span className={x.superato ? 'testo-tenue' : undefined}>
         <b>{x.numero || TIPO[x.tipo]}</b>
         <span className="sec-riga">
-          {x.numero ? TIPO[x.tipo] + ' del ' : ''}{dataIt(x.data)}{x.note ? ' · ' + x.note : ''}
+          {x.numero ? TIPO[x.tipo] + ' del ' : ''}{dataIt(x.data)}
+          {x.superato ? ' · superata da ' + (x.superato_da ?? 'un’altra') : ''}{x.note ? ' · ' + x.note : ''}
         </span>
-      </>,
+      </span>,
       destra: <span className="azioni-cella">
         {euro(x.importo)}
-        {puoModifica && <button type="button" className="btn testo piccolo" onClick={() => sposta(x)}>Sposta</button>}
+        {puoModifica && <AzioniRiga azioni={AZIONI_ALTRO} oggetto={'il documento ' + (x.numero || TIPO[x.tipo])}
+          riga={[{ nome: 'sposta', onClick: () => sposta(x) }]} />}
       </span>,
     }))} vuoto="Nessun altro documento" />
   );
@@ -342,16 +376,30 @@ export function VistaPratica({ id }: { id: string }) {
         <div className="colonne riepilogo-pratica">
           <div className="pila">
             <Pannello titolo="Provvigione" nota={fiscali.documenti.length ? 'sul netto fatturato' : 'prevista'}>
-              {!d.provvigione ? <Nota>Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni.</Nota> : <>
+              {d.sconto_medio?.oltre && (
+                <div className="avviso-verifica">
+                  <span>Lo sconto medio {pct(d.sconto_medio.valore)} del documento che comanda supera l&apos;ultimo scaglione ({pct(d.sconto_medio.ultimo_scaglione ?? 0)}): la provvigione è <b>da decidere</b>. Aggiungi lo scaglione in{' '}
+                    <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>.</span>
+                </div>
+              )}
+              {!d.provvigione ? <Nota>{d.sconto_medio?.oltre ? 'Provvigione da decidere: sconto medio oltre l\'ultimo scaglione.' : 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni.'}</Nota> : <>
                 <Cifre voci={[
-                  { etichetta: 'Imponibile', valore: d.provvigione.imponibile },
-                  { etichetta: 'Sconto al cliente', valore: pct(d.provvigione.sconto), nota: 'in vigore dal ' + dataIt(d.provvigione.valido_dal) },
-                  { etichetta: 'Da ' + d.fornitore + ' a Decobrands: ' + pct(d.provvigione.agente) + ' + ' + pct(d.provvigione.sub_standard), valore: d.provvigione.a_decobrands },
                   {
-                    etichetta: 'A ' + (d.subagente ?? 'subagente') + ': ' + pct(d.provvigione.sub) + (d.provvigione.eccezione ? ' (eccezione personale)' : ''),
+                    etichetta: 'Base provvigione', valore: d.provvigione.imponibile,
+                    nota: d.provvigione.spese > 0 ? <>netto {euro(d.provvigione.netto)} − spese {euro(d.provvigione.spese)} (escluse per accordo col fornitore)</> : undefined,
+                  },
+                  {
+                    etichetta: 'Sconto medio → scaglione', valore: (d.sconto_medio?.valore != null ? pct(d.sconto_medio.valore) + ' → ' + pct(d.sconto_medio.scaglione ?? 0) : pct(d.provvigione.sconto)),
+                    nota: <>in vigore dal {dataIt(d.provvigione.valido_dal)} · <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>
+                      {d.provvigione.congelato ? <><span className="testo-tenue"> · fissato il {dataIt(d.provvigione.congelato)}</span></> : null}</>,
+                  },
+                  { etichetta: 'Da ' + d.fornitore + ' a Decobrands: ' + pct(d.provvigione.agente), valore: d.provvigione.a_decobrands },
+                  {
+                    etichetta: 'di cui al subagente ' + (d.subagente ?? '') + ': ' + pct(d.provvigione.sub) + (d.provvigione.eccezione ? ' (eccezione personale)' : ''),
                     valore: d.provvigione.a_subagente,
                     nota: d.provvigione.regole.length ? d.provvigione.regole.join(' · ') : undefined,
                   },
+                  { etichetta: 'Margine Decobrands: ' + pct(d.provvigione.margine_pct), valore: d.provvigione.margine },
                 ]} />
                 <Nota>
                   {d.fornitore} {d.provvigione.maturazione === 'maturato'
@@ -390,13 +438,16 @@ export function VistaPratica({ id }: { id: string }) {
                       </div>
                       {puoModifica && st && (
                         <div className="azioni-cella">
-                          {(st.stato === 'insoluta' || st.stato === 'da_verificare') && <>
-                            <button type="button" className="btn sec piccolo" onClick={() => sollecita(x)}>Sollecita il cliente</button>
-                            <button type="button" className="btn testo piccolo" onClick={() => void segnaPagata(x)}>Segna come pagata</button>
-                          </>}
-                          {st.stato !== 'pagata' && st.stato !== 'insoluta' && st.stato !== 'da_verificare' && (
-                            <button type="button" className="btn testo piccolo" onClick={() => segnaNonPagata(x)}>Segna come non pagata</button>
-                          )}
+                          <AzioniRiga azioni={AZIONI_INCASSO} oggetto={'la fattura ' + x.numero}
+                            riga={[
+                              ...((st.stato === 'insoluta' || st.stato === 'da_verificare') ? [
+                                { nome: 'sollecita', onClick: () => sollecita(x) },
+                                { nome: 'pagata', onClick: () => void segnaPagata(x) },
+                              ] : []),
+                              ...(st.stato !== 'pagata' && st.stato !== 'insoluta' && st.stato !== 'da_verificare' ? [
+                                { nome: 'nonpagata', onClick: () => segnaNonPagata(x) },
+                              ] : []),
+                            ]} />
                         </div>
                       )}
                     </div>
@@ -466,12 +517,21 @@ export function VistaPratica({ id }: { id: string }) {
     }] : []),
   ];
 
+  // D-180 §19: tutti gli ordini della pratica, dalla fase «Ordini» del server (la testata ne dava uno solo);
+  // la riga cliente · fornitore · subagente va sempre a capo, su una riga sua.
+  const ordini = [...new Set([d.numero_ordine_fornitore, ...(d.fasi[0]?.numeri ?? [])].filter((n): n is string => !!n && n !== d.numero))];
   return (
-    <Pagina pieno titolo={d.numero} badge={<Stato v={s.v}>{s.testo}</Stato>}
-      sottotitolo={<>{d.cliente} · {d.fornitore}{d.subagente ? ' · seguita da ' + d.subagente : ' · nessun subagente abbinato'}</>}
+    <Pagina pieno titolo={d.numero} badge={<><Stato v={s.v}>{s.testo}</Stato><Copiabile valore={d.numero} /></>}
+      sottotitolo={<>
+        {ordini.length ? <div>{ordini.length > 1 ? 'Ordini' : 'Ordine'} fornitore {ordini.map((n) => <span key={n}><b>{n}</b><Copiabile valore={n} />{' '}</span>)}</div> : null}
+        <div><Link href={'/clienti/' + d.cliente_id}>{d.cliente}</Link> · <Link href={'/fornitori/' + d.fornitore_id}>{d.fornitore}</Link>{d.subagente_id ? <> · seguita da <Link href={'/subagenti/' + d.subagente_id}>{d.subagente}</Link></> : ' · nessun subagente abbinato'}</div>
+      </>}
       azioni={azioni}>
       <div className="pila riempi">
-        <Pannello senzaMargine><Binario tappe={d.fasi} /></Pannello>
+        <Pannello senzaMargine>
+          {d.progresso && <p className="nota" style={{ padding: '14px 18px 0' }}>Confermato <b>{euro(d.progresso.x)}</b> di {euro(d.progresso.y)}{d.progresso.parziale ? ' · confermato in parte' : ''}</p>}
+          <Binario tappe={d.fasi} />
+        </Pannello>
         <Schede riempi memoria={daVariazioni ? undefined : 'pratica-' + d.id} attiva={daVariazioni && !scheda ? 'righe' : scheda || undefined} onCambia={setScheda} schede={[
           { id: 'riepilogo', etichetta: 'Riepilogo', contenuto: riepilogo },
           {
@@ -490,9 +550,10 @@ export function VistaPratica({ id }: { id: string }) {
 
 /* ---------- Registra un documento (D-60) / fattura e nota di credito (F2-A3, §4.2.7.1) ---------- */
 
-function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, onChiudi, onSalvato }: {
+function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, coda, onChiudi, onSalvato }: {
   pratica: string; documento: Documento | null; tipo: Tipo;
   fatture: Documento[]; scelta?: Tipo[]; // tipi fra cui scegliere (registrazione a mano, D-60)
+  coda?: { fornitore: string; cliente: string; tipo?: Tipo }; // «Prendi dalla coda» (D-186 §19); `tipo` filtra l'elenco
   onChiudi: () => void; onSalvato: (f: Fiscali) => void | Promise<void>;
 }) {
   const id = useId();
@@ -502,6 +563,40 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, onChiudi
   const [arrivoId, setArrivoId] = useState<number | null>(null);
   const [multi, setMulti] = useState<{ messaggio: string; corpo: Record<string, unknown> } | null>(null);
   const modifica = !!documento;
+  // «Prendi dalla coda»: i documenti compatibili e la scelta fra coda e mano (predefinita sulla coda se ce n'è uno)
+  const [modo, setModo] = useState<'coda' | 'mano'>('coda');
+  const [codaDocs, setCodaDocs] = useState<DocumentoInCoda[] | null>(null);
+  const [scelto, setScelto] = useState<string | null>(null);
+  const [fatturaSel, setFatturaSel] = useState<string>('');
+
+  useEffect(() => {
+    if (!coda) return;
+    void api<{ documenti: DocumentoInCoda[] }>(`documenti?stato=aperte&fornitore_id=${coda.fornitore}&per_pagina=200`).then((r) => {
+      if (!r.ok) { setErrore(r.messaggio); setCodaDocs([]); return; }
+      // stesso fornitore; fra questi, il cliente riconosciuto uguale alla pratica o nessun cliente riconosciuto
+      const tutto = r.dati.documenti.filter((x) => x.stato !== 'in_lettura' && (!x.cliente_id || x.cliente_id === coda.cliente));
+      setCodaDocs(tutto);
+      // predefinito sulla coda solo se c'è un documento del tipo giusto (il tipo incerto non si può ancora abbinare)
+      setModo(tutto.some((x) => !coda.tipo || x.tipo === coda.tipo) ? 'coda' : 'mano');
+    });
+  }, [coda]);
+
+  async function abbinaDaCoda() {
+    if (!scelto) return;
+    setErrore('');
+    setAttesa(true);
+    try {
+      // il server ricava tipo, numero, data e importo dal file letto e ricontrolla fornitore e cliente (V12);
+      // per la nota di credito si indica la fattura da stornare, come nel flusso a mano
+      const corpo: Record<string, unknown> = { pratica_id: Number(pratica) };
+      if (tipo === 'nota_credito') corpo.fattura_id = Number(fatturaSel || fatture[0]?.id);
+      const r = await api<Fiscali>('documenti/' + scelto + '/abbina', corpo);
+      if (!r.ok) { setErrore(r.messaggio); return; }
+      await onSalvato(r.dati);
+    } finally {
+      setAttesa(false);
+    }
+  }
 
   async function invia(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault();
@@ -560,42 +655,112 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, onChiudi
     : tipo === 'fattura' ? 'Registra la fattura'
       : tipo === 'nota_credito' ? 'Registra la nota di credito' : 'Registra un documento';
 
+  // «Prendi dalla coda»: il cliente riconosciuto uguale alla pratica sopra, gli altri sotto (stesso fornitore);
+  // con `coda.tipo` l'elenco si filtra per tipo, e i documenti col tipo incerto vanno in fondo («tipo da verificare»)
+  const inCoda = !!coda && modo === 'coda';
+  const delTipo = (x: DocumentoInCoda) => !coda?.tipo || x.tipo === coda.tipo;
+  const riconosciuti = (codaDocs ?? []).filter((x) => x.cliente_id === (coda?.cliente ?? '') && delTipo(x));
+  const nonRiconosciuti = (codaDocs ?? []).filter((x) => !x.cliente_id && delTipo(x));
+  const daVerificare = (codaDocs ?? []).filter((x) => !!coda?.tipo && x.tipo == null);
+  const sceltoDoc = (codaDocs ?? []).find((x) => x.id === scelto) ?? null;
+  const voce = (x: DocumentoInCoda) => {
+    const numero = x.numero || (x.tipo === 'pagamento' ? 'Pagamento del ' + dataIt(x.data) : x.file_nome);
+    return {
+      onClick: () => setScelto(x.id),
+      titolo: 'Scegli ' + (x.numero || x.file_nome),
+      testo: <>
+        <b>{numero}</b>
+        <span className="sec-riga">
+          {x.tipo ? TIPO[x.tipo] + ' · ' : ''}{x.data ? dataIt(x.data) : '—'}{x.file_nome ? ' · ' + x.file_nome : ''}
+        </span>
+      </>,
+      destra: x.importo != null ? euro(x.importo) : null,
+    };
+  };
+
   return (
     <>
       <Modale titolo={titolo} onChiudi={() => { if (!attesa) onChiudi(); }} piede={<>
         <button type="button" className="btn sec" onClick={onChiudi} disabled={attesa}>Annulla</button>
-        <button type="submit" form={id} className="btn" disabled={attesa}>{attesa ? 'Attendi…' : modifica ? 'Salva' : 'Registra'}</button>
+        {inCoda
+          ? <button type="button" className="btn" disabled={attesa || !scelto} onClick={() => void abbinaDaCoda()}>{attesa ? 'Attendi…' : 'Abbina alla pratica'}</button>
+          : <button type="submit" form={id} className="btn" disabled={attesa}>{attesa ? 'Attendi…' : modifica ? 'Salva' : 'Registra'}</button>}
       </>}>
-        <form id={id} className="modulo modulo-2" onSubmit={invia} noValidate>
-          {scelta && (
-            <Campo nome="tipo" etichetta="Tipo di documento" tipo="select" largo valore={tipo}
-              opzioni={scelta.map((t) => ({ value: t, label: TIPO[t] }))}
-              aiuto="Numero e data sono obbligatori solo per l'ordine; per gli altri numero facoltativo, data di oggi." />
-          )}
-          {!modifica && tipo === 'nota_credito' && (
-            <Campo nome="fattura_id" etichetta="Fattura stornata" tipo="select" largo valore={fatture[0]?.id}
-              opzioni={fatture.map((f) => ({ value: f.id, label: f.numero + ' del ' + dataIt(f.data) + ' · residuo ' + euro(f.residuo ?? 0) }))} />
-          )}
-          <Campo nome="numero" etichetta="Numero" valore={documento?.numero ?? ''} />
-          <Campo nome="data" etichetta="Data" tipo="data" valore={documento?.data ?? oggi()} />
-          <Campo nome="importo" etichetta="Importo in €" valore={documento ? String(Math.abs(documento.importo)) : ''}
-            aiuto={scelta ? 'Facoltativo: non tocca il netto né la provvigione.'
-              : tipo === 'nota_credito' ? 'Positivo: il server lo registra come storno.' : 'Lordo della fattura.'} />
-          {!modifica && tipo === 'nota_credito' && (
-            <Campo nome="storno_totale" etichetta="Storna tutta la fattura" tipo="casella" largo
-              aiuto="L'importo lo calcola il server su quello che resta da stornare." />
-          )}
-          <Campo nome="note" etichetta="Note" valore={documento?.note ?? ''} largo />
-          {!modifica && (
-            <div className="campo largo">
-              <label>PDF o foto (facoltativo)</label>
-              <Caricamento titolo="Allega il file" testo="Un PDF o una foto (JPEG, PNG); il server controlla che sia un documento."
-                accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => { setFile(f[0] ?? null); setArrivoId(null); }} />
-              {file && <span className="aiuto">{file.name}</span>}
-            </div>
-          )}
-          <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
-        </form>
+        {coda && (
+          <div className="segmenti" role="radiogroup" aria-label="Origine del documento">
+            <button type="button" role="radio" aria-checked={modo === 'coda'} aria-selected={modo === 'coda'} onClick={() => setModo('coda')}>Prendi dalla coda</button>
+            <button type="button" role="radio" aria-checked={modo === 'mano'} aria-selected={modo === 'mano'} onClick={() => setModo('mano')}>Inserisci a mano</button>
+          </div>
+        )}
+        {inCoda ? (
+          <div className="pila">
+            {codaDocs == null
+              ? <Nota>Caricamento dei documenti in coda…</Nota>
+              : !(riconosciuti.length + nonRiconosciuti.length + daVerificare.length)
+                ? <Nota>Nessun documento in coda per questo fornitore e cliente: registralo a mano.</Nota>
+                : <>
+                  {!!riconosciuti.length && <Elenco voci={riconosciuti.map(voce)} vuoto="" />}
+                  {!!nonRiconosciuti.length && (
+                    <>
+                      <Nota><b>Cliente non riconosciuto</b> — stesso fornitore, cliente da decidere in Documenti.</Nota>
+                      <Elenco voci={nonRiconosciuti.map(voce)} vuoto="" />
+                    </>
+                  )}
+                  {!!daVerificare.length && (
+                    <>
+                      <Nota><b>Tipo da verificare</b> — il lettore non ha deciso il tipo: aprilo in Documenti.</Nota>
+                      <Elenco voci={daVerificare.map(voce)} vuoto="" />
+                    </>
+                  )}
+                </>}
+            {sceltoDoc && (
+              <Dettagli inColonne voci={[
+                { etichetta: 'Tipo', valore: sceltoDoc.tipo ? TIPO[sceltoDoc.tipo] : '—' },
+                { etichetta: 'Numero', valore: sceltoDoc.numero || '—' },
+                { etichetta: 'Data', valore: sceltoDoc.data ? dataIt(sceltoDoc.data) : '—' },
+                { etichetta: 'Importo', valore: sceltoDoc.importo != null ? euro(sceltoDoc.importo) : '—' },
+                { etichetta: 'File', valore: sceltoDoc.file_nome },
+              ]} />
+            )}
+            {tipo === 'nota_credito' && sceltoDoc && (
+              <Campo nome="fattura_id" etichetta="Fattura stornata" tipo="select" largo valore={fatturaSel || fatture[0]?.id}
+                opzioni={fatture.map((f) => ({ value: f.id, label: f.numero + ' del ' + dataIt(f.data) + ' · residuo ' + euro(f.residuo ?? 0) }))}
+                onCambia={setFatturaSel} />
+            )}
+            <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
+          </div>
+        ) : (
+          <form id={id} className="modulo modulo-2" onSubmit={invia} noValidate>
+            {scelta && (
+              <Campo nome="tipo" etichetta="Tipo di documento" tipo="select" largo valore={tipo}
+                opzioni={scelta.map((t) => ({ value: t, label: TIPO[t] }))}
+                aiuto="Numero e data sono obbligatori solo per l'ordine; per gli altri numero facoltativo, data di oggi." />
+            )}
+            {!modifica && tipo === 'nota_credito' && (
+              <Campo nome="fattura_id" etichetta="Fattura stornata" tipo="select" largo valore={fatture[0]?.id}
+                opzioni={fatture.map((f) => ({ value: f.id, label: f.numero + ' del ' + dataIt(f.data) + ' · residuo ' + euro(f.residuo ?? 0) }))} />
+            )}
+            <Campo nome="numero" etichetta="Numero" valore={documento?.numero ?? ''} />
+            <Campo nome="data" etichetta="Data" tipo="data" valore={documento?.data ?? oggi()} />
+            <Campo nome="importo" etichetta="Importo in €" valore={documento ? String(Math.abs(documento.importo)) : ''}
+              aiuto={scelta ? 'Facoltativo: non tocca il netto né la provvigione.'
+                : tipo === 'nota_credito' ? 'Positivo: il server lo registra come storno.' : 'Lordo della fattura.'} />
+            {!modifica && tipo === 'nota_credito' && (
+              <Campo nome="storno_totale" etichetta="Storna tutta la fattura" tipo="casella" largo
+                aiuto="L'importo lo calcola il server su quello che resta da stornare." />
+            )}
+            <Campo nome="note" etichetta="Note" valore={documento?.note ?? ''} largo />
+            {!modifica && (
+              <div className="campo largo">
+                <label>PDF o foto (facoltativo)</label>
+                <Caricamento titolo="Allega il file" testo="Un PDF o una foto (JPEG, PNG); il server controlla che sia un documento."
+                  accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => { setFile(f[0] ?? null); setArrivoId(null); }} />
+                {file && <span className="aiuto">{file.name}</span>}
+              </div>
+            )}
+            <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
+          </form>
+        )}
       </Modale>
       {multi && <Conferma titolo={'La ' + TIPO[tipo].toLowerCase() + ' è già su un’altra pratica'} testo={multi.messaggio}
         etichetta="Conferma" onRisposta={(si) => { setMulti(null); if (si) void manda(multi.corpo, true); }} />}

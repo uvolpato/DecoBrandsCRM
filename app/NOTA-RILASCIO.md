@@ -11,6 +11,30 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.7 — 16/11/2026 — sconto medio, spese e numeri che si fissano
+
+- **La percentuale si sceglie dallo sconto medio dei documenti** (lo sconto reale che il fornitore
+  stampa sulle righe), non più dallo sconto impostato sull'agenzia: nel Riepilogo della pratica
+  compare «Sconto medio → scaglione». Se lo sconto supera l'ultimo scaglione, la pratica resta da
+  decidere e non si chiude finché non si aggiunge lo scaglione.
+- **Le spese** (trasporto, imballo, «Fracht») sono escluse dalla base della provvigione, salvo che
+  l'accordo col fornitore le includa (spunta nelle condizioni del fornitore). L'«Imponibile» ora si
+  chiama «Base provvigione».
+- **I numeri si fissano**: quando un documento entra in un bollettino verificato o in un trimestre
+  liquidato, i suoi valori non cambiano più (segno «fissato il …»); si correggono solo con una nota
+  di credito o uno storno.
+- **Pratiche suggerite**: una tendina filtra le pratiche per stato, parte da «Aperte» (le già
+  fatturate non si propongono). La ricerca cerca solo fra le pratiche dello stesso cliente e
+  fornitore del documento.
+- **Prendi dalla coda**: dalla pratica si prende un documento già arrivato, senza reinserirlo a mano.
+- **Nelle email ai fornitori** il riferimento in testa è il loro numero d'ordine; il numero della
+  pratica nostra va in fondo come «nostro rif. OF/…».
+- **Più piccoli**: barra dei filtri su una riga (i segmenti diventano una tendina quando non ci
+  stanno); un pagamento non ha più un numero obbligatorio; la testata della pratica mostra tutti gli
+  ordini; le voci di Oggi dicono quale documento chiede una decisione; «Usa importi calcolati (N)»
+  corregge in blocco; il visualizzatore del PDF ha zoom ed errore visibile; tendina dell'anno nelle
+  Liquidazioni; la posizione del campo è «indicativa», mai «esatta».
+
 ### 0.2.6 — 15/11/2026 — riconoscimento più furbo e coda che si aggiorna
 
 - **Coda**: in coda e in lettura dal più vecchio al più recente (ordine di lettura); l’elenco si aggiorna da solo
@@ -54,8 +78,9 @@ cosa è cambiato.
 
 - **Testata su tre righe**: Tipo, Numero, Data, Importo; Cliente letto › Cliente, Codice e P.IVA cliente;
   Fornitore letto › Fornitore, P.IVA fornitore. Il pulsante › porta il nome letto nella ricerca.
-- **Somma righe** sopra l’Importo: si aggiorna con le righe; se non coincide c’è un avviso (non blocca)
-  e il server lo mette fra i punti da controllare.
+- **Somma righe** accanto all’Importo: si aggiorna con le righe e diventa **rossa** quando
+  differisce dall’importo (la differenza esatta è nel suggerimento); non blocca il salvataggio,
+  ma il server lo mette fra i punti da controllare.
 - **P.IVA fornitore** letta dal documento (vale per i documenti letti da ora).
 - **Ricerca su Integra e nel CRM per parole**: «ARTE WOHNACCESSOIRES GMBH & CO.KG» trova «Arte
   Wohnaccessoires GmbH & Co. KG» (sigle societarie e punteggiatura non contano).

@@ -4,11 +4,14 @@ import 'dotenv/config';
 import { createHash } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
+import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
+import { IntegraService } from '../src/integra';
 import {
-  controlliFissi, lettoDaCampi, normalizzaNome, propostaDocumento, riconosciCliente, risolviFornitore, valutaLettura,
+  controlliFissi, filtroDalTipo, lettoDaCampi, normalizzaNome, propostaDocumento, riconosciCliente, risolviFornitore, valutaLettura,
   type Contesto, type Letto, type RigaIntegra, type RigaLetta, type RigaStorico, type Soglie,
 } from '../src/proposta';
 import { svuota } from './svuota';
@@ -27,13 +30,13 @@ let c1: { id: bigint; versione_id: bigint };
 let c2: { id: bigint; versione_id: bigint };
 
 const L = (over: Partial<Letto>): Letto => ({
-  tipo: null, fornitore_id: null, fornitore: null, numero: null, data: null, codice_cliente: null, cliente: null, cliente_id: null, piva_cliente: null,
+  tipo: null, fornitore_id: null, fornitore: null, numero: null, numero_ordine_fornitore: null, data: null, codice_cliente: null, cliente: null, cliente_id: null, piva_cliente: null,
   importo: null, mese: null, anno: null, riferimento_fattura: null, righe: [],
   ...over,
 });
 const R = (over: Partial<RigaLetta>): RigaLetta => ({
   codice: null, descrizione: null, quantita: null, prezzo: null, importo: null,
-  numero_fattura: null, data_fattura: null, provvigione: null, ...over,
+  sconto: null, numero_fattura: null, data_fattura: null, provvigione: null, ...over,
 });
 
 async function creaFornitore(nome: string) {
@@ -250,13 +253,15 @@ describe('proposta — conferma e fattura', () => {
     expect(p.candidati[0].motivi).toContain('pratica già fatturata');
   });
 
-  it('conferma: esclude la pratica che ha già una conferma', async () => {
+  it('conferma: la pratica già confermata non è più esclusa (D-174), col suggerimento del ruolo', async () => {
     await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-1', data: '2026-05-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }], documenti: [{ tipo: 'conferma', numero: 'C-1', data: '2026-05-15' }] });
-    const p2 = await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-2', data: '2026-06-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }] });
+    await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-2', data: '2026-06-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }] });
     const p = await propostaDocumento(db, L({ tipo: 'conferma', fornitore_id: gries.id, numero: 'C-NUOVA', codice_cliente: 'K-100', righe: [R({ codice: 'A1', quantita: 2, prezzo: 10, importo: 20 })] }));
-    expect(p.esito).toBe('certo');
-    expect(p.candidati).toHaveLength(1);
-    expect(p.candidati[0].pratica.id).toBe(String(p2));
+    expect(p.candidati).toHaveLength(2);
+    const gia = p.candidati.find((c) => c.pratica.numero === 'OF-1')!;
+    const libera = p.candidati.find((c) => c.pratica.numero === 'OF-2')!;
+    expect(gia.ruolo).not.toBe(null); // già confermata: si propone con una scelta
+    expect(libera.ruolo).toBe(null); // prima conferma: nessuna scelta
   });
 
   it('nota di credito con riferimento: certa e prima', async () => {
@@ -266,6 +271,61 @@ describe('proposta — conferma e fattura', () => {
     expect(p.esito).toBe('certo');
     expect(p.candidati[0].pratica.id).toBe(String(p1));
     expect(p.candidati[0].motivi[0]).toBe('storna la fattura F-100 di questa pratica');
+  });
+});
+
+describe('proposta — proforma come conferma (D-60)', () => {
+  it('proforma con cliente scelto a mano e agenzia per il codice: propone l\'unica pratica aperta della coppia', async () => {
+    await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF/2026/001', data: '2026-02-17', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }] });
+    const l = L({ tipo: 'proforma', fornitore_id: gries.id, numero: 'PR102848', codice_cliente: 'K-100', cliente: 'Verde Vita snc', cliente_id: String(c1.id), data: '2026-04-08' });
+    const p = await propostaDocumento(db, l);
+    expect(p.esito).toBe('certo');
+    expect(p.candidati).toHaveLength(1);
+    expect(p.candidati[0].pratica.numero).toBe('OF/2026/001');
+    expect(p.cliente_riconosciuto).toEqual({ cliente_id: c1.id, ragione: 'Verde Vita snc' });
+    const controlli = await controlliFissi(db, l, p);
+    expect(controlli.filter((c) => c.codice === 'codice_cliente')).toEqual([]);
+  });
+
+  it('proforma su una pratica che ha già una proforma: ora si propone, con il suggerimento del ruolo (D-174)', async () => {
+    await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF/2026/001', data: '2026-02-17', documenti: [{ tipo: 'ordine', numero: 'AU', data: '2026-02-17' }, { tipo: 'proforma', numero: 'P-1', data: '2026-03-01' }] });
+    const d = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { tipo: 'ordine' } });
+    await db.ordini_fornitore_documenti.update({ where: { id: d.id }, data: { importo: 2154.5 } });
+    const p = await propostaDocumento(db, L({ tipo: 'proforma', fornitore_id: gries.id, numero: 'PR102849', codice_cliente: 'K-100', righe: [R({ codice: 'A1', quantita: 1, prezzo: 37.2, importo: 37.2 })] }));
+    expect(p.esito).toBe('certo');
+    expect(p.candidati).toHaveLength(1);
+    expect(p.candidati[0].ruolo).toBe('parziale'); // la somma (37,20) resta entro l'ordine (2.154,50)
+  });
+});
+
+describe('proposta — conferme/proforme multiple (D-174)', () => {
+  async function praticaCon(doc: { tipo: string; numero: string; importo: number }[]) {
+    const tid = await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-9', data: '2026-05-01' });
+    for (const x of doc) await db.ordini_fornitore_documenti.create({ data: { testata_id: tid, tipo: x.tipo, numero: x.numero, data: giorno('2026-05-10'), importo: x.importo } });
+    return tid;
+  }
+
+  it('seconda proforma parziale: propone «parziale» con i numeri (somma attuale, importo ordine)', async () => {
+    await praticaCon([{ tipo: 'ordine', numero: 'AU276839', importo: 2154.5 }, { tipo: 'proforma', numero: 'PR102813', importo: 2117.3 }]);
+    const p = await propostaDocumento(db, L({ tipo: 'proforma', fornitore_id: gries.id, numero: 'PR102848', codice_cliente: 'K-100', righe: [R({ codice: 'A1', importo: 37.2 })] }));
+    expect(p.esito).toBe('certo');
+    expect(p.candidati).toHaveLength(1);
+    expect(p.candidati[0].ruolo).toBe('parziale');
+    expect(p.candidati[0].motivi.join(' ')).toContain('confermato 2117,30 € su ordine 2154,50 €');
+  });
+
+  it('proforma ≈ all\'ordine totale: propone «sostituisce»', async () => {
+    await praticaCon([{ tipo: 'ordine', numero: 'AU', importo: 100 }, { tipo: 'proforma', numero: 'P-1', importo: 60 }]);
+    const p = await propostaDocumento(db, L({ tipo: 'proforma', fornitore_id: gries.id, numero: 'P-2', codice_cliente: 'K-100', righe: [R({ codice: 'A1', importo: 100 })] }));
+    expect(p.candidati[0].ruolo).toBe('sostituisce');
+  });
+
+  it('prima conferma (nessuna conferma/proforma precedente): ruolo null', async () => {
+    await praticaCon([{ tipo: 'ordine', numero: 'AU', importo: 100 }]);
+    const p = await propostaDocumento(db, L({ tipo: 'conferma', fornitore_id: gries.id, numero: 'C-1', codice_cliente: 'K-100', righe: [R({ codice: 'A1', importo: 100 })] }));
+    expect(p.esito).toBe('certo');
+    expect(p.candidati).toHaveLength(1);
+    expect(p.candidati[0].ruolo).toBe(null);
   });
 });
 
@@ -310,10 +370,12 @@ describe('proposta — agenzia mancante (D-106)', () => {
     expect(p.agenzia_mancante).toBeNull();
   });
 
-  it('proforma/pagamento/altro: mai manca_agenzia', async () => {
-    const p = await propostaDocumento(db, L({ tipo: 'proforma', fornitore_id: gasper.id, codice_cliente: 'K-100', piva_cliente: 'IT00000000001' }));
-    expect(p.esito).toBe('nessuno');
-    expect(p.agenzia_mancante).toBeNull();
+  it('pagamento/altro: mai manca_agenzia', async () => {
+    for (const tipo of ['pagamento', 'altro']) {
+      const p = await propostaDocumento(db, L({ tipo: tipo as 'pagamento' | 'altro', fornitore_id: gasper.id, codice_cliente: 'K-100', piva_cliente: 'IT00000000001' }));
+      expect(p.esito).toBe('nessuno');
+      expect(p.agenzia_mancante).toBeNull();
+    }
   });
 });
 
@@ -321,33 +383,88 @@ describe('controlliFissi', () => {
   it('totale diverso dalla somma delle righe: grave', async () => {
     const l = L({ tipo: 'fattura', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 523.7, righe: [R({ codice: 'A1', quantita: 1, prezzo: 471.7, importo: 471.7 })] });
     const c = await controlliFissi(db, l, await propostaDocumento(db, l));
-    expect(c).toContainEqual({ codice: 'totale', campo: 'totale', testo: 'Totale del documento 523,70 € diverso dalla somma delle righe 471,70 €', grave: true });
+    expect(c).toContainEqual({ codice: 'totale', campo: 'totale', testo: 'Totale del documento 523,70 € diverso dalla somma delle righe 471,70 €', grave: true, gruppo: 'lettura' });
   });
 
   it('riga: quantità × prezzo diverso dall\'importo, non grave', async () => {
     const l = L({ tipo: 'fattura', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 25, righe: [R({ codice: 'A1', quantita: 2, prezzo: 10, importo: 25 })] });
     const c = await controlliFissi(db, l, await propostaDocumento(db, l));
-    expect(c).toContainEqual({ codice: 'riga', campo: 'righe[0]', testo: 'Riga 1: quantità × prezzo 20,00 € diverso dall\'importo 25,00 €', grave: false });
+    expect(c).toContainEqual({ codice: 'riga', campo: 'righe[0]', testo: 'Riga 1: quantità × prezzo 20,00 € diverso dall\'importo 25,00 €', grave: false, gruppo: 'lettura' });
+  });
+
+  it('riga con sconto: quantità × prezzo × (1 − sconto/100) quadra, nessun rilievo', async () => {
+    const l = L({ tipo: 'fattura', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 26.82, righe: [R({ codice: 'A1', quantita: 2, prezzo: 14.9, sconto: 10, importo: 26.82 })] });
+    const c = await controlliFissi(db, l, await propostaDocumento(db, l));
+    expect(c.filter((x) => x.codice === 'riga')).toEqual([]);
+  });
+
+  it('riga senza importo letto, con sconto: il totale è calcolato, nessun rilievo riga', async () => {
+    const l = L({ tipo: 'fattura', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 26.82, righe: [R({ codice: 'A1', quantita: 2, prezzo: 14.9, sconto: 10 })] });
+    const p = await propostaDocumento(db, l);
+    const c = await controlliFissi(db, l, p);
+    expect(p.importo).toBe(26.82); // importoRigaLetta: 2 × 14,9 × (1 − 10/100)
+    expect(c.filter((x) => x.codice === 'riga')).toEqual([]);
   });
 
   it('codice cliente assente: grave', async () => {
     const l = L({ tipo: 'fattura', fornitore_id: gries.id, codice_cliente: 'ZZZ-999' });
     const c = await controlliFissi(db, l, await propostaDocumento(db, l));
-    expect(c).toContainEqual({ codice: 'codice_cliente', campo: 'codice_cliente', testo: 'Codice cliente ZZZ-999 non presente fra i clienti del fornitore', grave: true });
+    expect(c).toContainEqual({ codice: 'codice_cliente', campo: 'codice_cliente', testo: 'Codice cliente ZZZ-999 non presente fra i clienti del fornitore', grave: true, gruppo: 'lettura' });
   });
 
-  it('articolo assente fra le righe della pratica proposta: non grave', async () => {
-    await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-1', data: '2026-05-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }] });
+  it('cliente scelto a mano con agenzia per quel codice: nessun rilievo', async () => {
+    const l = L({ tipo: 'proforma', fornitore_id: gries.id, codice_cliente: 'K-100', cliente_id: String(c1.id) });
+    const c = await controlliFissi(db, l, await propostaDocumento(db, l));
+    expect(c.map((x) => x.codice)).not.toContain('codice_cliente');
+  });
+
+  it('agenzia da confermare per il cliente scelto: testo «da confermare», non «non presente»', async () => {
+    const sub = await db.subagenti.findFirstOrThrow();
+    await db.interscambio.create({ data: { subagente_id: sub.id, cliente_id: c1.id, fornitore_id: gasper.id, codice_cliente_fornitore: 'K-DC', valido_dal: giorno('2025-01-01'), da_confermare: true } });
+    const l = L({ tipo: 'proforma', fornitore_id: gasper.id, codice_cliente: 'K-DC', cliente_id: String(c1.id) });
+    const c = await controlliFissi(db, l, await propostaDocumento(db, l));
+    expect(c).toContainEqual({ codice: 'codice_cliente', campo: 'codice_cliente', testo: 'Codice cliente K-DC: agenzia dal vecchio CRM, da confermare', grave: false, gruppo: 'lettura' });
+  });
+
+  it('codice di un altro cliente: il testo dice di chi è', async () => {
+    const l = L({ tipo: 'proforma', fornitore_id: gries.id, codice_cliente: 'K-200', cliente_id: String(c1.id) });
+    const c = await controlliFissi(db, l, await propostaDocumento(db, l));
+    expect(c).toContainEqual({ codice: 'codice_cliente', campo: 'codice_cliente', testo: 'Il codice K-200 presso Gries GmbH & Co. KG è di Il Giardino di Sofia srl', grave: true, gruppo: 'lettura' });
+  });
+
+  it('articolo assente fra le righe dell\'ordine: avviso con il numero dell\'ordine', async () => {
+    await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-1', data: '2026-05-01', documenti: [{ tipo: 'ordine', numero: 'AU276839', data: '2026-05-01' }], righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }] });
     const l = L({ tipo: 'fattura', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 10, righe: [R({ codice: 'A9', quantita: 1, prezzo: 10, importo: 10 })] });
     const c = await controlliFissi(db, l, await propostaDocumento(db, l));
-    expect(c).toContainEqual({ codice: 'articolo', campo: 'righe[0]', testo: 'Articolo A9 assente fra le righe della pratica proposta', grave: false });
+    expect(c).toContainEqual({ codice: 'articolo', campo: 'righe[0]', testo: "L'articolo A9 non c'è nell'ordine AU276839: controlla se è un'aggiunta del fornitore", grave: false, gruppo: 'confronto' });
+  });
+
+  it('codici uguali a quelli dell\'ordine: nessun punto articolo', async () => {
+    await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-1', data: '2026-05-01', documenti: [{ tipo: 'ordine', numero: 'AU276839', data: '2026-05-01' }], righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }, { fase: 'ordine', codice: 'A2', quantita: 1, prezzo: 5 }] });
+    const l = L({ tipo: 'proforma', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 25, righe: [R({ codice: 'A1', quantita: 2, prezzo: 10, importo: 20 }), R({ codice: 'A2', quantita: 1, prezzo: 5, importo: 5 })] });
+    const c = await controlliFissi(db, l, await propostaDocumento(db, l));
+    expect(c.map((x) => x.codice)).not.toContain('articolo');
+  });
+
+  it('codici con spazi: trattati come uguali (nessun punto articolo)', async () => {
+    await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-1', data: '2026-05-01', documenti: [{ tipo: 'ordine', numero: 'AU276839', data: '2026-05-01' }], righe: [{ fase: 'ordine', codice: ' A1 ', quantita: 2, prezzo: 10 }] });
+    const l = L({ tipo: 'proforma', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 20, righe: [R({ codice: 'A1', quantita: 2, prezzo: 10, importo: 20 })] });
+    const c = await controlliFissi(db, l, await propostaDocumento(db, l));
+    expect(c.map((x) => x.codice)).not.toContain('articolo');
+  });
+
+  it('molti articoli assenti: un solo punto riassuntivo', async () => {
+    await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-1', data: '2026-05-01', documenti: [{ tipo: 'ordine', numero: 'AU276839', data: '2026-05-01' }], righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }] });
+    const l = L({ tipo: 'proforma', fornitore_id: gries.id, codice_cliente: 'K-100', importo: 30, righe: [R({ codice: 'B1', quantita: 1, prezzo: 10, importo: 10 }), R({ codice: 'B2', quantita: 1, prezzo: 10, importo: 10 }), R({ codice: 'B3', quantita: 1, prezzo: 10, importo: 10 })] });
+    const c = await controlliFissi(db, l, await propostaDocumento(db, l));
+    expect(c.filter((x) => x.codice === 'articolo')).toEqual([{ codice: 'articolo', campo: 'righe', testo: "Nessuna riga in comune con l'ordine AU276839: forse la pratica non è quella giusta", grave: false, gruppo: 'confronto' }]);
   });
 
   it('data precedente alla data dell\'ordine: non grave', async () => {
     await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-1', data: '2026-06-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }] });
     const l = L({ tipo: 'fattura', fornitore_id: gries.id, codice_cliente: 'K-100', data: '2026-05-15', importo: 20, righe: [R({ codice: 'A1', quantita: 2, prezzo: 10, importo: 20 })] });
     const c = await controlliFissi(db, l, await propostaDocumento(db, l));
-    expect(c).toContainEqual({ codice: 'data', campo: 'data', testo: 'Data del documento 2026-05-15 precedente alla data dell\'ordine 2026-06-01', grave: false });
+    expect(c).toContainEqual({ codice: 'data', campo: 'data', testo: 'Data del documento 2026-05-15 precedente alla data dell\'ordine 2026-06-01', grave: false, gruppo: 'confronto' });
   });
 
   it('fornitore non riconosciuto: salta codice cliente, articolo e bollettino', async () => {
@@ -361,7 +478,7 @@ describe('controlliFissi', () => {
     await db.bollettini_testata.create({ data: { fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, mese: 6, anno: 2026 } });
     const l = L({ tipo: 'bollettino', fornitore_id: gries.id, mese: 6, anno: 2026 });
     const c = await controlliFissi(db, l, await propostaDocumento(db, l));
-    expect(c).toContainEqual({ codice: 'bollettino', campo: 'mese', testo: 'Bollettino già registrato per questo fornitore e mese', grave: true });
+    expect(c).toContainEqual({ codice: 'bollettino', campo: 'mese', testo: 'Bollettino già registrato per questo fornitore e mese', grave: true, gruppo: 'lettura' });
   });
 });
 
@@ -576,5 +693,90 @@ describe('proposta — candidati da scegliere (D-152)', () => {
     expect(p.esito).toBe('fornitore_da_scegliere');
     expect(p.integra_non_raggiungibile).toBe(true);
     expect(p.candidati_fornitore.every((c) => c.fonte === 'crm')).toBe(true);
+  });
+});
+
+describe('proposta — filtro per stato delle pratiche suggerite (D-178)', () => {
+  // lo stato della pratica è la colonna della testata (aggiornaPratica, D-52): qui si imposta a mano
+  async function praticaStato(stato: string, numero: string, documenti: { tipo: string; numero: string; data: string }[] = []) {
+    const id = await creaPratica({
+      fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id,
+      numero, data: '2026-05-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }], documenti,
+    });
+    await db.ordini_fornitore_testata.update({ where: { id }, data: { stato } });
+    return id;
+  }
+  const fatturaNuova = () => L({ tipo: 'fattura', fornitore_id: gries.id, numero: 'F-NUOVA', codice_cliente: 'K-100', righe: [R({ codice: 'A1', quantita: 2, prezzo: 10, importo: 20 })] });
+
+  it('predefinito «aperte»: la pratica fatturata non è proposta', async () => {
+    await praticaStato('fatturato', 'OF-1', [{ tipo: 'fattura', numero: 'F-VECCHIA', data: '2026-06-01' }]);
+    const p = await propostaDocumento(db, fatturaNuova(), {}, 'aperte');
+    expect(p.candidati).toHaveLength(0);
+  });
+
+  it('con «tutte» la pratica fatturata è proposta, col motivo «pratica già fatturata»', async () => {
+    await praticaStato('fatturato', 'OF-1', [{ tipo: 'fattura', numero: 'F-VECCHIA', data: '2026-06-01' }]);
+    const p = await propostaDocumento(db, fatturaNuova(), {}, 'tutte');
+    expect(p.candidati).toHaveLength(1);
+    expect(p.candidati[0].motivi).toContain('pratica già fatturata');
+  });
+
+  it('«solo_ordine» e «confermata» filtrano per stato', async () => {
+    await praticaStato('inviato', 'OF-1');
+    await praticaStato('confermato', 'OF-2');
+    const l = fatturaNuova();
+    const solo = await propostaDocumento(db, l, {}, 'solo_ordine');
+    expect(solo.candidati.map((c) => c.pratica.numero)).toEqual(['OF-1']);
+    const confermata = await propostaDocumento(db, l, {}, 'confermata');
+    expect(confermata.candidati.map((c) => c.pratica.numero)).toEqual(['OF-2']);
+  });
+
+  it('valore fuori lista → 400 (DTO)', async () => {
+    jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue(null);
+    await db.utenti.create({ data: {
+      username: 'filtro-178', email: 'filtro-178@prova-filtro.it', nome: 'Prova Filtro', ruolo: 'utente',
+      aree: { create: [{ area: 'provvigioni', livello: 'lettura' }] },
+      password_hash: await cifra('password-di-prova'), deve_cambiare_password: false,
+    } });
+    const agente = request.agent(app.getHttpServer());
+    await agente.post('/api/accesso/entra').send({ utente: 'filtro-178', password: 'password-di-prova' }).expect(200);
+    const arrivo = await creaArrivo({ tipo: 'fattura', fornitore_id: gries.id });
+    await agente.get(`/api/documenti/${arrivo.id}?filtro=strano`).expect(400);
+  });
+});
+
+describe('proposta — predefinito dal tipo (15/11/2026)', () => {
+  it('filtroDalTipo: nota di credito e pagamento → fatturata, gli altri → aperte', () => {
+    expect(filtroDalTipo('nota_credito')).toBe('fatturata');
+    expect(filtroDalTipo('pagamento')).toBe('fatturata');
+    expect(filtroDalTipo('ordine')).toBe('aperte');
+    expect(filtroDalTipo('proforma')).toBe('aperte');
+    expect(filtroDalTipo('conferma')).toBe('aperte');
+    expect(filtroDalTipo('fattura')).toBe('aperte');
+    expect(filtroDalTipo('altro')).toBe('aperte');
+    expect(filtroDalTipo(null)).toBe('aperte');
+  });
+
+  it('nota di credito senza filtro: il server propone solo le pratiche fatturate', async () => {
+    const aperta = await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-APERTA', data: '2026-05-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }] });
+    await db.ordini_fornitore_testata.update({ where: { id: aperta }, data: { stato: 'inviato' } });
+    const fatta = await creaPratica({ fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c1.id, cliente_versione_id: c1.versione_id, numero: 'OF-FATT', data: '2026-06-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }], documenti: [{ tipo: 'fattura', numero: 'F-1', data: '2026-06-15' }] });
+    await db.ordini_fornitore_testata.update({ where: { id: fatta }, data: { stato: 'fatturato' } });
+
+    jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue(null);
+    await db.utenti.create({ data: {
+      username: 'pred-178', email: 'pred-178@prova-pred.it', nome: 'Prova Pred', ruolo: 'utente',
+      aree: { create: [{ area: 'provvigioni', livello: 'lettura' }] },
+      password_hash: await cifra('password-di-prova'), deve_cambiare_password: false,
+    } });
+    const agente = request.agent(app.getHttpServer());
+    await agente.post('/api/accesso/entra').send({ utente: 'pred-178', password: 'password-di-prova' }).expect(200);
+    const arrivo = await creaArrivo({ tipo: 'nota_credito', fornitore_id: gries.id, campi: [
+      ['numero', 'NC-1', 0.95], ['codice_cliente', 'K-100', 0.95],
+      ['righe[0].codice', 'A1', 0.95], ['righe[0].quantita', '2', 0.95], ['righe[0].prezzo', '10', 0.95], ['righe[0].importo', '20', 0.95],
+    ] });
+    const r = await agente.get(`/api/documenti/${arrivo.id}`).expect(200);
+    const candidati = r.body.proposta.candidati as { pratica: { numero: string } }[];
+    expect(candidati.map((c) => c.pratica.numero)).toEqual(['OF-FATT']);
   });
 });

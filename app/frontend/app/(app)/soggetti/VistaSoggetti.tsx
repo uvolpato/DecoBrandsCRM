@@ -14,6 +14,7 @@ import { SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
+import { domani } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
 
 // Anagrafica unica a soggetti (D-102, specifica-anagrafica-soggetti.md §4): elenco e scheda come il
@@ -101,11 +102,6 @@ const VARIANTE_RUOLO: Record<Ruolo['tipo'], Variante> = { cliente: 'info', forni
 const fiscale = (x: Soggetto) => (x.piva_norm ? 'P.IVA ' + x.piva_norm : x.cf_norm ? 'C.F. ' + x.cf_norm : 'Nessun dato fiscale');
 const aperte = <T extends { valido_al: string | null }>(righe: T[]) => righe.filter((x) => !x.valido_al); // §1.4: chiuse con valido_al
 // §4.3: valido_al è escluso e il server vuole una fine dopo l'inizio; il recapito chiude da domani
-const domani = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-};
 
 export function VistaSoggetti({ idSel }: { idSel?: string }) {
   const io = useUtente();

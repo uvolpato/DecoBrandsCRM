@@ -23,6 +23,8 @@ model fornitori {
   giorno_bollettino      Int       @default(10) @db.SmallInt // CHECK 1–28 (§5.6, D-03)
   tipo_provvigione       String    @default("fatturato") @db.VarChar(20) // maturato | fatturato (§5.5)
   giorni_incasso         Int       @default(60) @db.SmallInt // §5.14
+  // D-183 §19: le spese in fattura (trasporto, imballo) entrano nella base della provvigione? no = escluse
+  spese_base_provvigione Boolean   @default(false)
   note                   String?
   attivo                 Boolean   @default(true)
   creato_il              DateTime  @default(now()) @db.Timestamptz(6)
@@ -238,6 +240,8 @@ model ordini_fornitore_testata {
   importo_merce         Decimal?  @db.Decimal(12, 2)
   stato                 String    @default("inviato") @db.VarChar(20) // inviato | confermato | fatturato: dal motore (D-52)
   // numero_ordine = numero della pratica, data_ordine = data del primo ordine (D-60); ordini e conferme sono documenti
+  // numero_ordine_fornitore = numero d'ordine del fornitore (D-169); unico per fornitore (indice parziale nella migrazione)
+  numero_ordine_fornitore String? @db.VarChar(50)
   note                  String?
   // risultato del motore, scritto da aggiornaPratica nella stessa transazione di ogni modifica (D-52 §19)
   importo               Decimal   @default(0) @db.Decimal(14, 2) // importoPratica
@@ -282,7 +286,16 @@ model ordini_fornitore_documenti {
   solleciti       Int       @default(0) @db.SmallInt
   arrivo_id       BigInt? // file nel documento in arrivo
   liquidazione_id BigInt? // trimestre in cui il subagente l\'ha incassata (D-11)
+  // D-183 §19: valori calcolati salvati (base, spese escluse, sconto medio, scaglione, % e provvigioni)
+  // e quando si sono fissati. Li calcola e salva solo il server (V12); congelato_il non nullo = chiuso,
+  // non si ricalcolano né si toccano più (si corregge con documenti di rettifica).
+  calcolo        Json?
+  congelato_il   DateTime? @db.Timestamptz(6)
   note            String?
+  // D-174 §19: più conferme/proforme per la stessa pratica. ruolo = come l'operatore l'ha abbinata
+  // (parziale: si somma alle altre; sostituisce: revisione, quella vecchia resta superata e non conta).
+  ruolo           String?   @db.VarChar(15)
+  superato_da     BigInt? // id del documento che lo sostituisce (il sostituito non conta, D-174)
   creato_il       DateTime  @default(now()) @db.Timestamptz(6)
 
   fattura          ordini_fornitore_documenti?  @relation("storno", fields: [fattura_id], references: [id], onDelete: Restrict)
@@ -330,6 +343,9 @@ model ordini_fornitore_righe {
   quantita        Decimal? @db.Decimal(12, 3)
   prezzo_unitario Decimal? @db.Decimal(12, 4)
   importo         Decimal? @db.Decimal(12, 2)
+  // D-183 §19: riga di spesa (trasporto, imballo, «Fracht»): non è merce, esce da lordo e netto dello
+  // sconto medio e (di norma) dalla base della provvigione. Si segna nella correzione del documento.
+  spesa           Boolean  @default(false)
 
   testata   ordini_fornitore_testata    @relation(fields: [testata_id], references: [id], onDelete: Cascade)
   documento ordini_fornitore_documenti? @relation(fields: [documento_id], references: [id], onDelete: Cascade)
@@ -454,6 +470,7 @@ model documenti_in_arrivo {
   fornitore_versione_id  BigInt? // fornitore e versione vanno insieme (CHECK)
   livello                String?   @db.VarChar(16) // dal campo meno affidabile in documenti_campi
   controlli              Json?
+  lettura_grezza         Json? // D-170: risposta completa del lettore, per ricavare campi nuovi senza rileggere (mai al browser)
   modello                String?
   ricevuto_il            DateTime  @default(now()) @db.Timestamptz(6)
   letto_il               DateTime? @db.Timestamptz(6)

@@ -1,19 +1,22 @@
 'use client';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormAgenzia, type Agenzia } from '@/componenti/FormAgenzia';
 import { CercaInIntegra } from '@/componenti/CercaInIntegra';
+import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
+import { Copiabile } from '@/componenti/Copiabile';
 import { Icona } from '@/componenti/Icona';
-import { Conferma } from '@/componenti/Modale';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, quando, Stato } from '@/componenti/Piccoli';
 import { SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
-import { euro } from '@/lib/formati';
+import { data, euro } from '@/lib/formati';
 import { useMemoria } from '@/lib/memoria';
 import { fornitore, subagente } from '@/lib/entita';
 import { ETICHETTA_PRATICA, type StatoPratica } from '@/lib/stati';
@@ -57,10 +60,20 @@ interface Dettaglio {
   agenzie: Agenzia[];
 }
 
+// D-171: azioni di riga a icone in colonne fisse; l'ordine è fisso, lo slot vuoto se manca
+const AZIONI_AGENZIA: AzioneRiga[] = [
+  { nome: 'conferma', icona: 'spunta', etichetta: 'Conferma', variante: 'primario' },
+  { nome: 'modifica', icona: 'matita', etichetta: 'Modifica' },
+  { nome: 'elimina', icona: 'cestino', etichetta: 'Elimina', variante: 'pericolo' },
+];
+
 export function VistaClienti({ idSel }: { idSel?: string }) {
   const io = useUtente();
   const puo = usePuo();
   const router = useRouter();
+  const cerca = useSearchParams();
+  // ?scheda=agenzie apre la scheda Agenzie già selezionata (link diretto, 15/11/2026)
+  const schedaParam = cerca.get('scheda');
   const [clienti, setClienti] = useState<Cliente[] | null>(null);
   const [dettaglio, setDettaglio] = useState<Dettaglio | null>(null);
   const [pratiche, setPratiche] = useState<Pratica[] | null>(null);
@@ -116,14 +129,17 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
 
   const u = dettaglio;
   const chiudi = () => setFinestra(null);
-  const chiedi = (titolo: string, testo: ReactNode, etichetta: string, pericolo = false) =>
-    new Promise<boolean>((ok) => setFinestra(<Conferma titolo={titolo} testo={testo} etichetta={etichetta} pericolo={pericolo} onRisposta={(si) => { chiudi(); ok(si); }} />));
+  // D-172: conferma con casella per le operazioni senza ritorno
+  const chiediGrave = (titolo: string, punti: ReactNode[], etichetta: string, etichettaCasella?: string) =>
+    new Promise<boolean>((ok) => setFinestra(<ConfermaGrave titolo={titolo} punti={punti} etichettaCasella={etichettaCasella} etichetta={etichetta} onRisposta={(si) => { chiudi(); ok(si); }} />));
 
   const puoModificare = puo('dati.modifica');
   const sagome = useSagome(!clienti);
 
   async function eliminaAgenzia(x: Dettaglio, a: Agenzia) {
-    if (!(await chiedi('Eliminare questa agenzia?', 'L’agenzia verrà eliminata.', 'Elimina', true))) return;
+    if (!(await chiediGrave('Eliminare questa agenzia?',
+      ['L’agenzia viene eliminata in modo definitivo.', 'Le pratiche già chiuse e i documenti la citano nello storico.'],
+      'Elimina'))) return;
     const r = await api('clienti/' + x.id + '/agenzie/' + a.id, undefined, 'DELETE');
     if (!r.ok) { avviso(r.messaggio, true); return; }
     avviso('Agenzia eliminata');
@@ -144,12 +160,12 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   ];
 
   const colonneAgenzie: Colonna<Agenzia>[] = [
-    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (a) => <><b>{a.fornitore ?? '—'}</b>{a.da_confermare && <Stato v="attesa">da confermare</Stato>}<span className="sec-riga">{a.subagente ? 'seguito da ' + a.subagente : ''}</span></> },
+    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (a) => <><b>{a.fornitore ? <Link href={'/fornitori/' + a.fornitore_id}>{a.fornitore}</Link> : '—'}</b>{a.da_confermare && <Stato v="attesa">da confermare</Stato>}<span className="sec-riga">{a.subagente ? 'seguito da ' + a.subagente : ''}</span></> },
     { key: 'codice_cliente_fornitore', header: 'Codice cliente', cell: (a) => a.codice_cliente_fornitore ?? '—' },
     { key: 'sconto', header: 'Sconto', align: 'center', cell: (a) => a.sconto + ' %' },
     { key: 'pct_subagente', header: '% subagente', align: 'center', cell: (a) => (a.pct_subagente === null ? '—' : a.pct_subagente + ' %') },
     { key: 'regola_mensile', header: 'Regola', cell: (a) => a.regola_mensile === 'prima' ? 'una fattura: la prima' : a.regola_mensile === 'piu_alta' ? 'una fattura: la più alta' : 'ogni fattura' },
-    { key: 'periodo', header: 'Periodo', cell: (a) => a.valido_dal + (a.valido_al ? ' → ' + a.valido_al : '') },
+    { key: 'periodo', header: 'Periodo', cell: (a) => (a.valido_dal === '2000-01-01' ? 'da sempre' : data(a.valido_dal)) + (a.valido_al ? ' → ' + data(a.valido_al) : '') }, // D-158: 2000-01-01 = «da sempre» (import dal vecchio CRM)
   ];
 
   const colonnePratiche: Colonna<Pratica>[] = [
@@ -218,14 +234,14 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
           <>
             <Dettagli inColonne voci={[
               { etichetta: 'Ragione sociale', valore: u.ragione_sociale ?? '—' },
-              { etichetta: 'P.IVA', valore: u.piva ?? '—' },
+              { etichetta: 'P.IVA', valore: u.piva ? <>{u.piva}<Copiabile valore={u.piva} /></> : '—' },
               { etichetta: 'Indirizzo', valore: [u.indirizzo, u.cap, u.citta, u.provincia].filter(Boolean).join(' ') || '—' },
               { etichetta: 'Email', valore: u.email ?? '—' },
               { etichetta: 'Codice soggetto', valore: u.soggetto_codice ?? '—' },
               { etichetta: 'Codice Integra', valore: u.codice_integra ?? '—' },
             ]} />
             <Nota>Anagrafica da Integra (sola lettura).</Nota>
-            <Schede riempi memoria="clienti" schede={[
+            <Schede riempi memoria={schedaParam ? undefined : 'clienti'} attiva={schedaParam ?? undefined} schede={[
               {
                 id: 'agenzie', etichetta: 'Agenzie', contenuto: () => (
                   <div className="pila riempi">
@@ -244,11 +260,12 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
                       <DataTable righe={agenzieFiltrate} filtro={JSON.stringify(valoriAg)} colonne={[...colonneAgenzie, ...(puoModificare ? [{
                         key: 'azioni', header: '', align: 'center' as const, sortable: false,
                         cell: (a: Agenzia) => (
-                          <span className="azioni-riga">
-                            {a.da_confermare && <button type="button" className="btn primario piccolo" onClick={(e) => { e.stopPropagation(); void confermaAgenzia(u, a); }}>Conferma</button>}
-                            <button type="button" className="btn sec piccolo" onClick={(e) => { e.stopPropagation(); setFinestra(<FormAgenzia cliente={{ id: u.id, nome: u.ragione_sociale }} agenzia={a} onSalvata={async () => { await caricaDettaglio(u.id); }} onChiudi={chiudi} />); }}>Modifica</button>
-                            <button type="button" className="btn pericolo piccolo" onClick={(e) => { e.stopPropagation(); void eliminaAgenzia(u, a); }}>Elimina</button>
-                          </span>
+                          <AzioniRiga azioni={AZIONI_AGENZIA} oggetto={'l’agenzia ' + (a.fornitore ?? '')}
+                            riga={[
+                              ...(a.da_confermare ? [{ nome: 'conferma', onClick: () => void confermaAgenzia(u, a) }] : []),
+                              { nome: 'modifica', onClick: () => setFinestra(<FormAgenzia cliente={{ id: u.id, nome: u.ragione_sociale }} agenzia={a} onSalvata={async () => { await caricaDettaglio(u.id); }} onChiudi={chiudi} />) },
+                              { nome: 'elimina', onClick: () => void eliminaAgenzia(u, a) },
+                            ]} />
                         ),
                       }] : [])]} chiave={(a) => a.id} emptyText="Nessuna agenzia" memoria="clienti-agenzie" />
                     </div>

@@ -6,7 +6,7 @@ import * as posta from '../src/posta';
 import { verifica } from '../src/password';
 import { crea } from '../src/superutente';
 
-const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL!, options: '-c TimeZone=UTC' }) });
 
 afterAll(async () => {
   const su = await db.utenti.findMany({ where: { email: { endsWith: '@prova-superutente.it' } } });

@@ -160,10 +160,16 @@ describe('percentuale e regola del subagente', () => {
 
   it('responsabile: cambia percentuale e regola', async () => {
     const a = await entra('ammi-cli');
-    const r = await a.post('/clienti/' + clienteId + '/agenzie', { ...base(), pct_subagente: 40, valido_dal: '2042-01-01', valido_al: '2042-12-31' }).expect(201);
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', { ...base(), pct_subagente: 12, valido_dal: '2042-01-01', valido_al: '2042-12-31' }).expect(201);
     creati.push(BigInt(r.body.id));
-    const m = await a.put('/clienti/' + clienteId + '/agenzie/' + r.body.id, { pct_subagente: 45, regola_mensile: 'piu_alta' }).expect(200);
-    expect(m.body.pct_subagente).toBe(45);
+    const m = await a.put('/clienti/' + clienteId + '/agenzie/' + r.body.id, { pct_subagente: 14, regola_mensile: 'piu_alta' }).expect(200);
+    expect(m.body.pct_subagente).toBe(14);
+  });
+
+  it('D-166: la % del subagente non supera la % dal fornitore (400)', async () => {
+    const a = await entra('ammi-cli');
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', { ...base(), pct_subagente: 19, valido_dal: '2044-01-01' }).expect(400); // 19 > 18 (pct_agente dello sconto 2)
+    expect(r.body.message).toMatch(/supera/);
   });
 
   it('elenco clienti: id di fornitori e subagenti', async () => {

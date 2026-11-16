@@ -4,7 +4,8 @@ import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'c
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { type Dati, caricaDatiBollettino, fiscale } from './motore/dati';
-import { riconcilia, statoIncasso } from './motore/motore';
+import { anomaliaScontoMedio, riconcilia, statoIncasso } from './motore/motore';
+import { congelaDocumenti } from './pratiche';
 import { PrismaService } from './prisma.service';
 import { type Contesto, logEvent } from './registro';
 
@@ -284,11 +285,16 @@ export class BollettinoController {
       if (r.aperte) throw new ConflictException(`Ci sono ${r.aperte} righe da decidere prima di chiudere il bollettino`);
       if (c.stato === 'verificato' && contestate) throw new ConflictException('Ci sono righe contestate: il bollettino va segnato come contestato');
       if (c.stato === 'contestato' && !contestate) throw new ConflictException('Nessuna riga contestata: il bollettino va segnato come verificato');
+      // D-182 §19: una pratica con lo sconto medio oltre l'ultimo scaglione non si chiude (provvigione da decidere)
+      const anomala = S.pratiche.find((p) => anomaliaScontoMedio(S, p));
+      if (anomala) throw new ConflictException(`La pratica ${anomala.numero} ha lo sconto medio oltre l'ultimo scaglione: aggiungi lo scaglione al fornitore prima di chiudere il bollettino.`);
       for (const x of r.righe) {
         if (!x.id || !x.loro || !x.documento_id) continue; // righe del fornitore abbinate a un nostro documento
         const congela = !x.incasso && x.noi ? { pct_calcolata: x.noi.pct, importo_calcolato: x.noi.importo } : {};
         await tx.bollettini_righe.update({ where: { id: BigInt(x.id) }, data: { documento_id: BigInt(x.documento_id), ...congela } });
       }
+      // D-183: i documenti del bollettino si congelano (valori calcolati fissati con le regole di oggi)
+      await congelaDocumenti(tx, S, r.righe.filter((x) => x.id && x.loro && x.documento_id).map((x) => x.documento_id!));
       // attese rimaste su documenti che ora sono su una riga (abbinati per numero): non valgono più (D-56)
       const mancanti = r.righe.filter((x) => x.categoria === 'mancante').map((x) => BigInt(x.documento_id!));
       await tx.bollettini_attese.deleteMany({ where: { testata_id: BigInt(id), documento_id: { notIn: mancanti } } });

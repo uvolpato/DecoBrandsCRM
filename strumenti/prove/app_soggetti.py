@@ -9,6 +9,7 @@
 import re
 import sys, pathlib, time
 from playwright.sync_api import sync_playwright
+import segmenti as segm
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
 BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8011'
@@ -40,7 +41,6 @@ with sync_playwright() as p:
     righe = lambda pg: pg.locator('.soggetti-filtri .dt tbody tr.cliccabile').count()
     finestra = lambda pg: pg.locator('.velo .modale')
     scheda = lambda pg, t: pg.click('.schede-barra [role=tab]:has-text("%s")' % t)
-    seg = lambda pg, t: pg.locator('.segmenti [role=tab]:has-text("%s")' % t)
     sovr = lambda pg: pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth')
     cerca = lambda pg, t: (pg.fill('.filtri input[type=search]', t), pg.wait_for_timeout(1400))
     def vai(pg, voce):  # voce del menu: navigazione dentro l'app, senza ricaricare
@@ -67,23 +67,23 @@ with sync_playwright() as p:
     ok('Soggetti' in testo(pg, '.testa h1'), 'titolo della pagina')
     ok(righe(pg) == min(25, n_tutti) and 'di %d' % n_tutti in testo(pg, '.soggetti-filtri .dt-piede'),
        'elenco: %d righe in pagina, %d soggetti dal server' % (min(25, n_tutti), n_tutti))
-    ok(seg(pg, 'Tutti').locator('.n').inner_text() == str(n_tutti), 'segmento Tutti: %d dal server' % n_tutti)
+    ok(segm.numero(pg, 'Tutti') == n_tutti, 'segmento Tutti: %d dal server' % n_tutti)
     cerca(pg, 'MCL')
     ok(attesa(pg, '.soggetti-filtri .dt tbody tr:has-text("MCL SRL")') and righe(pg) == 1, 'ricerca per nome: MCL SRL')
-    ok(attesa(pg, '.segmenti [role=tab]:has-text("Tutti") .n:text-is("1")') and seg(pg, 'Tutti').locator('.n').inner_text() == '1',
+    ok(segm.attendi_numero(pg, 'Tutti', 1) and segm.numero(pg, 'Tutti') == 1,
        'D-23: il numero del segmento conta con la ricerca')
     cerca(pg, '08943010155')
     ok(righe(pg) == 1 and 'P.IVA 08943010155' in testo(pg, '.soggetti-filtri .dt tbody'), 'ricerca per P.IVA: MCL')
     cerca(pg, '')
-    seg(pg, 'Clienti').click()
+    segm.scegli(pg, 'Clienti')
     ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("%d elementi")' % n_clienti) and '%d elementi' % n_clienti in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Clienti: %d dal server' % n_clienti)
-    seg(pg, 'Fornitori').click()
+    segm.scegli(pg, 'Fornitori')
     ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("%d elementi")' % n_fornitori) and '%d elementi' % n_fornitori in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Fornitori: %d dal server' % n_fornitori)
-    seg(pg, 'Subagenti').click()
+    segm.scegli(pg, 'Subagenti')
     ok(attesa(pg, '.soggetti-filtri .dt-piede:has-text("%d elementi")' % n_subagenti) and '%d elementi' % n_subagenti in testo(pg, '.soggetti-filtri .dt-piede'), 'segmento Subagenti: %d dal server' % n_subagenti)
-    seg(pg, 'Non attivi').click()
+    segm.scegli(pg, 'Non attivi')
     ok(attesa(pg, '.soggetti-filtri .dt:has-text("Nessun soggetto")') and righe(pg) == 0, 'segmento Non attivi: elenco vuoto')
-    seg(pg, 'Tutti').click(); pg.wait_for_timeout(800)
+    segm.scegli(pg, 'Tutti'); pg.wait_for_timeout(800)
     pg.click('.soggetti-filtri .dt th:has-text("Codice")')
     ok(attesa(pg, '.soggetti-filtri .dt th[aria-sort="descending"]:has-text("Codice")'), 'ordinamento dal server: codice decrescente')
     codici = lambda pg: pg.locator('.soggetti-filtri .dt tbody tr td:first-child').all_inner_texts()

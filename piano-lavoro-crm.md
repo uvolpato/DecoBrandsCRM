@@ -1,6 +1,6 @@
 # Piano di lavoro — CRM Decobrands (fasi e attività parallele)
 
-**Versione:** 2.2 — **13/11/2026:** documentazione dell'onda 1 del collaudo (D-114…D-132, D-144…D-149); le attività delle correzioni sono in F7-A5 (10 h **da approvare**), F7-A6 (4 h **da approvare**) e F7-A7 (Righe dei bollettini dal PDF, 12 h **da approvare**). Le ore del piano approvate il 04/11/2026 restano tali. — versione 2.1 — **12/11/2026:** documentazione dell'onda 0 del collaudo (D-139…D-143) e attività delle correzioni, ore **da approvare**. — versione 2.0 — **04/11/2026:** tutte le ore segnate «da approvare» in questo piano sono **approvate da Ugo**: F4-A4 (2 h), F4-A6 (4 h), F4-A3 (+3 h), F1-A6 (4 h), la correzione D-62 di F3-A3 (1 h) e le attività già consegnate (F0-A3, F0-A4, F0-A7, F0-A8, F1-A4, F1-A7, F2-A1, F2-A4, F3-A3 nonché le pagine di F5/F6 ancora da fare). — versione 1.9 · **03/11/2026:** F2-A4 documenti della pratica per ogni fornitore, 8 h **da approvare** (D-60) · versione 1.8 · **Data:** 19/10/2026 (CRM staccato dalla Gestione Ordini, accesso con Microsoft 365 o link via email, registro unico, viste di Integra dal database ponte: F0-A3, F0-A8, F5-A2, F5-A5 con ore da approvare; spec D-29…D-32) · versione 1.7 (regola V12: tutto sul backend) · versione 1.6 (F1-A6 regole del subagente, da approvare) · versione 1.5 (F1-A5 percentuali datate ed eccezioni, approvate; riferimento alla checklist §1.1) · versione 1.4 (prototipo ufficiale `prototipo-alternativo/`, D-24: checklist §1.1 e file sorgente delle attività riscritti) · versione 1.3 del 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
+**Versione:** 2.5 — **16/11/2026:** registro del §19 completato per D-153…D-176 (onda del 14/11 e precedenti); allineati i riferimenti stantii di F7-A13 (D-178 → D-179; sconto di riga e importo calcolato restano senza numero di registro) e F7-A14 (tendina nella finestra di ricerca, non segmenti). — **Versione:** 2.4 — **16/11/2026:** documentazione dell'onda del 15/11 (D-177…D-196): attività F7-A16…F7-A20 (sconto medio, spese e valori congelati, ora del server, filtri e ricerca, documenti e coda, visualizzatore/Oggi/email/Liquidazioni), ore **da approvare**. — **Versione:** 2.3 — **15/11/2026:** preventivo 0.2.7: attività F7-A8…F7-A14 per le variazioni V19…V25 (45 h **da approvare**) e F7-A15 per il collaudo delle onde 0–2 (V18, ore da definire). — **Versione:** 2.2 — **13/11/2026:** documentazione dell'onda 1 del collaudo (D-114…D-132, D-144…D-149); le attività delle correzioni sono in F7-A5 (10 h **da approvare**), F7-A6 (4 h **da approvare**) e F7-A7 (Righe dei bollettini dal PDF, 12 h **da approvare**). Le ore del piano approvate il 04/11/2026 restano tali. — versione 2.1 — **12/11/2026:** documentazione dell'onda 0 del collaudo (D-139…D-143) e attività delle correzioni, ore **da approvare**. — versione 2.0 — **04/11/2026:** tutte le ore segnate «da approvare» in questo piano sono **approvate da Ugo**: F4-A4 (2 h), F4-A6 (4 h), F4-A3 (+3 h), F1-A6 (4 h), la correzione D-62 di F3-A3 (1 h) e le attività già consegnate (F0-A3, F0-A4, F0-A7, F0-A8, F1-A4, F1-A7, F2-A1, F2-A4, F3-A3 nonché le pagine di F5/F6 ancora da fare). — versione 1.9 · **03/11/2026:** F2-A4 documenti della pratica per ogni fornitore, 8 h **da approvare** (D-60) · versione 1.8 · **Data:** 19/10/2026 (CRM staccato dalla Gestione Ordini, accesso con Microsoft 365 o link via email, registro unico, viste di Integra dal database ponte: F0-A3, F0-A8, F5-A2, F5-A5 con ore da approvare; spec D-29…D-32) · versione 1.7 (regola V12: tutto sul backend) · versione 1.6 (F1-A6 regole del subagente, da approvare) · versione 1.5 (F1-A5 percentuali datate ed eccezioni, approvate; riferimento alla checklist §1.1) · versione 1.4 (prototipo ufficiale `prototipo-alternativo/`, D-24: checklist §1.1 e file sorgente delle attività riscritti) · versione 1.3 del 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato alla fase successiva)
 **Derivato da:** `specifica-crm-provvigioni.md` v2.0 (§16) · **Ore:** 71 h di attività + 18 h di margine = 89 h (preventivo §4)
 **Scopo:** suddividere l'implementazione in fasi e attività indipendenti, assegnabili ad **agenti in parallelo**, con **replicazione maniacale** del prototipo navigabile.
 
@@ -334,6 +334,71 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **Dipende da:** F6 (lettura), D-119
 - **Output:** lettura del PDF del bollettino con uno schema di estrazione proprio (3 h); rotta che crea le righe in transazione con abbinamento ai documenti per `documento_id` o numero + data (D-34) (3 h); finestra di controllo e correzione delle righe come per i documenti (4 h); prove backend e browser (2 h).
 - **Ore:** 12 h **da approvare**. Stima: è un flusso completo come la lettura dei documenti (lettura, controllo, abbinamento), ridotto perché riusa connettore e finestra di correzione.
+
+#### F7-A8 · Documenti in coda e lettura — 8 h **da approvare**
+- **Corrisponde a:** preventivo §5 V19 · **Dipende da:** F6 · **Riferimenti:** §6.5, §7.9, D-151, versioni 0.2.1 e 0.2.6
+- **Output (già fatto):** file caricati visibili subito e tolti dalla coda, coda in ordine di lettura aggiornata da sola, PDF su tutte le pagine col campo alla sua pagina, soglie di affidabilità dal server, prezzi e importi in euro nella correzione.
+- **Ore:** 8 h **da approvare** (stima dai commit `a1b43dc`, `06694b7` e dai resoconti `coda-visibile`, `pdf-tutte-le-pagine`, `soglie-lettura`).
+
+#### F7-A9 · Riconoscimento di fornitore e cliente — 10 h **da approvare**
+- **Corrisponde a:** preventivo §5 V20 · **Dipende da:** F6 · **Riferimenti:** §6.5, §7.9, D-152, D-164, D-165, versioni 0.2.1–0.2.6
+- **Output (già fatto):** candidati da CRM e Integra con scelta della persona (D-152), ricerca per parole su Integra e nel CRM, codice cliente nella ricerca, vocabolario dei nomi letti (`alias_letti`) e somiglianza pg_trgm (D-164), P.IVA letta dal documento e proposta di salvarla nel CRM (D-165).
+- **Ore:** 10 h **da approvare** (stima dai commit `a1b43dc`, `a39d2f2`, `6507cec`, `06694b7`).
+
+#### F7-A10 · Anagrafica del vecchio CRM e agenzie — 7 h **da approvare**
+- **Corrisponde a:** preventivo §5 V21 · **Dipende da:** F1 · **Riferimenti:** §4.7, §7.4, §7.9, D-156, D-158, D-159, versioni 0.2.3 e 0.2.4
+- **Output (già fatto):** import additivo del vecchio CRM con i legami, agenzie valide dal 01/01/2000 e «da confermare», «Aggiungi l'agenzia» dentro *Apri la pratica*, segno e azione «Conferma» nella scheda *Agenzie* del cliente.
+- **Ore:** 7 h **da approvare** (stima dai commit `6507cec`, `313e753`).
+
+#### F7-A11 · Percentuali e scaglioni dal flusso — 5 h **da approvare**
+- **Corrisponde a:** preventivo §5 V22 · **Dipende da:** F1 · **Riferimenti:** §7.4, §7.9, D-161, D-162, D-163, versione 0.2.5
+- **Output (già fatto):** «Configura le percentuali» da *Apri la pratica* con la finestra comune dei Fornitori, scaglioni aggiunti o tolti nella correzione (D-162, D-163), campi di ricerca senza numeri né pallino rosso durante il caricamento (D-161).
+- **Ore:** 5 h **da approvare** (stima dal commit `6f97568`).
+
+#### F7-A12 · Correzione dei dati letti — 5 h **da approvare**
+- **Corrisponde a:** preventivo §5 V23 · **Dipende da:** F6 · **Riferimenti:** §7.9, versione 0.2.2
+- **Output (già fatto):** testata su tre righe con cliente e fornitore letto e pulsante ›, somma delle righe con avviso, cliente scelto che resta nel campo, riepilogo dell'affidabilità chiuso all'apertura.
+- **Ore:** 5 h **da approvare** (stima dal commit `a39d2f2`).
+
+#### F7-A13 · Sconto di riga e importo calcolato o letto — 6 h **da approvare**
+- **Corrisponde a:** preventivo §5 V24 · **Dipende da:** F6 · **Riferimenti:** §6.5, §7.9, V12, D-179
+- **Output (già fatto):** campo `sconto` nello schema e nel prompt di lettura, colonna «Sconto» nel riquadro *Righe* e nella correzione, importo di riga calcolato se non letto e «Usa … €» quando il letto è discorde; il server ricalcola il vuoto e non riceve mai un importo calcolato dal browser. Un importo letto come 0 su una riga che vale è «non letto» (D-179). Sconto di riga e importo calcolato sono descritti in §6.5 e §7.9 ma **non hanno un numero nel §19**: i resoconti `sconto-riga` e `importo-calcolato` proponevano D-178/D-179, già presi da altre decisioni; i due numeri liberi (D-155, D-160) restano non usati, per non inventare.
+- **Ore:** 6 h **da approvare** (stima dai resoconti `sconto-riga`, `importo-calcolato`).
+
+#### F7-A14 · Filtro per stato nella ricerca delle pratiche — 4 h **da approvare**
+- **Corrisponde a:** preventivo §5 V25 · **Dipende da:** F2, F6 · **Riferimenti:** §6.5, §7.9, V12, D-177
+- **Output (già fatto):** `GET /api/pratiche/cerca?stato=` con lista chiusa applicata dal server; il filtro (*Tutte · Solo ordine · Confermata · Fatturata*) è una **tendina dentro la finestra di ricerca**, a destra del campo (D-177), non una riga di segmenti, con il valore iniziale dal tipo del documento; l'operatore può toglierlo o cambiarlo.
+- **Ore:** 4 h **da approvare** (stima dal resoconto `filtro-stato-pratiche`).
+
+#### F7-A15 · Collaudo onde 0–2 e correzioni per i documenti veri — ore **da definire (Ugo)**
+- **Corrisponde a:** preventivo §5 V18 · **Riferimenti:** D-144…D-179
+- **Output:** correzioni e diagnosi emerse dalle prove sui documenti veri: diagnosi dello sconto non recuperabile dalla lettura grezza, limite del selettore dei mesi dei Bollettini (si torna fino al primo documento), correzione della `Modale` (`<p>` → `<div>`), più i pacchetti dell'onda.
+- **Ore:** **da definire (Ugo)**, fuori dai totali del preventivo.
+
+#### F7-A16 · Onda del 15/11: sconto medio, spese e valori congelati — 14 h **da approvare**
+- **Riferimenti:** §5.3, §4.2.7.1, §4.2.8, D-182, D-183, D-194, versioni 0.2.7
+- **Output (già fatto):** lo scaglione si sceglie dallo sconto medio letto sui documenti (primo ≥, oltre l'ultimo = anomalia `provvigione.sconto_medio` e pratica non chiudibile, documento che comanda, riserva sull'agenzia) con il comando `sconto:medio`; le spese in fattura sono escluse dalla base salvo `spese_base_provvigione`; ogni documento fiscale salva `calcolo` (JSON) e `congelato_il` alla chiusura, la pratica è la somma; ricalcolo dei documenti aperti a ogni cambio di un ingresso del calcolo; righe di spesa lette e segnate `spesa: true`. Migrazione additiva `20261115210000_valori_congelati`, motore, pratiche/bollettino/liquidazioni/fornitori/analisi, frontend.
+- **Ore:** 14 h **da approvare** (stima: motore e regole 5 h, migrazione e persistenza 3 h, blocchi e chiusure 2 h, frontend 2 h, comandi e prove 2 h).
+
+#### F7-A17 · Onda del 15/11: ora unica del server — 2 h **da approvare**
+- **Riferimenti:** §16.5, D-181
+- **Output (già fatto):** sessione del database in UTC (`options: '-c TimeZone=UTC'`) così l'adattatore Prisma scrive e rilegge le ore senza scarto; le date di lavoro restano in `Europe/Rome`; un solo «oggi» in ora italiana nel frontend (`giornoRoma`, `oggi()`, `domani()` in `lib/formati.ts`).
+- **Ore:** 2 h **da approvare**.
+
+#### F7-A18 · Onda del 15/11: filtri e ricerca delle pratiche — 6 h **da approvare**
+- **Riferimenti:** §7.9, §16.4, §16.4.1, D-177, D-178, D-185, D-187
+- **Output (già fatto):** il filtro per stato dell'abbinamento sta nella finestra di ricerca come tendina (D-177); la tendina «Stato delle pratiche» nella scheda «Pratica proposta» parte da «Aperte» (D-178); la ricerca delle pratiche filtra per cliente e fornitore e il predefinito dello stato parte dal tipo del documento (D-185); la barra dei filtri sta su una riga con i segmenti in tendina quando non ci stanno (D-187).
+- **Ore:** 6 h **da approvare**.
+
+#### F7-A19 · Onda del 15/11: documenti e coda — 8 h **da approvare**
+- **Riferimenti:** §7.3, §7.9, §8.1, D-179, D-180, D-186, D-188, D-192, D-196
+- **Output (già fatto):** importo 0 su riga che vale = non letto (D-179); testata della pratica con tutti gli ordini (D-180); «Prendi dalla coda» nella registrazione dei documenti dalla pratica (D-186); un pagamento senza numero (D-188); «Usa importi calcolati (N)» in blocco (D-192); «Somma righe» accanto a «Importo», in rosso quando differisce (D-196).
+- **Ore:** 8 h **da approvare**.
+
+#### F7-A20 · Onda del 15/11: visualizzatore, Oggi, email e Liquidazioni — 6 h **da approvare**
+- **Riferimenti:** §7.1, §7.8, §7.9, §16.4, D-184, D-189, D-190, D-191, D-193, D-195
+- **Output (già fatto):** posizione del campo «indicativa» mai «esatta» (D-189); visualizzatore PDF/foto unico con riquadro, zoom ed errore visibile (D-190, D-193); voci «Documenti da decidere» più esplicite in Oggi (D-191); nelle email ai fornitori vincono i riferimenti del destinatario (D-184); tendina dell'anno nelle Liquidazioni (D-195).
+- **Ore:** 6 h **da approvare**.
 
 ---
 

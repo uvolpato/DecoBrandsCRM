@@ -60,35 +60,49 @@ with sync_playwright() as p:
     pg.click('.dt tbody tr.cliccabile'); pg.wait_for_function("/^\\/fornitori\\/\\d+/.test(location.pathname)"); pg.wait_for_timeout(500)
     ok('Gries' in testo(pg, '.pannello-testa h2') and pg.locator('.dt tbody tr.selezionata').count() == 1, 'scheda del fornitore aperta, riga evidenziata')
     ok(pg.locator('.schede-barra [role=tab]').count() == 2, 'due schede: Percentuali e Clienti seguiti')
-    # Percentuali datate (F1-A5): versioni, nuova versione, errore nel periodo chiuso, correzione, eliminazione
+    # Percentuali datate (F1-A5): versioni, scaglioni in tabella, Aggiungi scaglione, modifica ed eliminazione
     scheda(pg, 'Percentuali'); pg.wait_for_timeout(300)
     corpo = pg.locator('.schede-corpo')
     ok(corpo.locator('[data-versione]').count() >= 1 and 'In vigore dal' in corpo.inner_text(), 'Percentuali: versioni, quella in vigore in evidenza')
     ok(corpo.locator('.dt tbody tr').count() >= 1, 'Percentuali: scaglioni in tabella')
-    # D-51: la versione in vigore del seed è nel periodo chiuso, quindi niente Correggi/Elimina su di lei
-    ok(corpo.locator('button:has-text("Nuove percentuali")').count() == 1 and corpo.locator('button:has-text("Correggi")').count() == 0,
-       'responsabile: nuova versione sì, correzione no nel periodo chiuso')
+    # D-51: la versione in vigore del seed è nel periodo chiuso → niente matita/cestino sulle sue righe
+    ok(corpo.locator('button:has-text("Aggiungi scaglione")').count() == 1 and corpo.locator('.btn-riga').count() == 0,
+       'responsabile: Aggiungi scaglione sì, nessuna icona di riga nel periodo chiuso')
     pg.screenshot(path=str(USCITA / 'app-fornitori-1440.png'))
-    pg.click('button:has-text("Nuove percentuali")'); finestra(pg).wait_for()
-    pg.fill('#c-valido_dal', '2020-01-01'); pg.click('.modale-piede button[type=submit]')
+    # D-168: una sola finestra piccola per lo scaglione; data nel periodo chiuso → il server rifiuta
+    pg.click('button:has-text("Aggiungi scaglione")'); finestra(pg).wait_for()
+    ok(finestra(pg).locator('h2').inner_text().startswith('Nuovo scaglione di'), 'D-168: la finestra è «Nuovo scaglione di …»')
+    wovr = lambda: pg.evaluate("() => { const m=document.querySelector('.velo .modale'); return m ? m.scrollWidth > m.clientWidth : false }")
+    ok(not wovr(), 'D-168: finestra dello scaglione senza scorrimento orizzontale a 1440')
+    pg.screenshot(path=str(USCITA / 'percentuali-1440.png'))
+    pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(300)
+    ok(not wovr(), 'D-168: finestra dello scaglione senza scorrimento orizzontale a 768')
+    pg.screenshot(path=str(USCITA / 'percentuali-768.png'))
+    pg.set_viewport_size({'width': 1440, 'height': 900}); pg.wait_for_timeout(300)
+    pg.fill('#c-valido_dal', '2020-01-01'); pg.fill('#c-sconto', '25'); pg.fill('#c-agente', '3'); pg.fill('#c-sub', '1')
+    pg.click('.modale-piede button[type=submit]')
     pg.wait_for_selector('.modulo-errore:not([hidden])', timeout=5000)
     ok('chiuso' in testo(pg, '.modulo-errore'), 'data nel periodo chiuso: il server rifiuta, messaggio nella finestra')
+    # data nuova → nasce una versione nuova (che copia gli scaglioni in vigore) con lo sconto nuovo
     pg.fill('#c-valido_dal', '2050-01-01'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(500)
     nuovo = pg.locator('[data-versione="2050-01-01"]')
     ok(nuovo.count() == 1 and 'futura' in nuovo.inner_text(), 'nuova versione salvata e mostrata come futura')
-    nuovo.locator('button:has-text("Correggi")').click(); finestra(pg).wait_for()
-    pg.fill('#c-agente0', '21'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(500)
-    ok('21%' in pg.locator('[data-versione="2050-01-01"]').inner_text(), 'correzione salvata: la percentuale cambia')
-    # D-163: la correzione aggiunge uno scaglione con la riga «Aggiungi uno sconto %»
-    pg.locator('[data-versione="2050-01-01"] button:has-text("Correggi")').click(); finestra(pg).wait_for()
-    nuova = pg.locator('.velo .modale input[placeholder="Aggiungi uno sconto %"]')
-    nuova.wait_for(timeout=8000)
-    ok(nuova.count() == 1, 'D-163: correzione con la riga «Aggiungi uno sconto %»')
-    idx = nuova.get_attribute('id')[len('c-sconto'):]
-    nuova.fill('25'); pg.fill('#c-agente' + idx, '3'); pg.fill('#c-sub' + idx, '1')
-    pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(500)
-    ok('25%' in pg.locator('[data-versione="2050-01-01"]').inner_text(), 'D-163: scaglione aggiunto salvato (sconto 25 %)')
+    ok('25%' in nuovo.inner_text(), 'D-168: scaglione 25 % aggiunto alla versione nuova')
+    # D-168: la matita modifica uno scaglione (sconto fisso)
+    nuovo.locator('.btn-riga[aria-label^="Modifica lo scaglione da 0"]').click(); finestra(pg).wait_for()
+    ok(finestra(pg).locator('h2').inner_text().startswith('Modifica lo scaglione di'), 'D-168: la finestra è «Modifica lo scaglione di …»')
+    ok(pg.input_value('#c-sconto') == '0' and pg.locator('#c-sconto').get_attribute('disabled') is not None, 'D-168: sconto fisso in modifica')
+    pg.fill('#c-agente', '21'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(500)
+    ok('21%' in pg.locator('[data-versione="2050-01-01"]').inner_text(), 'modifica salvata: la percentuale cambia')
+    # D-168: sconto già presente nella versione → il server rifiuta «Uno sconto è ripetuto»
+    pg.click('button:has-text("Aggiungi scaglione")'); finestra(pg).wait_for()
+    pg.fill('#c-valido_dal', '2050-01-01'); pg.fill('#c-sconto', '0'); pg.fill('#c-agente', '18'); pg.fill('#c-sub', '10')
+    pg.click('.modale-piede button[type=submit]')
+    pg.wait_for_selector('.modulo-errore:not([hidden])', timeout=5000)
+    ok('ripetuto' in testo(pg, '.modulo-errore'), 'D-168: sconto doppio → messaggio «Uno sconto è ripetuto»')
+    pg.click('.velo .modale-piede button:has-text("Annulla")')
     pg.locator('[data-versione="2050-01-01"] button:has-text("Elimina")').click(); pg.wait_for_selector('.velo .modale')
+    pg.click('.velo .casella-grave input')
     pg.click('.velo .modale button.pericolo')
     pg.wait_for_function("!document.querySelector('[data-versione=\"2050-01-01\"]')", timeout=8000)
     ok(pg.locator('[data-versione="2050-01-01"]').count() == 0, 'eliminazione della versione di prova')
@@ -177,8 +191,8 @@ with sync_playwright() as p:
         ok('Senza scaglioni le pratiche' in avviso.inner_text() and avviso.locator('button:has-text("Configura gli scaglioni")').count() == 1,
            'fornitore senza scaglioni: avviso con «Configura gli scaglioni»')
         pg.screenshot(path=str(USCITA / 'app-fornitori-senza-scaglioni-1440.png'))
-        avviso.locator('button:has-text("Configura gli scaglioni")').click(); finestra(pg).wait_for(); pg.wait_for_selector('#c-sconto0')
-        pg.fill('#c-sconto0', '10'); pg.fill('#c-agente0', '5'); pg.fill('#c-sub0', '2')
+        avviso.locator('button:has-text("Configura gli scaglioni")').click(); finestra(pg).wait_for(); pg.wait_for_selector('#c-sconto')
+        pg.fill('#c-sconto', '10'); pg.fill('#c-agente', '5'); pg.fill('#c-sub', '2')
         pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached'); pg.wait_for_timeout(700)
         ok(pg.locator('.schede-corpo .nota-attesa').count() == 0 and 'In vigore dal' in testo(pg, '.schede-corpo') and '10%' in testo(pg, '.schede-corpo'),
            'scaglioni salvati: l’avviso sparisce e la versione è in vigore')
@@ -190,7 +204,7 @@ with sync_playwright() as p:
     for u in ('oper', 'lett'):
         pg = entra(S + '-' + u); pg.wait_for_timeout(600)
         scheda(pg, 'Percentuali'); pg.wait_for_timeout(300)
-        ok(pg.locator('button:has-text("Modifica le regole"), button:has-text("Nuove percentuali"), button:has-text("Correggi")').count() == 0,
+        ok(pg.locator('button:has-text("Modifica le regole")').count() == 0 and pg.locator('button:has-text("Aggiungi scaglione")').count() == 0 and pg.locator('button[aria-label^="Modifica lo scaglione"], button[aria-label^="Elimina lo scaglione"]').count() == 0,
            '%s: comandi delle percentuali assenti' % u)
         if u == 'oper':
             ok(pg.locator('button:has-text("Cerca in Integra"):not([disabled])').count() == 1, 'operatore: Cerca in Integra attivo (dati.importa)')

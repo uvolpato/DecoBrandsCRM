@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { CampoProps } from '@/componenti/Campo';
@@ -6,7 +7,8 @@ import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Elenco } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
-import { Conferma, Modale } from '@/componenti/Modale';
+import { Modale } from '@/componenti/Modale';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, Stato } from '@/componenti/Piccoli';
 import { Sagoma, SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
@@ -15,7 +17,7 @@ import { usePuo, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
 import { agente, fornitore } from '@/lib/entita';
 import { useMemoria } from '@/lib/memoria';
-import { data as dataIt, pct } from '@/lib/formati';
+import { data as dataIt, oggi, pct } from '@/lib/formati';
 
 interface Agente {
   id: string;
@@ -65,8 +67,6 @@ interface FormEccezione {
   scaglioni: number[];
 }
 
-const oggi = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-
 const VISTE: Record<string, (x: Subagente) => boolean> = { attivi: (x) => x.attivo, disattivati: (x) => !x.attivo, tutti: () => true };
 
 export function VistaSubagenti({ idSel }: { idSel?: string }) {
@@ -107,8 +107,9 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   const righe = useMemo(() => cercati.filter(VISTE[String(valori.vista ?? 'attivi')]), [cercati, valori.vista]);
 
   const chiudi = () => setFinestra(null);
-  const chiedi = (titolo: string, testo: ReactNode, etichetta: string, pericolo = false) =>
-    new Promise<boolean>((ok) => setFinestra(<Conferma titolo={titolo} testo={testo} etichetta={etichetta} pericolo={pericolo} onRisposta={(si) => { chiudi(); ok(si); }} />));
+  // D-172: conferma con casella per le operazioni senza ritorno
+  const chiediGrave = (titolo: string, punti: ReactNode[], etichetta: string, etichettaCasella?: string) =>
+    new Promise<boolean>((ok) => setFinestra(<ConfermaGrave titolo={titolo} punti={punti} etichettaCasella={etichettaCasella} etichetta={etichetta} onRisposta={(si) => { chiudi(); ok(si); }} />));
 
   const u = subagenti?.find((x) => x.id === idSel) ?? subagenti?.[0] ?? null;
   const puoModificare = puo('dati.modifica');
@@ -160,7 +161,9 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
     await carica();
   }
   async function elimina(x: Subagente) {
-    if (!(await chiedi('Eliminare ' + x.cognome + ' ' + x.nome + '?', 'Eliminazione definitiva se non ha pratiche o abbinamenti.', 'Elimina', true))) return;
+    if (!(await chiediGrave('Eliminare ' + x.cognome + ' ' + x.nome + '?',
+      ['Eliminazione definitiva.', 'Il server rifiuta se ha pratiche o abbinamenti.'],
+      'Elimina'))) return;
     const r = await api('subagenti/' + x.id, undefined, 'DELETE');
     if (!r.ok) { avviso(r.messaggio, true); return; }
     avviso('Subagente eliminato');
@@ -248,7 +251,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
           </>}
         </>}>
         <Dettagli inColonne voci={[
-          { etichetta: 'Fornitore', valore: e.fornitore ?? '—' },
+          { etichetta: 'Fornitore', valore: <Link href={'/fornitori/' + e.fornitore_id}>{e.fornitore ?? '—'}</Link> },
           { etichetta: 'Sconto al cliente', valore: pct(e.sconto_min) },
           { etichetta: 'Al subagente', valore: pct(e.pct_personale) },
           { etichetta: 'Percentuale standard', valore: e.pct_standard == null ? '—' : pct(e.pct_standard) },
@@ -298,7 +301,9 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   }
 
   async function eliminaEccezione(e: Eccezione) {
-    if (!(await chiedi('Eliminare l’eccezione?', 'Torna a valere la percentuale standard dello scaglione.', 'Elimina', true))) return;
+    if (!(await chiediGrave('Eliminare l’eccezione?',
+      ['L’eccezione viene eliminata in modo definitivo.', 'Torna a valere la percentuale standard dello scaglione.'],
+      'Elimina'))) return;
     const r = await api('eccezioni/' + e.id, undefined, 'DELETE');
     if (!r.ok) { avviso(r.messaggio, true); return; }
     avviso('Eccezione eliminata');

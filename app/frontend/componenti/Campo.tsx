@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Contesto, Entita } from '@/lib/entita';
 import { euro, num } from '@/lib/formati';
 import { CampoRicerca } from './CampoRicerca';
@@ -15,7 +15,7 @@ export interface CampoProps {
   completa?: string;
   valore?: string | string[] | boolean | number;
   opzioni?: { value: string; label: string; disabilitato?: boolean; titolo?: string }[]; // select, livello
-  aiuto?: string;
+  aiuto?: ReactNode;
   largo?: boolean; // occupa tutta la riga nei moduli a due colonne
   segnaposto?: string;
   min?: number; // numero: limiti e passo
@@ -30,6 +30,10 @@ export interface CampoProps {
   // ricerca: nome già noto al chiamante, mostrato al posto dell'id finché le voci non arrivano (D-161 §19)
   nomeIniziale?: string;
   onCambia?: (valore: string) => void; // per chi deve ricaricare altri campi della finestra (es. gli sconti del fornitore)
+  // ricerca (singola): il pallino verde della voce trovata diventa un link alla scheda (prop di CampoRicerca)
+  link?: (id: string) => string;
+  // D-170 §19: conferma prima di lasciare la finestra con dati non salvati (true = procedi)
+  linkConferma?: () => boolean | Promise<boolean>;
 }
 
 // Virgola o punto → stringa numerica col punto (quella che il server si aspetta, V12).
@@ -65,7 +69,7 @@ export function CampoEuro({ valore, onChange, dataCampo, onFocus, valuta = true,
   );
 }
 
-export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, segnaposto, min, max, step, disabilitato, entita, multipla, contesto, onCambia, testoIniziale, nomeIniziale }: CampoProps) {
+export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzioni = [], aiuto, largo, segnaposto, min, max, step, disabilitato, entita, multipla, contesto, onCambia, testoIniziale, nomeIniziale, link, linkConferma }: CampoProps) {
   const [vedi, setVedi] = useState(false);
   const id = 'c-' + nome;
   const [ricerca, setRicerca] = useState<string | string[]>(multipla ? (Array.isArray(valore) ? valore : []) : typeof valore === 'string' ? valore : '');
@@ -76,7 +80,7 @@ export function Campo({ nome, etichetta, tipo = 'testo', completa, valore, opzio
         <input type="hidden" name={nome} value={multipla ? JSON.stringify(ricerca) : (ricerca as string)} />
         {multipla
           ? <CampoRicerca entita={entita} contesto={contesto} id={id} multipla valori={ricerca as string[]} onChange={setRicerca} />
-          : <CampoRicerca entita={entita} contesto={contesto} id={id} valore={ricerca as string} onChange={(v) => { setRicerca(v); onCambia?.(v); }} testoIniziale={testoIniziale} nomeIniziale={nomeIniziale} />}
+          : <CampoRicerca entita={entita} contesto={contesto} id={id} valore={ricerca as string} onChange={(v) => { setRicerca(v); onCambia?.(v); }} testoIniziale={testoIniziale} nomeIniziale={nomeIniziale} link={link} linkConferma={linkConferma} />}
         {aiuto && <span className="aiuto">{aiuto}</span>}
       </div>
     );

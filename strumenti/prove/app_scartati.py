@@ -122,7 +122,7 @@ with sync_playwright() as p:
         pg.wait_for_timeout(400)
 
         # Recupera: torna fra i documenti da controllare e lo apre
-        righe(pg).first.locator('button:has-text("Recupera")').click()
+        righe(pg).first.locator('button[aria-label^="Recupera"]').click()
         pg.wait_for_url('**/documenti/**')
         pg.wait_for_load_state('networkidle')
         ok('/documenti/' in pg.url, 'Recupera apre il documento: %s' % pg.url.split(BASE)[-1])
@@ -133,10 +133,12 @@ with sync_playwright() as p:
         filtra(pg, 1)
         ok(righe(pg).count() == 1, 'dopo il recupero ne resta uno (%d)' % righe(pg).count())
 
-        # Elimina (amministratore): conferma, poi la riga sparisce
-        righe(pg).first.locator('button:has-text("Elimina")').click()
+        # Elimina (amministratore): conferma con la casella, poi la riga sparisce
+        righe(pg).first.locator('button[aria-label^="Elimina"]').click()
         pg.wait_for_selector('.modale')
         ok('non si possono più recuperare' in testo(pg, '.modale'), 'la conferma dice che non si recupera più')
+        ok(pg.locator('.modale-piede button:has-text("Elimina")').is_disabled(), 'Elimina: pulsante spento finché non si spunta (D-172)')
+        pg.click('.modale .casella-grave input')
         with pg.expect_response(lambda r: r.request.method == 'DELETE' and '/api/scartati/' in r.url) as risposta:
             pg.locator('.modale-piede button:has-text("Elimina")').click()
         ok(risposta.value.status == 204, 'l’eliminazione risponde 204')
@@ -150,9 +152,9 @@ with sync_playwright() as p:
         pg = entra(S + '-oper')
         filtra(pg, 2)
         ok(righe(pg).count() == 2, 'operatore: vede i documenti')
-        ok(pg.locator('.dt button:has-text("Recupera")').count() == pg.locator('.dt tbody tr').count(),
+        ok(pg.locator('.dt button[aria-label^="Recupera"]').count() == pg.locator('.dt tbody tr').count(),
            'operatore: ogni riga ha «Recupera»')
-        ok(pg.locator('.dt button:has-text("Elimina")').count() == 0, 'operatore: nessun pulsante Elimina')
+        ok(pg.locator('.dt button[aria-label^="Elimina"]').count() == 0, 'operatore: nessun pulsante Elimina')
         ok(pg.evaluate("async (q) => (await fetch('/api/scartati?q=' + q)).status", NUMERO) == 200, 'operatore: l’elenco risponde 200')
         pg.close()
 

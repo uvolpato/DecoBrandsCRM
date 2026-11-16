@@ -35,6 +35,7 @@ export const SCHEMA_DOCUMENTO = {
       description: 'Tipo del documento',
     },
     numero: { type: 'string', description: 'Numero del documento' },
+    numero_ordine_fornitore: { type: 'string', description: 'Il numero d’ordine del fornitore: per l’ordine è il suo numero; per proforma, conferma, fattura e nota di credito è il riferimento all’ordine stampato (es. «Auftrag / Order / Ordine n.», «Ihre Bestellung», «Rif. ordine») seguito dal codice' },
     data: { type: 'string', description: 'Data del documento in formato AAAA-MM-GG' },
     fornitore: { type: 'string', description: 'Chi vende la merce: la riga «Fornitore», oppure chi emette la fattura o la conferma' },
     codice_cliente: { type: 'string', description: 'Codice con cui il fornitore identifica il cliente (es. «Codice cliente», «Kunden-Nr.»)' },
@@ -56,9 +57,11 @@ export const SCHEMA_DOCUMENTO = {
           quantita: { type: 'number', description: 'Quantità' },
           prezzo: { type: 'number', description: 'Prezzo unitario in euro' },
           importo: { type: 'number', description: 'Importo della riga in euro; per il bollettino è l’imponibile della fattura' },
+          sconto: { type: 'number', description: 'Sconto percentuale della riga (es. 10 = 10%). Solo se scritto accanto al prezzo (es. «Rabatt», «Sonderrabatt»); altrimenti lascia il campo vuoto' },
           numero_fattura: { type: 'string', description: 'Per il bollettino: numero della fattura del mese' },
           data_fattura: { type: 'string', description: 'Per il bollettino: data della fattura in formato AAAA-MM-GG' },
           provvigione: { type: 'number', description: 'Per il bollettino: provvigione riconosciuta per la fattura' },
+          spesa: { type: 'boolean', description: 'True solo per le righe che non sono articoli ma spese (trasporto, imballo, «Fracht», «Porto», «Versand») o che hanno il codice come testo; per gli articoli normali lascia il campo vuoto' },
         },
       },
     },
@@ -72,7 +75,8 @@ export const PROMPT_DOCUMENTO = [
   'Gli importi sono numeri con il punto decimale e senza separatori delle migliaia.',
   'L’importo totale è l’imponibile (netto) senza IVA: se il documento mostra anche il totale con IVA, prendi il netto.',
   'Un rendiconto delle provvigioni del fornitore (Provisionsabrechnung, Abrechnung, «Provisionen») è di tipo bollettino: mese e anno sono quelli del periodo scritto nel titolo.',
-  'Nelle righe metti solo le righe articolo: non subtotali, totali, intestazioni ripetute o note.',
+  'Nelle righe metti ogni riga con posizione, quantità, prezzo e importo, anche se il codice articolo è un testo (es. «Fracht», «Verpackung», «Porto», «Versand») o manca: il codice si copia così com’è. Per queste righe di spesa metti spesa: true. Non mettere subtotali, totali, intestazioni ripetute o note.',
+  'Lo sconto di riga (sconto) è la percentuale scritta accanto al prezzo, es. «Rabatt», «Sonderrabatt», «10,00%»: metti solo il numero (10 per il 10%). Se non c’è, lascia il campo vuoto.',
   'Se il documento ha più pagine, unisci le righe di tutte le pagine in un solo elenco.',
   'Il tipo è uno di: ordine, conferma, proforma, fattura, nota_credito, pagamento, altro, bollettino.',
   'Il fornitore è chi vende la merce: quello indicato nella riga «Fornitore», oppure chi emette la fattura o la conferma.',
@@ -82,6 +86,7 @@ export const PROMPT_DOCUMENTO = [
   'La partita IVA del fornitore (piva_fornitore) è quella di chi vende la merce: se non è scritta, lascia il campo vuoto.',
   'Per il bollettino compila mese e anno; le sue righe sono le fatture del mese: numero_fattura, data_fattura, importo (imponibile) e provvigione, non gli articoli.',
   'Per la nota di credito compila riferimento_fattura con il numero della fattura stornata.',
+  'Il numero d’ordine del fornitore (numero_ordine_fornitore) è il numero d’ordine a cui si riferisce il documento: nell’ordine è il numero dell’ordine stesso; nella proforma, conferma, fattura e nota di credito è il numero d’ordine stampato accanto a diciture come «Auftrag», «Order», «Bestellung», «Ordine n.», «Ihre Bestellung», «Rif. ordine». Se il documento non cita un numero d’ordine, lascia il campo vuoto.',
 ].join(' ');
 
 /** Salvataggio dopo la lettura, in una transazione (V13): la riga si blocca e, se non è più
@@ -116,10 +121,22 @@ async function salva(db: PrismaService, id: bigint, r: Lettura, soglie: Soglie, 
       data: { tipo, fornitore_id: f?.fornitore_id ?? null, fornitore_versione_id: f?.fornitore_versione_id ?? null },
     });
     const val = await valutaLettura(tx, id, soglie);
+    // D-170: la risposta completa del lettore serve a ricavare campi nuovi dai documenti già letti
+    // senza rileggerli. Tetto di 5 MB (JSON serializzato): oltre, si conservano solo i campi estratti.
+    const grezza = (() => {
+      const g = r.grezza ?? r.risultato;
+      try {
+        const s = JSON.stringify(g);
+        return s != null && s.length <= 5_000_000 ? (g as Prisma.InputJsonValue) : Prisma.JsonNull;
+      } catch {
+        return Prisma.JsonNull;
+      }
+    })();
     await tx.documenti_in_arrivo.update({
       where: { id },
       data: {
         stato: 'da_controllare', letto_il: ora, modello: r.modello, errore: null, tentativi: 0,
+        lettura_grezza: grezza,
         livello: val.livello, controlli: { falliti: val.controlli } as unknown as Prisma.InputJsonValue,
       },
     });

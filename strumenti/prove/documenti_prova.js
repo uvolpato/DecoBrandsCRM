@@ -55,6 +55,7 @@ async function pulisci(c, nomi) {
       JOIN clienti c ON c.id = i.cliente_id AND c.versione_corrente_id IS NOT NULL
       JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
       WHERE i.codice_cliente_fornitore IS NOT NULL AND i.codice_cliente_fornitore <> ''
+        AND i.valido_dal <= '2026-09-15' AND (i.valido_al IS NULL OR i.valido_al >= '2026-09-15')
         AND NOT EXISTS (SELECT 1 FROM ordini_fornitore_testata t WHERE t.cliente_id = i.cliente_id AND t.fornitore_id = i.fornitore_id)
       ORDER BY i.id LIMIT 1`);
     if (!inter) {
@@ -66,6 +67,7 @@ async function pulisci(c, nomi) {
         JOIN clienti c ON c.id = i.cliente_id AND c.versione_corrente_id IS NOT NULL
         JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
         WHERE i.codice_cliente_fornitore IS NOT NULL AND i.codice_cliente_fornitore <> ''
+          AND i.valido_dal <= '2026-09-15' AND (i.valido_al IS NULL OR i.valido_al >= '2026-09-15')
         ORDER BY i.id LIMIT 1`));
     }
     if (!inter) throw new Error('Nessuna agenzia nel seed: carica i dati di prova (npm run db:seed)');

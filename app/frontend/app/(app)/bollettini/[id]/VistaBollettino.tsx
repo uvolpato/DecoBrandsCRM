@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Campo } from '@/componenti/Campo';
 import { Cerniera, type GruppoCerniera, type RigaCerniera } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
-import { Conferma, Modale } from '@/componenti/Modale';
+import { Modale } from '@/componenti/Modale';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { PdfEvidenziato } from '@/componenti/PdfEvidenziato';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
@@ -183,9 +184,10 @@ export function VistaBollettino({ id }: { id: string }) {
 
   function chiudiBollettino(stato: 'verificato' | 'contestato') {
     setFinestra(
-      <Conferma titolo={stato === 'verificato' ? 'Segnare il bollettino come verificato?' : 'Segnare il bollettino come contestato?'}
-        testo="Il mese diventa chiuso: le percentuali e i documenti di quel mese non si cambiano più."
-        etichetta={stato === 'verificato' ? 'Segna come verificato' : 'Segna come contestato'} pericolo={stato === 'contestato'}
+      <ConfermaGrave titolo={stato === 'verificato' ? 'Segnare il bollettino come verificato?' : 'Segnare il bollettino come contestato?'}
+        punti={['Il mese diventa chiuso.', 'Le percentuali e i documenti di quel mese non si cambiano più.']}
+        etichettaCasella="Ho capito: il mese si chiude e non si cambia più"
+        etichetta={stato === 'verificato' ? 'Segna come verificato' : 'Segna come contestato'}
         onRisposta={(si) => {
           chiudi();
           if (!si) return;
@@ -222,7 +224,7 @@ export function VistaBollettino({ id }: { id: string }) {
     return {
       titolo: x.pratica_id ? <Link href={'/pratiche/' + x.pratica_id}><b>{x.numero}</b></Link> : <b>{x.numero}</b>,
       dettagli: <>
-        {x.cliente ? (x.pratica_id ? <Link href={'/pratiche/' + x.pratica_id}>{x.cliente}</Link> : x.cliente) : ''}
+        {x.cliente ? (x.cliente_id ? <Link href={'/clienti/' + x.cliente_id}>{x.cliente}</Link> : x.cliente) : ''}
         {x.cliente ? ' · ' : ''}{x.data ? data(x.data) : 'senza data'}
         {CATEG[x.categoria] && !x.incasso && x.categoria !== 'quadra' ? ' · ' + CATEG[x.categoria] : ''}
         {x.pagamento && x.data ? ` · fattura di ${MESI_BREVI[Number(x.data.slice(5, 7)) - 1]}, il cliente ha pagato questo mese` : ''}
@@ -281,7 +283,7 @@ export function VistaBollettino({ id }: { id: string }) {
   return (
     <Pagina pieno titolo={`${d.fornitore} · ${MESI[d.mese - 1]} ${d.anno}`} badge={<Stato v={badge.v}>{badge.t}</Stato>}
       sottotitolo={<>
-        Ricevuto il {data(d.ricevuto)} · {d.file ? d.file.nome : 'nessun file allegato'} · paga sul {d.maturazione}
+        <Link href={'/fornitori/' + d.fornitore_id}>{d.fornitore}</Link> · ricevuto il {data(d.ricevuto)} · {d.file ? d.file.nome : 'nessun file allegato'} · paga sul {d.maturazione}
         {d.maturazione === 'maturato' ? ': verificando il bollettino si sbloccano le provvigioni dei subagenti su queste fatture.' : '.'}
       </>}>
       <div className="pila" style={{ flex: '1 1 auto', minHeight: 0 }}>

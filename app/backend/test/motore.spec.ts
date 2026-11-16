@@ -39,7 +39,8 @@ const TRIMESTRI = [2025, 2026].flatMap((a) => [1, 2, 3, 4].map((t) => [a, t] as 
 
 describe('motore §10 = prototipo', () => {
   it('scaglioni Gries 0/1/5/10/100 % e versioni datate (D-25)', () => {
-    const attesi: [number, number, number][] = [[0, 18, 10], [1, 18, 0], [3, 18, 0], [5, 13, 7], [7, 13, 7], [10, 5, 2], [50, 5, 2], [100, 0, 0]];
+    // D-182: il primo scaglione ≥ sconto (3,5 → 5; 7 → 10; 50 → 100)
+    const attesi: [number, number, number][] = [[0, 18, 10], [1, 18, 0], [3, 13, 7], [5, 13, 7], [7, 5, 2], [10, 5, 2], [50, 0, 0], [100, 0, 0]];
     for (const [sconto, agente, sub] of attesi) {
       const sc = m.scaglione(S, fornitore('Gries').id, dec(sconto), OGGI)!;
       const p = M.scaglione(1, sconto, OGGI);
@@ -70,8 +71,8 @@ describe('motore §10 = prototipo', () => {
     const forn = fornitore('Gries').id, cliente = 'D144-cliente';
     const subA = [...S.subagenti.keys()][0];
     const baseDoc = S.pratiche.find((x) => x.documenti.length)!.documenti[0];
-    const d = { ...baseDoc, id: 'D144-d1', numero: 'D144-F1', data: '2026-09-15', importo: dec(1000), tipo: 'fattura' as const, fattura_id: null, liquidazione_id: null, incasso: null, correzione: null };
-    const p = { ...pratica('OF/2026/041'), id: 'D144-p', numero: 'D144-P', fornitore_id: forn, cliente_id: cliente, data: '2026-05-10', documenti: [d] };
+    const d = { ...baseDoc, id: 'D144-d1', numero: 'D144-F1', data: '2026-09-15', importo: dec(1000), tipo: 'fattura' as const, fattura_id: null, liquidazione_id: null, incasso: null, correzione: null, calcolo: null, righe: [] };
+    const p = { ...pratica('OF/2026/041'), id: 'D144-p', numero: 'D144-P', fornitore_id: forn, cliente_id: cliente, data: '2026-05-10', documenti: [d], righe: { ordine: [], conferma: [], fattura: [] } };
     // agenzia valida 01/01 → 30/06 (valido_al escluso): alla data della fattura non vale più
     const agA = { id: 'D144-ag', subagente_id: subA, cliente_id: cliente, fornitore_id: forn, codice: 'D144', sconto: dec(0), pct_subagente: null, regola_mensile: null, valido_dal: '2026-01-01', valido_al: '2026-07-01' };
     const S2 = { ...S, interscambio: [...S.interscambio, agA] };
@@ -85,8 +86,8 @@ describe('motore §10 = prototipo', () => {
     const forn = fornitore('Gries').id, cliente = 'D144b-cliente';
     const [subA, subB] = [...S.subagenti.keys()];
     const baseDoc = S.pratiche.find((x) => x.documenti.length)!.documenti[0];
-    const d = { ...baseDoc, id: 'D144b-d1', numero: 'D144b-F1', data: '2026-09-15', importo: dec(1000), tipo: 'fattura' as const, fattura_id: null, liquidazione_id: null, incasso: null, correzione: null };
-    const p = { ...pratica('OF/2026/041'), id: 'D144b-p', numero: 'D144b-P', fornitore_id: forn, cliente_id: cliente, data: '2026-05-10', documenti: [d] };
+    const d = { ...baseDoc, id: 'D144b-d1', numero: 'D144b-F1', data: '2026-09-15', importo: dec(1000), tipo: 'fattura' as const, fattura_id: null, liquidazione_id: null, incasso: null, correzione: null, calcolo: null, righe: [] };
+    const p = { ...pratica('OF/2026/041'), id: 'D144b-p', numero: 'D144b-P', fornitore_id: forn, cliente_id: cliente, data: '2026-05-10', documenti: [d], righe: { ordine: [], conferma: [], fattura: [] } };
     const ag = (id: string, sub: string, dal: string, al: string | null) => ({ id, subagente_id: sub, cliente_id: cliente, fornitore_id: forn, codice: 'D144b', sconto: dec(0), pct_subagente: null, regola_mensile: null, valido_dal: dal, valido_al: al });
     const S2 = { ...S, interscambio: [...S.interscambio, ag('D144b-a', subA, '2026-01-01', '2026-07-01'), ag('D144b-b', subB, '2026-07-01', null)] };
     expect(m.percentuali(S2, p, d.data)!.subagente_id).toBe(subA);
@@ -139,7 +140,7 @@ describe('motore §10 = prototipo', () => {
     const { pratica: p, doc: d } = doc('NC-2026-005');
     expect([n(d.importo), m.documentoPerId(S, d.fattura_id!)!.doc.numero]).toEqual([-1311, 'F-2026-0815']);
     const pr = m.provvigioneDoc(S, p, d)!;
-    expect(n(pr.prese)).toBe(-367.08); // 28 % come nel bollettino Gries di agosto
+    expect(n(pr.prese)).toBe(-235.98); // 18 % (solo la % di Decobrands, D-166: non più 18 + 10)
     expect(n(m.netto(p))).toBe(M.netto(praticaM(p.numero)));
     expect(n(m.netto(p))).toBe(4289);
   });
@@ -248,7 +249,7 @@ describe('motore §10 = prototipo', () => {
   it('maturato: la nota di credito entra con la sua fattura riconosciuta (D-118)', () => {
     // F-2026-0858 (Gries, maturato) riconosciuta nel bollettino di agosto verificato → 3° trimestre
     const { pratica: p, doc: f } = doc('F-2026-0858');
-    const nc = { ...f, id: 'nc-maturato-500', numero: 'NC-2026-500', tipo: 'nota_credito' as const, data: '2026-06-10', importo: dec(-500), fattura_id: f.id, liquidazione_id: null, incasso: null, correzione: null };
+    const nc = { ...f, id: 'nc-maturato-500', numero: 'NC-2026-500', tipo: 'nota_credito' as const, data: '2026-06-10', importo: dec(-500), fattura_id: f.id, liquidazione_id: null, incasso: null, correzione: null, calcolo: null, righe: [] };
     const p2 = { ...p, id: 'p-nc-maturato-500', documenti: [...p.documenti, nc] };
     const S2 = { ...S, pratiche: [...S.pratiche, p2] };
     // la NC non è riconosciuta di per sé, ma segue la fattura: entra nel trimestre del bollettino che la riconosce (3°), liquidabile
@@ -378,5 +379,24 @@ describe('motore §10 = prototipo', () => {
       documenti: [], righe: [{ fase: 'fattura', codice: 'A', descrizione: 'reso', quantita: dec(-1), prezzo_unitario: dec(0.005), importo: null }],
     } as unknown as Parameters<typeof praticaDaDb>[0];
     expect(n(praticaDaDb(t).righe.fattura[0].importo)).toBe(-0.01);
+  });
+
+  it('la provvigione si calcola sull\'importo scontato: lo sconto di riga è già dentro l\'importo del documento (netto)', () => {
+    // OF/2026/002 (ARTE): sconto di riga 10 % su ogni riga → l'importo del documento fiscale è già al netto
+    // (1840,23 = 2044,70 lordo × 0,9). Il motore non vede lo sconto: riceve l'importo già netto in d.importo
+    // e ci calcola la provvigione (spec §5.3, §4.2.7.1: la base è il netto dei documenti).
+    const forn = fornitore('Gries').id, cliente = 'D-sconto-cliente';
+    const subA = [...S.subagenti.keys()][0];
+    const baseDoc = S.pratiche.find((x) => x.documenti.length)!.documenti[0];
+    const d = { ...baseDoc, id: 'D-sconto-doc', numero: 'D-SCO-F1', data: '2026-09-15', importo: dec(1840.23), tipo: 'fattura' as const, fattura_id: null, liquidazione_id: null, incasso: null, correzione: null, calcolo: null, righe: [] };
+    const p = { ...pratica('OF/2026/041'), id: 'D-sconto-p', numero: 'D-SCO-P', fornitore_id: forn, cliente_id: cliente, data: '2026-05-10', documenti: [d] };
+    const ag = { id: 'D-sconto-ag', subagente_id: subA, cliente_id: cliente, fornitore_id: forn, codice: 'D-SCO', sconto: dec(0), pct_subagente: null, regola_mensile: null, valido_dal: '2026-01-01', valido_al: null };
+    const S2 = { ...S, interscambio: [...S.interscambio, ag] };
+    const pr = m.provvigioneDoc(S2, p, d)!;
+    // base = netto 1840,23 (non il lordo 2044,70): la provvigione è ridotta dello sconto del 10 %
+    expect(n(m.importoPratica(p))).toBe(1840.23);
+    expect(n(pr.prese)).toBe(n(m.r2(dec(1840.23).times(pr.perc.dal_fornitore).div(100))));
+    expect(n(pr.sub.provvigione)).toBe(n(m.r2(dec(1840.23).times(pr.sub.pct).div(100))));
+    expect(n(pr.prese)).toBe(331.24); // 1840,23 × 18 % (scaglione 0 Gries); sul lordo 2044,70 sarebbe 368,05
   });
 });

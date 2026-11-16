@@ -107,12 +107,12 @@ try:
     ok(totale_pratiche >= 54, 'app: %d pratiche (almeno 54: 52 del prototipo + 2 dei casi §12)' % totale_pratiche)
     bol = json(pg, 'bollettini/6')
     ok(bol['fornitore'] == 'Gasper GmbH' and bol['mese'] == 8 and bol['anno'] == 2026, 'app: bollettino Gasper agosto 2026')
-    ok(bol['totali']['riconosciuto'] == 394.8 and bol['totali']['calcolato'] == 3349.38
-       and bol['totali']['differenza'] == -2954.58, 'app: totali Gasper agosto = prototipo (394,80 / 3.349,38 / -2.954,58)')
+    ok(bol['totali']['riconosciuto'] == 263.2 and bol['totali']['calcolato'] == 2190.1
+       and bol['totali']['differenza'] == -1926.9, 'app: totali Gasper agosto = prototipo (263,20 / 2.190,10 / -1.926,90)')
     ana = json(pg, 'analisi?dal=2025-10&al=2026-09')
-    ok(ana['numeri']['fatturato'] == 79534.06 and ana['numeri']['prese'] == 12976.26
-       and ana['numeri']['pagate'] == 4127.34 and ana['numeri']['margine'] == 8848.92,
-       'app: Analisi ott 2025–set 2026 = prototipo (79.534,06 / 12.976,26 / 4.127,34 / 8.848,92)')
+    ok(ana['numeri']['fatturato'] == 79534.06 and ana['numeri']['prese'] == 9045.12
+       and ana['numeri']['pagate'] == 4127.34 and ana['numeri']['margine'] == 4917.78,
+       'app: Analisi ott 2025–set 2026 = prototipo (79.534,06 / 9.045,12 / 4.127,34 / 4.917,78)')
     ok(ana['numeri']['documenti'] == 19 and ana['numeri']['clienti'] == 7, 'app: Analisi 19 documenti, 7 clienti')
     proto.close()
 
@@ -172,11 +172,11 @@ try:
     pg.wait_for_function("(n) => Number(document.querySelector('.segmenti [role=tab] .n')?.textContent) === n", arg=n); quieta(pg)
     ok(nseg('Tutte') == n, 'Togli tutti i filtri: torna a 54')
     pg.click('.dt th:has-text("Importo")'); pg.wait_for_function("() => document.querySelector('.dt th.attivo')?.getAttribute('aria-sort') === 'ascending'")
-    pg.wait_for_function("""() => { const v = [...document.querySelectorAll('.dt tbody tr.cliccabile')].map(r => Number((r.children[4]?.textContent || '').replace(/[^0-9,-]/g, '').replace('.', '').replace(',', '.'))); return v.length && v.every((x, i) => i === 0 || v[i-1] <= x); }"""); quieta(pg)
-    importi = lambda: [numero(pg.locator('.dt tbody tr.cliccabile').nth(i).locator('td').nth(4).inner_text()) for i in range(righe())]
+    pg.wait_for_function("""() => { const v = [...document.querySelectorAll('.dt tbody tr.cliccabile')].map(r => Number((r.children[5]?.textContent || '').replace(/[^0-9,-]/g, '').replace('.', '').replace(',', '.'))); return v.length && v.every((x, i) => i === 0 || v[i-1] <= x); }"""); quieta(pg)
+    importi = lambda: [numero(pg.locator('.dt tbody tr.cliccabile').nth(i).locator('td').nth(5).inner_text()) for i in range(righe())]
     ok(importi() == sorted(importi()), 'ordinamento per importo crescente')
     pg.click('.dt th:has-text("Importo")'); pg.wait_for_function("() => document.querySelector('.dt th.attivo')?.getAttribute('aria-sort') === 'descending'")
-    pg.wait_for_function("""() => { const v = [...document.querySelectorAll('.dt tbody tr.cliccabile')].map(r => Number((r.children[4]?.textContent || '').replace(/[^0-9,-]/g, '').replace('.', '').replace(',', '.'))); return v.length && v.every((x, i) => i === 0 || v[i-1] >= x); }"""); quieta(pg)
+    pg.wait_for_function("""() => { const v = [...document.querySelectorAll('.dt tbody tr.cliccabile')].map(r => Number((r.children[5]?.textContent || '').replace(/[^0-9,-]/g, '').replace('.', '').replace(',', '.'))); return v.length && v.every((x, i) => i === 0 || v[i-1] >= x); }"""); quieta(pg)
     ok(importi() == sorted(importi(), reverse=True), 'secondo clic: importo decrescente')
     prima_dec = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
     pg.click('.dt-pagine button[title="Pagina successiva"]')
@@ -249,6 +249,9 @@ try:
     if pg.locator('.velo .modale-piede button:has-text("Procedi comunque")').count():
         ok('affidabilità bassa' in testo(pg, '.velo'), 'lettura bassa: l’abbinamento chiede conferma')
         pg.click('.velo .modale-piede button:has-text("Procedi comunque")')
+        pg.wait_for_timeout(500)
+    # 15/11/2026 (D-177 §19): prima di abbinare il riepilogo di cosa cambia sulla pratica (fattura → conferma semplice)
+    pg.click('.velo .modale-piede button:has-text("Abbina")')
     pg.wait_for_function("!document.querySelector('.velo') || !document.querySelector('.velo .modale')", timeout=20000)
     pg.wait_for_timeout(1500)
     pratica = next((x for x in json(pg, 'pratiche?q=' + numero_pratica)['righe'] if x['numero'] == numero_pratica), None)
@@ -303,8 +306,8 @@ try:
     ok(pg.locator('.cerniera-riepilogo .lato b').count() == 2, 'cerniera: i due lati (loro / noi)')
     ok(pg.locator('.cerniera-riepilogo .cucitura b').count() == 1, 'cerniera: la cucitura (differenza)')
     if id_bol == '6':
-        ok(numero(testo(pg, '.cerniera-riepilogo .lato b')) == 394.8 and numero(testo(pg, '.cerniera-riepilogo .lato.destro b')) == 3349.38
-           and numero(testo(pg, '.cerniera-riepilogo .cucitura b')) == -2954.58, 'Gasper agosto: 394,80 / 3.349,38 / -2.954,58')
+        ok(numero(testo(pg, '.cerniera-riepilogo .lato b')) == 263.2 and numero(testo(pg, '.cerniera-riepilogo .lato.destro b')) == 2190.1
+           and numero(testo(pg, '.cerniera-riepilogo .cucitura b')) == -1926.9, 'Gasper agosto: 263,20 / 2.190,10 / -1.926,90')
         ok(pg.locator('object[type="application/pdf"]').count() == 0 and 'nessun file allegato' in testo(pg, '.testa'), 'senza PDF: la pagina lo dice')
     ok(pg.locator('.c-gruppo').count() >= 2, 'bollettino: gruppi Da decidere / Decise / Quadrano / Incassi')
     if testo(pg, '.testa .stato') != 'Verificato':
@@ -326,6 +329,7 @@ try:
         pg.click('.barra-decisione button:has-text("Segna come verificato")')
         pg.wait_for_selector('.velo .modale-piede button:has-text("Segna come verificato")')
         ok('mese diventa chiuso' in testo(pg, '.velo'), 'la conferma dice che il mese diventa chiuso')
+        pg.click('.velo .casella-grave input')
         pg.click('.velo .modale-piede button:has-text("Segna come verificato")')
         pg.wait_for_function("document.querySelector('.testa .stato')?.innerText === 'Verificato'")
         ok(True, 'bollettino chiuso: Verificato')

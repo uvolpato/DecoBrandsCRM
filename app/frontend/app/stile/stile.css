@@ -105,9 +105,9 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 /* ---------- Pannello ---------- */
 .pannello { background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-medio); box-shadow: var(--ombra); display: flex; flex-direction: column; min-height: 0; flex: none; }
 .pannello.riempi { flex: 1 1 auto; overflow: hidden; }
-.pannello-testa { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; padding: 13px 18px; border-bottom: 1px solid var(--bordo-tenue); flex: none; }
+.pannello-testa { display: flex; align-items: center; justify-content: flex-start; gap: 8px 12px; flex-wrap: wrap; padding: 13px 18px; border-bottom: 1px solid var(--bordo-tenue); flex: none; }
 .pannello-testa h2 { font-size: 15px; font-weight: 600; }
-.pannello-destra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.pannello-destra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
 .pannello-nota { color: var(--testo-tenue); font-size: 13px; text-align: right; }
 .pannello-corpo { padding: 16px 18px; min-height: 0; }
 .pannello.riempi > .pannello-corpo { flex: 1 1 auto; overflow: auto; display: flex; flex-direction: column; }
@@ -173,10 +173,10 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 
 /* ---------- FilterBar ---------- */
 .filtri { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: none; }
-.segmenti { display: inline-flex; background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-medio); padding: 3px; gap: 2px; flex-wrap: wrap; }
-.segmenti button { border: 0; background: none; padding: 5px 11px; border-radius: var(--r-piccolo); cursor: pointer; font-weight: 500; color: var(--testo-intest); }
+.segmenti, .segmenti-misura { display: inline-flex; background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-medio); padding: 3px; gap: 2px; flex-wrap: wrap; }
+.segmenti button, .segmenti-misura button { border: 0; background: none; padding: 5px 11px; border-radius: var(--r-piccolo); cursor: pointer; font-weight: 500; color: var(--testo-intest); }
 .segmenti button:hover { background: var(--bordo-tenue); }
-.segmenti button .n { font-size: 12px; margin-left: 5px; color: var(--testo-tenue); }
+.segmenti button .n, .segmenti-misura button .n { font-size: 12px; margin-left: 5px; color: var(--testo-tenue); }
 .segmenti button[aria-selected="true"] { background: var(--primario); color: #fff; }
 .segmenti button[aria-selected="true"] .n { color: rgba(255,255,255,.8); }
 .cerca { position: relative; flex: 0 1 280px; }
@@ -189,12 +189,12 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 .cerca input:focus, .cerca input:focus-visible { outline: 0; border-color: var(--primario); box-shadow: inset 0 0 0 1px var(--primario); }
 .cerca .icona { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--testo-tenue); width: 16px; height: 16px; }
 /* Soggetti: ricerca più larga e segmenti in fondo, sulla stessa riga (viste-soggetti.js) */
-.soggetti-filtri .filtri .cerca { flex: 1 1 320px; max-width: 480px; }
+.soggetti-filtri .filtri .cerca { flex: 0 1 320px; }
 .soggetti-filtri .filtri .segmenti { margin-left: auto; }
 .soggetti-filtri .filtri { margin-bottom: 14px; }
 /* Clienti: ricerca e segmenti sulla stessa riga anche nella colonna stretta */
 .clienti-filtri .filtri { flex-wrap: nowrap; gap: 10px; }
-.clienti-filtri .filtri .cerca { flex: 1 1 140px; min-width: 120px; }
+.clienti-filtri .filtri .cerca { flex: 0 1 140px; min-width: 120px; }
 .clienti-filtri .filtri .segmenti { margin-left: auto; }
 .clienti-filtri .segmenti button { padding: 5px 6px; }
 .clienti-filtri .segmenti { gap: 1px; }
@@ -261,7 +261,8 @@ button.kpi[aria-pressed="true"] { background: var(--primario-tenue); outline: 2p
 .da-fare .t-attesa .segno { background: var(--attesa); }
 .da-fare .t-primario .segno { background: var(--primario); }
 .da-fare b { display: block; font-weight: 600; font-size: 15px; }
-.da-fare span { color: var(--testo-tenue); font-size: 13px; }
+.da-fare div { min-width: 0; }
+.da-fare div > span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--testo-tenue); font-size: 13px; }
 
 /* ---------- ElencoSelezionabile e Scelte ---------- */
 .selezionabile { list-style: none; margin: 0; padding: 6px; overflow: auto; flex: 1 1 auto; }
@@ -371,9 +372,16 @@ a.m-cella:hover { background: #f1f6ff; }
 .modale { background: var(--superficie); border-radius: var(--r-medio); width: min(580px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; box-shadow: 0 18px 50px rgba(0, 0, 0, .25); }
 .modale-testa { padding: 18px 22px 6px; }
 .modale-testa h2 { font-size: 18px; }
-.modale-testa p { margin: 6px 0 0; color: var(--testo-tenue); }
+.modale-testa > div { margin: 6px 0 0; color: var(--testo-tenue); }
 .modale-corpo { padding: 14px 22px; overflow: auto; }
 .modale-piede { padding: 14px 22px 18px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--bordo-tenue); }
+/* D-172: elenco puntato delle conseguenze e casella che abilita il pulsante (ConfermaGrave) */
+.conferma-punti { margin: 0 0 14px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.4; }
+.conferma-punti li { margin: 0; }
+.casella-grave { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); background: var(--sfondo); cursor: pointer; font-size: 13.5px; line-height: 1.4; }
+.casella-grave input { width: 16px; height: 16px; margin: 1px 0 0; accent-color: var(--primario); flex: none; cursor: pointer; }
+.casella-grave:hover { border-color: var(--primario); }
+.casella-grave:focus-within { outline: 2px solid var(--primario); outline-offset: 1px; }
 .testo-email { width: 100%; min-height: 220px; padding: 12px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); font-size: 13.5px; line-height: 1.5; }
 .avviso { position: fixed; right: 22px; bottom: 22px; background: var(--ok); color: #fff; padding: 12px 16px; border-radius: var(--r-piccolo); z-index: 60; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
 .avviso.errore { background: var(--errore); }
@@ -496,12 +504,18 @@ a.m-cella:hover { background: #f1f6ff; }
 .aff-riepilogo ul[hidden] { display: none; }
 .aff-riepilogo li .btn.testo { padding: 2px 0; text-align: left; }
 .aff-riepilogo li.grave .btn.testo { color: var(--errore-testo); }
+/* D-176: etichetta di gruppo nel riepilogo di Correggi (Lettura / Confronto con la pratica) */
+.aff-riepilogo li.riep-gruppo { margin: 6px -12px 2px -30px; padding: 3px 12px; font-size: 11.5px; font-weight: 700; color: var(--testo-tenue); text-transform: uppercase; letter-spacing: .03em; }
 .griglia-letti { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; }
 /* D-154: testata di Correggi su tre righe; il pulsante › sta fra il campo letto e la ricerca.
    Le colonne della ricerca sono le stesse nelle righe 2 e 3, così Cliente e Fornitore hanno la
    stessa larghezza e stanno uno sopra l'altro (la riga 3 lascia vuota la colonna del codice). */
 .riga-letti { display: grid; gap: 12px 10px; align-items: end; margin-bottom: 12px; }
-.riga-letti.tipo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr); }
+/* D-172 (1b): i 5 campi della testata sulla stessa riga. Tipo e Data larghi quanto il loro contenuto
+   («Nota di credito» + freccia, gg/mm/aaaa + calendario), Numero e Ordine fornitore prendono il resto,
+   Importo come gli altri. A 768 la riga va a capo su due righe ordinate. */
+.riga-letti.tipo { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto minmax(0, 1fr); }
+.riga-letti.tipo > :nth-child(1) select, .riga-letti.tipo > :nth-child(4) input { min-width: max-content; }
 .riga-letti.cliente, .riga-letti.fornitore { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "letto arrow ricerca codice piva"; }
 .riga-letti.cliente > :nth-child(1), .riga-letti.fornitore > :nth-child(1) { grid-area: letto; }
 .riga-letti.cliente > :nth-child(3), .riga-letti.fornitore > :nth-child(3) { grid-area: ricerca; }
@@ -519,6 +533,7 @@ a.m-cella:hover { background: #f1f6ff; }
 @media (max-width: 768px) {
   .riga-letti.cliente, .riga-letti.fornitore { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.2fr); grid-template-areas: "letto arrow ricerca" "codice codice piva"; }
   .riga-letti.fornitore { grid-template-areas: "letto arrow ricerca" ". . piva"; }
+  .riga-letti.tipo { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); }
 }
 .campo-letto label { display: flex; flex-wrap: wrap; row-gap: 1px; align-items: center; gap: 6px; font-size: 12.5px; color: var(--testo-tenue); margin-bottom: 3px; }
 .campo-letto .aff { font-weight: 700; font-size: 11.5px; }
@@ -560,6 +575,10 @@ a.m-cella:hover { background: #f1f6ff; }
 .tab-righe td.campo-verificato input { border-color: var(--ok); }
 .tab-righe tr.nuova input { border-color: var(--ok); }
 .tab-righe td.calcolato { white-space: nowrap; color: var(--testo-tenue); padding-right: 8px; }
+.tab-righe td.importo-discorde { background: var(--attesa-tenue); }
+.tab-righe td.importo-discorde input { border-color: var(--attesa); background: #fffbea; }
+.usa-calcolato { flex: none; font-size: 11.5px; line-height: 1; padding: 3px 6px; border: 1px solid var(--attesa); border-radius: var(--r-piccolo); background: #fff; color: var(--attesa-testo); cursor: pointer; white-space: nowrap; }
+.usa-calcolato:hover { background: var(--attesa-tenue); }
 @media (max-width: 860px) {
   .aff-corpo { flex-direction: column; }
   .aff-sx { flex-basis: 40% !important; }
@@ -605,6 +624,9 @@ a.m-cella:hover { background: #f1f6ff; }
 .abbina-altra .ricerca { flex: 1 1 280px; max-width: 420px; }
 .abbina-altra .ricerca-testo { font: inherit; padding: 6px 8px; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); }
 .ricerca > .pallino { width: 9px; height: 9px; min-height: 0; align-self: center; padding: 0; }
+/* Il pallino verde è un link alla scheda (15/11/2026): area cliccabile più ampia, fuoco con bordo interno (D-64) */
+.pallino-link { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 4px; border-radius: 50%; }
+.pallino-link:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px var(--primario); }
 
 /* Elenco con voci cliccabili */
 .elenco li.cliccabile { cursor: pointer; border-radius: 6px; margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
@@ -772,6 +794,10 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .schede-barra [role=tab]:hover { color: var(--testo); background: var(--sfondo); }
 .schede-barra [role=tab][aria-selected="true"] { color: var(--primario); border-bottom-color: var(--primario); font-weight: 600; }
 .schede-barra [role=tab]:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; }
+.schede-azioni { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding-left: 8px; flex: none; }
+.schede-filtro { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--testo-tenue); white-space: nowrap; }
+.schede-filtro .filtro-select { font-size: 13px; padding: 4px 8px; }
+.in-aggiornamento { opacity: .55; pointer-events: none; transition: opacity .12s; }
 .schede-conta { min-width: 20px; padding: 1px 7px; border-radius: 10px; font-size: 12px; font-weight: 600; text-align: center; background: var(--neutro-tenue); color: var(--testo-tenue); }
 .schede-conta.c-attesa { background: var(--attesa-tenue); color: var(--attesa-testo); }
 .schede-conta.c-errore { background: var(--errore-tenue); color: var(--errore-testo); }
@@ -966,7 +992,7 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 .barra-analisi { gap: 10px; }
 .barra-analisi .filtri-entita { flex: 1 1 480px; flex-wrap: nowrap; min-width: 0; gap: 10px; }
 .filtro-slot { display: contents; }
-.filtro-ricerca { display: flex !important; align-items: center; gap: 6px; flex: 1 1 170px; max-width: 320px; min-width: 0; font-size: 13px; color: var(--testo-tenue); }
+.filtro-ricerca { display: flex !important; align-items: center; gap: 6px; flex: 0 1 170px; max-width: 320px; min-width: 0; font-size: 13px; color: var(--testo-tenue); }
 .filtro-ricerca .campo-ricerca { flex: 1 1 auto; min-width: 130px; }
 .filtri .filtro-ricerca > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }   /* il segnaposto "Tutti i …" fa da etichetta */
 .riepilogo-filtri { position: relative; display: flex; gap: 6px; }
@@ -977,6 +1003,18 @@ details.gruppo.richiudibile > summary .conta { margin-left: 4px; }
 /* numero dei filtri DENTRO il pulsante, accanto all'imbuto: un cerchio sporgente veniva tagliato dall'area che scorre */
 .btn-icona.con-conta { display: inline-flex; align-items: center; gap: 5px; width: auto; padding: 0 8px; border-color: var(--primario); color: var(--primario); }
 .btn-icona-conta { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--primario); color: #fff; font-size: 11.5px; font-weight: 600; line-height: 18px; text-align: center; }
+/* azioni di riga a icone in colonne fisse (D-171): slot fisso da 32 px per azione, vuoto se manca */
+.azioni-fisse { display: inline-flex; gap: 4px; align-items: center; }
+.azione-slot { display: inline-block; width: 32px; height: 32px; }
+.btn-riga { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--r-piccolo); background: none; color: var(--testo-intest); cursor: pointer; padding: 0; }
+.btn-riga:hover:not(:disabled) { color: var(--primario); background: var(--primario-tenue); }
+.btn-riga:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; } /* D-64: bordo interno, non finisce sotto il menu */
+.btn-riga:disabled { opacity: .4; cursor: default; }
+.btn-riga .icona { width: 16px; height: 16px; }
+.btn-riga.primario { color: var(--primario); }
+.btn-riga.primario:hover:not(:disabled) { color: var(--primario); background: var(--primario-tenue); }
+.btn-riga.pericolo { color: var(--errore-testo); }
+.btn-riga.pericolo:hover:not(:disabled) { color: var(--errore-testo); background: var(--errore-tenue); }
 .riepilogo-pop { position: absolute; z-index: 70; top: calc(100% + 6px); right: 0; width: 340px; max-width: calc(100vw - 32px); padding: 14px 16px; background: #fff;
   border: 1px solid var(--bordo); border-radius: var(--r-piccolo); box-shadow: 0 10px 28px rgba(0, 0, 0, .18); font-size: 13px; }
 .riepilogo-titolo { margin: 0 0 8px; font-weight: 600; color: var(--testo); }
@@ -1098,3 +1136,33 @@ body.in-accesso .principale, body:has(.accesso-scena) .principale { padding: 0; 
   .schermo-stretto img { width: min(340px, 70vw); filter: brightness(0) invert(1); }
   .schermo-stretto p { margin: 0; max-width: 36ch; font-size: 16px; line-height: 1.6; color: rgba(255,255,255,.85); }
 }
+
+/* Finestra di ricerca: filtro di stato come tendina sulla stessa riga del campo, a destra e al
+   bordo della tabella (15/11/2026). La barra dei filtri occupa lo spazio, la tendina va in fondo. */
+.ricerca-filtri { display: flex; align-items: center; gap: 12px; }
+.ricerca-filtri > .filtri { flex: 1 1 auto; }
+
+/* Visualizzatore del documento (§6.6.1): barra dell'ingrandimento in alto a destra e nota quando
+   la posizione del campo manca. Sopra lo sfondo scuro del visualizzatore, testo chiaro. */
+.zoom-barra { position: absolute; top: 10px; right: 10px; z-index: 5; display: flex; align-items: center; gap: 2px; background: rgba(0, 0, 0, .55); border-radius: var(--r-piccolo); padding: 3px; }
+.zoom-barra .zoom-btn { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 5px; background: none; color: #fff; cursor: pointer; }
+.zoom-barra .zoom-btn:hover:not(:disabled) { background: rgba(255, 255, 255, .18); }
+.zoom-barra .zoom-btn:disabled { opacity: .4; cursor: default; }
+.zoom-barra .zoom-btn.testo { width: auto; padding: 0 9px; font-size: 12.5px; font-weight: 600; }
+.zoom-barra .zoom-btn .icona { width: 16px; height: 16px; }
+.zoom-pct { min-width: 42px; text-align: center; color: #fff; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.visualizzatore-nota { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(0, 0, 0, .72); color: #fff; font-size: 12.5px; padding: 5px 12px; border-radius: 999px; }
+
+/* «Somma righe» accanto all'Importo (Ugo, 15/11/2026): il testo va a capo e la colonna non si
+   allarga, così non compare la barra orizzontale della finestra. Rossa se diversa dall'importo. */
+.riga-letti > * { min-width: 0; }
+.sopra-riga { white-space: normal; overflow-wrap: anywhere; }
+.sopra-riga.diversa { color: var(--errore-testo); }
+
+/* Barra filtri su una riga (Ugo, 15/11/2026): ricerca più stretta ed entità compatte, così a 1440 px
+   il riepilogo resta sulla stessa riga. Le regole più specifiche (soggetti, clienti, analisi) restano. */
+.filtri .cerca { flex: 0 1 260px; min-width: 180px; }
+.filtri .filtro-ricerca { max-width: 220px; }
+/* Segmenti → tendina quando non ci stanno (FilterBar): i segmenti restano nel DOM fuori dal flusso,
+   così il componente ne misura la larghezza naturale per capire quando tornare ai segmenti. */
+.segmenti-misura { position: absolute; left: -9999px; top: -9999px; visibility: hidden; pointer-events: none; width: max-content; flex-wrap: nowrap; }

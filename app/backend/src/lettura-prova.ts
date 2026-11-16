@@ -14,7 +14,7 @@ import { leggiDocumento } from './lettore';
 async function main(argv: string[]) {
   const [file, schemaFile] = argv;
   if (!file) throw new Error('uso: npm run lettura:prova -- <file.pdf|foto> [schema.json]');
-  const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+  const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL!, options: '-c TimeZone=UTC' }) });
   try {
     const c = await letturaConfig(db);
     if (!c) throw new Error('Server di lettura non configurato: in Impostazioni → Server di lettura scegli il connettore e salva la chiave API.');

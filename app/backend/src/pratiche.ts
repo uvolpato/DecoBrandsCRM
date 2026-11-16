@@ -4,10 +4,10 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Richiede } from './accesso';
 import { righePagina } from './impostazioni';
-import { CON_PRATICA, type Dati, caricaDatiPratica, giornoRoma, praticaDaDb } from './motore/dati';
-import { abbinamento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, statoIncasso, statoPratica } from './motore/motore';
+import { CON_PRATICA, type Dati, caricaDatiPratica, giornoRoma, iso, praticaDaDb } from './motore/dati';
+import { abbinamento, anomaliaScontoMedio, basePratica, calcoloDocumento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, statoIncasso, statoPratica } from './motore/motore';
 import { PrismaService } from './prisma.service';
-import { type Contesto, logEvent } from './registro';
+import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
 // Elenco delle pratiche (F2-A1, §7.2, §8.1): filtri, conteggi dei segmenti (D-23), ordinamento e
 // paginazione nel database. Stato, importo e variazioni li ricava il motore dai documenti e li salva
@@ -16,7 +16,7 @@ import { type Contesto, logEvent } from './registro';
 
 const STATI = ['tutte', 'scaduta', 'attesa', 'confermata', 'fatturata', 'variazioni'] as const;
 type Stato = (typeof STATI)[number];
-const ORDINI = ['numero', 'cliente', 'fornitore', 'data', 'importo', 'stato', 'subagente'] as const;
+const ORDINI = ['numero', 'cliente', 'fornitore', 'data', 'importo', 'stato', 'subagente', 'ordine_fornitore'] as const;
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 const ELENCO_ID = /^\d{1,18}(,\d{1,18})*$/;
 
@@ -39,6 +39,10 @@ class FiltroPratiche {
 /** Campo di ricerca delle pratiche per fornitore (D-60, §7.3: lo *Sposta*). */
 class CercaPratiche {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) fornitore_id?: number;
+  // il documento è vincolato a cliente e fornitore: la ricerca filtra per tutti e due (15/11/2026)
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) cliente_id?: number;
+  // D-177 §19: filtro per stato nella ricerca per l'abbinamento (lista chiusa, V12)
+  @IsOptional() @IsIn(['attesa', 'confermata', 'fatturata']) stato?: 'attesa' | 'confermata' | 'fatturata';
 }
 
 const idElenco = (s: string | undefined) => (s ? s.split(',').map((x) => BigInt(x)) : []);
@@ -70,6 +74,8 @@ export async function aggiornaPratica(tx: Prisma.TransactionClient, id: bigint, 
   const primo = t.documenti.filter((d) => d.tipo === 'ordine').reduce<Date | null>((m, d) => (!m || d.data < m ? d.data : m), null);
   const nuovi = { stato: STATO_DB[fasePratica(p)], importo: importoPratica(p), variazioni: haVariazioni(p), variazione, ...(primo ? { data_ordine: primo } : {}) };
   await tx.ordini_fornitore_testata.update({ where: { id }, data: nuovi });
+  await aggiornaAnomaliaScontoMedio(tx, p);
+  await salvaCalcolo(tx, id); // D-183: valori calcolati dei documenti aperti
   if (motivo && t.stato !== nuovi.stato) {
     await logEvent(tx, {
       tipo: 'stato', azione: 'change_state', entita: 'pratica', entita_id: id, esito: 'successo',
@@ -79,8 +85,59 @@ export async function aggiornaPratica(tx: Prisma.TransactionClient, id: bigint, 
   return { ...t, ...nuovi };
 }
 
+/** D-183 §19: riscrive i valori calcolati (`calcolo`) dei documenti aperti della pratica, dal motore.
+ *  I congelati (congelato_il non nullo) non si toccano. Chiamata a ogni modifica che può cambiare la base. */
+async function salvaCalcolo(tx: Prisma.TransactionClient, id: bigint) {
+  const S = await caricaDatiPratica(tx, id);
+  if (!S) return;
+  for (const pp of S.pratiche) for (const d of pp.documenti) {
+    if (d.congelato_il) continue;
+    await tx.ordini_fornitore_documenti.update({ where: { id: BigInt(d.id) }, data: { calcolo: calcoloDocumento(S, pp, d) as unknown as Prisma.InputJsonValue } });
+  }
+}
+
+/** D-183: un cambio di parametro del fornitore (spese nella base) o di scaglioni/percentuali ricalcola i
+ *  documenti aperti del fornitore; i congelati restano con i valori con cui sono stati chiusi. */
+export async function ricalcolaDocumentiAperti(tx: Prisma.TransactionClient, fornitore_id: bigint) {
+  const testate = await tx.ordini_fornitore_testata.findMany({ where: { fornitore_id }, select: { id: true } });
+  for (const t of testate) await salvaCalcolo(tx, t.id); // ponytail: una carica per pratica; filtro per fornitore se cresce
+}
+
+/** D-183 §19: congela i documenti dati nella transazione di chiusura (bollettino verificato, liquidazione
+ *  chiusa): ricalcola i valori una volta e fissa `congelato_il`; da qui non cambiano più. V13: tutto dentro
+ *  la stessa transazione, `S` è già caricato con i dati bloccati. */
+export async function congelaDocumenti(tx: Prisma.TransactionClient, S: Dati, ids: Iterable<string>) {
+  const perDoc = new Map<string, { p: Dati['pratiche'][number]; d: Dati['pratiche'][number]['documenti'][number] }>();
+  for (const p of S.pratiche) for (const d of p.documenti) perDoc.set(d.id, { p, d });
+  for (const id of ids) {
+    const v = perDoc.get(id);
+    if (!v || v.d.congelato_il) continue;
+    await tx.ordini_fornitore_documenti.update({
+      where: { id: BigInt(id) },
+      data: { calcolo: calcoloDocumento(S, v.p, v.d) as unknown as Prisma.InputJsonValue, congelato_il: new Date() },
+    });
+  }
+}
+
+/** Apre (o chiude) l'anomalia «sconto medio oltre l'ultimo scaglione» della pratica (D-182 §19). Il
+ *  dettaglio porta pratica, documento che comanda, sconto medio e ultimo scaglione (schema del codice). */
+async function aggiornaAnomaliaScontoMedio(tx: Prisma.TransactionClient, p: ReturnType<typeof praticaDaDb>) {
+  const scaglioni = (await tx.provvigioni_scaglioni.findMany({ where: { fornitore_id: BigInt(p.fornitore_id) } }))
+    .map((s) => ({ id: String(s.id), fornitore_id: String(s.fornitore_id), sconto: s.sconto_min, pct_agente: s.pct_agente, pct_sub: s.pct_subagente, valido_dal: iso(s.valido_dal) }));
+  const a = anomaliaScontoMedio({ scaglioni } as Dati, p);
+  if (a) {
+    await apriAnomalia(tx, {
+      servizio: 'provvigioni', codice: 'provvigione.sconto_medio', chiave: p.id,
+      messaggio: `La pratica ${a.numero} ha sconto medio ${a.sconto_medio.toFixed(2)} % oltre l'ultimo scaglione (${a.ultimo_scaglione.toFixed(2)} %): la provvigione resta da decidere.`,
+      dettaglio: { pratica: a.numero, documento: a.documento, sconto_medio: Number(a.sconto_medio), ultimo_scaglione: Number(a.ultimo_scaglione) },
+    });
+  } else {
+    await chiudiAnomalia(tx, 'provvigioni', 'provvigione.sconto_medio', p.id);
+  }
+}
+
 type Riga = {
-  id: bigint; numero: string; cliente_id: bigint; cliente: string; fornitore_id: bigint; fornitore: string;
+  id: bigint; numero: string; numero_ordine_fornitore: string | null; cliente_id: bigint; cliente: string; fornitore_id: bigint; fornitore: string;
   subagente_id: bigint | null; subagente: string | null; data: string; importo: Prisma.Decimal; stato: string; giorni: number;
   variazioni: boolean; variazione: Prisma.Decimal; pagato: boolean;
 };
@@ -106,14 +163,14 @@ export class PraticheController {
     if (q.al) filtri.push(Prisma.sql`t.data_ordine <= ${q.al}::date`);
     const pagato = Prisma.sql`EXISTS (SELECT 1 FROM ordini_fornitore_documenti d WHERE d.testata_id = t.id AND d.tipo = 'pagamento')`;
     if (q.pagato) filtri.push(q.pagato === 'si' ? pagato : Prisma.sql`NOT ${pagato}`);
-    if (testo) filtri.push(Prisma.sql`(t.numero_ordine ILIKE ${simile} OR cv.ragione_sociale ILIKE ${simile} OR fv.ragione_sociale ILIKE ${simile}
+    if (testo) filtri.push(Prisma.sql`(t.numero_ordine ILIKE ${simile} OR t.numero_ordine_fornitore ILIKE ${simile} OR cv.ragione_sociale ILIKE ${simile} OR fv.ragione_sociale ILIKE ${simile}
       OR EXISTS (SELECT 1 FROM ordini_fornitore_documenti d WHERE d.testata_id = t.id AND d.numero ILIKE ${simile}))`);
 
     // scaduta = in attesa e scadenza (data + giorni del fornitore) passata: dipende da oggi, si calcola qui (§5.1).
     // Il subagente è quello dell'agenzia alla data dell'ordine (D-35): l'EXCLUDE su interscambio ne garantisce uno solo.
     const base = Prisma.sql`
       WITH base AS (
-        SELECT t.id, t.numero_ordine AS numero, t.cliente_id, coalesce(cv.ragione_sociale, '') AS cliente,
+        SELECT t.id, t.numero_ordine AS numero, t.numero_ordine_fornitore, t.cliente_id, coalesce(cv.ragione_sociale, '') AS cliente,
                t.fornitore_id, coalesce(fv.ragione_sociale, '') AS fornitore,
                a.subagente_id, s.nome || ' ' || s.cognome AS subagente, to_char(t.data_ordine, 'YYYY-MM-DD') AS data,
                t.importo, t.variazioni, t.variazione, ${pagato} AS pagato,
@@ -145,6 +202,7 @@ export class PraticheController {
     const COLONNA: Record<(typeof ORDINI)[number], Prisma.Sql> = {
       numero: Prisma.sql`numero`, cliente: Prisma.sql`cliente`, fornitore: Prisma.sql`fornitore`, data: Prisma.sql`data`,
       importo: Prisma.sql`importo`, subagente: Prisma.sql`coalesce(subagente, '')`,
+      ordine_fornitore: Prisma.sql`coalesce(numero_ordine_fornitore, '')`,
       stato: Prisma.sql`CASE stato WHEN 'scaduta' THEN 0 WHEN 'attesa' THEN 1 WHEN 'confermata' THEN 2 ELSE 3 END`,
     };
     const dir = q.dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
@@ -158,7 +216,7 @@ export class PraticheController {
 
     return {
       righe: righe.map((r) => ({
-        id: String(r.id), numero: r.numero, cliente_id: String(r.cliente_id), cliente: r.cliente,
+        id: String(r.id), numero: r.numero, numero_ordine_fornitore: r.numero_ordine_fornitore, cliente_id: String(r.cliente_id), cliente: r.cliente,
         fornitore_id: String(r.fornitore_id), fornitore: r.fornitore,
         subagente_id: r.subagente_id == null ? null : String(r.subagente_id), subagente: r.subagente,
         data: r.data, importo: Number(r.importo), stato: r.stato, nota: notaStato(r.stato, r.giorni),
@@ -174,13 +232,17 @@ export class PraticheController {
   }
 
   /** Pratiche di un fornitore per il campo di ricerca (D-60, §7.3: lo *Sposta*), con i soli dati
-   *  che il menu mostra. Il filtro per numero o cliente lo fa il campo; qui conta il fornitore.
+   *  che il menu mostra. Il documento è sempre vincolato a cliente e fornitore (15/11/2026): con
+   *  `cliente_id` filtra per tutti e due. Il filtro per numero lo fa il campo; qui contano i vincoli.
    *  shortcut: tutte le pratiche del fornitore in una volta, con migliaia per fornitore serve una
    *  ricerca a testo sul server. */
   @Get('cerca')
   @Richiede('provvigioni.consulta')
   async cerca(@Query() q: CercaPratiche) {
     if (!q.fornitore_id) return [];
+    // D-177 §19: il filtro per stato lo applica il server; il browser invia solo la scelta (V12)
+    const stato = q.stato ? Prisma.sql`AND t.stato = ${STATO_DB[q.stato]}` : Prisma.empty;
+    const cliente = q.cliente_id != null ? Prisma.sql`AND t.cliente_id = ${BigInt(q.cliente_id)}` : Prisma.empty;
     const righe = await this.db.$queryRaw<{ id: bigint; numero: string; cliente: string; data: string; stato: string }[]>`
       SELECT t.id, t.numero_ordine AS numero, coalesce(cv.ragione_sociale, '') AS cliente,
              to_char(t.data_ordine, 'YYYY-MM-DD') AS data,
@@ -188,7 +250,7 @@ export class PraticheController {
       FROM ordini_fornitore_testata t
       JOIN clienti c ON c.id = t.cliente_id
       LEFT JOIN clienti_versioni cv ON cv.id = c.versione_corrente_id
-      WHERE t.fornitore_id = ${BigInt(q.fornitore_id)}
+      WHERE t.fornitore_id = ${BigInt(q.fornitore_id)} ${cliente} ${stato}
       ORDER BY t.data_ordine DESC, t.id DESC`;
     return righe.map((r) => ({ id: String(r.id), numero: r.numero, cliente: r.cliente, data: r.data, stato: r.stato }));
   }
@@ -201,7 +263,9 @@ export class PraticheController {
     const S = await caricaDatiPratica(this.db, BigInt(id)); // solo i dati della pratica (D-52 §19)
     const r = S && dettaglioPratica(S, String(id));
     if (!r) throw new NotFoundException('Pratica non trovata');
-    return r;
+    // D-169: il numero d'ordine del fornitore sta sulla testata, non nei dati del motore
+    const t = await this.db.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, select: { numero_ordine_fornitore: true } });
+    return { ...r, numero_ordine_fornitore: t?.numero_ordine_fornitore ?? null };
   }
 }
 
@@ -218,15 +282,24 @@ export function dettaglioPratica(S: Dati, id: string) {
   const numeri = (ds: { numero: string }[]) => ds[0].numero + (ds.length > 1 ? ` + ${ds.length - 1}` : '');
   const tutti = (ds: { numero: string }[]) => ds.map((d) => d.numero); // elenco per il binario (D-90)
   // una conferma registrata senza importo è arrivata, ma non dà un importo né una differenza (D-60)
-  const impOrdine = somma(p.ordini), impConferma = somma(p.conferme), confermaConImporto = !impConferma.isZero();
+  const impOrdine = somma(p.ordini);
+  // D-174: conferme e proforme valide (non superate) contano insieme per il progresso
+  const conferme = p.conferme.filter((d) => !d.superato);
+  const proforme = p.proforma.filter((d) => !d.superato);
+  const impConferma = somma(conferme), impValide = r2(impConferma.plus(somma(proforme)));
+  const confermaConImporto = !impConferma.isZero();
+  // «Confermato X di Y»: X = somma delle conferme/proforme valide, Y = importo dell'ordine (D-174)
+  const parziale = (conferme.length || proforme.length) && impValide.lt(impOrdine);
+  const progresso = (conferme.length || proforme.length) ? { x: Number(impValide), y: Number(impOrdine), parziale } : null;
+  const titoloConferma = conferme.length ? (conferme.length > 1 ? 'Conferme' : 'Conferma') : (proforme.length > 1 ? 'Proforme' : 'Proforma');
 
   const fasi = [
     { titolo: p.ordini.length > 1 ? 'Ordini' : 'Ordine', fatta: true, numero: p.ordini.length ? numeri(p.ordini) : p.numero, numeri: p.ordini.length ? tutti(p.ordini) : [p.numero], data: p.data, importo: Number(impOrdine) },
-    p.conferme.length
-      ? { titolo: p.conferme.length > 1 ? 'Conferme' : 'Conferma', fatta: true, numero: numeri(p.conferme), numeri: tutti(p.conferme), data: p.conferme[0].data,
-          ...(confermaConImporto ? { importo: Number(impConferma), delta: Number(r2(impConferma.minus(impOrdine))) } : {}) }
+    conferme.length
+      ? { titolo: titoloConferma, fatta: true, numero: numeri(conferme), numeri: tutti(conferme), data: conferme[0].data,
+          ...(confermaConImporto ? { importo: Number(impValide), delta: Number(r2(impValide.minus(impOrdine))) } : {}) }
       // conferma e proforma facoltative (D-60 §19): la proforma o la fattura fanno avanzare la pratica
-      : p.proforma.length ? { titolo: 'Proforma', fatta: true, numero: numeri(p.proforma), numeri: tutti(p.proforma), data: p.proforma[0].data, importo: Number(somma(p.proforma)) }
+      : proforme.length ? { titolo: titoloConferma, fatta: true, numero: numeri(proforme), numeri: tutti(proforme), data: proforme[0].data, importo: Number(impValide), delta: Number(r2(impValide.minus(impOrdine))) }
         : s.chiave === 'fatturata' ? { titolo: 'Conferma', assente: true, testo: 'Non arrivata' }
           : {
             titolo: 'Conferma', ritardo: s.chiave === 'scaduta',
@@ -259,20 +332,39 @@ export function dettaglioPratica(S: Dati, id: string) {
   const bicchiere = percentuali(S, p, fatture[0]?.data ?? p.data);
   const fiscali = p.documenti.filter((d) => d.tipo === 'fattura' || d.tipo === 'nota_credito');
   const quote = fiscali.map((d) => quotaSub(S, p, d)).filter((q): q is NonNullable<typeof q> => !!q);
-  const imponibile = importoPratica(p);
+  const netto = importoPratica(p);
+  const base = basePratica(p); // D-183: la provvigione si calcola sulla base (netto − spese escluse)
   const sub = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
-  const provvigione = bicchiere ? {
-    imponibile: Number(imponibile),
-    sconto: Number(bicchiere.sconto), valido_dal: bicchiere.scaglione.valido_dal,
-    agente: Number(bicchiere.agente), sub_standard: Number(bicchiere.sub_standard),
-    sub: Number(bicchiere.sub), eccezione: bicchiere.eccezione, da_fornitore: Number(bicchiere.dal_fornitore),
-    a_decobrands: Number(r2(imponibile.times(bicchiere.dal_fornitore).div(100))),
-    a_subagente: Number(quote.length
+  // D-182 §19: sconto medio del documento che comanda e scaglione che ne deriva; oltre l'ultimo scaglione è un'anomalia
+  const anomalia = anomaliaScontoMedio(S, p);
+  const sconto_medio = anomalia
+    ? { valore: Number(anomalia.sconto_medio), scaglione: null, documento: anomalia.documento, oltre: true, ultimo_scaglione: Number(anomalia.ultimo_scaglione) }
+    : bicchiere?.sconto_medio != null
+      ? { valore: Number(bicchiere.sconto_medio), scaglione: Number(bicchiere.scaglione.sconto), documento: null, oltre: false, ultimo_scaglione: null }
+      : null;
+  const provvigione = bicchiere ? (() => {
+    // D-166 §19: dal fornitore = base × pct_agente; al subagente = quota dei documenti; margine = differenza
+    const aDecobrands = r2(base.times(bicchiere.dal_fornitore).div(100));
+    const aSubagente = quote.length
       ? r2(quote.reduce((x, q) => x.plus(q.provvigione), new Prisma.Decimal(0)))
-      : r2(imponibile.times(bicchiere.sub).div(100))),
-    maturazione: S.fornitori.get(p.fornitore_id)?.maturazione ?? null,
-    regole: [...new Set(quote.map((q) => q.regola))],
-  } : null;
+      : r2(base.times(bicchiere.sub).div(100));
+    return {
+      imponibile: Number(base),
+      netto: Number(netto),
+      spese: Number(r2(netto.minus(base))),
+      // D-183: tutti i documenti congelati → il segno «fissato il» (la data più recente di congelamento)
+      congelato: fiscali.length && fiscali.every((d) => d.congelato_il) ? fiscali.map((d) => d.congelato_il!).sort().pop()! : null,
+      sconto: Number(bicchiere.sconto), valido_dal: bicchiere.scaglione.valido_dal,
+      agente: Number(bicchiere.agente), sub_standard: Number(bicchiere.sub_standard),
+      sub: Number(bicchiere.sub), eccezione: bicchiere.eccezione, da_fornitore: Number(bicchiere.dal_fornitore),
+      a_decobrands: Number(aDecobrands),
+      a_subagente: Number(aSubagente),
+      margine: Number(r2(aDecobrands.minus(aSubagente))),
+      margine_pct: Number(r2(bicchiere.dal_fornitore.minus(bicchiere.sub))),
+      maturazione: S.fornitori.get(p.fornitore_id)?.maturazione ?? null,
+      regole: [...new Set(quote.map((q) => q.regola))],
+    };
+  })() : null;
 
   const azione = s.chiave === 'fatturata'
     ? { tipo: 'nessuna', testo: 'Pratica fatturata: non serve altro.' }
@@ -287,8 +379,10 @@ export function dettaglioPratica(S: Dati, id: string) {
     cliente_id: p.cliente_id, cliente: S.clienti.get(p.cliente_id)?.nome ?? '',
     fornitore_id: p.fornitore_id, fornitore: S.fornitori.get(p.fornitore_id)?.nome ?? '',
     subagente_id: sub?.subagente_id ?? null, subagente: sub ? (S.subagenti.get(sub.subagente_id)?.nome ?? null) : null,
-    data: p.data, importo: Number(imponibile), stato: s.chiave, nota, scadenza: s.scadenza ?? null,
+    data: p.data, importo: Number(netto), stato: s.chiave, nota, scadenza: s.scadenza ?? null,
     fasi,
+    // D-174: «Confermato X di Y» con X = somma delle conferme/proforme valide, Y = importo dell'ordine
+    progresso,
     // il cliente ha pagato (D-60): solo un segno con i documenti a supporto, nessun effetto sui numeri
     pagato: pagato(p), pagamenti: p.pagamenti.map((d) => ({ id: d.id, numero: d.numero, data: d.data, importo: Number(d.importo) })),
     // Incasso del cliente (§5.14): stato d'incasso di ogni fattura dal motore (bollettini o segnalazione a mano)
@@ -301,6 +395,6 @@ export function dettaglioPratica(S: Dati, id: string) {
       })),
       variazioni: { numero: variate.length, totale: deltaVariazioni },
     },
-    provvigione, azione,
+    provvigione, sconto_medio, azione,
   };
 }

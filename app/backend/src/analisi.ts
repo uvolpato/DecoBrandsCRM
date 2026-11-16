@@ -306,7 +306,7 @@ function foglio(wb: ExcelJS.Workbook, nome: string, titolo: string, ctx: string,
 }
 
 const colGruppi = (voce: string): Col[] => [
-  { t: voce, w: 34 }, { t: 'Fatture', w: 10, tipo: 'num' }, { t: 'Fatturato', w: 18, tipo: 'euro' },
+  { t: voce, w: 34 }, { t: 'Fatture', w: 10, tipo: 'num' }, { t: 'Base provvigione', w: 18, tipo: 'euro' },
   { t: 'Dai fornitori', w: 18, tipo: 'euro' }, { t: 'Ai subagenti', w: 18, tipo: 'euro' }, { t: 'Margine Decobrands', w: 20, tipo: 'euro' },
   { t: 'Quota del fatturato', w: 18, tipo: 'pct' },
 ];
@@ -361,7 +361,7 @@ async function excel(S: Dati, c: Calcolo, q: Filtri, azienda = '') {
   {
     const col: Col[] = [
       { t: 'Data', w: 12, tipo: 'data' }, { t: 'Documento', w: 16 }, { t: 'Fornitore', w: 18 }, { t: 'Cliente', w: 32 },
-      { t: 'Subagente', w: 20 }, { t: 'Fatturato', w: 16, tipo: 'euro' }, { t: 'Dai fornitori', w: 16, tipo: 'euro' },
+      { t: 'Subagente', w: 20 }, { t: 'Base provvigione', w: 16, tipo: 'euro' }, { t: 'Dai fornitori', w: 16, tipo: 'euro' },
       { t: 'Ai subagenti', w: 16, tipo: 'euro' }, { t: 'Margine', w: 16, tipo: 'euro' },
     ];
     const ws = foglio(wb, 'Documenti', 'Documenti del periodo', ctx + '\n' + nota, azienda);
@@ -379,7 +379,7 @@ function csv(S: Dati, c: Calcolo) {
   const N = nomi(S);
   const { f, s } = N;
   const num = (v: number) => v.toFixed(2).replace('.', ',');
-  const righe = [['Data', 'Documento', 'Tipo', 'Fornitore', 'Partita IVA cliente', 'Cliente', 'Subagente', 'Fatturato', 'Dai fornitori', 'Ai subagenti', 'Margine']];
+  const righe = [['Data', 'Documento', 'Tipo', 'Fornitore', 'Partita IVA cliente', 'Cliente', 'Subagente', 'Base provvigione', 'Dai fornitori', 'Ai subagenti', 'Margine']];
   for (const x of c.sel) {
     righe.push([dataIt(x.data), x.numero, x.tipo === 'nota_credito' ? 'nota di credito' : 'fattura', f(x.fornitore_id),
       S.clienti.get(x.cliente_id)?.piva ?? '', N.c(x.cliente_id), s(x.subagente_id), num(n(x.importo)), num(n(x.prese)), num(n(x.pagate)), num(n(x.margine))]);

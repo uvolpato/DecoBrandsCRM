@@ -24,7 +24,7 @@ const PW = 'password-di-prova';
 const DOMINIO = '@furbo-prova.it';
 
 const L = (over: Partial<Letto>): Letto => ({
-  tipo: null, fornitore_id: null, fornitore: null, numero: null, data: null, codice_cliente: null, cliente: null, cliente_id: null, piva_cliente: null,
+  tipo: null, fornitore_id: null, fornitore: null, numero: null, numero_ordine_fornitore: null, data: null, codice_cliente: null, cliente: null, cliente_id: null, piva_cliente: null,
   importo: null, mese: null, anno: null, riferimento_fattura: null, righe: [],
   ...over,
 });
@@ -69,7 +69,7 @@ async function creaUtente(username: string, aree: { area: string; livello: strin
 async function entra(utente: string) {
   const agente = request.agent(app.getHttpServer());
   const csrf = (await agente.post('/api/accesso/entra').send({ utente, password: PW }).expect(200)).body.csrf as string;
-  return { get: (p: string) => agente.get('/api' + p), post: (p: string, b: object = {}) => agente.post('/api' + p).set('x-csrf-token', csrf).send(b) };
+  return { get: (p: string) => agente.get('/api' + p), post: (p: string, b: object = {}) => agente.post('/api' + p).set('x-csrf-token', csrf).send(b), put: (p: string, b: object = {}) => agente.put('/api' + p).set('x-csrf-token', csrf).send(b) };
 }
 let op: Awaited<ReturnType<typeof entra>>;
 
@@ -98,16 +98,15 @@ beforeEach(async () => {
 });
 
 describe('ordine della coda (D-164 §19)', () => {
-  it('in coda e in lettura vanno dal più vecchio al più recente; il resto resta dal più recente', async () => {
+  it('tutti i documenti da lavorare vanno dal più vecchio al più recente (D-169 §19)', async () => {
     const vecchio = await arrivo({ stato: 'in_coda', ricevuto_il: new Date('2026-09-01T08:00:00Z') });
     const mezzo = await arrivo({ stato: 'in_lettura', ricevuto_il: new Date('2026-09-02T08:00:00Z') });
     const nuovo = await arrivo({ stato: 'in_coda', ricevuto_il: new Date('2026-09-03T08:00:00Z') });
     const controllato = await arrivo({ stato: 'da_controllare', ricevuto_il: new Date('2026-09-05T08:00:00Z') });
     const r = await op.get('/documenti?stato=aperte').expect(200);
     const ids = (r.body.documenti as { id: string }[]).map((d) => d.id);
-    // la coda (in_coda + in_lettura) è in testa, dal più vecchio; il da_controllare resta dopo
-    expect(ids.slice(0, 3)).toEqual([String(vecchio.id), String(mezzo.id), String(nuovo.id)]);
-    expect(ids[3]).toBe(String(controllato.id));
+    // una sola coda di lavoro, dal più vecchio al più recente (in coda, in lettura e da controllare insieme)
+    expect(ids).toEqual([String(vecchio.id), String(mezzo.id), String(nuovo.id), String(controllato.id)]);
   });
 });
 
@@ -147,11 +146,57 @@ describe('somiglianza pg_trgm (D-164)', () => {
   it('due fornitori simili: mai una scelta a caso, si propongono con il punteggio (da scegliere)', async () => {
     await creaFornitore('Arte Wohnaccessories GmbH & Co. KG');
     await creaFornitore('Arte Wohnaccessoires GmbH & Co. KG');
-    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: null, fornitore: 'ARTE WOHNACCESSORIES GMBH & CO.KG', numero: 'OF-1' }));
+    // una terza grafia, vicina a entrambe ma non uguale a nessuna: distacco < 0,2 → da scegliere
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: null, fornitore: 'ARTE WOHNACCESSORIS GMBH & CO.KG', numero: 'OF-1' }));
     expect(p.esito).toBe('fornitore_da_scegliere');
     expect(p.candidati_fornitore.length).toBeGreaterThanOrEqual(2);
     expect(p.candidati_fornitore.every((c) => c.fonte === 'crm')).toBe(true);
     expect(p.candidati_fornitore.some((c) => c.punteggio != null)).toBe(true); // il simile porta il punteggio
+  });
+});
+
+describe('riconoscimento del fornitore con «Arte 2» presente (PR102813)', () => {
+  it('la somiglianza riconosce ARTE anche con «Arte 2» in anagrafica', async () => {
+    const f = await creaFornitore('ARTE WOHNACCESSORIES GMBH & CO.KG');
+    await creaFornitore('Arte 2');
+    expect(await risolviFornitore(db, 'ARTE WOHNACCESSOIRES GMBH & CO.KG')).toEqual({ fornitore_id: f.id, fornitore_versione_id: f.versione_id });
+  });
+
+  it('la proposta ri-risolve il fornitore già letto (fornitore_id null) invece di «da scegliere»', async () => {
+    const f = await creaFornitore('ARTE WOHNACCESSORIES GMBH & CO.KG');
+    await creaFornitore('Arte 2');
+    const p = await propostaDocumento(db, L({ tipo: 'proforma', fornitore_id: null, fornitore: 'ARTE WOHNACCESSOIRES GMBH & CO.KG', numero: 'PR102813' }));
+    expect(p.esito).not.toBe('fornitore_da_scegliere');
+    expect(p.candidati_fornitore).toEqual([]);
+  });
+});
+
+describe('vocabolario imparato dalla correzione (D-164)', () => {
+  it('la scelta a mano del fornitore in Correggi salva il vocabolario per il documento successivo', async () => {
+    const f = await creaFornitore('ARTE WOHNACCESSORIES GMBH & CO.KG');
+    const d = await arrivo({ tipo: 'proforma', campi: [['fornitore', 'ARTE WOHNACCESSOIRES GMBH & CO.KG'], ['numero', 'PR102813']] });
+    await op.put('/documenti/' + d.id, { testata: { tipo: 'proforma', fornitore_id: String(f.id) } }).expect(200);
+    const alias = await db.alias_letti.findFirst({ where: { tipo: 'fornitore' } });
+    expect(alias?.ruolo_id).toBe(f.id);
+    // lo stesso nome letto si riconosce subito, senza passare dalla somiglianza
+    expect(await risolviFornitore(db, 'ARTE WOHNACCESSOIRES GMBH & CO.KG')).toEqual({ fornitore_id: f.id, fornitore_versione_id: f.versione_id });
+  });
+});
+
+describe('somiglianza cliente (D-164)', () => {
+  it('cliente con grafia diversa riconosciuto per somiglianza', async () => {
+    const c = await creaCliente('Verde Vita Garden Center SRL');
+    expect(await riconosciCliente(db, L({ cliente: 'VERDE VITA GARDEN CENTER S.R.L.' }))).toEqual({ cliente_id: c.id, ragione: 'Verde Vita Garden Center SRL' });
+  });
+
+  it('due clienti simili: da scegliere con il punteggio, mai a caso', async () => {
+    const f = await creaFornitore('Arte Wohnaccessories GmbH & Co. KG');
+    await creaCliente('Verde Vita Garden Center SRL');
+    await creaCliente('Verde Vita Garden Center SPA');
+    // sigle diverse ma stesso nome netto: candidati vicini → cliente da scegliere
+    const p = await propostaDocumento(db, L({ tipo: 'ordine', fornitore_id: f.id, numero: 'OF-9', cliente: 'Verde Vita Garden Center' }));
+    expect(p.esito).toBe('cliente_da_scegliere');
+    expect(p.candidati_cliente.some((c) => c.punteggio != null)).toBe(true);
   });
 });
 

@@ -9,7 +9,6 @@ it('la versione è quella del package.json del backend', () => {
   const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
   const v = puntoVersione();
   expect(v.numero).toBe(pkg.version);
-  expect(v.numero).toBe('0.2.0');
   // il commit c'è quando Git risponde, altrimenti manca (in esercizio può non esserci)
   expect(v.commit === null || v.commit.length > 0).toBe(true);
 });

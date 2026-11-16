@@ -1,7 +1,7 @@
 # Preventivo — CRM Ordini a Fornitore, Bollettini e Provvigioni (Decobrands)
 
 **Redatto da:** Ugo Volpato — AI Consultant
-**Data:** 04/09/2026 — **aggiornato il 13/11/2026**: versione **0.2.0** consegnata e provata per i documenti veri; collaudo con le onde 0, 0 bis, 1, 2 e i pacchetti scelti (3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01); variazioni §5 salite a 92 h con F7-A0, F7-A3, F7-A5, F7-A6 e F7-A7 e con la riga del collaudo fuori dai totali. Aggiornato il 19/10/2026 (variazioni da approvare §5: 59 h, con accesso Microsoft 365, registro unico e database ponte; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)
+**Data:** 04/09/2026 — **aggiornato il 15/11/2026**: versione **0.2.7** in preparazione (versioni 0.2.1 → 0.2.6 consegnate e provate sui documenti veri); variazioni §5 salite a 137 h con V19…V25: documenti in coda e lettura, riconoscimento di fornitore e cliente, anagrafica del vecchio CRM e agenzie, percentuali dal flusso, correzione dei dati letti, sconto di riga e importo calcolato, filtro per stato nell'abbinamento; V18 resta il collaudo delle onde 0–2, fuori dai totali. Il 13/11/2026: versione **0.2.0** consegnata e provata per i documenti veri; collaudo con le onde 0, 0 bis, 1, 2 e i pacchetti scelti (3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01); variazioni §5 a 92 h con F7-A0, F7-A3, F7-A5, F7-A6 e F7-A7. Aggiornato il 19/10/2026 (variazioni da approvare §5: 59 h, con accesso Microsoft 365, registro unico e database ponte; grafica del prototipo ufficiale, margine 18 h, calcoli solo sul backend) e il 15/10/2026 (ingresso documenti interno senza n8n, GLM-OCR in locale; modulo ordini cliente rinviato)
 **Cliente:** Decobrands S.r.l. (da confermare)
 **Modalità di sviluppo:** assistita da AI (analisi, generazione e codifica tramite modelli AI)
 
@@ -64,8 +64,9 @@ La colonna "Ore (AI)" è la stima con sviluppo assistito; "Ore (senza AI)" è il
 ## 5. Variazioni da approvare (fuori preventivo)
 
 Funzioni nate dal confronto con il cliente dopo la specifica iniziale e già presenti nel
-prototipo ufficiale, più quelle nate dal collaudo sui documenti veri (V13…V18). Si sviluppano
-**solo se approvate**; ognuna è indipendente dalle altre.
+prototipo ufficiale, più quelle nate dal collaudo sui documenti veri e dal primo uso reale
+(V13…V25). Le voci V19…V25 raggruppano per argomento il lavoro delle versioni 0.2.1 → 0.2.7
+(non una riga per commit). Si sviluppano **solo se approvate**; ognuna è indipendente dalle altre.
 
 | # | Attività (piano) | Perché | Ore (AI) | Importo (AI) |
 |---|---|---|---|---|
@@ -86,10 +87,17 @@ prototipo ufficiale, più quelle nate dal collaudo sui documenti veri (V13…V18
 | V15 | **Onda 1 del collaudo — attività già fatte** (F7-A5): blocco dell'ordine senza fornitore, agenzia o scaglione; riconoscimento del cliente per P.IVA e ragione sociale; rettangolo sul valore nel PDF; elenco Documenti con aggiornamento dal vivo | i documenti veri hanno mostrato casi che il prototipo non copriva (D-87, D-91…D-94) | 10 | € 550,00 |
 | V16 | **Onda 1 del collaudo — correzioni documentate** (F7-A6): documento in errore recuperabile, 400 sul corpo malformato, segreti d'esempio rifiutati in esercizio, messa in esercizio con HSTS | gli errori di lettura non devono bruciare i tentativi e la pubblicazione deve essere sicura (D-114…D-149) | 4 | € 220,00 |
 | V17 | **Righe dei bollettini dal PDF** (F7-A7): lettura, creazione in transazione con abbinamento ai documenti, finestra di correzione, prove — ⚠ **non ancora fatta** (stima) | il bollettino arriva come PDF: le righe si devono ricavare dal documento, non digitare (D-34, D-119) | 12 | € 660,00 |
-| V18 | **Collaudo onde 0–2 e correzioni per i documenti veri (13/11/2026)** — ore da definire (Ugo) | le prove sui documenti veri hanno guidato correzioni e pacchetti scelti (3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01); **fuori dai totali** | — | — |
-| | **Totale variazioni** | | **92** | **€ 5.060,00** |
+| V18 | **Collaudo onde 0–2 e correzioni per i documenti veri (13/11/2026)** — ore da definire (Ugo); comprende la diagnosi dello sconto non recuperabile dalla lettura grezza, il limite del selettore dei mesi dei Bollettini (si torna fino al primo documento) e la correzione della `Modale` (`<p>` → `<div>`) | le prove sui documenti veri hanno guidato correzioni e pacchetti scelti (3-01, 3-07, 3-09, 5-01, 5-04, 5-05, 6-01); le correzioni di difetti nostri e le diagnosi senza codice stanno qui, **fuori dai totali** | — | — |
+| V19 | **Documenti in coda e lettura** (F7-A8): file caricati visibili subito e tolti dalla coda, coda in ordine di lettura aggiornata da sola, PDF su tutte le pagine col campo alla sua pagina, soglie di affidabilità dal server | un file appena caricato non deve sembrare perso, la coda deve leggere dal più vecchio e il PDF deve portare al valore da correggere; le soglie fisse nel browser potevano discordare dal server (D-151) | 8 | € 440,00 |
+| V20 | **Riconoscimento di fornitore e cliente** (F7-A9): candidati da CRM e Integra (D-152), ricerca per parole (sigle e punteggiatura non contano), codice cliente nella ricerca, vocabolario dei nomi letti e somiglianza (D-164), P.IVA letta dal documento (D-165) | sui documenti veri la sola P.IVA o il solo nome non bastano: scegliere il primo a caso sposta la provvigione al subagente sbagliato (D-152, D-164, D-165) | 10 | € 550,00 |
+| V21 | **Anagrafica del vecchio CRM e agenzie** (F7-A10): import additivo del vecchio CRM (D-156), agenzie del vecchio CRM valide dal 2000 e da confermare (D-158, D-159), «Aggiungi l'agenzia» dentro *Apri la pratica* | il vecchio CRM non ha date d'inizio e le agenzie vanno confermate; mancava un modo per creare l'agenzia senza uscire dal flusso (D-156, D-158, D-159) | 7 | € 385,00 |
+| V22 | **Percentuali e scaglioni dal flusso** (F7-A11): percentuali mancanti con «Configura le percentuali», scaglioni aggiunti o tolti nella correzione (D-162, D-163), campi di ricerca senza numeri né pallino rosso durante il caricamento (D-161) | nel vecchio CRM non ci sono percentuali e senza scaglioni la pratica non si apre (D-161, D-162, D-163) | 5 | € 275,00 |
+| V23 | **Correzione dei dati letti** (F7-A12): testata su tre righe con cliente e fornitore letto (pulsante ›), somma delle righe con avviso, cliente scelto che resta nel campo, riepilogo dell'affidabilità | l'operatore deve vedere subito cosa ha letto il modello, dove sta nel documento e se le righe sommano all'importo (versione 0.2.2) | 5 | € 275,00 |
+| V24 | **Sconto di riga e importo calcolato o letto** (F7-A13): sconto percentuale nelle righe lette e corrette (D-178); importo di riga calcolato se non letto, con «Usa … €» quando il letto è discorde (D-179) | alcuni fornitori stampano prezzo e sconto separati e l'importo va distinto fra letto (da controllare) e calcolato, che il browser non manda mai (V12, D-178, D-179) | 6 | € 330,00 |
+| V25 | **Filtro per stato nella ricerca delle pratiche** per l'abbinamento, secondo il tipo del documento (D-177) (F7-A14) | un ordine si abbina a una pratica con solo l'ordine, una fattura a una confermata, una nota di credito a una fatturata; il filtro lo applica il server (V12, D-177) | 4 | € 220,00 |
+| | **Totale variazioni** | | **137** | **€ 7.535,00** |
 
-Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 23 h, € 1.265,00),
+Sulle variazioni approvate vale lo stesso margine di rischio del 25 % (fino a 34 h, € 1.870,00),
 usato solo se serve e rendicontato a ore.
 
 ## 6. Riepilogo economico
@@ -99,9 +107,9 @@ usato solo se serve e rendicontato a ore.
 | Attività già svolte | 16 | € 1.280,00 |
 | Attività da svolgere (incluso margine 18 h) | 89 | € 4.895,00 |
 | **Totale del preventivo** | **105** | **€ 6.175,00** |
-| Variazioni da approvare (§5), tutte | 92 | € 5.060,00 |
-| **Totale con tutte le variazioni** | **197** | **€ 11.235,00** |
-| Margine sulle variazioni (riserva, solo se usato) | fino a 23 | fino a € 1.265,00 |
+| Variazioni da approvare (§5), tutte | 137 | € 7.535,00 |
+| **Totale con tutte le variazioni** | **242** | **€ 13.710,00** |
+| Margine sulle variazioni (riserva, solo se usato) | fino a 34 | fino a € 1.870,00 |
 
 **Riferimento senza AI** — lo sviluppo tradizionale richiederebbe **228 ore** (≈ 2,6× le ore assistite, margine incluso): 228 h × € 70,00 = **€ 15.960,00**, per un totale di **€ 17.240,00** (€ 1.280,00 già svolto + € 15.960,00 sviluppo).
 

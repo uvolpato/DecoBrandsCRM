@@ -151,7 +151,7 @@ function bloccoRiepilogo(m: Modello): Tabella {
   const col: Col[] = [
     { t: 'Subagente', w: 30 },
     { t: 'Documenti', w: 12, tipo: 'num', al: 'right' },
-    { t: 'Imponibile', w: 20, tipo: 'euro', al: 'right' },
+    { t: 'Base provvigione', w: 20, tipo: 'euro', al: 'right' }, // D-183
     { t: 'Provvigione da liquidare', w: 24, tipo: 'euro', al: 'right' },
   ];
   if (conAttesa) col.push({ t: 'In attesa dei bollettini', w: 24, tipo: 'euro', al: 'right' });
@@ -287,7 +287,7 @@ function csv(m: Modello): Buffer {
   let righe: string[][];
   if (m.contenuto === 'riepilogo') {
     const conAttesa = m.ctx.aperto && m.gruppi.some((g) => g.att.length);
-    righe = [['Subagente', 'Documenti', 'Imponibile', 'Provvigione da liquidare'].concat(conAttesa ? ['In attesa dei bollettini'] : [])];
+    righe = [['Subagente', 'Documenti', 'Base provvigione', 'Provvigione da liquidare'].concat(conAttesa ? ['In attesa dei bollettini'] : [])];
     for (const g of m.gruppi) {
       righe.push([g.nome, String(g.liq.length), num(somma(g.liq, 'imponibile')), num(somma(g.liq, 'provvigione'))]
         .concat(conAttesa ? [num(somma(g.att, 'provvigione'))] : []));

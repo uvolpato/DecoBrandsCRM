@@ -118,7 +118,7 @@ with sync_playwright() as p:
         ok(pg.locator('.barra .voce .conta').count() >= 1, 'il numero compare nella voce della barra')
 
         # Segna come visto: la riga esce da «Da vedere» e il contatore scende
-        riga.locator('button:has-text("Segna come visto")').click()
+        riga.locator('button[aria-label^="Segna come visto"]').click()
         pg.wait_for_timeout(1200)
         ok(problemi(pg).filter(has_text=testo_problema).count() == 0, 'il problema segnato come visto esce da «Da vedere»')
         c2 = contatore(pg)

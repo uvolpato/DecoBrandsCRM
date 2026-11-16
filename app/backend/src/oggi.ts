@@ -114,9 +114,9 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
     where: { stato: { notIn: ['scartato', 'abbinato'] }, abbinato_pratica_id: null },
     orderBy: { ricevuto_il: 'asc' },
     select: {
-      id: true, tipo: true, livello: true,
+      id: true, tipo: true, livello: true, stato: true, file_nome: true, letto_il: true, ricevuto_il: true,
       fornitore: { select: { ragione_sociale: true } },
-      campi: { where: { campo: { in: ['numero', 'mese', 'anno'] } }, select: { campo: true, valore_finale: true, valore_letto: true } },
+      campi: { where: { campo: { in: ['numero', 'mese', 'data', 'codice_cliente', 'cliente', 'importo_totale', 'fornitore'] } }, select: { campo: true, valore_finale: true, valore_letto: true } },
     },
   });
   const documenti = daDecidere.length;
@@ -216,20 +216,42 @@ export async function calcolaOggi(db: PrismaService, S: Dati, conErrori = false)
   };
   const vociDocumenti = daDecidere.map((d) => {
     const numero = valore(d, 'numero');
-    const mese = Number(valore(d, 'mese'));
-    const nomeMese = Number.isInteger(mese) && mese >= 1 && mese <= 12 ? MESI[mese - 1] : '';
-    const fornitore = d.fornitore?.ragione_sociale ?? 'fornitore non riconosciuto';
-    const titolo = d.tipo === 'bollettino'
-      ? `Registra il bollettino di ${nomeMese} di ${fornitore}`.replace('  ', ' ')
-      : d.tipo === 'ordine'
-        ? `Apri la pratica dell’ordine ${numero ?? ''}`.trim()
-        : `Abbina ${TIPO_DOC[d.tipo ?? 'altro'] ?? 'documento'} ${numero ?? ''}`.trim();
+    // il nome letto dal documento (campo `fornitore`) vale finché il fornitore non è abbinato a un'anagrafica
+    const fornitore = d.fornitore?.ragione_sociale ?? valore(d, 'fornitore') ?? 'fornitore non riconosciuto';
+    const tipoDoc = TIPO_DOC[d.tipo ?? 'altro'] ?? 'documento';
+    // bollettino e ordine hanno un'azione propria; gli altri si abbinano. Finché non è letto si dice
+    // il file; dopo la lettura tipo e numero, altrimenti tipo e file.
+    let titolo: string;
+    let azione: string;
+    if (d.tipo === 'bollettino') {
+      const mese = Number(valore(d, 'mese'));
+      const nomeMese = Number.isInteger(mese) && mese >= 1 && mese <= 12 ? MESI[mese - 1] : '';
+      titolo = `Registra il bollettino di ${nomeMese} di ${fornitore}`.replace('  ', ' ');
+      azione = 'Apri';
+    } else if (d.tipo === 'ordine') {
+      titolo = `Apri la pratica dell’ordine ${numero ?? d.file_nome}`.trim();
+      azione = 'Apri';
+    } else {
+      titolo = d.letto_il == null ? `Abbina ${d.file_nome}` : `Abbina ${tipoDoc} ${numero ?? d.file_nome}`;
+      azione = 'Abbina';
+    }
+    const motivo = d.stato === 'errore' ? 'errore' : d.livello === 'bassa' ? 'affidabilità bassa' : 'da controllare';
+    const pezzi: string[] = [fornitore];
+    const cliente = valore(d, 'codice_cliente') ?? valore(d, 'cliente');
+    if (cliente) pezzi.push(cliente);
+    const importo = valore(d, 'importo_totale');
+    if (importo != null && importo !== '' && Number.isFinite(Number(importo))) pezzi.push(euro(Number(importo)));
+    const dataDoc = valore(d, 'data');
+    if (dataDoc) pezzi.push(dataIt(dataDoc));
+    pezzi.push(motivo);
+    const inCoda = giorni(giornoRoma(d.ricevuto_il), oggi);
+    pezzi.push(inCoda <= 0 ? 'arrivato oggi' : inCoda === 1 ? '1 giorno in coda' : `${inCoda} giorni in coda`);
     return {
       tipo: (d.livello === 'bassa' ? 'errore' : 'primario') as 'errore' | 'primario',
       titolo,
-      dettaglio: `${fornitore} · ${d.livello === 'bassa' ? 'affidabilità bassa' : 'da controllare'}`,
+      dettaglio: pezzi.join(' · '),
       href: '/documenti/' + d.id,
-      azione: d.tipo === 'ordine' || d.tipo === 'bollettino' ? 'Apri' : 'Abbina',
+      azione,
     };
   });
 

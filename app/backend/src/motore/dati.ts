@@ -27,7 +27,8 @@ export type Testata = Prisma.ordini_fornitore_testataGetPayload<{ include: typeo
 const riga = (r: Testata['righe'][number]) => {
   const qta = r.quantita ?? ZERO, prezzo = r.prezzo_unitario ?? ZERO;
   // D-49 §19: il mezzo si allontana dallo zero (HALF_UP), anche sui negativi (resi): −0,005 → −0,01.
-  return { codice: r.codice, descrizione: r.descrizione, qta, prezzo, importo: r.importo ?? qta.times(prezzo).toDecimalPlaces(2, Dec.ROUND_HALF_UP) };
+  // D-183 §19: spesa = riga non merce (trasporto, imballo, «Fracht»): fuori da lordo/netto dello sconto medio e dalla base.
+  return { codice: r.codice, descrizione: r.descrizione, qta, prezzo, importo: r.importo ?? qta.times(prezzo).toDecimalPlaces(2, Dec.ROUND_HALF_UP), spesa: r.spesa };
 };
 
 /** Tipi di documento della pratica (D-60 §19); solo i fiscali toccano le provvigioni. */
@@ -35,10 +36,26 @@ export const TIPI_DOCUMENTO = ['ordine', 'conferma', 'proforma', 'fattura', 'not
 export type TipoDocumento = (typeof TIPI_DOCUMENTO)[number];
 export const fiscale = (tipo: string) => tipo === 'fattura' || tipo === 'nota_credito';
 
+/** Valori calcolati e congelati di un documento fiscale (D-183 §19): importi come testo al centesimo,
+ *  mai virgola mobile. `regola` = versione della regola con cui sono stati calcolati. */
+export type CalcoloDocumento = {
+  base: string; // base della provvigione = netto − spese escluse
+  spese: string; // spese escluse dalla base (0 se il fornitore le include)
+  netto: string; // importo del documento (netto)
+  sconto_medio: string | null; // % sul lordo di merce; null se riserva (sconto dell'agenzia)
+  scaglione: string | null; // soglia dello scaglione; null se oltre l'ultimo (anomalia)
+  pct_agente: string | null; // % che il fornitore riconosce a Decobrands
+  pct_subagente: string | null; // % al subagente (la regola applicata)
+  provvigione_agente: string | null; // base × pct_agente
+  provvigione_subagente: string | null; // quota del subagente sulla base
+  regola: string;
+};
+
 /** Una pratica nella forma del motore (M.S.pratiche). */
 export const praticaDaDb = (t: Testata) => {
-  // documenti solo tracciati (D-60): ordini, conferme, proforma, pagamenti, altri; nessun effetto sulle provvigioni
-  const tracciati = (tipo: TipoDocumento) => t.documenti.filter((d) => d.tipo === tipo).map((d) => ({ id: id(d.id), numero: d.numero, data: iso(d.data), importo: d.importo }));
+  // documenti solo tracciati (D-60): ordini, conferme, proforma, pagamenti, altri; nessun effetto sulle provvigioni.
+  // D-174 §19: una conferma/proforma sostituita (superato_da non null) resta in archivio ma non conta.
+  const tracciati = (tipo: TipoDocumento) => t.documenti.filter((d) => d.tipo === tipo).map((d) => ({ id: id(d.id), numero: d.numero, data: iso(d.data), importo: d.importo, superato: d.superato_da != null }));
   return {
     id: id(t.id), numero: t.numero_ordine, fornitore_id: id(t.fornitore_id), cliente_id: id(t.cliente_id), data: iso(t.data_ordine),
     ordini: tracciati('ordine'), conferme: tracciati('conferma'), proforma: tracciati('proforma'), pagamenti: tracciati('pagamento'),
@@ -57,6 +74,10 @@ export const praticaDaDb = (t: Testata) => {
       incasso: d.fonte_incasso === 'manuale' ? { stato: d.stato_incasso, dal: iso((d.stato_incasso === 'insoluta' ? d.insoluta_dal : d.pagata_il) ?? d.data), nota: d.nota_incasso } : null,
       solleciti: d.solleciti, sollecitata_il: d.sollecitata_il ? iso(d.sollecitata_il) : null,
       correzione: d.correzione ? { tipo: d.correzione.tipo, valore: d.correzione.valore, motivo: d.correzione.motivo } : null,
+      // D-183 §19: valori calcolati salvati e congelamento (JSON) + le righe del documento (per le spese)
+      calcolo: (d.calcolo as CalcoloDocumento | null) ?? null,
+      congelato_il: d.congelato_il ? iso(d.congelato_il) : null,
+      righe: t.righe.filter((r) => r.documento_id === d.id).map(riga),
     })),
   };
 };
@@ -246,6 +267,7 @@ function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccez
     fornitori: new Map(fornitori.map((f) => [id(f.id), {
       id: id(f.id), nome: f.corrente?.ragione_sociale ?? '', maturazione: f.tipo_provvigione,
       giorni_conferma: f.giorni_attesa_conferma, giorno_bollettino: f.giorno_bollettino, giorni_incasso: f.giorni_incasso,
+      spese_base_provvigione: f.spese_base_provvigione, // D-183: le spese entrano nella base?
     }])),
     clienti: new Map(clienti.map((c) => [id(c.id), { id: id(c.id), piva: c.corrente?.piva ?? null, nome: c.corrente?.ragione_sociale ?? '' }])),
     subagenti: new Map(subagenti.map((s) => [id(s.id), { id: id(s.id), nome: `${s.nome} ${s.cognome}`, attivo: s.attivo }])),

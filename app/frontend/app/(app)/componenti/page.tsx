@@ -2,6 +2,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Campo, CampoEuro } from '@/componenti/Campo';
 import { CampoRicerca } from '@/componenti/CampoRicerca';
+import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Binario, Caricamento, Cerniera, ElencoSelezionabile, Elenco, GruppiDaFare, ListaDaFare, Matrice, Periodi, Scelte } from '@/componenti/Flussi';
@@ -10,6 +11,8 @@ import { Grafico, COLORI_GRAFICI } from '@/componenti/Grafico';
 import { Icona } from '@/componenti/Icona';
 import { Cifre, KpiRow } from '@/componenti/Kpi';
 import { Conferma } from '@/componenti/Modale';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
+import { Copiabile } from '@/componenti/Copiabile';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { PeriodoMesi } from '@/componenti/PeriodoMesi';
 import { avviso, Dettagli, Stato } from '@/componenti/Piccoli';
@@ -82,10 +85,13 @@ function DemoFiltri() {
 function DemoRicerca() {
   const [sub, setSub] = useState(['1']);
   const [forn, setForn] = useState('1');
+  const [seg, setSeg] = useState('tutti');
   return <div className="modulo modulo-2" style={{ alignItems: 'start' }}>
     <div className="campo"><label htmlFor="d-f">Fornitore (singola)</label><CampoRicerca id="d-f" entita={FORNITORI} valore={forn} onChange={setForn} /></div>
     <div className="campo"><label htmlFor="d-s">Subagenti (selezione multipla)</label><CampoRicerca id="d-s" entita={SUBAGENTI} multipla valori={sub} onChange={setSub} placeholder="Tutti i subagenti" /></div>
-    <p className="nota">Scelti: fornitore {forn || '—'} · subagenti {sub.join(', ') || 'tutti'}</p>
+    <div className="campo"><label htmlFor="d-seg">Fornitore (segmenti nella finestra di ricerca)</label>
+      <CampoRicerca id="d-seg" entita={FORNITORI} valore={forn} onChange={setForn} segmenti={{ voci: [{ valore: 'tutti', etichetta: 'Tutti' }, { valore: 'attivi', etichetta: 'Attivi' }], valore: seg, onCambia: setSeg }} /></div>
+    <p className="nota">Scelti: fornitore {forn || '—'} · subagenti {sub.join(', ') || 'tutti'} · segmento {seg}</p>
   </div>;
 }
 
@@ -98,6 +104,7 @@ function DemoFinestre() {
         campi={[{ nome: 'motivo', etichetta: 'Motivo' }, { nome: 'fornitore', etichetta: 'Fornitore', tipo: 'ricerca', entita: FORNITORI }]}
         onConferma={async (v) => { if (!v.motivo) return 'Scrivi il motivo.'; avviso('Contestata: ' + v.motivo); }} />)}>FormModal</button>
       <button type="button" className="btn sec" onClick={() => setF(<Conferma titolo="Chiudere il trimestre?" testo="Gli importi vengono fissati." etichetta="Chiudi il trimestre" onRisposta={(si) => { chiudi(); avviso(si ? 'Confermato' : 'Annullato'); }} />)}>Conferma</button>
+      <button type="button" className="btn sec" onClick={() => setF(<ConfermaGrave titolo="Eliminare il documento?" punti={['Il file e i dati letti vengono cancellati.', 'Non si possono più recuperare.']} etichetta="Elimina" onRisposta={(si) => { chiudi(); avviso(si ? 'Eliminato' : 'Annullato'); }} />)}>ConfermaGrave</button>
       <button type="button" className="btn sec" onClick={() => avviso('Operazione completata')}>Avviso</button>
     </div>
     {f}
@@ -108,6 +115,30 @@ function DemoPeriodo() {
   const [da, setDa] = useMemoria('catalogo-periodo', '2026-04');
   const [a, setA] = useState('2026-09');
   return <><PeriodoMesi da={da} primo="2026-01" ultimo="2026-09" onChange={(d, x) => { setDa(d); setA(x); }} /><p className="nota">Scelto: {da} → {a}</p></>;
+}
+
+function DemoAzioniRiga() {
+  // D-171: azioni di riga a icone in colonne fisse; l'ordine è fisso, lo slot vuoto se manca
+  const azioni: AzioneRiga[] = [
+    { nome: 'conferma', icona: 'spunta', etichetta: 'Conferma', variante: 'primario' },
+    { nome: 'modifica', icona: 'matita', etichetta: 'Modifica' },
+    { nome: 'elimina', icona: 'cestino', etichetta: 'Elimina', variante: 'pericolo' },
+  ];
+  const righe = [
+    { id: 'a', testo: 'Conferma, Modifica ed Elimina', conferma: true, modifica: true, elimina: true },
+    { id: 'b', testo: 'Solo Modifica ed Elimina: lo slot Conferma resta vuoto', conferma: false, modifica: true, elimina: true },
+    { id: 'c', testo: 'Solo Modifica: due slot vuoti', conferma: false, modifica: true, elimina: false },
+  ];
+  const colonne: Colonna<(typeof righe)[number]>[] = [
+    { key: 'testo', header: 'Riga', grow: true },
+    { key: 'azioni', header: '', align: 'center', sortable: false, cell: (r) => <AzioniRiga azioni={azioni} oggetto={'la riga ' + r.id.toUpperCase()}
+      riga={[
+        ...(r.conferma ? [{ nome: 'conferma', onClick: prova }] : []),
+        ...(r.modifica ? [{ nome: 'modifica', onClick: prova }] : []),
+        ...(r.elimina ? [{ nome: 'elimina', onClick: prova }] : []),
+      ]} /> },
+  ];
+  return <DataTable compatta naturale righe={righe} colonne={colonne} chiave={(r) => r.id} />;
 }
 
 function DemoCampoEuro() {
@@ -154,8 +185,8 @@ const VOCI: Voce[] = [
   { nome: 'Pannello', gruppo: 'Struttura', testo: 'Contenitore bianco con titolo, nota e azioni. Con riempi occupa lo spazio rimasto e scorre al suo interno. Le azioni possono avere un contatore colorato (conta, contaVariante).',
     firma: '<Pannello titolo nota azioni={[{ etichetta, icona, variante, onClick, href, conta, contaVariante }]} riempi senzaMargine>',
     demo: <Pannello titolo="Titolo del pannello" nota="nota a destra" azioni={[{ etichetta: 'Azione', onClick: prova }, { etichetta: 'Correggi i dati letti', conta: 3, contaVariante: 'errore', onClick: prova }]}><Nota>Il contenuto va nel corpo.</Nota></Pannello> },
-  { nome: 'Schede', gruppo: 'Struttura', testo: 'Contenuti alternativi nello stesso spazio, con un contatore per scheda (neutro, giallo, rosso, verde). Con memoria la scheda aperta si ritrova tornando alla pagina.',
-    firma: '<Schede schede={[{ id, etichetta, conta, contaVariante, contenuto }]} attiva riempi onCambia memoria="nome" />\nTastiera: ← → fra le schede, Home / Fine',
+  { nome: 'Schede', gruppo: 'Struttura', testo: 'Contenuti alternativi nello stesso spazio, con un contatore per scheda (neutro, giallo, rosso, verde). Con memoria la scheda aperta si ritrova tornando alla pagina. Con azioni si mette qualcosa (es. una tendina) a destra della barra, sulla stessa riga.',
+    firma: '<Schede schede={[{ id, etichetta, conta, contaVariante, contenuto }]} attiva riempi onCambia memoria="nome" azioni={…} />\nTastiera: ← → fra le schede, Home / Fine',
     demo: <Schede memoria="catalogo-schede" schede={[
       { id: 'a', etichetta: 'Percentuali', conta: 5, contenuto: () => <DataTable compatta naturale righe={RIGHE.slice(0, 3)} colonne={COLONNE.slice(0, 4)} chiave={(r) => r.codice} /> },
       { id: 'b', etichetta: 'Da controllare', conta: 2, contaVariante: 'attesa', contenuto: () => <Nota>Contenuto della seconda scheda.</Nota> },
@@ -164,11 +195,13 @@ const VOCI: Voce[] = [
   { nome: 'DataTable', gruppo: 'Dati', alto: true, testo: 'Tabella standard: occupa tutto lo spazio, intestazione fissa, righe scorrevoli, intestazioni ordinabili, totali fissi, conteggio nel piede, paginazione. Ordinamento e totali valgono su tutto l’elenco. Con memoria ordinamento, pagina e scorrimento si ritrovano tornando.',
     firma: '<DataTable righe colonne={[{ key, header, tipo: testo|euro|numero|pct|data, valore, sortValue, cell, align, grow, sortable, classe, totale: \'somma\' }]} chiave\n  onRowClick rowClass emptyText emptyHint ordinamentoIniziale compatta naturale piede etichettaTotale perPagina filtro memoria="nome"\n  ordine onOrdine paginaServer={pagina, pagine, totale} onPagina (elenchi paginati dal server) />',
     demo: <DataTable memoria="catalogo-tabella" righe={RIGHE} colonne={COLONNE} chiave={(r) => r.codice} onRowClick={(r) => avviso('Riga ' + r.codice)} ordinamentoIniziale={{ key: 'data', dir: 'desc' }} piede="Clic su una riga o su un’intestazione." /> },
-  { nome: 'FilterBar', gruppo: 'Dati', testo: 'Barra dei filtri standard (D-22): segmenti con conteggio che segue gli altri filtri (D-23), ricerca, date Dal / Al, campi di ricerca multipli sulle anagrafiche (mai tendine), riepilogo e azzeramento a icona. Il bordo del fuoco è interno al campo: quello esterno finirebbe sotto il menu aperto. Prova: scegli due clienti, poi guarda i numeri dei segmenti.',
+  { nome: 'AzioniRiga', gruppo: 'Dati', testo: 'Azioni di riga sempre a icone, ognuna nel suo slot fisso: se un’azione manca lo slot resta vuoto e le altre non scorrono (D-171). Elimina in rosso tenue, Conferma in evidenza; fuoco con bordo interno (D-64), area di clic 32 px, aria-label e title con azione e oggetto.',
+    firma: '<AzioniRiga azioni={[{ nome, icona, etichetta, variante: primario|pericolo }]} oggetto="l’agenzia …" riga={[{ nome, onClick, etichetta, disabilitata, titolo }]} />', demo: <DemoAzioniRiga /> },
+  { nome: 'FilterBar', gruppo: 'Dati', testo: 'Barra dei filtri standard (D-22): segmenti con conteggio che segue gli altri filtri (D-23), ricerca, date Dal / Al, campi di ricerca multipli sulle anagrafiche (mai tendine), riepilogo e azzeramento a icona. Il bordo del fuoco è interno al campo: quello esterno finirebbe sotto il menu aperto. Quando la barra non sta su una riga i segmenti diventano una tendina (stesse voci con i numeri), misurato con ResizeObserver e con isteresi. Prova: scegli due clienti, poi guarda i numeri dei segmenti; stringi la finestra per vedere la tendina.',
     firma: '<FilterBar campi={[{ nome, tipo: segmenti|cerca|select|data|ricerca, opzioni, placeholder, etichetta, entita, multipla, contesto, predefinito, nelRiepilogo }]} valori onChange riepilogo={true | { prima: [{ etichetta, testo }] }} />\nValore di una ricerca multipla = elenco di chiavi. Il numero n dei segmenti lo ricalcola chi usa la barra (D-23).',
     demo: <DemoFiltri /> },
-  { nome: 'CampoRicerca · RicercaEntita', gruppo: 'Dati', testo: 'Campo su un’entità (fornitore, cliente, subagente, …): scrivendo compare un menu con le prime voci (↑ ↓ Invio, Esc); la lente o F4 apre la maschera con filtri e tabella. Il pallino è verde se il valore è in anagrafica. Multipla: riassunto nel campo, scelte nel menu, il cambio parte alla chiusura. Le voci arrivano dal server tramite l’entità (`voci`). Con `integra: \'fornitore\' | \'cliente\'` la ricerca mostra anche le viste di Integra (etichetta «Integra», sotto i risultati del CRM): scegliendo una riga si importa e si sceglie in un passo; senza `dati.importa` le righe si vedono ma non si scelgono (D-152). Con `testoIniziale` (nome letto dal documento) e il campo vuoto, sotto compare «Letto: … · Cerca questo»: mette quel nome nella ricerca senza sceglierlo.',
-    firma: '<CampoRicerca entita contesto placeholder etichetta multipla valori|valore onChange testoIniziale={{ q, mostra }} />\nEntita { titolo, voci(ctx) (elenco o promessa), chiave, testo, dettaglio, cerca, attiva, colonne, filtri, filtra, integra: \'fornitore\'|\'cliente\' }\nContesto { limita: [chiavi], tutti, …altro per `voci` }   <Campo tipo="ricerca" entita multipla testoIniziale /> nei moduli',
+  { nome: 'CampoRicerca · RicercaEntita', gruppo: 'Dati', testo: 'Campo su un’entità (fornitore, cliente, subagente, …): scrivendo compare un menu con le prime voci (↑ ↓ Invio, Esc); la lente o F4 apre la maschera con filtri e tabella. Il pallino è verde se il valore è in anagrafica. Multipla: riassunto nel campo, scelte nel menu, il cambio parte alla chiusura. Le voci arrivano dal server tramite l’entità (`voci`). Con `integra: \'fornitore\' | \'cliente\'` la ricerca mostra anche le viste di Integra (etichetta «Integra», sotto i risultati del CRM): scegliendo una riga si importa e si sceglie in un passo; senza `dati.importa` le righe si vedono ma non si scelgono (D-152). Con `testoIniziale` (nome letto dal documento) e il campo vuoto, sotto compare «Letto: … · Cerca questo»: mette quel nome nella ricerca senza sceglierlo. Con `segmenti` i segmenti di filtro stanno in cima alla finestra di ricerca: il chiamante tiene il valore e ricarica le voci dal server cambiando il contesto.',
+    firma: '<CampoRicerca entita contesto placeholder etichetta multipla valori|valore onChange testoIniziale={{ q, mostra }} segmenti={{ voci, valore, onCambia }} />\nEntita { titolo, voci(ctx) (elenco o promessa), chiave, testo, dettaglio, cerca, attiva, colonne, filtri, filtra, integra: \'fornitore\'|\'cliente\' }\nContesto { limita: [chiavi], tutti, …altro per `voci` }   <Campo tipo="ricerca" entita multipla testoIniziale /> nei moduli',
     demo: <DemoRicerca /> },
   { nome: 'RiepilogoFiltri', gruppo: 'Dati', testo: 'Due pulsanti a icona: l’imbuto con il numero delle voci scelte apre il riquadro con tutti i filtri (× per toglierne una), l’imbuto barrato li toglie tutti.',
     firma: '<RiepilogoFiltri voci={[{ etichetta, testo } | { etichetta, valori: [{ testo, togli }] }]} attivi onAzzera />', demo: <DemoRiepilogo /> },
@@ -191,6 +224,8 @@ const VOCI: Voce[] = [
     demo: <Elenco voci={[{ testo: <><Icona nome="file" /> Ordine <b>DB-2026-0412</b></>, destra: euro(4820.5) }, { testo: <><Icona nome="file" /> Conferma <b>AB-77120</b></>, destra: euro(4790), onClick: prova }]} /> },
   { nome: 'Stato', gruppo: 'Dati', testo: 'Etichetta di stato. Sei varianti, sempre con testo: il colore non porta da solo il significato.', firma: '<Stato v={ok|attesa|errore|info|primario|neutro}>testo</Stato>',
     demo: <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{([['ok', 'Fatturata'], ['info', 'Confermata'], ['attesa', 'Attesa conferma'], ['errore', 'In ritardo'], ['primario', 'Pronto da chiudere'], ['neutro', 'Al prossimo bollettino']] as const).map(([v, t]) => <Stato key={v} v={v}>{t}</Stato>)}</div> },
+  { nome: 'Copiabile', gruppo: 'Dati', testo: 'Icona «Copia» accanto a un identificativo (numero di pratica o di documento, codice cliente, P.IVA): copia negli appunti e mostra una spunta per 1,5 s (D-173). aria-label e title «Copia …», fuoco a bordo interno (D-64), non sposta il testo.', firma: '<Copiabile valore="AU276839" />',
+    demo: <span>Ordine fornitore <b>AU276839</b><Copiabile valore="AU276839" /></span> },
   { nome: 'Caricamento', gruppo: 'Flussi', testo: 'Area dove trascinare i file o sceglierli: il punto d’ingresso di tutti i documenti.', firma: '<Caricamento titolo testo accetta=".pdf,.xlsx" onFile={(file) => …} />',
     demo: <Caricamento titolo="Trascina qui i documenti" testo="PDF o Excel" onFile={(f) => avviso(f.length + (f.length === 1 ? ' file scelto: ' + f[0].name : ' file scelti'))} /> },
   { nome: 'GruppiDaFare', gruppo: 'Flussi', testo: 'Lista "Da fare" in gruppi richiudibili (aperti o chiusi restano come li lasci), con contatore, riassunto e azioni sul gruppo intero.',
@@ -233,8 +268,8 @@ const VOCI: Voce[] = [
   { nome: 'Campo', gruppo: 'Finestre', testo: 'Campi standard con etichetta e aiuto: testo, numero, password, casella, select, livello e ricerca su un’entità.', firma: '<Campo nome etichetta tipo={testo|numero|password|casella|select|livello|ricerca} valore opzioni aiuto largo segnaposto min max step disabilitato entita multipla contesto />',
     demo: <div className="modulo modulo-2"><Campo nome="demo_codice" etichetta="Codice del fornitore" aiuto="Come il fornitore chiama il cliente." /><Campo nome="demo_sconto" etichetta="Sconto %" tipo="select" opzioni={[{ value: '0', label: '0 %' }, { value: '5', label: '5 %' }]} /><Campo nome="demo_pw" etichetta="Password" tipo="password" /><Campo nome="demo_resta" etichetta="Resta collegato" tipo="casella" valore /></div> },
   { nome: 'CampoEuro', gruppo: 'Finestre', testo: 'Campo numerico delle finestre per prezzi e importi: fuori dal fuoco il valore si legge all’italiana (12,50 €), col fuoco si modifica con la virgola o il punto; al server arriva la stringa numerica col punto, come sempre (V12). Con valuta={false} mostra le quantità: virgola, senza €. Allineato a destra, inputMode decimale.', firma: '<CampoEuro valore onChange dataCampo onFocus valuta ariaLabel />', demo: <DemoCampoEuro /> },
-  { nome: 'FormModal · Modale · Conferma · Avviso', gruppo: 'Finestre', testo: 'Finestre sopra la pagina. FormModal resta aperta se onConferma restituisce il messaggio d’errore (il controllo vero lo fa il server). Avviso: messaggio temporaneo.',
-    firma: '<FormModal titolo testo campi colonne conferma pericolo azioniExtra onConferma={async (valori) => messaggio d’errore | niente} onChiudi />\n<Modale titolo testo piede larga onChiudi>   <Conferma titolo testo etichetta pericolo onRisposta={(si) => …} />   avviso(testo, errore)', demo: <DemoFinestre /> },
+  { nome: 'FormModal · Modale · Conferma · ConfermaGrave · Avviso', gruppo: 'Finestre', testo: 'Finestre sopra la pagina. FormModal resta aperta se onConferma restituisce il messaggio d’errore (il controllo vero lo fa il server); con `casella` mostra la casella da spuntare che abilita il pulsante (D-172). ConfermaGrave: come Conferma ma con la casella obbligatoria e il pulsante rosso spento finché non è spuntata. Avviso: messaggio temporaneo.',
+    firma: '<FormModal titolo testo campi colonne conferma pericolo casella azioniExtra onConferma={async (valori) => messaggio d’errore | niente} onChiudi />\n<Modale titolo testo piede larga onChiudi>   <Conferma titolo testo etichetta pericolo onRisposta={(si) => …} />   <ConfermaGrave titolo punti etichettaCasella etichetta onRisposta={(si) => …} />   avviso(testo, errore)', demo: <DemoFinestre /> },
   { nome: 'FormAgenzia', gruppo: 'Finestre', testo: 'Form dell’agenzia (interscambio) condiviso fra Clienti e Documenti: nuovo o modifica, con fornitore fisso facoltativo (dal documento) e valori iniziali. Salva con POST/PUT /api/clienti/:id/agenzie.',
     firma: '<FormAgenzia cliente={{ id, nome }} agenzia={null | Agenzia} fornitoreFisso={{ id, nome }} iniziali={{ codice_cliente_fornitore, valido_dal }} onSalvata onChiudi />', demo: null },
   { nome: 'CercaInIntegra', gruppo: 'Finestre', testo: 'Pulsante «Cerca in Integra» e finestra per le liste di Clienti e Fornitori (D-111): si cerca solo al clic, perché il ponte di Integra è lento; fino a 10 righe non ancora in anagrafica, ognuna con Importa. Dopo l’import la finestra si chiude e l’elenco si ricarica. Senza dati.importa il pulsante è spento, con il motivo; oltre 3 secondi compare «Il ponte di Integra non risponde, riprova».',

@@ -77,7 +77,7 @@ try:
         pg.wait_for_selector('.dettagli', timeout=10000)  # il dettaglio arriva dal server
         ok(pg.locator('.dettagli').count() == 1, 'a destra il documento scelto, senza cambiare pagina')
         ok('PROVA-' + S.upper() in pg.locator('.pannello-testa h2').last.inner_text(), 'dettaglio: titolo con il documento')
-        ok('Codice cliente' in testo(pg, '.dettagli') and 'Importo' in testo(pg, '.dettagli'), 'dettaglio: testata con codice cliente e importo')
+        ok('Codice cliente' in testo(pg, '.dettagli') and 'Importo' in testo(pg, '.dettagli') and 'Cliente' in testo(pg, '.dettagli'), 'dettaglio: testata con cliente, codice cliente e importo')
         ok(pg.locator('.schede-barra [role=tab]').count() == 2, 'due schede: azione proposta e righe lette')
         ok('Scegli la pratica' in testo(pg, '.schede-barra') or 'Pratica proposta' in testo(pg, '.schede-barra'), 'scheda dell’azione proposta')
 
@@ -119,10 +119,12 @@ try:
         pg.fill('input[data-campo="righe[2].descrizione"]', 'Riga aggiunta')
         pg.fill('input[data-campo="righe[2].quantita"]', '1')
         pg.fill('input[data-campo="righe[2].prezzo"]', '10.5')
-        pg.fill('input[data-campo="righe[2].importo"]', '10.5')
+        pg.locator('input[data-campo="righe[2].prezzo"]').blur()  # il CampoEuro si riformatta fuori dal fuoco
         pg.wait_for_timeout(100)
         ok(pg.input_value('input[data-campo="righe[2].prezzo"]').replace('\u00a0', ' ') == '10,50 €',
            'campo in euro: fuori dal fuoco il prezzo si legge 10,50 € (col fuoco il punto è accettato)')
+        ok('calcolato' in testo(pg, '.tab-righe tbody tr[data-riga="2"] .calcolato') and '10,50' in testo(pg, '.tab-righe tbody tr[data-riga="2"] .calcolato'),
+           'riga nuova: l’importo è calcolato da quantità × prezzo (D-153, non più scritto a mano)')
         # il segno di conferma accanto al campo incerto non cambia il valore (F6-A4b)
         const_cerchi = pg.locator('.aff-dx .conferma-campo').count()
         ok(const_cerchi >= 1, 'finestra: il segno di conferma per i campi incerti')
@@ -172,6 +174,8 @@ try:
 
         pg.click('.pannello-testa button:has-text("Scarta il documento")'); pg.wait_for_selector('.velo .modale')
         pg.select_option('.velo select[name=motivo]', 'Doppione')
+        ok(pg.locator('.velo .modale-piede button:has-text("Scarta")').is_disabled(), 'scarto: il pulsante Scarta è spento finché non si spunta (D-172)')
+        pg.click('.velo .casella-grave input')
         pg.click('.velo .modale-piede button:has-text("Scarta")')
         try:
             pg.wait_for_selector(voce, state='detached', timeout=10000)
@@ -184,7 +188,8 @@ try:
         voceSenza = '.selezionabile a:has-text("PROVA-SENZA-%s")' % S.upper()
         pg.wait_for_selector(voceSenza)
         ok(pg.locator(voceSenza + ' .stato:has-text("Manca l’agenzia")').count() == 1, 'lista: pillola Manca l’agenzia sul documento senza agenzia')
-        pg.click(voceSenza); pg.wait_for_timeout(300)
+        pg.click(voceSenza); pg.wait_for_selector('.dettagli', timeout=10000)
+        pg.wait_for_selector('button:has-text("Configura l’agenzia")', timeout=10000)
         ok(pg.locator('button:has-text("Configura l’agenzia")').count() == 1, 'dettaglio: azione Configura l’agenzia')
         pg.screenshot(path=str(USCITA / 'app-documento-manca-agenzia-1440.png'))
         pg.click('button:has-text("Configura l’agenzia")'); pg.wait_for_selector('.velo .modale')
@@ -300,6 +305,12 @@ try:
         ok(pg3.locator('button:has-text("Rileggi il documento")').count() == 1, 'errore: pulsante Rileggi il documento')
         ok(pg3.locator('button:has-text("Correggi i dati letti")').count() == 1, 'errore: pulsante Correggi i dati letti per inserire i dati a mano')
         ok('di non riconosciuto' not in pg3.locator('body').inner_text(), 'A6-16: nessun documento senza fornitore dice «di non riconosciuto»')
+        # D-172: «Rileggi» apre la conferma con la casella; il pulsante resta spento finché non si spunta
+        pg3.click('button:has-text("Rileggi il documento")'); pg3.wait_for_selector('.velo .modale')
+        ok(pg3.locator('.velo .modale-piede button:has-text("Rileggi il documento")').is_disabled(), 'rileggi: il pulsante è spento finché non si spunta (D-172)')
+        pg3.click('.velo .casella-grave input')
+        ok(pg3.locator('.velo .modale-piede button:has-text("Rileggi il documento")').is_enabled(), 'rileggi: il pulsante si accende dopo la spunta')
+        pg3.click('.velo .modale-piede button:has-text("Annulla")'); pg3.wait_for_timeout(200)
         pg3.close()
 
         # A6-16: ordine senza fornitore riconosciuto → testi pensati per un documento senza nome fornitore
@@ -406,6 +417,13 @@ try:
         pg6.wait_for_function("document.querySelectorAll('.aff-dx .ricerca-menu:not([hidden])').length === 0")
         ok('ok' in pg6.locator('.aff-dx input[aria-label="Cerca cliente"]').locator('xpath=..').locator('span.pallino').get_attribute('class'),
            'cliente scelto: alla scelta il pallino diventa verde')
+        verde_cli = pg6.locator('.aff-dx input[aria-label="Cerca cliente"]').locator('xpath=..').locator('a.pallino-link')
+        ok(verde_cli.count() == 1 and verde_cli.get_attribute('href') == '/clienti/1001',
+           'pallino verde del cliente: link alla scheda del cliente scelto')
+        ok(verde_cli.get_attribute('target') is None and verde_cli.get_attribute('rel') is None,
+           'pallino verde del cliente: si apre nella stessa scheda (D-170)')
+        ok(verde_cli.get_attribute('aria-label') == 'Apri la scheda del cliente Agri Aggio SNC',
+           'pallino verde del cliente: aria-label con il nome')
         ok(pg6.input_value('input[data-campo="cliente"]') == 'Agri Aggio SNC',
            'cliente scelto: «Cliente letto» resta il nome letto (non sovrascritto)')
         pg6.screenshot(path=str(USCITA / 'app-documenti-cliente-scelto-1440.png'))
@@ -478,6 +496,8 @@ try:
         ok(pg5.locator('button:has-text("Scarta il documento")').count() == 0, 'dettaglio in coda: niente Scarta il documento')
         pg5.screenshot(path=str(USCITA / 'app-documenti-coda-1440.png'))
         pg5.locator('button:has-text("Togli dalla coda")').click(); pg5.wait_for_selector('.modale')
+        ok(pg5.locator('.modale-piede button:has-text("Togli dalla coda")').is_disabled(), 'Togli dalla coda: pulsante spento finché non si spunta (D-172)')
+        pg5.click('.modale .casella-grave input')
         pg5.locator('.modale-piede button:has-text("Togli dalla coda")').click(); pg5.wait_for_timeout(500)
         ok(scarti['n'] == 1, 'Togli dalla coda: chiama lo scarto esistente (una volta)')
         pg5.close()
@@ -629,13 +649,13 @@ try:
         ok('Somma righe' in pgS.locator('.sopra-riga').inner_text(), 'somma righe: etichetta «Somma righe»')
         ok('250,00' in pgS.locator('.sopra-riga').inner_text(), 'somma righe: 250,00 € all’apertura (2×100 + 1×50)')
         ok(pgS.locator('.sopra-riga .spunta-ok').count() == 1, 'somma righe: spunta verde se uguale all’importo')
-        ok(pgS.locator('.sopra-riga .somma-righe-avviso').count() == 0, 'somma righe: nessun avviso se uguale')
+        ok(pgS.locator('.sopra-riga.diversa').count() == 0, 'somma righe: nessun avviso se uguale')
         pgS.fill('input[data-campo="righe[0].prezzo"]', '120'); pgS.wait_for_timeout(100)
         ok('290,00' in pgS.locator('.sopra-riga').inner_text(), 'somma righe: si aggiorna al cambio del prezzo (2×120 + 50 = 290)')
-        ok(pgS.locator('.sopra-riga .somma-righe-avviso').count() == 1, 'somma righe: avviso se diversa dall’importo')
-        somma_avviso = pgS.locator('.sopra-riga .somma-righe-avviso').inner_text()
-        ok('diversa di' in somma_avviso and '40,00' in somma_avviso,
-           'somma righe: avviso con la differenza (40,00 €)')
+        ok(pgS.locator('.sopra-riga.diversa').count() == 1, 'somma righe: avviso se diversa dall’importo')
+        somma_avviso = pgS.locator('.sopra-riga.diversa').inner_text()
+        ok('Somma righe' in somma_avviso and '290,00' in somma_avviso,
+           'somma righe: avviso rosso con la somma delle righe (290,00 €)')
         ok('290,00' in pgS.locator('.tab-righe tfoot td.dx').inner_text(), 'somma righe: stesso numero del piede della tabella')
         pgS.screenshot(path=str(USCITA.parents[1] / 'somma-1440.png'))
         pgS.close()
@@ -747,7 +767,7 @@ try:
         ok(pgD.locator('.velo button:has-text("Usa questa")').count() == 1, 'D-159: con agenzia da confermare compare «Usa questa»')
         ok(pgD.locator('.velo button:has-text("Configura")').count() == 1, 'D-159: ... e «Configura»')
         ok('codice 45172' in pgD.locator('.velo .nota').inner_text() and 'sconto 0 %' in pgD.locator('.velo .nota').inner_text()
-           and 'subagente Bastasin Maurizio' in pgD.locator('.velo .nota').inner_text() and 'dal 2000-01-01' in pgD.locator('.velo .nota').inner_text(),
+           and 'subagente Bastasin Maurizio' in pgD.locator('.velo .nota').inner_text() and 'dal 01/01/2000' in pgD.locator('.velo .nota').inner_text(),
            'D-159: il riquadro mostra codice, sconto, subagente e data')
         ok(stati_conf['abbina'] == 1, 'D-159: l’apertura ha risposto 409 una volta')
         pgD.screenshot(path=str(USCITA / 'app-documento-da-confermare-1440.png'))
@@ -804,10 +824,13 @@ try:
         ok(stati_scag['abbina'] == 1, 'D-162: l’apertura ha risposto 409 una volta')
         pgSC.screenshot(path=str(USCITA / 'app-documento-scaglione-mancante-1440.png'))
         pgSC.locator('.velo button:has-text("Configura le percentuali")').click()
-        pgSC.wait_for_selector('.velo .modale:has-text("Nuove percentuali di")')
-        ok(pgSC.input_value('.velo input[name=valido_dal]') == '2026-09-15', 'D-162: «Valide dal» = data dell’ordine')
-        pgSC.fill('#c-sconto0', '0'); pgSC.fill('#c-agente0', '10'); pgSC.fill('#c-sub0', '5')
-        pgSC.click('.velo .modale-piede button:has-text("Salva le nuove percentuali")')
+        pgSC.wait_for_selector('.velo .modale:has-text("Nuovo scaglione di")')
+        ok(pgSC.input_value('.velo input[name=valido_dal]') == '2026-09-15' and pgSC.locator('.velo input[name=valido_dal]').get_attribute('disabled') is not None,
+           'D-162: «Valide dal» = data dell’ordine, fisso')
+        ok(pgSC.input_value('.velo input[name=sconto_min]') == '0' and pgSC.locator('.velo input[name=sconto_min]').get_attribute('disabled') is not None,
+           'D-162: sconto dell’agenzia proposto e fisso')
+        pgSC.fill('#c-agente', '10'); pgSC.fill('#c-sub', '5')
+        pgSC.click('.velo .modale-piede button:has-text("Salva")')
         pgSC.wait_for_function("location.pathname.startsWith('/pratiche/')")
         ok(stati_scag['salvate'] == 1, 'D-162: le percentuali si salvano dalla finestra')
         ok(stati_scag['abbina'] == 2, 'D-162: dopo il salvataggio si riprova ad aprire la pratica')
@@ -859,20 +882,18 @@ try:
         pgCR.click('.velo .modale-piede button:has-text("Apri la pratica")')
         pgCR.locator('.velo button:has-text("Configura le percentuali")').wait_for(timeout=10000)
         pgCR.locator('.velo button:has-text("Configura le percentuali")').click()
-        pgCR.wait_for_selector('.velo .modale:has-text("Correggi le percentuali di")', timeout=10000)
-        ok(pgCR.locator('.velo .modale:has-text("Correggi le percentuali di")').count() == 1,
-           'D-163: con una versione alla data dell’ordine si apre la correzione (non «Nuove percentuali»)')
+        pgCR.wait_for_selector('.velo .modale:has-text("Nuovo scaglione di")', timeout=10000)
+        ok(pgCR.locator('.velo .modale:has-text("Nuovo scaglione di")').count() == 1,
+           'D-163: con una versione alla data dell’ordine si apre comunque la finestra dello scaglione')
         ok(pgCR.input_value('.velo input[name=valido_dal]') == '2026-09-15'
            and pgCR.locator('.velo input[name=valido_dal]').get_attribute('disabled') is not None,
            'D-163: «Valide dal» bloccato alla data della versione')
-        nuova_corr = pgCR.locator('.velo .modale input[placeholder="Aggiungi uno sconto %"]')
-        ok(nuova_corr.count() == 1 and nuova_corr.input_value() == '0',
-           'D-163: lo sconto dell’agenzia (0 %) è già proposto come riga nuova')
-        idx_corr = nuova_corr.get_attribute('id')[len('c-sconto'):]
-        pgCR.fill('#c-agente' + idx_corr, '10'); pgCR.fill('#c-sub' + idx_corr, '5')
-        pgCR.click('.velo .modale-piede button:has-text("Salva la correzione")')
+        ok(pgCR.input_value('.velo input[name=sconto_min]') == '0',
+           'D-163: lo sconto dell’agenzia (0 %) è già proposto')
+        pgCR.fill('#c-agente', '10'); pgCR.fill('#c-sub', '5')
+        pgCR.click('.velo .modale-piede button:has-text("Salva")')
         pgCR.wait_for_function("location.pathname.startsWith('/pratiche/')")
-        ok(stati_corr['put'] == 1, 'D-163: la correzione salva con la rotta PUT della versione')
+        ok(stati_corr['put'] == 1, 'D-163: con la versione alla data si salva con la rotta PUT della versione')
         ok(stati_corr['abbina'] == 2, 'D-163: dopo il salvataggio si riprova ad aprire la pratica')
         pgCR.close()
 
@@ -909,6 +930,89 @@ try:
         ok('ok' in c_nr.locator('xpath=..').locator('span.pallino').get_attribute('class'), 'D-161: cliente trovato, pallino verde')
         pgN.screenshot(path=str(USCITA / 'app-documento-numeri-rossi-caricato.png'))
         pgN.close()
+
+        # D-175: intestazione «Codice cliente» — spunta verde se il codice è del cliente associato,
+        # avviso giallo col motivo se no (lo stato lo calcola il server). Scheda simulata.
+        scheda_ok = dict(scheda_errore, id='999986', stato='da_controllare', tipo='fattura',
+                         livello='affidabile', file_nome='prova-codice-ok.pdf')
+        scheda_ok['testata'] = dict(scheda_errore['testata'], tipo='fattura', numero='PROVA-CODICE-OK',
+                                    fornitore_id='5', codice_cliente='45172', cliente='Agri Aggio SNC')
+        scheda_ok['codice_cliente_esito'] = {'stato': 'corrisponde', 'cliente': 'Agri Aggio SNC'}
+        pgOK = entra(S + '-oper')
+        pgOK.route(re.compile(r'^.*/api/documenti/999986$'), lambda r: risposta(r, json.dumps(scheda_ok)))
+        pgOK.route(re.compile(r'^.*/api/fornitori$'), lambda r: risposta(r, json.dumps(fornitori_mock)))
+        pgOK.route(re.compile(r'^.*/api/clienti\?fornitore_id=5$'), lambda r: risposta(r, json.dumps(clienti_mock)))
+        pgOK.goto(BASE + '/documenti/999986')
+        pgOK.locator('.dettagli').wait_for(timeout=15000)
+        ok('codice del cliente associato' in pgOK.locator('.dettagli').inner_text(),
+           'D-175: spunta verde «codice del cliente associato» sotto Codice cliente')
+        pgOK.screenshot(path=str(USCITA / 'app-documento-codice-ok-1440.png'))
+        pgOK.close()
+
+        scheda_alt = dict(scheda_errore, id='999985', stato='da_controllare', tipo='fattura',
+                          livello='affidabile', file_nome='prova-codice-alt.pdf')
+        scheda_alt['testata'] = dict(scheda_errore['testata'], tipo='fattura', numero='PROVA-CODICE-ALT',
+                                     fornitore_id='5', codice_cliente='45172', cliente='Agri Aggio SNC')
+        scheda_alt['codice_cliente_esito'] = {'stato': 'altro_cliente', 'cliente': 'Vivai Prova SNC', 'fornitore': 'Arte Wohnaccessoires GmbH'}
+        pgALT = entra(S + '-oper')
+        pgALT.route(re.compile(r'^.*/api/documenti/999985$'), lambda r: risposta(r, json.dumps(scheda_alt)))
+        pgALT.route(re.compile(r'^.*/api/fornitori$'), lambda r: risposta(r, json.dumps(fornitori_mock)))
+        pgALT.route(re.compile(r'^.*/api/clienti\?fornitore_id=5$'), lambda r: risposta(r, json.dumps(clienti_mock)))
+        pgALT.goto(BASE + '/documenti/999985')
+        pgALT.locator('.dettagli').wait_for(timeout=15000)
+        ok('Il codice 45172 presso Arte Wohnaccessoires GmbH è di Vivai Prova SNC' in pgALT.locator('.dettagli').inner_text(),
+           'D-175: avviso giallo col motivo quando il codice è di un altro cliente')
+        pgALT.close()
+
+        # D-174: conferma/proforma su una pratica già confermata → scelta parziale/sostituisce, col
+        # suggerimento preselezionato; l'abbinamento manda il ruolo scelto.
+        scheda_pf = dict(scheda_errore, id='999984', stato='da_controllare', tipo='proforma',
+                         livello='affidabile', file_nome='prova-proforma-multiple.pdf')
+        scheda_pf['testata'] = dict(scheda_errore['testata'], tipo='proforma', numero='PROVA-PF', data='2026-09-03')
+        scheda_pf['proposta'] = {
+            'esito': 'certo',
+            'candidati': [{'pratica': {'id': '1', 'numero': 'OF/2026/001', 'cliente': 'Agri Aggio SNC', 'stato': 'confermato', 'data_ordine': '2026-02-17'},
+                           'punteggio': 1, 'motivi': ['confermato 2.117,30 € su ordine 2.154,50 €: parziale (si somma)'], 'delta': 0, 'ruolo': 'parziale'}],
+            'importo': 37.2, 'abbinamento': None, 'cliente_riconosciuto': None, 'agenzia_mancante': None,
+            'cliente_da_integra': None, 'manca_rappresentanza': None, 'fornitore_da_integra': None,
+            'candidati_fornitore': [], 'candidati_cliente': [], 'integra_non_raggiungibile': False,
+        }
+        visti_pf = {'abbina': 0, 'ruolo': None}
+        def abbina_pf(route):
+            visti_pf['abbina'] += 1
+            try:
+                visti_pf['ruolo'] = json.loads(route.request.post_data or '{}').get('ruolo')
+            except Exception:
+                visti_pf['ruolo'] = None
+            route.fulfill(status=200, content_type='application/json', body=json.dumps({'pratica': {'id': '1', 'numero': 'OF/2026/001'}}))
+        pgPF = entra(S + '-oper')
+        pgPF.route(re.compile(r'^.*/api/documenti/999984$'), lambda r: risposta(r, json.dumps(scheda_pf)))
+        pgPF.route(re.compile(r'^.*/api/documenti/999984/abbina$'), abbina_pf)
+        # 15/11/2026: la conferma dell'abbinamento mostra i dati veri della pratica (stato, «Confermato X di Y»)
+        pgPF.route(re.compile(r'^.*/api/pratiche/1$'), lambda r: risposta(r, json.dumps({
+            'numero': 'OF/2026/001', 'cliente': 'Agri Aggio SNC', 'fornitore': 'Gries', 'stato': 'confermato',
+            'numero_ordine_fornitore': 'AU276839', 'progresso': {'x': 2117.3, 'y': 2154.5},
+        })))
+        pgPF.goto(BASE + '/documenti/999984')
+        pgPF.locator('.scelte button:has-text("Abbina a OF/2026/001")').wait_for(timeout=15000)
+        pgPF.locator('.scelte button:has-text("Abbina a OF/2026/001")').click()
+        pgPF.wait_for_selector('.velo .modale:has-text("in più sulla pratica")')
+        ok(pgPF.locator('#c-ruolo').input_value() == 'parziale', 'D-174: il suggerimento «parziale» è preselezionato')
+        pgPF.select_option('#c-ruolo', 'sostituisce')
+        pgPF.click('.velo .modale-piede button:has-text("Abbina")')
+        pgPF.wait_for_selector('.velo .modale:has-text("Abbinare proforma PROVA-PF a OF/2026/001?")')
+        testo_conf = pgPF.locator('.velo .modale').inner_text()
+        ok('Sostituisce' in testo_conf and 'superata' in testo_conf, 'conferma abbinamento: il ruolo scelto e il suo effetto')
+        ok('2.117,30' in testo_conf and '2.154,50' in testo_conf, 'conferma abbinamento: «Confermato X di Y» dal server')
+        ok('ordine AU276839' in testo_conf, 'conferma abbinamento: l’ordine del fornitore arriva dal server (V12)')
+        ok(pgPF.locator('.velo .casella-grave input[type=checkbox]').count() == 1,
+           'proforma non si annulla dalla pratica: casella da spuntare (D-172)')
+        pgPF.locator('.velo .casella-grave input[type=checkbox]').check()
+        pgPF.click('.velo .modale-piede button:has-text("Abbina")')
+        pgPF.wait_for_timeout(700)
+        ok(visti_pf['abbina'] == 1 and visti_pf['ruolo'] == 'sostituisce', 'D-174: l’abbinamento manda il ruolo scelto')
+        pgPF.screenshot(path=str(USCITA / 'app-documento-ruolo-1440.png'))
+        pgPF.close()
 
         b.close()
 finally:

@@ -1,12 +1,15 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type CSSProperties } from 'react';
 import { DataTable } from '@/componenti/DataTable';
 import { Campo } from '@/componenti/Campo';
+import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
 import { Elenco, Periodi } from '@/componenti/Flussi';
 import { COLORI_GRAFICI, Grafico } from '@/componenti/Grafico';
 import { KpiRow } from '@/componenti/Kpi';
 import { Conferma, Modale } from '@/componenti/Modale';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, SagomaRiquadri, SagomaTabella, useSagome } from '@/componenti/Sagoma';
@@ -56,9 +59,14 @@ interface Risposta {
   totali: { subagenti: { provvigione: number }; documenti: { provvigione: number } };
 }
 
+// D-171: azione di riga a icona («Correggi la provvigione»)
+const AZIONE_CORREGGI: AzioneRiga[] = [{ nome: 'correggi', icona: 'matita', etichetta: 'Correggi la provvigione' }];
+
 export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre: number }) {
   const puo = usePuo();
+  const router = useRouter();
   const [subSel, setSubSel] = useMemoria<string | null>('subagente', null);
+  const [anni, setAnni] = useState<number[]>([]);
   const [dati, setDati] = useState<Risposta | null>(null);
   const [errore, setErrore] = useState('');
   const [caricando, setCaricando] = useState(true);
@@ -101,11 +109,24 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
     return () => { vivo = false; };
   }, [dati, anno, trimestre, subSel]);
 
+  // tendina dell'anno (§7.8): l'elenco lo dà il server (V12); si carica una volta sola
+  useEffect(() => {
+    void api<{ anni: number[] }>('liquidazioni/anni').then((r) => {
+      if (r.ok && r.dati.anni.length) setAnni(r.dati.anni);
+    });
+  }, []);
+
   // cambio trimestre dall'indirizzo: finché i dati nuovi non arrivano non si mostrano quelli di prima
   const b = dati && dati.anno === anno && dati.trimestre === trimestre ? dati : null;
+  const tendinaAnno = (
+    <select className="filtro-select" aria-label="Anno" value={anno}
+      onChange={(e) => router.push(`/liquidazioni/${e.target.value}/${trimestre}`)}>
+      {[...new Set([...anni, anno])].sort((x, y) => y - x).map((y) => <option key={y} value={y}>{y}</option>)}
+    </select>
+  );
   if (!b) {
     return (
-      <Pagina titolo="Liquidazioni" pieno sottotitolo="Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre.">
+      <Pagina titolo="Liquidazioni" pieno testa={tendinaAnno} sottotitolo="Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre.">
         {errore ? <Pannello><div className="vuoto"><b>Liquidazione non caricata</b>{errore}</div></Pannello>
           : sagome ? <>
             <Sagoma larghezza="100%" altezza={78} arrotondato={10} />
@@ -158,7 +179,7 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
   };
 
   return (
-    <Pagina titolo="Liquidazioni" pieno sottotitolo="Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre."
+    <Pagina titolo="Liquidazioni" pieno testa={tendinaAnno} sottotitolo="Provvigioni ai subagenti per trimestre: gennaio–marzo, aprile–giugno, luglio–settembre, ottobre–dicembre."
       azioni={[
         {
           etichetta: 'Esporta in Excel', icona: 'scarica', variante: 'sec', consentito: puoEsportare,
@@ -244,9 +265,8 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
                               : `${pct(d.pct)} di ${euro(d.imponibile)}`}
                           </span>
                           {!d.voce && !chiusa && puoModifica && (
-                            <button type="button" className="btn testo piccolo" onClick={() => setCorreggiDoc(d)}>
-                              {d.correzione ? 'Cambia la correzione' : 'Correggi'}
-                            </button>
+                            <AzioniRiga azioni={AZIONE_CORREGGI} oggetto={'di ' + d.numero}
+                              riga={[{ nome: 'correggi', etichetta: d.correzione ? 'Cambia la correzione' : undefined, onClick: () => setCorreggiDoc(d) }]} />
                           )}
                         </>,
                       },
@@ -276,8 +296,9 @@ export function VistaLiquidazioni({ anno, trimestre }: { anno: number; trimestre
       {esporta && <FinestraEsporta anno={anno} trimestre={trimestre} chiusa={chiusa} subagenti={b.subagenti} scelto={scelto}
         onChiudi={() => setEsporta(false)} onScarica={scarica} />}
 
-      {chiedi && <Conferma titolo={`Chiudere la liquidazione del ${trimestre}° trimestre?`}
-        testo={`Gli importi vengono fissati: ${euro(b.riepilogo?.provvigione ?? 0)} a ${b.subagenti.filter((s) => s.liquidabili > 0).length} subagenti.`}
+      {chiedi && <ConfermaGrave titolo={`Chiudere la liquidazione del ${trimestre}° trimestre?`}
+        punti={[`Gli importi vengono fissati: ${euro(b.riepilogo?.provvigione ?? 0)} a ${b.subagenti.filter((s) => s.liquidabili > 0).length} subagenti.`, 'Dopo la chiusura non si cambia più nulla: gli importi restano nella fotografia.']}
+        etichettaCasella="Ho capito: la chiusura è definitiva"
         etichetta="Chiudi il trimestre" onRisposta={(si) => (si ? void chiudi() : setChiedi(false))} />}
 
       {correggiDoc && <FinestraCorrezione documento={correggiDoc}
@@ -311,7 +332,7 @@ function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
               key: 'nome', header: 'Subagente', grow: true,
               cell: (x) => <><b>{x.nome}</b><span className="sec-riga">{x.clienti} {x.clienti === 1 ? 'cliente' : 'clienti'} · {x.documenti} {x.documenti === 1 ? 'documento' : 'documenti'}</span></>,
             },
-            { key: 'fatturato', header: 'Fatturato', tipo: 'euro', totale: 'somma' },
+            { key: 'fatturato', header: 'Base provvigione', tipo: 'euro', totale: 'somma' },
             { key: 'pagate', header: 'Provvigione', tipo: 'euro', totale: 'somma' },
             { key: 'margine', header: 'Margine', tipo: 'euro', totale: 'somma' },
             {

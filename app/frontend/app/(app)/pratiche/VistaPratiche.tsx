@@ -20,6 +20,7 @@ import { ETICHETTA_PRATICA, type StatoPratica } from '@/lib/stati';
 interface Pratica {
   id: string;
   numero: string;
+  numero_ordine_fornitore: string | null;
   cliente_id: string;
   cliente: string;
   fornitore_id: string;
@@ -120,6 +121,7 @@ export function VistaPratiche() {
 
   const colonne: Colonna<Pratica>[] = [
     { key: 'numero', header: 'Pratica', cell: (p) => <Link href={'/pratiche/' + p.id}><b>{p.numero}</b></Link> },
+    { key: 'ordine_fornitore', header: 'Ordine fornitore', cell: (p) => p.numero_ordine_fornitore ?? <span className="testo-tenue">—</span> },
     { key: 'cliente', header: 'Cliente', grow: true, cell: (p) => p.cliente || '—' },
     { key: 'fornitore', header: 'Fornitore', cell: (p) => p.fornitore || '—' },
     { key: 'data', header: 'Data ordine', tipo: 'data' },

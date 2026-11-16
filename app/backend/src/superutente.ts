@@ -11,7 +11,7 @@ import { logEvent } from './registro';
 async function crea(argv: string[]) {
   const [username, email, nome] = argv.map((a) => a.trim());
   if (!username || !email || !nome) throw new Error('uso: npm run superutente -- <nome utente> <email> "<nome e cognome>"');
-  const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+  const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL!, options: '-c TimeZone=UTC' }) });
   try {
     if (await db.utenti.findFirst({ where: { ruolo: 'superutente' } })) throw new Error('Il superutente esiste già: ce n\'è uno solo');
     const password = provvisoria();

@@ -5,7 +5,8 @@ import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { type Dati, caricaDati, giornoRoma } from './motore/dati';
-import { analisiTrimestre, documentoPerId, fotografiaLiquidazione, giorni, limiti, r2, righeLiquidazione, trimestre } from './motore/motore';
+import { analisiTrimestre, anomaliaScontoMedio, documentoPerId, fotografiaLiquidazione, giorni, limiti, r2, righeLiquidazione, trimestre } from './motore/motore';
+import { congelaDocumenti } from './pratiche';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -41,7 +42,7 @@ function stato(S: Dati, a: number, t: number, chiusa: { chiusa_il: Date } | unde
 /** Perché il trimestre non si chiude, o null (§7.8, prototipo viste-periodo.js): finito, non già chiuso, il trimestre
  *  prima chiuso (D-57; senza liquidazioni né documenti prima, questo è il primo), nessun documento in attesa dei
  *  bollettini. Le fatture sul maturato in attesa d'incasso non bloccano (§5.14). */
-function bloccoChiusura(S: Dati, st: { chiave: string }, righe: Righe, a: number, t: number) {
+export function bloccoChiusura(S: Dati, st: { chiave: string }, righe: Righe, a: number, t: number) {
   if (st.chiave === 'chiusa') return 'Trimestre già liquidato';
   if (st.chiave === 'futura') return 'Il trimestre non è iniziato';
   if (st.chiave === 'in_corso') return `Il trimestre si chiude il ${dataIt(limiti(a, t).a)}`;
@@ -50,11 +51,29 @@ function bloccoChiusura(S: Dati, st: { chiave: string }, righe: Righe, a: number
   const qualcosaPrima = S.liquidazioni_chiuse.some((l) => l.anno * 10 + l.trimestre < a * 10 + t) || S.pratiche.some((p) => p.documenti.some((d) => d.data < da));
   if (!primaChiuso && qualcosaPrima) return `Chiudi prima il ${pt}° trimestre ${pa}`;
   const n = righe.filter((r) => !r.liquidabile && !r.incasso).length;
-  return n ? `Ci sono ${n} ${n === 1 ? 'documento' : 'documenti'} in attesa dei bollettini` : null;
+  if (n) return `Ci sono ${n} ${n === 1 ? 'documento' : 'documenti'} in attesa dei bollettini`;
+  // D-182 §19: una pratica con lo sconto medio oltre l'ultimo scaglione non si chiude (provvigione da decidere)
+  const anomale = S.pratiche.filter((p) => anomaliaScontoMedio(S, p));
+  if (anomale.length) return `Ci ${anomale.length === 1 ? 'è una pratica' : `sono ${anomale.length} pratiche`} con lo sconto medio oltre l'ultimo scaglione: aggiungi lo scaglione al fornitore prima di liquidare.`;
+  return null;
 }
 
 const chiuseDellAnno = (db: Db, anno: number) =>
   db.liquidazioni.findMany({ where: { anno }, include: { autore: { select: { nome: true } } } });
+
+/** Anni della tendina (F4-A1, §7.8): dal primo anno con dati (documenti, pratiche, liquidazioni)
+ *  all'anno corrente, sempre almeno l'anno corrente. Il browser mostra e basta (V12). */
+async function anniDisponibili(db: Db, oggi: string) {
+  const corrente = Number(oggi.slice(0, 4));
+  const annoDi = (d: Date | null | undefined) => (d ? Number(d.toISOString().slice(0, 4)) : null);
+  const [doc, pra, liq] = await Promise.all([
+    db.ordini_fornitore_documenti.aggregate({ _min: { data: true } }),
+    db.ordini_fornitore_testata.aggregate({ _min: { data_ordine: true } }),
+    db.liquidazioni.aggregate({ _min: { anno: true } }),
+  ]);
+  const primo = Math.min(annoDi(doc._min.data) ?? corrente, annoDi(pra._min.data_ordine) ?? corrente, liq._min.anno ?? corrente, corrente);
+  return Array.from({ length: corrente - primo + 1 }, (_, i) => primo + i);
+}
 
 /** Riga del prospetto con i nomi risolti e le etichette decise qui (V12, §7.8): il browser mostra e basta. */
 function rigaDocumento(S: Dati, r: Riga, chiusa: boolean) {
@@ -144,6 +163,13 @@ export class LiquidazioniController {
     return liquidazione(this.db, q.anno ?? Number(oggi.slice(0, 4)), q.trimestre ?? trimestre(oggi));
   }
 
+  /** Anni per la tendina della testata (§7.8): dal primo anno con dati all'anno corrente. */
+  @Get('anni')
+  @Richiede('provvigioni.consulta')
+  async anni() {
+    return { anni: await anniDisponibili(this.db, giornoRoma(new Date())) };
+  }
+
   /** Chiusura del trimestre (§4.2.19, §7.8, D-11, D-33, D-51): blocca le righe di tutti i fornitori in ordine di id
    *  (la liquidazione chiude il periodo di tutti, come la verifica di un bollettino blocca il suo), poi ricontrolla e
    *  ricalcola dal database; salva la fotografia, lega documenti e voci alla liquidazione, un evento. Da qui il
@@ -170,6 +196,8 @@ export class LiquidazioniController {
       });
       const documenti = righe.filter((r) => r.liquidabile && !r.voce).map((r) => BigInt(r.documento_id));
       const voci = righe.filter((r) => r.riga_bollettino_id).map((r) => BigInt(r.riga_bollettino_id!));
+      // D-183: i documenti liquidati si congelano (valori calcolati fissati) nella stessa transazione della chiusura
+      await congelaDocumenti(tx, S, documenti.map(String));
       // solo righe non ancora liquidate: un documento pagato due volte è un errore, non si scrive niente
       const d = await tx.ordini_fornitore_documenti.updateMany({ where: { id: { in: documenti }, liquidazione_id: null }, data: { liquidazione_id: liq.id } });
       const v = await tx.bollettini_righe.updateMany({ where: { id: { in: voci }, liquidazione_id: null }, data: { liquidazione_id: liq.id } });

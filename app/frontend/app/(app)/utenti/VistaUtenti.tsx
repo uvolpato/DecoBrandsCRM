@@ -6,6 +6,7 @@ import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
 import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli, quando, Stato } from '@/componenti/Piccoli';
 import { SagomaElenco, useSagome } from '@/componenti/Sagoma';
@@ -103,6 +104,9 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
   const chiudi = () => setFinestra(null);
   const chiedi = (titolo: string, testo: ReactNode, etichetta: string, pericolo = false) =>
     new Promise<boolean>((ok) => setFinestra(<Conferma titolo={titolo} testo={testo} etichetta={etichetta} pericolo={pericolo} onRisposta={(si) => { chiudi(); ok(si); }} />));
+  // D-172: conferma con casella per le operazioni senza ritorno
+  const chiediGrave = (titolo: string, punti: ReactNode[], etichetta: string, etichettaCasella?: string) =>
+    new Promise<boolean>((ok) => setFinestra(<ConfermaGrave titolo={titolo} punti={punti} etichettaCasella={etichettaCasella} etichetta={etichetta} onRisposta={(si) => { chiudi(); ok(si); }} />));
 
   function modifica(x: Utente | null) {
     const sonoIo = x?.id === io.id;
@@ -166,8 +170,8 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
     await carica();
   }
   async function elimina(x: Utente) {
-    const testo = x.ultimo_accesso ? x.nome + ' ha già usato l’app: il suo nome resta nel registro eventi. Se deve solo smettere di accedere, conviene disattivarlo.' : 'Non ha mai effettuato l’accesso.';
-    if (!(await chiedi('Eliminare ' + x.nome + '?', testo, 'Elimina', true))) return;
+    const testo = x.ultimo_accesso ? 'Ha già usato l’app: il suo nome resta nel registro eventi. Se deve solo smettere di accedere, conviene disattivarlo.' : 'Non ha mai effettuato l’accesso.';
+    if (!(await chiediGrave('Eliminare ' + x.nome + '?', [testo, 'Eliminazione definitiva: non si può annullare.'], 'Elimina'))) return;
     const r = await api('utenti/' + x.id, undefined, 'DELETE');
     if (!r.ok) { avviso(r.messaggio, true); return; }
     avviso('Utente eliminato');

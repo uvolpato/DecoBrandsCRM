@@ -125,6 +125,20 @@ describe('abbinamento a mano (POST /api/documenti/:id/abbina)', () => {
     expect((await arrivo(b.id)).stato).toBe('in_coda');
   });
 
+  it('l\'abbinamento copia le righe lette nella fotografia della pratica, fase dal tipo (D-176)', async () => {
+    const a = (await op.carica(pdf('ordine con righe'), 'ordine-righe.pdf').expect(201)).body;
+    await db.documenti_campi.createMany({ data: [
+      { documento_id: BigInt(a.id), campo: 'righe[0].codice', valore_letto: 'A1' },
+      { documento_id: BigInt(a.id), campo: 'righe[0].quantita', valore_letto: '2' },
+      { documento_id: BigInt(a.id), campo: 'righe[0].prezzo', valore_letto: '10' },
+      { documento_id: BigInt(a.id), campo: 'righe[1].codice', valore_letto: 'A2' },
+    ] });
+    const r = (await op.post(`/documenti/${a.id}/abbina`, { tipo: 'ordine', numero: 'AB-RA', data: '2026-09-05', importo: 20, cliente_id: Number(base.cliente_id), fornitore_id: Number(base.fornitore_id) }).expect(201)).body;
+    const rr = await db.ordini_fornitore_righe.findMany({ where: { documento_id: BigInt(r.documento_id) }, orderBy: { numero_riga: 'asc' } });
+    expect(rr.map((x) => [x.codice, x.fase])).toEqual([['A1', 'ordine'], ['A2', 'ordine']]);
+    expect(Number(rr[0].importo)).toBe(20);
+  });
+
   it('GET /api/pratiche/:id/documenti: ogni documento porta le righe per il confronto affiancato', async () => {
     const r = (await op.get(`/pratiche/${base.id}/documenti`).expect(200)).body;
     const ord = r.altri.find((x: { tipo: string }) => x.tipo === 'ordine');
@@ -347,7 +361,7 @@ describe('correzioni dopo la revisione (D-60)', () => {
     await db.interscambio.create({ data: { subagente_id: sub.id, cliente_id: cliente.id, fornitore_id: f.id, sconto: 0, codice_cliente_fornitore: 'FS-1', valido_dal: new Date('2025-01-01') } });
     const a = (await op.carica(pdf('ordine senza scaglione'), 'ordine-no-scaglione.pdf').expect(201)).body;
     const r = await op.post(`/documenti/${a.id}/abbina`, { tipo: 'ordine', numero: 'O-SC-1', data: '2026-09-01', cliente_id: Number(cliente.id), fornitore_id: Number(f.id) }).expect(409);
-    expect(r.body.message).toMatch(/scaglione/);
+    expect(r.body.message).toMatch(/percentuali/);
   });
 
   it('spostare una fattura con la correzione del subagente: 409 come per l annullamento', async () => {
@@ -400,5 +414,148 @@ describe('totali delle righe dal server (D-126)', () => {
     const r = (await op.get(`/documenti/${d.id}`).expect(200)).body;
     expect(r.totali).toEqual({ importo: 10.5, provvigione: 1.25 });
     expect(r.righe).toHaveLength(2);
+  });
+});
+
+describe('conferme e proforme multiple (D-174)', () => {
+  async function nuovaPratica(numero: string, importo: number) {
+    const a = (await op.carica(pdf('ordine ' + numero), 'ordine-' + numero + '.pdf').expect(201)).body;
+    const r = (await op.post(`/documenti/${a.id}/abbina`, {
+      tipo: 'ordine', numero, data: '2026-09-01', importo, cliente_id: Number(base.cliente_id), fornitore_id: Number(base.fornitore_id),
+    }).expect(201)).body;
+    return r.pratica.id as string;
+  }
+
+  it('due proforme parziali: somma = ordine → progresso «Confermato 2.154,50 di 2.154,50»', async () => {
+    const p = await nuovaPratica('D174-2154', 2154.5);
+    await op.post(`/pratiche/${p}/documenti`, { tipo: 'proforma', numero: 'PR102813', data: '2026-09-02', importo: 2117.3 }).expect(201);
+    await op.post(`/pratiche/${p}/documenti`, { tipo: 'proforma', numero: 'PR102848', data: '2026-09-03', importo: 37.2 }).expect(201);
+    const d = (await op.get(`/pratiche/${p}`).expect(200)).body;
+    expect(d.stato).toBe('confermata');
+    expect(d.progresso).toEqual({ x: 2154.5, y: 2154.5, parziale: false });
+    expect(d.fasi[1]).toMatchObject({ titolo: 'Proforme', importo: 2154.5 });
+    const docs = (await op.get(`/pratiche/${p}/documenti`).expect(200)).body.altri;
+    expect(docs.filter((x: any) => x.tipo === 'proforma').every((x: any) => !x.superato)).toBe(true);
+  });
+
+  it('prima conferma: ruolo assente, la pratica passa ad attesa fattura come oggi', async () => {
+    const p = await nuovaPratica('D174-100', 100);
+    await op.post(`/pratiche/${p}/documenti`, { tipo: 'conferma', numero: 'C-1', data: '2026-09-02', importo: 100 }).expect(201);
+    const d = (await op.get(`/pratiche/${p}`).expect(200)).body;
+    expect(d.stato).toBe('confermata');
+    expect(d.progresso).toEqual({ x: 100, y: 100, parziale: false });
+  });
+
+  it('una conferma che sostituisce: la vecchia è superata e non conta', async () => {
+    const p = await nuovaPratica('D174-200', 100);
+    await op.post(`/pratiche/${p}/documenti`, { tipo: 'conferma', numero: 'C-1', data: '2026-09-02', importo: 60 }).expect(201);
+    await op.post(`/pratiche/${p}/documenti`, { tipo: 'conferma', numero: 'C-2', data: '2026-09-03', importo: 100, ruolo: 'sostituisce' }).expect(201);
+    const d = (await op.get(`/pratiche/${p}`).expect(200)).body;
+    expect(d.stato).toBe('confermata');
+    expect(d.progresso).toEqual({ x: 100, y: 100, parziale: false });
+    expect(d.importo).toBe(100); // la superata non conta nella stima
+    const docs = (await op.get(`/pratiche/${p}/documenti`).expect(200)).body.altri;
+    const vecchia = docs.find((x: any) => x.numero === 'C-1');
+    const nuova = docs.find((x: any) => x.numero === 'C-2');
+    expect(vecchia.superato).toBe(true);
+    expect(vecchia.superato_da).toBe('C-2');
+    expect(nuova.ruolo).toBe('sostituisce');
+  });
+
+  it('più fatture parziali si sommano nel netto e nella provvigione (§5, motore)', async () => {
+    const p = await nuovaPratica('D174-300', 100);
+    await op.post(`/pratiche/${p}/documenti`, { tipo: 'fattura', numero: 'F-1', data: '2026-09-10', importo: 60 }).expect(201);
+    const r = (await op.post(`/pratiche/${p}/documenti`, { tipo: 'fattura', numero: 'F-2', data: '2026-09-11', importo: 40 }).expect(201)).body;
+    expect(r.totali.netto).toBe(100);
+    const d = (await op.get(`/pratiche/${p}`).expect(200)).body;
+    expect(d.stato).toBe('fatturata');
+    expect(d.provvigione.imponibile).toBe(100);
+  });
+});
+
+describe('«Prendi dalla coda» dalla pagina della pratica (D-… §19)', () => {
+  let n = 0;
+  const hash = () => (Date.now().toString(36) + (n++).toString(36)).padStart(64, '0').slice(0, 64);
+  // un documento in coda già letto (tipo e fornitore riconosciuti, campi letti), come arriva dal lettore
+  async function letto(o: { fornitore_id: bigint; cliente_id?: bigint | null; tipo: string | null; numero: string; data?: string; importo?: string }) {
+    const fv = (await db.fornitori.findUniqueOrThrow({ where: { id: o.fornitore_id }, select: { versione_corrente_id: true } })).versione_corrente_id;
+    const d = await db.documenti_in_arrivo.create({
+      data: {
+        origine: 'caricamento', file_nome: o.numero + '.pdf', file_hash: hash(),
+        file_percorso: 'in_arrivo/' + o.numero + '.pdf', stato: 'da_controllare',
+        tipo: o.tipo, fornitore_id: o.fornitore_id, fornitore_versione_id: fv, livello: 'affidabile',
+      },
+    });
+    const campi = [
+      { documento_id: d.id, campo: 'numero', valore_letto: o.numero },
+      ...(o.data ? [{ documento_id: d.id, campo: 'data', valore_letto: o.data }] : []),
+      ...(o.importo ? [{ documento_id: d.id, campo: 'importo_totale', valore_letto: o.importo }] : []),
+      ...(o.cliente_id != null ? [{ documento_id: d.id, campo: 'cliente_id', valore_letto: String(o.cliente_id) }] : []),
+    ];
+    await db.documenti_campi.createMany({ data: campi });
+    return d.id;
+  }
+
+  it('elenco filtrato per fornitore e cliente riconosciuto; cliente_id nella risposta', async () => {
+    await letto({ fornitore_id: base.fornitore_id, cliente_id: base.cliente_id, tipo: 'conferma', numero: 'CODA-1', data: '2026-09-05', importo: '123.45' });
+    await letto({ fornitore_id: base.fornitore_id, cliente_id: base.cliente_id, tipo: 'conferma', numero: 'CODA-2' });
+    const altroF = (await db.fornitori.findFirstOrThrow({ where: { id: { not: base.fornitore_id } } })).id;
+    await letto({ fornitore_id: altroF, cliente_id: base.cliente_id, tipo: 'conferma', numero: 'CODA-ALTRO-F' });
+
+    const r = (await op.get(`/documenti?fornitore_id=${base.fornitore_id}&cliente_id=${base.cliente_id}&per_pagina=200`).expect(200)).body;
+    const numeri = r.documenti.map((x: any) => x.numero);
+    expect(numeri).toContain('CODA-1');
+    expect(numeri).toContain('CODA-2');
+    expect(numeri).not.toContain('CODA-ALTRO-F');
+    expect(r.documenti.find((x: any) => x.numero === 'CODA-1').cliente_id).toBe(String(base.cliente_id));
+  });
+
+  it('abbina dalla pratica: solo pratica_id, il server ricava i dati e il documento esce dalla coda', async () => {
+    const a = await letto({ fornitore_id: base.fornitore_id, cliente_id: base.cliente_id, tipo: 'conferma', numero: 'CODA-AB', data: '2026-09-06', importo: '77.5' });
+    const r = (await op.post(`/documenti/${a}/abbina`, { pratica_id: Number(base.id) }).expect(201)).body;
+    const doc = r.altri.find((x: any) => x.numero === 'CODA-AB');
+    expect(doc).toMatchObject({ tipo: 'conferma', data: '2026-09-06', importo: 77.5, arrivo_id: String(a) });
+    const x = await arrivo(String(a));
+    expect(x).toMatchObject({ stato: 'abbinato', abbinato_pratica_id: base.id });
+    expect(await db.ordini_fornitore_documenti.count({ where: { arrivo_id: BigInt(a) } })).toBe(1);
+  });
+
+  it('fornitore diverso 400, cliente riconosciuto diverso 400, già abbinato 409', async () => {
+    const altroF = (await db.fornitori.findFirstOrThrow({ where: { id: { not: base.fornitore_id } } })).id;
+    const aF = await letto({ fornitore_id: altroF, cliente_id: base.cliente_id, tipo: 'conferma', numero: 'CODA-F' });
+    expect((await op.post(`/documenti/${aF}/abbina`, { pratica_id: Number(base.id) }).expect(400)).body.message).toMatch(/altro fornitore/);
+
+    const altroC = (await db.clienti.findFirstOrThrow({ where: { id: { not: base.cliente_id } } })).id;
+    const aC = await letto({ fornitore_id: base.fornitore_id, cliente_id: altroC, tipo: 'conferma', numero: 'CODA-C' });
+    expect((await op.post(`/documenti/${aC}/abbina`, { pratica_id: Number(base.id) }).expect(400)).body.message).toMatch(/altro cliente/);
+
+    // un documento non letto (niente tipo) non si può prendere dalla coda: 400 con il motivo
+    const aN = await letto({ fornitore_id: base.fornitore_id, cliente_id: base.cliente_id, tipo: null, numero: 'CODA-NON-LETTO' });
+    expect((await op.post(`/documenti/${aN}/abbina`, { pratica_id: Number(base.id) }).expect(400)).body.message).toMatch(/non è stato letto/);
+
+    // già abbinato (CODA-AB del test precedente): non è più in coda
+    const gia = await db.documenti_in_arrivo.findFirstOrThrow({ where: { file_nome: 'CODA-AB.pdf' } });
+    expect((await op.post(`/documenti/${gia.id}/abbina`, { pratica_id: Number(base.id) }).expect(409)).body.message).toMatch(/non è più in coda/);
+  });
+
+  it('nota di credito dalla coda: si abbina con la fattura scelta e la storna', async () => {
+    const f = (await op.post(`/pratiche/${base.id}/documenti`, { tipo: 'fattura', numero: 'FT-CODA-NC', data: '2026-09-01', importo: 100 }).expect(201)).body;
+    const fatturaId = f.documenti.find((x: any) => x.numero === 'FT-CODA-NC').id;
+    const a = await letto({ fornitore_id: base.fornitore_id, cliente_id: base.cliente_id, tipo: 'nota_credito', numero: 'NC-CODA', data: '2026-09-08', importo: '30' });
+    const r = (await op.post(`/documenti/${a}/abbina`, { pratica_id: Number(base.id), fattura_id: Number(fatturaId) }).expect(201)).body;
+    const nc = r.documenti.find((x: any) => x.numero === 'NC-CODA');
+    expect(nc).toMatchObject({ tipo: 'nota_credito', importo: -30, fattura_id: String(fatturaId) });
+    const fatt = r.documenti.find((x: any) => x.numero === 'FT-CODA-NC');
+    expect(fatt.stornato).toBe(30);
+    expect((await arrivo(String(a)))).toMatchObject({ stato: 'abbinato', abbinato_pratica_id: base.id });
+  });
+
+  it('elenco per tipo: una fattura in coda non compare fra le note di credito', async () => {
+    await letto({ fornitore_id: base.fornitore_id, cliente_id: base.cliente_id, tipo: 'fattura', numero: 'FT-NON-NC' });
+    await letto({ fornitore_id: base.fornitore_id, cliente_id: base.cliente_id, tipo: 'nota_credito', numero: 'NC-SI' });
+    const r = (await op.get(`/documenti?fornitore_id=${base.fornitore_id}&tipo=nota_credito&per_pagina=200`).expect(200)).body;
+    const numeri = r.documenti.map((x: any) => x.numero);
+    expect(numeri).toContain('NC-SI');
+    expect(numeri).not.toContain('FT-NON-NC');
   });
 });

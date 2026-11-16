@@ -6,6 +6,7 @@
 # Uso: python strumenti/prove/app_registro.py <suffisso> <cartella schermate> [base]
 import sys, pathlib
 from playwright.sync_api import sync_playwright
+import segmenti as segm
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
 BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8001'
@@ -39,15 +40,14 @@ with sync_playwright() as p:
     piede = lambda pg: testo(pg, '.dt-piede')
 
     pg = entra(S + '-ammi')
-    pg.wait_for_function("() => { const n = document.querySelector('.filtri .segmenti button .n'); return !!n && /\\d/.test(n.textContent); }")
+    pg.wait_for_function("() => { const n = document.querySelector('.filtri .segmenti button .n, .filtri .segmenti-select option'); return !!n && /\\d/.test(n.textContent); }")
     dati = api(pg)
     ok(testo(pg, '.testa h1') == 'Registro', 'titolo della pagina: Registro')
 
-    seg = pg.locator('.filtri .segmenti button')
-    ok(seg.count() == 3, 'tre segmenti: Tutto, Anomalie aperte, Errori')
-    ok(str(dati['conteggi']['tutto']) in seg.nth(0).inner_text(), 'Tutto conta %d' % dati['conteggi']['tutto'])
-    ok(str(dati['conteggi']['aperte']) in seg.nth(1).inner_text(), 'Anomalie aperte conta %d' % dati['conteggi']['aperte'])
-    ok(str(dati['conteggi']['errori']) in seg.nth(2).inner_text(), 'Errori conta %d' % dati['conteggi']['errori'])
+    ok(segm.quanti(pg, '.filtri ') == 3, 'tre segmenti: Tutto, Anomalie aperte, Errori')
+    ok(segm.numero(pg, 'Tutto', '.filtri ') == dati['conteggi']['tutto'], 'Tutto conta %d' % dati['conteggi']['tutto'])
+    ok(segm.numero(pg, 'Anomalie aperte', '.filtri ') == dati['conteggi']['aperte'], 'Anomalie aperte conta %d' % dati['conteggi']['aperte'])
+    ok(segm.numero(pg, 'Errori', '.filtri ') == dati['conteggi']['errori'], 'Errori conta %d' % dati['conteggi']['errori'])
     ok(pg.locator('.dt thead th').count() == 6, 'sei colonne: quando, livello, messaggio, utente, riferimento, volte')
     ok(str(dati['totale']) in piede(pg), 'la tabella mostra il totale del server: %d' % dati['totale'])
     per_pagina = dati.get('per_pagina', 25)  # Impostazioni · righe per pagina (iniziale 25)
@@ -64,7 +64,7 @@ with sync_playwright() as p:
 
     # segmento Errori: righe e totale dal server (D-23)
     errori_api = api(pg, '?vista=errori')
-    seg.nth(2).click()
+    segm.scegli(pg, 'Errori', '.filtri ')
     pg.wait_for_function("(n) => { const t = document.querySelector('.dt-piede')?.textContent || ''; return t.includes(n + ' elementi') || t.includes('di ' + n + ' elementi'); }", arg=str(errori_api['totale']))
     ok(str(errori_api['totale']) in piede(pg), 'segmento Errori: %d righe (piede: %s)' % (errori_api['totale'], piede(pg)))
     # il piede cambia prima delle righe: si aspetta anche il numero di righe prima di contarle (c)
@@ -77,18 +77,18 @@ with sync_playwright() as p:
     ok(righe_errori == attese, 'il segmento restringe davvero le righe (%d attese, %d a schermo)' % (attese, righe_errori))
 
     # filtro Codice con una tendina (i valori vengono dal server)
-    seg.nth(0).click(); pg.wait_for_timeout(500)
+    segm.scegli(pg, 'Tutto', '.filtri '); pg.wait_for_timeout(500)
     codici = dati['opzioni']['codici']
     if codici:
         cod = codici[0]['valore']
-        # la tendina del Codice è la quarta (Genere, Livello, Servizio, Codice)
-        pg.locator('.filtri select').nth(3).select_option(cod)
+        # la tendina del Codice si sceglie per etichetta (la barra può avere in più la tendina dei segmenti, D-187)
+        pg.locator('.filtri select[aria-label="Codice"]').select_option(cod)
         pg.wait_for_timeout(1200)
         per_codice = api(pg, '?codice=%s' % cod)
         ok(str(per_codice['totale']) in piede(pg), 'filtro Codice %s: %d righe (piede: %s)' % (cod, per_codice['totale'], piede(pg)))
         pg.locator('.riepilogo-filtri [title="Togli tutti i filtri"]').click(); pg.wait_for_timeout(1500)
         tutto = api(pg)
-        ok(pg.locator('.filtri select').nth(3).input_value() == '', 'Togli tutti i filtri azzera il codice')
+        ok(pg.locator('.filtri select[aria-label="Codice"]').input_value() == '', 'Togli tutti i filtri azzera il codice')
         ok(str(tutto['totale']) in piede(pg), 'Togli tutti i filtri riporta al totale %d (piede: %s)' % (tutto['totale'], piede(pg)))
 
     pg.screenshot(path=str(USCITA / 'app-registro-1440.png'), full_page=True)

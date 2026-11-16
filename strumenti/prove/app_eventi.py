@@ -146,8 +146,9 @@ with sync_playwright() as p:
     if riga_doc.count() == 0:  # la pagina può essersi ricaricata: si riapre
         pgB.goto(BASE + '/pratiche/' + pratica['id']); pgB.wait_for_selector('.schede-barra')
         riga_doc = pgB.locator('.elenco li', has_text=NUMERO).first
-    riga_doc.locator('button', has_text='Annulla').first.click()
+    riga_doc.locator('button[aria-label^="Annulla"]').first.click()
     pgB.wait_for_selector('.velo .modale-piede button:has-text("Annulla il documento")')
+    pgB.click('.velo .casella-grave input')
     pgB.click('.velo .modale-piede button:has-text("Annulla il documento")')
     pgB.wait_for_function("!document.querySelector('.velo')", timeout=15000)
     pgB.wait_for_timeout(700)

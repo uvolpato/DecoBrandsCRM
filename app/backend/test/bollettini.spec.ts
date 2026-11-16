@@ -86,7 +86,7 @@ describe('GET /api/bollettini', () => {
     const b = r.body as Matrice;
     expect(b.colonne).toEqual(['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09']);
     expect(b.da).toBe('2026-04');
-    expect(b.primo).toBe('2026-05');
+    expect(b.primo).toBe('2025-01'); // il documento più vecchio del seed, prima dei bollettini (2026-05)
     expect(b.ultimo).toBe(M.oggi().slice(0, 7));
 
     const api = new Map(b.fornitori.map((f) => [String(f.id), new Map(f.celle.map((c) => [c.mese, c]))]));
@@ -154,6 +154,16 @@ describe('GET /api/bollettini', () => {
     await dati.get('/bollettini').expect(403);
     await op.get('/bollettini?al=2026-13').expect(400);
     await op.get('/bollettini?al=giugno').expect(400);
+  });
+
+  it('primo risale al documento più vecchio, anche oltre i bollettini', async () => {
+    const [{ bol }] = await db.$queryRaw<{ bol: string }[]>`
+      SELECT to_char(min(make_date(anno, mese, 1)), 'YYYY-MM') AS bol FROM bollettini_testata`;
+    const [{ doc }] = await db.$queryRaw<{ doc: string }[]>`
+      SELECT to_char(min(data), 'YYYY-MM') AS doc FROM ordini_fornitore_documenti`;
+    expect(doc < bol).toBe(true); // il seed ha documenti più vecchi dei bollettini: la prova è significativa
+    const b = (await op.get('/bollettini?al=2026-09').expect(200)).body as Matrice;
+    expect(b.primo).toBe(doc);
   });
 });
 

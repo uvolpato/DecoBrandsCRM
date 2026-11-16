@@ -121,11 +121,11 @@ with sync_playwright() as p:
 
     # correzione della quota del subagente (F1-A6, D-27): finestra, salvataggio, Cambia la correzione, Togli
     totale = lambda pg: numero(testo(pg, '.colonne > .pannello tfoot td.dx'))
-    righe_corr = pg.locator(destra + '.schede-corpo .dt tbody tr', has_text='Liquidabile').filter(has=pg.locator('button:has-text("Correggi")'))
+    righe_corr = pg.locator(destra + '.schede-corpo .dt tbody tr', has_text='Liquidabile').filter(has=pg.locator('button[aria-label^="Correggi"]'))
     numero_doc = righe_corr.first.locator('td').first.locator('a').inner_text()
     riga_doc = lambda: pg.locator(destra + '.schede-corpo .dt tbody tr', has_text=numero_doc)
     tot_prima = totale(pg)
-    riga_doc().locator('button:has-text("Correggi")').click()
+    riga_doc().locator('button[aria-label^="Correggi"]').click()
     pg.wait_for_selector('.velo .modale-corpo #c-tipo')
     ok('Provvigione di ' in testo(pg, '.velo .modale-testa h2') and 'imponibile' in testo(pg, '.velo .modale-testa'),
        'finestra Correggi: titolo con subagente e documento, imponibile e provvigione')
@@ -135,12 +135,12 @@ with sync_playwright() as p:
     pg.fill('.velo #c-motivo', 'prova correzione')
     pg.click('.velo .modale-piede button:has-text("Salva la correzione")')
     pg.wait_for_function("!document.querySelector('.velo')")
-    riga_doc().locator('button:has-text("Cambia la correzione")').wait_for(timeout=20000)  # la pagina ha ripreso i numeri dal server
+    riga_doc().locator('button[aria-label^="Cambia la correzione"]').wait_for(timeout=20000)  # la pagina ha ripreso i numeri dal server
     ok('Correzione salvata' in testo(pg, '.avviso'), 'avviso: correzione salvata')
     ok('corretto: 10,00 € — prova correzione' in piatto(riga_doc().inner_text()), 'la riga mostra la correzione')
-    ok(riga_doc().locator('button:has-text("Cambia la correzione")').count() == 1, 'il pulsante passa a Cambia la correzione')
+    ok(riga_doc().locator('button[aria-label^="Cambia la correzione"]').count() == 1, 'il pulsante passa a Cambia la correzione')
     ok(totale(pg) != tot_prima, 'il totale da liquidare cambia (%.2f → %.2f)' % (tot_prima, totale(pg)))
-    riga_doc().locator('button:has-text("Cambia la correzione")').click()
+    riga_doc().locator('button[aria-label^="Cambia la correzione"]').click()
     pg.wait_for_selector('.velo .modale-corpo #c-tipo')
     ok(pg.locator('.velo #c-tipo').input_value() == 'importo' and pg.locator('.velo #c-motivo').input_value() == 'prova correzione',
        'Cambia la correzione: finestra precompilata')
@@ -148,14 +148,14 @@ with sync_playwright() as p:
     pg.wait_for_selector('.velo .modale-piede button.pericolo')
     pg.locator('.velo').last.locator('.modale-piede button', has_text='Togli').click()
     pg.wait_for_function("!document.querySelector('.velo')")
-    riga_doc().locator('button:has-text("Correggi")').wait_for(timeout=20000)  # tornata la regola normale
+    riga_doc().locator('button[aria-label^="Correggi"]').wait_for(timeout=20000)  # tornata la regola normale
     ok('Correzione tolta' in testo(pg, '.avviso'), 'avviso: correzione tolta')
-    ok(totale(pg) == tot_prima and riga_doc().locator('button:has-text("Correggi")').count() == 1,
+    ok(totale(pg) == tot_prima and riga_doc().locator('button[aria-label^="Correggi"]').count() == 1,
        'dopo Togli la correzione torna la regola normale e il totale (%s)' % totale(pg))
 
     # 768 px: la finestra Correggi sta dentro lo schermo
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
-    riga_doc().locator('button:has-text("Correggi")').click()
+    riga_doc().locator('button[aria-label^="Correggi"]').click()
     pg.wait_for_selector('.velo .modale-corpo #c-tipo')
     ok(not pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth'), '768 px: finestra Correggi senza scorrimento orizzontale')
     pg.screenshot(path=str(USCITA / 'app-liquidazioni-correggi-768.png'))
@@ -200,7 +200,7 @@ with sync_playwright() as p:
     testo_csv = pathlib.Path(csv.path()).read_text(encoding='utf-8-sig')
     righe_csv = [r for r in testo_csv.strip().splitlines() if r]
     ok(csv.suggested_filename == 'Liquidazione_2026_T3_riepilogo.csv'
-       and righe_csv[0] == 'Subagente;Documenti;Imponibile;Provvigione da liquidare;In attesa dei bollettini'
+       and righe_csv[0] == 'Subagente;Documenti;Base provvigione;Provvigione da liquidare;In attesa dei bollettini'
        and len(righe_csv) == 5, 'CSV del solo riepilogo: intestazione e 4 subagenti')
     totale_csv = sum(float(r.split(';')[3].replace('.', '').replace(',', '.')) for r in righe_csv[1:])
     ok(abs(totale_csv - 1986.38) < 0.01, 'CSV del riepilogo: totale da liquidare 1.986,38 €')
@@ -249,6 +249,7 @@ with sync_playwright() as p:
         pg.wait_for_function("!document.querySelector('.velo')"); attesa(pg)
     pg.click('.barra-decisione button:has-text("Segna come verificato")')
     pg.wait_for_selector('.velo .modale-piede button:has-text("Segna come verificato")')
+    pg.click('.velo .casella-grave input')
     pg.click('.velo .modale-piede button:has-text("Segna come verificato")')
     pg.wait_for_function("document.querySelector('.testa .stato') && document.querySelector('.testa .stato').innerText === 'Verificato'")
     attesa(pg)
@@ -263,9 +264,11 @@ with sync_playwright() as p:
     # chiusura: conferma con importo e subagenti, poi la pagina legge la fotografia
     pg.click('.testa-azioni button:has-text("Chiudi il trimestre")')
     pg.wait_for_selector('.velo .modale-piede button:has-text("Chiudi il trimestre")')
-    conferma = piatto(testo(pg, '.velo .modale-testa'))
+    conferma = piatto(testo(pg, '.velo .modale'))
     ok('Chiudere la liquidazione del 3° trimestre?' in conferma and '2.492,18 €' in conferma and '4 subagenti' in conferma,
        'conferma con importo e numero di subagenti')
+    ok(pg.locator('.velo .modale-piede button:has-text("Chiudi il trimestre")').is_disabled(), 'chiusura: pulsante spento finché non si spunta (D-172)')
+    pg.click('.velo .casella-grave input')
     pg.click('.velo .modale-piede button:has-text("Chiudi il trimestre")')
     pg.wait_for_function("!document.querySelector('.velo')")
     pg.wait_for_function("() => [...document.querySelectorAll('.testa-azioni button')].some(b => b.innerText === 'Liquidazione chiusa')")
@@ -299,9 +302,9 @@ with sync_playwright() as p:
     pg.wait_for_function("() => document.querySelectorAll('.report-sub .kpi .kpi-valore').length === 3", timeout=20000)
     sub_report = pannelli(pg).nth(1).locator('.report-sub')
     kpi = [piatto(x) for x in sub_report.locator('.kpi .kpi-valore').all_inner_texts()]
-    ok(kpi == ['12.000,00 €', '960,00 €', '1.800,00 €'], 'report del subagente: fatturato, provvigione e margine (trovati %s)' % kpi)
+    ok(kpi == ['12.000,00 €', '960,00 €', '840,00 €'], 'report del subagente: fatturato, provvigione e margine (trovati %s)' % kpi)
     ok('nessun importo sul 2° trimestre' in piatto(sub_report.inner_text()), 'confronto con il trimestre prima: nessun importo')
-    ok('65,22% delle provvigioni' in piatto(sub_report.inner_text()), 'margine sulle provvigioni calcolato dal server')
+    ok('46,67% delle provvigioni' in piatto(sub_report.inner_text()), 'margine sulle provvigioni calcolato dal server')
     ok(sub_report.locator('.griglia-bi .pannello').count() == 2 and 'Trimestri 2026' in piatto(sub_report.inner_text())
        and 'Clienti principali' in piatto(sub_report.inner_text()), 'trimestri dell’anno e primi clienti (pannelli %d)' % sub_report.locator('.griglia-bi .pannello').count())
     elenco = piatto(sub_report.locator('.elenco').inner_text())

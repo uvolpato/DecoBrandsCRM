@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
+import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
 import { KpiRow, type Kpi } from '@/componenti/Kpi';
 import { Pagina, Pannello, type Azione } from '@/componenti/Pagina';
 import { avviso, quando, Stato, type Variante } from '@/componenti/Piccoli';
@@ -40,6 +41,9 @@ const ESITO: Record<string, { testo: string; v: Variante }> = {
   errore: { testo: 'Errore', v: 'errore' },
 };
 const FILTRI: Valori = { vista: 'da_vedere' };
+
+// D-171: azione di riga a icona («Segna come visto»)
+const AZIONE_VISTO: AzioneRiga[] = [{ nome: 'visto', icona: 'occhio', etichetta: 'Segna come visto' }];
 
 const statoDi = (s: string) => STATO[s] ?? { testo: s, v: 'neutro' as Variante };
 const esitoDi = (e: string | null) => (e ? ESITO[e] ?? { testo: e, v: 'neutro' as Variante } : { testo: '—', v: 'neutro' as Variante });
@@ -163,7 +167,7 @@ export function VistaSistema() {
     {
       key: 'visto', header: '', sortable: false, cell: (p) => (p.stato === 'chiusa' ? <span className="testo-tenue">chiuso</span>
         : p.visto ? <span className="testo-tenue">visto</span>
-          : <button type="button" className="btn sec piccolo" onClick={() => void visto(p.id)}>Segna come visto</button>),
+          : <AzioniRiga azioni={AZIONE_VISTO} oggetto={'il problema «' + p.testo + '»'} riga={[{ nome: 'visto', onClick: () => void visto(p.id) }]} />),
     },
   ];
 

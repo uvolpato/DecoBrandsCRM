@@ -199,10 +199,11 @@
     const perSconto = {};
     validi.forEach(s => { if (!perSconto[s.sconto] || perSconto[s.sconto].valido_dal < s.valido_dal) perSconto[s.sconto] = s; });
     const lista = Object.values(perSconto).sort((a, b) => a.sconto - b.sconto);
-    return lista.find(s => s.sconto === Number(sconto)) || lista.filter(s => s.sconto <= Number(sconto)).pop() || null;
+    // D-182: il primo scaglione ≥ sconto (non più la soglia più alta ≤ sconto)
+    return lista.find(s => s.sconto >= Number(sconto)) || null;
   };
   /* Percentuali per una pratica a una data:
-     - dal fornitore ci aspettiamo agente + subagente standard dello scaglione;
+     - dal fornitore ci aspettiamo solo la % di Decobrands (pct_agente); il fornitore non somma la % del subagente (D-166);
      - al subagente liquidiamo la sua percentuale (con eventuale eccezione). */
   M.percentuali = function (p, data) {
     const ab = M.abbinamento(p.cliente_piva, p.fornitore_id);
@@ -213,7 +214,7 @@
     return {
       sconto: ab.sconto, scaglione: sc, subagente_id: ab.subagente_id,
       agente: sc.pct_agente, sub_standard: sc.pct_sub, sub: ecc ? ecc.pct_sub : sc.pct_sub, eccezione: !!ecc,
-      dal_fornitore: sc.pct_agente + sc.pct_sub
+      dal_fornitore: sc.pct_agente
     };
   };
 
@@ -396,7 +397,7 @@
   /* ---------- Analisi del trimestre (sintesi delle Liquidazioni, §7.8) ----------
      Sugli stessi documenti della liquidazione (righeLiquidazione, compresi quelli in attesa e le
      voci di storno/riaccredito): fatturato = imponibile; provvigioni dai fornitori = imponibile ×
-     % che il fornitore riconosce a Decobrands (agente + subagente); ai subagenti = provvigione
+     % che il fornitore riconosce a Decobrands (solo pct_agente, D-166); ai subagenti = provvigione
      liquidata; margine = differenza. Sono importi di competenza, non incassati. */
   M.analisiTrimestre = function (a, t) {
     const righe = M.righeLiquidazione(a, t);

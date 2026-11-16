@@ -15,6 +15,10 @@ export const pct = (n: unknown) => numero(n, 2, 0) + '%';
 export const num = (n: unknown) => numero(n, 2, 0);
 /** aaaa-mm-gg → gg/mm/aaaa */
 export const data = (iso?: string | null) => { if (!iso) return '—'; const [a, m, g] = iso.split('-'); return g + '/' + m + '/' + a; };
+/** Una data come aaaa-mm-gg in ora italiana (Europe/Rome): un solo punto per «oggi»/«domani» (D-181). */
+export const giornoRoma = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+export const oggi = () => giornoRoma(new Date());
+export const domani = () => giornoRoma(new Date(Date.now() + 86_400_000));
 /** Classe del segno di un importo: negativo in rosso, positivo in verde (CRM.classeSegno). */
 export const classeSegno = (n: number) => (n > 0.004 ? 'positivo' : n < -0.004 ? 'negativo' : '');
 export const euroSegno = (n: number) => (n > 0.004 ? '+' : '') + euro(n);

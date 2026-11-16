@@ -110,7 +110,20 @@ with sync_playwright() as p:
     ok('Gries' in f and fid.isdigit(), 'fornitore scelto dal menu: %s (id %s)' % (f, fid))
     s_, sid = scegli(pg, 'subagente_id', 'Nis')
     ok('Nista' in s_ and sid.isdigit(), 'subagente scelto dal menu: %s (id %s)' % (s_, sid))
-    ok('Scaglioni in vigore' in testo(pg, '.velo .campo:has(#c-sconto) .aiuto') and 'Gries' in testo(pg, '.velo .campo:has(#c-sconto) .aiuto'), 'sconto: aiuto con gli scaglioni dei fornitori')
+    # 15/11/2026: l'aiuto dello sconto mostra gli scaglioni del fornitore SCELTO ed è un link alle percentuali
+    # (apre nella stessa scheda, con conferma se ci sono correzioni non salvate — D-170, rilievo A)
+    link_sconto = pg.locator('.velo .campo:has(#c-sconto) .aiuto a').first
+    ok(link_sconto.count() == 1 and 'Scaglioni in vigore' in link_sconto.inner_text()
+       and link_sconto.get_attribute('href') == '/fornitori/' + fid + '?scheda=percentuali',
+       'sconto: aiuto con gli scaglioni del fornitore scelto, link alle percentuali')
+    # il pallino verde di Fornitore e Subagente è un link alla loro scheda (prop link di CampoRicerca)
+    ok(pg.locator('.velo a.pallino-link[aria-label*="fornitore"]').first.get_attribute('href') == '/fornitori/' + fid,
+       'pallino verde del fornitore: link alla scheda')
+    ok(pg.locator('.velo a.pallino-link[aria-label*="subagente"]').first.get_attribute('href') == '/subagenti/' + sid,
+       'pallino verde del subagente: link alla scheda')
+    # 15/11/2026: Valido dal e Valido al sono campi data (selettore nativo)
+    ok(pg.locator('#c-valido_dal[type=date]').count() == 1 and pg.locator('#c-valido_al[type=date]').count() == 1,
+       'valido dal e valido al: campi data con selettore')
     ok(pg.locator('#c-pct_subagente:not([disabled])').count() == 1 and pg.locator('#c-regola_mensile:not([disabled])').count() == 1, 'responsabile: percentuale e regola del subagente attive')
     pg.fill('#c-codice_cliente_fornitore', 'T' + RUN); pg.fill('#c-sconto', '5'); pg.fill('#c-valido_dal', D1); pg.fill('#c-valido_al', A1)
     prima_post = len(post_agenzie)
@@ -123,7 +136,7 @@ with sync_playwright() as p:
     pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
     ok(len(post_agenzie) - prima_post == 1, 'creazione agenzia: %d richiesta POST, nessun doppio invio' % (len(post_agenzie) - prima_post))
     riga = pg.locator('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
-    ok('Gries' in riga.inner_text() and 'Nista' in riga.inner_text() and '5 %' in riga.inner_text() and A1 in riga.inner_text(), 'agenzia creata: fornitore, subagente, sconto e periodo in tabella')
+    ok('Gries' in riga.inner_text() and 'Nista' in riga.inner_text() and '5 %' in riga.inner_text() and '30/06/2031' in riga.inner_text(), 'agenzia creata: fornitore, subagente, sconto e periodo in tabella')
     pg.reload(); pg.wait_for_selector('.schede-corpo .dt'); pg.wait_for_timeout(500)
     ok(pg.locator('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN).count() == 1, 'dopo il ricaricamento l’agenzia resta')
 
@@ -143,12 +156,27 @@ with sync_playwright() as p:
     ok(pg.locator('.schede-corpo .dt tbody tr').count() == 1 and pg.locator('.schede-corpo .dt tbody tr:has-text("Ravelli")').count() == 1, 'scheda Agenzie: filtro per subagente Ravelli, una riga')
     pg.locator('.schede-corpo .riepilogo-filtri .btn-icona').nth(1).click(); pg.wait_for_timeout(300)
     ok(pg.locator('.schede-corpo .dt tbody tr').count() == 2, 'scheda Agenzie: tolto il filtro, due righe')
+    # D-171: azioni a icone in colonne fisse — lo slot vuoto di Conferma non sposta Modifica ed Elimina;
+    # nessuno scorrimento orizzontale causato dalle azioni (1440 e 768)
+    ra = pg.locator('.schede-corpo .dt tbody tr')
+    xs = [ra.nth(i).locator('button[aria-label^="Modifica"]').bounding_box()['x'] for i in range(ra.count())]
+    ok(ra.count() == 2 and all(abs(x - xs[0]) <= 1 for x in xs), 'Agenzie: Modifica alla stessa x in ogni riga (slot vuoto di Conferma compreso)')
+    xe = ra.first.locator('button[aria-label^="Elimina"]').bounding_box()['x']
+    ok(abs(xe - xs[0] - 36) <= 1, 'Agenzie: Elimina a 36 px da Modifica (lo slot vuoto di Conferma resta)')
+    ok(not pg.evaluate("document.querySelector('.schede-corpo .dt-scorri').scrollWidth > document.querySelector('.schede-corpo .dt-scorri').clientWidth"),
+       'Agenzie 1440: nessuno scorrimento orizzontale della tabella')
+    pg.screenshot(path=str(USCITA.parents[1] / 'azioni-riga-1440.png'))
+    pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
+    ok(not sovr(pg) and not pg.evaluate("document.querySelector('.schede-corpo .dt-scorri').scrollWidth > document.querySelector('.schede-corpo .dt-scorri').clientWidth"),
+       'Agenzie 768: nessuno scorrimento orizzontale')
+    pg.screenshot(path=str(USCITA.parents[1] / 'azioni-riga-768.png'))
+    pg.set_viewport_size({'width': 1440, 'height': 900}); pg.wait_for_timeout(400)
     # modifica della prima
-    pg.click('.schede-corpo .dt tbody tr:has-text("T%s") button:has-text("Modifica")' % RUN); finestra(pg).wait_for()
+    pg.click('.schede-corpo .dt tbody tr:has-text("T%s") button[aria-label^="Modifica"]' % RUN); finestra(pg).wait_for()
     ok(pg.input_value('#c-sconto') == '5' and pg.input_value('#c-valido_dal') == D1, 'modifica: il modulo parte dai valori attuali')
-    pg.fill('#c-sconto', '7'); pg.fill('#c-pct_subagente', '33'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached')
+    pg.fill('#c-sconto', '7'); pg.fill('#c-pct_subagente', '12'); pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached')
     pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s"):has-text("7 %%")' % RUN)
-    ok('33 %' in testo(pg, '.schede-corpo .dt tbody tr:has-text("T%s")' % RUN), 'agenzia modificata: sconto 7 %, al subagente 33 % (responsabile)')
+    ok('12 %' in testo(pg, '.schede-corpo .dt tbody tr:has-text("T%s")' % RUN), 'agenzia modificata: sconto 7 %, al subagente 12 % (responsabile, D-166: non supera il fornitore)')
     pg.screenshot(path=str(USCITA / 'app-clienti-agenzie-1440.png'))
 
     # Pratiche
@@ -181,7 +209,8 @@ with sync_playwright() as p:
     pg.locator('.dt tbody tr.cliccabile', has_text=cliente).first.click(); pg.wait_for_timeout(600)
     scheda(pg, 'Agenzie'); pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
     for chi in ('T' + RUN, 'Ravelli'):
-        pg.click('.schede-corpo .dt tbody tr:has-text("%s") button:has-text("Elimina")' % chi); pg.wait_for_selector('.velo .modale')
+        pg.click('.schede-corpo .dt tbody tr:has-text("%s") button[aria-label^="Elimina"]' % chi); pg.wait_for_selector('.velo .modale')
+        pg.click('.velo .casella-grave input')
         pg.click('.velo .modale button.pericolo, .velo .modale button:has-text("Elimina")')
         pg.wait_for_function("!document.querySelector('.velo .modale')")
         pg.wait_for_function("![...document.querySelectorAll('.schede-corpo .dt tbody tr')].some(r => r.textContent.includes('%s'))" % chi)

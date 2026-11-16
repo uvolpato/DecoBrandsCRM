@@ -19,8 +19,15 @@ export const PASSWORD_PROVA = 'Prova-Decobrands-2026'; // fissa, solo per i dati
 const data = (s: string) => new Date(s + 'T00:00:00Z');
 const ora = (s: string) => new Date(s + (s.length <= 16 ? ':00' : '') + '+02:00');
 const r2 = (n: number) => Math.round(n * 100) / 100;
-const importoRiga = (r: any[]) => r2(r[2] * r[3]); // r = [codice, descrizione, qta, prezzo]
+// D-182 §19: lo scaglione si sceglie dallo sconto medio (1 − netto/lordo). Il seed mette su ogni riga uno
+// sconto di riga uguale allo sconto dell'agenzia (abbinamenti.sconto), così lo sconto medio cade nello stesso
+// scaglione di prima e i numeri restano quelli del prototipo. Il netto non cambia: il prezzo resta il netto,
+// il lordo (prezzo_unitario) si ricava da esso. Math.floor (non round) tiene lo sconto medio appena sotto la
+// soglia, così «il primo scaglione ≥ sconto medio» sceglie sempre la soglia giusta (mai quella dopo).
+const r4 = (n: number) => Math.floor(n * 10000) / 10000;
+const importoRiga = (r: any[]) => r2(r[2] * r[3]); // r = [codice, descrizione, qta, prezzo] (netto)
 const importoDoc = (d: any) => r2(d.righe.reduce((s: number, r: any[]) => s + importoRiga(r), 0));
+const prezzoLordo = (prezzo: number, sconto: number) => (sconto ? r4(prezzo / (1 - sconto / 100)) : prezzo);
 const nomeCognome = (n: string) => { const i = n.indexOf(' '); return [n.slice(0, i), n.slice(i + 1)]; };
 
 export async function base(tx: Tx) {
@@ -173,6 +180,8 @@ export async function base(tx: Tx) {
   const note: [bigint, string][] = [];
   for (const p of D.pratiche) {
     const ordine = p.documenti.find((d: any) => d.tipo === 'ordine');
+    // D-182: sconto di riga = sconto dell'agenzia (abbinamenti.sconto), così lo sconto medio cade nello stesso scaglione
+    const sconto = Number(D.abbinamenti.find((a: any) => a.fornitore_id === p.fornitore_id && a.cliente_piva === p.cliente_piva)?.sconto ?? 0);
     const t = await tx.ordini_fornitore_testata.create({ data: {
       fornitore_id: ids.fornitori[p.fornitore_id], fornitore_versione_id: ids.versioniF[p.fornitore_id],
       cliente_id: ids.clienti[p.cliente_piva], cliente_versione_id: ids.versioniC[p.cliente_piva], agente_id: agente.id,
@@ -184,7 +193,7 @@ export async function base(tx: Tx) {
         ...(d.incasso ? { stato_incasso: 'pagata', fonte_incasso: 'manuale', note: d.incasso.nota, pagata_il: data(d.data.slice(0, 8) + '15') } : {}) } }); // data di pagamento: il prototipo ha solo un modello
       if (d.tipo !== 'nota_credito') {
         await tx.ordini_fornitore_righe.createMany({ data: d.righe.map((r: any[], i: number) => ({
-          testata_id: t.id, documento_id: creato.id, fase: d.tipo, numero_riga: i + 1, codice: r[0], descrizione: r[1], quantita: r[2], prezzo_unitario: r[3], importo: importoRiga(r) })) });
+          testata_id: t.id, documento_id: creato.id, fase: d.tipo, numero_riga: i + 1, codice: r[0], descrizione: r[1], quantita: r[2], prezzo_unitario: prezzoLordo(r[3], sconto), importo: importoRiga(r) })) });
       }
       if (d.tipo === 'fattura') fatturaId[d.numero] = creato.id;
       if (d.tipo === 'nota_credito') note.push([creato.id, d.riferimento]);

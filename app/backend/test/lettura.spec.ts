@@ -8,7 +8,7 @@ import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
-import { leggiDallaCoda } from '../src/lettura';
+import { leggiDallaCoda, PROMPT_DOCUMENTO, SCHEMA_DOCUMENTO } from '../src/lettura';
 import { leggiDocumento, type CampoLetto, type Lettura } from '../src/lettore';
 import { PrismaService } from '../src/prisma.service';
 import { svuota } from './svuota';
@@ -133,6 +133,33 @@ describe('F6-A2 lettura dalla coda', () => {
     expect(await db.documenti_campi.count({ where: { documento_id: d.id } })).toBe(7);
   });
 
+  it('riga spesa (codice testo) e flag spesa: si salvano; schema e prompt li chiedono', async () => {
+    // lo schema descrive il flag e il prompt chiede le righe con codice testo (es. «Fracht»)
+    const proprieta = (SCHEMA_DOCUMENTO.properties.righe as { items: { properties: Record<string, unknown> } }).items.properties;
+    expect(proprieta.spesa).toBeDefined();
+    expect(PROMPT_DOCUMENTO).toContain('Fracht');
+    expect(PROMPT_DOCUMENTO).toContain('spesa: true');
+
+    const d = await inCoda();
+    const r: Lettura = {
+      modello: 'finto:1', crediti: null, risultato: { tipo: 'proforma', importo_totale: 963.78 },
+      campi: [
+        campo('tipo', 'proforma', 0.98),
+        campo('righe[0].codice', 'Fracht', 0.95),
+        campo('righe[0].descrizione', 'Verpackung und Versand', 0.95),
+        campo('righe[0].quantita', '1', 0.95),
+        campo('righe[0].prezzo', '87.5', 0.95),
+        campo('righe[0].importo', '87.5', 0.95),
+        campo('righe[0].spesa', 'true', 0.95),
+      ],
+    };
+    await leggiDallaCoda(db, config, async () => r);
+    const campi = await db.documenti_campi.findMany({ where: { documento_id: d.id } });
+    expect(campi.map((c) => c.campo)).toContain('righe[0].spesa');
+    expect(campi.find((c) => c.campo === 'righe[0].spesa')!.valore_letto).toBe('true');
+    expect(campi.find((c) => c.campo === 'righe[0].codice')!.valore_letto).toBe('Fracht');
+  });
+
   it('errore del lettore: 3 giri, poi errore e anomalia lettura.fallita', async () => {
     const d = await inCoda();
     const rotto = async (): Promise<Lettura> => { throw new Error('il modello non risponde'); };
@@ -203,7 +230,7 @@ describe('F6-A2 lettura dalla coda', () => {
     };
     await leggiDallaCoda(db, config, async () => r);
     const riga = await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: d.id } });
-    expect(riga.controlli).toEqual({ falliti: [{ codice: 'codice_cliente', campo: 'codice_cliente', testo: 'Codice cliente ZZZ-999 non presente fra i clienti del fornitore', grave: true }] });
+    expect(riga.controlli).toEqual({ falliti: [{ codice: 'codice_cliente', campo: 'codice_cliente', testo: 'Codice cliente ZZZ-999 non presente fra i clienti del fornitore', grave: true, gruppo: 'lettura' }] });
     expect(riga.livello).toBe('bassa');
   });
 

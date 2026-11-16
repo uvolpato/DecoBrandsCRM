@@ -167,15 +167,15 @@ afterAll(async () => {
 });
 
 describe('GET /api/documenti — elenco', () => {
-  it('solo lo stato chiesto, dal più recente, con i conteggi di tutti gli stati', async () => {
+  it('solo lo stato chiesto, dal più vecchio al più recente (coda di lavoro), con i conteggi di tutti gli stati', async () => {
     const r = await oper.get('/documenti').expect(200);
-    expect(r.body.documenti.map((d: { id: string }) => d.id)).toEqual([String(docA), String(docB)]);
+    expect(r.body.documenti.map((d: { id: string }) => d.id)).toEqual([String(docB), String(docA)]);
     expect(r.body.conteggi).toEqual({ da_controllare: 2, in_coda: 1, in_lettura: 1, errore: 1 });
     expect(r.body).toMatchObject({ totale: 2, pagina: 1, per_pagina: 25 });
   });
 
   it('valori dal finale quando c\'è, altrimenti dal letto; tipo del file dall\'estensione', async () => {
-    const a = (await oper.get('/documenti').expect(200)).body.documenti[0];
+    const a = (await oper.get('/documenti').expect(200)).body.documenti[1];
     expect(a).toMatchObject({
       file_nome: 'fattura-a.pdf', file_tipo: 'pdf', tipo: 'fattura', numero: 'FIN-1', data: '2026-09-03',
       fornitore_id: String(forn.id), fornitore: 'Gries Prova GmbH', codice_cliente: 'K-100', cliente: 'Alfa',
@@ -210,7 +210,7 @@ describe('GET /api/documenti — elenco', () => {
   it('paginazione sul server', async () => {
     const r = await oper.get('/documenti?per_pagina=1&pagina=2').expect(200);
     expect(r.body).toMatchObject({ totale: 2, pagina: 2, per_pagina: 1 });
-    expect(r.body.documenti.map((d: { id: string }) => d.id)).toEqual([String(docB)]);
+    expect(r.body.documenti.map((d: { id: string }) => d.id)).toEqual([String(docA)]);
   });
 
   it('stato e pagina non validi: 400', async () => {
@@ -240,7 +240,8 @@ describe('GET /api/documenti/:id — dettaglio', () => {
     const numero = r.body.campi.find((c: { campo: string }) => c.campo === 'numero');
     expect(numero).toMatchObject({ valore_letto: 'OLD-1', valore_finale: 'FIN-1', affidabilita: 0.8, verificato: false });
     expect(numero.posizione).toMatchObject({ tipo: 'pdf', pagina: 1 });
-    expect(r.body.controlli).toHaveLength(2);
+    // D-169/E: i controlli si ricalcolano dal server (non dai valori salvati, che restano stantii)
+    expect(r.body.controlli).toHaveLength(0);
     expect(r.body.proposta.abbinamento).toMatchObject({ cliente_id: String(cli.id), codice: 'K-100' });
     expect(r.body.proposta.candidati[0].pratica.id).toBe(String(pratica));
     expect(r.body.bollettino).toBeNull();
@@ -366,6 +367,75 @@ describe('PUT /api/documenti/:id — correzione dei dati letti', () => {
     expect(r.body.controlli).toEqual([]);
   });
 
+  it('importo di riga vuoto con sconto: il server lo calcola, niente importo salvato (V12)', async () => {
+    const id = await creaDoc({
+      tipo: 'fattura', fornitore_id: forn.id, campi: [
+        { campo: 'importo_totale', letto: '26.82', aff: 0.95 },
+        { campo: 'righe[0].codice', letto: 'A1', aff: 0.95 },
+        { campo: 'righe[0].quantita', letto: '2', aff: 0.95 },
+        { campo: 'righe[0].prezzo', letto: '14.9', aff: 0.95 },
+        { campo: 'righe[0].sconto', letto: '10', aff: 0.95 },
+      ],
+    });
+    const r = await oper.put(`/documenti/${id}`, {
+      testata: { tipo: 'fattura', importo: 26.82 },
+      righe: [{ i: 0, codice: 'A1', descrizione: '', quantita: 2, prezzo: 14.9, importo: '', sconto: 10 }],
+    }).expect(200);
+    expect(r.body.righe[0].importo).toBeNull(); // importo non letto: resta vuoto
+    expect(r.body.proposta.importo).toBe(26.82); // calcolato dal server: 2 × 14,9 × 0,9
+    expect(r.body.controlli.some((c: { codice: string }) => c.codice === 'riga')).toBe(false);
+    expect(await db.documenti_campi.count({ where: { documento_id: id, campo: 'righe[0].importo' } })).toBe(0);
+  });
+
+  it('importo 0 letto su una riga che vale: non è letto, la riga è calcolata', async () => {
+    const id = await creaDoc({
+      tipo: 'fattura', fornitore_id: forn.id, campi: [
+        { campo: 'importo_totale', letto: '25.65', aff: 0.95 },
+        { campo: 'righe[0].codice', letto: 'A1', aff: 0.95 },
+        { campo: 'righe[0].quantita', letto: '54', aff: 0.95 },
+        { campo: 'righe[0].prezzo', letto: '0.5', aff: 0.95 },
+        { campo: 'righe[0].sconto', letto: '5', aff: 0.95 },
+        { campo: 'righe[0].importo', letto: '0', aff: 0.95 },
+      ],
+    });
+    const r = await oper.get(`/documenti/${id}`).expect(200);
+    expect(r.body.righe[0].importo).toBeNull(); // 0 del lettore, non un importo vero: resta vuoto
+    expect(r.body.proposta.importo).toBe(25.65); // calcolato: 54 × 0,5 × 0,95
+    expect(r.body.controlli.some((c: { codice: string }) => c.codice === 'riga')).toBe(false);
+  });
+
+  it('importo 0 con prezzo 0 (riga omaggio): lo 0 è vero e resta', async () => {
+    const id = await creaDoc({
+      tipo: 'fattura', fornitore_id: forn.id, campi: [
+        { campo: 'importo_totale', letto: '0', aff: 0.95 },
+        { campo: 'righe[0].codice', letto: 'A9', aff: 0.95 },
+        { campo: 'righe[0].quantita', letto: '1', aff: 0.95 },
+        { campo: 'righe[0].prezzo', letto: '0', aff: 0.95 },
+        { campo: 'righe[0].importo', letto: '0', aff: 0.95 },
+      ],
+    });
+    const r = await oper.get(`/documenti/${id}`).expect(200);
+    expect(r.body.righe[0].importo).toBe(0); // il documento stampa davvero 0: si tiene
+  });
+
+  it('importo di riga letto discorde: resta scritto e resta il rilievo', async () => {
+    const id = await creaDoc({
+      tipo: 'fattura', fornitore_id: forn.id, campi: [
+        { campo: 'importo_totale', letto: '30', aff: 0.95 },
+        { campo: 'righe[0].codice', letto: 'A1', aff: 0.95 },
+        { campo: 'righe[0].quantita', letto: '2', aff: 0.95 },
+        { campo: 'righe[0].prezzo', letto: '14.9', aff: 0.95 },
+        { campo: 'righe[0].sconto', letto: '10', aff: 0.95 },
+      ],
+    });
+    const r = await oper.put(`/documenti/${id}`, {
+      testata: { tipo: 'fattura', importo: 30 },
+      righe: [{ i: 0, codice: 'A1', descrizione: '', quantita: 2, prezzo: 14.9, importo: 30, sconto: 10 }],
+    }).expect(200);
+    expect(r.body.righe[0].importo).toBe(30); // il letto non si sovrascrive da solo
+    expect(r.body.controlli.some((c: { codice: string }) => c.codice === 'riga')).toBe(true);
+  });
+
   it('409 se lo stato non è da_controllare; 400 per tipo, fornitore e data non validi', async () => {
     const coda = await creaDoc({ stato: 'in_coda' });
     await oper.put(`/documenti/${coda}`, { testata: { tipo: 'fattura' }, righe: [] }).expect(409);
@@ -382,6 +452,13 @@ describe('PUT /api/documenti/:id — correzione dei dati letti', () => {
 
   it('404 se il documento non c\'è', async () => {
     await oper.put('/documenti/999999999', { testata: { tipo: 'fattura' }, righe: [] }).expect(404);
+  });
+
+  it('un pagamento senza numero si salva; il numero resta obbligatorio solo per ordine, fattura e nota di credito', async () => {
+    const id = await creaDoc({ tipo: 'pagamento', campi: [{ campo: 'data', letto: '2026-09-04' }] });
+    const r = await oper.put(`/documenti/${id}`, { testata: { tipo: 'pagamento', numero: '', data: '2026-09-04' }, righe: [] }).expect(200);
+    expect(r.body.testata.numero).toBeNull();
+    expect(await db.documenti_campi.findFirst({ where: { documento_id: id, campo: 'numero' } })).toBeNull();
   });
 
   it('da errore la correzione a mano porta a da_controllare e chiude lettura.fallita (A4-01)', async () => {
@@ -442,10 +519,13 @@ describe('POST /api/documenti/:id/rileggi (A4-01)', () => {
     expect(ev.dettaglio).toMatchObject({ documento_id: String(id), prima: { stato: 'errore' }, dopo: { stato: 'in_coda' } });
   });
 
-  it('409 se non è in errore; 404 se non c\'è', async () => {
-    const id = await creaDoc({ stato: 'da_controllare' });
-    await oper.post(`/documenti/${id}/rileggi`).expect(409);
+  it('409 se non è in errore né da controllare; 404 se non c\'è; da controllare torna in coda (D-170)', async () => {
+    const abbinato = await creaDoc({ stato: 'abbinato' });
+    await oper.post(`/documenti/${abbinato}/rileggi`).expect(409);
     await oper.post('/documenti/999999999/rileggi').expect(404);
+    const dc = await creaDoc({ stato: 'da_controllare' });
+    await oper.post(`/documenti/${dc}/rileggi`).expect(204); // D-170: rileggere un documento già letto per i campi nuovi
+    expect((await db.documenti_in_arrivo.findUniqueOrThrow({ where: { id: dc } })).stato).toBe('in_coda');
   });
 });
 

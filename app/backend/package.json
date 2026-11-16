@@ -1,6 +1,6 @@
 {
   "name": "decobrands-backend",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "license": "UNLICENSED",
   "engines": {
@@ -19,9 +19,13 @@
     "ponte:prova": "ts-node prisma/ponte-prova.ts",
     "import:vecchio-crm": "ts-node prisma/import-vecchio-crm.ts",
     "import:storico": "ts-node prisma/import-storico.ts",
+    "servizio:sistema-dati": "ts-node prisma/sistema-dati.ts",
     "superutente": "node dist/src/superutente.js",
     "lettura:prova": "node dist/src/lettura-prova.js",
-    "pratiche:ricalcola": "node dist/src/pratiche-ricalcola.js"
+    "pratiche:ricalcola": "node dist/src/pratiche-ricalcola.js",
+    "sconto:medio": "node dist/src/sconto-medio-ricalcola.js",
+    "valori:congelati": "node dist/src/valori-congelati-ricalcola.js",
+    "rilettura:mirata": "node dist/src/rilettura-mirata.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.26",

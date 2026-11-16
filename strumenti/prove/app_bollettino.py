@@ -122,8 +122,11 @@ with sync_playwright() as p:
     pg = entra(S + '-ammi')
     gries = id_bollettino(pg, 'Gries', '2026-07')
     pg.goto(BASE + '/bollettini/' + gries); pg.wait_for_selector('.cerniera')
-    ok(tot(pg, '.cerniera-riepilogo .lato b') == 2228.10 and tot(pg, '.cerniera-riepilogo .lato.destro b') == 2260.80
-       and tot(pg, '.cerniera-riepilogo .cucitura b') == -32.70, 'Gries luglio: totali 2.228,10 / 2.260,80 / -32,70')
+    # 15/11/2026: il fornitore nel sottotitolo e il cliente della riga sono link alle loro schede
+    ok(pg.locator('.testa .sotto a[href^="/fornitori/"]').count() == 1, 'bollettino: il fornitore è un link alla sua scheda')
+    ok(pg.locator('.cerniera .c-riga a[href^="/clienti/"]').count() >= 1, 'bollettino: il cliente della riga è un link alla sua scheda')
+    ok(tot(pg, '.cerniera-riepilogo .lato b') == 1918.50 and tot(pg, '.cerniera-riepilogo .lato.destro b') == 1951.20
+       and tot(pg, '.cerniera-riepilogo .cucitura b') == -32.70, 'Gries luglio: totali 1.918,50 / 1.951,20 / -32,70')
     ok(n_gruppo(pg, 'Da decidere') == 1 and n_gruppo(pg, 'Quadrano') == 1, 'Gries luglio: 1 da decidere, 1 che quadra')
     ok('Manca 1 riga da decidere' in testo(pg, '.barra-decisione')
        and pg.locator('.barra-decisione button:has-text("Segna come verificato")').first.is_disabled(),
@@ -188,8 +191,8 @@ with sync_playwright() as p:
     pg.goto(BASE + '/bollettini/' + gasper); pg.wait_for_selector('.cerniera')
     ok('Gasper' in testo(pg, '.testa h1') and 'agosto 2026' in testo(pg, '.testa h1') and 'Da verificare' in testo(pg, '.testa h1'),
        'testata: fornitore, mese e badge Da verificare')
-    ok(tot(pg, '.cerniera-riepilogo .lato b') == 394.80 and tot(pg, '.cerniera-riepilogo .lato.destro b') == 3349.38
-       and tot(pg, '.cerniera-riepilogo .cucitura b') == -2954.58, 'Gasper agosto: totali 394,80 / 3.349,38 / -2.954,58')
+    ok(tot(pg, '.cerniera-riepilogo .lato b') == 263.20 and tot(pg, '.cerniera-riepilogo .lato.destro b') == 2190.10
+       and tot(pg, '.cerniera-riepilogo .cucitura b') == -1926.90, 'Gasper agosto: totali 263,20 / 2.190,10 / -1.926,90')
     ok(n_gruppo(pg, 'Da decidere') == 1 and n_gruppo(pg, 'Quadrano') == 1 and n_gruppo(pg, 'Incassi') == 1,
        'gruppi: 1 da decidere, 1 che quadra, 1 incasso')
     ok(pg.locator('.pannello canvas').count() == 0 and 'nessun file allegato' in testo(pg, '.testa'),
@@ -253,6 +256,8 @@ with sync_playwright() as p:
     pg.click('.barra-decisione button:has-text("Segna come verificato")')
     pg.wait_for_selector('.velo .modale-piede button:has-text("Segna come verificato")')
     ok('mese diventa chiuso' in testo(pg, '.velo'), 'la conferma spiega che il mese diventa chiuso')
+    ok(pg.locator('.velo .modale-piede button:has-text("Segna come verificato")').is_disabled(), 'verifica: pulsante spento finché non si spunta (D-172)')
+    pg.click('.velo .casella-grave input')
     pg.click('.velo .modale-piede button:has-text("Segna come verificato")')
     pg.wait_for_function("document.querySelector('.testa .stato') && document.querySelector('.testa .stato').innerText === 'Verificato'")
     attesa(pg)

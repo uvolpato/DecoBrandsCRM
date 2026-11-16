@@ -56,9 +56,9 @@
           compatta: true, righe: sc, ordinamentoIniziale: { key: 'sconto', dir: 'asc' },
           colonne: [
             { key: 'sconto', header: 'Sconto al cliente', tipo: 'pct' },
-            { key: 'pct_agente', header: 'A Decobrands', tipo: 'pct' },
-            { key: 'pct_sub', header: 'Al subagente', tipo: 'pct', cell: s => { const ecc = M.S.eccezioni.filter(x => x.scaglione_id === s.id); return M.pct(s.pct_sub) + (ecc.length ? '<span class="sec-riga">' + ecc.map(x => e(M.subagente(x.subagente_id).nome) + ' ' + M.pct(x.pct_sub)).join(', ') + '</span>' : ''); } },
-            { key: 'tot', header: 'Totale dal fornitore', tipo: 'pct', valore: s => s.pct_agente + s.pct_sub },
+            { key: 'pct_agente', header: 'Dal fornitore', tipo: 'pct' },
+            { key: 'pct_sub', header: 'di cui al subagente', tipo: 'pct', cell: s => { const ecc = M.S.eccezioni.filter(x => x.scaglione_id === s.id); return M.pct(s.pct_sub) + (ecc.length ? '<span class="sec-riga">' + ecc.map(x => e(M.subagente(x.subagente_id).nome) + ' ' + M.pct(x.pct_sub)).join(', ') + '</span>' : ''); } },
+            { key: 'margine', header: 'Margine Decobrands', tipo: 'pct', valore: s => s.pct_agente - s.pct_sub },
             { key: 'clienti', header: 'Clienti', tipo: 'numero', valore: s => clienti.filter(a => a.sconto === s.sconto).length }
           ]
         });
@@ -102,7 +102,7 @@
   function nuovePercentuali(f, sc) {
     const campi = [{ nome: 'valido_dal', etichetta: 'Valide dal', tipo: 'data', valore: M.oggi(), largo: true }];
     sc.forEach(s => campi.push(
-      { nome: 'a' + s.sconto, etichetta: 'Sconto ' + M.pct(s.sconto) + ' · a Decobrands %', tipo: 'numero', passo: '0.5', valore: s.pct_agente },
+      { nome: 'a' + s.sconto, etichetta: 'Sconto ' + M.pct(s.sconto) + ' · provvigione dal fornitore %', tipo: 'numero', passo: '0.5', valore: s.pct_agente },
       { nome: 's' + s.sconto, etichetta: 'Sconto ' + M.pct(s.sconto) + ' · al subagente %', tipo: 'numero', passo: '0.5', valore: s.pct_sub }));
     CRM.FormModal({
       titolo: 'Nuove percentuali di ' + f.breve, testo: 'Valgono per i documenti con data uguale o successiva a quella indicata.',

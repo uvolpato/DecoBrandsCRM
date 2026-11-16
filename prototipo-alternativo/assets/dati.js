@@ -1062,22 +1062,22 @@ window.DATI_DEMO = {
      decisioni: per numero documento, l'esito della verifica di una riga che non quadra. */
   bollettini: [
     { id: 1, fornitore_id: 1, anno: 2026, mese: 5, ricevuto: '2026-06-10', stato: 'verificato', file: 'Gries_bollettino_2026-05.pdf', decisioni: {}, righe: [
-      { numero: 'F-2026-0815', data: '2026-05-30', imponibile: 5600.00, pct: 28.00, importo: 1568.00 } ] },
+      { numero: 'F-2026-0815', data: '2026-05-30', imponibile: 5600.00, pct: 18.00, importo: 1008.00 } ] },
     { id: 2, fornitore_id: 1, anno: 2026, mese: 6, ricevuto: '2026-07-08', stato: 'verificato', file: 'Gries_bollettino_2026-06.pdf', decisioni: {}, righe: [
-      { numero: 'F-2026-0840', data: '2026-06-25', imponibile: 11240.00, pct: 7.00, importo: 786.80 } ] },
+      { numero: 'F-2026-0840', data: '2026-06-25', imponibile: 11240.00, pct: 5.00, importo: 562.00 } ] },
     { id: 3, fornitore_id: 1, anno: 2026, mese: 7, ricevuto: '2026-08-07', stato: 'da_verificare', file: 'Gries_bollettino_2026-07.pdf', decisioni: {}, righe: [
-      { numero: 'F-2026-0891', data: '2026-07-02', imponibile: 15480.00, pct: 7.00,  importo: 1083.60 },
+      { numero: 'F-2026-0891', data: '2026-07-02', imponibile: 15480.00, pct: 5.00,  importo: 774.00 },
       { numero: 'F-2026-0912', data: '2026-07-28', imponibile: 6540.00,  pct: 17.50, importo: 1144.50, nota_fornitore: 'Promozione estiva −0,5%' } ] },
     { id: 4, fornitore_id: 1, anno: 2026, mese: 8, ricevuto: '2026-09-03', stato: 'verificato', file: 'Gries_bollettino_2026-08.pdf', decisioni: {}, righe: [
-      { numero: 'NC-2026-005', data: '2026-08-22', imponibile: -1311.00, pct: 28.00, importo: -367.08 },
-      { numero: 'F-2026-0858', data: '2026-06-05', imponibile: 2204.80, pct: 28.00, importo: 617.34, nota_fornitore: 'Pagata dal cliente il 18/08' } ] },
+      { numero: 'NC-2026-005', data: '2026-08-22', imponibile: -1311.00, pct: 18.00, importo: -235.98 },
+      { numero: 'F-2026-0858', data: '2026-06-05', imponibile: 2204.80, pct: 18.00, importo: 396.86, nota_fornitore: 'Pagata dal cliente il 18/08' } ] },
     { id: 5, fornitore_id: 2, anno: 2026, mese: 7, ricevuto: '2026-08-10', stato: 'verificato', file: 'Gasper_bollettino_2026-07.pdf', decisioni: {}, righe: [
-      { numero: 'F-2026-0907', data: '2026-07-18', imponibile: 9312.50, pct: 18.00, importo: 1676.25 } ] },
+      { numero: 'F-2026-0907', data: '2026-07-18', imponibile: 9312.50, pct: 12.00, importo: 1117.50 } ] },
     { id: 6, fornitore_id: 2, anno: 2026, mese: 8, ricevuto: '2026-09-04', stato: 'da_verificare', file: 'Gasper_bollettino_2026-08.pdf', decisioni: {}, righe: [
-      { numero: 'F-2026-0921', data: '2026-08-20', imponibile: 3980.00, pct: 21.00, importo: 835.80 },
-      { numero: 'F-2026-0822', data: '2026-06-20', imponibile: -2450.00, pct: 18.00, importo: -441.00, tipo: 'storno', nota_fornitore: 'Storno per mancato pagamento' } ] },
+      { numero: 'F-2026-0921', data: '2026-08-20', imponibile: 3980.00, pct: 14.00, importo: 557.20 },
+      { numero: 'F-2026-0822', data: '2026-06-20', imponibile: -2450.00, pct: 12.00, importo: -294.00, tipo: 'storno', nota_fornitore: 'Storno per mancato pagamento' } ] },
     { id: 7, fornitore_id: 3, anno: 2026, mese: 8, ricevuto: '2026-09-02', stato: 'da_verificare', file: 'Ings_bollettino_2026-08.pdf', decisioni: {}, righe: [
-      { numero: 'F-2026-0930', data: '2026-08-31', imponibile: 4250.00, pct: 32.00, importo: 1360.00 } ] }
+      { numero: 'F-2026-0930', data: '2026-08-31', imponibile: 4250.00, pct: 20.00, importo: 850.00 } ] }
   ],
 
   /* Liquidazioni ai subagenti già chiuse. */

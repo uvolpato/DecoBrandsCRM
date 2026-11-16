@@ -88,7 +88,8 @@ with sync_playwright() as p:
     pg.click('.azioni-riga button:has-text("Elimina")'); finestra(pg).wait_for()
     pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
     ok(finestra(pg).count() == 0 and 'Prova Creato Due' in testo(pg, '.pannello-testa h2'), 'Esc annulla l’eliminazione')
-    pg.click('.azioni-riga button:has-text("Elimina")'); pg.click('.modale-piede button:has-text("Elimina")')
+    pg.click('.azioni-riga button:has-text("Elimina")'); pg.wait_for_selector('.velo .modale')
+    pg.click('.velo .casella-grave input'); pg.click('.modale-piede button:has-text("Elimina")')
     pg.wait_for_function("location.pathname === '/utenti'"); pg.wait_for_timeout(300)
     ok(pg.locator('.dt tbody tr:has-text("Prova Creato Due")').count() == 0, 'eliminato')
 

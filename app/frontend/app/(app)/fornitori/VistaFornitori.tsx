@@ -1,12 +1,14 @@
 'use client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { CercaInIntegra } from '@/componenti/CercaInIntegra';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { FormModal } from '@/componenti/FormModal';
 import { FormPercentuali, type Percentuali, type Scaglione, type ScaglioneVersione, type Versione } from '@/componenti/FormPercentuali';
-import { Conferma } from '@/componenti/Modale';
+import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
+import { Copiabile } from '@/componenti/Copiabile';
+import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Nota, Pagina, Pannello, Pulsante, type Azione } from '@/componenti/Pagina';
 import { avviso, Dettagli } from '@/componenti/Piccoli';
 import { SagomaCorpo, SagomaElenco, SagomaTabella, useSagome } from '@/componenti/Sagoma';
@@ -28,6 +30,7 @@ interface Fornitore {
   giorno_bollettino: number;
   tipo_provvigione: string;
   giorni_incasso: number;
+  spese_base_provvigione: boolean;
   note: string | null;
   attivo: boolean;
   scaglioni: number;
@@ -57,6 +60,10 @@ type Dettaglio = Omit<Fornitore, 'scaglioni'> & {
 export function VistaFornitori({ idSel }: { idSel?: string }) {
   const puo = usePuo();
   const router = useRouter();
+  const cerca = useSearchParams();
+  // ?scheda=percentuali apre la scheda delle percentuali già selezionata (link diretto, 15/11/2026):
+  // senza memoria, così il collegamento vince su una scheda ricordata di una navigazione precedente
+  const schedaParam = cerca.get('scheda');
   const [fornitori, setFornitori] = useState<Fornitore[] | null>(null);
   const [dettaglio, setDettaglio] = useState<Dettaglio | null>(null);
   const [percentuali, setPercentuali] = useState<Percentuali | null>(null);
@@ -64,7 +71,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   const [valoriCl, setValoriCl] = useMemoria<Valori>('filtri-clienti', { subagenti: [] });
   const [finestra, setFinestra] = useState<ReactNode>(null);
   // D-162: la finestra delle percentuali è FormPercentuali (condivisa con «Apri la pratica»)
-  const [formPct, setFormPct] = useState<{ versione?: Versione } | null>(null);
+  const [formPct, setFormPct] = useState<{ scaglione?: ScaglioneVersione; validoDal?: string } | null>(null);
   const [errore, setErrore] = useState('');
   const [errorePercentuali, setErrorePercentuali] = useState(false);
   const sagome = useSagome(!fornitori);
@@ -116,8 +123,9 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   // D-113: senza una versione in vigore la pratica non si apre; dopo il salvataggio lo dice subito `in_vigore`
   const mancanoScaglioni = percentuali ? percentuali.in_vigore === null : (u?.mancano_scaglioni ?? false);
 
-  const chiedi = (titolo: string, testo: ReactNode, etichetta: string, pericolo = false) =>
-    new Promise<boolean>((ok) => setFinestra(<Conferma titolo={titolo} testo={testo} etichetta={etichetta} pericolo={pericolo} onRisposta={(si) => { chiudi(); ok(si); }} />));
+  // D-172: conferma con casella per le operazioni senza ritorno
+  const chiediGrave = (titolo: string, punti: ReactNode[], etichetta: string, etichettaCasella?: string) =>
+    new Promise<boolean>((ok) => setFinestra(<ConfermaGrave titolo={titolo} punti={punti} etichettaCasella={etichettaCasella} etichetta={etichetta} onRisposta={(si) => { chiudi(); ok(si); }} />));
 
   function modificaRegole(x: Dettaglio) {
     setFinestra(
@@ -127,6 +135,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
           { nome: 'giorno_bollettino', etichetta: 'Giorno del bollettino (mese successivo)', tipo: 'testo', valore: String(x.giorno_bollettino) },
           { nome: 'tipo_provvigione', etichetta: 'Tipo di provvigione', tipo: 'select', valore: x.tipo_provvigione, opzioni: [{ value: 'maturato', label: 'Sul maturato' }, { value: 'fatturato', label: 'Sul fatturato' }] },
           { nome: 'giorni_incasso', etichetta: 'Giorni per l’incasso dal cliente', tipo: 'testo', valore: String(x.giorni_incasso) },
+          { nome: 'spese_base_provvigione', etichetta: 'Spese nella base della provvigione (trasporto, imballo)', tipo: 'casella', valore: x.spese_base_provvigione, largo: true },
           { nome: 'note', etichetta: 'Note', tipo: 'testo', valore: x.note ?? '', largo: true },
         ]}
         onChiudi={chiudi}
@@ -137,6 +146,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
           if (v.tipo_provvigione !== undefined) corpo.tipo_provvigione = v.tipo_provvigione;
           if (v.giorni_incasso !== undefined) corpo.giorni_incasso = Number(v.giorni_incasso);
           if (v.note !== undefined) corpo.note = v.note;
+          // la casella non compare nel corpo quando non è spuntata (D-183: esclusa è il predefinito)
+          corpo.spese_base_provvigione = v.spese_base_provvigione === 'on';
           const r = await api<Dettaglio>('fornitori/' + x.id, corpo, 'PUT');
           if (!r.ok) return r.messaggio;
           avviso('Regole salvate');
@@ -148,17 +159,33 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
     );
   }
 
-  function nuovePercentuali() {
-    setFormPct({});
+  // D-168: un solo scaglione alla volta; la data (editable) decide se entra nella versione esistente
+  // o ne crea una nuova (il server copia gli scaglioni in vigore a quella data, come «Nuove percentuali»).
+  function aggiungiScaglione(validoDal?: string) {
+    setFormPct({ validoDal });
   }
 
-  function correggi(v: Versione) {
-    setFormPct({ versione: v });
+  function modificaScaglione(s: ScaglioneVersione) {
+    setFormPct({ scaglione: s });
+  }
+
+  async function eliminaScaglione(v: Versione, s: ScaglioneVersione) {
+    if (!u) return;
+    if (!(await chiediGrave('Eliminare lo scaglione da ' + pct(s.sconto_min) + '?',
+      ['Lo scaglione sparisce dalla versione dal ' + dataIt(v.valido_dal) + '.', 'Se è usato da un’eccezione personale o da un periodo chiuso il server rifiuta.'],
+      'Elimina'))) return;
+    const scaglioni = v.scaglioni.filter((x) => x.id !== s.id).map((x) => ({ sconto_min: x.sconto_min, pct_agente: x.pct_agente, pct_subagente: x.pct_subagente }));
+    const r = await api<Percentuali>('fornitori/' + u.id + '/percentuali/' + v.valido_dal, { scaglioni }, 'PUT');
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    avviso('Scaglione eliminato');
+    setPercentuali(r.dati);
   }
 
   async function eliminaVersione(v: Versione) {
     if (!u) return;
-    if (!(await chiedi('Eliminare le percentuali dal ' + dataIt(v.valido_dal) + '?', 'La versione sparisce: i documenti da quel giorno tornano alle percentuali della versione precedente.', 'Elimina', true))) return;
+    if (!(await chiediGrave('Eliminare le percentuali dal ' + dataIt(v.valido_dal) + '?',
+      ['La versione sparisce in modo definitivo.', 'I documenti da quel giorno tornano alle percentuali della versione precedente.'],
+      'Elimina'))) return;
     const r = await api('fornitori/' + u.id + '/percentuali/' + v.valido_dal, undefined, 'DELETE');
     if (!r.ok) { avviso(r.messaggio, true); return; }
     avviso('Versione eliminata');
@@ -186,14 +213,34 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
 
   const colonneScaglioni: Colonna<ScaglioneVersione>[] = [
     { key: 'sconto_min', header: 'Sconto', align: 'center', cell: (s) => pct(s.sconto_min) },
-    { key: 'pct_agente', header: 'A Decobrands', align: 'center', cell: (s) => pct(s.pct_agente) },
+    { key: 'pct_agente', header: 'Dal fornitore', align: 'center', cell: (s) => pct(s.pct_agente) },
     {
-      key: 'pct_subagente', header: 'Al subagente', align: 'center', classe: () => 'avvolgi', cell: (s) => <>{pct(s.pct_subagente)}
+      key: 'pct_subagente', header: 'di cui al subagente', align: 'center', classe: () => 'avvolgi', cell: (s) => <>{pct(s.pct_subagente)}
         {s.eccezioni.map((e) => <span key={e.id} className="sec-riga">{e.subagente} {pct(e.pct_personale)} · dal {dataIt(e.valido_dal)}{e.valido_al ? ' al ' + dataIt(e.valido_al) : ''}</span>)}
       </>,
     },
-    { key: 'dal_fornitore', header: 'Totale', align: 'center', cell: (s) => pct(s.dal_fornitore) },
+    { key: 'margine', header: 'Margine Decobrands', align: 'center', cell: (s) => pct(s.pct_agente - s.pct_subagente) },
     { key: 'clienti', header: 'Clienti', align: 'center' },
+  ];
+
+  // D-168, D-171: matita e cestino per riga (solo nelle versioni modificabili); l'ultimo scaglione
+  // non si elimina dalla tabella (si elimina la versione).
+  const AZIONI_SCAGLIONE: AzioneRiga[] = [
+    { nome: 'modifica', icona: 'matita', etichetta: 'Modifica' },
+    { nome: 'elimina', icona: 'cestino', etichetta: 'Elimina', variante: 'pericolo' },
+  ];
+  const colonneScaglioniConAzioni = (v: Versione): Colonna<ScaglioneVersione>[] => [
+    ...colonneScaglioni,
+    ...(puoModificare && v.modificabile ? [{
+      key: 'azioni', header: '', align: 'center' as const, sortable: false,
+      cell: (s: ScaglioneVersione) => (
+        <AzioniRiga azioni={AZIONI_SCAGLIONE} oggetto={'lo scaglione da ' + pct(s.sconto_min)}
+          riga={[
+            { nome: 'modifica', onClick: () => modificaScaglione(s) },
+            { nome: 'elimina', onClick: () => void eliminaScaglione(v, s), disabilitata: v.scaglioni.length === 1 },
+          ]} />
+      ),
+    }] : []),
   ];
 
   const colonneClienti: Colonna<ClienteSeguito>[] = [
@@ -201,7 +248,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
     { key: 'subagente', header: 'Seguito da', cell: (c) => c.subagente ?? '—' },
     { key: 'codice_cliente_fornitore', header: 'Codice cliente', cell: (c) => c.codice_cliente_fornitore ?? '—' },
     { key: 'sconto', header: 'Sconto', align: 'center', cell: (c) => c.sconto + ' %' },
-    { key: 'periodo', header: 'Periodo', cell: (c) => (c.valido_dal + (c.valido_al ? ' → ' + c.valido_al : '')) },
+    { key: 'periodo', header: 'Periodo', cell: (c) => (dataIt(c.valido_dal) + (c.valido_al ? ' → ' + dataIt(c.valido_al) : '')) },
   ];
 
   const pagina = (corpo?: ReactNode) => (
@@ -211,7 +258,10 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
       {finestra}
       {formPct && u && (
         <FormPercentuali idFornitore={u.id} ragioneSociale={u.ragione_sociale}
-          correzione={formPct.versione ?? null}
+          scaglione={formPct.scaglione ?? null}
+          validoDal={formPct.validoDal}
+          validoDalFisso={!!formPct.scaglione}
+          scontoFisso={!!formPct.scaglione}
           onSalvata={(p) => { setPercentuali(p); setFormPct(null); }}
           onChiudi={() => setFormPct(null)} />
       )}
@@ -246,7 +296,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
           <>
             <Dettagli inColonne voci={[
               { etichetta: 'Ragione sociale', valore: u.ragione_sociale ?? '—' },
-              { etichetta: 'P.IVA', valore: u.piva ?? '—' },
+              { etichetta: 'P.IVA', valore: u.piva ? <>{u.piva}<Copiabile valore={u.piva} /></> : '—' },
               { etichetta: 'Paese', valore: u.paese ?? '—' },
               { etichetta: 'Codice soggetto', valore: u.soggetto_codice ?? '—' },
               { etichetta: 'Codice Integra', valore: u.codice_integra ?? '—' },
@@ -254,9 +304,10 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               { etichetta: 'Giorno del bollettino', valore: u.giorno_bollettino },
               { etichetta: 'Tipo di provvigione', valore: u.tipo_provvigione === 'maturato' ? 'Sul maturato' : 'Sul fatturato' },
               { etichetta: 'Giorni per l’incasso', valore: u.giorni_incasso },
+              { etichetta: 'Spese nella base', valore: u.spese_base_provvigione ? 'Sì (incluse)' : 'No (escluse)' },
               { etichetta: 'Note', valore: u.note ?? '—' },
             ]} />
-            <Schede riempi memoria="fornitori" schede={[
+            <Schede riempi memoria={schedaParam ? undefined : 'fornitori'} attiva={schedaParam ?? undefined} schede={[
               {
                 id: 'percentuali', etichetta: 'Percentuali', contenuto: () => (
                   <div className="pila riempi">
@@ -267,14 +318,14 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
                           {!puoModificare && <span className="testo-tenue"> Serve il livello responsabile in Dati.</span>}
                         </span>
                         <Pulsante piccolo a={{
-                          etichetta: 'Configura gli scaglioni', variante: 'sec', onClick: nuovePercentuali,
+                          etichetta: 'Configura gli scaglioni', variante: 'sec', onClick: () => aggiungiScaglione(),
                           disabilitato: !puoModificare, titolo: puoModificare ? undefined : 'Serve il livello responsabile in Dati',
                         }} />
                       </div>
                     )}
                     <div className="strumenti-scheda">
                       <span className="spazio" />
-                      {puoModificare && percentuali && !mancanoScaglioni && <button type="button" className="btn sec piccolo" onClick={nuovePercentuali}>Nuove percentuali</button>}
+                      {puoModificare && percentuali && !mancanoScaglioni && <button type="button" className="btn sec piccolo" onClick={() => aggiungiScaglione(percentuali.in_vigore ?? undefined)}>Aggiungi scaglione</button>}
                     </div>
                     {!percentuali
                       ? errorePercentuali ? <div className="vuoto">Percentuali non caricate.</div> : <SagomaTabella righe={4} colonne={5} />
@@ -284,14 +335,13 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
                             <h3>{tipo === 'in vigore' ? 'In vigore dal ' + dataIt(v.valido_dal) : 'Dal ' + dataIt(v.valido_dal)}</h3>
                             {tipo !== 'in vigore' && <span className="testo-tenue">{tipo}</span>}
                             <span className="spazio" />
-                            {puoModificare && v.modificabile && <button type="button" className="btn sec piccolo" onClick={() => correggi(v)}>Correggi</button>}
                             {puoModificare && v.modificabile && percentuali.versioni.length > 1 &&<button type="button" className="btn sec piccolo" onClick={() => void eliminaVersione(v)}>Elimina</button>}
                           </div>
-                          <DataTable compatta naturale righe={v.scaglioni} colonne={colonneScaglioni} chiave={(s) => s.id}
+                          <DataTable compatta naturale righe={v.scaglioni} colonne={colonneScaglioniConAzioni(v)} chiave={(s) => s.id}
                             ordinamentoIniziale={{ key: 'sconto_min', dir: 'asc' }} emptyText="Nessuno scaglione" />
                         </div>
                       ))}
-                    <Nota>Totale = % a Decobrands + % al subagente; Clienti = clienti seguiti con quello sconto. I documenti si calcolano con le percentuali in vigore alla loro data. Una versione nuova, una correzione o un’eccezione valgono da una data dopo l’ultima chiusura (bollettino verificato o contestato, trimestre liquidato): prima il server rifiuta.</Nota>
+                    <Nota>Dal fornitore = % che il fornitore riconosce a Decobrands; di cui al subagente = la parte girata al subagente; Margine Decobrands = la differenza. Clienti = clienti seguiti con quello sconto. I documenti si calcolano con le percentuali in vigore alla loro data. Un nuovo scaglione, una sua modifica o un’eccezione valgono da una data dopo l’ultima chiusura (bollettino verificato o contestato, trimestre liquidato): prima il server rifiuta.</Nota>
                   </div>
                 ),
               },

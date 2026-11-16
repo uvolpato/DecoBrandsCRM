@@ -7,8 +7,9 @@ import type { Request } from 'express';
 import { Richiede, contesto, permessiDi } from './accesso';
 import { ForbiddenException } from '@nestjs/common';
 import { giornoRoma } from './motore/dati';
-import { dopoChiusura } from './fornitori';
+import { dopoChiusura, controllaQuotaSubagente } from './fornitori';
 import { PrismaService } from './prisma.service';
+import { ricalcolaDocumentiAperti } from './pratiche';
 import { normalizzaNome } from './proposta';
 import { logEvent } from './registro';
 import { normalizzaPiva, segnaUsata } from './storico';
@@ -288,6 +289,8 @@ export class ClientiController {
       if (!cliente) throw new NotFoundException('Cliente non trovato');
       const sub = await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id!) } });
       if (!sub) throw new NotFoundException('Subagente non trovato');
+      // D-166 §19: la % del subagente non supera la % che il fornitore riconosce a Decobrands
+      if (b.pct_subagente != null) await controllaQuotaSubagente(tx, fornitore.id, b.sconto ?? 0, b.valido_dal!, b.pct_subagente);
       // D-112, V13: la riga dello storico si legge bloccata e si consuma una volta sola (409 se già
       // usata): due agenzie con lo stesso storico_id non si sovrascrivono.
       let legame: interscambio_storico | null = null;
@@ -334,6 +337,7 @@ export class ClientiController {
         },
       }, contesto(req));
       if (legame) await segnaUsata(tx, legame.id, creato.id, 'Agenzia creata dal CRM'); // D-112, stessa transazione
+      await ricalcolaDocumentiAperti(tx, creato.fornitore_id); // D-183: agenzia nuova → ricalcola gli aperti del fornitore
       return mappaAgenzia(creato as never);
     }));
   }
@@ -374,6 +378,8 @@ export class ClientiController {
         valido_al: b.valido_al !== undefined ? (b.valido_al ? new Date(b.valido_al) : null) : prima.valido_al,
       };
       if (dopoData.valido_al && dopoData.valido_al <= dopoData.valido_dal) throw new BadRequestException('La data di fine deve essere dopo la data di inizio');
+      // D-166 §19: la % del subagente non supera la % che il fornitore riconosce a Decobrands
+      if (dopoData.pct_subagente != null) await controllaQuotaSubagente(tx, dopoData.fornitore_id, dopoData.sconto, iso(dopoData.valido_dal)!, dopoData.pct_subagente);
       const campi = ['subagente_id', 'fornitore_id', 'codice_cliente_fornitore', 'sconto', 'pct_subagente', 'regola_mensile', 'valido_dal', 'valido_al'] as const;
       const primaDiff: Record<string, unknown> = {};
       const dopoDiff: Record<string, unknown> = {};
@@ -454,6 +460,8 @@ export class ClientiController {
           ...(prima.da_confermare ? { confermata: true } : {}),
         },
       }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, prima.fornitore_id); // D-183: agenzia cambiata → ricalcola gli aperti
+      if (cambiaFornitore) await ricalcolaDocumentiAperti(tx, dopoData.fornitore_id); // e quelli del fornitore nuovo
       return mappaAgenzia(dopo as never);
     }));
   }
@@ -528,6 +536,7 @@ export class ClientiController {
           sconto: Number(a.sconto),
         },
       }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, a.fornitore_id); // D-183: agenzia eliminata → ricalcola gli aperti
     });
   }
 }

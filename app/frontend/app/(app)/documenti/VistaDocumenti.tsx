@@ -10,7 +10,7 @@ import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
 import { useEventi } from '@/lib/eventi';
-import { euro } from '@/lib/formati';
+import { data, euro } from '@/lib/formati';
 import { VistaDocumento } from './[id]/VistaDocumento';
 
 // Pagina Documenti come il prototipo (F6-A4b, §7.9, D-73): una sola pagina, a sinistra
@@ -29,9 +29,9 @@ const LIVELLO: Record<string, { testo: string; v: Variante }> = {
 
 interface Documento {
   id: string; file_nome: string; file_tipo: string; tipo: string | null; numero: string | null;
-  data: string | null; fornitore_id: string | null; fornitore: string | null; codice_cliente: string | null;
+  numero_ordine_fornitore: string | null; data: string | null; fornitore_id: string | null; fornitore: string | null; codice_cliente: string | null;
   cliente: string | null; importo: number | null; livello: string | null; stato: string; ricevuto_il: string;
-  letto_il: string | null; controlli_n: number; manca_agenzia: boolean;
+  letto_il: string | null; controlli_n: number; confronto_n: number; manca_agenzia: boolean;
   manca_rappresentanza: boolean; fornitore_da_integra: boolean; cliente_da_integra: boolean;
 }
 interface Risposta {
@@ -150,12 +150,13 @@ export function VistaDocumenti() {
                 return {
                   id: d.id,
                   href: '/documenti/' + d.id,
-                  titolo: inCoda ? d.file_nome : (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : ''),
+                  titolo: inCoda ? d.file_nome : (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : d.tipo === 'pagamento' && d.data ? ' del ' + data(d.data) + (d.importo != null ? ' · ' + euro(d.importo) : '') : '') + (d.numero_ordine_fornitore && d.tipo !== 'ordine' ? ' · ordine ' + d.numero_ordine_fornitore : ''),
                   valore: inCoda ? '' : d.importo == null ? '' : euro(d.importo),
                   sotto: inCoda ? 'arrivato il ' + quando(d.ricevuto_il) : (d.fornitore ?? 'fornitore non riconosciuto') + ' · caricato il ' + quando(d.ricevuto_il),
                   stato: inCoda ? <Stato v="info">{d.stato === 'in_coda' ? 'In coda' : 'In lettura'}</Stato>
-                    : l || d.manca_agenzia || d.manca_rappresentanza || d.fornitore_da_integra || d.cliente_da_integra ? <>
+                    : l || d.confronto_n > 0 || d.manca_agenzia || d.manca_rappresentanza || d.fornitore_da_integra || d.cliente_da_integra ? <>
                       {l ? <Stato v={l.v}>{l.testo}</Stato> : null}
+                      {d.confronto_n > 0 ? <Stato v="attesa">{d.confronto_n} {d.confronto_n === 1 ? 'avviso' : 'avvisi'}</Stato> : null}
                       {d.fornitore_da_integra ? <Stato v="info">Fornitore in Integra</Stato> : null}
                       {d.cliente_da_integra ? <Stato v="info">Cliente in Integra</Stato> : null}
                       {d.manca_rappresentanza ? <Stato v="attesa">Non rappresentato</Stato> : null}

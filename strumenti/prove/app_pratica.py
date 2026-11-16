@@ -9,6 +9,7 @@
 # Uso: python strumenti/prove/app_pratica.py <suffisso> <cartella schermate> [base]
 import sys, pathlib, re, time
 from playwright.sync_api import sync_playwright
+import segmenti as segm
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
 BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8011'
@@ -43,7 +44,6 @@ with sync_playwright() as p:
         pg.wait_for_selector('.dt tbody tr.cliccabile')
         return pg
     testo = lambda pg, s: pg.locator(s).first.inner_text()
-    seg = lambda pg, t: pg.locator('.segmenti [role=tab]:has-text("%s")' % t)
     scheda = lambda pg, t: pg.locator('.schede-barra [role=tab]:has-text("%s")' % t)
     sovr = lambda pg: pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth')
     def apri_pratica(pg, riga=0):
@@ -68,9 +68,20 @@ with sync_playwright() as p:
         pg.locator('.modale .ricerca-menu li[role=option]').filter(has_text=numero).first.click()
         pg.wait_for_timeout(300)
     def filtra(pg, etichetta, attesa):
-        seg(pg, etichetta).click()
+        segm.scegli(pg, etichetta)
         # la lista arriva dal server: si aspetta la prima riga con lo stato che il filtro promette
         pg.wait_for_function("(t) => { const r = document.querySelector('.dt tbody tr.cliccabile'); return !!r && r.innerText.includes(t) }", arg=attesa)
+    def mano(pg):
+        # D-186: la finestra Registra apre sulla coda se c'è un documento compatibile; si passa a mano
+        b = pg.locator('.modale button:has-text("Inserisci a mano")')
+        if not b.count():
+            return
+        try:
+            pg.wait_for_function("() => !document.querySelector('.modale')?.innerText.includes('Caricamento dei documenti in coda')", timeout=8000)
+        except Exception:
+            pass
+        b.click()
+        pg.wait_for_timeout(100)
 
     # --- amministratore: dettaglio di una pratica con variazioni ---
     pg = entra(S + '-ammi', 1440)
@@ -89,10 +100,10 @@ with sync_playwright() as p:
     righe_var = pg.locator('.dt tbody tr').count()
     ok(righe_var == n_var and pg.locator('.dt tbody tr.evidenzia').count() == n_var, 'solo le %d righe che cambiano, evidenziate' % n_var)
     ok(pg.locator('.dt thead th').count() >= 4, 'colonne del confronto: articolo, fasi e differenza')
-    opz = pg.locator('.filtri .segmenti [role=tab]').all_inner_texts()
+    opz = [segm.testo_voce(pg, i, '.filtri ') for i in range(segm.quanti(pg, '.filtri '))]
     ok(len(opz) == 2 and 'Solo righe che cambiano' in opz[0] and 'Tutte le righe' in opz[1], 'segmenti: %s' % ' · '.join(opz))
     pg.screenshot(path=str(USCITA / 'app-pratica-righe-1440.png'), full_page=True)
-    pg.locator('.filtri .segmenti [role=tab]:has-text("Tutte le righe")').click(); pg.wait_for_timeout(400)
+    segm.scegli(pg, 'Tutte le righe', '.filtri '); pg.wait_for_timeout(400)
     tutte = pg.locator('.dt tbody tr').count()
     ok(tutte > righe_var, 'Tutte le righe: %d righe' % tutte)
 
@@ -102,6 +113,11 @@ with sync_playwright() as p:
     ok('righe cambian' in testo(pg, '.avviso-variazioni') and 'totale' in testo(pg, '.avviso-variazioni'), 'avviso delle variazioni nel Riepilogo')
     ok(pannello(pg, 'Provvigione').locator('.cifre').count() == 1, 'Riepilogo: la provvigione calcolata dal server')
     ok('Da ' in testo(pg, '.cifre') and '%' in testo(pg, '.cifre'), 'provvigione: percentuali e quota a Decobrands')
+    # 15/11/2026: link diretti — cliente e fornitore nella testata portano alla loro scheda, la provvigione alle percentuali
+    sotto = pg.locator('.testa .sotto')
+    ok(sotto.locator('a[href^="/clienti/"]').count() == 1 and sotto.locator('a[href^="/fornitori/"]').count() == 1,
+       'testata: cliente e fornitore sono link alle loro schede')
+    ok(pg.locator('.cifre a[href*="scheda=percentuali"]').count() == 1, 'riepilogo provvigione: link alle percentuali del fornitore')
     ok(pannello(pg, 'Documenti fiscali').locator('.elenco').count() == 1, 'Riepilogo: la card Documenti fiscali')
     pg.screenshot(path=str(USCITA / 'app-pratica-1440.png'), full_page=True)
 
@@ -122,11 +138,11 @@ with sync_playwright() as p:
 
     # --- ritorno all'elenco nello stesso punto (filtro, ordinamento) ---
     pg.goto(BASE + '/pratiche'); pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.dt tbody tr.cliccabile')
-    seg(pg, 'Con variazioni').click(); pg.wait_for_timeout(1200)
+    segm.scegli(pg, 'Con variazioni'); pg.wait_for_timeout(1200)
     pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(1200)
     elenco_url = pg.url
     apri_pratica(pg); pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(900)
-    ok(pg.url == elenco_url and seg(pg, 'Con variazioni').get_attribute('aria-selected') == 'true', 'indietro: stesso filtro di stato')
+    ok(pg.url == elenco_url and segm.scelta(pg, 'Con variazioni'), 'indietro: stesso filtro di stato')
     ok(pg.locator('.dt th.attivo:has-text("Importo")').get_attribute('aria-sort') in ('ascending', 'descending'), 'indietro: stesso ordinamento')
 
     # --- fattura con PDF, nota di credito, annullamento ---
@@ -137,6 +153,7 @@ with sync_playwright() as p:
     numero_ft = 'FT-' + marca
     pg.click('button:has-text("Registra fattura")'); pg.wait_for_selector('.modale')
     ok(pg.locator('.modale h2').inner_text() == 'Registra la fattura', 'si apre la finestra della fattura')
+    mano(pg)
     pg.fill('#c-numero', numero_ft); pg.fill('#c-importo', '1000')
     pg.set_input_files('.modale .caricamento input[type=file]', str(PDF)); pg.wait_for_timeout(300)
     pg.click('.modale-piede button[type=submit]')
@@ -161,15 +178,15 @@ with sync_playwright() as p:
     ok(inc.count() == 1, 'Riepilogo: il riquadro Incasso del cliente')
     riga_inc = inc.locator('.incasso-riga', has_text=numero_ft)
     ok(riga_inc.count() == 1 and 'In attesa di incasso' in riga_inc.inner_text(), 'la fattura appena registrata è In attesa di incasso')
-    riga_inc.locator('button:has-text("Segna come non pagata")').click(); pg.wait_for_selector('.modale')
+    riga_inc.locator('button[aria-label^="Segna come non pagata"]').click(); pg.wait_for_selector('.modale')
     ok('non pagata' in testo(pg, '.modale h2'), 'si apre la finestra della segnalazione con la nota')
     pg.fill('#c-nota', 'email di prova del fornitore')
     pg.click('.modale-piede button[type=submit]')
     pg.wait_for_function("document.querySelector('.velo') === null"); pg.wait_for_timeout(1500)
     riga_inc = pannello_esatto(pg, 'Incasso del cliente').locator('.incasso-riga', has_text=numero_ft)
     ok('Non pagata' in riga_inc.inner_text() and 'email di prova del fornitore' in riga_inc.inner_text(), 'segnalazione: Non pagata con la nota')
-    ok(riga_inc.locator('button:has-text("Segna come pagata")').count() == 1, 'con una segnalazione si può segnare come pagata')
-    riga_inc.locator('button:has-text("Sollecita il cliente")').click(); pg.wait_for_selector('.modale')
+    ok(riga_inc.locator('button[aria-label^="Segna come pagata"]').count() == 1, 'con una segnalazione si può segnare come pagata')
+    riga_inc.locator('button[aria-label^="Sollecita"]').click(); pg.wait_for_selector('.modale')
     ok(testo(pg, '.modale h2') == 'Solleciti di pagamento', 'si apre la finestra dei solleciti su quel cliente')
     ok(numero_ft in pg.locator('.testo-email').input_value(), 'il testo del sollecito contiene la fattura')
     pg.locator('.modale-piede button:has-text("Copia il testo")').click(); pg.wait_for_timeout(1200)
@@ -177,7 +194,7 @@ with sync_playwright() as p:
     pg.locator('.modale-piede button:has-text("Chiudi")').click(); pg.wait_for_timeout(2200)
     riga_inc = pannello_esatto(pg, 'Incasso del cliente').locator('.incasso-riga', has_text=numero_ft)
     ok('sollecitata 1 volta' in riga_inc.inner_text(), 'il sollecito resta sulla fattura (quante volte)')
-    riga_inc.locator('button:has-text("Segna come pagata")').click(); pg.wait_for_timeout(1500)
+    riga_inc.locator('button[aria-label^="Segna come pagata"]').click(); pg.wait_for_timeout(1500)
     riga_inc = pannello_esatto(pg, 'Incasso del cliente').locator('.incasso-riga', has_text=numero_ft)
     ok('Pagata' in riga_inc.inner_text(), 'segna come pagata: la fattura passa a Pagata')
     pg.screenshot(path=str(USCITA / 'app-pratica-incasso-1440.png'), full_page=True)
@@ -185,6 +202,7 @@ with sync_playwright() as p:
     # nota di credito oltre il residuo: errore del server nella finestra, che resta aperta
     pg.click('button:has-text("Nota di credito")'); pg.wait_for_selector('.modale')
     ok(pg.locator('.modale h2').inner_text() == 'Registra la nota di credito', 'si apre la finestra della nota di credito')
+    mano(pg)
     pg.fill('#c-numero', 'NC-' + marca); pg.fill('#c-importo', '5000')
     pg.click('.modale-piede button[type=submit]'); pg.wait_for_selector('.modulo-errore:not([hidden])')
     ok('supera la fattura' in testo(pg, '.modulo-errore'), 'nota oltre il residuo: errore visibile «%s»' % testo(pg, '.modulo-errore')[:60])
@@ -196,14 +214,14 @@ with sync_playwright() as p:
     ok('Netto 900,00' in pannello(pg, 'Documenti fiscali').inner_text(), 'netto aggiornato: 900,00')
 
     # annullamento: prima la nota di credito, poi la fattura (che rimette il file in coda)
-    riga_nc.locator('button:has-text("Annulla")').click(); pg.wait_for_selector('.velo')
+    riga_nc.locator('button[aria-label^="Annulla"]').click(); pg.wait_for_selector('.velo')
     ok('Annullare la nota di credito' in testo(pg, '.modale h2'), 'conferma dell’annullamento')
-    pg.click('.modale-piede button.pericolo')
+    pg.click('.velo .casella-grave input'); pg.click('.modale-piede button.pericolo')
     pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='NC-' + marca).wait_for(state='detached', timeout=20000)
     ok(pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='NC-' + marca).count() == 0, 'annullata la nota di credito')
     ok('Netto 1.000,00' in pannello(pg, 'Documenti fiscali').inner_text(), 'netto tornato a 1.000,00')
-    pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text=numero_ft).locator('button:has-text("Annulla")').click()
-    pg.wait_for_selector('.velo'); pg.click('.modale-piede button.pericolo')
+    pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text=numero_ft).locator('button[aria-label^="Annulla"]').click()
+    pg.wait_for_selector('.velo'); pg.click('.velo .casella-grave input'); pg.click('.modale-piede button.pericolo')
     pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text=numero_ft).wait_for(state='detached', timeout=20000)
     pg.wait_for_timeout(600)
     ok('Confermata' in testo(pg, '.testa .stato'), 'annullata la fattura: la pratica torna Confermata')
@@ -213,6 +231,7 @@ with sync_playwright() as p:
     ok(pannello_esatto(pg, 'Pagamento del cliente').count() == 0, 'senza pagamenti: nessun segno Pagato')
     pg.click('button:has-text("Registra un documento")'); pg.wait_for_selector('.modale')
     ok(testo(pg, '.modale h2') == 'Registra un documento', 'si apre la finestra del documento con la tendina del tipo')
+    mano(pg)
     pg.select_option('#c-tipo', 'pagamento')
     pg.fill('#c-numero', 'PROVA-PAG-' + marca); pg.fill('#c-importo', '250')
     pg.click('.modale-piede button[type=submit]')
@@ -253,10 +272,26 @@ with sync_playwright() as p:
     ok('nessuna' in testo(pg, '.affiancata'), 'nessuna variazione: la differenza della finestra è quella del server')
     pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
 
+    # --- affiancati-righe (D-173): con un solo documento la tabella mostra le righe del documento ---
+    cerca_e_apri(pg, 'OF/2026/042')
+    pg.click('button:has-text("Consulta affiancati")')
+    pg.wait_for_selector('.affiancata .dt tbody tr')
+    ok(pg.locator('.affiancata select[aria-label="Documento con cui confrontare"]').is_disabled(),
+       'un solo documento: la tendina «Confrontato con» è spenta')
+    n_righe = pg.locator('.affiancata .dt tbody tr').count()
+    ok(n_righe > 0, 'a destra le righe del documento anche senza confronto (%d righe)' % n_righe)
+    testa = testo(pg, '.affiancata .dt thead')
+    ok(all(t in testa for t in ('Articolo', 'Descrizione', 'Quantità', 'Prezzo', 'Importo')),
+       'colonne del documento senza confronto: %s' % testa.replace('\n', ' '))
+    ok('Totale' in testo(pg, '.affiancata .dt tfoot'), 'importo col totale nel piede')
+    pg.screenshot(path=str(USCITA / 'app-pratica-affiancati-1440.png'), full_page=True)
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+
     # --- D-60: proforma al posto della conferma e più ordini nello stesso binario ---
     cerca_e_apri(pg, 'OF/2026/041')
     ok(pg.locator('.binario .tappa').nth(1).locator('h3').inner_text() == 'Conferma', 'prima della proforma: la fase è Conferma')
     pg.click('button:has-text("Registra un documento")'); pg.wait_for_selector('.modale')
+    mano(pg)
     pg.select_option('#c-tipo', 'proforma')
     pg.fill('#c-numero', 'PROVA-PRO-' + marca); pg.fill('#c-importo', '500')
     pg.click('.modale-piede button[type=submit]')
@@ -265,7 +300,21 @@ with sync_playwright() as p:
     ok('fatta' in (pg.locator('.binario .tappa').nth(1).get_attribute('class') or ''), 'la fase Proforma è fra quelle fatte')
     ok(pannello_esatto(pg, 'Documenti').locator('.elenco li', has_text='PROVA-PRO-' + marca).count() == 1, 'la proforma è fra i Documenti')
 
+    # --- D-174: più proforme parziali → progresso «Confermato X di Y», poi una che si somma ---
+    corpo = pg.locator('.pannello-corpo.senza-margine').inner_text()
+    ok('Confermato' in corpo and 'confermato in parte' in corpo,
+       'D-174: il progresso «Confermato X di Y · confermato in parte»')
     pg.click('button:has-text("Registra un documento")'); pg.wait_for_selector('.modale')
+    mano(pg)
+    pg.select_option('#c-tipo', 'proforma')
+    pg.fill('#c-numero', 'PROVA-PRO2-' + marca); pg.fill('#c-importo', '100')
+    pg.click('.modale-piede button[type=submit]')
+    pg.wait_for_function("document.querySelector('.velo') === null"); pg.wait_for_timeout(1800)
+    corpo = pg.locator('.pannello-corpo.senza-margine').inner_text()
+    ok('Proforme' in corpo and 'Confermato 600,00' in corpo, 'D-174: due proforme si sommano nel progresso')
+
+    pg.click('button:has-text("Registra un documento")'); pg.wait_for_selector('.modale')
+    mano(pg)
     pg.select_option('#c-tipo', 'ordine')
     pg.fill('#c-numero', 'PROVA-OF-' + marca)
     pg.set_input_files('.modale .caricamento input[type=file]', str(PDF2)); pg.wait_for_timeout(300)
@@ -286,6 +335,7 @@ with sync_playwright() as p:
     # --- D-60: fatturata senza conferma: Conferma — Non arrivata ---
     cerca_e_apri(pg, 'OF/2026/047')
     pg.click('button:has-text("Registra fattura")'); pg.wait_for_selector('.modale')
+    mano(pg)
     pg.fill('#c-numero', 'PROVA-FT-' + marca); pg.fill('#c-importo', '800')
     pg.click('.modale-piede button[type=submit]')
     pg.wait_for_function("document.querySelector('.velo') === null"); pg.wait_for_timeout(1800)
@@ -298,7 +348,7 @@ with sync_playwright() as p:
 
     # --- D-60: spostamento di un documento in un'altra pratica dello stesso fornitore ---
     riga_ft2 = pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='PROVA-FT-' + marca)
-    riga_ft2.locator('button:has-text("Sposta")').click(); pg.wait_for_selector('.modale')
+    riga_ft2.locator('button[aria-label^="Sposta"]').click(); pg.wait_for_selector('.modale')
     ok(testo(pg, '.modale h2').startswith('Sposta'), 'si apre la finestra Sposta')
     campo = pg.locator('.modale .campo-ricerca input.ricerca-testo')
     campo.fill('OF/2026/042'); pg.wait_for_timeout(500)
@@ -316,7 +366,7 @@ with sync_playwright() as p:
 
     # --- D-60: il 409 del server (l'unico ordine della pratica) si legge nella finestra ---
     cerca_e_apri(pg, 'OF/2026/047')
-    pannello_esatto(pg, 'Documenti').locator('.elenco li', has_text='OF/2026/047').first.locator('button:has-text("Sposta")').click()
+    pannello_esatto(pg, 'Documenti').locator('.elenco li', has_text='OF/2026/047').first.locator('button[aria-label^="Sposta"]').click()
     pg.wait_for_selector('.modale')
     scegli_pratica(pg, 'OF/2026/041')
     pg.click('.modale-piede button[type=submit]'); pg.wait_for_selector('.modulo-errore:not([hidden])')
@@ -339,8 +389,8 @@ with sync_playwright() as p:
 
     # la fattura spostata si annulla dalla pratica di arrivo (pulizia del giro di prova)
     cerca_e_apri(pg, 'OF/2026/041')
-    pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='PROVA-FT-' + marca).locator('button:has-text("Annulla")').click()
-    pg.wait_for_selector('.velo'); pg.click('.modale-piede button.pericolo')
+    pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='PROVA-FT-' + marca).locator('button[aria-label^="Annulla"]').click()
+    pg.wait_for_selector('.velo'); pg.click('.velo .casella-grave input'); pg.click('.modale-piede button.pericolo')
     riga_ann = pannello(pg, 'Documenti fiscali').locator('.elenco li', has_text='PROVA-FT-' + marca)
     riga_ann.wait_for(state='detached', timeout=20000)
     ok(riga_ann.count() == 0, 'annullata la fattura spostata')
@@ -362,6 +412,24 @@ with sync_playwright() as p:
       return fatti;
     }""")
     ok(all(t[2] == 204 for t in tolti), 'pulizia dei documenti di prova: %s' % tolti)
+
+    # --- 15/11/2026: catena navigabile pratica → fornitore → percentuali e pratica → cliente → agenzie ---
+    cerca_e_apri(pg, 'OF/2026/038')
+    url_pratica = pg.evaluate('location.pathname')
+    fornitore_link = pg.locator('.testa .sotto a[href^="/fornitori/"]').first
+    fornitore_link.click(); pg.wait_for_function("location.pathname.startsWith('/fornitori/')"); pg.wait_for_load_state('networkidle')
+    pg.wait_for_selector('.pannello-testa h2'); pg.wait_for_timeout(400)
+    ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Percentuali")').count() == 1,
+       'catena: dal fornitore della pratica si apre la scheda Percentuali')
+    pg.go_back(); pg.wait_for_function("location.pathname === '" + url_pratica + "'"); pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.binario')
+    ok('OF/2026/038' in testo(pg, '.testa h1'), 'catena: Indietro torna alla pratica')
+    cliente_link = pg.locator('.testa .sotto a[href^="/clienti/"]').first
+    cliente_link.click(); pg.wait_for_function("location.pathname.startsWith('/clienti/')"); pg.wait_for_load_state('networkidle')
+    pg.wait_for_selector('.pannello-testa h2'); pg.wait_for_timeout(400)
+    ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Agenzie")').count() == 1,
+       'catena: dal cliente della pratica si apre la scheda Agenzie')
+    pg.go_back(); pg.wait_for_function("location.pathname === '" + url_pratica + "'"); pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.binario')
+    ok('OF/2026/038' in testo(pg, '.testa h1'), 'catena: Indietro torna ancora alla pratica')
     pg.close()
 
     # lettura: consulta la pratica, nessun comando di scrittura (l'operatore invece modifica, D-45)
@@ -371,7 +439,7 @@ with sync_playwright() as p:
     testi = ' '.join(pg.locator('button, a.btn').all_inner_texts())
     ok('Registra fattura' not in testi and 'Nota di credito' not in testi and 'Correggi' not in testi and 'Annulla' not in testi,
        'lettura: nessun pulsante di scrittura')
-    ok(pg.locator('.incasso-riga button:has-text("Segna come")').count() == 0 and pg.locator('.incasso-riga button:has-text("Sollecita")').count() == 0,
+    ok(pg.locator('.incasso-riga button[aria-label^="Segna come"]').count() == 0 and pg.locator('.incasso-riga button[aria-label^="Sollecita"]').count() == 0,
        'lettura: nessun comando nel riquadro Incasso del cliente')
     ok(pg.locator('.binario .tappa').count() == 4 and scheda(pg, 'Riepilogo').count() == 1, 'lettura: binario, schede e provvigione in consultazione')
     pg.close()

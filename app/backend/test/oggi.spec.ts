@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createHash } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
@@ -137,8 +138,8 @@ describe('F5-A1 pagina Oggi', () => {
     const somma = (f: (x: any) => boolean) => righe.filter(f).reduce((s: number, x: any) => s + x.provvigione, 0);
     expect(r.trimestre.da_liquidare).toBeCloseTo(somma((x: any) => x.liquidabile), 2);
     expect(r.trimestre.bloccato).toBeCloseTo(somma((x: any) => !x.liquidabile), 2);
-    expect(r.trimestre.atteso).toBeCloseTo(8069.6, 1);
-    expect(r.trimestre.riconosciuto).toBeCloseTo(5909.41, 2);
+    expect(r.trimestre.atteso).toBeCloseTo(5773.62, 1);
+    expect(r.trimestre.riconosciuto).toBeCloseTo(4310.08, 2);
   });
 
   it('GET /api/oggi: struttura, giorno di Roma, ultime operazioni', async () => {
@@ -246,6 +247,131 @@ describe('F5-A1 pagina Oggi', () => {
     })();
     await le.agente.post('/api/solleciti/conferme').set('x-csrf-token', le.csrf)
       .send({ fornitore_id: Number(f.fornitore_id) }).expect(403);
+  });
+});
+
+describe('riferimenti del fornitore nei solleciti di conferma', () => {
+  it('un solo ordine: numero del fornitore in testa, nostro rif. in fondo, inviarcela', async () => {
+    const S = await caricaDati(db, OGGI);
+    const uno = sollecitiConferme(S).per_fornitore.find((f) => f.voci.length === 1)!;
+    const numeri = new Map([[uno.voci[0].id, 'AU278665']]);
+    const f = sollecitiConferme(S, numeri).per_fornitore.find((x) => x.fornitore_id === uno.fornitore_id)!;
+    expect(f.testo).toContain('Ordine AU278665 del ');
+    expect(f.testo).toContain('nostro rif. ' + uno.voci[0].numero);
+    expect(f.testo).toContain('vostro codice cliente');
+    expect(f.testo).toContain('conferma attesa entro il');
+    expect(f.testo).toContain('inviarcela');
+    expect(f.testo).not.toContain('inviarcele');
+  });
+
+  it('due ordini: tutti i numeri del fornitore, nostro rif. in fondo, inviarcele', async () => {
+    const S = await caricaDati(db, OGGI);
+    const due = sollecitiConferme(S).per_fornitore.find((f) => f.voci.length >= 2)!;
+    const numeri = new Map(due.voci.map((v, i) => [v.id, `AU${1000 + i}`] as const));
+    const f = sollecitiConferme(S, numeri).per_fornitore.find((x) => x.fornitore_id === due.fornitore_id)!;
+    for (const [i, v] of due.voci.entries()) {
+      expect(f.testo).toContain(`Ordine AU${1000 + i} del `);
+      expect(f.testo).toContain('nostro rif. ' + v.numero);
+    }
+    expect(f.testo).toContain('inviarcele');
+    expect(f.testo).not.toContain('inviarcela');
+  });
+
+  it('ordine senza numero del fornitore: nostro numero d\'ordine con data e cliente', async () => {
+    const S = await caricaDati(db, OGGI);
+    const uno = sollecitiConferme(S).per_fornitore.find((f) => f.voci.length === 1)!;
+    const v = uno.voci[0];
+    const f = sollecitiConferme(S).per_fornitore.find((x) => x.fornitore_id === uno.fornitore_id)!;
+    expect(f.testo).toContain(`Ordine ${v.numero} del ${v.data.split('-').reverse().join('/')}`);
+    expect(f.testo).toContain(v.cliente);
+    expect(f.testo).not.toContain('nostro rif.');
+  });
+});
+
+describe('documenti da decidere: titolo e dettaglio', () => {
+  const creati: bigint[] = [];
+  async function creaDoc(dati: {
+    file_nome: string; tipo?: string | null; letto?: boolean; fornitore?: boolean; livello?: string; stato?: string;
+    campi?: { campo: string; valore: string }[];
+  }) {
+    const gries = await db.fornitori.findFirstOrThrow({
+      where: { corrente: { ragione_sociale: { startsWith: 'Gries' } } }, include: { corrente: true } });
+    const doc = await db.documenti_in_arrivo.create({
+      data: {
+        origine: 'caricamento', file_nome: dati.file_nome,
+        file_hash: createHash('sha256').update(dati.file_nome).digest('hex'),
+        file_percorso: 'in_arrivo/prova/' + dati.file_nome, stato: dati.stato ?? 'da_controllare', tipo: dati.tipo ?? null,
+        fornitore_id: dati.fornitore ? gries.id : null, fornitore_versione_id: dati.fornitore ? gries.corrente!.id : null,
+        livello: dati.livello ?? 'da_controllare', ricevuto_il: new Date('2026-09-01T08:00:00+02:00'),
+        letto_il: dati.letto ? new Date('2026-09-01T08:05:00+02:00') : null,
+      },
+    });
+    creati.push(doc.id);
+    if (dati.campi) await db.documenti_campi.createMany({ data: dati.campi.map((c) => ({ documento_id: doc.id, campo: c.campo, valore_letto: c.valore })) });
+    return doc;
+  }
+  const voceDi = async (cerca: string) => {
+    const S = await caricaDati(db, OGGI);
+    const r = await calcolaOggi(db, S);
+    return r.gruppi.find((g) => g.id === 'documenti')!.voci.find((v) => v.titolo.includes(cerca));
+  };
+  afterAll(async () => {
+    await db.documenti_campi.deleteMany({ where: { documento_id: { in: creati } } });
+    await db.documenti_in_arrivo.deleteMany({ where: { id: { in: creati } } });
+  });
+
+  it('documento non letto: il titolo dice il nome del file', async () => {
+    await creaDoc({ file_nome: 'estratto-conto.pdf', tipo: null, letto: false, fornitore: true });
+    const v = await voceDi('estratto-conto.pdf');
+    expect(v).toBeTruthy();
+    expect(v!.titolo).toBe('Abbina estratto-conto.pdf');
+  });
+
+  it('documento letto con numero: il titolo dice tipo e numero', async () => {
+    await creaDoc({ file_nome: 'fattura-RE.pdf', tipo: 'fattura', letto: true, fornitore: true, campi: [{ campo: 'numero', valore: 'RE196022' }] });
+    const v = await voceDi('RE196022');
+    expect(v).toBeTruthy();
+    expect(v!.titolo).toBe('Abbina fattura RE196022');
+  });
+
+  it('documento letto senza numero: il titolo dice tipo e file', async () => {
+    await creaDoc({ file_nome: 'dettaglioDistinta (6).pdf', tipo: 'pagamento', letto: true, fornitore: true });
+    const v = await voceDi('pagamento dettaglioDistinta (6).pdf');
+    expect(v).toBeTruthy();
+    expect(v!.titolo).toBe('Abbina pagamento dettaglioDistinta (6).pdf');
+  });
+
+  it('ordine: «Apri la pratica dell’ordine <numero>» e pulsante Apri', async () => {
+    await creaDoc({ file_nome: 'ordine-AU.pdf', tipo: 'ordine', letto: true, fornitore: true, campi: [{ campo: 'numero', valore: 'AU278666' }] });
+    const v = await voceDi('AU278666');
+    expect(v).toBeTruthy();
+    expect(v!.titolo).toBe('Apri la pratica dell’ordine AU278666');
+    expect(v!.azione).toBe('Apri');
+  });
+
+  it('bollettino: «Registra il bollettino di <mese> di <fornitore>» e pulsante Apri', async () => {
+    await creaDoc({ file_nome: 'bollettino-ago.pdf', tipo: 'bollettino', letto: true, fornitore: true, campi: [{ campo: 'mese', valore: '8' }] });
+    const v = await voceDi('Registra il bollettino di agosto');
+    expect(v).toBeTruthy();
+    expect(v!.titolo).toContain('agosto');
+    expect(v!.titolo).toContain('Gries');
+    expect(v!.azione).toBe('Apri');
+  });
+
+  it('fornitore abbinato all\'anagrafica: niente «fornitore non riconosciuto»', async () => {
+    await creaDoc({ file_nome: 'fattura-G.pdf', tipo: 'fattura', letto: true, fornitore: true, campi: [{ campo: 'numero', valore: 'RE555555' }] });
+    const v = await voceDi('RE555555');
+    expect(v).toBeTruthy();
+    expect(v!.dettaglio).toContain('Gries');
+    expect(v!.dettaglio).not.toContain('fornitore non riconosciuto');
+  });
+
+  it('fornitore non abbinato ma nome letto: si dice il nome letto, non «non riconosciuto»', async () => {
+    await creaDoc({ file_nome: 'arte.pdf', tipo: 'pagamento', letto: true, fornitore: false, campi: [{ campo: 'fornitore', valore: 'ARTE WOHNACCESSOIRES' }] });
+    const v = await voceDi('pagamento arte.pdf');
+    expect(v).toBeTruthy();
+    expect(v!.dettaglio).toContain('ARTE WOHNACCESSOIRES');
+    expect(v!.dettaglio).not.toContain('fornitore non riconosciuto');
   });
 });
 

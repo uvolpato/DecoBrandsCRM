@@ -13,6 +13,9 @@ export interface FormModalProps {
   colonne?: 1 | 2;
   conferma?: string;
   pericolo?: boolean;
+  // D-172: con questa etichetta il modulo mostra una casella da spuntare che abilita il pulsante
+  // di conferma (operazioni senza ritorno: scartare, eliminare…)
+  casella?: string;
   // azioni oltre ad Annulla e Salva (es. Disattiva nel recapito), come `azioniExtra` del prototipo
   azioniExtra?: { etichetta: string; variante?: 'sec' | 'pericolo'; onClick: () => void }[];
   // contenuto accanto all'errore, quando onConferma restituisce un messaggio (es. «Aggiungi l'agenzia», D-158)
@@ -21,10 +24,11 @@ export interface FormModalProps {
   onChiudi: () => void;
 }
 
-export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva', pericolo, azioniExtra, erroreExtra, onConferma, onChiudi }: FormModalProps) {
+export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva', pericolo, casella, azioniExtra, erroreExtra, onConferma, onChiudi }: FormModalProps) {
   const id = useId();
   const [errore, setErrore] = useState('');
   const [attesa, setAttesa] = useState(false);
+  const [spuntata, setSpuntata] = useState(!casella); // senza casella il pulsante resta abilitato
 
   async function invia(ev: FormEvent<HTMLFormElement>) {
     ev.preventDefault();
@@ -45,10 +49,16 @@ export function FormModal({ titolo, testo, campi, colonne = 1, conferma = 'Salva
     <Modale titolo={titolo} testo={testo} onChiudi={() => { if (!attesa) onChiudi(); }} piede={<>
       {azioniExtra?.map((a) => <button key={a.etichetta} type="button" className={'btn ' + (a.variante ?? 'sec')} onClick={a.onClick} disabled={attesa}>{a.etichetta}</button>)}
       <button type="button" className="btn sec" onClick={onChiudi} disabled={attesa}>Annulla</button>
-      <button type="submit" form={id} className={'btn' + (pericolo ? ' pericolo' : '')} disabled={attesa}>{attesa ? 'Attendi…' : conferma}</button>
+      <button type="submit" form={id} className={'btn' + (pericolo ? ' pericolo' : '')} disabled={attesa || !spuntata}>{attesa ? 'Attendi…' : conferma}</button>
     </>}>
       <form id={id} className={'modulo modulo-' + colonne} onSubmit={invia} noValidate>
         {campi.map((c) => <Campo key={c.nome} {...c} />)}
+        {casella && (
+          <label className="casella-grave">
+            <input type="checkbox" checked={spuntata} onChange={(e) => setSpuntata(e.target.checked)} />
+            <span>{casella}</span>
+          </label>
+        )}
         <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
         {errore && erroreExtra?.(errore)}
       </form>

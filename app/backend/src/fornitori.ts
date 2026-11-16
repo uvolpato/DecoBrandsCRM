@@ -4,13 +4,14 @@ import {
 import { Prisma, type fornitori, type provvigioni_scaglioni } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested,
+  ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested,
 } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { unico } from './clienti';
 import { giornoRoma, iso, ultimaChiusura } from './motore/dati';
 import { piuGiorni } from './motore/motore';
+import { ricalcolaDocumentiAperti } from './pratiche';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -25,6 +26,8 @@ class ModificaFornitore {
   @Facoltativo() @IsInt() @Min(1) @Max(28) giorno_bollettino?: number;
   @Facoltativo() @IsIn(['maturato', 'fatturato']) tipo_provvigione?: string;
   @Facoltativo() @IsInt() @Min(0) giorni_incasso?: number;
+  // D-183 §19: le spese in fattura entrano nella base della provvigione? predefinito no (escluse)
+  @Facoltativo() @IsBoolean() spese_base_provvigione?: boolean;
   @IsOptional() @IsString() @MaxLength(2000) note?: string;
 }
 
@@ -101,7 +104,7 @@ async function percentualiFornitore(db: Db, fid: bigint) {
         modificabile: !chiusura || d > chiusura, // D-51: correggi/elimina solo fuori dal periodo chiuso (lo ricontrolla la scrittura)
         scaglioni: righe.map((s) => ({
           ...mappaScaglione(s),
-          dal_fornitore: Number(s.pct_agente.plus(s.pct_subagente)),
+          dal_fornitore: Number(s.pct_agente), // D-166: il fornitore paga solo la % di Decobrands
           clienti: agenzie.filter((a) => sogliaDi(a.sconto) === s).length,
           eccezioni: ecc
             .filter((e) => e.sconto_min.equals(s.sconto_min) && (!fino || iso(e.valido_dal) < fino) && (!e.valido_al || iso(e.valido_al) > d))
@@ -122,13 +125,16 @@ function giornoDa(d: string) {
   return new Date(t);
 }
 
+/** 'aaaa-mm-gg' → 'gg/mm/aaaa' per i messaggi rivolti a chi usa l'app (D-168). */
+const ggmmaaaa = (d: string) => { const [a, m, g] = d.split('-'); return g + '/' + m + '/' + a; };
+
 /** D-51 §19: un cambio vale da una data in poi e la data non cade in un periodo chiuso; 409 altrimenti. */
 export async function dopoChiusura(tx: Db, fid: bigint, data: string, testo: (chiusura: string) => string) {
   const c = await ultimaChiusura(tx, fid);
   if (c && data <= c) throw new ConflictException(testo(c));
 }
 const usate = (d: string) => (c: string) =>
-  `Le percentuali dal ${d} sono già usate in un periodo chiuso (fino al ${c}): crea una versione nuova da una data successiva`;
+  `Le percentuali dal ${ggmmaaaa(d)} sono già usate in un periodo chiuso (fino al ${ggmmaaaa(c)}): crea una versione nuova da una data successiva`;
 
 /** Fornitore bloccato per la transazione (V13): una scrittura di percentuali o eccezioni alla volta. */
 async function fornitoreBloccato(tx: Db, id: number | bigint) {
@@ -158,10 +164,10 @@ async function controllaSoglie(tx: Db, fid: bigint, dal: Date, scaglioni: Scagli
   if (new Set(soglie).size !== soglie.length) throw new BadRequestException('Uno sconto è ripetuto');
   const { prima, dopo } = await versioniVicine(tx, fid, dal);
   const manca = prima?.soglie.find((x) => !soglie.includes(x));
-  if (manca !== undefined) throw new BadRequestException(`Manca lo sconto ${manca} %: la versione comprende tutti gli scaglioni di quella dal ${prima!.data}`);
+  if (manca !== undefined) throw new BadRequestException(`Manca lo sconto ${manca} %: la versione comprende tutti gli scaglioni di quella dal ${ggmmaaaa(prima!.data)}`);
   const nuova = dopo && soglie.find((x) => !dopo.soglie.includes(x));
   if (nuova != null) {
-    throw new BadRequestException(`La versione dal ${dopo!.data} non ha lo sconto ${nuova} %: aggiungilo prima a quella versione o toglilo da questa`);
+    throw new BadRequestException(`La versione dal ${ggmmaaaa(dopo!.data)} non ha lo sconto ${nuova} %: aggiungilo prima a quella versione o toglilo da questa`);
   }
 }
 
@@ -178,12 +184,36 @@ async function controllaOrfane(tx: Db, fid: bigint, dal: Date, restano: number[]
     throw new ConflictException(`Ci sono eccezioni personali sullo sconto ${Number(orfana.sconto_min)} % in questo periodo: terminale o lascia lo sconto nella versione`);
   }
 }
+/** D-166 §19: la % del subagente non supera la % che il fornitore riconosce a Decobrands. */
+function controllaPct(scaglioni: ScaglioneNuovo[]) {
+  const s = scaglioni.find((x) => x.pct_subagente > x.pct_agente);
+  if (s) throw new BadRequestException(`Sullo sconto ${s.sconto_min} % la percentuale del subagente (${s.pct_subagente}) supera quella dal fornitore (${s.pct_agente})`);
+}
+
+/** D-166 §19: % che il fornitore riconosce a Decobrands sullo scaglione in vigore alla data (soglia più
+ *  alta ≤ sconto, versione più recente ≤ data, come il motore `scaglione`). Null se non c'è. */
+export async function pctAgenteAllaData(tx: Db, fid: bigint, sconto: number, dal: string) {
+  const sc = await tx.provvigioni_scaglioni.findFirst({
+    where: { fornitore_id: fid, sconto_min: { lte: sconto }, valido_dal: { lte: new Date(dal) } },
+    orderBy: [{ sconto_min: 'desc' }, { valido_dal: 'desc' }],
+  });
+  return sc ? Number(sc.pct_agente) : null;
+}
+
+/** D-166 §19: la % del subagente (eccezione personale o agenzia) non supera la % dal fornitore. */
+export async function controllaQuotaSubagente(tx: Db, fid: bigint, sconto: number, dal: string, pctSubagente: number) {
+  const pctAgente = await pctAgenteAllaData(tx, fid, sconto, dal);
+  if (pctAgente != null && pctSubagente > pctAgente) {
+    throw new BadRequestException(`La percentuale del subagente (${pctSubagente}) supera quella dal fornitore (${pctAgente} % su questo scaglione)`);
+  }
+}
+
 const righeScaglioni = (fid: bigint, dal: Date, scaglioni: ScaglioneNuovo[]) =>
   scaglioni.map((s) => ({ fornitore_id: fid, valido_dal: dal, sconto_min: s.sconto_min, pct_agente: s.pct_agente, pct_subagente: s.pct_subagente }));
 const perEvento = (scaglioni: { sconto_min: number | Prisma.Decimal; pct_agente: number | Prisma.Decimal; pct_subagente: number | Prisma.Decimal }[]) =>
   scaglioni.map((s) => ({ sconto_min: Number(s.sconto_min), pct_agente: Number(s.pct_agente), pct_subagente: Number(s.pct_subagente) }));
 
-const CAMPI_REGOLE =['giorni_attesa_conferma', 'giorno_bollettino', 'tipo_provvigione', 'giorni_incasso', 'note'] as const;
+const CAMPI_REGOLE =['giorni_attesa_conferma', 'giorno_bollettino', 'tipo_provvigione', 'giorni_incasso', 'spese_base_provvigione', 'note'] as const;
 
 function mappaFornitore(f: fornitori & { corrente?: { ragione_sociale: string; piva: string | null; paese: string | null } | null; soggetto?: { id: bigint; codice: string } | null }, codice: string | null) {
   return {
@@ -198,6 +228,7 @@ function mappaFornitore(f: fornitori & { corrente?: { ragione_sociale: string; p
     giorno_bollettino: f.giorno_bollettino,
     tipo_provvigione: f.tipo_provvigione,
     giorni_incasso: f.giorni_incasso,
+    spese_base_provvigione: f.spese_base_provvigione, // D-183
     note: f.note,
     attivo: f.attivo,
   };
@@ -340,6 +371,8 @@ export class FornitoriController {
         tipo: 'crud', azione: 'update', entita: 'fornitore', entita_id: prima.id, esito: 'successo',
         dettaglio: { etichetta: prima.corrente?.ragione_sociale ?? '', prima: primaDiff, dopo: dopoDiff },
       }, contesto(req));
+      // D-183: il cambio dell'accordo sulle spese ricalcola i documenti aperti del fornitore (i congelati restano)
+      if (dopoDiff.spese_base_provvigione !== undefined) await ricalcolaDocumentiAperti(tx, prima.id);
       const codice = await tx.codici_esterni.findFirst({ where: { sistema: 'integra', tipo: 'fornitore', entita_id: BigInt(id) } });
       return { ...mappaFornitore(dopo as never, codice?.codice ?? null) };
     });
@@ -359,17 +392,19 @@ export class FornitoriController {
   async nuovePercentuali(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: NuovePercentuali) {
     return this.db.$transaction(async (tx) => {
       const f = await fornitoreBloccato(tx, id);
-      await dopoChiusura(tx, f.id, b.valido_dal, (c) => `Il periodo fino al ${c} è chiuso: le nuove percentuali devono valere da una data successiva`);
+      await dopoChiusura(tx, f.id, b.valido_dal, (c) => `Il periodo fino al ${ggmmaaaa(c)} è chiuso: le nuove percentuali devono valere da una data successiva`);
       const dal = new Date(b.valido_dal);
       if (await tx.provvigioni_scaglioni.findFirst({ where: { fornitore_id: f.id, valido_dal: dal } })) {
-        throw new BadRequestException(`Ci sono già percentuali dal ${b.valido_dal}: usa la correzione`);
+        throw new BadRequestException(`Ci sono già percentuali dal ${ggmmaaaa(b.valido_dal)}: usa la correzione`);
       }
       await controllaSoglie(tx, f.id, dal, b.scaglioni);
+      controllaPct(b.scaglioni); // D-166
       await tx.provvigioni_scaglioni.createMany({ data: righeScaglioni(f.id, dal, b.scaglioni) });
       await logEvent(tx, {
         tipo: 'crud', azione: 'create', entita: 'scaglione', entita_id: f.id, esito: 'successo', // un evento per versione (§15.2.2)
         dettaglio: { etichetta: `${f.corrente?.ragione_sociale ?? ''} · dal ${b.valido_dal}`, fornitore_id: String(f.id), valido_dal: b.valido_dal, scaglioni: perEvento(b.scaglioni) },
       }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, f.id); // D-183: scaglioni/percentuali cambiate → ricalcola gli aperti (i congelati restano)
       return percentualiFornitore(tx, f.id);
     });
   }
@@ -385,6 +420,7 @@ export class FornitoriController {
       if (!prima.length) throw new NotFoundException('Versione non trovata');
       await dopoChiusura(tx, f.id, d, usate(d));
       await controllaSoglie(tx, f.id, dal, b.scaglioni);
+      controllaPct(b.scaglioni); // D-166
       await controllaOrfane(tx, f.id, dal, b.scaglioni.map((s) => s.sconto_min), (await versioniVicine(tx, f.id, dal)).dopo?.data);
       await tx.provvigioni_scaglioni.deleteMany({ where: { fornitore_id: f.id, valido_dal: dal } });
       await tx.provvigioni_scaglioni.createMany({ data: righeScaglioni(f.id, dal, b.scaglioni) });
@@ -395,6 +431,7 @@ export class FornitoriController {
           prima: { scaglioni: perEvento(prima) }, dopo: { scaglioni: perEvento(b.scaglioni) },
         },
       }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, f.id); // D-183
       return percentualiFornitore(tx, f.id);
     });
   }
@@ -420,6 +457,7 @@ export class FornitoriController {
         tipo: 'crud', azione: 'delete', entita: 'scaglione', entita_id: f.id, esito: 'successo',
         dettaglio: { etichetta: `${f.corrente?.ragione_sociale ?? ''} · dal ${d}`, fornitore_id: String(f.id), valido_dal: d, scaglioni: perEvento(righe) },
       }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, f.id); // D-183
     });
   }
 }
@@ -520,11 +558,13 @@ export class EccezioniController {
       if (!(await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id) } }))) throw new NotFoundException('Subagente non trovato');
       await dopoChiusura(tx, f.id, b.valido_dal, (c) => `Il periodo fino al ${c} è chiuso: l'eccezione deve valere da una data successiva`);
       await controllaSconto(tx, f.id, b.sconto_min, b.valido_dal);
+      await controllaQuotaSubagente(tx, f.id, b.sconto_min, b.valido_dal, b.pct_personale); // D-166
       const e = await tx.provvigioni_eccezioni.create({
         data: { fornitore_id: f.id, subagente_id: BigInt(b.subagente_id), sconto_min: b.sconto_min, pct_personale: b.pct_personale, valido_dal: new Date(b.valido_dal) },
         include: conDettagli,
       });
       await logEvent(tx, { tipo: 'crud', azione: 'create', entita: 'eccezione', entita_id: e.id, esito: 'successo', dettaglio: perEventoEcc(e) }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, f.id); // D-183: eccezione cambiata → ricalcola gli aperti del fornitore
       return mappaEccezione(tx, e);
     }), SOVRAPPOSTO);
   }
@@ -539,6 +579,7 @@ export class EccezioniController {
       if (e.valido_al && b.dal >= iso(e.valido_al)) throw new BadRequestException(`L'eccezione non vale più dal ${iso(e.valido_al)}: il cambio cade fuori dal suo periodo`);
       if (Number(e.pct_personale) === b.pct_personale) throw new BadRequestException('La percentuale è già questa');
       await dopoChiusura(tx, e.fornitore_id, b.dal, (c) => `Il periodo fino al ${c} è chiuso: il cambio deve valere da una data successiva`);
+      await controllaQuotaSubagente(tx, e.fornitore_id, Number(e.sconto_min), b.dal, b.pct_personale); // D-166
       const chiusa = await tx.provvigioni_eccezioni.update({ where: { id: e.id }, data: { valido_al: new Date(b.dal) }, include: conDettagli }); // valido_al escluso
       const nuova = await tx.provvigioni_eccezioni.create({
         data: { fornitore_id: e.fornitore_id, subagente_id: e.subagente_id, sconto_min: e.sconto_min, pct_personale: b.pct_personale, valido_dal: new Date(b.dal), valido_al: e.valido_al },
@@ -549,6 +590,7 @@ export class EccezioniController {
         dettaglio: { etichetta: etichettaEcc(e), prima: { valido_al: e.valido_al ? iso(e.valido_al) : null }, dopo: { valido_al: b.dal }, nuova_id: String(nuova.id) },
       }, contesto(req));
       await logEvent(tx, { tipo: 'crud', azione: 'create', entita: 'eccezione', entita_id: nuova.id, esito: 'successo', dettaglio: perEventoEcc(nuova) }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, e.fornitore_id); // D-183
       const [c, n] = await mappaEccezioni(tx, [chiusa, nuova]);
       return { chiusa: c, nuova: n };
     }), SOVRAPPOSTO);
@@ -571,6 +613,7 @@ export class EccezioniController {
         tipo: 'crud', azione: 'update', entita: 'eccezione', entita_id: e.id, esito: 'successo',
         dettaglio: { etichetta: etichettaEcc(e), prima: { valido_al: prima }, dopo: { valido_al: b.al } },
       }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, e.fornitore_id); // D-183
       return mappaEccezione(tx, dopo);
     }), SOVRAPPOSTO);
   }
@@ -583,6 +626,7 @@ export class EccezioniController {
       const e = await eccezioneBloccata(tx, id);
       await rigaAperta(tx, e);
       const dal = b.valido_dal ?? iso(e.valido_dal);
+      await controllaQuotaSubagente(tx, e.fornitore_id, Number(e.sconto_min), dal, b.pct_personale); // D-166
       if (b.valido_dal !== undefined) {
         await dopoChiusura(tx, e.fornitore_id, dal, (c) => `Il periodo fino al ${c} è chiuso: l'eccezione deve valere da una data successiva`);
         await controllaSconto(tx, e.fornitore_id, Number(e.sconto_min), dal);
@@ -595,6 +639,7 @@ export class EccezioniController {
       await logEvent(tx, {
         tipo: 'crud', azione: 'update', entita: 'eccezione', entita_id: e.id, esito: 'successo', dettaglio: { etichetta: etichettaEcc(e), prima, dopo: dopoDiff },
       }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, e.fornitore_id); // D-183
       return mappaEccezione(tx, dopo);
     }), SOVRAPPOSTO);
   }
@@ -608,6 +653,7 @@ export class EccezioniController {
       await rigaAperta(tx, e);
       await tx.provvigioni_eccezioni.delete({ where: { id: e.id } });
       await logEvent(tx, { tipo: 'crud', azione: 'delete', entita: 'eccezione', entita_id: e.id, esito: 'successo', dettaglio: perEventoEcc(e) }, contesto(req));
+      await ricalcolaDocumentiAperti(tx, e.fornitore_id); // D-183
     });
   }
 }

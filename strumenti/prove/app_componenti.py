@@ -6,6 +6,7 @@
 # Uso: python strumenti/prove/app_componenti.py <suffisso> <cartella schermate> [base, predefinita http://localhost:8011]
 import sys, pathlib
 from playwright.sync_api import sync_playwright
+import segmenti as segm
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
 BASE = sys.argv[3] if len(sys.argv) > 3 else 'http://localhost:8011'
@@ -32,7 +33,7 @@ def sezione(pg, nome):
 
 
 def n_seg(pg, nome):  # numero del segmento della prima barra del catalogo (FilterBar)
-    return int(pg.locator('.catalogo-voci .filtri .segmenti button', has_text=nome).first.locator('.n').inner_text())
+    return segm.numero(pg, nome, '.catalogo-voci .filtri ')
 
 
 with sync_playwright() as p:
@@ -108,7 +109,8 @@ with sync_playwright() as p:
     # CampoRicerca singola + maschera
     cr = sezione(pg, 'CampoRicerca')
     cr.scroll_into_view_if_needed()
-    ok(cr.locator('.pallino.ok').count() == 1, 'campo singolo: pallino verde (valore in anagrafica)')
+    campo_f = cr.locator('.campo:has(#d-f)')  # il campo singolo (ce ne sono due per fornitore, D-177)
+    ok(campo_f.locator('.pallino.ok').count() == 1, 'campo singolo: pallino verde (valore in anagrafica)')
     f = cr.locator('#d-f')
     f.fill('')
     f.type('gas')
@@ -118,12 +120,12 @@ with sync_playwright() as p:
     ok(bool(adv) and cr.locator(f'[id="{adv}"]').get_attribute('role') == 'option', 'campo singolo: la freccia annuncia la voce attiva (aria-activedescendant)')
     ctrl = f.get_attribute('aria-controls')
     ok(bool(ctrl) and cr.locator(f'[id="{ctrl}"] li[role=option]').count() > 0, 'campo singolo: aria-controls punta al menu')
-    ok(cr.get_by_role('combobox', name='Cerca fornitore').count() == 1, 'campo singolo: il combobox ha un nome')
+    ok(campo_f.get_by_role('combobox', name='Cerca fornitore').count() == 1, 'campo singolo: il combobox ha un nome')
     cr.locator('.ricerca-menu li[role=option]', has_text='Gasper').click()
     ok('fornitore 2' in cr.inner_text(), 'campo singolo: scelta dal menu')
     f.fill('xyz')
     pg.keyboard.press('Tab'); pg.keyboard.press('Tab')  # esce dal campo (la lente è dentro)
-    ok(cr.locator('.pallino.ko').count() == 1, 'campo singolo: valore scritto a mano, pallino rosso')
+    ok(campo_f.locator('.pallino.ko').count() == 1, 'campo singolo: valore scritto a mano, pallino rosso')
     cr.locator('.ricerca-lente').nth(1).click()  # maschera del campo multiplo
     pg.wait_for_selector('.modale.larga')
     ok(pg.locator('.modale.larga h2').inner_text() == 'Cerca subagente', 'maschera: aperta con la lente')

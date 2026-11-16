@@ -58,11 +58,12 @@ export interface PaginaProps {
   briciole?: { etichetta: string; href?: string }[];
   badge?: ReactNode;
   azioni?: Azione[];
+  testa?: ReactNode; // elemento nella testata fra «Torna a…» e le azioni (es. la tendina dell'anno)
   pieno?: boolean; // il corpo riempie lo spazio (pagine a due colonne con tabelle)
   children?: ReactNode;
 }
 
-export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], pieno, children }: PaginaProps) {
+export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], testa, pieno, children }: PaginaProps) {
   // anche a ogni cambio d'indirizzo: navigando, Next rimette il titolo del layout ("Decobrands")
   const percorso = usePathname();
   const router = useRouter();
@@ -80,11 +81,7 @@ export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], pien
     titolo: 'Torna alla schermata precedente, con filtri e posizione',
   }] : [];
   const guida = argomentoGuida(percorso);
-  const tutte = [
-    ...indietro,
-    ...azioni,
-    ...(guida ? [{ etichetta: 'Guida', href: '/guida/' + guida, variante: 'sec' as const, consentito: true }] : []),
-  ];
+  const guidaAzione = guida ? [{ etichetta: 'Guida', href: '/guida/' + guida, variante: 'sec' as const, consentito: true }] : [];
   return (
     <>
       <header className="testa">
@@ -93,7 +90,11 @@ export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], pien
           <h1>{titolo}{badge && <span className="testa-badge">{badge}</span>}</h1>
           {sottotitolo && <div className="sotto">{sottotitolo}</div>}
         </div>
-        <div className="testa-azioni">{tutte.map((a) => <Pulsante key={a.etichetta} a={a} />)}</div>
+        <div className="testa-azioni">
+          {indietro.map((a) => <Pulsante key={a.etichetta} a={a} />)}
+          {testa}
+          {[...azioni, ...guidaAzione].map((a) => <Pulsante key={a.etichetta} a={a} />)}
+        </div>
       </header>
       <section ref={corpo} className={'corpo' + (pieno ? ' pieno' : '')}>{children}</section>
     </>
@@ -101,7 +102,7 @@ export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], pien
 }
 
 export interface PannelloProps {
-  titolo?: string;
+  titolo?: ReactNode;
   nota?: ReactNode;
   azioni?: Azione[];
   riempi?: boolean;

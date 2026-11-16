@@ -21,7 +21,7 @@ import { aggiornaPratica } from './pratiche';
 import { cerca, importa } from './anagrafica-integra';
 import { IntegraService } from './integra';
 import { cercaLegame } from './storico';
-import { type ClienteConCorrente, type Controllo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, ricordaAlias, riconosciClienteDai, soglieLettura, valutaLettura, type Contesto as ContestoProposta, type Letto, type RigaStorico } from './proposta';
+import { type ClienteConCorrente, controlliFissi, esitoCodiceCliente, fattoreSconto, filtroDalTipo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, ricordaAlias, riconosciClienteDai, risolviFornitore, ruoloConferma, soglieLettura, STATI_PRATICHE, superatiConferma, valutaLettura, type Contesto as ContestoProposta, type FiltroPratiche, type Letto, type RigaStorico } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -34,6 +34,9 @@ const dataIt = (s: string) => s.split('-').reverse().join('/');
 const NOME: Record<TipoDocumento, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura', nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento',
 };
+/** Fase della fotografia delle righe (§4.2.8) per tipo di documento: gli altri tipi non hanno righe (come il seed). */
+export const faseDi = (tipo: TipoDocumento): 'ordine' | 'conferma' | 'fattura' | null =>
+  tipo === 'ordine' ? 'ordine' : (tipo === 'conferma' || tipo === 'proforma') ? 'conferma' : tipo === 'fattura' ? 'fattura' : null;
 
 /* ---------- Canale comune: file → disco → coda (§6.5 punti 1–2, D-34, D-36) ---------- */
 
@@ -301,6 +304,14 @@ class ElencoDocumenti {
   @IsOptional() @IsIn(['affidabile', 'da_controllare', 'bassa']) livello?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) pagina?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) per_pagina?: number;
+  // «Prendi dalla coda» (D-186 §19): filtri sui documenti in coda della pratica (fornitore e cliente riconosciuti)
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) fornitore_id?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) cliente_id?: number;
+}
+
+/** Filtro per stato delle pratiche suggerite nel dettaglio del documento (D-178 §19, V12). */
+class FiltroDettaglio {
+  @IsOptional() @IsIn(STATI_PRATICHE) filtro?: FiltroPratiche;
 }
 
 class ScartaDocumento {
@@ -339,6 +350,12 @@ const fileTipo = (percorso: string) => {
 const controlliFalliti = (v: unknown): number => {
   const f = (v as { falliti?: unknown[] } | null)?.falliti;
   return Array.isArray(f) ? f.length : 0;
+};
+
+/** D-176: i punti sull'abbinamento (gruppo «confronto») salvati fra i controlli del documento, separati dal livello di lettura. */
+const confrontiFalliti = (v: unknown): number => {
+  const f = (v as { falliti?: { gruppo?: string }[] } | null)?.falliti;
+  return Array.isArray(f) ? f.filter((c) => c.gruppo === 'confronto').length : 0;
 };
 
 /** Pool e schema del ponte di Integra (D-111): null se la sincronizzazione non è configurata. */
@@ -460,26 +477,62 @@ async function esitiImportazione(
   return { fornitore, cliente };
 }
 
+/** D-175: all'apertura del dettaglio, se la ri-risoluzione trova un fornitore certo che il documento
+ *  non ha ancora salvato, lo salva (una transazione, evento «riconosciuto all'apertura»): così l'elenco
+ *  vede lo stesso fornitore del dettaglio. Il cliente non si salva: l'intestazione e Correggi leggono
+ *  lo stesso `proposta.abbinamento`/`cliente_riconosciuto` del server, senza riscrivere il campo a mano.
+ *  Mai sovrascrivere una scelta (un `fornitore_id` già presente resta). */
+export async function salvaFornitoreRiconosciuto(db: PrismaService, did: bigint, ctx: Contesto) {
+  await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
+    const d = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
+    if (!d || d.fornitore_id != null) return;
+    const letto = await lettoDaCampi(tx, did);
+    if (!letto.fornitore) return;
+    const f = await risolviFornitore(tx, letto.fornitore);
+    if (!f) return;
+    await tx.documenti_in_arrivo.update({ where: { id: did }, data: { fornitore_id: f.fornitore_id, fornitore_versione_id: f.fornitore_versione_id } });
+    await logEvent(tx, {
+      tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
+      dettaglio: { etichetta: d.file_nome, documento_id: String(did), pratica_id: null, prima: { fornitore_id: null }, dopo: { fornitore_id: String(f.fornitore_id) }, riconosciuto: 'apertura' },
+    }, ctx);
+  });
+}
+
 /** Dettaglio per la pagina (§7.9): testata e righe dai valori finali, campi grezzi per i bordi
- *  di affidabilità, proposta ricalcolata. Una sola lettura dei campi per proposta e testata. */
-async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null = null) {
+ *  di affidabilità, proposta ricalcolata. Una sola lettura dei campi per proposta e testata.
+ *  `filtro` è lo stato delle pratiche suggerite (D-178 §19): aperte di default. */
+async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null = null, filtro: FiltroPratiche = 'aperte') {
   const d = await db.documenti_in_arrivo.findUnique({
     where: { id }, include: { fornitore: true, campi: { orderBy: { id: 'asc' } } },
   });
   if (!d) throw new NotFoundException('Documento non trovato');
-  const letto = await lettoDaCampi(db, id);
+  let letto = await lettoDaCampi(db, id);
+  // D-164: il fornitore si ri-risolve a ogni apertura (vocabolario + somiglianza): i documenti letti
+  // prima del riconoscimento furbo, o con un nome storpiato, si riconoscono senza rileggere il file.
+  let fornitoreRisoltoNome: string | null = null;
+  if (letto.fornitore_id == null && letto.fornitore) {
+    const f = await risolviFornitore(db, letto.fornitore);
+    if (f) {
+      letto = { ...letto, fornitore_id: f.fornitore_id };
+      fornitoreRisoltoNome = (await db.fornitori.findUnique({ where: { id: f.fornitore_id }, select: { corrente: { select: { ragione_sociale: true } } } }))?.corrente?.ragione_sociale ?? null;
+    }
+  }
   // il nome letto del fornitore è un campo grezzo (§6.5): serve solo a cercare su Integra (D-111)
   const campoFornitore = d.campi.find((c) => c.campo === 'fornitore');
   const fornitoreNome = (campoFornitore?.valore_finale ?? campoFornitore?.valore_letto ?? null);
-  const p = await propostaDocumento(db, letto, await contestoDocumento(db, ponte, letto, fornitoreNome));
+  const p = await propostaDocumento(db, letto, await contestoDocumento(db, ponte, letto, fornitoreNome), filtro);
   // il cliente dell'abbinamento è un BigInt: nella risposta va come stringa (come gli altri id)
   const proposta = {
     ...p,
     abbinamento: p.abbinamento ? { ...p.abbinamento, cliente_id: String(p.abbinamento.cliente_id) } : null,
     cliente_riconosciuto: p.cliente_riconosciuto ? { ...p.cliente_riconosciuto, cliente_id: String(p.cliente_riconosciuto.cliente_id) } : null,
     agenzia_mancante: p.agenzia_mancante ? { ...p.agenzia_mancante, cliente_id: String(p.agenzia_mancante.cliente_id), fornitore_id: String(p.agenzia_mancante.fornitore_id) } : null,
+    pratica_ordine: p.pratica_ordine ? { ...p.pratica_ordine, pratica: { ...p.pratica_ordine.pratica, cliente_id: String(p.pratica_ordine.pratica.cliente_id), fornitore_id: String(p.pratica_ordine.pratica.fornitore_id) } } : null,
   };
-  const controlli = (d.controlli as { falliti?: Controllo[] } | null)?.falliti ?? [];
+  // D-169/E: i controlli si ricalcolano qui (come la proposta), non dai valori salvati: così le
+  // correzioni successive (codice cliente, numero d'ordine) valgono anche sui documenti già letti.
+  const controlli = await controlliFissi(db, letto, p);
   // solo il bollettino ha un omonimo da cercare (D-71): «esiste» dice se è già registrato
   const bollettino = letto.tipo === 'bollettino'
     ? {
@@ -498,11 +551,14 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
     : false;
   // D-165: P.IVA letta valida e soggetto riconosciuto senza P.IVA → suggerimento «Salva la P.IVA»
   const piva_da_salvare = await suggerimentoPiva(db, letto, p.abbinamento?.cliente_id ?? null, p.cliente_riconosciuto?.cliente_id ?? null);
+  // D-175: spunta verde/avviso giallo dell'intestazione (il cliente associato è lo stesso del link «Cliente»)
+  const codice_cliente_esito = await esitoCodiceCliente(db, letto, p.abbinamento?.cliente_id ?? p.cliente_riconosciuto?.cliente_id ?? null);
   return {
     id: String(d.id), file_nome: d.file_nome, file_tipo: fileTipo(d.file_percorso), stato: d.stato,
     tipo: d.tipo, livello: d.livello, ricevuto_il: d.ricevuto_il.toISOString(),
     letto_il: d.letto_il?.toISOString() ?? null, errore: d.errore, scaglioni_mancanti,
-    fornitore: letto.fornitore_id != null ? { id: String(letto.fornitore_id), nome: d.fornitore?.ragione_sociale ?? null } : null,
+    lettura_grezza: d.lettura_grezza != null,
+    fornitore: letto.fornitore_id != null ? { id: String(letto.fornitore_id), nome: d.fornitore?.ragione_sociale ?? fornitoreRisoltoNome ?? null } : null,
     campi: d.campi.map((c) => ({
       campo: c.campo, valore_letto: c.valore_letto, valore_finale: c.valore_finale,
       affidabilita: c.affidabilita == null ? null : Number(c.affidabilita),
@@ -510,6 +566,7 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
     })),
     testata: {
       tipo: letto.tipo, numero: letto.numero, data: letto.data,
+      numero_ordine_fornitore: letto.numero_ordine_fornitore,
       fornitore_id: letto.fornitore_id != null ? String(letto.fornitore_id) : null,
       codice_cliente: letto.codice_cliente, cliente: letto.cliente, cliente_id: letto.cliente_id,
       piva_cliente: letto.piva_cliente,
@@ -525,7 +582,7 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
     },
     // D-151 §19: le soglie in vigore viaggiano col documento (V12): il browser non ha soglie fisse
     soglie: await soglieLettura(db),
-    controlli, proposta, bollettino, piva_da_salvare,
+    controlli, proposta, bollettino, piva_da_salvare, codice_cliente_esito,
   };
 }
 
@@ -632,6 +689,7 @@ const diverso = (tipo: string, letto: string | null, nuovo: string) => {
 /** I campi della testata: nome nell'API → nome in documenti_campi (l'importo è `importo_totale`). */
 const TESTATA_CAMPI: Record<string, { campo: string; tipo: 'testo' | 'data' | 'numero' | 'intero' }> = {
   numero: { campo: 'numero', tipo: 'testo' },
+  numero_ordine_fornitore: { campo: 'numero_ordine_fornitore', tipo: 'testo' },
   data: { campo: 'data', tipo: 'data' },
   codice_cliente: { campo: 'codice_cliente', tipo: 'testo' },
   cliente: { campo: 'cliente', tipo: 'testo' },
@@ -646,8 +704,52 @@ const TESTATA_CAMPI: Record<string, { campo: string; tipo: 'testo' | 'data' | 'n
 };
 const RIGA_CAMPI: Record<string, 'testo' | 'data' | 'numero'> = {
   codice: 'testo', descrizione: 'testo', quantita: 'numero', prezzo: 'numero', importo: 'numero',
-  numero_fattura: 'testo', data_fattura: 'data', provvigione: 'numero',
+  sconto: 'numero', numero_fattura: 'testo', data_fattura: 'data', provvigione: 'numero',
+  spesa: 'testo', // D-183: riga di spesa (trasporto, imballo, «Fracht»): true/false, non è merce
 };
+
+/** D-170: tutti i testi della risposta grezza del lettore, in un elenco (valori di stringhe, ovunque nel JSON). */
+export function testiDaGrezza(grezza: unknown): string[] {
+  const out: string[] = [];
+  const cammina = (v: unknown) => {
+    if (typeof v === 'string') { out.push(v); return; }
+    if (Array.isArray(v)) { v.forEach(cammina); return; }
+    if (v && typeof v === 'object') { for (const x of Object.values(v as Record<string, unknown>)) cammina(x); }
+  };
+  cammina(grezza);
+  return out;
+}
+
+/** D-170: il numero d'ordine del fornitore da una dizione («Auftrag», «Order», «Bestellung»,
+ *  «Ordine n.», «Ihre Bestellung», «Rif. ordine») seguita da un codice. Regola semplice, non un
+ *  riconoscimento: estrae il codice più probabile; senza dizione → null. */
+export function estraiNumeroOrdine(testo: string): string | null {
+  const re = /(?:auftrag|order|bestellung|ordine|ihre\s*bestellung|rif\.?\s*ordine)\s*(?:n\.?|nr\.?)?\s*[:#]?\s*([A-Za-z]{0,4}[-/ ]?\d{2,12})/i;
+  const m = re.exec(testo);
+  return m ? m[1].replace(/\s+/g, '').toUpperCase() : null;
+}
+
+/** Riprova la lettura di un documento (A4-01, §7.9, D-170): da `errore` o `da_controllare` torna
+ *  `in_coda` (tentativi azzerati), chiude `lettura.fallita` e scrive l'evento come la rotta. È la
+ *  stessa funzione della rotta `POST /documenti/:id/rileggi`; la usa anche il comando di servizio
+ *  `rileggi:mirata` (nessuna logica nuova). */
+export async function rileggiDocumento(db: PrismaClient | Tx, id: bigint, ctx: Contesto = {}): Promise<void> {
+  await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${id} FOR UPDATE`;
+    const d = await tx.documenti_in_arrivo.findUnique({ where: { id } });
+    if (!d) throw new NotFoundException('Documento non trovato');
+    if (d.stato !== 'errore' && d.stato !== 'da_controllare') throw new ConflictException('Solo un documento in errore o da controllare si può rileggere');
+    await tx.documenti_in_arrivo.update({ where: { id }, data: { stato: 'in_coda', tentativi: 0, errore: null } });
+    await logEvent(tx, {
+      tipo: 'documento', azione: 'update', entita: 'documento', entita_id: id, esito: 'successo',
+      dettaglio: {
+        etichetta: d.file_nome, documento_id: String(id), pratica_id: null,
+        prima: { stato: 'errore' }, dopo: { stato: 'in_coda' },
+      },
+    }, ctx);
+    await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(id));
+  });
+}
 
 @Controller('documenti')
 export class DocumentiController {
@@ -669,13 +771,17 @@ export class DocumentiController {
     const simile = '%' + testo.replace(/[\\%_]/g, '\\$&') + '%'; // % e _ sono lettere, non jolly
     const tipo = q.tipo ?? '';
     const livello = q.livello ?? '';
+    const fornitoreId = q.fornitore_id != null ? BigInt(q.fornitore_id) : null;
+    const clienteId = q.cliente_id != null ? String(q.cliente_id) : null;
     // una sola sottoquery dei campi per pagina (niente N+1): finale se c'è, altrimenti letto
     const campi = Prisma.sql`campi AS (
       SELECT documento_id,
         MAX(CASE WHEN campo = 'numero' THEN COALESCE(valore_finale, valore_letto) END) AS numero,
+        MAX(CASE WHEN campo = 'numero_ordine_fornitore' THEN COALESCE(valore_finale, valore_letto) END) AS numero_ordine_fornitore,
         MAX(CASE WHEN campo = 'data' THEN COALESCE(valore_finale, valore_letto) END) AS data,
         MAX(CASE WHEN campo = 'codice_cliente' THEN COALESCE(valore_finale, valore_letto) END) AS codice_cliente,
         MAX(CASE WHEN campo = 'cliente' THEN COALESCE(valore_finale, valore_letto) END) AS cliente,
+        MAX(CASE WHEN campo = 'cliente_id' THEN COALESCE(valore_finale, valore_letto) END) AS cliente_id,
         MAX(CASE WHEN campo = 'importo_totale' THEN COALESCE(valore_finale, valore_letto) END) AS importo,
         MAX(CASE WHEN campo = 'piva_cliente' THEN COALESCE(valore_finale, valore_letto) END) AS piva_cliente,
         MAX(CASE WHEN campo = 'fornitore' THEN COALESCE(valore_finale, valore_letto) END) AS fornitore_letto
@@ -685,26 +791,26 @@ export class DocumentiController {
       (${testo} = '' OR COALESCE(c.numero, '') ILIKE ${simile} OR d.file_nome ILIKE ${simile}
         OR COALESCE(fv.ragione_sociale, '') ILIKE ${simile} OR COALESCE(c.cliente, '') ILIKE ${simile})
       AND (${tipo} = '' OR d.tipo = ${tipo})
-      AND (${livello} = '' OR d.livello = ${livello})`;
+      AND (${livello} = '' OR d.livello = ${livello})
+      ${fornitoreId != null ? Prisma.sql`AND d.fornitore_id = ${fornitoreId}` : Prisma.empty}
+      ${clienteId != null ? Prisma.sql`AND c.cliente_id = ${clienteId}` : Prisma.empty}`;
     const righe = await this.db.$queryRaw<{
       id: bigint; file_nome: string; file_percorso: string; tipo: string | null; fornitore_id: bigint | null;
-      fornitore: string | null; fornitore_piva: string | null; numero: string | null; data: string | null; codice_cliente: string | null;
-      cliente: string | null; piva_cliente: string | null; fornitore_letto: string | null; importo: string | null; livello: string | null; stato: string; ricevuto_il: Date;
+      fornitore: string | null; fornitore_piva: string | null; numero: string | null; numero_ordine_fornitore: string | null; data: string | null; codice_cliente: string | null;
+      cliente: string | null; cliente_id: string | null; piva_cliente: string | null; fornitore_letto: string | null; importo: string | null; livello: string | null; stato: string; ricevuto_il: Date;
       letto_il: Date | null; controlli: Prisma.JsonValue | null;
     }[]>`
       WITH ${campi}
       SELECT d.id, d.file_nome, d.file_percorso, d.tipo, d.fornitore_id, fv.ragione_sociale AS fornitore, fv.piva AS fornitore_piva,
-             c.numero, c.data, c.codice_cliente, c.cliente, c.piva_cliente, c.fornitore_letto, c.importo, d.livello, d.stato, d.ricevuto_il, d.letto_il, d.controlli
+             c.numero, c.numero_ordine_fornitore, c.data, c.codice_cliente, c.cliente, c.cliente_id, c.piva_cliente, c.fornitore_letto, c.importo, d.livello, d.stato, d.ricevuto_il, d.letto_il, d.controlli
       FROM documenti_in_arrivo d
       LEFT JOIN campi c ON c.documento_id = d.id
       LEFT JOIN fornitori_versioni fv ON fv.fornitore_id = d.fornitore_id AND fv.id = d.fornitore_versione_id
       WHERE d.stato IN (${Prisma.join(stati.map((s) => Prisma.sql`${s}`))}) AND ${altro}
-      -- D-164 §19: la coda (in_coda/in_lettura) va dal più vecchio al più recente (è l'ordine del lettore);
-      -- il resto dell'elenco resta dal più recente
-      ORDER BY CASE WHEN d.stato IN ('in_coda', 'in_lettura') THEN 0 ELSE 1 END,
-               CASE WHEN d.stato IN ('in_coda', 'in_lettura') THEN d.ricevuto_il END ASC,
-               CASE WHEN d.stato IN ('in_coda', 'in_lettura') THEN d.id END ASC,
-               d.ricevuto_il DESC, d.id DESC
+      -- D-169 §19: i documenti da lavorare (in coda, in lettura, da controllare, errore) sono una coda
+      -- di lavoro, dal più vecchio caricato al più recente; l'elenco non mostra documenti chiusi (abbinati
+      -- o scartati), quindi vale un solo ordine crescente per tutti.
+      ORDER BY d.ricevuto_il ASC, d.id ASC
       LIMIT ${perPagina} OFFSET ${(pagina - 1) * perPagina}`;
     const conti = await this.db.$queryRaw<{ stato: string; n: bigint }[]>`
       WITH ${campi}
@@ -733,11 +839,13 @@ export class DocumentiController {
     return {
       documenti: righe.map((r) => ({
         id: String(r.id), file_nome: r.file_nome, file_tipo: fileTipo(r.file_percorso), tipo: r.tipo,
-        numero: r.numero, data: r.data, fornitore_id: r.fornitore_id != null ? String(r.fornitore_id) : null,
+        numero: r.numero, numero_ordine_fornitore: r.numero_ordine_fornitore, data: r.data, fornitore_id: r.fornitore_id != null ? String(r.fornitore_id) : null,
         fornitore: r.fornitore, codice_cliente: r.codice_cliente, cliente: r.cliente,
+        cliente_id: r.cliente_id,
         importo: r.importo == null ? null : Number(r.importo), livello: r.livello, stato: r.stato,
         ricevuto_il: r.ricevuto_il.toISOString(), letto_il: r.letto_il?.toISOString() ?? null,
         controlli_n: controlliFalliti(r.controlli),
+        confronto_n: confrontiFalliti(r.controlli),
         manca_agenzia: manca.has(r.id) && !nonRappresentata.has(r.id),
         manca_rappresentanza: nonRappresentata.has(r.id),
         fornitore_da_integra: importa.fornitore.has(r.id),
@@ -839,13 +947,15 @@ export class DocumentiController {
    *  testata e righe dai valori finali, proposta di abbinamento ricalcolata. */
   @Get(':id')
   @Richiede('provvigioni.consulta')
-  async dettaglio(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
+  async dettaglio(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Query() q: FiltroDettaglio) {
     const did = BigInt(id);
-    const d = await this.db.documenti_in_arrivo.findUnique({ where: { id: did }, select: { stato: true } });
+    const d = await this.db.documenti_in_arrivo.findUnique({ where: { id: did }, select: { stato: true, tipo: true } });
     if (!d) throw new NotFoundException('Documento non trovato');
     // uno scartato si apre solo con il permesso provvigioni.scartati, non con la sola consulta (§7.16)
     if (d.stato === 'scartato' && !permessiDi(req.utente!.ruolo, req.livelli ?? {}).includes('provvigioni.scartati')) throw new ForbiddenException();
-    return dettaglioDocumento(this.db, did, await this.integra.ponte());
+    await salvaFornitoreRiconosciuto(this.db, did, contesto(req)); // D-175: elenco e dettaglio vedono lo stesso fornitore
+    // 15/11/2026: senza `filtro` dal browser lo sceglie il server dal tipo (nota di credito e pagamento → fatturata)
+    return dettaglioDocumento(this.db, did, await this.integra.ponte(), q.filtro ?? filtroDalTipo(d.tipo));
   }
 
   /** D-152: la persona sceglie il fornitore o il cliente fra i candidati proposti. Un candidato del
@@ -1149,28 +1259,47 @@ export class DocumentiController {
     });
   }
 
-  /** Riprova la lettura di un documento in `errore` (A4-01, §7.9): torna `in_coda` e chiude
-   *  `lettura.fallita`; il lettore lo riprende al giro successivo. Solo da `errore`. */
+  /** Riprova la lettura (A4-01, §7.9, D-170): da `errore` (servizio sistemato) o da `da_controllare`
+   *  (rileggere un documento già letto per ricavare i campi nuovi). Torna `in_coda`, chiude
+   *  `lettura.fallita`; il lettore lo riprende al giro successivo. */
   @Post(':id/rileggi')
   @HttpCode(204)
   @Richiede('provvigioni.modifica')
   async rileggi(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
-    const ctx = contesto(req);
+    await rileggiDocumento(this.db, BigInt(id), contesto(req));
+  }
+
+  /** D-170: ricava il numero d'ordine del fornitore dal testo già letto (`lettura_grezza`), senza
+   *  rileggere. Lo propone come campo letto da confermare. Per i documenti letti prima di questa
+   *  versione la grezza non c'è: si propone di rileggere. */
+  @Post(':id/ricava-ordine')
+  @HttpCode(200)
+  @Richiede('provvigioni.modifica')
+  async ricavaOrdine(@Param('id', ParseIntPipe) id: number) {
     const did = BigInt(id);
-    await this.db.$transaction(async (tx) => {
+    return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
       const d = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
       if (!d) throw new NotFoundException('Documento non trovato');
-      if (d.stato !== 'errore') throw new ConflictException('Solo un documento in errore si può rileggere');
-      await tx.documenti_in_arrivo.update({ where: { id: did }, data: { stato: 'in_coda', tentativi: 0, errore: null } });
-      await logEvent(tx, {
-        tipo: 'documento', azione: 'update', entita: 'documento', entita_id: did, esito: 'successo',
-        dettaglio: {
-          etichetta: d.file_nome, documento_id: String(did), pratica_id: null,
-          prima: { stato: 'errore' }, dopo: { stato: 'in_coda' },
-        },
-      }, ctx);
-      await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(did));
+      if (d.lettura_grezza == null) {
+        return { esito: 'rilegere', messaggio: 'Il documento è stato letto prima di questa versione: la lettura grezza non c’è. Usa «Rileggi il documento».' };
+      }
+      const gia = await tx.documenti_campi.findFirst({ where: { documento_id: did, campo: 'numero_ordine_fornitore' } });
+      if (gia?.valore_letto || gia?.valore_finale) {
+        return { esito: 'presente', messaggio: 'Il numero d’ordine del fornitore è già stato letto.' };
+      }
+      const numero = estraiNumeroOrdine(testiDaGrezza(d.lettura_grezza).join('\n'));
+      if (!numero) {
+        return { esito: 'nessuno', messaggio: 'Nessun numero d’ordine trovato nel testo letto: correggilo a mano.' };
+      }
+      if (gia) {
+        await tx.documenti_campi.update({ where: { id: gia.id }, data: { valore_letto: numero, affidabilita: null, precisione: 'assente' } });
+      } else {
+        await tx.documenti_campi.create({ data: { documento_id: did, campo: 'numero_ordine_fornitore', valore_letto: numero, valore_finale: null, affidabilita: null, posizione: Prisma.DbNull, precisione: 'assente', verificato: false } });
+      }
+      const val = await valutaLettura(tx, did);
+      await tx.documenti_in_arrivo.update({ where: { id: did }, data: { livello: val.livello, controlli: { falliti: val.controlli } as unknown as Prisma.InputJsonValue } });
+      return { esito: 'trovato', numero, messaggio: `Numero d’ordine ${numero} proposto: confermalo in Correggi i dati letti.` };
     });
   }
 }
@@ -1199,9 +1328,13 @@ class NuovoDocumento {
   @Facoltativo() @IsInt() @Min(1) fattura_id?: number; // nota di credito: la fattura stornata (D-34)
   @Facoltativo() @IsInt() @Min(1) arrivo_id?: number; // file in coda dal canale comune
   @Facoltativo() @IsBoolean() multi_ordine?: boolean; // D-123: la persona conferma la stessa fattura su più ordini
+  @IsOptional() @IsIn(['parziale', 'sostituisce']) ruolo?: 'parziale' | 'sostituisce'; // D-174: conferma/proforma in più
 }
 /** Abbinamento a mano di un file in coda (D-60): pratica esistente, oppure cliente e fornitore per un ordine che apre una pratica nuova. */
 class AbbinaDocumento extends NuovoDocumento {
+  // «Prendi dalla coda» (D-186 §19): dalla pagina della pratica si manda solo pratica_id; tipo, numero, data
+  // e importo li ricava il server dal file letto (V12). Negli altri casi il tipo resta obbligatorio.
+  @IsOptional() declare tipo: TipoDocumento;
   @Facoltativo() @IsInt() @Min(1) pratica_id?: number;
   @Facoltativo() @IsInt() @Min(1) cliente_id?: number;
   @Facoltativo() @IsInt() @Min(1) fornitore_id?: number;
@@ -1283,6 +1416,7 @@ async function documentoDi(tx: Tx, testata_id: bigint, did: number | bigint) {
   });
   if (!d || d.testata_id !== testata_id) throw new NotFoundException('Documento non trovato');
   if (d.liquidazione_id) throw new ConflictException(`${nomeDi(d.tipo)} ${d.numero} già liquidata al subagente: non si modifica, registra una nota di credito`);
+  if (d.congelato_il) throw new ConflictException(`${nomeDi(d.tipo)} ${d.numero} è in un periodo chiuso (bollettino verificato o liquidazione): non si modifica, si corregge con una nota di credito`); // D-183
   return d;
 }
 type Doc = Awaited<ReturnType<typeof documentoDi>>;
@@ -1340,12 +1474,15 @@ function documentiPratica(t: Testata) {
   }));
   const riferimento = (d: { fattura_id: bigint | null }) =>
     d.fattura_id ? (t.documenti.find((x) => x.id === d.fattura_id)?.numero ?? null) : null;
+  // D-174: il documento sostituito mostra il numero di quello che lo sostituisce (per il grigio «superato da …»)
+  const superatoDa = (d: { superato_da: bigint | null }) => (d.superato_da ? (t.documenti.find((x) => x.id === d.superato_da)?.numero ?? null) : null);
   return {
     pratica: { id: String(t.id), numero: t.numero_ordine, stato: t.stato, importo: Number(t.importo) },
     // D-60: ordini, conferme, proforma, pagamenti e altri, solo tracciati
     altri: t.documenti.filter((d) => !fiscale(d.tipo)).map((d) => ({
       id: String(d.id), pratica_id: String(t.id), tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: Number(d.importo),
       arrivo_id: d.arrivo_id ? String(d.arrivo_id) : null, file_nome: d.arrivo?.file_nome ?? null, note: d.note,
+      ruolo: d.ruolo, superato: d.superato_da != null, superato_da: superatoDa(d),
       righe: righeDi(d), riferimento: riferimento(d),
     })),
     documenti: t.documenti.filter((d) => fiscale(d.tipo)).map((d) => {
@@ -1377,7 +1514,7 @@ function confrontoDocumenti(t: Testata, cur: bigint, rif: bigint) {
   const righe = (id: bigint) => perCodice(
     t.righe.filter((r) => r.documento_id === id).map((r) => {
       const qta = r.quantita ?? new Dec(0), prezzo = r.prezzo_unitario ?? new Dec(0);
-      return { codice: r.codice, descrizione: r.descrizione, qta, prezzo, importo: r.importo ?? qta.times(prezzo).toDecimalPlaces(2, Dec.ROUND_HALF_UP) };
+      return { codice: r.codice, descrizione: r.descrizione, qta, prezzo, importo: r.importo ?? qta.times(prezzo).toDecimalPlaces(2, Dec.ROUND_HALF_UP), spesa: r.spesa };
     }),
   );
   const CUR = righe(cur), RIF = righe(rif);
@@ -1590,6 +1727,26 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
     if (altra) throw new ConflictException(`${nomeDi(b.tipo)} ${numero} è già registrata in ${altra.testata.numero_ordine}: se è una ${nomeDi(b.tipo).toLowerCase()} su più ordini conferma`);
   }
   const importo = await importoValido(tx, pid, { tipo: b.tipo, importo: b.importo, storno_totale, fattura_id });
+  // D-174: più conferme/proforme sulla stessa pratica. La prima non ha ruolo; le successive sono
+  // «parziale» (si sommano) o «sostituisce» (revisione: le precedenti restano superate e non contano).
+  // Se il ruolo non è scelto (abbinamento a mano), il server applica la proposta.
+  let ruolo: 'parziale' | 'sostituisce' | null = null, supera: bigint[] = [];
+  if (b.tipo === 'conferma' || b.tipo === 'proforma') {
+    const validi = await tx.ordini_fornitore_documenti.findMany({
+      where: { testata_id: pid, tipo: { in: ['conferma', 'proforma'] }, superato_da: null },
+      select: { id: true, importo: true },
+    });
+    const ordine = Number((await tx.ordini_fornitore_documenti.aggregate({ where: { testata_id: pid, tipo: 'ordine' }, _sum: { importo: true } }))._sum.importo ?? 0);
+    const v = validi.map((x) => ({ id: x.id, importo: Number(x.importo) }));
+    if (b.ruolo) {
+      ruolo = b.ruolo;
+      supera = b.ruolo === 'sostituisce' ? superatiConferma(Number(importo), ordine, v) : [];
+    } else {
+      const sugg = ruoloConferma(Number(importo), ordine, v);
+      ruolo = sugg.ruolo;
+      supera = sugg.supera;
+    }
+  }
   let arrivo_id: bigint | null = null;
   if (b.arrivo_id) {
     arrivo_id = BigInt(b.arrivo_id);
@@ -1605,9 +1762,29 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
     if (a.stato === 'errore') await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(arrivo_id));
   }
   const d = await tx.ordini_fornitore_documenti.create({
-    data: { testata_id: pid, tipo: b.tipo, numero, data: new Date(data), importo, storno_totale, fattura_id, arrivo_id, note: b.note },
+    data: { testata_id: pid, tipo: b.tipo, numero, data: new Date(data), importo, storno_totale, fattura_id, arrivo_id, note: b.note, ruolo },
   });
-  await logEvent(tx, { tipo: 'documento', azione: 'create', entita: 'documento', entita_id: d.id, esito: 'successo', dettaglio: { ...perEvento(d), arrivo_id: arrivo_id ? String(arrivo_id) : null } }, ctx);
+  // D-176: copia le righe lette del file nella fotografia della pratica (§4.2.8). Senza, il confronto
+  // della proposta vede la pratica senza righe e segnala ogni articolo come assente (caso PR102813).
+  if (arrivo_id) {
+    const fase = faseDi(b.tipo);
+    if (fase) {
+      const letto = await lettoDaCampi(tx, arrivo_id);
+      if (letto.righe.length) {
+        await tx.ordini_fornitore_righe.createMany({
+          data: letto.righe.map((r, i) => ({
+            testata_id: pid, documento_id: d.id, fase, numero_riga: i + 1,
+            codice: r.codice, descrizione: r.descrizione, quantita: r.quantita, prezzo_unitario: r.prezzo,
+            importo: r.importo != null ? r2(r.importo) : (r.quantita != null && r.prezzo != null ? r2(r.quantita * r.prezzo * fattoreSconto(r)) : null),
+            spesa: r.spesa ?? false, // D-183: la riga di spesa si copia come spesa
+          })),
+        });
+      }
+    }
+  }
+  // D-174: «sostituisce» — le conferme/proforme precedenti restano in archivio, superate, e non contano
+  if (supera.length) await tx.ordini_fornitore_documenti.updateMany({ where: { id: { in: supera } }, data: { superato_da: d.id } });
+  await logEvent(tx, { tipo: 'documento', azione: 'create', entita: 'documento', entita_id: d.id, esito: 'successo', dettaglio: { ...perEvento(d), arrivo_id: arrivo_id ? String(arrivo_id) : null, ...(ruolo ? { ruolo, superati: supera.map(String) } : {}) } }, ctx);
   return d;
 }
 
@@ -1697,9 +1874,15 @@ async function nuovaPratica(tx: Tx, b: AbbinaDocumento, ctx: Contesto) {
   const [m] = await tx.$queryRaw<{ n: number | null }[]>`
     SELECT max(substring(numero_ordine FROM ${'^OF/' + anno + '/(\\d+)$'})::int) AS n FROM ordini_fornitore_testata WHERE numero_ordine LIKE ${'OF/' + anno + '/%'}`;
   const numero_ordine = `OF/${anno}/${String((m.n ?? 0) + 1).padStart(3, '0')}`;
+  // D-169: la pratica è marchiata col numero d'ordine del fornitore (b.numero, per l'ordine); la coppia
+  // fornitore + numero è unica, mai il numero da solo (due fornitori possono avere la stessa numerazione)
+  if (b.numero) {
+    const gia = await tx.ordini_fornitore_testata.findFirst({ where: { fornitore_id: fid, numero_ordine_fornitore: b.numero }, select: { id: true } });
+    if (gia) throw new ConflictException(`Il fornitore ha già una pratica per l'ordine ${b.numero}`);
+  }
   const t = await tx.ordini_fornitore_testata.create({ data: {
     fornitore_id: fid, fornitore_versione_id: f.versione_corrente_id, cliente_id: cid, cliente_versione_id: c.versione_corrente_id,
-    numero_ordine, data_ordine: new Date(b.data), importo_merce: b.importo ?? null, agente_id: ag.subagente.agente_id,
+    numero_ordine, numero_ordine_fornitore: b.numero ?? null, data_ordine: new Date(b.data), importo_merce: b.importo ?? null, agente_id: ag.subagente.agente_id,
   } });
   await logEvent(tx, {
     tipo: 'crud', azione: 'create', entita: 'pratica', entita_id: t.id, esito: 'successo',
@@ -1728,7 +1911,20 @@ export class DocumentiAbbinaController {
       } else if (b.tipo === 'ordine') {
         ({ fid, pid } = await nuovaPratica(tx, b, ctx));
       } else throw new BadRequestException('Scegli la pratica: solo un ordine apre una pratica nuova');
-      const d = await registra(tx, fid, pid, { ...b, arrivo_id: id }, ctx);
+      // «Prendi dalla coda» (D-186 §19): il browser manda solo documento e pratica; il server ricava i dati
+      // dal file letto e ricontrolla che fornitore (e cliente, se riconosciuto) coincidano con la pratica (V12).
+      let corpo: NuovoDocumento = b;
+      if (!b.tipo) {
+        // V13: il documento si blocca prima di leggerlo, così fornitore e cliente non cambiano durante la lettura
+        await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${BigInt(id)} FOR UPDATE`;
+        const letto = await lettoDaCampi(tx, BigInt(id));
+        const t = await tx.ordini_fornitore_testata.findUniqueOrThrow({ where: { id: pid }, select: { fornitore_id: true, cliente_id: true } });
+        if (letto.fornitore_id != null && letto.fornitore_id !== t.fornitore_id) throw new BadRequestException('Il documento è di un altro fornitore');
+        if (letto.cliente_id != null && BigInt(letto.cliente_id) !== t.cliente_id) throw new BadRequestException('Il documento è di un altro cliente');
+        if (!letto.tipo || !(TIPI_DOCUMENTO as readonly string[]).includes(letto.tipo)) throw new BadRequestException('Il documento non è stato letto: aprilo in Documenti per scegliere tipo e dati a mano');
+        corpo = { ...b, tipo: letto.tipo as TipoDocumento, numero: letto.numero ?? '', data: letto.data ?? undefined, importo: letto.importo ?? undefined };
+      }
+      const d = await registra(tx, fid, pid, { ...corpo, arrivo_id: id }, ctx);
       // D-164: fornitore e cliente scelti a mano si imparano per i documenti successivi
       await imparaAlias(tx, BigInt(id), 'fornitore', fid, ctx.utente_id);
       if (b.cliente_id) await imparaAlias(tx, BigInt(id), 'cliente', BigInt(b.cliente_id), ctx.utente_id);
@@ -1757,6 +1953,8 @@ async function bloccaDocumento(tx: Tx, id: number) {
   if (!fiscale(d.tipo)) throw new BadRequestException(`${nomeDi(d.tipo)} ${d.numero} non dà provvigioni al subagente`);
   // già pagato al subagente: il trimestre è chiuso, si corregge con una nota di credito (D-11)
   if (d.liquidazione_id) throw new ConflictException(`${nomeDi(d.tipo)} ${d.numero} già liquidata al subagente: non si modifica, registra una nota di credito`);
+  // D-183: congelato (bollettino verificato o liquidazione chiusa) → non si tocca la quota
+  if (d.congelato_il) throw new ConflictException(`${nomeDi(d.tipo)} ${d.numero} è in un periodo chiuso: la quota non si cambia, si corregge con una nota di credito`);
   return d;
 }
 
