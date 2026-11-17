@@ -9,8 +9,8 @@ import { FormPercentuali, type Percentuali, type Scaglione, type ScaglioneVersio
 import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
 import { Copiabile } from '@/componenti/Copiabile';
 import { ConfermaGrave } from '@/componenti/ConfermaGrave';
-import { Nota, Pagina, Pannello, Pulsante, type Azione } from '@/componenti/Pagina';
-import { avviso, Dettagli } from '@/componenti/Piccoli';
+import { Pagina, Pannello, Pulsante, type Azione } from '@/componenti/Pagina';
+import { avviso, Dettagli, Informazioni } from '@/componenti/Piccoli';
 import { SagomaCorpo, SagomaElenco, SagomaTabella, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
@@ -31,6 +31,8 @@ interface Fornitore {
   tipo_provvigione: string;
   giorni_incasso: number;
   spese_base_provvigione: boolean;
+  raggruppamento: string;
+  scaglioni_esatti: boolean;
   note: string | null;
   attivo: boolean;
   scaglioni: number;
@@ -136,6 +138,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
           { nome: 'tipo_provvigione', etichetta: 'Tipo di provvigione', tipo: 'select', valore: x.tipo_provvigione, opzioni: [{ value: 'maturato', label: 'Sul maturato' }, { value: 'fatturato', label: 'Sul fatturato' }] },
           { nome: 'giorni_incasso', etichetta: 'Giorni per l’incasso dal cliente', tipo: 'testo', valore: String(x.giorni_incasso) },
           { nome: 'spese_base_provvigione', etichetta: 'Spese nella base della provvigione (trasporto, imballo)', tipo: 'casella', valore: x.spese_base_provvigione, largo: true },
+          { nome: 'raggruppamento', etichetta: 'Raggruppamento per lo scaglione', tipo: 'select', valore: x.raggruppamento, opzioni: [{ value: 'documento', label: 'Sconto medio del documento' }, { value: 'riga', label: 'Per sconto di riga' }], largo: true },
+          { nome: 'scaglioni_esatti', etichetta: 'Scaglioni', tipo: 'select', valore: x.scaglioni_esatti ? 'esatti' : 'fascia', opzioni: [{ value: 'fascia', label: 'A fascia (prima soglia ≥ sconto)' }, { value: 'esatti', label: 'Solo sconti esatti (±0,05)' }], largo: true },
           { nome: 'note', etichetta: 'Note', tipo: 'testo', valore: x.note ?? '', largo: true },
         ]}
         onChiudi={chiudi}
@@ -148,6 +152,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
           if (v.note !== undefined) corpo.note = v.note;
           // la casella non compare nel corpo quando non è spuntata (D-183: esclusa è il predefinito)
           corpo.spese_base_provvigione = v.spese_base_provvigione === 'on';
+          if (v.raggruppamento !== undefined) corpo.raggruppamento = v.raggruppamento;
+          if (v.scaglioni_esatti !== undefined) corpo.scaglioni_esatti = v.scaglioni_esatti === 'esatti';
           const r = await api<Dettaglio>('fornitori/' + x.id, corpo, 'PUT');
           if (!r.ok) return r.messaggio;
           avviso('Regole salvate');
@@ -212,14 +218,14 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
   ];
 
   const colonneScaglioni: Colonna<ScaglioneVersione>[] = [
-    { key: 'sconto_min', header: 'Sconto', align: 'center', cell: (s) => pct(s.sconto_min) },
-    { key: 'pct_agente', header: 'Dal fornitore', align: 'center', cell: (s) => pct(s.pct_agente) },
+    { key: 'sconto_min', header: 'Sconto', align: 'right', cell: (s) => pct(s.sconto_min) },
+    { key: 'pct_agente', header: 'Dal fornitore', align: 'right', cell: (s) => pct(s.pct_agente) },
     {
-      key: 'pct_subagente', header: 'di cui al subagente', align: 'center', classe: () => 'avvolgi', cell: (s) => <>{pct(s.pct_subagente)}
+      key: 'pct_subagente', header: 'di cui al subagente', align: 'right', classe: () => 'avvolgi', cell: (s) => <>{pct(s.pct_subagente)}
         {s.eccezioni.map((e) => <span key={e.id} className="sec-riga">{e.subagente} {pct(e.pct_personale)} · dal {dataIt(e.valido_dal)}{e.valido_al ? ' al ' + dataIt(e.valido_al) : ''}</span>)}
       </>,
     },
-    { key: 'margine', header: 'Margine Decobrands', align: 'center', cell: (s) => pct(s.pct_agente - s.pct_subagente) },
+    { key: 'margine', header: 'Margine', align: 'right', cell: (s) => pct(s.pct_agente - s.pct_subagente) },
     { key: 'clienti', header: 'Clienti', align: 'center' },
   ];
 
@@ -305,6 +311,8 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               { etichetta: 'Tipo di provvigione', valore: u.tipo_provvigione === 'maturato' ? 'Sul maturato' : 'Sul fatturato' },
               { etichetta: 'Giorni per l’incasso', valore: u.giorni_incasso },
               { etichetta: 'Spese nella base', valore: u.spese_base_provvigione ? 'Sì (incluse)' : 'No (escluse)' },
+              { etichetta: 'Raggruppamento', valore: u.raggruppamento === 'riga' ? 'Per sconto di riga' : 'Sconto medio del documento' },
+              { etichetta: 'Scaglioni', valore: u.scaglioni_esatti ? 'Solo sconti esatti (±0,05)' : 'A fascia (prima soglia ≥ sconto)' },
               { etichetta: 'Note', valore: u.note ?? '—' },
             ]} />
             <Schede riempi memoria={schedaParam ? undefined : 'fornitori'} attiva={schedaParam ?? undefined} schede={[
@@ -325,23 +333,33 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
                     )}
                     <div className="strumenti-scheda">
                       <span className="spazio" />
+                      <Informazioni titolo="Informazioni sulle percentuali">
+                        <ul>
+                          <li><b>Dal fornitore</b>: la % che il fornitore riconosce a Decobrands.</li>
+                          <li><b>Di cui al subagente</b>: la parte girata al subagente.</li>
+                          <li><b>Margine Decobrands</b>: la differenza fra le due.</li>
+                          <li><b>Clienti</b>: i clienti seguiti con quello sconto.</li>
+                          <li><b>Date di validità e chiusure</b>: i documenti si calcolano con le percentuali in vigore alla loro data. Un nuovo scaglione, una sua modifica o un’eccezione valgono da una data dopo l’ultima chiusura (bollettino verificato o contestato, trimestre liquidato): prima il server rifiuta.</li>
+                        </ul>
+                      </Informazioni>
                       {puoModificare && percentuali && !mancanoScaglioni && <button type="button" className="btn sec piccolo" onClick={() => aggiungiScaglione(percentuali.in_vigore ?? undefined)}>Aggiungi scaglione</button>}
                     </div>
                     {!percentuali
                       ? errorePercentuali ? <div className="vuoto">Percentuali non caricate.</div> : <SagomaTabella righe={4} colonne={5} />
-                      : ordinate(percentuali.versioni).map(({ v, tipo }) => (
-                        <div key={v.valido_dal} data-versione={v.valido_dal} style={{ flex: 'none' }}>
-                          <div className="strumenti-scheda">
-                            <h3>{tipo === 'in vigore' ? 'In vigore dal ' + dataIt(v.valido_dal) : 'Dal ' + dataIt(v.valido_dal)}</h3>
-                            {tipo !== 'in vigore' && <span className="testo-tenue">{tipo}</span>}
-                            <span className="spazio" />
-                            {puoModificare && v.modificabile && percentuali.versioni.length > 1 &&<button type="button" className="btn sec piccolo" onClick={() => void eliminaVersione(v)}>Elimina</button>}
-                          </div>
-                          <DataTable compatta naturale righe={v.scaglioni} colonne={colonneScaglioniConAzioni(v)} chiave={(s) => s.id}
-                            ordinamentoIniziale={{ key: 'sconto_min', dir: 'asc' }} emptyText="Nessuno scaglione" />
-                        </div>
-                      ))}
-                    <Nota>Dal fornitore = % che il fornitore riconosce a Decobrands; di cui al subagente = la parte girata al subagente; Margine Decobrands = la differenza. Clienti = clienti seguiti con quello sconto. I documenti si calcolano con le percentuali in vigore alla loro data. Un nuovo scaglione, una sua modifica o un’eccezione valgono da una data dopo l’ultima chiusura (bollettino verificato o contestato, trimestre liquidato): prima il server rifiuta.</Nota>
+                      : <div className="scaglioni-elenco scaglioni-tabella">
+                          {ordinate(percentuali.versioni).map(({ v, tipo }) => (
+                            <div key={v.valido_dal} data-versione={v.valido_dal} className="scaglioni-versione">
+                              <div className="strumenti-scheda">
+                                <h3>{tipo === 'in vigore' ? 'In vigore dal ' + dataIt(v.valido_dal) : 'Dal ' + dataIt(v.valido_dal)}</h3>
+                                {tipo !== 'in vigore' && <span className="testo-tenue">{tipo}</span>}
+                                <span className="spazio" />
+                                {puoModificare && v.modificabile && percentuali.versioni.length > 1 &&<button type="button" className="btn sec piccolo" onClick={() => void eliminaVersione(v)}>Elimina</button>}
+                              </div>
+                              <DataTable compatta righe={v.scaglioni} colonne={colonneScaglioniConAzioni(v)} chiave={(s) => s.id}
+                                ordinamentoIniziale={{ key: 'sconto_min', dir: 'asc' }} emptyText="Nessuno scaglione" />
+                            </div>
+                          ))}
+                        </div>}
                   </div>
                 ),
               },

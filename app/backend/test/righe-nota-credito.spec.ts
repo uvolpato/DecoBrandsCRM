@@ -20,7 +20,7 @@ const documento = (tipo: string, numero: string, data: string, importo: number, 
 
 const pratica = (fattura: any[], documenti: any[] = []): any => ({
   id: 'p1', numero: 'OF/2026/999', fornitore_id: 'f1', cliente_id: 'c1', data: '2026-01-01',
-  ordini: [], conferme: [], proforma: [], pagamenti: [],
+  raggruppamento: null, ordini: [], conferme: [], proforma: [], pagamenti: [],
   righe: { ordine: [], conferma: [], fattura },
   documenti,
 });

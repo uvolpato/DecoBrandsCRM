@@ -82,6 +82,10 @@ Si aggiorna a ogni nuova regola (Claude Code la tiene allineata quando chiude un
     e vincoli al salvataggio (D-168).
 26. **Il dettaglio mostra sempre i propri dati**, anche quando la funzione principale (confronto)
     non è disponibile; il controllo che non serve è spento con il motivo nel `title`.
+26b. **Spiegazioni lunghe sotto una tabella → pulsante informazioni** (icona «i», componente
+    `Informazioni`) in alto a destra: apre una finestra con il testo diviso in punti brevi, invece
+    di stare in pagina. La tabella resta senza scorrimento orizzontale (testi brevi, larghezze in
+    %, numeri a destra) e scorrono solo le righe, con intestazione fissa.
 
 ## Conferme e messaggi
 27. **Operazioni senza ritorno**: finestra di conferma con l'elenco **vero** delle conseguenze e

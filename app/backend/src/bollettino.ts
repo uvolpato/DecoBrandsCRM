@@ -4,7 +4,7 @@ import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'c
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { type Dati, caricaDatiBollettino, fiscale } from './motore/dati';
-import { anomaliaScontoMedio, riconcilia, statoIncasso } from './motore/motore';
+import { anomaliaProvvigione, descrizioneAnomalia, riconcilia, statoIncasso } from './motore/motore';
 import { congelaDocumenti } from './pratiche';
 import { PrismaService } from './prisma.service';
 import { type Contesto, logEvent } from './registro';
@@ -285,9 +285,10 @@ export class BollettinoController {
       if (r.aperte) throw new ConflictException(`Ci sono ${r.aperte} righe da decidere prima di chiudere il bollettino`);
       if (c.stato === 'verificato' && contestate) throw new ConflictException('Ci sono righe contestate: il bollettino va segnato come contestato');
       if (c.stato === 'contestato' && !contestate) throw new ConflictException('Nessuna riga contestata: il bollettino va segnato come verificato');
-      // D-182 §19: una pratica con lo sconto medio oltre l'ultimo scaglione non si chiude (provvigione da decidere)
-      const anomala = S.pratiche.find((p) => anomaliaScontoMedio(S, p));
-      if (anomala) throw new ConflictException(`La pratica ${anomala.numero} ha lo sconto medio oltre l'ultimo scaglione: aggiungi lo scaglione al fornitore prima di chiudere il bollettino.`);
+      // D-182 §19, D-199 §19: una pratica con sconto medio (o un gruppo in modalità riga) oltre l'ultimo
+      // scaglione non si chiude (provvigione da decidere)
+      const anomala = S.pratiche.find((p) => anomaliaProvvigione(S, p));
+      if (anomala) throw new ConflictException(`La pratica ${anomala.numero} ha ${descrizioneAnomalia(S, anomala)}: aggiungi lo scaglione al fornitore prima di chiudere il bollettino.`);
       for (const x of r.righe) {
         if (!x.id || !x.loro || !x.documento_id) continue; // righe del fornitore abbinate a un nostro documento
         const congela = !x.incasso && x.noi ? { pct_calcolata: x.noi.pct, importo_calcolato: x.noi.importo } : {};

@@ -7,6 +7,8 @@ import { base } from './seed/00-base';
 export async function seed(db: PrismaService) {
   // utenti con password fissa: mai in esercizio
   if (process.env.NODE_ENV === 'production') throw new Error('Dati di prova: non si caricano in esercizio');
+  const [{ db: nome }] = await db.$queryRawUnsafe<{ db: string }[]>('SELECT current_database() AS db');
+  if (!nome.startsWith('decobrands_test') && process.env.SEED_SU_DB !== nome) throw new Error(`seed rifiutato su ${nome}: SEED_SU_DB=${nome} per forzarlo`);
   const c = await db.codici_esterni.findUnique({ where: { sistema_tipo_codice: { sistema: 'integra', tipo: 'fornitore', codice: 'F00031' } } });
   if (c) return false;
   await db.$transaction(async (tx) => { await base(tx); }, { timeout: 120_000, maxWait: 10_000 });

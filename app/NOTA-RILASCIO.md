@@ -11,6 +11,26 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.9 — 17/11/2026 — percentuale per riga, scaglioni esatti, informazioni a comparsa
+
+- **Raggruppamento sul fornitore** (D-199): «Sconto medio del documento» (come prima) oppure **«Per
+  sconto di riga»**: le righe si raggruppano per sconto, ogni gruppo prende il suo scaglione e la
+  provvigione è la somma (come fa Arte). Sulla pratica si può **derogare**, con motivo obbligatorio
+  che resta nel registro; le pratiche con deroga hanno un segno e un filtro. In pratica e nel documento
+  si vedono i gruppi. Documento, Riepilogo, liquidazione, Analisi e bollettini usano lo stesso calcolo.
+- **Scaglioni «solo sconti esatti»** (D-200): sul fornitore si sceglie «a fascia» (come prima) oppure
+  «solo sconti esatti» (±0,05 punti): uno sconto che non coincide con una soglia (es. 3% con soglie
+  0/1/5/10) diventa un'anomalia e la provvigione resta da decidere, invece di prendere la soglia
+  successiva. Serve per tabelle come quella di Arte con l'1% della fiera.
+- **Il calcolo del CRM è una previsione**: il dato certo resta il bollettino del fornitore.
+- **Informazioni a comparsa**: le spiegazioni lunghe sotto la tabella degli scaglioni (Fornitori) e
+  dei ruoli (Soggetti) stanno ora in una finestra che si apre con il pulsante «i» in alto a destra; la
+  tabella degli scaglioni non scorre più di lato e scorrono solo le righe.
+- **Correzioni**: le anomalie di provvigione si registrano di nuovo (il registro rifiutava il servizio
+  `provvigioni` dalla 0.2.7); una nota di credito già fissata non si sottrae più due volte nella
+  liquidazione del subagente.
+- **Sicurezza dei dati**: svuotamento e dati di prova si rifiutano su un database che non sia di prova.
+
 ### 0.2.8 — 16/11/2026 — note di credito più precise e pratica in una scheda a parte
 
 - **La nota di credito porta le sue righe**: quelle lette dal documento si salvano come quelle della

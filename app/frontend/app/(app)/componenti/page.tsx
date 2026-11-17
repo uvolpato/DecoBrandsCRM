@@ -15,7 +15,7 @@ import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Copiabile } from '@/componenti/Copiabile';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { PeriodoMesi } from '@/componenti/PeriodoMesi';
-import { avviso, Dettagli, Stato } from '@/componenti/Piccoli';
+import { avviso, Dettagli, Informazioni, Stato } from '@/componenti/Piccoli';
 import { RiepilogoFiltri } from '@/componenti/RiepilogoFiltri';
 import { Sagoma, SagomaRiquadri, SagomaSegmenti, SagomaTabella } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
@@ -268,6 +268,9 @@ const VOCI: Voce[] = [
   { nome: 'Campo', gruppo: 'Finestre', testo: 'Campi standard con etichetta e aiuto: testo, numero, password, casella, select, livello e ricerca su un’entità.', firma: '<Campo nome etichetta tipo={testo|numero|password|casella|select|livello|ricerca} valore opzioni aiuto largo segnaposto min max step disabilitato entita multipla contesto />',
     demo: <div className="modulo modulo-2"><Campo nome="demo_codice" etichetta="Codice del fornitore" aiuto="Come il fornitore chiama il cliente." /><Campo nome="demo_sconto" etichetta="Sconto %" tipo="select" opzioni={[{ value: '0', label: '0 %' }, { value: '5', label: '5 %' }]} /><Campo nome="demo_pw" etichetta="Password" tipo="password" /><Campo nome="demo_resta" etichetta="Resta collegato" tipo="casella" valore /></div> },
   { nome: 'CampoEuro', gruppo: 'Finestre', testo: 'Campo numerico delle finestre per prezzi e importi: fuori dal fuoco il valore si legge all’italiana (12,50 €), col fuoco si modifica con la virgola o il punto; al server arriva la stringa numerica col punto, come sempre (V12). Con valuta={false} mostra le quantità: virgola, senza €. Allineato a destra, inputMode decimale.', firma: '<CampoEuro valore onChange dataCampo onFocus valuta ariaLabel />', demo: <DemoCampoEuro /> },
+  { nome: 'Informazioni', gruppo: 'Finestre', testo: 'Pulsante a icona «i» che apre una finestra con la spiegazione: le note lunghe sotto una tabella si mettono qui, non in pagina. Il titolo dà anche aria-label e title del pulsante.',
+    firma: '<Informazioni titolo="Informazioni sulle percentuali">…</Informazioni>',
+    demo: <Informazioni titolo="Informazioni di esempio"><ul><li>La prima spiegazione.</li><li>La seconda spiegazione.</li></ul></Informazioni> },
   { nome: 'FormModal · Modale · Conferma · ConfermaGrave · Avviso', gruppo: 'Finestre', testo: 'Finestre sopra la pagina. FormModal resta aperta se onConferma restituisce il messaggio d’errore (il controllo vero lo fa il server); con `casella` mostra la casella da spuntare che abilita il pulsante (D-172). ConfermaGrave: come Conferma ma con la casella obbligatoria e il pulsante rosso spento finché non è spuntata. Avviso: messaggio temporaneo.',
     firma: '<FormModal titolo testo campi colonne conferma pericolo casella azioniExtra onConferma={async (valori) => messaggio d’errore | niente} onChiudi />\n<Modale titolo testo piede larga onChiudi>   <Conferma titolo testo etichetta pericolo onRisposta={(si) => …} />   <ConfermaGrave titolo punti etichettaCasella etichetta onRisposta={(si) => …} />   avviso(testo, errore)', demo: <DemoFinestre /> },
   { nome: 'FormAgenzia', gruppo: 'Finestre', testo: 'Form dell’agenzia (interscambio) condiviso fra Clienti e Documenti: nuovo o modifica, con fornitore fisso facoltativo (dal documento) e valori iniziali. Salva con POST/PUT /api/clienti/:id/agenzie.',

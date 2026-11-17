@@ -11,6 +11,9 @@ Valgono per ogni sessione di OpenCode che esegue un pacchetto `collaudo-<onda>-N
   - commit, push, stash, reset, checkout;
   - Integra (192.168.239.49);
   - `decobrands_db`;
+  - **script fuori da jest che toccano il database** (`ts-node`, `node -e`, file di prova nella radice): senza jest
+    `DATABASE_URL` è `decobrands_db` (16/11/2026 uno script con `svuota()` l'ha svuotato). Per riprodurre un errore si
+    scrive o si restringe una prova jest (`-t "nome"`); per leggere il db di prova si usa solo `DATABASE_URL_TEST`;
   - le porte 8001/8002 (ci girano i server di Ugo).
 - Se una correzione va contro il §19 della spec o non si applica, fermati e scrivilo nel resoconto. Non inventare.
 - Il pacchetto è finito quando:

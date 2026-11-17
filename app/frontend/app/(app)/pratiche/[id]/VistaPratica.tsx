@@ -55,6 +55,7 @@ interface Dettaglio {
   id: string; numero: string;
   numero_ordine_fornitore: string | null;
   cliente_id: string; cliente: string; fornitore_id: string; fornitore: string;
+  raggruppamento: string; raggruppamento_da: 'fornitore' | 'pratica'; raggruppamento_motivo: string | null;
   subagente_id: string | null; subagente: string | null;
   data: string; importo: number; stato: Chiave; nota: string | null; scadenza: string | null;
   pagato: boolean;
@@ -63,7 +64,7 @@ interface Dettaglio {
   progresso: { x: number; y: number; parziale: boolean } | null;
   confronto: { fasi: FaseRiga[]; righe: Riga[]; variazioni: { numero: number; totale: number } };
   provvigione: Provvigione | null;
-  sconto_medio: { valore: number; scaglione: number | null; documento: string | null; oltre: boolean; ultimo_scaglione: number | null } | null;
+  sconto_medio: { valore: number; scaglione: number | null; documento: string | null; oltre: boolean; ultimo_scaglione: number | null; gruppo: boolean; esatti: boolean } | null;
   sconto_dopo_nota: { valore: number; scaglione: number; fattura: number } | null;
   azione: { tipo: string; testo: string };
   incassi: Incasso[];
@@ -76,6 +77,8 @@ interface Documento {
   ruolo?: 'parziale' | 'sostituisce' | null; superato?: boolean; superato_da?: string | null;
   righe: { codice: string | null; descrizione: string | null; quantita: number | null; prezzo: number | null; importo: number | null }[];
   riferimento: string | null;
+  // D-199 §19: in modalità riga i gruppi per sconto di riga (il frontend li mostra e basta, V12)
+  gruppi?: { sconto: string; base: string; scaglione: string | null; pct_agente: string | null; pct_sub: string | null; provvigione_agente: string | null; provvigione_sub: string | null }[] | null;
 }
 interface Fiscali {
   pratica: { id: string; numero: string; stato: string; importo: number };
@@ -258,6 +261,28 @@ export function VistaPratica({ id }: { id: string }) {
     await carica();
   }
 
+  // D-199 §19: deroga sul raggruppamento della pratica (null = come il fornitore), motivo obbligatorio
+  function cambiaRaggruppamento() {
+    setFinestra(<FormModal
+      titolo="Raggruppamento per lo scaglione"
+      testo="Come si raggruppano le righe per scegliere lo scaglione: per sconto medio del documento (predefinito) o per sconto di riga, come applicano alcuni fornitori."
+      conferma="Salva"
+      campi={[
+        { nome: 'raggruppamento', etichetta: 'Raggruppamento', tipo: 'select', valore: d!.raggruppamento_da === 'pratica' ? d!.raggruppamento : '', opzioni: [{ value: '', label: 'Come il fornitore' }, { value: 'documento', label: 'Sconto medio del documento' }, { value: 'riga', label: 'Per sconto di riga' }], largo: true },
+        { nome: 'motivo', etichetta: 'Motivo', valore: '', largo: true, aiuto: 'obbligatorio: resta nel registro con il valore prima e dopo' },
+      ]}
+      onChiudi={chiudi}
+      onConferma={async (v) => {
+        const raggruppamento = v.raggruppamento === '' ? null : v.raggruppamento;
+        const r = await api('pratiche/' + id + '/raggruppamento', { raggruppamento, motivo: v.motivo }, 'PUT');
+        if (!r.ok) return r.messaggio;
+        avviso('Raggruppamento salvato');
+        chiudi();
+        await carica();
+      }}
+    />);
+  }
+
   if (!d || !fiscali) {
     return (
       <Pagina titolo="Pratica" pieno>
@@ -336,6 +361,27 @@ export function VistaPratica({ id }: { id: string }) {
             sconto medio dopo la nota {pct(d.sconto_dopo_nota.valore)} → scaglione {pct(d.sconto_dopo_nota.scaglione)}
           </span>
         )}
+        {x.gruppi?.length ? (
+          <table style={{ marginTop: 6, width: '100%', borderCollapse: 'collapse', color: 'var(--testo-tenue)', fontSize: 12 }}>
+            <thead>
+              <tr>{['Sconto', 'Base', 'Scaglione', '% Decobrands', '% subagente', 'Provvigioni'].map((h, i) => (
+                <th key={h} style={{ textAlign: i === 0 ? 'left' : 'right', fontWeight: 600, padding: '2px 8px 2px 0', borderBottom: '1px solid var(--bordo-tenue)' }}>{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {x.gruppi.map((g, i) => (
+                <tr key={i}>
+                  <td style={{ padding: '2px 8px 2px 0' }}>{pct(Number(g.sconto))}</td>
+                  <td style={{ padding: '2px 8px 2px 0', textAlign: 'right' }}>{euro(Number(g.base))}</td>
+                  <td style={{ padding: '2px 8px 2px 0', textAlign: 'right' }}>{g.scaglione != null ? pct(Number(g.scaglione)) : '—'}</td>
+                  <td style={{ padding: '2px 8px 2px 0', textAlign: 'right' }}>{g.pct_agente != null ? pct(Number(g.pct_agente)) : '—'}</td>
+                  <td style={{ padding: '2px 8px 2px 0', textAlign: 'right' }}>{g.pct_sub != null ? pct(Number(g.pct_sub)) : '—'}</td>
+                  <td style={{ padding: '2px 0', textAlign: 'right' }}>{g.provvigione_agente != null ? euro(Number(g.provvigione_agente)) : '—'} · {g.provvigione_sub != null ? euro(Number(g.provvigione_sub)) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
       </>,
       destra: <span className="azioni-cella">
         {euro(x.importo)}
@@ -383,11 +429,21 @@ export function VistaPratica({ id }: { id: string }) {
         )}
         <div className="colonne riepilogo-pratica">
           <div className="pila">
+            <div className="nota" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <span>Raggruppamento: <b>{d.raggruppamento === 'riga' ? 'per sconto di riga' : 'sconto medio del documento'}</b>
+                {d.raggruppamento_da === 'pratica' ? <> · deroga: {d.raggruppamento_motivo}</> : <> · dal fornitore</>}
+              </span>
+              {puoModifica && <button type="button" className="btn sec piccolo" onClick={cambiaRaggruppamento}>Cambia</button>}
+            </div>
             <Pannello titolo="Provvigione" nota={fiscali.documenti.length ? 'sul netto fatturato' : 'prevista'}>
               {d.sconto_medio?.oltre && (
                 <div className="avviso-verifica">
-                  <span>Lo sconto medio {pct(d.sconto_medio.valore)} del documento che comanda supera l&apos;ultimo scaglione ({pct(d.sconto_medio.ultimo_scaglione ?? 0)}): la provvigione è <b>da decidere</b>. Aggiungi lo scaglione in{' '}
-                    <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>.</span>
+                  <span>{d.sconto_medio.gruppo
+                    ? <>Un gruppo con sconto {pct(d.sconto_medio.valore)} {d.sconto_medio.esatti ? 'non ha uno scaglione esatto' : `supera l'ultimo scaglione (${pct(d.sconto_medio.ultimo_scaglione ?? 0)})`}: la provvigione è <b>da decidere</b>. Aggiungi lo scaglione in{' '}
+                      <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>.</>
+                    : <>Lo sconto medio {pct(d.sconto_medio.valore)} del documento che comanda {d.sconto_medio.esatti ? 'non ha uno scaglione esatto' : `supera l'ultimo scaglione (${pct(d.sconto_medio.ultimo_scaglione ?? 0)})`}: la provvigione è <b>da decidere</b>. Aggiungi lo scaglione in{' '}
+                      <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>.</>}
+                  </span>
                 </div>
               )}
               {!d.provvigione ? <Nota>{d.sconto_medio?.oltre ? 'Provvigione da decidere: sconto medio oltre l\'ultimo scaglione.' : 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni.'}</Nota> : <>
@@ -397,8 +453,9 @@ export function VistaPratica({ id }: { id: string }) {
                     nota: d.provvigione.spese > 0 ? <>netto {euro(d.provvigione.netto)} − spese {euro(d.provvigione.spese)} (escluse per accordo col fornitore)</> : undefined,
                   },
                   {
-                    etichetta: 'Sconto medio → scaglione', valore: (d.sconto_medio?.valore != null ? pct(d.sconto_medio.valore) + ' → ' + pct(d.sconto_medio.scaglione ?? 0) : pct(d.provvigione.sconto)),
-                    nota: <>in vigore dal {dataIt(d.provvigione.valido_dal)} · <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>
+                    etichetta: 'Sconto medio → scaglione',
+                    valore: d.raggruppamento === 'riga' ? 'per sconto di riga' : (d.sconto_medio?.valore != null ? pct(d.sconto_medio.valore) + ' → ' + pct(d.sconto_medio.scaglione ?? 0) : pct(d.provvigione.sconto)),
+                    nota: d.raggruppamento === 'riga' ? <>i gruppi sono sulle righe del documento</> : <>in vigore dal {dataIt(d.provvigione.valido_dal)} · <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>
                       {d.provvigione.congelato ? <><span className="testo-tenue"> · fissato il {dataIt(d.provvigione.congelato)}</span></> : null}</>,
                   },
                   { etichetta: 'Da ' + d.fornitore + ' a Decobrands: ' + pct(d.provvigione.agente), valore: d.provvigione.a_decobrands },

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { costruisciIndici, scegliDocumento } from './dati';
-import type { CalcoloDocumento, Dati } from './dati';
+import type { CalcoloDocumento, Dati, GruppoRiga } from './dati';
 
 // Motore delle provvigioni (§10, F0-A5): funzioni pure sui dati di caricaDati(). Stessi nomi e
 // stesse regole di prototipo-alternativo/assets/motore.js, che resta la fonte dei numeri.
@@ -175,10 +175,17 @@ function soglieInVigore(S: Pick<Dati, 'scaglioni'>, fornitore_id: string, data: 
   return [...perSoglia.values()];
 }
 
-/** Scaglione in vigore alla data: il primo (più basso) ≥ sconto medio (D-182 §19). Senza (sconto oltre
- *  l'ultima soglia) → null: la provvigione resta «da decidere», mai calcolata su uno scaglione inventato. */
-export function scaglione(S: Pick<Dati, 'scaglioni'>, fornitore_id: string, sconto: Dec, data: string) {
-  return soglieInVigore(S, fornitore_id, data).filter((s) => s.sconto.gte(sconto)).sort((a, b) => a.sconto.comparedTo(b.sconto))[0] ?? null;
+/** Scaglione in vigore alla data: il primo (più basso) ≥ sconto medio (D-182 §19); se il fornitore ha
+ *  `scaglioni_esatti` (D-200 §19) vale solo la soglia con |sconto − soglia| ≤ 0,05 punti (tolleranza per
+ *  gli arrotondamenti). Senza soglia (sconto oltre l'ultima, o nessun esatto) → null: la provvigione
+ *  resta «da decidere», mai calcolata su uno scaglione inventato. */
+const TOLLERANZA_SCAGLIONE_ESATTO = new Dec('0.05'); // D-200 §19
+export function scaglione(S: Pick<Dati, 'scaglioni'> & { fornitori?: Dati['fornitori'] }, fornitore_id: string, sconto: Dec, data: string) {
+  const soglie = soglieInVigore(S, fornitore_id, data).sort((a, b) => a.sconto.comparedTo(b.sconto));
+  if (S.fornitori?.get(fornitore_id)?.scaglioni_esatti) {
+    return soglie.find((s) => s.sconto.minus(sconto).abs().lte(TOLLERANZA_SCAGLIONE_ESATTO)) ?? null;
+  }
+  return soglie.filter((s) => s.sconto.gte(sconto))[0] ?? null;
 }
 
 /** L'ultimo (più alto) scaglione del fornitore in vigore alla data, o null se non ce n'è. */
@@ -186,14 +193,16 @@ export function ultimoScaglione(S: Pick<Dati, 'scaglioni'>, fornitore_id: string
   return soglieInVigore(S, fornitore_id, data).sort((a, b) => b.sconto.comparedTo(a.sconto))[0] ?? null;
 }
 
-/** Sconto medio oltre l'ultimo scaglione del fornitore: anomalia (D-182 §19). null se non c'è o lo sconto
- *  medio è ignoto (si usa lo sconto dell'agenzia). Il numero è quello del documento che comanda. */
-export function anomaliaScontoMedio(S: Pick<Dati, 'scaglioni'>, p: Pratica) {
+/** Sconto medio senza scaglione: anomalia (D-182 §19, D-200 §19). null se non c'è o lo sconto medio è
+ *  ignoto (si usa lo sconto dell'agenzia). A fascia è lo sconto oltre l'ultimo scaglione; con
+ *  `scaglioni_esatti` ogni sconto senza soglia esatta (±0,05). Il numero è quello del documento che comanda. */
+export function anomaliaScontoMedio(S: Pick<Dati, 'scaglioni'> & { fornitori?: Dati['fornitori'] }, p: Pratica) {
   const sm = scontoMedio(p);
   if (sm == null) return null;
   const data = p.documenti[p.documenti.length - 1]?.data ?? p.data;
   const ultimo = ultimoScaglione(S, p.fornitore_id, data);
-  if (!ultimo || sm.lte(ultimo.sconto)) return null;
+  if (!ultimo) return null; // nessuno scaglione: non è un'anomalia di sconto medio (D-113)
+  if (scaglione(S, p.fornitore_id, sm, data)) return null; // a fascia o esatto: c'è uno scaglione
   const comanda = p.documenti.length ? p.documenti[p.documenti.length - 1].numero
     : p.proforma.length ? p.proforma[0].numero : p.conferme.length ? p.conferme[0].numero : p.ordini[0]?.numero ?? p.numero;
   return { pratica_id: p.id, numero: p.numero, documento: comanda, sconto_medio: sm, ultimo_scaglione: ultimo.sconto };
@@ -254,13 +263,10 @@ export function fatturaDelMese(S: Dati, ab: Abbinamento, mese: string) {
   return ff[0] ?? null;
 }
 
-/** Quota del subagente su un documento (D-27 §19), vince la prima regola presente: correzione sul
- *  documento → una fattura al mese → % dell'agenzia → eccezione personale → % dello scaglione. */
-export function quotaSub(S: Dati, p: Pratica, d: Documento, base?: Dec) {
-  const perc = percentuali(S, p, d.data);
-  if (!perc) return null;
-  const imp = base ?? baseDoc(d); // D-183: la quota si calcola sulla base (netto − spese escluse)
-  const q = (pct: Dec, regola: string, vale: string | null = null) => ({ pct, provvigione: quota(imp, pct), regola, vale });
+/** Precedenza delle regole piatte del subagente (D-27 §19): correzione → «una fattura al mese» → %
+ *  dell'agenzia. Restituisce la regola piatta o null se non si applica (allora contano lo scaglione
+ *  o, in modalità riga, i gruppi). Un punto solo, riusato da `quotaSub` e `provvigioneRiga`. */
+function regolaPiatta(S: Dati, p: Pratica, d: Documento, ab: Abbinamento, imp: Dec): { pct: Dec; provvigione: Dec; regola: string; vale: string | null } | null {
   const cor = d.correzione;
   if (cor) {
     if (cor.tipo === 'importo') {
@@ -269,37 +275,69 @@ export function quotaSub(S: Dati, p: Pratica, d: Documento, base?: Dec) {
       const v = imp.isNegative() ? cor.valore.neg() : cor.valore;
       return { pct: imp.isZero() ? ZERO : r2(v.div(imp).times(100)), provvigione: r2(v), regola: 'correzione', vale: null };
     }
-    return q(cor.tipo === 'nessuna' ? ZERO : cor.valore, 'correzione');
+    const pct = cor.tipo === 'nessuna' ? ZERO : cor.valore;
+    return { pct, provvigione: quota(imp, pct), regola: 'correzione', vale: null };
   }
-  if (perc.ab.regola_mensile) {
+  if (ab.regola_mensile) {
     // le note di credito seguono la fattura a cui si riferiscono
     const rif = d.tipo === 'nota_credito' && d.fattura_id ? (documentoPerId(S, d.fattura_id)?.doc ?? d) : d;
-    const scelta = fatturaDelMese(S, perc.ab, rif.data.slice(0, 7));
-    if (scelta && scelta.id !== rif.id) return q(ZERO, 'mensile', scelta.numero);
+    const scelta = fatturaDelMese(S, ab, rif.data.slice(0, 7));
+    if (scelta && scelta.id !== rif.id) return { pct: ZERO, provvigione: ZERO, regola: 'mensile', vale: scelta.numero };
   }
-  if (perc.ab.pct_subagente != null) return q(perc.ab.pct_subagente, 'agenzia');
-  return q(perc.sub, perc.eccezione ? 'eccezione' : 'standard');
+  if (ab.pct_subagente != null) return { pct: ab.pct_subagente, provvigione: quota(imp, ab.pct_subagente), regola: 'agenzia', vale: null };
+  return null;
+}
+
+/** Quota del subagente su un documento (D-27 §19), vince la prima regola presente: correzione sul
+ *  documento → una fattura al mese → % dell'agenzia → eccezione personale → % dello scaglione. */
+export function quotaSub(S: Dati, p: Pratica, d: Documento, base?: Dec) {
+  // D-183 §19: un documento congelato non si ricalcola: vale la quota fissata nel `calcolo`.
+  if (d.congelato_il && d.calcolo?.provvigione_subagente != null) {
+    const c = d.calcolo;
+    return { pct: new Dec(c.pct_subagente ?? '0'), provvigione: new Dec(c.provvigione_subagente ?? '0'), regola: 'congelato', vale: null, eccezione: false };
+  }
+  // D-199 §19: in modalità riga la quota del subagente è la somma dei gruppi; le regole piatte
+  // (correzione, mensile, % agenzia) vincono lì, dentro `provvigioneRiga`. Con base esplicita si
+  // ricalcola sulla base data (stessa percentuale effettiva).
+  if (raggruppamentoDi(S, p).raggruppamento === 'riga' && d.righe?.length) {
+    const r = provvigioneRiga(S, p, d);
+    if (r) {
+      if (r.sub == null) return null; // gruppo oltre l'ultimo scaglione: da decidere
+      return { pct: r.pct_sub ?? ZERO, provvigione: base != null ? quota(base, r.pct_sub ?? ZERO) : r.sub, regola: 'riga', vale: null, eccezione: r.eccezione };
+    }
+    // r == null (riga merce senza prezzo) → si ricade nello sconto medio (sotto)
+  }
+  const perc = percentuali(S, p, d.data);
+  if (!perc) return null;
+  const imp = base ?? baseDoc(d); // D-183: la quota si calcola sulla base (netto − spese escluse)
+  const piatta = regolaPiatta(S, p, d, perc.ab, imp);
+  if (piatta) return { ...piatta, eccezione: false };
+  return { pct: perc.sub, provvigione: quota(imp, perc.sub), regola: perc.eccezione ? 'eccezione' : 'standard', vale: null, eccezione: perc.eccezione };
 }
 
 /** Provvigioni di un documento: dal fornitore (prese), al subagente (pagate), margine di Decobrands.
  *  D-197 §19: per una nota su fattura congelata prese e pagate sono la differenza della coppia. */
-export function provvigioneDoc(S: Dati, p: Pratica, d: Documento, base?: Dec) {
-  const perc = percentuali(S, p, d.data);
-  if (!perc) return null;
-  const imp = base ?? baseDoc(d); // D-183: sulla base (netto − spese escluse)
-  const diff = differenzaNotaCongelata(S, p, d);
-  const prese = diff ? diff.agente : quota(imp, perc.dal_fornitore);
-  const sub = quotaSub(S, p, d, imp)!;
-  const pagate = diff ? diff.subagente : sub.provvigione;
-  return { perc, importo: imp, prese, sub, pagate, margine: r2(prese.minus(pagate)) };
+export function provvigioneDoc(S: Dati, p: Pratica, d: Documento) {
+  // senza agenzia non c'è subagente: nessuna provvigione, come quando mancano le percentuali
+  const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
+  if (!ab) return null;
+  // D-199 §19: i valori effettivi (per gruppi in modalità riga, fissati se congelato, D-197 in documento);
+  // agente null = «da decidere», come quando mancano le percentuali.
+  const v = provvigioneDocumento(S, p, d);
+  if (!v || v.agente == null) return null;
+  const sub = quotaSub(S, p, d)!;
+  const perc = { subagente_id: ab.subagente_id, dal_fornitore: v.pct_agente ?? ZERO };
+  return { perc, importo: v.base, prese: v.agente, sub, pagate: v.sub ?? sub.provvigione, margine: r2(v.agente.minus(v.sub ?? sub.provvigione)) };
 }
 
 /** D-197 §19: una nota di credito su una fattura **congelata** porta la **differenza** fra la provvigione
  *  della coppia (fattura − note, con lo scaglione della differenza) e i valori già fissati (fattura + note
  *  già congelate), per Decobrands e per il subagente. Null se non è una nota, se la fattura non è congelata
  *  o se mancano le percentuali. La base della coppia usa la base della nota (netto + spese, D-197) e le basi
- *  salvate degli altri documenti. */
+ *  salvate degli altri documenti. Una nota già congelata vale il suo `calcolo` (D-183): la differenza è già
+ *  stata fissata, ricalcolarla toglierebbe di nuovo la quota della fattura. */
 export function differenzaNotaCongelata(S: Dati, p: Pratica, d: Documento) {
+  if (d.congelato_il) return null;
   if (d.tipo !== 'nota_credito' || !d.fattura_id) return null;
   // la fattura stornata è sempre nella stessa pratica (D-54: fattura_id di una fattura della pratica)
   const fattura = p.documenti.find((x) => x.id === d.fattura_id) ?? null;
@@ -325,11 +363,112 @@ export function differenzaNotaCongelata(S: Dati, p: Pratica, d: Documento) {
   };
 }
 
+/* ---------- Raggruppamento per lo scaglione (D-199 §19) ---------- */
+/** Come si raggruppano le righe di un documento per lo scaglione: la deroga della pratica vince sul
+ *  fornitore. `documento` = sconto medio (oggi invariato); `riga` = per sconto di riga e somma. */
+export function raggruppamentoDi(S: Dati, p: Pratica): { raggruppamento: 'documento' | 'riga'; da: 'pratica' | 'fornitore' } {
+  if (p.raggruppamento === 'riga' || p.raggruppamento === 'documento') return { raggruppamento: p.raggruppamento, da: 'pratica' };
+  return { raggruppamento: S.fornitori.get(p.fornitore_id)?.raggruppamento === 'riga' ? 'riga' : 'documento', da: 'fornitore' };
+}
+
+/** Sconto di una riga: 1 − importo/(quantità × prezzo), in % a 2 decimali (stessa funzione dello sconto
+ *  medio). Una riga di spesa ha sconto 0 (di norma); una merce senza quantità o prezzo → null (non utilizzabile). */
+const scontoRiga = (r: Riga): Dec | null => (r.spesa ? ZERO : utilePerSconto(r) ? scontoDa(r.qta.times(r.prezzo), r.importo) : null);
+
+/** Eccezione personale del subagente sulla soglia di un gruppo (D-51), come in `percentuali`. */
+const eccezioneSu = (S: Dati, p: Pratica, subagente_id: string, sconto: Dec, data: string) =>
+  S.eccezioni.find((e) => e.fornitore_id === p.fornitore_id && e.subagente_id === subagente_id && e.sconto.equals(sconto)
+    && e.valido_dal <= data && (!e.valido_al || data < e.valido_al));
+
+/** Anomalia in modalità riga (D-199 §19): un gruppo di righe con sconto oltre l'ultimo scaglione del
+ *  fornitore (o senza soglia esatta, D-200 §19) → provvigione «da decidere». Controlla i documenti fiscali (le note sulle loro righe). */
+export function anomaliaGruppo(S: Pick<Dati, 'scaglioni'> & { fornitori?: Dati['fornitori'] }, p: Pratica) {
+  for (const d of p.documenti) {
+    if (!d.righe?.length) continue;
+    for (const r of d.righe) {
+      if (r.spesa) continue; // le spese hanno sconto 0, mai oltre l'ultimo scaglione
+      const s = scontoRiga(r);
+      if (s == null) continue; // riga merce senza prezzo: il documento torna allo sconto medio
+      if (!scaglione(S, p.fornitore_id, s, d.data)) {
+        return { pratica_id: p.id, numero: p.numero, documento: d.numero, sconto_gruppo: s, ultimo_scaglione: ultimoScaglione(S, p.fornitore_id, d.data)?.sconto ?? null };
+      }
+    }
+  }
+  return null;
+}
+
+/** Anomalia della provvigione della pratica (D-182 §19, D-199 §19): in modalità documento lo sconto
+ *  medio oltre l'ultimo scaglione; in modalità riga un gruppo oltre l'ultimo scaglione (lo sconto medio
+ *  non comanda). null se la pratica è a posto. */
+export function anomaliaProvvigione(S: Dati, p: Pratica) {
+  return raggruppamentoDi(S, p).raggruppamento === 'riga' ? anomaliaGruppo(S, p) : anomaliaScontoMedio(S, p);
+}
+
+/** Descrizione dell'anomalia di provvigione di una pratica (D-199 §19, D-200 §19) per i messaggi di
+ *  blocco alla chiusura: distingue sconto medio, gruppo oltre l'ultimo scaglione e senza scaglione esatto. */
+export function descrizioneAnomalia(S: Dati, p: Pratica): string | null {
+  const a = anomaliaProvvigione(S, p);
+  if (!a) return null;
+  const esatti = S.fornitori.get(p.fornitore_id)?.scaglioni_esatti ?? false;
+  if ('sconto_gruppo' in a) {
+    return esatti ? 'un gruppo senza scaglione esatto' : 'un gruppo oltre l\'ultimo scaglione';
+  }
+  return esatti ? 'lo sconto medio senza scaglione esatto' : 'lo sconto medio oltre l\'ultimo scaglione';
+}
+
+/** Provvigione di un documento in modalità riga (D-199 §19): le righe merce si raggruppano per sconto,
+ *  ogni gruppo prende il suo scaglione (primo ≥, come oggi) e la provvigione è la somma dei gruppi.
+ *  Stessa cosa per la quota del subagente (eccezione personale sulla soglia del gruppo, D-51); la
+ *  correzione, la regola mensile e la % dell'agenzia restano piatte e vincono (precedenza invariata, D-27).
+ *  null se una riga merce è senza quantità o prezzo: il documento torna allo sconto medio. */
+function provvigioneRiga(S: Dati, p: Pratica, d: Documento): {
+  base: Dec; gruppi: GruppoRiga[]; agente: Dec | null; sub: Dec | null; pct_agente: Dec | null; pct_sub: Dec | null; eccezione: boolean;
+} | null {
+  // D-199: qui si parte dall'abbinamento, non da percentuali (che tornerebbe null con lo sconto medio
+  // oltre l'ultimo scaglione anche se i singoli gruppi hanno il loro scaglione).
+  const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
+  if (!ab) return null;
+  const escludeSpese = !S.fornitori.get(p.fornitore_id)?.spese_base_provvigione;
+  const perSconto = new Map<string, Dec>();
+  const segno = d.tipo === 'nota_credito' ? -1 : 1; // D-199: le righe della nota sono positive, il segno è sul documento
+  for (const r of d.righe ?? []) {
+    if (r.spesa && escludeSpese) continue; // D-183: le spese escluse restano fuori dai gruppi
+    const s = scontoRiga(r);
+    if (s == null) return null; // merce senza prezzo → sconto medio
+    const k = s.toFixed(2);
+    perSconto.set(k, (perSconto.get(k) ?? ZERO).plus(segno < 0 ? r.importo.neg() : r.importo));
+  }
+  const base = r2(somma([...perSconto.values()]));
+  // quota del subagente: regole piatte (correzione, mensile, % agenzia) vincono, come in quotaSub (D-27)
+  const piatta = regolaPiatta(S, p, d, ab, base);
+  let usaEccezione = false;
+  const gruppi: GruppoRiga[] = [...perSconto.entries()].sort((a, b) => Number(a[0]) - Number(b[0])).map(([sconto, b]) => {
+    const s = new Dec(sconto);
+    const sc = scaglione(S, p.fornitore_id, s, d.data);
+    if (!sc) return { sconto, base: b.toFixed(2), scaglione: null, pct_agente: null, pct_sub: null, provvigione_agente: null, provvigione_sub: null };
+    const ecc = piatta ? null : eccezioneSu(S, p, ab.subagente_id, sc.sconto, d.data);
+    if (ecc) usaEccezione = true;
+    const pctSub = piatta ? piatta.pct : (ecc?.pct ?? sc.pct_sub);
+    return {
+      sconto, base: b.toFixed(2), scaglione: sc.sconto.toFixed(2),
+      pct_agente: sc.pct_agente.toFixed(2), pct_sub: pctSub.toFixed(2),
+      provvigione_agente: quota(b, sc.pct_agente).toFixed(2), provvigione_sub: quota(b, pctSub).toFixed(2),
+    };
+  });
+  const oltre = gruppi.some((g) => g.scaglione == null); // un gruppo oltre l'ultimo scaglione → da decidere
+  const agente = oltre ? null : r2(somma(gruppi.map((g) => new Dec(g.provvigione_agente!))));
+  const sub = oltre ? null : piatta ? piatta.provvigione : r2(somma(gruppi.map((g) => new Dec(g.provvigione_sub!))));
+  const pct = (tot: Dec | null) => (tot == null || base.isZero() ? null : r2(tot.div(base).times(100)));
+  return { base, gruppi, agente, sub, pct_agente: pct(agente), pct_sub: pct(sub), eccezione: usaEccezione };
+}
+
 /** Punto unico di calcolo dei valori salvati di un documento fiscale (D-183 §19): base = netto − spese
  *  escluse (secondo l'accordo col fornitore), sconto medio solo sulla merce, scaglione, percentuali e
  *  provvigioni. Riusa `percentuali` e `quotaSub`. Il server lo calcola sugli aperti e salva il JSON;
- *  i congelati non si toccano. */
+ *  i congelati non si toccano. D-199: in modalità riga si calcola per gruppi di sconto (lineare). */
 export function calcoloDocumento(S: Dati, p: Pratica, d: Documento): CalcoloDocumento {
+  const { raggruppamento, da } = raggruppamentoDi(S, p);
+  const esatti = S.fornitori.get(p.fornitore_id)?.scaglioni_esatti ?? false; // D-200 §19
   const perc = percentuali(S, p, d.data);
   const spese = speseEscluse(S, p, d);
   // D-197 §19: le spese della nota riducono quelle della fattura, quindi la base della nota è netto + spese
@@ -337,10 +476,16 @@ export function calcoloDocumento(S: Dati, p: Pratica, d: Documento): CalcoloDocu
   // basi dà la base della differenza (coppia fattura + note).
   const base = d.tipo === 'nota_credito' ? r2(d.importo.plus(spese)) : r2(d.importo.minus(spese));
   const sm = scontoMedio(p);
-  const q = perc ? quotaSub(S, p, d, base) : null;
+  // D-199 §19: in modalità riga il risultato per gruppi si calcola una sola volta: serve sia all'agente
+  // (`provvigioneRiga`, qui sotto) sia al subagente (`quotaSub`, che altrimenti lo ricalcolerebbe).
+  const r = raggruppamento === 'riga' && d.righe?.length ? provvigioneRiga(S, p, d) : null;
+  const q = r
+    ? (r.sub == null ? null : { pct: r.pct_sub ?? ZERO, provvigione: quota(base, r.pct_sub ?? ZERO), regola: 'riga', vale: null, eccezione: r.eccezione })
+    : perc ? quotaSub(S, p, d, base) : null;
   // D-197 §19: nota su fattura congelata → la provvigione è la differenza (coppia − fissato), non base × pct
   const diff = differenzaNotaCongelata(S, p, d);
-  return {
+  // risultato in modalità documento (oggi invariato); in modalità riga è la riserva e il ripiego
+  const inDocumento: CalcoloDocumento = {
     base: base.toFixed(2),
     spese: spese.toFixed(2),
     netto: d.importo.toFixed(2),
@@ -351,6 +496,7 @@ export function calcoloDocumento(S: Dati, p: Pratica, d: Documento): CalcoloDocu
     provvigione_agente: perc ? (diff ? diff.agente : quota(base, perc.dal_fornitore)).toFixed(2) : null,
     provvigione_subagente: q ? (diff ? diff.subagente : q.provvigione).toFixed(2) : null,
     regola: REGOLA_CALCOLO,
+    raggruppamento, raggruppamento_da: da, scaglioni_esatti: esatti,
     ...(diff ? {
       differenza_nota: {
         base_coppia: diff.base_coppia.toFixed(2),
@@ -360,6 +506,47 @@ export function calcoloDocumento(S: Dati, p: Pratica, d: Documento): CalcoloDocu
         subagente_fissata: diff.subagente_fissata.toFixed(2),
       },
     } : {}),
+  };
+  // D-199 §19: in modalità riga il calcolo è per gruppi e lineare: la coppia fattura+nota di D-197 non serve.
+  if (raggruppamento !== 'riga') return inDocumento;
+  if (!(d.righe?.length)) return inDocumento; // nota/documento senza righe → riserva di oggi (sconto medio)
+  if (!r) {
+    // una riga merce senza quantità o prezzo → tutto il documento torna allo sconto medio (D-199)
+    return { ...inDocumento, regola: 'riga senza prezzo: sconto medio' };
+  }
+  // D-199 §19: in modalità riga la base è la somma delle righe; se non torna col netto del documento
+  // (sconto in calce o arrotondamenti oltre 0,05 €) si ricade sullo sconto medio.
+  if (r.base.minus(base).abs().gt(new Dec('0.05'))) {
+    return { ...inDocumento, regola: 'righe che non tornano col netto: sconto medio' };
+  }
+  return {
+    base: r.base.toFixed(2),
+    spese: spese.toFixed(2),
+    netto: d.importo.toFixed(2),
+    sconto_medio: sm == null ? null : sm.toFixed(2),
+    raggruppamento, raggruppamento_da: da, scaglioni_esatti: esatti,
+    scaglione: null, // in modalità riga non c'è un solo scaglione: i gruppi li portano
+    pct_agente: r.pct_agente?.toFixed(2) ?? null,
+    pct_subagente: r.pct_sub?.toFixed(2) ?? null,
+    provvigione_agente: r.agente?.toFixed(2) ?? null,
+    provvigione_subagente: r.sub?.toFixed(2) ?? null,
+    regola: 'riga-v1',
+    gruppi: r.gruppi,
+  };
+}
+
+/** Valori effettivi della provvigione di un documento (D-199 §19, D-183, D-197): il punto unico letto
+ *  da liquidazione, Analisi e bollettini. Congelato → il `calcolo` salvato; aperto → il calcolo corrente
+ *  (per gruppi in modalità `riga`, con lo sconto medio in `documento`). `agente`/`sub` null quando la
+ *  provvigione è «da decidere» (sconto oltre l'ultimo scaglione). */
+export function provvigioneDocumento(S: Dati, p: Pratica, d: Documento) {
+  const c = d.congelato_il && d.calcolo ? d.calcolo : calcoloDocumento(S, p, d);
+  return {
+    base: new Dec(c.base),
+    agente: c.provvigione_agente != null ? new Dec(c.provvigione_agente) : null,
+    sub: c.provvigione_subagente != null ? new Dec(c.provvigione_subagente) : null,
+    pct_agente: c.pct_agente != null ? new Dec(c.pct_agente) : null,
+    pct_sub: c.pct_subagente != null ? new Dec(c.pct_subagente) : null,
   };
 }
 
@@ -400,20 +587,21 @@ export function riconcilia(S: Dati, b: Bollettino) {
       decisione: r.decisione as Decisione | null,
     };
     if (!n) return riga;
-    const perc = percentuali(S, n.pratica, n.doc.data), pct = perc ? perc.dal_fornitore : ZERO;
+    // D-199 §19: la provvigione attesa è quella effettiva del documento (gruppi in modalità riga,
+    // differenza della coppia D-197 in documento, valori fissati se congelato).
+    const v = provvigioneDocumento(S, n.pratica, n.doc);
+    const pct = v.pct_agente ?? ZERO;
     if (r.tipo) {
       // §5.14: storno (il cliente non ha pagato) e riaccredito (ha pagato) sul fatturato: non sono differenze da decidere
       const imp = r.tipo === 'storno' ? baseDoc(n.doc).neg() : baseDoc(n.doc);
-      riga.noi = { imponibile: imp, pct, importo: perc ? quota(imp, pct) : ZERO };
+      riga.noi = { imponibile: imp, pct, importo: quota(imp, pct) };
       riga.differenza = r2(r.importo.minus(riga.noi.importo));
       riga.categoria = r.tipo; riga.incasso = true;
       return riga;
     }
     const imp = baseDoc(n.doc);
     // mese verificato: valgono i valori congelati (§5.11)
-    // D-197 §19: nota su fattura congelata → il «noi» della nota è la differenza della coppia
-    const diff = differenzaNotaCongelata(S, n.pratica, n.doc);
-    riga.noi = r.importo_calcolato != null ? { imponibile: imp, pct: r.pct_calcolata, importo: r.importo_calcolato } : { imponibile: imp, pct, importo: perc ? (diff ? diff.agente : quota(imp, pct)) : ZERO };
+    riga.noi = r.importo_calcolato != null ? { imponibile: imp, pct: r.pct_calcolata, importo: r.importo_calcolato } : { imponibile: imp, pct, importo: v.agente ?? ZERO };
     riga.differenza = r2(r.importo.minus(riga.noi.importo));
     riga.categoria = riga.differenza.isZero() && r.imponibile?.equals(imp) ? 'quadra' : 'differenza';
     // maturato: fattura di un mese precedente riconosciuta nel mese in cui il cliente ha pagato
@@ -421,15 +609,15 @@ export function riconcilia(S: Dati, b: Bollettino) {
     return riga;
   });
   for (const x of nostri.filter((x) => !b.righe.some((r) => suDocumento(S, b, r, x.doc)))) {
-    const perc = percentuali(S, x.pratica, x.doc.data), pct = perc ? perc.dal_fornitore : ZERO;
-    // D-197 §19: nota su fattura congelata → l'atteso della nota è la differenza della coppia
-    const atteso = perc ? (differenzaNotaCongelata(S, x.pratica, x.doc)?.agente ?? quota(baseDoc(x.doc), pct)) : ZERO;
+    // D-199 §19: l'atteso della nota su fattura congelata (D-197) e i gruppi in modalità riga sono già dentro `provvigioneDocumento`
+    const v = provvigioneDocumento(S, x.pratica, x.doc);
+    const atteso = v.agente ?? ZERO;
     // la decisione su un documento assente sta in bollettini_attese (D-56 §19); vale solo qui, finché manca
     const attesa = b.attese.find((a) => a.documento_id === x.doc.id) ?? null;
     const riga = {
       id: null as string | null, documento_id: x.doc.id as string | null,
       numero: x.doc.numero, data: x.doc.data, pratica_id: x.pratica.id, cliente_id: x.pratica.cliente_id, tipo: x.doc.tipo,
-      loro: null as Lato | null, noi: { imponibile: baseDoc(x.doc), pct, importo: atteso } as Lato | null, differenza: atteso.neg() as Dec | null,
+      loro: null as Lato | null, noi: { imponibile: baseDoc(x.doc), pct: v.pct_agente ?? ZERO, importo: atteso } as Lato | null, differenza: atteso.neg() as Dec | null,
       categoria: 'mancante', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
       decisione: attesa?.decisione ?? null,
     };
@@ -505,15 +693,22 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
   const lim = limiti(a, t), nelTrimestre = (iso: string) => iso >= lim.da && iso <= lim.a;
   const out = [];
   const riga = (p: Pratica, d: Documento, segno: 1 | -1) => {
-    const perc = percentuali(S, p, d.data)!, q = quotaSub(S, p, d)!;
-    // D-197 §19: nota su fattura congelata → al subagente va la differenza, non base × pct
-    const diff = differenzaNotaCongelata(S, p, d);
+    // D-199 §19: il subagente viene dall'abbinamento, non da `percentuali` (che con lo sconto medio
+    // senza scaglione tornerebbe null anche se i gruppi hanno la loro soglia).
+    const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
+    if (!ab) return null;
+    const q = quotaSub(S, p, d);
+    // D-199 §19: gruppo oltre l'ultimo scaglione → provvigione da decidere, il documento non si liquida
+    if (!q) return null;
+    // D-197 §19: la differenza della coppia nota/fattura congelata vale solo in modalità documento
+    // (in riga il calcolo è lineare, come `calcoloDocumento` e `riconcilia`)
+    const diff = raggruppamentoDi(S, p).raggruppamento === 'riga' ? null : differenzaNotaCongelata(S, p, d);
     const prov = diff ? diff.subagente : q.provvigione;
     return {
       pratica_id: p.id, documento_id: d.id, numero: d.numero, tipo: d.tipo, data: d.data, origine: null as string | null,
-      fornitore_id: p.fornitore_id, subagente_id: perc.subagente_id, cliente_id: p.cliente_id, codice_cliente: perc.ab.codice,
+      fornitore_id: p.fornitore_id, subagente_id: ab.subagente_id, cliente_id: p.cliente_id, codice_cliente: ab.codice,
       importo: segno < 0 ? baseDoc(d).neg() : baseDoc(d), pct: q.pct, provvigione: segno < 0 ? prov.neg() : prov,
-      regola: q.regola, eccezione: q.regola === 'eccezione',
+      regola: q.regola, eccezione: q.eccezione,
       liquidabile: true, incasso: false, motivo: null as string | null, voce: null as string | null, bollettino_id: null as string | null, riga_bollettino_id: null as string | null,
     };
   };
@@ -525,8 +720,8 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
     return q.a === a && q.t === t;
   };
   for (const p of S.pratiche) for (const d of p.documenti) {
-    if (!percentuali(S, p, d.data)) continue;
     const r = riga(p, d, 1);
+    if (!r) continue; // provvigione da decidere (gruppo oltre l'ultimo scaglione)
     if (S.fornitori.get(p.fornitore_id)!.maturazione === 'maturato') {
       // maturato→maturato (§5.14): entra nel trimestre del bollettino che la riconosce (il mese in cui il cliente paga)
       // D-118 §19: sul maturato la nota di credito segue la sua fattura (entra col suo riconoscimento)
@@ -562,8 +757,9 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
       const quando = b.chiuso_il ?? b.ricevuto;
       if (!qui(rb.liquidazione_id, quando)) continue;
       const n = documentoDiRiga(S, b, rb);
-      if (!n || !percentuali(S, n.pratica, n.doc.data)) continue;
+      if (!n) continue;
       const base = riga(n.pratica, n.doc, rb.tipo === 'storno' ? -1 : 1);
+      if (!base) continue; // provvigione da decidere
       // D-35 §19: se il documento è già liquidato, la voce riprende subagente e provvigione della fotografia
       // di quella liquidazione (non quotaSub ricalcolato sull'agenzia attuale, che può essere cambiata) — A2-01.
       const foto = n.doc.liquidazione_id ? S.fotografie.get(n.doc.id) : undefined;
@@ -613,8 +809,10 @@ export function analisiTrimestre(S: Dati, a: number, t: number) {
   const tot = nuovo(), fornitori = new Map<string, ReturnType<typeof nuovo>>(), subagenti = new Map<string, ReturnType<typeof nuovo>>();
   for (const r of righe) {
     const p = indici(S).praticaPerId.get(r.pratica_id)!;
-    const perc = percentuali(S, p, r.origine ?? r.data);
-    const prese = perc ? quota(r.importo, perc.dal_fornitore) : ZERO;
+    // D-199 §19: per i documenti la presa è la provvigione effettiva (gruppi in modalità riga); per
+    // storni e riaccrediti la quota sulla voce, con la stessa percentuale effettiva.
+    const v = r.documento_id ? provvigioneDocumento(S, p, documentoPerId(S, r.documento_id)!.doc) : null;
+    const prese = !r.voce && v ? (v.agente ?? ZERO) : quota(r.importo, v?.pct_agente ?? percentuali(S, p, r.origine ?? r.data)?.dal_fornitore ?? ZERO);
     if (!fornitori.has(r.fornitore_id)) fornitori.set(r.fornitore_id, nuovo(r.fornitore_id, S.fornitori.get(r.fornitore_id)!.nome));
     if (!subagenti.has(r.subagente_id)) subagenti.set(r.subagente_id, nuovo(r.subagente_id, S.subagenti.get(r.subagente_id)?.nome));
     const gruppi = [fornitori.get(r.fornitore_id)!, subagenti.get(r.subagente_id)!];

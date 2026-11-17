@@ -59,6 +59,7 @@ const REGOLE: Record<string, (p: any) => boolean> = {
   confermata: (p) => M.statoPratica(p).chiave === 'confermata',
   fatturata: (p) => M.statoPratica(p).chiave === 'fatturata',
   variazioni: (p) => M.haVariazioni(p),
+  deroga: (p) => p.raggruppamento != null, // D-199
 };
 const attesi = () => {
   const c = Object.fromEntries(Object.keys(REGOLE).map((k) => [k, M.S.pratiche.filter(REGOLE[k]).length])) as Record<string, number>;

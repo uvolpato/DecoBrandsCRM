@@ -11,7 +11,7 @@ import { Richiede, contesto } from './accesso';
 import { unico } from './clienti';
 import { giornoRoma, iso, ultimaChiusura } from './motore/dati';
 import { piuGiorni } from './motore/motore';
-import { ricalcolaDocumentiAperti } from './pratiche';
+import { aggiornaAnomalieFornitore, ricalcolaDocumentiAperti } from './pratiche';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
 
@@ -28,6 +28,10 @@ class ModificaFornitore {
   @Facoltativo() @IsInt() @Min(0) giorni_incasso?: number;
   // D-183 §19: le spese in fattura entrano nella base della provvigione? predefinito no (escluse)
   @Facoltativo() @IsBoolean() spese_base_provvigione?: boolean;
+  // D-199 §19: come si raggruppano le righe per lo scaglione (sconto medio o per sconto di riga)
+  @Facoltativo() @IsIn(['documento', 'riga']) raggruppamento?: 'documento' | 'riga';
+  // D-200 §19: solo sconti esatti (±0,05) per lo scaglione, altrimenti anomalia; false = a fascia
+  @Facoltativo() @IsBoolean() scaglioni_esatti?: boolean;
   @IsOptional() @IsString() @MaxLength(2000) note?: string;
 }
 
@@ -213,7 +217,7 @@ const righeScaglioni = (fid: bigint, dal: Date, scaglioni: ScaglioneNuovo[]) =>
 const perEvento = (scaglioni: { sconto_min: number | Prisma.Decimal; pct_agente: number | Prisma.Decimal; pct_subagente: number | Prisma.Decimal }[]) =>
   scaglioni.map((s) => ({ sconto_min: Number(s.sconto_min), pct_agente: Number(s.pct_agente), pct_subagente: Number(s.pct_subagente) }));
 
-const CAMPI_REGOLE =['giorni_attesa_conferma', 'giorno_bollettino', 'tipo_provvigione', 'giorni_incasso', 'spese_base_provvigione', 'note'] as const;
+const CAMPI_REGOLE =['giorni_attesa_conferma', 'giorno_bollettino', 'tipo_provvigione', 'giorni_incasso', 'spese_base_provvigione', 'raggruppamento', 'scaglioni_esatti', 'note'] as const;
 
 function mappaFornitore(f: fornitori & { corrente?: { ragione_sociale: string; piva: string | null; paese: string | null } | null; soggetto?: { id: bigint; codice: string } | null }, codice: string | null) {
   return {
@@ -229,6 +233,8 @@ function mappaFornitore(f: fornitori & { corrente?: { ragione_sociale: string; p
     tipo_provvigione: f.tipo_provvigione,
     giorni_incasso: f.giorni_incasso,
     spese_base_provvigione: f.spese_base_provvigione, // D-183
+    raggruppamento: f.raggruppamento, // D-199
+    scaglioni_esatti: f.scaglioni_esatti, // D-200
     note: f.note,
     attivo: f.attivo,
   };
@@ -373,6 +379,12 @@ export class FornitoriController {
       }, contesto(req));
       // D-183: il cambio dell'accordo sulle spese ricalcola i documenti aperti del fornitore (i congelati restano)
       if (dopoDiff.spese_base_provvigione !== undefined) await ricalcolaDocumentiAperti(tx, prima.id);
+      // D-199: il cambio del raggruppamento ricalcola i documenti aperti (i congelati restano, D-183)
+      if (dopoDiff.raggruppamento !== undefined) await ricalcolaDocumentiAperti(tx, prima.id);
+      // D-200: il cambio del modo di scelta della soglia ricalcola i documenti aperti (i congelati restano, D-183)
+      if (dopoDiff.scaglioni_esatti !== undefined) await ricalcolaDocumentiAperti(tx, prima.id);
+      // D-199/D-200: questi cambi possono aprire o chiudere anomalie di provvigione: aggiornale subito
+      if (dopoDiff.raggruppamento !== undefined || dopoDiff.scaglioni_esatti !== undefined) await aggiornaAnomalieFornitore(tx, prima.id);
       const codice = await tx.codici_esterni.findFirst({ where: { sistema: 'integra', tipo: 'fornitore', entita_id: BigInt(id) } });
       return { ...mappaFornitore(dopo as never, codice?.codice ?? null) };
     });

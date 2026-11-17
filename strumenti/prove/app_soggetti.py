@@ -129,6 +129,8 @@ with sync_playwright() as p:
     scheda(pg, 'Ruoli'); pg.wait_for_timeout(300)
     corpo = testo(pg, '.schede-corpo')
     ok('C02477' in corpo and 'F90012' in corpo and 'cliente' in corpo and 'fornitore' in corpo, 'D-101: due ruoli e due codici sullo stesso soggetto')
+    ok(pg.locator('.schede-corpo button[aria-label="Informazioni sui ruoli"]').count() == 1, 'scheda Ruoli: pulsante Informazioni, accanto ad Aggiungi ruolo')
+    pg.screenshot(path=str(USCITA / 'ruoli-1440.png'))
     # D-138: il master arriva da Integra: in sola lettura, con la nota
     ok(pg.locator('.pannello-testa button:has-text("Modifica identità"), .pannello-testa button:has-text("Disattiva")').count() == 0,
        'D-138: soggetto da Integra senza comandi sul master')
@@ -283,6 +285,9 @@ with sync_playwright() as p:
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
     ok(righe(pg) > 0 and pg.locator('.pannello-testa h2').count() == 1, '768 px: elenco e scheda si usano')
     pg.screenshot(path=str(USCITA / 'app-soggetti-768.png'), full_page=True)
+    scheda(pg, 'Ruoli'); pg.wait_for_timeout(300)
+    ok(pg.locator('.schede-corpo button[aria-label="Informazioni sui ruoli"]').count() == 1, '768 px: pulsante Informazioni nella scheda Ruoli')
+    pg.screenshot(path=str(USCITA / 'ruoli-768.png'), full_page=True)  # impilata: la scheda sta sotto l'elenco
     pg.close()
 
     # ---------- 12. R2-02 e R2-04: risposta vecchia non sovrascrive, soggetto che non c'è

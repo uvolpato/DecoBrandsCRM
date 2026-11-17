@@ -33,6 +33,7 @@ interface Pratica {
   nota: string | null;
   variazioni: boolean;
   variazione: number;
+  deroga: boolean;
 }
 interface Risposta {
   righe: Pratica[];
@@ -55,7 +56,7 @@ const STATI: { value: string; label: string }[] = [
 
 export function VistaPratiche() {
   const router = useRouter();
-  const [valori, setValori] = useMemoria<Valori>('filtri', { stato: 'tutte', q: '', fornitori: [], clienti: [], subagenti: [] });
+  const [valori, setValori] = useMemoria<Valori>('filtri', { stato: 'tutte', deroga: '', q: '', fornitori: [], clienti: [], subagenti: [] });
   const [ordine, setOrdine] = useMemoria<{ key: string; dir: 'asc' | 'desc' }>('ordine', { key: 'stato', dir: 'asc' });
   const [pagina, setPagina] = useMemoria<number>('pagina', 0);
   const [dati, setDati] = useState<Risposta | null>(null);
@@ -72,6 +73,7 @@ export function VistaPratiche() {
   const parametri = () => {
     const p = new URLSearchParams();
     p.set('stato', String(valori.stato ?? 'tutte'));
+    if (valori.deroga) p.set('deroga', String(valori.deroga));
     if (valori.q) p.set('q', String(valori.q));
     for (const nome of ['fornitori', 'clienti', 'subagenti']) {
       const scelte = (valori[nome] as string[] | undefined) ?? [];
@@ -120,7 +122,7 @@ export function VistaPratiche() {
   };
 
   const colonne: Colonna<Pratica>[] = [
-    { key: 'numero', header: 'Pratica', cell: (p) => <Link href={'/pratiche/' + p.id}><b>{p.numero}</b></Link> },
+    { key: 'numero', header: 'Pratica', cell: (p) => <Link href={'/pratiche/' + p.id}><b>{p.numero}</b>{p.deroga && <span className="sec-riga">deroga sul raggruppamento</span>}</Link> },
     { key: 'ordine_fornitore', header: 'Ordine fornitore', cell: (p) => p.numero_ordine_fornitore ?? <span className="testo-tenue">—</span> },
     { key: 'cliente', header: 'Cliente', grow: true, cell: (p) => p.cliente || '—' },
     { key: 'fornitore', header: 'Fornitore', cell: (p) => p.fornitore || '—' },
@@ -145,6 +147,7 @@ export function VistaPratiche() {
       <div className="pila riempi">
         <FilterBar valori={valori} onChange={(v) => { setValori(v); setPagina(0); }} riepilogo caricando={sagome && !dati} campi={[
           { nome: 'stato', tipo: 'segmenti', etichetta: 'Stato', opzioni: STATI.map((s) => ({ ...s, n: dati?.conteggi[s.value] })) },
+          { nome: 'deroga', tipo: 'segmenti', etichetta: 'Raggruppamento', opzioni: [{ value: '', label: 'Tutte', n: dati?.conteggi.tutte }, { value: 'si', label: 'Con deroga', n: dati?.conteggi.deroga }] },
           { nome: 'q', tipo: 'cerca', etichetta: 'Ricerca', placeholder: 'Cerca pratica, cliente, documento' },
           { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, etichetta: 'Fornitore', placeholder: 'Tutti i fornitori' },
           { nome: 'clienti', tipo: 'ricerca', entita: cliente, multipla: true, etichetta: 'Cliente', placeholder: 'Tutti i clienti' },

@@ -15,7 +15,7 @@ import type { Request, Response } from 'express';
 import { permessiDi, Richiede, TentativiGuard, contesto } from './accesso';
 import { Data, Facoltativo } from './fornitori';
 import { letturaConfig, righePagina } from './impostazioni';
-import { CON_PRATICA, TIPI_DOCUMENTO, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
+import { CON_PRATICA, TIPI_DOCUMENTO, type CalcoloDocumento, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
 import { chiaveRiga, netto, perCodice, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
 import { cerca, importa } from './anagrafica-integra';
@@ -1499,6 +1499,8 @@ function documentiPratica(t: Testata) {
         stato_incasso: d.tipo === 'fattura' ? d.stato_incasso : null,
         liquidato: d.liquidazione_id !== null, note: d.note,
         righe: righeDi(d), riferimento: riferimento(d),
+        // D-199 §19: in modalità riga il frontend mostra i gruppi per sconto di riga (nessun conto nel browser, V12)
+        gruppi: ((d.calcolo as CalcoloDocumento | null)?.gruppi ?? null),
       };
     }),
     totali: { fatture: Number(somma('fattura')), note_credito: Number(somma('nota_credito')), netto: Number(netto(praticaDaDb(t))) },

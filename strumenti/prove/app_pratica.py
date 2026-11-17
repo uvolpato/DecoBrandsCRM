@@ -45,6 +45,8 @@ PDF = USCITA / ('prova-' + marca + '.pdf')
 PDF.write_bytes(b'%PDF-1.4\n% prova ' + marca.encode() + b'\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n')
 PDF2 = USCITA / ('prova-2-' + marca + '.pdf')
 PDF2.write_bytes(b'%PDF-1.4\n% prova ordine ' + marca.encode() + b'\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n')
+# 0.2.9: l'elenco delle pratiche ha anche il filtro Raggruppamento; lo stato è il primo campo
+SEG = '.filtri > .filtro-slot:nth-child(1) '
 
 with sync_playwright() as p:
     b = p.chromium.launch(headless=True)
@@ -81,7 +83,7 @@ with sync_playwright() as p:
         pg.locator('.modale .ricerca-menu li[role=option]').filter(has_text=numero).first.click()
         pg.wait_for_timeout(300)
     def filtra(pg, etichetta, attesa):
-        segm.scegli(pg, etichetta)
+        segm.scegli(pg, etichetta, SEG)
         # la lista arriva dal server: si aspetta la prima riga con lo stato che il filtro promette
         pg.wait_for_function("(t) => { const r = document.querySelector('.dt tbody tr.cliccabile'); return !!r && r.innerText.includes(t) }", arg=attesa)
     def mano(pg):
@@ -131,6 +133,13 @@ with sync_playwright() as p:
     ok('righe cambian' in testo(pg, '.avviso-variazioni') and 'totale' in testo(pg, '.avviso-variazioni'), 'avviso delle variazioni nel Riepilogo')
     ok(pannello(pg, 'Provvigione').locator('.cifre').count() == 1, 'Riepilogo: la provvigione calcolata dal server')
     ok('Da ' in testo(pg, '.cifre') and '%' in testo(pg, '.cifre'), 'provvigione: percentuali e quota a Decobrands')
+    # D-199: raggruppamento per lo scaglione, con la deroga («Cambia» apre la finestra col motivo)
+    ok('Raggruppamento' in testo(pg, '.riepilogo-pratica'), 'Riepilogo: il raggruppamento per lo scaglione (D-199)')
+    ok(pg.locator('.riepilogo-pratica button:has-text("Cambia")').count() == 1, 'raggruppamento: il pulsante Cambia per la deroga')
+    pg.locator('.riepilogo-pratica button:has-text("Cambia")').click(); pg.wait_for_timeout(400)
+    ok(testo(pg, '.modale h2') == 'Raggruppamento per lo scaglione', 'deroga: si apre la finestra del raggruppamento')
+    ok(pg.locator('.modale select#c-raggruppamento').count() == 1 and pg.locator('.modale #c-motivo').count() == 1, 'deroga: tendina e campo motivo')
+    pg.locator('.modale button:has-text("Annulla")').click(); pg.wait_for_timeout(300)
     # 15/11/2026: link diretti — cliente e fornitore nella testata portano alla loro scheda, la provvigione alle percentuali
     sotto = pg.locator('.testa .sotto')
     ok(sotto.locator('a[href^="/clienti/"]').count() == 1 and sotto.locator('a[href^="/fornitori/"]').count() == 1,
@@ -156,11 +165,11 @@ with sync_playwright() as p:
 
     # --- ritorno all'elenco nello stesso punto (filtro, ordinamento) ---
     pg.goto(BASE + '/pratiche'); pg.wait_for_load_state('networkidle'); pg.wait_for_selector('.dt tbody tr.cliccabile')
-    segm.scegli(pg, 'Con variazioni'); pg.wait_for_timeout(1200)
+    segm.scegli(pg, 'Con variazioni', SEG); pg.wait_for_timeout(1200)
     pg.click('.dt th:has-text("Importo")'); pg.wait_for_timeout(1200)
     elenco_url = pg.url
     apri_pratica(pg); pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(900)
-    ok(pg.url == elenco_url and segm.scelta(pg, 'Con variazioni'), 'indietro: stesso filtro di stato')
+    ok(pg.url == elenco_url and segm.scelta(pg, 'Con variazioni', SEG), 'indietro: stesso filtro di stato')
     ok(pg.locator('.dt th.attivo:has-text("Importo")').get_attribute('aria-sort') in ('ascending', 'descending'), 'indietro: stesso ordinamento')
 
     # --- fattura con PDF, nota di credito, annullamento ---

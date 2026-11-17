@@ -71,6 +71,9 @@ with sync_playwright() as p:
     pg.screenshot(path=str(USCITA / 'app-fornitori-1440.png'))
     # D-168: una sola finestra piccola per lo scaglione; data nel periodo chiuso → il server rifiuta
     pg.click('button:has-text("Aggiungi scaglione")'); finestra(pg).wait_for()
+    # la finestra si apre subito col titolo e i campi arrivano con le percentuali dal server: la
+    # schermata si fa a campi pronti, non nel primo istante (17/11/2026)
+    pg.wait_for_selector('#c-valido_dal')
     ok(finestra(pg).locator('h2').inner_text().startswith('Nuovo scaglione di'), 'D-168: la finestra è «Nuovo scaglione di …»')
     wovr = lambda: pg.evaluate("() => { const m=document.querySelector('.velo .modale'); return m ? m.scrollWidth > m.clientWidth : false }")
     ok(not wovr(), 'D-168: finestra dello scaglione senza scorrimento orizzontale a 1440')

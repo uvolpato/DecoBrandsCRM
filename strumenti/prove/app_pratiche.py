@@ -50,12 +50,14 @@ with sync_playwright() as p:
         return [numero(pg.locator('.dt tbody tr.cliccabile').nth(i).locator('td').nth(5).inner_text()) for i in range(righe(pg))]
 
     pg = entra(S + '-ammi')
+    # 0.2.9: oltre allo Stato c'è il filtro Raggruppamento: i segmenti di stato sono il primo campo
+    SEG = '.filtri > .filtro-slot:nth-child(1) '
     ok('Pratiche' in testo(pg, '.testa h1'), 'titolo della pagina')
-    ok(segm.quanti(pg) == 6, 'sei segmenti di stato')
-    n = segm.numero(pg, 'Tutte')
-    stati = sum(segm.numero(pg, t) for t in ('Conferma in ritardo', 'Attesa conferma', 'Attesa fattura', 'Fatturate'))
-    ok(n >= 40 and stati == n and segm.numero(pg, 'Con variazioni') <= n and totali_piede(pg) == n,
-       'numeri dal server: %d pratiche = somma degli stati, %d con variazioni' % (n, segm.numero(pg, 'Con variazioni')))
+    ok(segm.quanti(pg, SEG) == 6, 'sei segmenti di stato')
+    n = segm.numero(pg, 'Tutte', SEG)
+    stati = sum(segm.numero(pg, t, SEG) for t in ('Conferma in ritardo', 'Attesa conferma', 'Attesa fattura', 'Fatturate'))
+    ok(n >= 40 and stati == n and segm.numero(pg, 'Con variazioni', SEG) <= n and totali_piede(pg) == n,
+       'numeri dal server: %d pratiche = somma degli stati, %d con variazioni' % (n, segm.numero(pg, 'Con variazioni', SEG)))
     ok(righe(pg) == min(25, n) and 'di %d elementi' % n in testo(pg, '.dt-piede'), 'prima pagina: %d righe di %d' % (righe(pg), n))
     ok(pg.locator('.dt th:has-text("Ordine fornitore")').count() == 1, 'colonna «Ordine fornitore» (D-169)')
     pg.screenshot(path=str(USCITA / 'app-pratiche-1440.png'))
@@ -71,7 +73,7 @@ with sync_playwright() as p:
     fb = pg.locator('.filtri').first
     campo = fb.locator('.ricerca.multipla .ricerca-testo').first
     campo.click(); fb.locator('.ricerca-menu li[role=option]', has_text='Gries').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(1200)
-    n_g = segm.numero(pg, 'Tutte')
+    n_g = segm.numero(pg, 'Tutte', SEG)
     ok(1 <= n_g < n and righe(pg) == min(25, n_g) and totali_piede(pg) == n_g and 'Gries' in (campo.get_attribute('placeholder') or ''),
        'filtro Gries: %d pratiche, numeri dei segmenti aggiornati' % n_g)
     pg.locator('.riepilogo-filtri .btn-icona').first.click(); pg.wait_for_timeout(200)
@@ -142,7 +144,7 @@ with sync_playwright() as p:
 
     # operatore: legge l'elenco (provvigioni.consulta), nessun comando di modifica
     pg = entra(S + '-oper'); pg.wait_for_timeout(600)
-    ok(righe(pg) >= 1 and segm.numero(pg, 'Tutte') == n, 'operatore: consulta l’elenco')
+    ok(righe(pg) >= 1 and segm.numero(pg, 'Tutte', SEG) == n, 'operatore: consulta l’elenco')
     pg.close()
     b.close()
 

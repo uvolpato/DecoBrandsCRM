@@ -5,6 +5,9 @@ export const USERNAME = ['ugo', 'matteo', 'giulia', 'luca', 'servizi'];
 
 // ordine: prima le tabelle che puntano alle altre
 export async function svuota(db: PrismaService) {
+  // 16/11/2026: uno script lanciato fuori da jest ha svuotato decobrands_db. Il controllo sta qui, non solo in ambiente.ts.
+  const [{ db: nome }] = await db.$queryRawUnsafe<{ db: string }[]>('SELECT current_database() AS db');
+  if (!nome.startsWith('decobrands_test')) throw new Error(`svuota rifiutato: ${nome} non è un database di prova`);
   await db.$executeRawUnsafe(`ALTER TABLE clienti_versioni DISABLE TRIGGER USER; ALTER TABLE fornitori_versioni DISABLE TRIGGER USER; ALTER TABLE registro DISABLE TRIGGER USER`);
   try {
     await db.$executeRawUnsafe(`

@@ -1,4 +1,6 @@
-import { Fragment, useEffect, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { Icona } from './Icona';
+import { Modale } from './Modale';
 
 // Pezzi piccoli del prototipo: CRM.stato (etichetta colorata), CRM.Dettagli (coppie etichetta /
 // valore), CRM.Avviso (messaggio temporaneo in basso a destra), date come quando() del prototipo.
@@ -58,3 +60,15 @@ export function avviso(testo: string, errore = false) {
 /** Data e ora come nel prototipo (gg/mm/aaaa hh:mm), all'ora italiana. */
 export const quando = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '—';
+
+/** Pulsante a icona «informazioni» che apre una finestra con la spiegazione: le note lunghe sotto una
+ *  tabella vanno qui, non in pagina (regole-interfaccia.md, tabelle). */
+export function Informazioni({ titolo, children }: { titolo: string; children: ReactNode }) {
+  const [aperta, setAperta] = useState(false);
+  return <>
+    <button type="button" className="btn sec piccolo" aria-label={titolo} title={titolo} onClick={() => setAperta(true)}>
+      <Icona nome="info" />
+    </button>
+    {aperta && <Modale titolo={titolo} onChiudi={() => setAperta(false)}>{children}</Modale>}
+  </>;
+}

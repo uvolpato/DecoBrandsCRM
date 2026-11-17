@@ -9,7 +9,7 @@ import { FormModal } from '@/componenti/FormModal';
 import { Icona } from '@/componenti/Icona';
 import { Conferma, Modale } from '@/componenti/Modale';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
-import { avviso, Dettagli, Stato, type Variante } from '@/componenti/Piccoli';
+import { avviso, Dettagli, Informazioni, Stato, type Variante } from '@/componenti/Piccoli';
 import { SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
@@ -381,6 +381,13 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
       <div className="pila riempi">
         <div className="strumenti-scheda">
           <span className="spazio" />
+          <Informazioni titolo="Informazioni sui ruoli">
+            <ul>
+              <li>Il ruolo si chiude nella sua pagina (attivo = false): i documenti restano appesi.</li>
+              <li>Il codice di Integra arriva dall’import, non si scrive a mano.</li>
+              <li>Un clic sulla riga apre la pagina del ruolo.</li>
+            </ul>
+          </Informazioni>
           {puoModificare && <button type="button" className="btn sec piccolo" onClick={() => aggiungiRuolo(det)}><Icona nome="piu" /> Aggiungi ruolo</button>}
         </div>
         <div className="riempi">
@@ -392,7 +399,6 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
             ] as Colonna<Ruolo>[]}
             onRowClick={(r) => router.push(apriRuolo(r))} emptyText="Nessun ruolo" emptyHint="Un soggetto può essere cliente e fornitore insieme: due codici diversi (D-101)." />
         </div>
-        <Nota>Il ruolo si chiude nella sua pagina (attivo = false): i documenti restano appesi. Il codice di Integra arriva dall’import, non si scrive a mano. Un clic sulla riga apre la pagina del ruolo.</Nota>
       </div>
     );
   }

@@ -1,11 +1,12 @@
-import { Controller, Get, NotFoundException, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Put, Query, Req } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { Richiede } from './accesso';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import type { Request } from 'express';
+import { Richiede, contesto } from './accesso';
 import { righePagina } from './impostazioni';
 import { CON_PRATICA, type Dati, caricaDatiPratica, giornoRoma, iso, praticaDaDb } from './motore/dati';
-import { abbinamento, anomaliaScontoMedio, basePratica, calcoloDocumento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, quotaSub, r2, scontoMedioFase, statoIncasso, statoPratica } from './motore/motore';
+import { abbinamento, anomaliaGruppo, anomaliaProvvigione, anomaliaScontoMedio, basePratica, calcoloDocumento, confronto, fasePratica, haVariazioni, importoPratica, pagato, percentuali, provvigioneDocumento, quotaSub, r2, raggruppamentoDi, scontoMedioFase, statoIncasso, statoPratica } from './motore/motore';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -30,6 +31,7 @@ class FiltroPratiche {
   @IsOptional() @Matches(DATA) dal?: string;
   @IsOptional() @Matches(DATA) al?: string;
   @IsOptional() @IsIn(['si', 'no']) pagato?: 'si' | 'no'; // D-60: il cliente ha pagato (c'è un documento di pagamento)
+  @IsOptional() @IsIn(['si']) deroga?: 'si'; // D-199: la pratica ha una deroga sul raggruppamento
   @IsOptional() @IsIn(ORDINI) ordina?: (typeof ORDINI)[number];
   @IsOptional() @IsIn(['asc', 'desc']) dir?: 'asc' | 'desc';
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) pagina?: number;
@@ -43,6 +45,13 @@ class CercaPratiche {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) cliente_id?: number;
   // D-177 §19: filtro per stato nella ricerca per l'abbinamento (lista chiusa, V12)
   @IsOptional() @IsIn(['attesa', 'confermata', 'fatturata']) stato?: 'attesa' | 'confermata' | 'fatturata';
+}
+
+/** Deroga sul raggruppamento della pratica (D-199 §19): `raggruppamento` null = come il fornitore,
+ *  altrimenti documento | riga; il motivo è obbligatorio. */
+class DerogaRaggruppamento {
+  @IsOptional() @IsIn(['documento', 'riga']) raggruppamento?: 'documento' | 'riga' | null;
+  @IsString() @IsNotEmpty() @MaxLength(2000) motivo!: string;
 }
 
 const idElenco = (s: string | undefined) => (s ? s.split(',').map((x) => BigInt(x)) : []);
@@ -74,7 +83,7 @@ export async function aggiornaPratica(tx: Prisma.TransactionClient, id: bigint, 
   const primo = t.documenti.filter((d) => d.tipo === 'ordine').reduce<Date | null>((m, d) => (!m || d.data < m ? d.data : m), null);
   const nuovi = { stato: STATO_DB[fasePratica(p)], importo: importoPratica(p), variazioni: haVariazioni(p), variazione, ...(primo ? { data_ordine: primo } : {}) };
   await tx.ordini_fornitore_testata.update({ where: { id }, data: nuovi });
-  await aggiornaAnomaliaScontoMedio(tx, p);
+  await aggiornaAnomalieProvvigione(tx, p);
   await salvaCalcolo(tx, id); // D-183: valori calcolati dei documenti aperti
   if (motivo && t.stato !== nuovi.stato) {
     await logEvent(tx, {
@@ -119,27 +128,72 @@ export async function congelaDocumenti(tx: Prisma.TransactionClient, S: Dati, id
   }
 }
 
-/** Apre (o chiude) l'anomalia «sconto medio oltre l'ultimo scaglione» della pratica (D-182 §19). Il
- *  dettaglio porta pratica, documento che comanda, sconto medio e ultimo scaglione (schema del codice). */
-async function aggiornaAnomaliaScontoMedio(tx: Prisma.TransactionClient, p: ReturnType<typeof praticaDaDb>) {
-  const scaglioni = (await tx.provvigioni_scaglioni.findMany({ where: { fornitore_id: BigInt(p.fornitore_id) } }))
-    .map((s) => ({ id: String(s.id), fornitore_id: String(s.fornitore_id), sconto: s.sconto_min, pct_agente: s.pct_agente, pct_sub: s.pct_subagente, valido_dal: iso(s.valido_dal) }));
-  const a = anomaliaScontoMedio({ scaglioni } as Dati, p);
+/** Apre (o chiude) l'anomalia della provvigione della pratica (D-182 §19, D-199 §19): sconto medio
+ *  oltre l'ultimo scaglione in modalità documento, gruppo oltre l'ultimo scaglione in modalità riga
+ *  (lì lo sconto medio non comanda). Il dettaglio porta pratica, documento, sconto e ultimo scaglione.
+ *  `fornitore` e `scaglioni` si possono passare già caricati (cambio a livello di fornitore), altrimenti
+ *  li legge qui. */
+async function aggiornaAnomalieProvvigione(
+  tx: Prisma.TransactionClient,
+  p: ReturnType<typeof praticaDaDb>,
+  fornitore?: { raggruppamento: string | null; scaglioni_esatti: boolean },
+  scaglioni?: { id: bigint; fornitore_id: bigint; sconto_min: Prisma.Decimal; pct_agente: Prisma.Decimal; pct_subagente: Prisma.Decimal; valido_dal: Date }[],
+) {
+  if (!fornitore || !scaglioni) {
+    [fornitore, scaglioni] = await Promise.all([
+      tx.fornitori.findUniqueOrThrow({ where: { id: BigInt(p.fornitore_id) }, select: { raggruppamento: true, scaglioni_esatti: true } }),
+      tx.provvigioni_scaglioni.findMany({ where: { fornitore_id: BigInt(p.fornitore_id) } }),
+    ]);
+  }
+  const S = { scaglioni: scaglioni.map((s) => ({ id: String(s.id), fornitore_id: String(s.fornitore_id), sconto: s.sconto_min, pct_agente: s.pct_agente, pct_sub: s.pct_subagente, valido_dal: iso(s.valido_dal) })), fornitori: new Map([[p.fornitore_id, fornitore]]) } as unknown as Dati;
+  const ragg = p.raggruppamento ?? fornitore.raggruppamento ?? 'documento';
+  // D-200 §19: con «solo sconti esatti» l'anomalia è lo sconto senza soglia esatta (±0,05), non oltre l'ultimo scaglione
+  const esatti = fornitore.scaglioni_esatti;
+  if (ragg === 'riga') {
+    const a = anomaliaGruppo(S, p);
+    if (a) {
+      await apriAnomalia(tx, {
+        servizio: 'provvigioni', codice: 'provvigione.gruppo_scaglione', chiave: p.id,
+        messaggio: esatti
+          ? `La pratica ${a.numero} ha un gruppo con sconto ${a.sconto_gruppo.toFixed(2)} % senza scaglione esatto (±0,05): la provvigione resta da decidere.`
+          : `La pratica ${a.numero} ha un gruppo con sconto ${a.sconto_gruppo.toFixed(2)} % oltre l'ultimo scaglione (${(a.ultimo_scaglione ?? new Prisma.Decimal(0)).toFixed(2)} %): la provvigione resta da decidere.`,
+        dettaglio: { pratica: a.numero, documento: a.documento, sconto_gruppo: Number(a.sconto_gruppo), ultimo_scaglione: a.ultimo_scaglione != null ? Number(a.ultimo_scaglione) : null },
+      });
+    } else {
+      await chiudiAnomalia(tx, 'provvigioni', 'provvigione.gruppo_scaglione', p.id);
+    }
+    await chiudiAnomalia(tx, 'provvigioni', 'provvigione.sconto_medio', p.id); // in riga comandano i gruppi
+    return;
+  }
+  const a = anomaliaScontoMedio(S, p);
   if (a) {
     await apriAnomalia(tx, {
       servizio: 'provvigioni', codice: 'provvigione.sconto_medio', chiave: p.id,
-      messaggio: `La pratica ${a.numero} ha sconto medio ${a.sconto_medio.toFixed(2)} % oltre l'ultimo scaglione (${a.ultimo_scaglione.toFixed(2)} %): la provvigione resta da decidere.`,
+      messaggio: esatti
+        ? `La pratica ${a.numero} ha sconto medio ${a.sconto_medio.toFixed(2)} % senza scaglione esatto (±0,05): la provvigione resta da decidere.`
+        : `La pratica ${a.numero} ha sconto medio ${a.sconto_medio.toFixed(2)} % oltre l'ultimo scaglione (${a.ultimo_scaglione.toFixed(2)} %): la provvigione resta da decidere.`,
       dettaglio: { pratica: a.numero, documento: a.documento, sconto_medio: Number(a.sconto_medio), ultimo_scaglione: Number(a.ultimo_scaglione) },
     });
   } else {
     await chiudiAnomalia(tx, 'provvigioni', 'provvigione.sconto_medio', p.id);
   }
+  await chiudiAnomalia(tx, 'provvigioni', 'provvigione.gruppo_scaglione', p.id);
+}
+
+/** D-199/D-200 §19: dopo un cambio di `raggruppamento` o di `scaglioni_esatti` sul fornitore, riapre o
+ *  chiude le anomalie di provvigione delle sue pratiche nella stessa transazione. Il solo ricalcolo dei
+ *  calcoli non basta: l'elenco anomalie resterebbe incoerente fino a un'altra modifica. */
+export async function aggiornaAnomalieFornitore(tx: Prisma.TransactionClient, fornitore_id: bigint) {
+  const fornitore = await tx.fornitori.findUniqueOrThrow({ where: { id: fornitore_id }, select: { raggruppamento: true, scaglioni_esatti: true } });
+  const scaglioni = await tx.provvigioni_scaglioni.findMany({ where: { fornitore_id } });
+  const testate = await tx.ordini_fornitore_testata.findMany({ where: { fornitore_id }, include: CON_PRATICA });
+  for (const t of testate) await aggiornaAnomalieProvvigione(tx, praticaDaDb(t), fornitore, scaglioni);
 }
 
 type Riga = {
   id: bigint; numero: string; numero_ordine_fornitore: string | null; cliente_id: bigint; cliente: string; fornitore_id: bigint; fornitore: string;
   subagente_id: bigint | null; subagente: string | null; data: string; importo: Prisma.Decimal; stato: string; giorni: number;
-  variazioni: boolean; variazione: Prisma.Decimal; pagato: boolean;
+  variazioni: boolean; variazione: Prisma.Decimal; pagato: boolean; deroga: boolean;
 };
 
 @Controller('pratiche')
@@ -163,6 +217,7 @@ export class PraticheController {
     if (q.al) filtri.push(Prisma.sql`t.data_ordine <= ${q.al}::date`);
     const pagato = Prisma.sql`EXISTS (SELECT 1 FROM ordini_fornitore_documenti d WHERE d.testata_id = t.id AND d.tipo = 'pagamento')`;
     if (q.pagato) filtri.push(q.pagato === 'si' ? pagato : Prisma.sql`NOT ${pagato}`);
+    if (q.deroga) filtri.push(Prisma.sql`t.raggruppamento IS NOT NULL`); // D-199: deroga sul raggruppamento
     if (testo) filtri.push(Prisma.sql`(t.numero_ordine ILIKE ${simile} OR t.numero_ordine_fornitore ILIKE ${simile} OR cv.ragione_sociale ILIKE ${simile} OR fv.ragione_sociale ILIKE ${simile}
       OR EXISTS (SELECT 1 FROM ordini_fornitore_documenti d WHERE d.testata_id = t.id AND d.numero ILIKE ${simile}))`);
 
@@ -174,6 +229,7 @@ export class PraticheController {
                t.fornitore_id, coalesce(fv.ragione_sociale, '') AS fornitore,
                a.subagente_id, s.nome || ' ' || s.cognome AS subagente, to_char(t.data_ordine, 'YYYY-MM-DD') AS data,
                t.importo, t.variazioni, t.variazione, ${pagato} AS pagato,
+               (t.raggruppamento IS NOT NULL) AS deroga,
                CASE t.stato WHEN 'fatturato' THEN 'fatturata' WHEN 'confermato' THEN 'confermata'
                  ELSE CASE WHEN f.giorni_attesa_conferma > 0 AND t.data_ordine + f.giorni_attesa_conferma < ${oggi}::date THEN 'scaduta' ELSE 'attesa' END END AS stato,
                CASE WHEN f.giorni_attesa_conferma > 0 THEN (t.data_ordine + f.giorni_attesa_conferma) - ${oggi}::date END AS giorni -- 0 = nessuna scadenza (D-60)
@@ -190,11 +246,12 @@ export class PraticheController {
     const stato = q.stato ?? 'tutte';
     const scelte = stato === 'tutte' ? Prisma.sql`TRUE` : stato === 'variazioni' ? Prisma.sql`variazioni` : Prisma.sql`stato = ${stato}`;
 
-    const [c] = await this.db.$queryRaw<(Record<Stato, number> & { totale: number; importo: Prisma.Decimal | null })[]>`${base}
+    const [c] = await this.db.$queryRaw<(Record<Stato, number> & { totale: number; deroga: number; importo: Prisma.Decimal | null })[]>`${base}
       SELECT count(*)::int AS tutte,
              count(*) FILTER (WHERE stato = 'scaduta')::int AS scaduta, count(*) FILTER (WHERE stato = 'attesa')::int AS attesa,
              count(*) FILTER (WHERE stato = 'confermata')::int AS confermata, count(*) FILTER (WHERE stato = 'fatturata')::int AS fatturata,
              count(*) FILTER (WHERE variazioni)::int AS variazioni,
+             count(*) FILTER (WHERE deroga)::int AS deroga,
              count(*) FILTER (WHERE ${scelte})::int AS totale, sum(importo) FILTER (WHERE ${scelte}) AS importo
       FROM base`;
 
@@ -221,9 +278,10 @@ export class PraticheController {
         subagente_id: r.subagente_id == null ? null : String(r.subagente_id), subagente: r.subagente,
         data: r.data, importo: Number(r.importo), stato: r.stato, nota: notaStato(r.stato, r.giorni),
         variazioni: r.variazioni, variazione: Number(r.variazione), pagato: r.pagato,
+        deroga: r.deroga,
       })),
       totale: c.totale,
-      conteggi: Object.fromEntries(STATI.map((s) => [s, c[s]])) as Record<Stato, number>,
+      conteggi: { ...Object.fromEntries(STATI.map((s) => [s, c[s]])) as Record<Stato, number>, deroga: c.deroga },
       totali: { importo: Number(c.importo ?? 0) },
       pagina,
       pagine,
@@ -268,7 +326,42 @@ export class PraticheController {
     if (!r) throw new NotFoundException('Pratica non trovata');
     // D-169: il numero d'ordine del fornitore sta sulla testata, non nei dati del motore
     const t = await this.db.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, select: { numero_ordine_fornitore: true } });
-    return { ...r, numero_ordine_fornitore: t?.numero_ordine_fornitore ?? null };
+    // D-199: il motivo dell'ultima deroga sul raggruppamento sta nel registro, sull'evento che porta
+    // `campo: 'raggruppamento'` (un campo esplicito: non si fida dell'ultimo crud.update sulla pratica)
+    const ev = await this.db.registro.findFirst({
+      where: { entita: 'pratica', entita_id: BigInt(id), codice: 'crud.update', dettaglio: { path: ['campo'], equals: 'raggruppamento' } },
+      orderBy: { id: 'desc' },
+    });
+    const dd = (ev?.dettaglio ?? null) as { motivo?: string } | null;
+    const raggruppamento_motivo = dd?.motivo ?? null;
+    return { ...r, numero_ordine_fornitore: t?.numero_ordine_fornitore ?? null, raggruppamento_motivo };
+  }
+
+  /** Imposta la deroga sul raggruppamento della pratica (D-199 §19): null = come il fornitore, altrimenti
+   *  documento | riga; motivo obbligatorio. Stessi permessi della correzione della provvigione. Ricalcola
+   *  i documenti aperti della pratica nella stessa transazione (V13); i congelati restano (D-183). */
+  @Put(':id/raggruppamento')
+  @Richiede('provvigioni.modifica')
+  async derogaRaggruppamento(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: DerogaRaggruppamento) {
+    const ctx = contesto(req);
+    const motivo = b.motivo.trim();
+    if (!motivo) throw new BadRequestException('Scrivi il motivo della deroga');
+    const dopo = b.raggruppamento ?? null;
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM ordini_fornitore_testata WHERE id = ${BigInt(id)} FOR UPDATE`;
+      const t = await tx.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, select: { numero_ordine: true, raggruppamento: true } });
+      if (!t) throw new NotFoundException('Pratica non trovata');
+      const prima = t.raggruppamento ?? null;
+      await tx.ordini_fornitore_testata.update({ where: { id: BigInt(id) }, data: { raggruppamento: dopo } });
+      await logEvent(tx, {
+        tipo: 'crud', azione: 'update', entita: 'pratica', entita_id: BigInt(id), esito: 'successo',
+        dettaglio: { etichetta: t.numero_ordine, campo: 'raggruppamento', prima: { raggruppamento: prima }, dopo: { raggruppamento: dopo }, motivo },
+      }, ctx);
+      await salvaCalcolo(tx, BigInt(id)); // D-199: ricalcola gli aperti della pratica, i congelati restano (D-183)
+      // D-199: il cambio del raggruppamento può aprire o chiudere un'anomalia di provvigione: aggiornala subito
+      await aggiornaAnomalieProvvigione(tx, praticaDaDb(await tx.ordini_fornitore_testata.findUniqueOrThrow({ where: { id: BigInt(id) }, include: CON_PRATICA })));
+      return { raggruppamento: dopo, raggruppamento_da: dopo == null ? 'fornitore' : 'pratica', motivo };
+    });
   }
 }
 
@@ -338,12 +431,19 @@ export function dettaglioPratica(S: Dati, id: string) {
   const netto = importoPratica(p);
   const base = basePratica(p); // D-183: la provvigione si calcola sulla base (netto − spese escluse)
   const sub = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
-  // D-182 §19: sconto medio del documento che comanda e scaglione che ne deriva; oltre l'ultimo scaglione è un'anomalia
-  const anomalia = anomaliaScontoMedio(S, p);
+  // D-182 §19, D-199 §19, D-200 §19: l'anomalia di provvigione dipende dal modo di raggruppamento
+  // (sconto medio in documento, gruppo in riga); in riga lo sconto medio non comanda.
+  const anomalia = anomaliaProvvigione(S, p);
+  const esatti = S.fornitori.get(p.fornitore_id)?.scaglioni_esatti ?? false;
   const sconto_medio = anomalia
-    ? { valore: Number(anomalia.sconto_medio), scaglione: null, documento: anomalia.documento, oltre: true, ultimo_scaglione: Number(anomalia.ultimo_scaglione) }
+    ? {
+        valore: Number('sconto_gruppo' in anomalia ? anomalia.sconto_gruppo : anomalia.sconto_medio),
+        scaglione: null, documento: anomalia.documento, oltre: true,
+        ultimo_scaglione: anomalia.ultimo_scaglione != null ? Number(anomalia.ultimo_scaglione) : null,
+        gruppo: 'sconto_gruppo' in anomalia, esatti,
+      }
     : bicchiere?.sconto_medio != null
-      ? { valore: Number(bicchiere.sconto_medio), scaglione: Number(bicchiere.scaglione.sconto), documento: null, oltre: false, ultimo_scaglione: null }
+      ? { valore: Number(bicchiere.sconto_medio), scaglione: Number(bicchiere.scaglione.sconto), documento: null, oltre: false, ultimo_scaglione: null, gruppo: false, esatti }
       : null;
   // D-197 §19: lo sconto medio della differenza (fattura − nota) quando cambia rispetto a quello della
   // fattura: sulla riga della nota si mostra «sconto medio dopo la nota X% → scaglione Y».
@@ -354,29 +454,40 @@ export function dettaglioPratica(S: Dati, id: string) {
         return { valore: Number(bicchiere.sconto_medio), scaglione: Number(bicchiere.scaglione.sconto), fattura: Number(prima) };
       })()
     : null;
-  const provvigione = bicchiere ? (() => {
-    // D-166 §19: dal fornitore = base × pct_agente; al subagente = quota dei documenti; margine = differenza
-    const aDecobrands = r2(base.times(bicchiere.dal_fornitore).div(100));
+  // In modalità riga la provvigione non dipende da `percentuali` (che con lo sconto medio senza scaglione
+  // tornerebbe null anche se i gruppi hanno la loro soglia): si mostra lo stesso, con i valori effettivi.
+  const inRiga = raggruppamentoDi(S, p).raggruppamento === 'riga';
+  const provvigione = (!sub || (!inRiga && !bicchiere)) ? null : (() => {
+    // D-166 §19: dal fornitore = somma delle prese effettive dei documenti (gruppi in modalità riga,
+    // D-197/D-199); al subagente = quota dei documenti; margine = differenza.
+    const aDecobrands = r2(fiscali.reduce((x, d) => x.plus(provvigioneDocumento(S, p, d).agente ?? new Prisma.Decimal(0)), new Prisma.Decimal(0)));
     const aSubagente = quote.length
       ? r2(quote.reduce((x, q) => x.plus(q.provvigione), new Prisma.Decimal(0)))
-      : r2(base.times(bicchiere.sub).div(100));
+      : (bicchiere ? r2(base.times(bicchiere.sub).div(100)) : new Prisma.Decimal(0));
+    const margine = r2(aDecobrands.minus(aSubagente));
+    // in modalità riga le percentuali «singole» sono quelle effettive (somma dei gruppi ÷ base),
+    // non una soglia dello sconto medio che lì non comanda (D-199)
+    const eff = (tot: Prisma.Decimal) => (base.isZero() ? new Prisma.Decimal(0) : r2(tot.div(base).times(100)));
+    const agentePct = inRiga ? eff(aDecobrands) : bicchiere!.agente;
+    const subPct = inRiga ? eff(aSubagente) : bicchiere!.sub;
     return {
       imponibile: Number(base),
       netto: Number(netto),
       spese: Number(r2(netto.minus(base))),
       // D-183: tutti i documenti congelati → il segno «fissato il» (la data più recente di congelamento)
       congelato: fiscali.length && fiscali.every((d) => d.congelato_il) ? fiscali.map((d) => d.congelato_il!).sort().pop()! : null,
-      sconto: Number(bicchiere.sconto), valido_dal: bicchiere.scaglione.valido_dal,
-      agente: Number(bicchiere.agente), sub_standard: Number(bicchiere.sub_standard),
-      sub: Number(bicchiere.sub), eccezione: bicchiere.eccezione, da_fornitore: Number(bicchiere.dal_fornitore),
+      sconto: Number(inRiga ? (bicchiere?.sconto ?? new Prisma.Decimal(0)) : bicchiere!.sconto),
+      valido_dal: inRiga ? (bicchiere?.scaglione.valido_dal ?? '') : bicchiere!.scaglione.valido_dal,
+      agente: Number(agentePct), sub_standard: Number(inRiga ? eff(aSubagente) : bicchiere!.sub_standard),
+      sub: Number(subPct), eccezione: inRiga ? quote.some((q) => q.eccezione) : bicchiere!.eccezione, da_fornitore: Number(agentePct),
       a_decobrands: Number(aDecobrands),
       a_subagente: Number(aSubagente),
-      margine: Number(r2(aDecobrands.minus(aSubagente))),
-      margine_pct: Number(r2(bicchiere.dal_fornitore.minus(bicchiere.sub))),
+      margine: Number(margine),
+      margine_pct: Number(r2(agentePct.minus(subPct))),
       maturazione: S.fornitori.get(p.fornitore_id)?.maturazione ?? null,
       regole: [...new Set(quote.map((q) => q.regola))],
     };
-  })() : null;
+  })();
 
   const azione = s.chiave === 'fatturata'
     ? { tipo: 'nessuna', testo: 'Pratica fatturata: non serve altro.' }
@@ -390,6 +501,9 @@ export function dettaglioPratica(S: Dati, id: string) {
     id: p.id, numero: p.numero,
     cliente_id: p.cliente_id, cliente: S.clienti.get(p.cliente_id)?.nome ?? '',
     fornitore_id: p.fornitore_id, fornitore: S.fornitori.get(p.fornitore_id)?.nome ?? '',
+    // D-199 §19: raggruppamento effettivo (deroga della pratica o fornitore) per lo scaglione
+    raggruppamento: raggruppamentoDi(S, p).raggruppamento,
+    raggruppamento_da: raggruppamentoDi(S, p).da,
     subagente_id: sub?.subagente_id ?? null, subagente: sub ? (S.subagenti.get(sub.subagente_id)?.nome ?? null) : null,
     data: p.data, importo: Number(netto), stato: s.chiave, nota, scadenza: s.scadenza ?? null,
     fasi,

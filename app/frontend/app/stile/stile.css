@@ -171,6 +171,29 @@ div.riempi:not(.colonne) { display: flex; flex-direction: column; }
 .dt.compatta td, .dt.compatta th { padding: 7px 12px; }
 .pannello-corpo.senza-margine > .dt { border: 0; border-radius: 0; }
 
+/* ---------- Scaglioni del fornitore ----------
+   Colonne dentro la larghezza (niente scorrimento orizzontale) e solo le righe scorrono dentro
+   l'elenco, non la pagina né il pannello. Le tabelle restano alte quanto le righe: un riquadro più
+   basso del contenuto faceva scorrere la prima riga sotto l'intestazione fissa, che rubava i clic
+   (app_fornitori, 17/11/2026). Vale solo per la scheda Percentuali (percentuali-fornitore-layout). */
+.scaglioni-elenco { display: flex; flex-direction: column; gap: 16px; flex: 1 1 auto; min-height: 0; overflow: auto; }
+.scaglioni-versione { display: flex; flex-direction: column; flex: none; }
+.scaglioni-versione .dt, .scaglioni-versione .dt-scorri { flex: none; }
+.scaglioni-tabella .dt table { table-layout: fixed; }
+/* Le intestazioni vanno a capo fra le parole, mai lettera per lettera («Scont/o»): le colonne
+   numeriche restano strette ma la parola ci sta (17/11/2026). */
+.scaglioni-tabella .dt th { white-space: normal; overflow-wrap: normal; word-break: normal; hyphens: none; }
+.scaglioni-tabella .dt td { white-space: normal; overflow-wrap: anywhere; }
+.scaglioni-tabella .dt th, .scaglioni-tabella .dt td { padding-left: 10px; padding-right: 10px; }
+.scaglioni-tabella .dt th:nth-child(1) { width: 15%; }
+.scaglioni-tabella .dt th:nth-child(2) { width: 17%; }
+.scaglioni-tabella .dt th:nth-child(3) { width: 20%; }
+.scaglioni-tabella .dt th:nth-child(4) { width: 16%; }
+.scaglioni-tabella .dt th:nth-child(5) { width: 14%; }
+.scaglioni-tabella .dt th:nth-child(6) { width: 18%; }
+/* l'ultima colonna (icone di riga) non ha testo: lo spazio del margine serve alle due icone */
+.scaglioni-tabella .dt th:last-child, .scaglioni-tabella .dt td:last-child { padding-right: 6px; }
+
 /* ---------- FilterBar ---------- */
 .filtri { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: none; }
 .segmenti, .segmenti-misura { display: inline-flex; background: var(--superficie); border: 1px solid var(--bordo); border-radius: var(--r-medio); padding: 3px; gap: 2px; flex-wrap: wrap; }

@@ -25,6 +25,10 @@ model fornitori {
   giorni_incasso         Int       @default(60) @db.SmallInt // §5.14
   // D-183 §19: le spese in fattura (trasporto, imballo) entrano nella base della provvigione? no = escluse
   spese_base_provvigione Boolean   @default(false)
+  // D-199 §19: come si raggruppano le righe per lo scaglione: documento (sconto medio) o riga (per sconto di riga)
+  raggruppamento         String    @default("documento") @db.VarChar(10) // documento | riga (CHECK)
+  // D-200 §19: solo sconti esatti (±0,05) per lo scaglione, altrimenti anomalia; false = a fascia (prima soglia ≥ sconto)
+  scaglioni_esatti       Boolean   @default(false)
   note                   String?
   attivo                 Boolean   @default(true)
   creato_il              DateTime  @default(now()) @db.Timestamptz(6)
@@ -242,6 +246,8 @@ model ordini_fornitore_testata {
   // numero_ordine = numero della pratica, data_ordine = data del primo ordine (D-60); ordini e conferme sono documenti
   // numero_ordine_fornitore = numero d'ordine del fornitore (D-169); unico per fornitore (indice parziale nella migrazione)
   numero_ordine_fornitore String? @db.VarChar(50)
+  // D-199 §19: deroga della pratica sul raggruppamento del fornitore (null = come il fornitore)
+  raggruppamento         String?   @db.VarChar(10) // documento | riga (CHECK)
   note                  String?
   // risultato del motore, scritto da aggiornaPratica nella stessa transazione di ogni modifica (D-52 §19)
   importo               Decimal   @default(0) @db.Decimal(14, 2) // importoPratica

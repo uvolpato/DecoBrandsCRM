@@ -43,14 +43,33 @@ export type CalcoloDocumento = {
   spese: string; // spese escluse dalla base (0 se il fornitore le include)
   netto: string; // importo del documento (netto)
   sconto_medio: string | null; // % sul lordo di merce; null se riserva (sconto dell'agenzia)
-  scaglione: string | null; // soglia dello scaglione; null se oltre l'ultimo (anomalia)
-  pct_agente: string | null; // % che il fornitore riconosce a Decobrands
-  pct_subagente: string | null; // % al subagente (la regola applicata)
+  scaglione: string | null; // soglia dello scaglione; null se oltre l'ultimo (anomalia) o in modalità riga
+  pct_agente: string | null; // % che il fornitore riconosce a Decobrands (in modalità riga: effettiva = provvigione ÷ base)
+  pct_subagente: string | null; // % al subagente (la regola applicata; in modalità riga: effettiva)
   provvigione_agente: string | null; // base × pct_agente; per la nota su fattura congelata è la differenza (D-197)
   provvigione_subagente: string | null; // quota del subagente sulla base; per la nota su fattura congelata la differenza (D-197)
   regola: string;
+  // D-199 §19: come si raggruppano le righe per lo scaglione (documento | riga) e chi lo decide
+  // (assenti nei valori salvati prima di D-199: si leggono come «documento»)
+  raggruppamento?: string;
+  raggruppamento_da?: string; // fornitore | pratica
+  // D-200 §19: come si sceglie la soglia (a fascia o solo sconti esatti); assente nei valori salvati prima di D-200: si legge come false
+  scaglioni_esatti?: boolean;
+  // D-199 §19: solo in modalità riga, i gruppi per sconto di riga
+  gruppi?: GruppoRiga[];
   // D-197 §19: come è calcolata la provvigione di una nota su fattura congelata (differenza della coppia)
   differenza_nota?: { base_coppia: string; agente_coppia: string; subagente_coppia: string; agente_fissata: string; subagente_fissata: string } | null;
+};
+
+/** Gruppo di righe con lo stesso sconto in modalità riga (D-199 §19): importi come testo al centesimo. */
+export type GruppoRiga = {
+  sconto: string; // % sconto di riga
+  base: string; // somma degli importi del gruppo
+  scaglione: string | null; // soglia dello scaglione; null se oltre l'ultimo (anomalia)
+  pct_agente: string | null; // % dal fornitore sullo scaglione
+  pct_sub: string | null; // % al subagente (eccezione personale o standard)
+  provvigione_agente: string | null; // base × pct_agente
+  provvigione_sub: string | null; // base × pct_sub
 };
 
 /** Una pratica nella forma del motore (M.S.pratiche). */
@@ -60,6 +79,7 @@ export const praticaDaDb = (t: Testata) => {
   const tracciati = (tipo: TipoDocumento) => t.documenti.filter((d) => d.tipo === tipo).map((d) => ({ id: id(d.id), numero: d.numero, data: iso(d.data), importo: d.importo, superato: d.superato_da != null }));
   return {
     id: id(t.id), numero: t.numero_ordine, fornitore_id: id(t.fornitore_id), cliente_id: id(t.cliente_id), data: iso(t.data_ordine),
+    raggruppamento: t.raggruppamento ?? null, // D-199: deroga della pratica (null = come il fornitore)
     ordini: tracciati('ordine'), conferme: tracciati('conferma'), proforma: tracciati('proforma'), pagamenti: tracciati('pagamento'),
     // tre fotografie delle righe (§4.2.8): più ordini e più fatture della stessa fase si sommano (confronto)
     righe: {
@@ -270,6 +290,8 @@ function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccez
       id: id(f.id), nome: f.corrente?.ragione_sociale ?? '', maturazione: f.tipo_provvigione,
       giorni_conferma: f.giorni_attesa_conferma, giorno_bollettino: f.giorno_bollettino, giorni_incasso: f.giorni_incasso,
       spese_base_provvigione: f.spese_base_provvigione, // D-183: le spese entrano nella base?
+      raggruppamento: f.raggruppamento, // D-199: documento | riga
+      scaglioni_esatti: f.scaglioni_esatti, // D-200: solo sconti esatti (±0,05)
     }])),
     clienti: new Map(clienti.map((c) => [id(c.id), { id: id(c.id), piva: c.corrente?.piva ?? null, nome: c.corrente?.ragione_sociale ?? '' }])),
     subagenti: new Map(subagenti.map((s) => [id(s.id), { id: id(s.id), nome: `${s.nome} ${s.cognome}`, attivo: s.attivo }])),
