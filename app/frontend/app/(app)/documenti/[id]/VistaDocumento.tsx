@@ -31,6 +31,12 @@ const TIPO: Record<string, string> = {
   ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura',
   nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento', bollettino: 'Bollettino',
 };
+// D-204: etichetta del pulsante «Sostituisci» secondo il tipo del documento aggiornato
+const SOSTITUISCI_LABEL: Record<string, string> = {
+  ordine: 'Sostituisci l’ordine registrato',
+  conferma: 'Sostituisci la conferma registrata',
+  proforma: 'Sostituisci la proforma registrata',
+};
 const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 // Ugo 15/11/2026: un pagamento non ha un numero; al suo posto «Pagamento del <data> · <importo>» o il nome del file.
 const titoloDoc = (tipo: string, numero: string | null, dataDoc: string | null, importo: number | null, fileNome: string) =>
@@ -153,6 +159,7 @@ interface Proposta {
   candidati_cliente: CandidatoSoggetto[];
   integra_non_raggiungibile: boolean;
   pratica_ordine: { pratica: { id: string; numero: string; numero_ordine_fornitore: string; cliente: string | null; cliente_id: string; fornitore: string | null; fornitore_id: string; stato: string; data_ordine: string }; cliente_coincide: boolean | null } | null;
+  doppio: { tipo: string; pratica_id: string; pratica_numero: string; documento_id: string; numero: string; data: string; importo: number; righe: number; cliente: string | null } | null;
 }
 interface Dettaglio {
   id: string; file_nome: string; file_tipo: 'pdf' | 'jpg' | 'png'; stato: string; tipo: string | null;
@@ -298,6 +305,7 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
   const incerte = righeIncerte(doc);
   const etichettaTipo = t.tipo ? TIPO[t.tipo] ?? t.tipo : 'Documento';
   const ab = doc.proposta.abbinamento;
+  const doppio = doc.proposta.doppio;
   // D-170 §19 (B): il cliente associato al documento (scelto, riconosciuto, o quello della pratica
   // agganciata per numero d'ordine), per la voce «Cliente» dell'intestazione.
   const po = doc.proposta.pratica_ordine?.pratica ?? null;
@@ -492,6 +500,40 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
           onFatto?.();
           router.push('/documenti');
         }} />);
+  }
+
+  /** D-204: la versione aggiornata sostituisce il documento registrato nella pratica. Finestra con
+   *  prima → dopo (data, importo, righe, cliente) e motivo precompilato; il server fa tutto (V12). */
+  function sostituisci() {
+    const dd = doc.proposta.doppio;
+    if (!dd) return;
+    const etichetta = TIPO[t.tipo ?? ''] ?? 'Documento';
+    const punti = [
+      ['Data', data(dd.data), data(t.data)],
+      ['Importo', euro(dd.importo), euro(doc.proposta.importo)],
+      ['Righe', String(dd.righe), String(doc.righe.length)],
+      ['Cliente', dd.cliente ?? '—', clienteAssociato?.nome ?? '—'],
+    ] as const;
+    setFinestra(
+      <FormModal titolo={'Sostituire ' + etichetta.toLowerCase() + (t.numero ? ' ' + t.numero : '') + '?'}
+        conferma="Sostituisci" colonne={1}
+        testo={<>
+          <p>La versione registrata nella pratica <Link href={'/pratiche/' + dd.pratica_id}><b>{dd.pratica_numero}</b></Link> viene sostituita da questa versione aggiornata.</p>
+          <ul className="conferma-punti">
+            {punti.map(([nome, prima, dopo]) => <li key={nome}><b>{nome}</b>: {prima} → {dopo}</li>)}
+          </ul>
+        </>}
+        campi={[{ nome: 'motivo', etichetta: 'Motivo', valore: etichetta + ' aggiornato dal fornitore', largo: true }]}
+        onChiudi={chiudi}
+        onConferma={async (v) => {
+          if (!v.motivo) return 'Scrivi il motivo della sostituzione.';
+          const r = await api<{ pratica: { id: string; numero: string } }>('documenti/' + id + '/sostituisci', { motivo: v.motivo });
+          if (!r.ok) return r.messaggio;
+          avviso(etichetta + ' sostituito nella pratica ' + r.dati.pratica.numero);
+          onFatto?.();
+          router.push('/pratiche/' + r.dati.pratica.id);
+        }} />,
+    );
   }
 
   /** A4-01 / D-170 / D-172: riprova la lettura (chiave o crediti del servizio sistemati, o rileggere
@@ -725,7 +767,14 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         ) : t.tipo === 'ordine' ? (
           <>
             {doc.proposta.esito === 'doppio' ? (
-              <Nota>Questo ordine risulta già registrato: controlla il numero letto o scarta il documento.</Nota>
+              doppio ? (
+                <div className="pila">
+                  <Nota>Questo ordine c’è già nella pratica <Link href={'/pratiche/' + doppio.pratica_id}><b>{doppio.pratica_numero}</b></Link>. Se è la versione aggiornata, sostituiscilo; altrimenti scarta il documento.</Nota>
+                  <div className="azioni-riga">
+                    <button type="button" className="btn sec" disabled={!puoModifica} onClick={sostituisci}>{SOSTITUISCI_LABEL.ordine}</button>
+                  </div>
+                </div>
+              ) : null
             ) : (
               <>
                 {!ab && (doc.proposta.cliente_riconosciuto
@@ -755,7 +804,16 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
                 : <>Fornitore e codice cliente non letti: scegli la pratica a mano oppure correggi il codice.</>}</Nota>
               // 15/11/2026: codice vuoto (es. il pagamento non ce l'ha) → niente rilievo se il cliente è già scelto
               : !clienteAssociato && <Nota>Manca il codice cliente: scegli il cliente o la pratica a mano.</Nota>)}
-            {doc.proposta.esito === 'doppio' && <Nota>Questo documento risulta già registrato: controlla il numero letto o scarta il documento.</Nota>}
+            {doc.proposta.esito === 'doppio' && (doppio ? (
+              <div className="pila">
+                <Nota>Questo {(TIPO[doppio.tipo] ?? 'documento').toLowerCase()} c’è già nella pratica <Link href={'/pratiche/' + doppio.pratica_id}><b>{doppio.pratica_numero}</b></Link>. Se è la versione aggiornata, sostituiscilo; altrimenti scarta il documento.</Nota>
+                <div className="azioni-riga">
+                  <button type="button" className="btn sec" disabled={!puoModifica} onClick={sostituisci}>{SOSTITUISCI_LABEL[doppio.tipo] ?? 'Sostituisci'}</button>
+                </div>
+              </div>
+            ) : (
+              <Nota>Questo documento risulta già registrato: controlla il numero letto o scarta il documento.</Nota>
+            ))}
             <div className={caricando ? 'in-aggiornamento' : undefined} aria-busy={caricando}>
               <Scelte vuoto="Nessuna pratica aperta da proporre" voci={doc.proposta.candidati.map((c, i) => {
                 const s = STATO_PRATICA[c.pratica.stato] ?? { testo: c.pratica.stato, v: 'neutro' as Variante };

@@ -21,7 +21,7 @@ import { aggiornaPratica } from './pratiche';
 import { cerca, importa, TEMPO_AUTO_MS } from './anagrafica-integra';
 import { IntegraService } from './integra';
 import { cercaLegame } from './storico';
-import { type ClienteConCorrente, controlliFissi, esitoCodiceCliente, fattoreSconto, filtroDalTipo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, ricordaAlias, riconosciClienteDai, risolviFornitore, ruoloConferma, soglieLettura, STATI_PRATICHE, superatiConferma, valutaLettura, type Contesto as ContestoProposta, type FiltroPratiche, type Letto, type RigaStorico } from './proposta';
+import { type ClienteConCorrente, candidatiDoppio, controlliFissi, esitoCodiceCliente, fattoreSconto, filtroDalTipo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, ricordaAlias, riconosciClienteDai, risolviFornitore, ruoloConferma, soglieLettura, STATI_PRATICHE, superatiConferma, valutaLettura, type Contesto as ContestoProposta, type FiltroPratiche, type Letto, type RigaStorico } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -318,6 +318,11 @@ class FiltroDettaglio {
 class ScartaDocumento {
   @IsIn(MOTIVI_SCARTO as unknown as string[]) motivo!: string;
   @IsOptional() @IsString() @MaxLength(2000) nota?: string;
+}
+
+/** D-204: sostituzione di un ordine/conferma/proforma già registrato con la versione aggiornata. */
+class SostituisciDocumento {
+  @IsString() @IsNotEmpty() @MaxLength(2000) motivo!: string;
 }
 
 /** D-152: la persona sceglie il fornitore o il cliente fra i candidati del CRM o di Integra. */
@@ -1942,6 +1947,81 @@ export class DocumentiAbbinaController {
       return { documento_id: String(d.id), ...documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(d.tipo)} ${d.numero}`.trim())) };
     });
     await archiviaDopo(this.db, BigInt(id));
+    return r;
+  }
+
+  /** D-204: un ordine/conferma/proforma aggiornato sostituisce quello registrato nella pratica (stesso
+   *  numero e fornitore). Una transazione (V13) con fornitore e pratica bloccati: il documento prende
+   *  dati, righe e file nuovi; il file vecchio resta collegato alla pratica (non si cancella) e il cambio
+   *  finisce nel registro con prima/dopo e motivo. Rifiuto se la pratica è in un periodo chiuso (D-183). */
+  @Post(':id/sostituisci')
+  @HttpCode(200)
+  @Richiede('provvigioni.modifica')
+  async sostituisci(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: SostituisciDocumento) {
+    const ctx = contesto(req);
+    const did = BigInt(id);
+    const motivo = b.motivo.trim();
+    if (!motivo) throw new BadRequestException('Scrivi il motivo della sostituzione');
+    const r = await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${did} FOR UPDATE`;
+      const a = await tx.documenti_in_arrivo.findUnique({ where: { id: did } });
+      if (!a) throw new NotFoundException('Documento non trovato');
+      if (a.stato !== 'da_controllare' && a.stato !== 'errore') throw new ConflictException('Il documento non è più da controllare');
+      const letto = await lettoDaCampi(tx, did);
+      const tipo = letto.tipo;
+      if (tipo !== 'ordine' && tipo !== 'conferma' && tipo !== 'proforma') throw new BadRequestException('La sostituzione vale solo per ordine, conferma e proforma');
+      if (letto.fornitore_id == null || !letto.numero) throw new BadRequestException('Servono fornitore e numero letti per sostituire il documento');
+      // D-204/D-34: i candidati aperti (pratica non chiusa) col numero e il fornitore, dal più vicino per
+      // data. Più di uno = numero riusato e nessuno chiuso: ambiguo, si abbina a mano.
+      const candidati = await candidatiDoppio(tx, letto, tipo);
+      if (candidati.length === 0) throw new NotFoundException(`Non c'è un ${nomeDi(tipo).toLowerCase()} ${letto.numero} registrato da sostituire`);
+      if (candidati.length > 1) throw new ConflictException('Più documenti con questo numero: abbina a mano');
+      const esistente = await tx.ordini_fornitore_documenti.findUniqueOrThrow({
+        where: { id: BigInt(candidati[0].documento_id) },
+        select: { id: true, testata_id: true, data: true, importo: true, arrivo_id: true, numero: true },
+      });
+      const pid = esistente.testata_id;
+      const fid = letto.fornitore_id;
+      await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${fid} FOR UPDATE`;
+      await bloccaPratiche(tx, [pid]);
+      // D-183: pratica con un documento congelato o in una liquidazione chiusa: non si sostituisce più
+      const chiusa = await tx.ordini_fornitore_documenti.findFirst({
+        where: { testata_id: pid, OR: [{ congelato_il: { not: null } }, { liquidazione_id: { not: null } }] },
+        select: { id: true },
+      });
+      if (chiusa) throw new ConflictException('La pratica è in un periodo chiuso: il documento non si sostituisce più');
+      const dataNuova = letto.data ?? iso(esistente.data);
+      const importoNuovo = letto.importo ?? Number(r2(letto.righe.reduce((s, r) => s + (r.importo ?? 0), 0)));
+      const prima = { data: iso(esistente.data), importo: Number(esistente.importo), arrivo_id: esistente.arrivo_id ? String(esistente.arrivo_id) : null };
+      await tx.ordini_fornitore_documenti.update({ where: { id: esistente.id }, data: { data: new Date(dataNuova), importo: importoNuovo, arrivo_id: did } });
+      const fase = faseDi(tipo as TipoDocumento);
+      if (fase) {
+        await tx.ordini_fornitore_righe.deleteMany({ where: { documento_id: esistente.id } });
+        if (letto.righe.length) {
+          await tx.ordini_fornitore_righe.createMany({
+            data: letto.righe.map((r, i) => ({
+              testata_id: pid, documento_id: esistente.id, fase, numero_riga: i + 1,
+              codice: r.codice, descrizione: r.descrizione, quantita: r.quantita, prezzo_unitario: r.prezzo,
+              importo: r.importo != null ? r2(r.importo) : (r.quantita != null && r.prezzo != null ? r2(r.quantita * r.prezzo * fattoreSconto(r)) : null),
+              spesa: r.spesa ?? false,
+            })),
+          });
+        }
+      }
+      // il file nuovo si chiude come registrato; quello vecchio resta legato alla pratica (storico, D-204)
+      await tx.documenti_in_arrivo.update({ where: { id: did }, data: { stato: 'abbinato', tipo, abbinato_pratica_id: pid, controllato_il: new Date(), utente_id: ctx.utente_id ?? a.utente_id } });
+      if (a.stato === 'errore') await chiudiAnomalia(tx, 'lettura', 'lettura.fallita', String(did));
+      await logEvent(tx, {
+        tipo: 'documento', azione: 'update', entita: 'documento', entita_id: esistente.id, esito: 'successo',
+        dettaglio: {
+          etichetta: `${esistente.numero} · ${nomeDi(tipo)}`, documento_id: String(esistente.id), pratica_id: String(pid),
+          tipo, numero: esistente.numero, sostituito: true, motivo,
+          prima, dopo: { data: dataNuova, importo: importoNuovo, arrivo_id: String(did) },
+        },
+      }, ctx);
+      return { documento_id: String(esistente.id), ...documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(tipo)} ${esistente.numero} aggiornata`)) };
+    });
+    await archiviaDopo(this.db, did);
     return r;
   }
 }

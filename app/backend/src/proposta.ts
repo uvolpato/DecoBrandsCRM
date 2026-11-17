@@ -88,6 +88,21 @@ export interface Candidato {
   ruolo: 'parziale' | 'sostituisce' | null;
 }
 
+/** D-204: documento già registrato nella pratica con lo stesso numero e fornitore (ordine, conferma o
+ *  proforma): la versione aggiornata può sostituirlo. Porta i dati della versione registrata per il
+ *  confronto prima → dopo della finestra «Sostituisci». */
+export interface DocumentoDoppio {
+  tipo: string;
+  pratica_id: string;
+  pratica_numero: string;
+  documento_id: string;
+  numero: string;
+  data: string;
+  importo: number;
+  righe: number;
+  cliente: string | null;
+}
+
 /** D-169: la pratica trovata per numero d'ordine del fornitore (chiave fornitore + numero, mai il numero da solo). */
 export interface PraticaOrdine {
   id: string;
@@ -199,6 +214,8 @@ export interface Proposta {
   /** D-169: la pratica trovata per numero d'ordine del fornitore; `cliente_coincide` dice se il cliente
    *  del documento è quello della pratica (false/null → punto da controllare, mai un abbinamento al cliente da solo). */
   pratica_ordine: { pratica: PraticaOrdine; cliente_coincide: boolean | null } | null;
+  /** D-204: documento già registrato (ordine/conferma/proforma) da poter sostituire; null per fattura e nota di credito. */
+  doppio: DocumentoDoppio | null;
 }
 
 export interface Controllo {
@@ -745,10 +762,49 @@ const CON_PROP = {
   cliente: { select: { ragione_sociale: true } },
 } satisfies Prisma.ordini_fornitore_testataInclude;
 
+/** D-204/D-34: i documenti aperti (pratica senza documenti congelati o liquidati) con lo stesso numero
+ *  e fornitore della stessa fase, dal più vicino per data al documento letto (il più recente se il
+ *  documento non ha una data). Il numero da solo non identifica un documento (D-34): un numero riusato
+ *  in un altro anno su una pratica già chiusa non è un candidato. Usata dalla proposta (esito `doppio`)
+ *  e dalla rotta di sostituzione, così entrambe indicano lo stesso documento. */
+export async function candidatiDoppio(db: Db, l: Letto, tipo: string): Promise<DocumentoDoppio[]> {
+  if (l.fornitore_id == null || !l.numero) return [];
+  const numero = l.numero;
+  const g = await db.ordini_fornitore_documenti.findMany({
+    where: {
+      tipo, numero,
+      testata: { fornitore_id: l.fornitore_id, documenti: { none: { OR: [{ congelato_il: { not: null } }, { liquidazione_id: { not: null } }] } } },
+    },
+    select: {
+      id: true, data: true, importo: true, testata_id: true,
+      testata: { select: { numero_ordine: true, cliente: { select: { ragione_sociale: true } } } },
+      _count: { select: { righe: true } },
+    },
+  });
+  const out = g.map((x) => ({
+    tipo, pratica_id: String(x.testata_id), pratica_numero: x.testata.numero_ordine,
+    documento_id: String(x.id), numero, data: iso(x.data), importo: Number(x.importo),
+    righe: x._count.righe, cliente: x.testata.cliente?.ragione_sociale ?? null,
+  }));
+  // il più vicino per data al documento letto; senza data letta, il più recente
+  if (l.data) {
+    const g0 = new Date(l.data + 'T00:00:00Z').getTime();
+    out.sort((a, b) => (Math.abs(new Date(a.data + 'T00:00:00Z').getTime() - g0) - Math.abs(new Date(b.data + 'T00:00:00Z').getTime() - g0)) || b.data.localeCompare(a.data));
+  } else {
+    out.sort((a, b) => b.data.localeCompare(a.data));
+  }
+  return out;
+}
+
+/** D-204: il documento aperto più vicino (per data) da proporre per la sostituzione; null = nessuno. */
+async function doppioDocumento(db: Db, l: Letto, tipo: string): Promise<DocumentoDoppio | null> {
+  return (await candidatiDoppio(db, l, tipo))[0] ?? null;
+}
+
 export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {}, filtro: FiltroPratiche = 'tutte'): Promise<Proposta> {
   const imp = importoDocumento(l);
   // base della risposta: i campi nuovi (D-111/D-112) sono null finché un esito non li riempie
-  const base: Proposta = { esito: 'nessuno', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null, fornitore_da_integra: null, cliente_da_integra: null, manca_rappresentanza: null, candidati_fornitore: [], candidati_cliente: [], integra_non_raggiungibile: !!contesto.integra_non_raggiungibile, pratica_ordine: null };
+  const base: Proposta = { esito: 'nessuno', candidati: [], importo: imp, abbinamento: null, cliente_riconosciuto: null, agenzia_mancante: null, fornitore_da_integra: null, cliente_da_integra: null, manca_rappresentanza: null, candidati_fornitore: [], candidati_cliente: [], integra_non_raggiungibile: !!contesto.integra_non_raggiungibile, pratica_ordine: null, doppio: null };
   if (l.tipo === 'bollettino') {
     const gia = l.fornitore_id != null && l.mese != null && l.anno != null
       ? await db.bollettini_testata.findFirst({ where: { fornitore_id: l.fornitore_id, mese: l.mese, anno: l.anno }, select: { id: true } })
@@ -850,10 +906,8 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   if (l.tipo === 'ordine') {
     // il numero letto è quello del fornitore: il doppione si cerca fra i documenti della pratica,
     // non sul numero della pratica (che il CRM genera OF/AAAA/NNN, D-60)
-    const gia = l.fornitore_id != null && l.numero
-      ? await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'ordine', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } })
-      : null;
-    if (gia) return { ...base, esito: 'doppio' };
+    const doppio = await doppioDocumento(db, l, 'ordine');
+    if (doppio) return { ...base, esito: 'doppio', abbinamento: ab, cliente_riconosciuto, doppio };
     const cd = await clienteDaIntegra();
     if (cd) return cd;
     const manca = await agenziaMancante(db, l, ab, cliente_riconosciuto);
@@ -874,6 +928,13 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   if (l.tipo === 'fattura' && l.fornitore_id != null && l.numero) {
     const gia = await db.ordini_fornitore_documenti.findFirst({ where: { tipo: 'fattura', numero: l.numero, testata: { fornitore_id: l.fornitore_id } }, select: { id: true } });
     if (gia) return { ...base, esito: 'doppio', abbinamento: ab, cliente_riconosciuto: null };
+  }
+
+  // D-204: una conferma o proforma con lo stesso numero (e fornitore) di una già registrata è la versione
+  // aggiornata: doppione da poter sostituire. Un numero diverso resta una conferma in più (D-174).
+  if (l.tipo === 'conferma' || l.tipo === 'proforma') {
+    const doppio = await doppioDocumento(db, l, l.tipo);
+    if (doppio) return { ...base, esito: 'doppio', abbinamento: ab, cliente_riconosciuto, doppio };
   }
 
   const cd = await clienteDaIntegra();
@@ -992,17 +1053,18 @@ export async function controlliFissi(db: Db, l: Letto, proposta: Proposta): Prom
 
   if (f && l.codice_cliente && proposta.abbinamento == null) {
     // Quando il cliente è scelto a mano `abbinamento` resta null anche se l'agenzia per quel codice
-    // esiste (D-159): il controllo non deve dire «non presente». L'agenzia del codice si rilegge e
-    // si distingue fra: del cliente scelto (niente), di un altro cliente, da confermare.
+    // esiste (D-159), e resta null anche per il doppione (D-204): il controllo non deve dire «non
+    // presente». L'agenzia del codice si rilegge e si distingue fra: del cliente scelto (niente),
+    // di un altro cliente, da confermare. Senza un cliente scelto a mano il codice indica il cliente:
+    // nessun conflitto (D-204).
     const ag = await agenziaPerCodice(db, l);
     const scelto = l.cliente_id != null && /^\d+$/.test(l.cliente_id) ? BigInt(l.cliente_id) : null;
     if (!ag) {
       out.push({ codice: 'codice_cliente', campo: 'codice_cliente', testo: `Codice cliente ${l.codice_cliente} non presente fra i clienti del fornitore`, grave: true, gruppo: 'lettura' });
     } else if (ag.da_confermare) {
       out.push({ codice: 'codice_cliente', campo: 'codice_cliente', testo: `Codice cliente ${l.codice_cliente}: agenzia dal vecchio CRM, da confermare`, grave: false, gruppo: 'lettura' });
-    } else if (scelto != null && ag.cliente_id === scelto) {
-      // il codice è del cliente scelto a mano: nessun rilievo
-    } else {
+    } else if (scelto != null && ag.cliente_id !== scelto) {
+      // il codice è di un altro cliente rispetto a quello scelto a mano: l'avviso grave
       out.push({ codice: 'codice_cliente', campo: 'codice_cliente', testo: `Il codice ${l.codice_cliente} presso ${ag.fornitore ?? ''} è di ${ag.cliente ?? ''}`, grave: true, gruppo: 'lettura' });
     }
   }

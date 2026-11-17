@@ -1131,6 +1131,59 @@ try:
         pgV.screenshot(path=str(USCITA / 'app-documenti-vista-sola-1440.png'))
         pgV.close()
 
+        # D-204: un ordine già registrato (doppio) propone «Sostituisci l'ordine registrato», con la
+        # finestra prima → dopo (data, importo, righe, cliente) e il motivo precompilato; il salvataggio
+        # chiama POST /documenti/:id/sostituisci e apre la pratica. Scheda simulata.
+        scheda_agg = dict(scheda_errore, id='999982', stato='da_controllare', tipo='ordine',
+                          livello='affidabile', file_nome='prova-ordine-aggiornato.pdf')
+        scheda_agg['fornitore'] = {'id': '5', 'nome': 'Arte Wohnaccessoires GmbH'}
+        scheda_agg['testata'] = dict(scheda_errore['testata'], tipo='ordine', numero='AU278504', data='2026-05-05',
+                                     fornitore_id='5', codice_cliente='45172', cliente='Agri Aggio SNC', importo=1056.24)
+        scheda_agg['righe'] = [
+            {'i': 0, 'codice': 'A1', 'descrizione': None, 'quantita': 2, 'prezzo': 5, 'importo': 10, 'sconto': None, 'numero_fattura': None, 'data_fattura': None, 'provvigione': None, 'spesa': None},
+            {'i': 1, 'codice': 'A2', 'descrizione': None, 'quantita': 1, 'prezzo': 6, 'importo': 6, 'sconto': None, 'numero_fattura': None, 'data_fattura': None, 'provvigione': None, 'spesa': None},
+        ]
+        scheda_agg['proposta'] = {
+            'esito': 'doppio', 'candidati': [], 'importo': 1056.24,
+            'abbinamento': {'cliente_id': '1001', 'cliente': 'Agri Aggio SNC', 'codice': '45172'},
+            'cliente_riconosciuto': None, 'agenzia_mancante': None, 'cliente_da_integra': None,
+            'manca_rappresentanza': None, 'fornitore_da_integra': None,
+            'candidati_fornitore': [], 'candidati_cliente': [], 'integra_non_raggiungibile': False,
+            'pratica_ordine': None,
+            'doppio': {'tipo': 'ordine', 'pratica_id': '1', 'pratica_numero': 'OF/2026/001', 'documento_id': '10',
+                       'numero': 'AU278504', 'data': '2026-05-01', 'importo': 900.0, 'righe': 1, 'cliente': 'Agri Aggio SNC'},
+        }
+        visti_agg = {'sostituisci': 0, 'motivo': None}
+        def sostituisci_rotta(route):
+            visti_agg['sostituisci'] += 1
+            try:
+                visti_agg['motivo'] = json.loads(route.request.post_data or '{}').get('motivo')
+            except Exception:
+                visti_agg['motivo'] = None
+            route.fulfill(status=200, content_type='application/json', body=json.dumps({'pratica': {'id': '1', 'numero': 'OF/2026/001'}}))
+        pgAGG = entra(S + '-oper')
+        pgAGG.route(re.compile(r'^.*/api/documenti/999982$'), lambda r: risposta(r, json.dumps(scheda_agg)))
+        pgAGG.route(re.compile(r'^.*/api/documenti/999982/sostituisci$'), sostituisci_rotta)
+        pgAGG.route(re.compile(r'^.*/api/pratiche/1$'), lambda r: risposta(r, json.dumps(pratica_pf)))
+        pgAGG.route(re.compile(r'^.*/api/pratiche/1/documenti$'), lambda r: risposta(r, json.dumps(fiscali_sola)))
+        pgAGG.goto(BASE + '/documenti/999982')
+        pgAGG.locator('button:has-text("registrato")').wait_for(timeout=15000)
+        # la nota sta in <Nota> (p.nota), non nei .dettagli; l'apostrofo è tipografico, non lo si cerca
+        nota_doppio = pgAGG.locator('.nota:has-text("già nella pratica")')
+        ok(nota_doppio.count() == 1 and 'Questo ordine' in nota_doppio.first.inner_text(), "D-204: il doppio dice «Questo ordine c'è già nella pratica»")
+        ok(nota_doppio.first.locator('a[href="/pratiche/1"]:has-text("OF/2026/001")').count() == 1, 'D-204: il doppio porta il numero della pratica come link a /pratiche/1')
+        pgAGG.click('button:has-text("registrato")')
+        pgAGG.wait_for_selector('.velo .modale:has-text("Sostituire ordine AU278504?")')
+        testo_agg = pgAGG.locator('.velo .modale').inner_text()
+        ok('Data' in testo_agg and 'Importo' in testo_agg and 'Righe' in testo_agg and 'Cliente' in testo_agg, 'D-204: la finestra mostra data, importo, righe e cliente')
+        ok('900,00' in testo_agg and '1.056,24' in testo_agg, 'D-204: prima → dopo con i due importi')
+        ok(pgAGG.input_value('#c-motivo') == 'Ordine aggiornato dal fornitore', 'D-204: il motivo è precompilato')
+        pgAGG.screenshot(path=str(USCITA / 'app-documento-sostituisci-1440.png'))
+        pgAGG.click('.velo .modale-piede button:has-text("Sostituisci")')
+        pgAGG.wait_for_function("location.pathname === '/pratiche/1'", timeout=20000)
+        ok(visti_agg['sostituisci'] == 1 and visti_agg['motivo'] == 'Ordine aggiornato dal fornitore', 'D-204: il salvataggio chiama sostituisci col motivo')
+        pgAGG.close()
+
         b.close()
 finally:
     prova_documento('togli')

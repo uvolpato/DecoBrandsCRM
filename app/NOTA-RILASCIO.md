@@ -11,6 +11,18 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.11 — 17/11/2026 — ordine, conferma e proforma aggiornati
+
+- **Sostituisci il documento registrato** (D-204): un ordine, una conferma o una proforma che arriva di
+  nuovo con lo stesso numero (es. «agg Auftrag…», «agg Proforma…») è la versione aggiornata. La pagina
+  dice «Questo ordine c'è già nella pratica N» e offre «Sostituisci…»: una finestra mostra prima e dopo
+  (data, importo, righe, cliente) e chiede il motivo; il documento prende dati, righe e PDF nuovi, il
+  PDF vecchio resta nella pratica, tutto finisce nel registro e si ricalcolano i documenti aperti. Non si
+  può su una pratica chiusa; con due documenti aperti con lo stesso numero si abbina a mano. Fatture e
+  note di credito restano doppioni.
+- **Codice cliente**: su un documento già registrato il cliente si propone dal codice; l'avviso «il
+  codice è di …» compare solo se il cliente scelto a mano è un altro.
+
 ### 0.2.10 — 17/11/2026 — bollettini a consuntivo, scaglioni come il vecchio CRM, Documenti più veloce
 
 - **Scaglioni «Sconto da %» come nel vecchio CRM** (D-202): ogni soglia vale da quello sconto in su,
