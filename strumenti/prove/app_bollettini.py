@@ -50,9 +50,11 @@ with sync_playwright() as p:
     def carica(pg, fornitore, mese, anno, pdf, conferma=True):
         pg.click('button:has-text("Carica un bollettino")')
         pg.wait_for_selector('.velo form#carica-bollettino')
-        pg.locator('.velo .ricerca .ricerca-testo').first.fill(fornitore)
-        pg.wait_for_timeout(700)
-        pg.locator('.velo .ricerca .ricerca-testo').first.press('Enter')
+        campo = pg.locator('.velo .ricerca .ricerca-testo').first
+        campo.fill(fornitore)
+        # le voci arrivano dal server: si sceglie quella giusta nell'elenco, senza fidarsi dell'Invio
+        pg.wait_for_selector('.velo .ricerca-menu li[role=option]', state='attached', timeout=10000)
+        pg.locator('.velo .ricerca-menu li[role=option]', has_text=fornitore).first.click()
         pg.wait_for_timeout(200)
         pg.select_option('#c-mese', str(mese)); pg.select_option('#c-anno', str(anno))
         pg.set_input_files('.velo input[type=file]', {'name': 'bollettino.pdf', 'mimeType': 'application/pdf', 'buffer': pdf})
@@ -128,7 +130,7 @@ with sync_playwright() as p:
 
     carica(pg, "Ing's", 9, 2026, b'%PDF-1.4\n% un altro bollettino\n%%EOF\n')
     pg.wait_for_selector('.modulo-errore:not([hidden])')
-    ok("c'è già" in testo(pg, '.modulo-errore'), 'doppione: errore chiaro nella finestra')
+    ok("c'è già" in testo(pg, '.modulo-errore'), 'doppione: errore chiaro nella finestra «%s»' % testo(pg, '.modulo-errore'))
     pg.click('.velo .modale-piede button:has-text("Annulla")'); pg.wait_for_timeout(400)
 
     # 768 px: la pagina non scorre, la matrice sì (le 6 colonne restano raggiungibili)

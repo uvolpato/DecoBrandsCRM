@@ -52,8 +52,8 @@ export function bloccoChiusura(S: Dati, st: { chiave: string }, righe: Righe, a:
   if (!primaChiuso && qualcosaPrima) return `Chiudi prima il ${pt}° trimestre ${pa}`;
   const n = righe.filter((r) => !r.liquidabile && !r.incasso).length;
   if (n) return `Ci sono ${n} ${n === 1 ? 'documento' : 'documenti'} in attesa dei bollettini`;
-  // D-182 §19, D-199 §19: una pratica con sconto medio (o un gruppo in modalità riga) oltre l'ultimo
-  // scaglione non si chiude (provvigione da decidere)
+  // D-182 §19, D-199 §19, D-202 §19: una pratica con sconto medio (o un gruppo in modalità riga) sotto
+  // la prima soglia non si chiude (provvigione da decidere)
   const anomale = S.pratiche.filter((p) => anomaliaProvvigione(S, p));
   if (anomale.length === 1) return `C'è una pratica con ${descrizioneAnomalia(S, anomale[0])}: aggiungi lo scaglione al fornitore prima di liquidare.`;
   if (anomale.length) return `Ci sono ${anomale.length} pratiche con la provvigione da decidere: aggiungi lo scaglione al fornitore prima di liquidare.`;

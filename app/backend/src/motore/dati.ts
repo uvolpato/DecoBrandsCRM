@@ -43,7 +43,7 @@ export type CalcoloDocumento = {
   spese: string; // spese escluse dalla base (0 se il fornitore le include)
   netto: string; // importo del documento (netto)
   sconto_medio: string | null; // % sul lordo di merce; null se riserva (sconto dell'agenzia)
-  scaglione: string | null; // soglia dello scaglione; null se oltre l'ultimo (anomalia) o in modalità riga
+  scaglione: string | null; // soglia dello scaglione; null se sotto la prima soglia (anomalia) o in modalità riga
   pct_agente: string | null; // % che il fornitore riconosce a Decobrands (in modalità riga: effettiva = provvigione ÷ base)
   pct_subagente: string | null; // % al subagente (la regola applicata; in modalità riga: effettiva)
   provvigione_agente: string | null; // base × pct_agente; per la nota su fattura congelata è la differenza (D-197)
@@ -65,7 +65,7 @@ export type CalcoloDocumento = {
 export type GruppoRiga = {
   sconto: string; // % sconto di riga
   base: string; // somma degli importi del gruppo
-  scaglione: string | null; // soglia dello scaglione; null se oltre l'ultimo (anomalia)
+  scaglione: string | null; // soglia dello scaglione; null se sotto la prima soglia (anomalia)
   pct_agente: string | null; // % dal fornitore sullo scaglione
   pct_sub: string | null; // % al subagente (eccezione personale o standard)
   provvigione_agente: string | null; // base × pct_agente
@@ -224,6 +224,7 @@ const bollettinoDaDb = (b: Righe['bollettini'][number]) => ({
   righe: b.righe.map((r) => ({
     id: id(r.id), documento_id: r.documento_id ? id(r.documento_id) : null, liquidazione_id: r.liquidazione_id ? id(r.liquidazione_id) : null, // D-34, D-11
     numero: r.fattura_numero, data: r.fattura_data ? iso(r.fattura_data) : null, imponibile: r.importo_merce, pct: r.pct_riconosciuta, importo: r.importo_riconosciuto,
+    quota_pagata: r.quota_pagata, // % pagata della fattura (D-201 §19); null = 100 %
     tipo: r.tipo_riga === 'provvigione' ? null : r.tipo_riga, // storno | riaccredito (§5.14)
     pct_calcolata: r.pct_calcolata, importo_calcolato: r.importo_calcolato, // congelati alla verifica (§5.11)
     decisione: decisione(r), // riga che non quadra (D-49)

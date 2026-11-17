@@ -12,7 +12,7 @@ import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
-import { cerca, importa } from '../src/anagrafica-integra';
+import { cerca, chiudiInterruttore, importa, TEMPO_AUTO_MS } from '../src/anagrafica-integra';
 import { svuota } from './svuota';
 
 let app: NestExpressApplication;
@@ -100,6 +100,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await svuota(db);
   await pulisciPonte();
+  chiudiInterruttore(); // lo stato dell'interruttore è in memoria: ogni prova riparte pulita
 });
 
 describe('importa', () => {
@@ -337,6 +338,51 @@ describe('cerca', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('interruttore del ponte per le ricerche automatiche (D-203)', () => {
+  it('dopo una ricerca automatica lenta, le successive non chiamano il ponte per 60 s, poi riprovano', async () => {
+    jest.useFakeTimers();
+    try {
+      let chiamate = 0;
+      const ponteConte = { query: () => { chiamate++; return new Promise(() => {}); } } as unknown as Pool;
+      // prima automatica: lenta → apre l'interruttore
+      const p1 = cerca(db, ponteConte, SCHEMA, 'cliente', 'x', TEMPO_AUTO_MS, true);
+      jest.advanceTimersByTime(600); // oltre TEMPO_AUTO_MS (500)
+      await expect(p1).resolves.toEqual({ errore: 'ponte lento', ms: expect.any(Number) });
+      expect(chiamate).toBe(1);
+
+      // entro 60 s: non chiama il ponte, «ponte non disponibile»
+      const p2 = await cerca(db, ponteConte, SCHEMA, 'cliente', 'x', TEMPO_AUTO_MS, true);
+      expect(p2).toEqual({ errore: 'ponte non disponibile', ms: expect.any(Number) });
+      expect(chiamate).toBe(1);
+
+      // dopo 60 s (orologio finto) si riprova davvero
+      jest.advanceTimersByTime(61_000);
+      const p3 = cerca(db, ponteConte, SCHEMA, 'cliente', 'x', TEMPO_AUTO_MS, true);
+      jest.advanceTimersByTime(600);
+      await expect(p3).resolves.toEqual({ errore: 'ponte lento', ms: expect.any(Number) });
+      expect(chiamate).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('la ricerca su richiesta riuscita richiude l\'interruttore', async () => {
+    // apre l'interruttore con una automatica che fallisce subito (ponte non raggiungibile)
+    const ko = { query: () => Promise.reject(new Error('connessione rifiutata')) } as unknown as Pool;
+    await expect(cerca(db, ko, SCHEMA, 'cliente', 'x', TEMPO_AUTO_MS, true))
+      .resolves.toEqual({ errore: 'ponte non raggiungibile', ms: expect.any(Number) });
+
+    // su richiesta con il ponte vero: riesce e richiude l'interruttore
+    await mettiCliente({ id_integra: 210, codice: 'C00210', ragione_sociale: 'Breaker Due' });
+    const r = await cerca(db, ponte, SCHEMA, 'cliente', 'Breaker Due');
+    expect('errore' in r).toBe(false);
+
+    // ora l'automatica riprova davvero: fallisce di nuovo (chiama il ponte, non lo salta)
+    await expect(cerca(db, ko, SCHEMA, 'cliente', 'x', TEMPO_AUTO_MS, true))
+      .resolves.toEqual({ errore: 'ponte non raggiungibile', ms: expect.any(Number) });
   });
 });
 

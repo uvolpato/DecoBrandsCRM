@@ -2,7 +2,7 @@
 // sconto medio letto sui documenti (1 − netto/lordo), non più dallo sconto dell'agenzia. Funzioni pure
 // del motore su dati costruiti: niente database. V12/V13: il motore è puro, il blocco è in bloccoChiusura.
 import { Prisma } from '@prisma/client';
-import { anomaliaScontoMedio, percentuali, r2, scaglione, scontoMedio, ultimoScaglione } from '../src/motore/motore';
+import { anomaliaScontoMedio, percentuali, primaSoglia, r2, scaglione, scontoMedio } from '../src/motore/motore';
 import { bloccoChiusura } from '../src/liquidazioni';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,22 +46,39 @@ describe('sconto medio sui documenti (D-182)', () => {
     expect(n(scontoMedio(p))).toBe(10);
   });
 
-  it('scaglione: il primo ≥ sconto medio (3,5 → 5; 5,00 → 5; 0 → 0; 6,2 → null)', () => {
-    expect(n(scaglione({ scaglioni: SOGLIE_05 } as any, 'f1', dec(3.5), '2026-01-01')!.sconto)).toBe(5);
+  it('scaglione: l\'ultima soglia ≤ sconto medio (da soglia in su, D-202)', () => {
+    expect(n(scaglione({ scaglioni: SOGLIE_05 } as any, 'f1', dec(3.5), '2026-01-01')!.sconto)).toBe(0);
     expect(n(scaglione({ scaglioni: SOGLIE_05 } as any, 'f1', dec(5), '2026-01-01')!.sconto)).toBe(5);
     expect(n(scaglione({ scaglioni: SOGLIE_05 } as any, 'f1', dec(0), '2026-01-01')!.sconto)).toBe(0);
-    expect(scaglione({ scaglioni: SOGLIE_05 } as any, 'f1', dec(6.2), '2026-01-01')).toBeNull();
-    expect(n(ultimoScaglione({ scaglioni: SOGLIE_05 } as any, 'f1', '2026-01-01')!.sconto)).toBe(5);
+    expect(n(scaglione({ scaglioni: SOGLIE_05 } as any, 'f1', dec(6.2), '2026-01-01')!.sconto)).toBe(5); // sopra l'ultima vale l'ultima
+    expect(n(primaSoglia({ scaglioni: SOGLIE_05 } as any, 'f1', '2026-01-01')!.sconto)).toBe(0);
   });
 
-  it('sconto medio 6,2 oltre l\'ultimo scaglione → anomalia con pratica, documento, sconto medio e ultimo', () => {
-    const p = pratica({ righe: { fattura: [riga('A', 1, 100, 93.8)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 93.8)] });
-    const a = anomaliaScontoMedio({ scaglioni: SOGLIE_05 } as any, p)!;
-    expect(n(a.sconto_medio)).toBe(6.2);
-    expect(n(a.ultimo_scaglione)).toBe(5);
+  it('a fascia (Gasper 0/30/40): 0 → 20 %, 25 → 20 %, 30 → 15 %, 39,99 → 15 %, 40 → 10 %, 55 → 10 %', () => {
+    const soglie = [sc('f1', 0, 20, 10), sc('f1', 30, 15, 8), sc('f1', 40, 10, 6)];
+    const pct = (sconto: number) => n(scaglione({ scaglioni: soglie } as any, 'f1', dec(sconto), '2026-01-01')!.pct_agente);
+    expect(pct(0)).toBe(20);
+    expect(pct(25)).toBe(20);
+    expect(pct(30)).toBe(15);
+    expect(pct(39.99)).toBe(15);
+    expect(pct(40)).toBe(10);
+    expect(pct(55)).toBe(10);
+  });
+
+  it('tabella senza 0 (prima soglia 5): sconto 2 sotto la prima soglia → anomalia, sconto 6 → soglia 5', () => {
+    const soglie = [sc('f1', 5, 15, 8)];
+    expect(scaglione({ scaglioni: soglie } as any, 'f1', dec(2), '2026-01-01')).toBeNull();
+    expect(n(scaglione({ scaglioni: soglie } as any, 'f1', dec(6), '2026-01-01')!.sconto)).toBe(5);
+  });
+
+  it('sconto medio sotto la prima soglia → anomalia con pratica, documento, sconto medio e prima soglia', () => {
+    const p = pratica({ righe: { fattura: [riga('A', 1, 100, 98)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 98)] });
+    const a = anomaliaScontoMedio({ scaglioni: [sc('f1', 5, 15, 8)] } as any, p)!;
+    expect(n(a.sconto_medio)).toBe(2);
+    expect(n(a.prima_soglia)).toBe(5);
     expect(a.documento).toBe('F1');
-    // nessuna anomalia quando lo sconto medio sta dentro l'ultimo scaglione
-    expect(anomaliaScontoMedio({ scaglioni: SOGLIE_05 } as any, pratica({ righe: { fattura: [riga('A', 1, 100, 95)] } }))).toBeNull();
+    // nessuna anomalia quando lo sconto medio sta dentro (≥ prima soglia)
+    expect(anomaliaScontoMedio({ scaglioni: [sc('f1', 5, 15, 8)] } as any, pratica({ righe: { fattura: [riga('A', 1, 100, 94)] } }))).toBeNull();
   });
 
   it('documento senza righe → riserva sullo sconto dell\'agenzia (percentuali)', () => {
@@ -102,14 +119,15 @@ describe('sconto medio sui documenti (D-182)', () => {
     expect(n(percentuali(S, p, '2026-02-10')!.scaglione.sconto)).toBe(10);
   });
 
-  it('chiusura rifiutata quando una pratica ha lo sconto medio oltre l\'ultimo scaglione (bloccoChiusura)', () => {
+  it('chiusura rifiutata quando una pratica ha lo sconto medio sotto la prima soglia (bloccoChiusura)', () => {
+    const soglie = [sc('f1', 5, 15, 8)]; // prima soglia 5, niente 0
     const S = {
-      scaglioni: SOGLIE_05, pratiche: [pratica({ righe: { fattura: [riga('A', 1, 100, 93.8)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 93.8)] })],
+      scaglioni: soglie, pratiche: [pratica({ righe: { fattura: [riga('A', 1, 100, 98)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 98)] })],
       liquidazioni_chiuse: [], fornitori: new Map(), clienti: new Map(), subagenti: new Map(), eccezioni: [], interscambio: [], bollettini: [],
     } as any;
-    expect(bloccoChiusura(S, { chiave: 'da_liquidare' }, [] as any, 2026, 4)).toMatch(/sconto medio oltre/);
+    expect(bloccoChiusura(S, { chiave: 'da_liquidare' }, [] as any, 2026, 4)).toMatch(/sconto medio sotto la prima soglia/);
     // senza anomalia la chiusura non blocca per questo motivo
-    const ok = { ...S, pratiche: [pratica({ righe: { fattura: [riga('A', 1, 100, 95)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 95)] })] };
+    const ok = { ...S, pratiche: [pratica({ righe: { fattura: [riga('A', 1, 100, 94)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 94)] })] };
     expect(bloccoChiusura(ok, { chiave: 'da_liquidare' }, [] as any, 2026, 4)).toBeNull();
   });
 });

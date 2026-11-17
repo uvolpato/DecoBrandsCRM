@@ -72,22 +72,21 @@ describe('righe della nota di credito (D-197)', () => {
     expect(n(scontoMedio(p))).toBe(10); // differenza: solo la riga al 10 % resta
     const prima = scaglione(S(), 'f1', scontoMedioFase(p)!, '2026-02-01')!;
     const dopo = scaglione(S(), 'f1', scontoMedio(p)!, '2026-02-10')!;
-    expect(n(prima.sconto)).toBe(5); // 1 % → scaglione 5
+    expect(n(prima.sconto)).toBe(0); // 1 % → scaglione 0
     expect(n(dopo.sconto)).toBe(10); // 10 % → scaglione 10
     expect(calcoloDocumento(S(), p, p.documenti[1]).scaglione).toBe('10.00');
   });
 
-  it('differenza oltre l\'ultimo scaglione → anomalia', () => {
-    // fattura allo 0 % (lordo 100, netto 100) e riga al 10 % (lordo 10, netto 9): sconto medio 0,9 %;
-    // la nota toglie la riga allo 0 % → differenza 10 %, oltre l'ultimo scaglione 5
+  it('differenza sotto la prima soglia → anomalia', () => {
+    // tabella senza 0 (prima soglia 5): la nota toglie la riga allo 0 % → differenza 3 %, sotto la prima soglia
     const p = pratica(
-      [riga('A', 1, 100, 100), riga('B', 1, 10, 9)],
-      [documento('fattura', 'F1', '2026-02-01', 109, [riga('A', 1, 100, 100), riga('B', 1, 10, 9)]),
-       documento('nota_credito', 'NC1', '2026-02-10', -100, [riga('A', 1, 100, 100)], 'F1')],
+      [riga('A', 1, 100, 97), riga('B', 1, 100, 100)],
+      [documento('fattura', 'F1', '2026-02-01', 197, [riga('A', 1, 100, 97), riga('B', 1, 100, 100)]),
+       documento('nota_credito', 'NC1', '2026-02-10', -100, [riga('B', 1, 100, 100)], 'F1')],
     );
-    const a = anomaliaScontoMedio({ scaglioni: [sc(0, 20, 12), sc(5, 15, 8)] } as any, p)!;
-    expect(n(a.sconto_medio)).toBe(10);
-    expect(n(a.ultimo_scaglione)).toBe(5);
+    const a = anomaliaScontoMedio({ scaglioni: [sc(5, 15, 8), sc(10, 7, 3)] } as any, p)!;
+    expect(n(a.sconto_medio)).toBe(3);
+    expect(n(a.prima_soglia)).toBe(5);
   });
 
   it('fattura congelata + nota → la fattura resta con lo scaglione fissato, la nota porta la differenza', () => {

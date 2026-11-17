@@ -64,7 +64,7 @@ interface Dettaglio {
   progresso: { x: number; y: number; parziale: boolean } | null;
   confronto: { fasi: FaseRiga[]; righe: Riga[]; variazioni: { numero: number; totale: number } };
   provvigione: Provvigione | null;
-  sconto_medio: { valore: number; scaglione: number | null; documento: string | null; oltre: boolean; ultimo_scaglione: number | null; gruppo: boolean; esatti: boolean } | null;
+  sconto_medio: { valore: number; scaglione: number | null; documento: string | null; oltre: boolean; prima_soglia: number | null; gruppo: boolean; esatti: boolean } | null;
   sconto_dopo_nota: { valore: number; scaglione: number; fattura: number } | null;
   azione: { tipo: string; testo: string };
   incassi: Incasso[];
@@ -439,14 +439,14 @@ export function VistaPratica({ id }: { id: string }) {
               {d.sconto_medio?.oltre && (
                 <div className="avviso-verifica">
                   <span>{d.sconto_medio.gruppo
-                    ? <>Un gruppo con sconto {pct(d.sconto_medio.valore)} {d.sconto_medio.esatti ? 'non ha uno scaglione esatto' : `supera l'ultimo scaglione (${pct(d.sconto_medio.ultimo_scaglione ?? 0)})`}: la provvigione è <b>da decidere</b>. Aggiungi lo scaglione in{' '}
+                    ? <>Un gruppo con sconto {pct(d.sconto_medio.valore)} {d.sconto_medio.esatti ? 'non ha uno scaglione esatto' : `è sotto la prima soglia (${pct(d.sconto_medio.prima_soglia ?? 0)})`}: la provvigione è <b>da decidere</b>. Aggiungi lo scaglione in{' '}
                       <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>.</>
-                    : <>Lo sconto medio {pct(d.sconto_medio.valore)} del documento che comanda {d.sconto_medio.esatti ? 'non ha uno scaglione esatto' : `supera l'ultimo scaglione (${pct(d.sconto_medio.ultimo_scaglione ?? 0)})`}: la provvigione è <b>da decidere</b>. Aggiungi lo scaglione in{' '}
+                    : <>Lo sconto medio {pct(d.sconto_medio.valore)} del documento che comanda {d.sconto_medio.esatti ? 'non ha uno scaglione esatto' : `è sotto la prima soglia (${pct(d.sconto_medio.prima_soglia ?? 0)})`}: la provvigione è <b>da decidere</b>. Aggiungi lo scaglione in{' '}
                       <Link href={'/fornitori/' + d.fornitore_id + '?scheda=percentuali'}>percentuali del fornitore</Link>.</>}
                   </span>
                 </div>
               )}
-              {!d.provvigione ? <Nota>{d.sconto_medio?.oltre ? 'Provvigione da decidere: sconto medio oltre l\'ultimo scaglione.' : 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni.'}</Nota> : <>
+              {!d.provvigione ? <Nota>{d.sconto_medio?.oltre ? 'Provvigione da decidere: sconto medio sotto la prima soglia.' : 'Nessun abbinamento cliente × fornitore: la pratica non genera provvigioni.'}</Nota> : <>
                 <Cifre voci={[
                   {
                     etichetta: 'Base provvigione', valore: d.provvigione.imponibile,

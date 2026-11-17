@@ -61,6 +61,7 @@ export const SCHEMA_DOCUMENTO = {
           numero_fattura: { type: 'string', description: 'Per il bollettino: numero della fattura del mese' },
           data_fattura: { type: 'string', description: 'Per il bollettino: data della fattura in formato AAAA-MM-GG' },
           provvigione: { type: 'number', description: 'Per il bollettino: provvigione riconosciuta per la fattura' },
+          quota_pagata: { type: 'number', description: 'Per il bollettino: quota pagata della fattura in percentuale (es. 96,43 = 96,43 %), se c\'è una colonna che la indica (es. «% bezahlt»); altrimenti lascia il campo vuoto' },
           spesa: { type: 'boolean', description: 'True solo per le righe che non sono articoli ma spese (trasporto, imballo, «Fracht», «Porto», «Versand») o che hanno il codice come testo; per gli articoli normali lascia il campo vuoto' },
         },
       },
@@ -84,7 +85,7 @@ export const PROMPT_DOCUMENTO = [
   'Il codice cliente è il codice con cui il fornitore identifica il cliente (spesso «Codice cliente» o «Kunden-Nr.»).',
   'La partita IVA del cliente è quella dell’intestatario (P.IVA, USt-IdNr., codice fiscale): se non è scritta, lascia il campo vuoto.',
   'La partita IVA del fornitore (piva_fornitore) è quella di chi vende la merce: se non è scritta, lascia il campo vuoto.',
-  'Per il bollettino compila mese e anno; le sue righe sono le fatture del mese: numero_fattura, data_fattura, importo (imponibile) e provvigione, non gli articoli.',
+  'Per il bollettino compila mese e anno; le sue righe sono le fatture del mese: numero_fattura, data_fattura, importo (imponibile), provvigione e, se c\'è una colonna con la quota pagata (es. «% bezahlt»), quota_pagata come percentuale (es. 96,43 per il 96,43 %), non gli articoli.',
   'Per la nota di credito compila riferimento_fattura con il numero della fattura stornata.',
   'Il numero d’ordine del fornitore (numero_ordine_fornitore) è il numero d’ordine a cui si riferisce il documento: nell’ordine è il numero dell’ordine stesso; nella proforma, conferma, fattura e nota di credito è il numero d’ordine stampato accanto a diciture come «Auftrag», «Order», «Bestellung», «Ordine n.», «Ihre Bestellung», «Rif. ordine». Se il documento non cita un numero d’ordine, lascia il campo vuoto.',
 ].join(' ');

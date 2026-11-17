@@ -1,5 +1,5 @@
 // Prove del pacchetto `scaglioni-esatti` (D-200 §19): l'impostazione «Scaglioni» sul fornitore accetta
-// solo sconti esatti (|sconto − soglia| ≤ 0,05) al posto della fascia (prima soglia ≥ sconto). Funzioni
+// solo sconti esatti (|sconto − soglia| ≤ 0,05) al posto della fascia (da soglia in su, D-202). Funzioni
 // pure del motore su dati costruiti: niente database.
 import { Prisma } from '@prisma/client';
 import { anomaliaProvvigione, anomaliaScontoMedio, calcoloDocumento, fattiAnalisi, r2, righeLiquidazione, scaglione } from '../src/motore/motore';
@@ -44,14 +44,14 @@ const S = (esatti: boolean): any => ({
 const n = (x: Prisma.Decimal | null | undefined) => (x == null ? null : x.toNumber());
 
 describe('scaglioni esatti (D-200)', () => {
-  it('a fascia: comportamento invariato (prima soglia ≥ sconto)', () => {
+  it('a fascia: vale l\'ultima soglia ≤ sconto (da soglia in su)', () => {
     const s = S(false);
-    expect(n(scaglione(s, 'f1', dec(3), '2026-10-01')!.pct_agente)).toBe(15); // 3 → soglia 5
-    expect(n(scaglione(s, 'f1', dec(0.5), '2026-10-01')!.pct_agente)).toBe(7); // 0,5 → soglia 1
+    expect(n(scaglione(s, 'f1', dec(3), '2026-10-01')!.pct_agente)).toBe(7); // 3 → soglia 1
+    expect(n(scaglione(s, 'f1', dec(0.5), '2026-10-01')!.pct_agente)).toBe(15); // 0,5 → soglia 0
     expect(n(scaglione(s, 'f1', dec(0), '2026-10-01')!.pct_agente)).toBe(15);
     expect(n(scaglione(s, 'f1', dec(1), '2026-10-01')!.pct_agente)).toBe(7);
-    expect(n(scaglione(s, 'f1', dec(9.98), '2026-10-01')!.pct_agente)).toBe(15); // → soglia 10
-    expect(scaglione(s, 'f1', dec(10.06), '2026-10-01')).toBeNull(); // oltre l'ultima
+    expect(n(scaglione(s, 'f1', dec(9.98), '2026-10-01')!.pct_agente)).toBe(15); // → soglia 5
+    expect(n(scaglione(s, 'f1', dec(10.06), '2026-10-01')!.pct_agente)).toBe(15); // → soglia 10 (l'ultima)
   });
 
   it('solo sconti esatti: la soglia deve coincidere (±0,05), altrimenti null', () => {
@@ -82,11 +82,11 @@ describe('scaglioni esatti (D-200)', () => {
     const c = calcoloDocumento(S(true), p, p.documenti[0]);
     expect(c.scaglioni_esatti).toBe(true);
     expect(c.provvigione_agente).toBeNull();
-    // a fascia lo stesso documento prende la soglia 5 (15 %)
+    // a fascia lo stesso documento prende la soglia 1 (7 %): sconto 3 → ultima soglia ≤ 3
     const cf = calcoloDocumento(S(false), p, p.documenti[0]);
     expect(cf.scaglioni_esatti).toBe(false);
-    expect(cf.scaglione).toBe('5.00');
-    expect(cf.provvigione_agente).toBe('145.50'); // 970 × 15 %
+    expect(cf.scaglione).toBe('1.00');
+    expect(cf.provvigione_agente).toBe('67.90'); // 970 × 7 %
   });
 
   it('esatti + raggruppamento riga: righe a 0 % e 3 % → anomalia del documento; 0 % e 10 % → somma giusta', () => {
@@ -132,8 +132,8 @@ describe('scaglioni esatti (D-200)', () => {
 describe('riepilogo pratica: presa effettiva in modalità riga (D-199)', () => {
   const scRiga = (sconto: number, pct_agente: number, pct_sub: number) =>
     ({ id: `s-${sconto}`, fornitore_id: 'f1', sconto: dec(sconto), pct_agente: dec(pct_agente), pct_sub: dec(pct_sub), valido_dal: '2025-01-01' });
-  // scaglioni 0–10 → 15/8, 20 → 10/5
-  const SCAGLIONI_RIGA = [scRiga(10, 15, 8), scRiga(20, 10, 5)];
+  // scaglioni 0 → 15/8, 10 → 10/5 (da soglia in su)
+  const SCAGLIONI_RIGA = [scRiga(0, 15, 8), scRiga(10, 10, 5)];
   const Sriga = (): any => ({
     oggi: '2026-10-30', scaglioni: SCAGLIONI_RIGA,
     fornitori: new Map([['f1', { id: 'f1', nome: 'F', maturazione: 'fatturato', giorni_conferma: 30, giorno_bollettino: 10, giorni_incasso: 60, spese_base_provvigione: false, raggruppamento: 'riga', scaglioni_esatti: false }]]),

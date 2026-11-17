@@ -50,7 +50,7 @@ async function main(argv: string[]) {
         `${subagente(vecchio)?.toFixed(2) ?? '—'} → ${subagente(nuovoSc)?.toFixed(2) ?? (anom ? 'da decidere' : '—')}`]);
       if (anom) {
         const valore = 'sconto_medio' in anom ? `sconto medio ${anom.sconto_medio.toFixed(2)} %` : `gruppo con sconto ${anom.sconto_gruppo.toFixed(2)} %`;
-        cambiate.push(`${p.numero}: anomalia, ${valore} senza scaglione (ultimo ${anom.ultimo_scaglione?.toFixed(2) ?? '—'} %)`);
+        cambiate.push(`${p.numero}: anomalia, ${valore} senza scaglione (prima soglia ${anom.prima_soglia?.toFixed(2) ?? '—'} %)`);
       } else if (vecchio?.sconto.toString() !== nuovoSc?.sconto.toString()) cambiate.push(`${p.numero}: scaglione ${sca(vecchio)} → ${sca(nuovoSc)}`);
     }
     const lar = righe.reduce((acc, r) => r.map((c, i) => Math.max(acc[i] ?? 0, c.length)), new Array<number>(righe[0].length).fill(0));

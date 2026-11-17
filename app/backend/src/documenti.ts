@@ -18,7 +18,7 @@ import { letturaConfig, righePagina } from './impostazioni';
 import { CON_PRATICA, TIPI_DOCUMENTO, type CalcoloDocumento, type TipoDocumento, fiscale, giornoRoma, iso, praticaDaDb, type Testata } from './motore/dati';
 import { chiaveRiga, netto, perCodice, r2 } from './motore/motore';
 import { aggiornaPratica } from './pratiche';
-import { cerca, importa } from './anagrafica-integra';
+import { cerca, importa, TEMPO_AUTO_MS } from './anagrafica-integra';
 import { IntegraService } from './integra';
 import { cercaLegame } from './storico';
 import { type ClienteConCorrente, controlliFissi, esitoCodiceCliente, fattoreSconto, filtroDalTipo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, ricordaAlias, riconosciClienteDai, risolviFornitore, ruoloConferma, soglieLettura, STATI_PRATICHE, superatiConferma, valutaLettura, type Contesto as ContestoProposta, type FiltroPratiche, type Letto, type RigaStorico } from './proposta';
@@ -380,7 +380,7 @@ async function contestoDocumento(db: DbLetto, ponte: Ponte | null, letto: Letto,
   if (letto.fornitore_id == null) {
     // D-111: fornitore non riconosciuto → ricerca mirata sul nome letto
     if (ponte && fornitoreNome) {
-      const r = await cerca(db as PrismaService, ponte.pool, ponte.schema, 'fornitore', fornitoreNome);
+      const r = await cerca(db as PrismaService, ponte.pool, ponte.schema, 'fornitore', fornitoreNome, TEMPO_AUTO_MS, true);
       if (!('errore' in r)) c.fornitore_su_integra = r.righe;
       else c.integra_non_raggiungibile = true; // D-152: candidati solo dal CRM, con la nota
     }
@@ -392,7 +392,7 @@ async function contestoDocumento(db: DbLetto, ponte: Ponte | null, letto: Letto,
   if (ponte) {
     const q = (letto.codice_cliente || letto.piva_cliente || letto.cliente || '').trim();
     if (q) {
-      const r = await cerca(db as PrismaService, ponte.pool, ponte.schema, 'cliente', q);
+      const r = await cerca(db as PrismaService, ponte.pool, ponte.schema, 'cliente', q, TEMPO_AUTO_MS, true);
       if (!('errore' in r)) c.cliente_su_integra = r.righe;
       else c.integra_non_raggiungibile = true; // D-152
     }
@@ -409,17 +409,18 @@ async function esitiImportazione(
   ponte: Ponte | null,
   righe: { id: bigint; fornitore_id: bigint | null; fornitore: string | null; fornitore_piva: string | null; fornitore_letto: string | null; codice_cliente: string | null; cliente: string | null; piva_cliente: string | null }[],
   clienti: ClienteConCorrente[],
-): Promise<{ fornitore: Set<bigint>; cliente: Set<bigint> }> {
+): Promise<{ fornitore: Set<bigint>; cliente: Set<bigint>; integra: 'non_disponibile' | null }> {
   const fornitore = new Set<bigint>();
   const cliente = new Set<bigint>();
   let ponteGiu = false; // R1-02: dopo il primo errore le ricerche successive aspettano solo il tempo massimo
+  let ponteKo = false; // ponte non interrogato o senza risposta: i candidati da importare non sono aggiornati
 
   if (ponte) {
     // fornitore non riconosciuto → una ricerca per nome distinto (di norma una per pagina)
     const senzaFornitore = righe.filter((r) => r.fornitore_id == null && r.fornitore_letto);
     for (const nome of new Set(senzaFornitore.map((r) => r.fornitore_letto!))) {
-      const r = await cerca(db, ponte.pool, ponte.schema, 'fornitore', nome);
-      if ('errore' in r) { ponteGiu = true; break; }
+      const r = await cerca(db, ponte.pool, ponte.schema, 'fornitore', nome, TEMPO_AUTO_MS, true);
+      if ('errore' in r) { ponteGiu = true; ponteKo = true; break; }
       if (r.righe.length === 1) {
         for (const d of senzaFornitore) if (d.fornitore_letto === nome) fornitore.add(d.id);
       }
@@ -427,7 +428,7 @@ async function esitiImportazione(
   }
 
   const conFornitore = righe.filter((r) => r.fornitore_id != null);
-  if (!conFornitore.length) return { fornitore, cliente };
+  if (!conFornitore.length) return { fornitore, cliente, integra: ponteKo ? 'non_disponibile' : null };
   const fornitori = [...new Set(conFornitore.map((r) => r.fornitore_id!))];
   const interscambi = await db.interscambio.findMany({
     where: { fornitore_id: { in: fornitori } },
@@ -470,12 +471,12 @@ async function esitiImportazione(
   }
   if (ponte && !ponteGiu) {
     for (const [q, ids] of daCercare) {
-      const r = await cerca(db, ponte.pool, ponte.schema, 'cliente', q);
-      if ('errore' in r) break;
+      const r = await cerca(db, ponte.pool, ponte.schema, 'cliente', q, TEMPO_AUTO_MS, true);
+      if ('errore' in r) { ponteKo = true; break; }
       if (r.righe.length === 1) for (const id of ids) cliente.add(id);
     }
   }
-  return { fornitore, cliente };
+  return { fornitore, cliente, integra: ponteKo ? 'non_disponibile' : null };
 }
 
 /** D-175: all'apertura del dettaglio, se la ri-risoluzione trova un fornitore certo che il documento
@@ -584,6 +585,7 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
     // D-151 §19: le soglie in vigore viaggiano col documento (V12): il browser non ha soglie fisse
     soglie: await soglieLettura(db),
     controlli, proposta, bollettino, piva_da_salvare, codice_cliente_esito,
+    integra: p.integra_non_raggiungibile ? 'non_disponibile' : null,
   };
 }
 
@@ -705,7 +707,7 @@ const TESTATA_CAMPI: Record<string, { campo: string; tipo: 'testo' | 'data' | 'n
 };
 const RIGA_CAMPI: Record<string, 'testo' | 'data' | 'numero'> = {
   codice: 'testo', descrizione: 'testo', quantita: 'numero', prezzo: 'numero', importo: 'numero',
-  sconto: 'numero', numero_fattura: 'testo', data_fattura: 'data', provvigione: 'numero',
+  sconto: 'numero', numero_fattura: 'testo', data_fattura: 'data', provvigione: 'numero', quota_pagata: 'numero',
   spesa: 'testo', // D-183: riga di spesa (trasporto, imballo, «Fracht»): true/false, non è merce
 };
 
@@ -853,6 +855,7 @@ export class DocumentiController {
         cliente_da_integra: importa.cliente.has(r.id),
       })),
       conteggi, totale, pagina, per_pagina: perPagina, lettura_configurata,
+      integra: importa.integra,
     };
   }
 

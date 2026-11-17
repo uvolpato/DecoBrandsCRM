@@ -139,7 +139,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
           { nome: 'giorni_incasso', etichetta: 'Giorni per l’incasso dal cliente', tipo: 'testo', valore: String(x.giorni_incasso) },
           { nome: 'spese_base_provvigione', etichetta: 'Spese nella base della provvigione (trasporto, imballo)', tipo: 'casella', valore: x.spese_base_provvigione, largo: true },
           { nome: 'raggruppamento', etichetta: 'Raggruppamento per lo scaglione', tipo: 'select', valore: x.raggruppamento, opzioni: [{ value: 'documento', label: 'Sconto medio del documento' }, { value: 'riga', label: 'Per sconto di riga' }], largo: true },
-          { nome: 'scaglioni_esatti', etichetta: 'Scaglioni', tipo: 'select', valore: x.scaglioni_esatti ? 'esatti' : 'fascia', opzioni: [{ value: 'fascia', label: 'A fascia (prima soglia ≥ sconto)' }, { value: 'esatti', label: 'Solo sconti esatti (±0,05)' }], largo: true },
+          { nome: 'scaglioni_esatti', etichetta: 'Scaglioni', tipo: 'select', valore: x.scaglioni_esatti ? 'esatti' : 'fascia', opzioni: [{ value: 'fascia', label: 'A fascia (da soglia in su)' }, { value: 'esatti', label: 'Solo sconti esatti (±0,05)' }], largo: true },
           { nome: 'note', etichetta: 'Note', tipo: 'testo', valore: x.note ?? '', largo: true },
         ]}
         onChiudi={chiudi}
@@ -312,7 +312,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
               { etichetta: 'Giorni per l’incasso', valore: u.giorni_incasso },
               { etichetta: 'Spese nella base', valore: u.spese_base_provvigione ? 'Sì (incluse)' : 'No (escluse)' },
               { etichetta: 'Raggruppamento', valore: u.raggruppamento === 'riga' ? 'Per sconto di riga' : 'Sconto medio del documento' },
-              { etichetta: 'Scaglioni', valore: u.scaglioni_esatti ? 'Solo sconti esatti (±0,05)' : 'A fascia (prima soglia ≥ sconto)' },
+              { etichetta: 'Scaglioni', valore: u.scaglioni_esatti ? 'Solo sconti esatti (±0,05)' : 'A fascia (da soglia in su)' },
               { etichetta: 'Note', valore: u.note ?? '—' },
             ]} />
             <Schede riempi memoria={schedaParam ? undefined : 'fornitori'} attiva={schedaParam ?? undefined} schede={[
@@ -339,6 +339,7 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
                           <li><b>Di cui al subagente</b>: la parte girata al subagente.</li>
                           <li><b>Margine Decobrands</b>: la differenza fra le due.</li>
                           <li><b>Clienti</b>: i clienti seguiti con quello sconto.</li>
+                          <li><b>Come vale una soglia</b>: ogni soglia vale da quello sconto in su, fino alla successiva (come nel vecchio CRM). Con «solo sconti esatti» lo sconto deve coincidere con una soglia.</li>
                           <li><b>Date di validità e chiusure</b>: i documenti si calcolano con le percentuali in vigore alla loro data. Un nuovo scaglione, una sua modifica o un’eccezione valgono da una data dopo l’ultima chiusura (bollettino verificato o contestato, trimestre liquidato): prima il server rifiuta.</li>
                         </ul>
                       </Informazioni>

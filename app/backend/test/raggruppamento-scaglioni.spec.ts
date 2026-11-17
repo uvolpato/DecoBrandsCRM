@@ -27,8 +27,8 @@ const pratica = (o: { raggruppamento?: string | null; righe?: { fattura?: any[] 
 const sc = (sconto: number, pct_agente: number, pct_sub: number) =>
   ({ id: `s-${sconto}`, fornitore_id: 'f1', sconto: dec(sconto), pct_agente: dec(pct_agente), pct_sub: dec(pct_sub), valido_dal: '2025-01-01' });
 
-/** Scaglioni della regola: 0–10 % → 15/8, 20 % → 10/5. */
-const SCAGLIONI = [sc(10, 15, 8), sc(20, 10, 5)];
+/** Scaglioni della regola (da soglia in su, D-202): 0 → 15/8, 10 → 10/5. */
+const SCAGLIONI = [sc(0, 15, 8), sc(10, 10, 5)];
 
 /** Dati minimi con il fornitore f1; `raggruppamento` decide documento | riga. */
 const S = (raggruppamento: string): any => ({
@@ -62,10 +62,10 @@ describe('raggruppamento per lo scaglione (D-199)', () => {
     expect(c.raggruppamento).toBe('riga');
     expect(c.base).toBe('1000.00');
     expect(c.gruppi).toHaveLength(2);
-    // gruppo 5 % → scaglione 10 (15/8): 600 × 15 % = 90 · 600 × 8 % = 48
-    expect(c.gruppi![0]).toMatchObject({ sconto: '5.00', base: '600.00', scaglione: '10.00', pct_agente: '15.00', pct_sub: '8.00', provvigione_agente: '90.00', provvigione_sub: '48.00' });
-    // gruppo 20 % → scaglione 20 (10/5): 400 × 10 % = 40 · 400 × 5 % = 20
-    expect(c.gruppi![1]).toMatchObject({ sconto: '20.00', base: '400.00', scaglione: '20.00', pct_agente: '10.00', pct_sub: '5.00', provvigione_agente: '40.00', provvigione_sub: '20.00' });
+    // gruppo 5 % → scaglione 0 (15/8): 600 × 15 % = 90 · 600 × 8 % = 48
+    expect(c.gruppi![0]).toMatchObject({ sconto: '5.00', base: '600.00', scaglione: '0.00', pct_agente: '15.00', pct_sub: '8.00', provvigione_agente: '90.00', provvigione_sub: '48.00' });
+    // gruppo 20 % → scaglione 10 (10/5): 400 × 10 % = 40 · 400 × 5 % = 20
+    expect(c.gruppi![1]).toMatchObject({ sconto: '20.00', base: '400.00', scaglione: '10.00', pct_agente: '10.00', pct_sub: '5.00', provvigione_agente: '40.00', provvigione_sub: '20.00' });
     expect(c.provvigione_agente).toBe('130.00');
     expect(c.provvigione_subagente).toBe('68.00');
     // percentuali effettive: provvigione ÷ base, 2 decimali
@@ -74,14 +74,14 @@ describe('raggruppamento per lo scaglione (D-199)', () => {
     expect(c.scaglione).toBeNull(); // in modalità riga non c'è un solo scaglione
   });
 
-  it('lo stesso documento in modalità documento: sconto medio 11,63 % → un solo scaglione (20), numero diverso', () => {
+  it('lo stesso documento in modalità documento: sconto medio 11,63 % → un solo scaglione (10), numero diverso', () => {
     const p = pratica(fatturaMista());
     expect(n(scontoMedio(p))).toBe(11.63);
     const c = calcoloDocumento(S('documento'), p, p.documenti[0]);
     expect(c.regola).toBe('spese-base-v1');
     expect(c.raggruppamento).toBe('documento');
     expect(c.gruppi).toBeUndefined();
-    expect(c.scaglione).toBe('20.00');
+    expect(c.scaglione).toBe('10.00');
     expect(c.pct_agente).toBe('10.00');
     expect(c.provvigione_agente).toBe('100.00'); // 1000 × 10 %
     expect(c.provvigione_subagente).toBe('50.00');
@@ -104,13 +104,14 @@ describe('raggruppamento per lo scaglione (D-199)', () => {
     const c = calcoloDocumento(S('riga'), p, p.documenti[0]);
     expect(c.regola).toBe('riga senza prezzo: sconto medio');
     expect(c.gruppi).toBeUndefined();
-    expect(c.pct_agente).toBe('15.00'); // riserva sullo sconto dell'agenzia (0) → scaglione 10 (15/8)
+    expect(c.pct_agente).toBe('15.00'); // riserva sullo sconto dell'agenzia (0) → scaglione 0 (15/8)
   });
 
-  it('gruppo oltre l\'ultimo scaglione → provvigione «da decidere» (null)', () => {
-    // riga al 25 % (oltre lo scaglione 20): lordo 1000, netto 750
-    const p = pratica({ righe: { fattura: [riga('A', 1, 1000, 750)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 750, [riga('A', 1, 1000, 750)])] });
-    const c = calcoloDocumento(S('riga'), p, p.documenti[0]);
+  it('gruppo sotto la prima soglia → provvigione «da decidere» (null)', () => {
+    // tabella senza 0 (prima soglia 5): una riga al 2 % è sotto la prima soglia
+    const senza0 = [sc(5, 15, 8), sc(10, 10, 5)];
+    const p = pratica({ righe: { fattura: [riga('A', 1, 1000, 980)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 980, [riga('A', 1, 1000, 980)])] });
+    const c = calcoloDocumento({ ...S('riga'), scaglioni: senza0 }, p, p.documenti[0]);
     expect(c.gruppi![0].scaglione).toBeNull();
     expect(c.gruppi![0].provvigione_agente).toBeNull();
     expect(c.provvigione_agente).toBeNull();
@@ -188,17 +189,18 @@ describe('raggruppamento per lo scaglione — correzioni (documento/liquidazione
     expect(n(fatto.pagate)).toBe(111);
   });
 
-  it('rilievo 2: gruppo oltre l\'ultimo scaglione → anomalia del gruppo, non dello sconto medio', () => {
-    const p = pratica({ righe: { fattura: [riga('A', 1, 1000, 750)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 750, [riga('A', 1, 1000, 750)])] });
-    const a = anomaliaProvvigione(S('riga'), p)!;
+  it('rilievo 2: gruppo sotto la prima soglia → anomalia del gruppo, non dello sconto medio', () => {
+    const senza0 = [sc(5, 15, 8), sc(10, 10, 5)]; // tabella senza 0: prima soglia 5
+    const p = pratica({ righe: { fattura: [riga('A', 1, 1000, 980)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 980, [riga('A', 1, 1000, 980)])] }); // sconto 2 %
+    const a = anomaliaProvvigione({ ...S('riga'), scaglioni: senza0 }, p)!;
     expect(a).toMatchObject({ documento: 'F1' });
     expect('sconto_gruppo' in a).toBe(true);
     expect('sconto_medio' in a).toBe(false);
-    // in modalità documento comanda lo sconto medio (la stessa riga al 25 % è oltre l'ultimo scaglione)
-    const adoc = anomaliaProvvigione(S('documento'), p)!;
+    // in modalità documento comanda lo sconto medio (la stessa riga al 2 % è sotto la prima soglia)
+    const adoc = anomaliaProvvigione({ ...S('documento'), scaglioni: senza0 }, p)!;
     expect('sconto_medio' in adoc).toBe(true);
     // la funzione pura dello sconto medio resta indipendente dal raggruppamento
-    expect(anomaliaScontoMedio(S('riga'), p)).not.toBeNull();
+    expect(anomaliaScontoMedio({ ...S('riga'), scaglioni: senza0 }, p)).not.toBeNull();
   });
 
   it('rilievo 4: righe che non tornano col netto → ripiego allo sconto medio con regola scritta', () => {
@@ -207,7 +209,7 @@ describe('raggruppamento per lo scaglione — correzioni (documento/liquidazione
     const c = calcoloDocumento(S('riga'), p, p.documenti[0]);
     expect(c.regola).toBe('righe che non tornano col netto: sconto medio');
     expect(c.gruppi).toBeUndefined();
-    expect(c.provvigione_agente).toBe('99.00'); // 990 × 10 % (scaglione 20 dallo sconto medio 11,63 %)
+    expect(c.provvigione_agente).toBe('99.00'); // 990 × 10 % (scaglione 10 dallo sconto medio 11,63 %)
   });
 
   it('rilievo 2: nota su fattura congelata in modalità riga → lineare (niente differenza D-197)', () => {
@@ -233,9 +235,10 @@ describe('raggruppamento per lo scaglione — correzioni (documento/liquidazione
 
   it('rilievo 7: un gruppo con eccezione personale → il segno eccezione in liquidazione è vero', () => {
     const p = pratica({ righe: { fattura: [riga('A', 1, 631.58, 600)] }, documenti: [documento('fattura', 'F1', '2026-10-15', 600, [riga('A', 1, 631.58, 600)])] });
-    const S0 = { ...S('riga'), pratiche: [p], eccezioni: [{ fornitore_id: 'f1', subagente_id: 's1', sconto: dec(10), pct: dec(9), valido_dal: '2025-01-01', valido_al: null }] };
+    // il gruppo al 5 % prende la soglia 0 → l'eccezione è sulla soglia 0
+    const S0 = { ...S('riga'), pratiche: [p], eccezioni: [{ fornitore_id: 'f1', subagente_id: 's1', sconto: dec(0), pct: dec(9), valido_dal: '2025-01-01', valido_al: null }] };
     const r = righeLiquidazione(S0, 2026, 4).find((x) => x.numero === 'F1')!;
     expect(r.eccezione).toBe(true);
-    expect(n(r.provvigione)).toBe(54); // 600 × 9 % (eccezione personale sullo scaglione 10)
+    expect(n(r.provvigione)).toBe(54); // 600 × 9 % (eccezione personale sulla soglia 0)
   });
 });

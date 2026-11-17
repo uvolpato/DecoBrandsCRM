@@ -121,49 +121,60 @@ describe('raggruppamento sul fornitore e deroga sulla pratica (D-199)', () => {
   });
 
   it('rilievo 3: una deroga che crea un\'anomalia di gruppo aggiorna subito l\'elenco anomalie', async () => {
-    // fornitore senza lo scaglione 100 (soglie fino a 10): un gruppo al 15 % va oltre l'ultimo scaglione
+    // fornitore senza lo scaglione 100 (soglie fino a 10); tolgo la soglia 0: prima soglia 5,
+    // un gruppo al 2 % va sotto la prima soglia (D-202)
     const senzaTutto = await db.fornitori.findMany({ where: { scaglioni: { every: { sconto_min: { lte: 20 } } } }, select: { id: true } });
     const doc = await db.ordini_fornitore_documenti.findFirstOrThrow({
       where: { tipo: 'fattura', testata: { fornitore_id: { in: senzaTutto.map((f) => f.id) } } },
       orderBy: { id: 'asc' },
     });
     const testata = doc.testata_id;
-    // righe deterministiche: 0 % (merce 900) + 15 % (merce 85) → sconto medio 1,5 % (dentro), gruppo al 15 % (oltre)
+    const { fornitore_id } = await db.ordini_fornitore_testata.findUniqueOrThrow({ where: { id: testata }, select: { fornitore_id: true } });
+    const zero = await db.provvigioni_scaglioni.findFirstOrThrow({ where: { fornitore_id, sconto_min: 0 } });
+    await db.provvigioni_scaglioni.deleteMany({ where: { fornitore_id, sconto_min: 0 } });
+    // righe deterministiche: 2 % (merce 98) + 20 % (merce 800) → sconto medio 18,4 % (dentro), gruppo al 2 % (sotto)
     await db.ordini_fornitore_righe.deleteMany({ where: { documento_id: doc.id } });
     await db.ordini_fornitore_righe.createMany({
       data: [
-        { testata_id: testata, documento_id: doc.id, fase: 'fattura', numero_riga: 1, codice: 'A', descrizione: 'A', quantita: 1, prezzo_unitario: 900, importo: 900, spesa: false },
-        { testata_id: testata, documento_id: doc.id, fase: 'fattura', numero_riga: 2, codice: 'B', descrizione: 'B', quantita: 1, prezzo_unitario: 100, importo: 85, spesa: false },
+        { testata_id: testata, documento_id: doc.id, fase: 'fattura', numero_riga: 1, codice: 'A', descrizione: 'A', quantita: 1, prezzo_unitario: 100, importo: 98, spesa: false },
+        { testata_id: testata, documento_id: doc.id, fase: 'fattura', numero_riga: 2, codice: 'B', descrizione: 'B', quantita: 1, prezzo_unitario: 1000, importo: 800, spesa: false },
       ],
     });
-    await db.ordini_fornitore_documenti.update({ where: { id: doc.id }, data: { importo: 985 } });
-    // in modalità documento non c'è anomalia (sconto medio 1,5 % dentro lo scaglione)
+    await db.ordini_fornitore_documenti.update({ where: { id: doc.id }, data: { importo: 898 } });
+    // in modalità documento non c'è anomalia (sconto medio 18,4 % dentro lo scaglione 10)
     expect(await db.registro.count({ where: { genere: 'anomalia', servizio: 'provvigioni', chiave: String(testata), stato: 'aperta' } })).toBe(0);
-    // la deroga al raggruppamento riga apre subito l'anomalia del gruppo
+    // la deroga al raggruppamento riga apre subito l'anomalia del gruppo (2 % sotto la prima soglia 5)
     await op.put(`/pratiche/${testata}/raggruppamento`, { raggruppamento: 'riga', motivo: 'prova' }).expect(200);
     expect(await db.registro.findFirst({ where: { genere: 'anomalia', servizio: 'provvigioni', codice: 'provvigione.gruppo_scaglione', chiave: String(testata), stato: 'aperta' } })).toBeTruthy();
     // torna come il fornitore: l'anomalia si chiude
     await op.put(`/pratiche/${testata}/raggruppamento`, { raggruppamento: null, motivo: 'ripristina' }).expect(200);
     expect(await db.registro.findFirst({ where: { genere: 'anomalia', servizio: 'provvigioni', codice: 'provvigione.gruppo_scaglione', chiave: String(testata), stato: 'aperta' } })).toBeNull();
+    // ripristino la soglia 0
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id, sconto_min: zero.sconto_min, pct_agente: zero.pct_agente, pct_subagente: zero.pct_subagente, valido_dal: zero.valido_dal } });
   });
 
   it('rilievo 3: un\'anomalia di sconto medio (servizio provvigioni) si apre nel registro senza errori', async () => {
-    // fornitore senza lo scaglione 100: una sola riga al 15 % → sconto medio oltre l'ultimo scaglione (10)
+    // fornitore senza lo scaglione 100; tolgo la soglia 0: una sola riga al 2 % → sconto medio sotto la prima soglia (5)
     const senzaTutto = await db.fornitori.findMany({ where: { scaglioni: { every: { sconto_min: { lte: 20 } } } }, select: { id: true } });
     const doc = await db.ordini_fornitore_documenti.findFirstOrThrow({
       where: { tipo: 'fattura', testata: { fornitore_id: { in: senzaTutto.map((f) => f.id) } } },
       orderBy: { id: 'asc' },
     });
     const testata = doc.testata_id;
+    const { fornitore_id } = await db.ordini_fornitore_testata.findUniqueOrThrow({ where: { id: testata }, select: { fornitore_id: true } });
+    const zero = await db.provvigioni_scaglioni.findFirstOrThrow({ where: { fornitore_id, sconto_min: 0 } });
+    await db.provvigioni_scaglioni.deleteMany({ where: { fornitore_id, sconto_min: 0 } });
     await db.ordini_fornitore_righe.deleteMany({ where: { documento_id: doc.id } });
     await db.ordini_fornitore_righe.create({
-      data: { testata_id: testata, documento_id: doc.id, fase: 'fattura', numero_riga: 1, codice: 'A', descrizione: 'A', quantita: 1, prezzo_unitario: 100, importo: 85, spesa: false },
+      data: { testata_id: testata, documento_id: doc.id, fase: 'fattura', numero_riga: 1, codice: 'A', descrizione: 'A', quantita: 1, prezzo_unitario: 100, importo: 98, spesa: false },
     });
-    await db.ordini_fornitore_documenti.update({ where: { id: doc.id }, data: { importo: 85 } });
+    await db.ordini_fornitore_documenti.update({ where: { id: doc.id }, data: { importo: 98 } });
     // la deroga esplicita a documento ricalcola e apre l'anomalia di sconto medio (CHECK servizio 'provvigioni')
     await op.put(`/pratiche/${testata}/raggruppamento`, { raggruppamento: 'documento', motivo: 'prova' }).expect(200);
     expect(await db.registro.findFirst({ where: { genere: 'anomalia', servizio: 'provvigioni', codice: 'provvigione.sconto_medio', chiave: String(testata), stato: 'aperta' } })).toBeTruthy();
     await op.put(`/pratiche/${testata}/raggruppamento`, { raggruppamento: null, motivo: 'ripristina' }).expect(200);
+    // ripristino la soglia 0
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id, sconto_min: zero.sconto_min, pct_agente: zero.pct_agente, pct_subagente: zero.pct_subagente, valido_dal: zero.valido_dal } });
   });
 
   it('cambio del raggruppamento sul fornitore: l\'aperto si ricalcola, il congelato resta (D-183)', async () => {

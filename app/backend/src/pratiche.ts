@@ -129,8 +129,8 @@ export async function congelaDocumenti(tx: Prisma.TransactionClient, S: Dati, id
 }
 
 /** Apre (o chiude) l'anomalia della provvigione della pratica (D-182 §19, D-199 §19): sconto medio
- *  oltre l'ultimo scaglione in modalità documento, gruppo oltre l'ultimo scaglione in modalità riga
- *  (lì lo sconto medio non comanda). Il dettaglio porta pratica, documento, sconto e ultimo scaglione.
+ *  sotto la prima soglia in modalità documento, gruppo sotto la prima soglia in modalità riga
+ *  (lì lo sconto medio non comanda). Il dettaglio porta pratica, documento, sconto e prima soglia.
  *  `fornitore` e `scaglioni` si possono passare già caricati (cambio a livello di fornitore), altrimenti
  *  li legge qui. */
 async function aggiornaAnomalieProvvigione(
@@ -147,7 +147,7 @@ async function aggiornaAnomalieProvvigione(
   }
   const S = { scaglioni: scaglioni.map((s) => ({ id: String(s.id), fornitore_id: String(s.fornitore_id), sconto: s.sconto_min, pct_agente: s.pct_agente, pct_sub: s.pct_subagente, valido_dal: iso(s.valido_dal) })), fornitori: new Map([[p.fornitore_id, fornitore]]) } as unknown as Dati;
   const ragg = p.raggruppamento ?? fornitore.raggruppamento ?? 'documento';
-  // D-200 §19: con «solo sconti esatti» l'anomalia è lo sconto senza soglia esatta (±0,05), non oltre l'ultimo scaglione
+  // D-200 §19: con «solo sconti esatti» l'anomalia è lo sconto senza soglia esatta (±0,05), non sotto la prima soglia
   const esatti = fornitore.scaglioni_esatti;
   if (ragg === 'riga') {
     const a = anomaliaGruppo(S, p);
@@ -156,8 +156,8 @@ async function aggiornaAnomalieProvvigione(
         servizio: 'provvigioni', codice: 'provvigione.gruppo_scaglione', chiave: p.id,
         messaggio: esatti
           ? `La pratica ${a.numero} ha un gruppo con sconto ${a.sconto_gruppo.toFixed(2)} % senza scaglione esatto (±0,05): la provvigione resta da decidere.`
-          : `La pratica ${a.numero} ha un gruppo con sconto ${a.sconto_gruppo.toFixed(2)} % oltre l'ultimo scaglione (${(a.ultimo_scaglione ?? new Prisma.Decimal(0)).toFixed(2)} %): la provvigione resta da decidere.`,
-        dettaglio: { pratica: a.numero, documento: a.documento, sconto_gruppo: Number(a.sconto_gruppo), ultimo_scaglione: a.ultimo_scaglione != null ? Number(a.ultimo_scaglione) : null },
+          : `La pratica ${a.numero} ha un gruppo con sconto ${a.sconto_gruppo.toFixed(2)} % sotto la prima soglia (${(a.prima_soglia ?? new Prisma.Decimal(0)).toFixed(2)} %): la provvigione resta da decidere.`,
+        dettaglio: { pratica: a.numero, documento: a.documento, sconto_gruppo: Number(a.sconto_gruppo), prima_soglia: a.prima_soglia != null ? Number(a.prima_soglia) : null },
       });
     } else {
       await chiudiAnomalia(tx, 'provvigioni', 'provvigione.gruppo_scaglione', p.id);
@@ -171,8 +171,8 @@ async function aggiornaAnomalieProvvigione(
       servizio: 'provvigioni', codice: 'provvigione.sconto_medio', chiave: p.id,
       messaggio: esatti
         ? `La pratica ${a.numero} ha sconto medio ${a.sconto_medio.toFixed(2)} % senza scaglione esatto (±0,05): la provvigione resta da decidere.`
-        : `La pratica ${a.numero} ha sconto medio ${a.sconto_medio.toFixed(2)} % oltre l'ultimo scaglione (${a.ultimo_scaglione.toFixed(2)} %): la provvigione resta da decidere.`,
-      dettaglio: { pratica: a.numero, documento: a.documento, sconto_medio: Number(a.sconto_medio), ultimo_scaglione: Number(a.ultimo_scaglione) },
+        : `La pratica ${a.numero} ha sconto medio ${a.sconto_medio.toFixed(2)} % sotto la prima soglia (${a.prima_soglia.toFixed(2)} %): la provvigione resta da decidere.`,
+      dettaglio: { pratica: a.numero, documento: a.documento, sconto_medio: Number(a.sconto_medio), prima_soglia: Number(a.prima_soglia) },
     });
   } else {
     await chiudiAnomalia(tx, 'provvigioni', 'provvigione.sconto_medio', p.id);
@@ -439,11 +439,11 @@ export function dettaglioPratica(S: Dati, id: string) {
     ? {
         valore: Number('sconto_gruppo' in anomalia ? anomalia.sconto_gruppo : anomalia.sconto_medio),
         scaglione: null, documento: anomalia.documento, oltre: true,
-        ultimo_scaglione: anomalia.ultimo_scaglione != null ? Number(anomalia.ultimo_scaglione) : null,
+        prima_soglia: anomalia.prima_soglia != null ? Number(anomalia.prima_soglia) : null,
         gruppo: 'sconto_gruppo' in anomalia, esatti,
       }
     : bicchiere?.sconto_medio != null
-      ? { valore: Number(bicchiere.sconto_medio), scaglione: Number(bicchiere.scaglione.sconto), documento: null, oltre: false, ultimo_scaglione: null, gruppo: false, esatti }
+      ? { valore: Number(bicchiere.sconto_medio), scaglione: Number(bicchiere.scaglione.sconto), documento: null, oltre: false, prima_soglia: null, gruppo: false, esatti }
       : null;
   // D-197 §19: lo sconto medio della differenza (fattura − nota) quando cambia rispetto a quello della
   // fattura: sulla riga della nota si mostra «sconto medio dopo la nota X% → scaglione Y».

@@ -4,7 +4,7 @@ import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'c
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
 import { type Dati, caricaDatiBollettino, fiscale } from './motore/dati';
-import { anomaliaProvvigione, descrizioneAnomalia, riconcilia, statoIncasso } from './motore/motore';
+import { anomaliaProvvigione, descrizioneAnomalia, r2, riconcilia, statoIncasso } from './motore/motore';
 import { congelaDocumenti } from './pratiche';
 import { PrismaService } from './prisma.service';
 import { type Contesto, logEvent } from './registro';
@@ -80,6 +80,9 @@ export function riconciliazione(S: Dati, id: string) {
       pagata_in: x.pagata_in ? (({ id, mese, anno }) => ({ id, mese, anno }))(S.bollettini.find((o) => o.id === x.pagata_in)!) : null,
       decisione: x.decisione, // {esito, motivo, da, il}; il nome di chi ha deciso lo aggiunge la rotta
       scelte: aperto && !x.incasso ? (SCELTE[x.categoria] ?? []) : [],
+      // D-201 §19: il dettaglio delle righe del bollettino (gruppo) e la sua quota pagata
+      righe: x.righe.map((r) => ({ id: r.id, importo: Number(r.importo), pct: num(r.pct), quota: num(r.quota) })),
+      quota: num(x.quota), quote_diverse: x.quote_diverse,
     })),
     totali: { riconosciuto: Number(r.riconosciuto), calcolato: Number(r.atteso), differenza: Number(r.differenza), aperte: r.aperte, contestate },
     azione,
@@ -223,7 +226,9 @@ export class BollettinoController {
       const di = (y: { esito: string; motivo: string | null } | null) => ({ decisione: y?.esito ?? null, motivo: y?.motivo ?? null });
       const prima = di(x.decisione), dopo = di(d.decisione ? { esito: d.decisione, motivo } : null);
       if (x.categoria !== 'mancante') {
-        await tx.bollettini_righe.update({ where: { id: BigInt(x.id!) }, data: v || { decisione: null, decisione_motivo: null, deciso_da: null, deciso_il: null } });
+        // D-201 §19: la decisione su una riga del gruppo si applica a tutte le righe dello stesso documento
+        const ids = x.righe.map((r) => r.id).filter((i): i is string => i != null).map((i) => BigInt(i));
+        await tx.bollettini_righe.updateMany({ where: { id: { in: ids } }, data: v || { decisione: null, decisione_motivo: null, deciso_da: null, deciso_il: null } });
         await eventoRiga(tx, S, b, x, BigInt(x.id!), prima, dopo, ctx);
         return;
       }
@@ -256,9 +261,10 @@ export class BollettinoController {
       if (!fiscale(doc.tipo)) throw new BadRequestException('Una riga del bollettino va su una fattura o una nota di credito'); // D-60
       if (String(doc.testata.fornitore_id) !== b.fornitore_id) throw new BadRequestException('Il documento è di un altro fornitore');
       // lo stesso documento sta su una sola riga dello stesso tipo (storno e riaccredito sono righe a parte, §5.14):
-      // per id, o per numero se l'altra riga non è ancora abbinata (come suDocumento del motore)
+      // per id, o per numero se l'altra riga non è ancora abbinata (come suDocumento del motore). D-201 §19: nello
+      // stesso bollettino più righe per la stessa fattura sono ammesse (Arte); il doppione resta solo fra bollettini diversi.
       const altra = await tx.bollettini_righe.findFirst({
-        where: { id: { not: riga.id }, tipo_riga: riga.tipo_riga, OR: [{ documento_id: doc.id }, { documento_id: null, fattura_numero: doc.numero, testata: { fornitore_id: doc.testata.fornitore_id } }] },
+        where: { id: { not: riga.id }, testata_id: { not: riga.testata_id }, tipo_riga: riga.tipo_riga, OR: [{ documento_id: doc.id }, { documento_id: null, fattura_numero: doc.numero, testata: { fornitore_id: doc.testata.fornitore_id } }] },
         include: { testata: { select: { mese: true, anno: true } } },
       });
       if (altra) throw new ConflictException(`Il documento ${doc.numero} è già sulla riga ${altra.fattura_numero} del bollettino ${altra.testata.mese}/${altra.testata.anno}`);
@@ -285,14 +291,29 @@ export class BollettinoController {
       if (r.aperte) throw new ConflictException(`Ci sono ${r.aperte} righe da decidere prima di chiudere il bollettino`);
       if (c.stato === 'verificato' && contestate) throw new ConflictException('Ci sono righe contestate: il bollettino va segnato come contestato');
       if (c.stato === 'contestato' && !contestate) throw new ConflictException('Nessuna riga contestata: il bollettino va segnato come verificato');
-      // D-182 §19, D-199 §19: una pratica con sconto medio (o un gruppo in modalità riga) oltre l'ultimo
-      // scaglione non si chiude (provvigione da decidere)
+      // D-182 §19, D-199 §19, D-202 §19: una pratica con sconto medio (o un gruppo in modalità riga) sotto
+      // la prima soglia non si chiude (provvigione da decidere)
       const anomala = S.pratiche.find((p) => anomaliaProvvigione(S, p));
       if (anomala) throw new ConflictException(`La pratica ${anomala.numero} ha ${descrizioneAnomalia(S, anomala)}: aggiungi lo scaglione al fornitore prima di chiudere il bollettino.`);
       for (const x of r.righe) {
         if (!x.id || !x.loro || !x.documento_id) continue; // righe del fornitore abbinate a un nostro documento
+        const ids = x.righe.map((r) => r.id).filter((i): i is string => i != null).map((i) => BigInt(i));
+        if (!ids.length) continue;
         const congela = !x.incasso && x.noi ? { pct_calcolata: x.noi.pct, importo_calcolato: x.noi.importo } : {};
-        await tx.bollettini_righe.update({ where: { id: BigInt(x.id) }, data: { documento_id: BigInt(x.documento_id), ...congela } });
+        // D-201 §19: le righe del gruppo si abbinano tutte allo stesso documento; l'atteso congelato (con la
+        // quota) si distribuisce in proporzione all'importo riconosciuto, l'ultima assorbe l'arrotondamento.
+        const parti = congela.importo_calcolato != null && ids.length > 1
+          ? (() => {
+            const totale = x.loro!.importo;
+            const quote = ids.slice(0, -1).map((_, i) => r2(x.noi!.importo.times(x.righe[i].importo).div(totale)));
+            const ultima = r2(x.noi!.importo.minus(quote.reduce((s, p) => s.plus(p), new Prisma.Decimal(0))));
+            return [...quote, ultima];
+          })()
+          : null;
+        for (let i = 0; i < ids.length; i++) {
+          const dati = congela.importo_calcolato != null ? { pct_calcolata: congela.pct_calcolata, importo_calcolato: parti ? parti[i] : congela.importo_calcolato } : {};
+          await tx.bollettini_righe.update({ where: { id: ids[i] }, data: { documento_id: BigInt(x.documento_id!), ...dati } });
+        }
       }
       // D-183: i documenti del bollettino si congelano (valori calcolati fissati con le regole di oggi)
       await congelaDocumenti(tx, S, r.righe.filter((x) => x.id && x.loro && x.documento_id).map((x) => x.documento_id!));

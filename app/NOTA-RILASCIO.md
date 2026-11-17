@@ -11,6 +11,22 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.10 — 17/11/2026 — bollettini a consuntivo, scaglioni come il vecchio CRM, Documenti più veloce
+
+- **Scaglioni «Sconto da %» come nel vecchio CRM** (D-202): ogni soglia vale da quello sconto in su,
+  fino alla successiva. Sotto la prima soglia è un'anomalia; sopra l'ultima vale l'ultima. Con «solo
+  sconti esatti» lo sconto deve coincidere con una soglia.
+- **Quota pagata nel bollettino** (D-201): dove il fornitore la scrive (Arte, «% bezahlt») si legge e
+  il nostro conto la usa (base × quota × %), così non ogni riga risulta diversa.
+- **Più righe del bollettino sulla stessa fattura** (Arte: una al 10% e una al 15%) si sommano e si
+  confrontano con la nostra unica provvigione; una sola decisione per il gruppo. La stessa fattura in due
+  bollettini diversi resta un doppione. Tolleranza 0,01 € per fattura.
+- **Le differenze si guardano a consuntivo**: il CRM le evidenzia, una persona decide (accettato,
+  contestato, attendere); niente regole per indovinare la logica del fornitore.
+- **Documenti più veloce** (D-203): la coda e il dettaglio aspettavano Integra fino a 3 s a ogni
+  apertura. Ora la ricerca automatica aspetta al massimo 0,5 s e, se Integra non risponde, per un minuto
+  non lo interroga; la pagina dice «Integra non raggiungibile» invece di «nessun candidato».
+
 ### 0.2.9 — 17/11/2026 — percentuale per riga, scaglioni esatti, informazioni a comparsa
 
 - **Raggruppamento sul fornitore** (D-199): «Sconto medio del documento» (come prima) oppure **«Per

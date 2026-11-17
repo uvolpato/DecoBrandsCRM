@@ -36,7 +36,7 @@ const L = (over: Partial<Letto>): Letto => ({
 });
 const R = (over: Partial<RigaLetta>): RigaLetta => ({
   codice: null, descrizione: null, quantita: null, prezzo: null, importo: null,
-  sconto: null, numero_fattura: null, data_fattura: null, provvigione: null, ...over,
+  sconto: null, numero_fattura: null, data_fattura: null, provvigione: null, quota_pagata: null, ...over,
 });
 
 async function creaFornitore(nome: string) {

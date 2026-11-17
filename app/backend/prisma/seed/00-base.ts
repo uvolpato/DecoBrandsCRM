@@ -19,11 +19,12 @@ export const PASSWORD_PROVA = 'Prova-Decobrands-2026'; // fissa, solo per i dati
 const data = (s: string) => new Date(s + 'T00:00:00Z');
 const ora = (s: string) => new Date(s + (s.length <= 16 ? ':00' : '') + '+02:00');
 const r2 = (n: number) => Math.round(n * 100) / 100;
-// D-182 §19: lo scaglione si sceglie dallo sconto medio (1 − netto/lordo). Il seed mette su ogni riga uno
-// sconto di riga uguale allo sconto dell'agenzia (abbinamenti.sconto), così lo sconto medio cade nello stesso
-// scaglione di prima e i numeri restano quelli del prototipo. Il netto non cambia: il prezzo resta il netto,
-// il lordo (prezzo_unitario) si ricava da esso. Math.floor (non round) tiene lo sconto medio appena sotto la
-// soglia, così «il primo scaglione ≥ sconto medio» sceglie sempre la soglia giusta (mai quella dopo).
+// D-182 §19, D-202 §19: lo scaglione si sceglie dallo sconto medio (1 − netto/lordo). Il seed mette su
+// ogni riga uno sconto di riga uguale allo sconto dell'agenzia (abbinamenti.sconto), così lo sconto medio
+// cade nello stesso scaglione di prima e i numeri restano quelli del prototipo. Il netto non cambia: il
+// prezzo resta il netto, il lordo (prezzo_unitario) si ricava da esso. Lo sconto medio (2 decimali) cade
+// esattamente sulla soglia «da» dell'agenzia (0, 1, 5, 10…): sia «prima soglia ≥» (D-182) sia «ultima
+// soglia ≤» (D-202) scelgono la soglia giusta.
 const r4 = (n: number) => Math.floor(n * 10000) / 10000;
 const importoRiga = (r: any[]) => r2(r[2] * r[3]); // r = [codice, descrizione, qta, prezzo] (netto)
 const importoDoc = (d: any) => r2(d.righe.reduce((s: number, r: any[]) => s + importoRiga(r), 0));

@@ -415,10 +415,22 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 - **Output (già fatto):** impostazione «Raggruppamento» sul fornitore (`documento` predefinito, `riga`) e deroga sulla pratica (null = come il fornitore, motivo obbligatorio) con migrazione `20261116130000_raggruppamento_scaglioni` scritta e non applicata a `decobrands_db`; in modalità `riga` le righe merce si raggruppano per sconto di riga, ogni gruppo prende il suo scaglione e la provvigione è la somma dei gruppi (`provvigioneRiga`, `calcoloDocumento`), con `calcolo.gruppi`, `raggruppamento`/`raggruppamento_da` e pct effettive; regole piatte invariate (correzione, mensile, % agenzia), riga senza prezzo → sconto medio, gruppo oltre l'ultimo scaglione → da decidere, nota per gruppi sulle sue righe; endpoint `PUT /api/pratiche/:id/raggruppamento` e filtro/segno «deroga» nell'elenco; fornitore e pratica nel frontend, guida, prove.
 - **Ore:** 12 h **da approvare** (stima: motore 5 h, migrazione e endpoint 3 h, frontend e guida 2 h, prove 2 h).
 
-#### F7-A24 · Onda del 16/11: scaglioni esatti (fascia o solo sconti esatti) — 6 h **da approvare**
-- **Riferimenti:** §4.2.1, §5.3, D-200, versione 0.2.9
-- **Output (già fatto):** impostazione «Scaglioni» sul fornitore (`scaglioni_esatti`, default false = a fascia) con migrazione `20261116180000_scaglioni_esatti` scritta e non applicata a `decobrands_db`; `scaglione()` esteso a scegliere la soglia esatta (±0,05, costante nel motore) quando il fornitore lo richiede, usato ovunque (anomalie comprese); senza soglia esatta → anomalia e provvigione «da decidere», messaggio proprio; `calcolo` aggiunge `scaglioni_esatti`; il cambio ricalcola solo gli aperti (evento nel registro); il Riepilogo della pratica in modalità riga usa la presa effettiva dei documenti (non più la percentuale unica) e `sconto-medio-ricalcola.ts` usa `anomaliaProvvigione`; fornitore nel frontend, guida, prove.
-- **Ore:** 6 h **da approvare** (stima: motore 2 h, migrazione e server 2 h, frontend e guida 1 h, prove 1 h).
+ #### F7-A24 · Onda del 16/11: scaglioni esatti (fascia o solo sconti esatti) — 6 h **da approvare**
+ - **Riferimenti:** §4.2.1, §5.3, D-200, versione 0.2.9
+ - **Output (già fatto):** impostazione «Scaglioni» sul fornitore (`scaglioni_esatti`, default false = a fascia) con migrazione `20261116180000_scaglioni_esatti` scritta e non applicata a `decobrands_db`; `scaglione()` esteso a scegliere la soglia esatta (±0,05, costante nel motore) quando il fornitore lo richiede, usato ovunque (anomalie comprese); senza soglia esatta → anomalia e provvigione «da decidere», messaggio proprio; `calcolo` aggiunge `scaglioni_esatti`; il cambio ricalcola solo gli aperti (evento nel registro); il Riepilogo della pratica in modalità riga usa la presa effettiva dei documenti (non più la percentuale unica) e `sconto-medio-ricalcola.ts` usa `anomaliaProvvigione`; fornitore nel frontend, guida, prove.
+ - **Ore:** 6 h **da approvare** (stima: motore 2 h, migrazione e server 2 h, frontend e guida 1 h, prove 1 h).
+
+#### F7-A25 · Quota pagata e più righe per la stessa fattura nel bollettino — 8 h **da approvare**
+ - **Riferimenti:** §4.2.10, §5.11, §6.2, §7.7, D-201, versione 0.2.10
+ - **Output (già fatto):** colonna `bollettini_righe.quota_pagata` (DECIMAL(7,4), NULL = 100 %, CHECK 0–100) con migrazione `20261117090000_quota_pagata` scritta e non applicata a `decobrands_db`; il lettore estrae la quota dove il bollettino la porta (Arte «% bezahlt»): schema, prompt, `RigaLetta.quota_pagata`, `componiLetto` e correzione a mano (`RIGA_CAMPI`); `riconcilia` applica la quota all'atteso (provvigione del documento × quota/100, un solo arrotondamento) e raggruppa le righe dello stesso documento (somma contro la nostra unica provvigione, decisione unica per il gruppo, media pesata delle quote, tolleranza 0,01 €, anomalia «quote diverse»); `bollettino.ts` ammette più righe della stessa fattura nello stesso bollettino (il doppione resta solo fra bollettini diversi) e distribuisce l'atteso congelato sulle righe del gruppo; frontend del bollettino con il gruppo e la quota, guida, prove.
+ - **Ore:** 8 h **da approvare** (stima: motore e riconciliazione 3 h, migrazione e lettore 2 h, server e chiusura 2 h, frontend e guida 1 h).
+
+#### F7-A26 · Scaglioni «da soglia in su» come nel vecchio CRM — 5 h **da approvare**
+ - **Riferimenti:** §5.3, D-202, versione 0.2.11
+ - **Output (già fatto):** la soglia torna a valere «da quello sconto in su» (limite inferiore): `motore.ts` sceglie l'ultima soglia ≤ sconto (`scaglione`), `ultimoScaglione` diventa `primaSoglia`, le anomalie «oltre l'ultimo scaglione» diventano «sotto la prima soglia» (backend e messaggi), sconto sopra l'ultima soglia non è più un'anomalia; «solo sconti esatti» (D-200) invariato. Seed riallineato (il lordo delle righe tiene lo sconto medio appena sopra la soglia), frontend (FormPercentuali, VistaFornitori, Riepilogo, guida) e prove.
+ - **Ore:** 5 h **da approvare** (stima: motore e anomalie 2 h, seed e prove 2 h, frontend e guida 1 h).
+
+
 
 ---
 

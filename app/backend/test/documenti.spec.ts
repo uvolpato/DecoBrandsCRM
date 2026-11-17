@@ -726,8 +726,23 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
     const spiaPonte = jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue({ pool: {} as never, schema: 'public' });
     const spiaCerca = jest.spyOn(anagraficaIntegra, 'cerca').mockResolvedValue({ errore: 'ponte lento', ms: 3000 });
     try {
-      await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200);
+      const r = (await op.get('/documenti?stato=da_controllare&per_pagina=200').expect(200)).body;
       expect(spiaCerca).toHaveBeenCalledTimes(1);
+      // D-203: il ponte non ha risposto → la risposta lo dice, la pagina non nasconde i candidati mancanti
+      expect(r.integra).toBe('non_disponibile');
+    } finally {
+      spiaPonte.mockRestore();
+      spiaCerca.mockRestore();
+    }
+  });
+
+  it('il dettaglio dice integra non_disponibile quando il ponte non risponde (D-203)', async () => {
+    const d = await creaArrivo('fornitore-giu.pdf', { tipo: 'ordine', campi: [['fornitore', 'Zeta Inesistente SRL']] });
+    const spiaPonte = jest.spyOn(IntegraService.prototype, 'ponte').mockResolvedValue({ pool: {} as never, schema: 'public' });
+    const spiaCerca = jest.spyOn(anagraficaIntegra, 'cerca').mockResolvedValue({ errore: 'ponte non disponibile', ms: 0 });
+    try {
+      const r = (await op.get(`/documenti/${d.id}`).expect(200)).body;
+      expect(r.integra).toBe('non_disponibile');
     } finally {
       spiaPonte.mockRestore();
       spiaCerca.mockRestore();

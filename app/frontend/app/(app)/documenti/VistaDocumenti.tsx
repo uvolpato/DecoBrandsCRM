@@ -38,6 +38,7 @@ interface Risposta {
   documenti: Documento[];
   conteggi: Record<string, number>;
   totale: number; pagina: number; per_pagina: number; lettura_configurata: boolean;
+  integra?: 'non_disponibile' | null;
 }
 
 export function VistaDocumenti() {
@@ -132,6 +133,9 @@ export function VistaDocumenti() {
             </>
           )}
           <Nota>Si legge un documento ogni 15 secondi.</Nota>
+          {dati?.integra === 'non_disponibile' && (
+            <Nota>Integra non raggiungibile: i candidati da importare non sono aggiornati.</Nota>
+          )}
           {(c?.errore ?? 0) > 0 && (
             <Nota>{c!.errore} {c!.errore === 1 ? 'documento non letto' : 'documenti non letti'} dopo 3 tentativi: aprili per inserire i dati a mano o scartali.</Nota>
           )}

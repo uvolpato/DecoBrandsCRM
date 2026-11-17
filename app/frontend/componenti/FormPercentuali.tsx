@@ -134,6 +134,7 @@ export function FormPercentuali({ idFornitore, ragioneSociale, scaglione = null,
         <div className="campo">
           <label htmlFor="c-sconto">Sconto da %</label>
           <input id="c-sconto" name="sconto_min" type="number" inputMode="decimal" min={0} max={100} value={scontoMin} disabled={scontoFisso} onChange={(e) => setScontoMin(e.target.value)} />
+          <span className="aiuto">Ogni soglia vale da quello sconto in su, fino alla successiva (come nel vecchio CRM). Con «solo sconti esatti» lo sconto deve coincidere con una soglia.</span>
         </div>
         <div className="campo">
           <label htmlFor="c-agente">Provvigione dal fornitore %</label>

@@ -5,7 +5,7 @@
 # (password-di-prova). Il seed deve essere pulito: la prova chiude Gasper agosto e carica un bollettino,
 # quindi va rilanciato il seed dopo.
 # Uso: python strumenti/prove/app_bollettino.py <suffisso> <cartella schermate> [base]
-import sys, pathlib, re
+import sys, pathlib, re, atexit
 from playwright.sync_api import sync_playwright
 
 S, USCITA = sys.argv[1], pathlib.Path(sys.argv[2])
@@ -14,6 +14,14 @@ PW = 'password-di-prova'
 USCITA.mkdir(parents=True, exist_ok=True)
 esiti, errori = [], []
 def ok(c, t): esiti.append(('OK ' if c else 'KO ') + t)
+
+# anche se la prova si ferma su un'attesa, si vedono i controlli fatti fin lì (giro.sh conta OK/KO nell'uscita)
+def riepilogo():
+    print('\n'.join(esiti))
+    print('errori della pagina:', errori or 'nessuno')
+    print(f"{len(esiti)} controlli, {sum(e.startswith('KO') for e in esiti)} KO")
+atexit.register(riepilogo)
+
 def numero(testo):
     return float(re.sub(r'[^\d,-]', '', testo).replace('.', '').replace(',', '.'))
 
@@ -128,6 +136,8 @@ with sync_playwright() as p:
     ok(tot(pg, '.cerniera-riepilogo .lato b') == 1918.50 and tot(pg, '.cerniera-riepilogo .lato.destro b') == 1951.20
        and tot(pg, '.cerniera-riepilogo .cucitura b') == -32.70, 'Gries luglio: totali 1.918,50 / 1.951,20 / -32,70')
     ok(n_gruppo(pg, 'Da decidere') == 1 and n_gruppo(pg, 'Quadrano') == 1, 'Gries luglio: 1 da decidere, 1 che quadra')
+    # D-201 §19: la quota pagata compare solo se almeno una riga la porta (il seed non ne ha)
+    ok('quota ' not in pg.locator('.cerniera').inner_text(), 'nessuna quota pagata mostrata: il bollettino non porta la colonna')
     ok('Manca 1 riga da decidere' in testo(pg, '.barra-decisione')
        and pg.locator('.barra-decisione button:has-text("Segna come verificato")').first.is_disabled(),
        'azione proposta: riga da decidere, chiusura spenta e righe mancanti indicate')
@@ -143,12 +153,13 @@ with sync_playwright() as p:
     campo = apri_abbina(pg, diff)
     ok(pg.locator('.velo .ricerca-menu li[role=option]').count() >= 3,
        'abbinamento: l\'elenco arriva dal server con i documenti del fornitore di ogni mese')
-    campo.fill('F-2026-0891'); pg.wait_for_timeout(300)
-    ok('già sul bollettino 7/2026' in testo(pg, '.velo .ricerca-menu'), 'il documento già usato lo dice nell\'elenco')
-    scegli(pg, 'F-2026-0891')
+    # D-201 §19: il 409 resta solo per un documento su un ALTRO bollettino (F-2026-0840 è su Gries 6/2026)
+    campo.fill('F-2026-0840'); pg.wait_for_timeout(300)
+    ok('già sul bollettino 6/2026' in testo(pg, '.velo .ricerca-menu'), 'il documento già usato lo dice nell\'elenco')
+    scegli(pg, 'F-2026-0840')
     pg.click('.velo .modale-piede button:has-text("Abbina")')
     pg.wait_for_selector('.modulo-errore:not([hidden])')
-    ok('già sulla riga' in testo(pg, '.modulo-errore'), 'abbinamento a un documento già usato: il 409 del server si vede')
+    ok('già sulla riga' in testo(pg, '.modulo-errore'), 'abbinamento a un documento di un altro bollettino: il 409 del server si vede')
     pg.click('.velo .modale-piede button:has-text("Annulla")'); pg.wait_for_timeout(300)
 
     # contesta con motivo, poi prepara la contestazione (testo dal server, copia e .txt)
@@ -183,6 +194,22 @@ with sync_playwright() as p:
        and not pg.locator('.barra-decisione button:has-text("Segna come verificato")').first.is_disabled()
        and pg.locator('.barra-decisione button:has-text("Prepara la contestazione")').count() == 0,
        'dopo la decisione la verifica è attiva e non c\'è nulla da contestare')
+
+    # D-201 §19: nello stesso bollettino due righe sulla stessa fattura vanno sullo stesso documento e formano
+    # il gruppo (nessun 409, che resta fra bollettini diversi): una riga a schermo con il dettaglio sotto.
+    riga_testo(pg, 'F-2026-0912').locator('button', has_text='Annulla').first.click(); attesa(pg)
+    abbina(pg, riga_testo(pg, 'F-2026-0912'), 'F-2026-0891')
+    attesa(pg)
+    gruppi_dopo = (n_gruppo(pg, 'Quadrano'), n_gruppo(pg, 'Da decidere'))
+    righe_dopo = pg.locator('.c-riga').count()
+    testo_dopo = testo(pg, '.c-riga') if righe_dopo else ''
+    # le due righe del gruppo stanno nel dettaglio sotto la riga (Playwright ignora gli spazi, anche quello
+    # unificatore prima dell'euro che l'assert con `in` non vedrebbe)
+    gruppo_riga = pg.locator('.c-riga', has_text='774,00 € al 5%').filter(has_text='1.144,50 € al 17,5%')
+    ok(pg.locator('.modulo-errore:not([hidden])').count() == 0 and gruppi_dopo == (0, 1)
+       and gruppo_riga.count() == 1,
+       'abbinata a un documento dello stesso bollettino: le due righe formano un gruppo, senza errore '
+       '(quadrano/da decidere %s, %d righe, «%s»)' % (gruppi_dopo, righe_dopo, testo_dopo.replace('\n', ' | ')))
     pg.close()
 
     # --- Gasper agosto: mancante, abbinamento D→E, chiusura verificato ---
@@ -228,9 +255,9 @@ with sync_playwright() as p:
     attesa(pg)
     ok(pg.locator('.c-riga', has_text='F-2026-0921').filter(has_text='manca nel bollettino').count() == 1,
        'abbinamento a un documento di un altro mese: funziona e il vecchio torna mancante')
-    con_abbina = pg.locator('.c-riga', has_text='F-2026-0921').filter(
-        has=pg.locator('button', has_text='Abbina il documento')).first
-    abbina(pg, con_abbina, 'F-2026-0921')
+    # una riga mancante non ha il pulsante (non è una riga del bollettino): si torna indietro abbinando la riga
+    # che ora punta a NC-2026-007 alla sua fattura
+    abbina(pg, riga_testo(pg, 'NC-2026-007'), 'F-2026-0921')
     attesa(pg)
     ok(n_gruppo(pg, 'Da decidere') == 1 and n_gruppo(pg, 'Quadrano') == 1,
        'tornando al documento giusto la riga quadra di nuovo')
@@ -341,6 +368,3 @@ with sync_playwright() as p:
     b.close()
 
 ok(not errori, 'nessun errore JavaScript')
-print('\n'.join(esiti))
-print('errori della pagina:', errori or 'nessuno')
-print(f"{len(esiti)} controlli, {sum(e.startswith('KO') for e in esiti)} KO")

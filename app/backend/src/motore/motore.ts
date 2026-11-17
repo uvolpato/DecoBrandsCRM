@@ -175,37 +175,39 @@ function soglieInVigore(S: Pick<Dati, 'scaglioni'>, fornitore_id: string, data: 
   return [...perSoglia.values()];
 }
 
-/** Scaglione in vigore alla data: il primo (più basso) ≥ sconto medio (D-182 §19); se il fornitore ha
- *  `scaglioni_esatti` (D-200 §19) vale solo la soglia con |sconto − soglia| ≤ 0,05 punti (tolleranza per
- *  gli arrotondamenti). Senza soglia (sconto oltre l'ultima, o nessun esatto) → null: la provvigione
- *  resta «da decidere», mai calcolata su uno scaglione inventato. */
+/** Scaglione in vigore alla data (D-202 §19): la soglia è «Sconto da %» (limite inferiore), vale
+ *  l'ultima (più alta) soglia ≤ sconto; sotto la prima soglia (tabella senza 0) → null. Se il fornitore
+ *  ha `scaglioni_esatti` (D-200 §19) vale solo la soglia con |sconto − soglia| ≤ 0,05 punti (tolleranza
+ *  per gli arrotondamenti). Senza soglia → null: la provvigione resta «da decidere», mai su uno scaglione inventato. */
 const TOLLERANZA_SCAGLIONE_ESATTO = new Dec('0.05'); // D-200 §19
 export function scaglione(S: Pick<Dati, 'scaglioni'> & { fornitori?: Dati['fornitori'] }, fornitore_id: string, sconto: Dec, data: string) {
   const soglie = soglieInVigore(S, fornitore_id, data).sort((a, b) => a.sconto.comparedTo(b.sconto));
   if (S.fornitori?.get(fornitore_id)?.scaglioni_esatti) {
     return soglie.find((s) => s.sconto.minus(sconto).abs().lte(TOLLERANZA_SCAGLIONE_ESATTO)) ?? null;
   }
-  return soglie.filter((s) => s.sconto.gte(sconto))[0] ?? null;
+  // D-202 §19: la soglia vale da quello sconto in su, fino alla successiva (limite inferiore)
+  const valide = soglie.filter((s) => s.sconto.lte(sconto));
+  return valide[valide.length - 1] ?? null;
 }
 
-/** L'ultimo (più alto) scaglione del fornitore in vigore alla data, o null se non ce n'è. */
-export function ultimoScaglione(S: Pick<Dati, 'scaglioni'>, fornitore_id: string, data: string) {
-  return soglieInVigore(S, fornitore_id, data).sort((a, b) => b.sconto.comparedTo(a.sconto))[0] ?? null;
+/** La prima (più bassa) soglia del fornitore in vigore alla data, o null se non ce n'è (D-202). */
+export function primaSoglia(S: Pick<Dati, 'scaglioni'>, fornitore_id: string, data: string) {
+  return soglieInVigore(S, fornitore_id, data).sort((a, b) => a.sconto.comparedTo(b.sconto))[0] ?? null;
 }
 
-/** Sconto medio senza scaglione: anomalia (D-182 §19, D-200 §19). null se non c'è o lo sconto medio è
- *  ignoto (si usa lo sconto dell'agenzia). A fascia è lo sconto oltre l'ultimo scaglione; con
+/** Sconto medio senza scaglione: anomalia (D-182 §19, D-200 §19, D-202 §19). null se non c'è o lo sconto
+ *  medio è ignoto (si usa lo sconto dell'agenzia). A fascia è lo sconto sotto la prima soglia; con
  *  `scaglioni_esatti` ogni sconto senza soglia esatta (±0,05). Il numero è quello del documento che comanda. */
 export function anomaliaScontoMedio(S: Pick<Dati, 'scaglioni'> & { fornitori?: Dati['fornitori'] }, p: Pratica) {
   const sm = scontoMedio(p);
   if (sm == null) return null;
   const data = p.documenti[p.documenti.length - 1]?.data ?? p.data;
-  const ultimo = ultimoScaglione(S, p.fornitore_id, data);
-  if (!ultimo) return null; // nessuno scaglione: non è un'anomalia di sconto medio (D-113)
+  const prima = primaSoglia(S, p.fornitore_id, data);
+  if (!prima) return null; // nessuno scaglione: non è un'anomalia di sconto medio (D-113)
   if (scaglione(S, p.fornitore_id, sm, data)) return null; // a fascia o esatto: c'è uno scaglione
   const comanda = p.documenti.length ? p.documenti[p.documenti.length - 1].numero
     : p.proforma.length ? p.proforma[0].numero : p.conferme.length ? p.conferme[0].numero : p.ordini[0]?.numero ?? p.numero;
-  return { pratica_id: p.id, numero: p.numero, documento: comanda, sconto_medio: sm, ultimo_scaglione: ultimo.sconto };
+  return { pratica_id: p.id, numero: p.numero, documento: comanda, sconto_medio: sm, prima_soglia: prima.sconto };
 }
 
 /** Chi segue il cliente su quel fornitore alla data del documento (D-35). */
@@ -302,7 +304,7 @@ export function quotaSub(S: Dati, p: Pratica, d: Documento, base?: Dec) {
   if (raggruppamentoDi(S, p).raggruppamento === 'riga' && d.righe?.length) {
     const r = provvigioneRiga(S, p, d);
     if (r) {
-      if (r.sub == null) return null; // gruppo oltre l'ultimo scaglione: da decidere
+      if (r.sub == null) return null; // gruppo sotto la prima soglia: da decidere
       return { pct: r.pct_sub ?? ZERO, provvigione: base != null ? quota(base, r.pct_sub ?? ZERO) : r.sub, regola: 'riga', vale: null, eccezione: r.eccezione };
     }
     // r == null (riga merce senza prezzo) → si ricade nello sconto medio (sotto)
@@ -380,44 +382,44 @@ const eccezioneSu = (S: Dati, p: Pratica, subagente_id: string, sconto: Dec, dat
   S.eccezioni.find((e) => e.fornitore_id === p.fornitore_id && e.subagente_id === subagente_id && e.sconto.equals(sconto)
     && e.valido_dal <= data && (!e.valido_al || data < e.valido_al));
 
-/** Anomalia in modalità riga (D-199 §19): un gruppo di righe con sconto oltre l'ultimo scaglione del
- *  fornitore (o senza soglia esatta, D-200 §19) → provvigione «da decidere». Controlla i documenti fiscali (le note sulle loro righe). */
+/** Anomalia in modalità riga (D-199 §19, D-202 §19): un gruppo di righe con sconto sotto la prima soglia
+ *  del fornitore (o senza soglia esatta, D-200 §19) → provvigione «da decidere». Controlla i documenti fiscali (le note sulle loro righe). */
 export function anomaliaGruppo(S: Pick<Dati, 'scaglioni'> & { fornitori?: Dati['fornitori'] }, p: Pratica) {
   for (const d of p.documenti) {
     if (!d.righe?.length) continue;
     for (const r of d.righe) {
-      if (r.spesa) continue; // le spese hanno sconto 0, mai oltre l'ultimo scaglione
+      if (r.spesa) continue; // le spese hanno sconto 0, sempre nella prima soglia
       const s = scontoRiga(r);
       if (s == null) continue; // riga merce senza prezzo: il documento torna allo sconto medio
       if (!scaglione(S, p.fornitore_id, s, d.data)) {
-        return { pratica_id: p.id, numero: p.numero, documento: d.numero, sconto_gruppo: s, ultimo_scaglione: ultimoScaglione(S, p.fornitore_id, d.data)?.sconto ?? null };
+        return { pratica_id: p.id, numero: p.numero, documento: d.numero, sconto_gruppo: s, prima_soglia: primaSoglia(S, p.fornitore_id, d.data)?.sconto ?? null };
       }
     }
   }
   return null;
 }
 
-/** Anomalia della provvigione della pratica (D-182 §19, D-199 §19): in modalità documento lo sconto
- *  medio oltre l'ultimo scaglione; in modalità riga un gruppo oltre l'ultimo scaglione (lo sconto medio
+/** Anomalia della provvigione della pratica (D-182 §19, D-199 §19, D-202 §19): in modalità documento lo
+ *  sconto medio sotto la prima soglia; in modalità riga un gruppo sotto la prima soglia (lo sconto medio
  *  non comanda). null se la pratica è a posto. */
 export function anomaliaProvvigione(S: Dati, p: Pratica) {
   return raggruppamentoDi(S, p).raggruppamento === 'riga' ? anomaliaGruppo(S, p) : anomaliaScontoMedio(S, p);
 }
 
-/** Descrizione dell'anomalia di provvigione di una pratica (D-199 §19, D-200 §19) per i messaggi di
- *  blocco alla chiusura: distingue sconto medio, gruppo oltre l'ultimo scaglione e senza scaglione esatto. */
+/** Descrizione dell'anomalia di provvigione di una pratica (D-199 §19, D-200 §19, D-202 §19) per i messaggi
+ *  di blocco alla chiusura: distingue sconto medio, gruppo sotto la prima soglia e senza scaglione esatto. */
 export function descrizioneAnomalia(S: Dati, p: Pratica): string | null {
   const a = anomaliaProvvigione(S, p);
   if (!a) return null;
   const esatti = S.fornitori.get(p.fornitore_id)?.scaglioni_esatti ?? false;
   if ('sconto_gruppo' in a) {
-    return esatti ? 'un gruppo senza scaglione esatto' : 'un gruppo oltre l\'ultimo scaglione';
+    return esatti ? 'un gruppo senza scaglione esatto' : 'un gruppo sotto la prima soglia';
   }
-  return esatti ? 'lo sconto medio senza scaglione esatto' : 'lo sconto medio oltre l\'ultimo scaglione';
+  return esatti ? 'lo sconto medio senza scaglione esatto' : 'lo sconto medio sotto la prima soglia';
 }
 
-/** Provvigione di un documento in modalità riga (D-199 §19): le righe merce si raggruppano per sconto,
- *  ogni gruppo prende il suo scaglione (primo ≥, come oggi) e la provvigione è la somma dei gruppi.
+/** Provvigione di un documento in modalità riga (D-199 §19, D-202 §19): le righe merce si raggruppano per
+ *  sconto, ogni gruppo prende il suo scaglione (ultima soglia ≤ sconto) e la provvigione è la somma dei gruppi.
  *  Stessa cosa per la quota del subagente (eccezione personale sulla soglia del gruppo, D-51); la
  *  correzione, la regola mensile e la % dell'agenzia restano piatte e vincono (precedenza invariata, D-27).
  *  null se una riga merce è senza quantità o prezzo: il documento torna allo sconto medio. */
@@ -425,7 +427,7 @@ function provvigioneRiga(S: Dati, p: Pratica, d: Documento): {
   base: Dec; gruppi: GruppoRiga[]; agente: Dec | null; sub: Dec | null; pct_agente: Dec | null; pct_sub: Dec | null; eccezione: boolean;
 } | null {
   // D-199: qui si parte dall'abbinamento, non da percentuali (che tornerebbe null con lo sconto medio
-  // oltre l'ultimo scaglione anche se i singoli gruppi hanno il loro scaglione).
+  // sotto la prima soglia anche se i singoli gruppi hanno il loro scaglione).
   const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
   if (!ab) return null;
   const escludeSpese = !S.fornitori.get(p.fornitore_id)?.spese_base_provvigione;
@@ -455,7 +457,7 @@ function provvigioneRiga(S: Dati, p: Pratica, d: Documento): {
       provvigione_agente: quota(b, sc.pct_agente).toFixed(2), provvigione_sub: quota(b, pctSub).toFixed(2),
     };
   });
-  const oltre = gruppi.some((g) => g.scaglione == null); // un gruppo oltre l'ultimo scaglione → da decidere
+  const oltre = gruppi.some((g) => g.scaglione == null); // un gruppo sotto la prima soglia → da decidere
   const agente = oltre ? null : r2(somma(gruppi.map((g) => new Dec(g.provvigione_agente!))));
   const sub = oltre ? null : piatta ? piatta.provvigione : r2(somma(gruppi.map((g) => new Dec(g.provvigione_sub!))));
   const pct = (tot: Dec | null) => (tot == null || base.isZero() ? null : r2(tot.div(base).times(100)));
@@ -538,7 +540,7 @@ export function calcoloDocumento(S: Dati, p: Pratica, d: Documento): CalcoloDocu
 /** Valori effettivi della provvigione di un documento (D-199 §19, D-183, D-197): il punto unico letto
  *  da liquidazione, Analisi e bollettini. Congelato → il `calcolo` salvato; aperto → il calcolo corrente
  *  (per gruppi in modalità `riga`, con lo sconto medio in `documento`). `agente`/`sub` null quando la
- *  provvigione è «da decidere» (sconto oltre l'ultimo scaglione). */
+ *  provvigione è «da decidere» (sconto sotto la prima soglia). */
 export function provvigioneDocumento(S: Dati, p: Pratica, d: Documento) {
   const c = d.congelato_il && d.calcolo ? d.calcolo : calcoloDocumento(S, p, d);
   return {
@@ -573,11 +575,90 @@ export const righeBollettinoDi = (S: Dati, d: Documento, fornitore_id: string) =
 
 type Lato = { imponibile: Dec | null; pct: Dec | null; importo: Dec };
 type Decisione = NonNullable<RigaBollettino['decisione']>;
-/** Riconciliazione riga per riga: fornitore (loro) contro calcolo del CRM (noi). */
+/** Quota pagata di una riga del bollettino: null = 100 % (i bollettini senza la colonna, D-201 §19). */
+const quotaDi = (r: RigaBollettino) => r.quota_pagata ?? new Dec(100);
+/** Quota del gruppo di righe dello stesso documento (D-201 §19): media pesata sugli importi del
+ *  bollettino (Σ Betrag × quota / Σ Betrag). null se nessuna riga porta la quota (comportamento di oggi). */
+function quotaGruppo(rr: RigaBollettino[]): Dec | null {
+  if (rr.every((r) => r.quota_pagata == null)) return null;
+  let num = ZERO, den = ZERO;
+  for (const r of rr) {
+    const betrag = r.imponibile ?? ZERO;
+    num = num.plus(betrag.times(quotaDi(r)));
+    den = den.plus(betrag);
+  }
+  return den.isZero() ? new Dec(100) : num.div(den);
+}
+/** Quote che differiscono di più di 0,01 punti nello stesso gruppo: anomalia «quote diverse» (D-201 §19). */
+function quoteDiverse(rr: RigaBollettino[]): boolean {
+  if (rr.length < 2) return false;
+  const quote = rr.map(quotaDi);
+  const min = quote.reduce((a, q) => (q.lt(a) ? q : a));
+  const max = quote.reduce((a, q) => (q.gt(a) ? q : a));
+  return max.minus(min).gt(new Dec('0.01'));
+}
+// D-201 §19: differenza ≤ 0,01 € per fattura → quadra (il calcolo del CRM è una previsione)
+const TOLLERANZA_QUOTA = new Dec('0.01');
+/** Una voce della riconciliazione: una riga del fornitore, un gruppo di righe dello stesso documento
+ *  (D-201 §19) o un documento che manca nel bollettino. */
+type RigaRiconcilia = {
+  id: string | null; documento_id: string | null; numero: string; data: string | null; pratica_id: string | null; cliente_id: string | null; tipo: string | null;
+  loro: Lato | null; noi: Lato | null; differenza: Dec | null;
+  categoria: string; incasso: boolean; pagamento: boolean; pagata_in: string | null; giorni: number | null;
+  decisione: Decisione | null;
+  righe: { id: string | null; importo: Dec; pct: Dec | null; quota: Dec | null }[];
+  quota: Dec | null; quote_diverse: boolean;
+};
+/** Riconciliazione riga per riga: fornitore (loro) contro calcolo del CRM (noi). Le righe del fornitore
+ *  dello stesso documento formano un gruppo (D-201): la differenza, la categoria e la decisione valgono
+ *  per il gruppo, che a schermo si mostra come una riga con il dettaglio delle righe sotto. */
 export function riconcilia(S: Dati, b: Bollettino) {
   const f = S.fornitori.get(b.fornitore_id)!, maturato = f.maturazione === 'maturato', meseB = aaaamm(b.anno, b.mese);
   const nostri = fiscaliDelMese(S, b.fornitore_id, meseB);
-  const righe = b.righe.map((r) => {
+  // provvigioni raggruppate per documento; sconosciute, storni e riaccrediti restano righe a sé (D-201)
+  const perDoc = new Map<string, { n: { pratica: Pratica; doc: Documento }; righe: RigaBollettino[] }>();
+  const singole: RigaBollettino[] = [];
+  for (const r of b.righe) {
+    const n = r.documento_id ? documentoPerId(S, r.documento_id) : (nostri.find((x) => x.doc.numero === r.numero) ?? trovaDocumento(S, r.numero, b.fornitore_id, r.data, fineMese(b.anno, b.mese)));
+    if (!n || r.tipo) { singole.push(r); continue; }
+    const g = perDoc.get(n.doc.id);
+    if (g) g.righe.push(r); else perDoc.set(n.doc.id, { n, righe: [r] });
+  }
+  const righe: RigaRiconcilia[] = [...perDoc.values()].map(({ n, righe: rr }) => {
+    const r0 = rr[0];
+    const loro: Lato = { imponibile: rr.some((r) => r.imponibile == null) ? null : r2(somma(rr.map((r) => r.imponibile!))), pct: rr.length === 1 ? rr[0].pct : null, importo: r2(somma(rr.map((r) => r.importo))) };
+    const riga = {
+      id: r0.id as string | null, documento_id: n.doc.id,
+      numero: n.doc.numero, data: n.doc.data, pratica_id: n.pratica.id, cliente_id: n.pratica.cliente_id, tipo: n.doc.tipo,
+      loro, noi: null as Lato | null, differenza: null as Dec | null,
+      categoria: 'sconosciuta', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
+      decisione: (rr.find((r) => r.decisione)?.decisione ?? null) as Decisione | null,
+      // D-201 §19: il dettaglio delle righe del bollettino del gruppo e la sua quota
+      righe: rr.map((r) => ({ id: r.id, importo: r.importo, pct: r.pct, quota: r.quota_pagata })),
+      quota: quotaGruppo(rr), quote_diverse: quoteDiverse(rr),
+    };
+    // D-199 §19: la provvigione attesa è quella effettiva del documento (gruppi in modalità riga,
+    // differenza della coppia D-197 in documento, valori fissati se congelato).
+    const v = provvigioneDocumento(S, n.pratica, n.doc);
+    const pct = v.pct_agente ?? ZERO;
+    const imp = baseDoc(n.doc);
+    const congelato = rr.some((r) => r.importo_calcolato != null);
+    // D-201 §19: nostro atteso = provvigione del documento × quota/100, un solo arrotondamento al
+    // centesimo; senza quota resta il valore di oggi (v.agente). Congelato = valori fissati alla verifica.
+    const atteso = congelato
+      ? r2(somma(rr.map((r) => r.importo_calcolato ?? ZERO)))
+      : riga.quota == null ? (v.agente ?? ZERO) : r2(v.base.times(pct).div(100).times(riga.quota).div(100));
+    const pctEffettiva = imp.isZero() ? ZERO : r2(atteso.div(imp).times(100));
+    riga.noi = congelato
+      ? { imponibile: imp, pct: rr.find((r) => r.pct_calcolata != null)?.pct_calcolata ?? pctEffettiva, importo: atteso }
+      : { imponibile: imp, pct: pctEffettiva, importo: atteso };
+    riga.differenza = r2(rr.reduce((s, r) => s.plus(r.importo), ZERO).minus(atteso));
+    riga.categoria = riga.differenza.abs().lte(TOLLERANZA_QUOTA) && (loro.imponibile == null || loro.imponibile.equals(imp)) ? 'quadra' : 'differenza';
+    // maturato: fattura di un mese precedente riconosciuta nel mese in cui il cliente ha pagato
+    riga.pagamento = riga.categoria === 'quadra' && n.doc.data.slice(0, 7) < meseB && maturato;
+    return riga;
+  });
+  for (const r of singole) {
     const n = r.documento_id ? documentoPerId(S, r.documento_id) : (nostri.find((x) => x.doc.numero === r.numero) ?? trovaDocumento(S, r.numero, b.fornitore_id, r.data, fineMese(b.anno, b.mese)));
     const riga = {
       id: r.id as string | null, documento_id: n?.doc.id ?? null,
@@ -585,29 +666,18 @@ export function riconcilia(S: Dati, b: Bollettino) {
       loro: { imponibile: r.imponibile, pct: r.pct, importo: r.importo } as Lato | null, noi: null as Lato | null, differenza: null as Dec | null,
       categoria: 'sconosciuta', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
       decisione: r.decisione as Decisione | null,
+      righe: [{ id: r.id, importo: r.importo, pct: r.pct, quota: r.quota_pagata }], quota: null as Dec | null, quote_diverse: false,
     };
-    if (!n) return riga;
-    // D-199 §19: la provvigione attesa è quella effettiva del documento (gruppi in modalità riga,
-    // differenza della coppia D-197 in documento, valori fissati se congelato).
+    if (!n) { righe.push(riga); continue; }
     const v = provvigioneDocumento(S, n.pratica, n.doc);
     const pct = v.pct_agente ?? ZERO;
-    if (r.tipo) {
-      // §5.14: storno (il cliente non ha pagato) e riaccredito (ha pagato) sul fatturato: non sono differenze da decidere
-      const imp = r.tipo === 'storno' ? baseDoc(n.doc).neg() : baseDoc(n.doc);
-      riga.noi = { imponibile: imp, pct, importo: quota(imp, pct) };
-      riga.differenza = r2(r.importo.minus(riga.noi.importo));
-      riga.categoria = r.tipo; riga.incasso = true;
-      return riga;
-    }
-    const imp = baseDoc(n.doc);
-    // mese verificato: valgono i valori congelati (§5.11)
-    riga.noi = r.importo_calcolato != null ? { imponibile: imp, pct: r.pct_calcolata, importo: r.importo_calcolato } : { imponibile: imp, pct, importo: v.agente ?? ZERO };
+    // §5.14: storno (il cliente non ha pagato) e riaccredito (ha pagato) sul fatturato: non sono differenze da decidere
+    const imp = r.tipo === 'storno' ? baseDoc(n.doc).neg() : baseDoc(n.doc);
+    riga.noi = { imponibile: imp, pct, importo: quota(imp, pct) };
     riga.differenza = r2(r.importo.minus(riga.noi.importo));
-    riga.categoria = riga.differenza.isZero() && r.imponibile?.equals(imp) ? 'quadra' : 'differenza';
-    // maturato: fattura di un mese precedente riconosciuta nel mese in cui il cliente ha pagato
-    riga.pagamento = riga.categoria === 'quadra' && n.doc.data.slice(0, 7) < meseB && maturato;
-    return riga;
-  });
+    riga.categoria = r.tipo ?? 'differenza'; riga.incasso = !!r.tipo;
+    righe.push(riga);
+  }
   for (const x of nostri.filter((x) => !b.righe.some((r) => suDocumento(S, b, r, x.doc)))) {
     // D-199 §19: l'atteso della nota su fattura congelata (D-197) e i gruppi in modalità riga sono già dentro `provvigioneDocumento`
     const v = provvigioneDocumento(S, x.pratica, x.doc);
@@ -620,6 +690,7 @@ export function riconcilia(S: Dati, b: Bollettino) {
       loro: null as Lato | null, noi: { imponibile: baseDoc(x.doc), pct: v.pct_agente ?? ZERO, importo: atteso } as Lato | null, differenza: atteso.neg() as Dec | null,
       categoria: 'mancante', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
       decisione: attesa?.decisione ?? null,
+      righe: [] as { id: string | null; importo: Dec; pct: Dec | null; quota: Dec | null }[], quota: null as Dec | null, quote_diverse: false,
     };
     // maturato (§5.14): una fattura assente non è "mancante": il cliente non ha ancora pagato
     if (maturato && x.doc.tipo === 'fattura') {
@@ -698,7 +769,7 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
     const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
     if (!ab) return null;
     const q = quotaSub(S, p, d);
-    // D-199 §19: gruppo oltre l'ultimo scaglione → provvigione da decidere, il documento non si liquida
+    // D-199 §19: gruppo sotto la prima soglia → provvigione da decidere, il documento non si liquida
     if (!q) return null;
     // D-197 §19: la differenza della coppia nota/fattura congelata vale solo in modalità documento
     // (in riga il calcolo è lineare, come `calcoloDocumento` e `riconcilia`)
@@ -721,7 +792,7 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
   };
   for (const p of S.pratiche) for (const d of p.documenti) {
     const r = riga(p, d, 1);
-    if (!r) continue; // provvigione da decidere (gruppo oltre l'ultimo scaglione)
+    if (!r) continue; // provvigione da decidere (gruppo sotto la prima soglia)
     if (S.fornitori.get(p.fornitore_id)!.maturazione === 'maturato') {
       // maturato→maturato (§5.14): entra nel trimestre del bollettino che la riconosce (il mese in cui il cliente paga)
       // D-118 §19: sul maturato la nota di credito segue la sua fattura (entra col suo riconoscimento)

@@ -47,6 +47,7 @@ export interface RigaLetta {
   numero_fattura: string | null;
   data_fattura: string | null;
   provvigione: number | null;
+  quota_pagata: number | null; // % pagata della fattura nel bollettino (es. «% bezahlt»); null se non c'è la colonna
   /** True se la riga è una spesa (trasporto, imballo, «Fracht») e non un articolo: si copia come riga ma non è merce. */
   spesa?: boolean | null;
 }
@@ -249,6 +250,7 @@ function componiLetto(tipo: string | null, fornitore_id: bigint | null, m: Map<s
       codice: valore(p + 'codice'), descrizione: valore(p + 'descrizione'),
       quantita, prezzo, importo, sconto: num(valore(p + 'sconto')),
       numero_fattura: valore(p + 'numero_fattura'), data_fattura: dataValida(valore(p + 'data_fattura')), provvigione: num(valore(p + 'provvigione')),
+      quota_pagata: num(valore(p + 'quota_pagata')),
       spesa: bool(valore(p + 'spesa')),
     };
     if (Object.values(r).every((x) => x == null)) break;

@@ -38,13 +38,11 @@ const fornitore = (inizio: string) => [...S.fornitori.values()].find((f) => f.no
 const TRIMESTRI = [2025, 2026].flatMap((a) => [1, 2, 3, 4].map((t) => [a, t] as const));
 
 describe('motore §10 = prototipo', () => {
-  it('scaglioni Gries 0/1/5/10/100 % e versioni datate (D-25)', () => {
-    // D-182: il primo scaglione ≥ sconto (3,5 → 5; 7 → 10; 50 → 100)
-    const attesi: [number, number, number][] = [[0, 18, 10], [1, 18, 0], [3, 13, 7], [5, 13, 7], [7, 5, 2], [10, 5, 2], [50, 0, 0], [100, 0, 0]];
+  it('scaglioni Gries 0/1/5/10/100 % e versioni datate (D-25, D-202)', () => {
+    // D-202: l'ultima soglia ≤ sconto (da soglia in su): 3 → 1; 7 → 5; 50 → 10
+    const attesi: [number, number, number][] = [[0, 18, 10], [1, 18, 0], [3, 18, 0], [5, 13, 7], [7, 13, 7], [10, 5, 2], [50, 5, 2], [100, 0, 0]];
     for (const [sconto, agente, sub] of attesi) {
       const sc = m.scaglione(S, fornitore('Gries').id, dec(sconto), OGGI)!;
-      const p = M.scaglione(1, sconto, OGGI);
-      expect([sconto, n(sc.pct_agente), n(sc.pct_sub)]).toEqual([sconto, p.pct_agente, p.pct_sub]);
       expect([sconto, n(sc.pct_agente), n(sc.pct_sub)]).toEqual([sconto, agente, sub]);
     }
     // nuova versione dello scaglione 0 dal 01/09/2026: i documenti di prima restano al 18 + 10

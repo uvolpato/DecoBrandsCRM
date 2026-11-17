@@ -27,7 +27,7 @@ const CATEG: Record<string, string> = {
   attesa_incasso: 'non ancora pagata dal cliente', pagata_dopo: 'pagata dopo',
 };
 
-interface Lato { imponibile: number; pct: number; importo: number }
+interface Lato { imponibile: number; pct: number | null; importo: number }
 interface Riga {
   id: string | null; documento_id: string | null; numero: string; data: string | null; tipo: string | null;
   pratica_id: string | null; cliente_id: string | null; cliente: string | null;
@@ -37,6 +37,9 @@ interface Riga {
   pagata_in: { id: string; mese: number; anno: number } | null;
   decisione: { esito: 'accettato' | 'contestato' | 'attendere'; motivo: string | null; da: string | null; da_nome?: string | null; il: string | null } | null;
   scelte: string[];
+  // D-201 §19: il dettaglio delle righe del bollettino (gruppo) e la quota pagata
+  righe: { id: string | null; importo: number; pct: number | null; quota: number | null }[];
+  quota: number | null; quote_diverse: boolean;
 }
 interface Dettaglio {
   id: string; fornitore_id: string; fornitore: string; maturazione: string; mese: number; anno: number;
@@ -230,9 +233,13 @@ export function VistaBollettino({ id }: { id: string }) {
         {x.pagamento && x.data ? ` · fattura di ${MESI_BREVI[Number(x.data.slice(5, 7)) - 1]}, il cliente ha pagato questo mese` : ''}
         {x.decisione?.motivo ? <><br />Motivo: {x.decisione.motivo}</> : null}
         {x.decisione ? <><br />Decisa da {x.decisione.da_nome ?? 'un utente'}{x.decisione.il ? ' il ' + data(x.decisione.il) : ''}</> : null}
+        {x.righe.length > 1 && <>
+          <br /><span className="testo-tenue">{x.righe.map((r) => euro(r.importo) + (r.pct != null ? ' al ' + pct(r.pct) : '') + (r.quota != null ? ' · quota ' + pct(r.quota) : '')).join(' · ')}</span>
+        </>}
+        {x.quote_diverse && <><br /><span className="testo-tenue">Quote pagate diverse nel gruppo</span></>}
       </>,
-      sinistra: x.loro ? { importo: x.loro.importo, dett: pct(x.loro.pct) + ' di ' + euro(x.loro.imponibile) } : null,
-      destra: x.noi ? { importo: x.noi.importo, dett: pct(x.noi.pct) + ' di ' + euro(x.noi.imponibile) } : null,
+      sinistra: x.loro ? { importo: x.loro.importo, dett: (x.quota != null ? 'quota ' + pct(x.quota) + ' · ' : '') + (x.loro.pct != null ? pct(x.loro.pct) + ' di ' + euro(x.loro.imponibile) : euro(x.loro.imponibile)) } : null,
+      destra: x.noi ? { importo: x.noi.importo, dett: x.noi.pct != null ? pct(x.noi.pct) + ' di ' + euro(x.noi.imponibile) : euro(x.noi.imponibile) } : null,
       differenza: x.differenza ?? 0, // D-126 §19: la differenza arriva dal server, non si calcola qui (V12)
       quadra: x.categoria === 'quadra' || x.incasso,
       esito: x.incasso ? esitoIncasso(x) : esitoDecisione,

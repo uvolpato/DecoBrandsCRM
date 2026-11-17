@@ -169,6 +169,8 @@ interface Dettaglio {
   piva_da_salvare: { ruolo: 'cliente' | 'fornitore'; soggetto_id: string; ragione_sociale: string; piva: string }[];
   // D-175: corrispondenza codice cliente ↔ cliente associato, calcolata dal server (spunta/avviso)
   codice_cliente_esito: { stato: 'assente' | 'corrisponde' | 'altro_cliente' | 'senza_agenzia' | 'da_confermare'; cliente?: string | null; fornitore?: string | null };
+  // ponte di Integra non interrogato o senza risposta: i candidati da importare non sono aggiornati
+  integra?: 'non_disponibile' | null;
 }
 
 /** Punti da controllare (come M.statoLettura): controlli falliti + campi incerti con un valore. */
@@ -658,6 +660,9 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
     if (doc.proposta.candidati_cliente.length) return riquadroScelta('cliente', doc.proposta.candidati_cliente);
     return (
       <>
+        {doc.integra === 'non_disponibile' && (
+          <Nota>Integra non raggiungibile: i candidati da importare non sono aggiornati.</Nota>
+        )}
         {incerte.size > 0 && (
           <div className="avviso-variazioni" role="status">
             <Icona nome="avviso" />

@@ -23,18 +23,32 @@ type Tipo = 'cliente' | 'fornitore';
 type Db = Prisma.TransactionClient | PrismaService;
 const VISTA_DI: Record<Tipo, 'clienti' | 'fornitori'> = { cliente: 'clienti', fornitore: 'fornitori' };
 const TEMPO_MASSIMO_MS = 3000; // D-111: oltre, «ponte lento» (§4.7.1)
+/** Tempo massimo delle ricerche automatiche nella pagina Documenti (candidati da importare): un ponte
+ *  lento non deve fermare l'apertura della pagina. La ricerca su richiesta (GET /integra/cerca) tiene il
+ *  tempo pieno di D-111. */
+export const TEMPO_AUTO_MS = 500;
 const LENTO = Symbol('lento');
+
+/** Interruttore del ponte per le ricerche automatiche: se una ricerca fallisce o va oltre il tempo,
+ *  per i successivi TEMPO_KO_MS le ricerche automatiche non chiamano il ponte (rispondono subito
+ *  «ponte non disponibile»); la ricerca su richiesta prova sempre e, se riesce, richiude l'interruttore.
+ *  ponytail: variabile in memoria, un solo processo; al riavvio l'interruttore riparte chiuso. Se i
+ *  processi diventano più d'uno serve un interruttore condiviso. */
+const TEMPO_KO_MS = 60_000;
+let ponteKoFino = 0;
+/** Richiude l'interruttore: la ricerca su richiesta riuscita (e le prove, per ripartire pulite). */
+export function chiudiInterruttore() { ponteKoFino = 0; }
 
 const testo = (v: unknown) => String(v ?? '').trim().replace(/\s+/g, ' ');
 
-/** La query del ponte entro 3 s: oltre, la ricerca risponde «ponte lento» invece di un 500 (D-111).
+/** La query del ponte entro `ms`: oltre, la ricerca risponde «ponte lento» invece di un 500 (D-111).
  *  La query che resta appesa si annulla da sola con il `query_timeout` di `cerca` e `importa` (C2). */
-async function conTempo<T>(p: Promise<T>): Promise<T> {
+async function conTempo<T>(p: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([
       p,
-      new Promise<never>((_, rej) => { timer = setTimeout(() => rej(LENTO), TEMPO_MASSIMO_MS); }),
+      new Promise<never>((_, rej) => { timer = setTimeout(() => rej(LENTO), ms); }),
     ]);
   } finally {
     if (timer) clearTimeout(timer);
@@ -101,24 +115,31 @@ function sqlRicerca(schema: string, tipo: Tipo, q: string) {
 
 /** Le righe della vista, anche quelle già in anagrafica: il documento deve vederle tutte (C1).
  *  C2: il limite di 5 s vale solo per la ricerca e l'import su richiesta, non per la sincronizzazione. */
-async function righeVista(ponte: Pool, schema: string, tipo: Tipo, q: string): Promise<Riga[]> {
+async function righeVista(ponte: Pool, schema: string, tipo: Tipo, q: string, ms: number): Promise<Riga[]> {
   const { text, values } = sqlRicerca(schema, tipo, q);
   // @types/pg non dichiara `query_timeout`, che pg legge per query
-  return (await conTempo(ponte.query<Riga>({ text, values, query_timeout: 5000 } as unknown as QueryConfig))).rows;
+  return (await conTempo(ponte.query<Riga>({ text, values, query_timeout: 5000 } as unknown as QueryConfig), ms)).rows;
 }
 
-/** Ricerca mirata sulla vista: massimo 10 righe, per codice esatto → P.IVA → ragione sociale (D-111). */
-export async function cerca(db: Db, ponte: Pool, schema: string, tipo: Tipo, q: string) {
+/** Ricerca mirata sulla vista: massimo 10 righe, per codice esatto → P.IVA → ragione sociale (D-111).
+ *  `ms` è il tempo massimo: le ricerche automatiche della pagina Documenti passano TEMPO_AUTO_MS. */
+export async function cerca(db: Db, ponte: Pool, schema: string, tipo: Tipo, q: string, ms: number = TEMPO_MASSIMO_MS, automatica = false) {
   const inizio = Date.now();
+  // interruttore aperto: la ricerca automatica non chiama il ponte per 60 s (la su richiesta prova sempre)
+  if (automatica && Date.now() < ponteKoFino) {
+    return { errore: 'ponte non disponibile' as const, ms: Date.now() - inizio };
+  }
   let righe: Riga[];
   try {
-    righe = await righeVista(ponte, schema, tipo, q);
+    righe = await righeVista(ponte, schema, tipo, q, ms);
   } catch (e) {
+    ponteKoFino = Date.now() + TEMPO_KO_MS; // una ricerca fallita apre l'interruttore
     if (e === LENTO) return { errore: 'ponte lento' as const, ms: Date.now() - inizio };
     // C4: la ricerca non apre anomalie (la regola dei tre giri è della sincronizzazione, §7.14.3):
     // ponte giù (VPN, password, vista) → nessun candidato, non un 500
     return { errore: 'ponte non raggiungibile' as const, ms: Date.now() - inizio };
   }
+  if (!automatica) chiudiInterruttore(); // la ricerca su richiesta riuscita richiude l'interruttore
   // esclude chi è già in anagrafica: una sola query sui codici trovati, niente cicli (D-111)
   const codici = righe.map(codiceDi);
   const importati = new Set(
@@ -152,12 +173,13 @@ export async function importa(
       text: `SELECT ${v.colonne.join(', ')} FROM ${schema}.${v.vista} WHERE id_integra = $1`,
       values: [idIntegra],
       query_timeout: 5000, // C2: il limite vale per l'import su richiesta, non per la sincronizzazione
-    } as unknown as QueryConfig))).rows;
+    } as unknown as QueryConfig), TEMPO_MASSIMO_MS)).rows;
   } catch (e) {
     // R1-02: ponte appeso → 502, non una richiesta che non torna
     if (e === LENTO) throw new BadGatewayException('Integra non risponde in tempo: riprova');
     throw e;
   }
+  chiudiInterruttore(); // la ricerca su richiesta riuscita richiude l'interruttore
   const r = rows[0];
   if (!r) throw new NotFoundException(`${tipo} ${idIntegra} non trovato in Integra`);
   const p = paesePiva(r);
@@ -177,7 +199,7 @@ export async function importa(
     // deve trovare **questa** riga, con la stessa P.IVA normalizzata
     let c: Riga[];
     try {
-      c = await righeVista(ponte, schema, 'fornitore', letto);
+      c = await righeVista(ponte, schema, 'fornitore', letto, TEMPO_MASSIMO_MS);
     } catch {
       throw new BadGatewayException('Integra non risponde: riprova');
     }
