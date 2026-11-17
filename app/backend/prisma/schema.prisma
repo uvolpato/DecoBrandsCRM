@@ -206,7 +206,7 @@ model subagenti {
 /// Subagente × cliente × fornitore: chi segue il cliente e con che sconto (§4.2.6, D-27).
 model interscambio {
   id                       BigInt    @id @default(autoincrement())
-  subagente_id             BigInt
+  subagente_id             BigInt? // null = senza subagente: la provvigione è tutta di Decobrands
   cliente_id               BigInt
   fornitore_id             BigInt
   codice_cliente_fornitore String?   @db.VarChar(50)
@@ -218,7 +218,7 @@ model interscambio {
   da_confermare            Boolean   @default(false) // dal vecchio CRM, da confermare al primo uso (D-159)
   creato_il                DateTime  @default(now()) @db.Timestamptz(6)
 
-  subagente subagenti @relation(fields: [subagente_id], references: [id], onDelete: Restrict)
+  subagente subagenti? @relation(fields: [subagente_id], references: [id], onDelete: Restrict)
   cliente   clienti   @relation(fields: [cliente_id], references: [id], onDelete: Restrict)
   fornitore fornitori @relation(fields: [fornitore_id], references: [id], onDelete: Restrict)
   sconti    sconti[]

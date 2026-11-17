@@ -52,7 +52,7 @@ export function completaPeriodo(da: string, n: number, primo: string, ultimo: st
 /* ---------- Fatti, totali e raggruppamenti ---------- */
 
 type Totale = { fatturato: Dec; prese: Dec; pagate: Dec; margine: Dec; documenti: number; clienti: number };
-type Gruppo = { chiave: string; nome: string } & Totale;
+type Gruppo = { chiave: string | null; nome: string } & Totale;
 
 function somma(rr: Fatto[]): Totale {
   let fatturato = ZERO, prese = ZERO, pagate = ZERO, documenti = 0;
@@ -67,8 +67,8 @@ function somma(rr: Fatto[]): Totale {
   return { fatturato: r2(fatturato), prese: r2(prese), pagate: r2(pagate), margine: r2(prese.minus(pagate)), documenti, clienti: clienti.size };
 }
 
-function raggruppa(rr: Fatto[], chiave: (f: Fatto) => string, nome: (f: Fatto) => string): Gruppo[] {
-  const m = new Map<string, Fatto[]>();
+function raggruppa(rr: Fatto[], chiave: (f: Fatto) => string | null, nome: (f: Fatto) => string): Gruppo[] {
+  const m = new Map<string | null, Fatto[]>();
   for (const r of rr) { const g = m.get(chiave(r)); if (g) g.push(r); else m.set(chiave(r), [r]); }
   return [...m.entries()].map(([chiave, righe]) => ({ chiave, nome: nome(righe[0]), ...somma(righe) }));
 }
@@ -96,12 +96,16 @@ type Dimensione = keyof typeof DIM;
  *  filtro incrociato e alle voci proposte dai campi: quella dimensione si ignora (D-18, D-23). */
 function filtra(rr: Fatto[], q: Filtri, salvo?: Dimensione) {
   const insiemi = (Object.keys(DIM) as Dimensione[]).map((d) => [d, scelte(q[d])] as const);
-  return rr.filter((f) => insiemi.every(([d, ks]) => d === salvo || !ks.size || ks.has(f[DIM[d]])));
+  return rr.filter((f) => insiemi.every(([d, ks]) => {
+    if (d === salvo || !ks.size) return true;
+    const v = f[DIM[d]];
+    return v != null && ks.has(v);
+  }));
 }
 
 function nomi(S: Dati) {
   const f = (id: string) => S.fornitori.get(id)?.nome ?? '';
-  const s = (id: string) => S.subagenti.get(id)?.nome ?? '';
+  const s = (id: string | null) => id == null ? 'Senza subagente' : S.subagenti.get(id)?.nome ?? '';
   const c = (id: string) => S.clienti.get(id)?.nome ?? '';
   return { f, s, c };
 }
@@ -208,8 +212,9 @@ function pagina(S: Dati, c: Calcolo, q: Filtri) {
       etichetta: c.periodo.mesi === 12 ? 'sullo stesso periodo dell’anno prima' : 'sui ' + c.periodo.mesi + ' mesi prima',
     },
     filtri_attivi: filtriAttivi,
-    // voci proposte dai campi di ricerca: con gli altri filtri attivi, senza il proprio (D-23)
-    voci: { fornitori: vociDi('fornitori'), subagenti: vociDi('subagenti'), clienti: vociDi('clienti') },
+    // voci proposte dai campi di ricerca: con gli altri filtri attivi, senza il proprio (D-23); il
+    // documento senza subagente non è una voce sceglibile (non è un subagente)
+    voci: { fornitori: vociDi('fornitori'), subagenti: vociDi('subagenti').filter((x) => x != null) as string[], clienti: vociDi('clienti') },
     numeri: {
       fatturato: n(t.fatturato), prese: n(t.prese), pagate: n(t.pagate), margine: n(t.margine),
       documenti: t.documenti, clienti: t.clienti,

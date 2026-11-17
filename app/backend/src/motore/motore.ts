@@ -227,9 +227,11 @@ export function percentuali(S: Dati, p: Pratica, data = p.data) {
   // eccezione del subagente sulla soglia dello scaglione, valida alla data del documento (D-51 §19)
   const ecc = S.eccezioni.find((e) => e.fornitore_id === p.fornitore_id && e.subagente_id === ab.subagente_id && e.sconto.equals(sc.sconto)
     && e.valido_dal <= data && (!e.valido_al || data < e.valido_al)); // valido_al escluso, come interscambio
+  // senza subagente la provvigione è tutta di Decobrands: al subagente zero, niente eccezioni
+  const senzaSub = ab.subagente_id == null;
   return {
     ab, sconto: sm ?? ab.sconto, sconto_medio: sm, scaglione: sc, subagente_id: ab.subagente_id,
-    agente: sc.pct_agente, sub_standard: sc.pct_sub, sub: ecc ? ecc.pct : sc.pct_sub, eccezione: !!ecc,
+    agente: sc.pct_agente, sub_standard: senzaSub ? ZERO : sc.pct_sub, sub: senzaSub ? ZERO : (ecc ? ecc.pct : sc.pct_sub), eccezione: !!ecc,
     // D-166 §19: il fornitore paga a Decobrands la sola pct_agente; la parte del subagente è presa da quella
     dal_fornitore: sc.pct_agente,
   };
@@ -293,6 +295,9 @@ function regolaPiatta(S: Dati, p: Pratica, d: Documento, ab: Abbinamento, imp: D
 /** Quota del subagente su un documento (D-27 §19), vince la prima regola presente: correzione sul
  *  documento → una fattura al mese → % dell'agenzia → eccezione personale → % dello scaglione. */
 export function quotaSub(S: Dati, p: Pratica, d: Documento, base?: Dec) {
+  // senza subagente la provvigione è tutta di Decobrands: quota 0, prima di tutto (anche del congelato)
+  const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
+  if (ab && ab.subagente_id == null) return { pct: ZERO, provvigione: ZERO, regola: 'senza_subagente', vale: null, eccezione: false };
   // D-183 §19: un documento congelato non si ricalcola: vale la quota fissata nel `calcolo`.
   if (d.congelato_il && d.calcolo?.provvigione_subagente != null) {
     const c = d.calcolo;
@@ -378,7 +383,7 @@ export function raggruppamentoDi(S: Dati, p: Pratica): { raggruppamento: 'docume
 const scontoRiga = (r: Riga): Dec | null => (r.spesa ? ZERO : utilePerSconto(r) ? scontoDa(r.qta.times(r.prezzo), r.importo) : null);
 
 /** Eccezione personale del subagente sulla soglia di un gruppo (D-51), come in `percentuali`. */
-const eccezioneSu = (S: Dati, p: Pratica, subagente_id: string, sconto: Dec, data: string) =>
+const eccezioneSu = (S: Dati, p: Pratica, subagente_id: string | null, sconto: Dec, data: string) =>
   S.eccezioni.find((e) => e.fornitore_id === p.fornitore_id && e.subagente_id === subagente_id && e.sconto.equals(sconto)
     && e.valido_dal <= data && (!e.valido_al || data < e.valido_al));
 
@@ -450,7 +455,7 @@ function provvigioneRiga(S: Dati, p: Pratica, d: Documento): {
     if (!sc) return { sconto, base: b.toFixed(2), scaglione: null, pct_agente: null, pct_sub: null, provvigione_agente: null, provvigione_sub: null };
     const ecc = piatta ? null : eccezioneSu(S, p, ab.subagente_id, sc.sconto, d.data);
     if (ecc) usaEccezione = true;
-    const pctSub = piatta ? piatta.pct : (ecc?.pct ?? sc.pct_sub);
+    const pctSub = ab.subagente_id == null ? ZERO : piatta ? piatta.pct : (ecc?.pct ?? sc.pct_sub);
     return {
       sconto, base: b.toFixed(2), scaglione: sc.sconto.toFixed(2),
       pct_agente: sc.pct_agente.toFixed(2), pct_sub: pctSub.toFixed(2),
@@ -459,7 +464,8 @@ function provvigioneRiga(S: Dati, p: Pratica, d: Documento): {
   });
   const oltre = gruppi.some((g) => g.scaglione == null); // un gruppo sotto la prima soglia → da decidere
   const agente = oltre ? null : r2(somma(gruppi.map((g) => new Dec(g.provvigione_agente!))));
-  const sub = oltre ? null : piatta ? piatta.provvigione : r2(somma(gruppi.map((g) => new Dec(g.provvigione_sub!))));
+  // senza subagente la quota è 0 anche se c'è una correzione (regola piatta): la provvigione è tutta di Decobrands
+  const sub = ab.subagente_id == null ? ZERO : oltre ? null : piatta ? piatta.provvigione : r2(somma(gruppi.map((g) => new Dec(g.provvigione_sub!))));
   const pct = (tot: Dec | null) => (tot == null || base.isZero() ? null : r2(tot.div(base).times(100)));
   return { base, gruppi, agente, sub, pct_agente: pct(agente), pct_sub: pct(sub), eccezione: usaEccezione };
 }
@@ -768,6 +774,8 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
     // senza scaglione tornerebbe null anche se i gruppi hanno la loro soglia).
     const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
     if (!ab) return null;
+    // senza subagente: nessuna riga in liquidazione ai subagenti, la provvigione è tutta di Decobrands
+    if (ab.subagente_id == null) return null;
     const q = quotaSub(S, p, d);
     // D-199 §19: gruppo sotto la prima soglia → provvigione da decidere, il documento non si liquida
     if (!q) return null;

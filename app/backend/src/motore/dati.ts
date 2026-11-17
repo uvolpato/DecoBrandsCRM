@@ -304,7 +304,7 @@ function componi(oggi: string, { fornitori, clienti, subagenti, scaglioni, eccez
       valido_dal: iso(e.valido_dal), valido_al: e.valido_al ? iso(e.valido_al) : null,
     })),
     interscambio: interscambio.map((a) => ({
-      id: id(a.id), subagente_id: id(a.subagente_id), cliente_id: id(a.cliente_id), fornitore_id: id(a.fornitore_id),
+      id: id(a.id), subagente_id: a.subagente_id === null ? null : id(a.subagente_id), cliente_id: id(a.cliente_id), fornitore_id: id(a.fornitore_id),
       codice: a.codice_cliente_fornitore, sconto: a.sconto, pct_subagente: a.pct_subagente, regola_mensile: a.regola_mensile,
       valido_dal: iso(a.valido_dal), valido_al: a.valido_al ? iso(a.valido_al) : null,
     })),

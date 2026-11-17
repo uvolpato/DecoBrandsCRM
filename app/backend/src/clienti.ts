@@ -103,7 +103,7 @@ function mappaAgenzia(a: interscambio & {
 }) {
   return {
     id: String(a.id),
-    subagente_id: String(a.subagente_id),
+    subagente_id: a.subagente_id === null ? null : String(a.subagente_id),
     subagente: a.subagente ? `${a.subagente.cognome} ${a.subagente.nome}` : null,
     subagente_codice: a.subagente?.codice ?? null,
     fornitore_id: String(a.fornitore_id),
@@ -142,7 +142,7 @@ export class ClientiController {
       const k = String(r.cliente_id);
       agenziePer.set(k, (agenziePer.get(k) ?? 0) + 1);
       (fornPer.get(k) ?? fornPer.set(k, new Set()).get(k)!).add(String(r.fornitore_id));
-      (subPer.get(k) ?? subPer.set(k, new Set()).get(k)!).add(String(r.subagente_id));
+      if (r.subagente_id !== null) (subPer.get(k) ?? subPer.set(k, new Set()).get(k)!).add(String(r.subagente_id));
     }
     const pratiche = await this.db.ordini_fornitore_testata.groupBy({ by: ['cliente_id'], _count: { _all: true }, where: { stato: { not: 'fatturato' } } });
     const pratichePer = new Map(pratiche.map((p) => [String(p.cliente_id), p._count._all]));
@@ -275,8 +275,11 @@ export class ClientiController {
   @Post(':id/agenzie')
   @Richiede('dati.modifica')
   async creaAgenzia(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: DatiAgenzia) {
+    // senza subagente la provvigione è tutta di Decobrands: percentuale e regola del subagente non hanno senso
+    if (!b.subagente_id && (b.pct_subagente != null || b.regola_mensile != null)) {
+      throw new BadRequestException('Senza subagente la provvigione è tutta di Decobrands: percentuale e regola non si impostano');
+    }
     soloResponsabile(req, b, { pct: null, regola: null });
-    if (!b.subagente_id) throw new BadRequestException('Subagente obbligatorio');
     if (!b.fornitore_id) throw new BadRequestException('Fornitore obbligatorio');
     if (!b.valido_dal) throw new BadRequestException('Data di inizio obbligatoria');
     if (b.valido_al && new Date(b.valido_al) <= new Date(b.valido_dal)) throw new BadRequestException('La data di fine deve essere dopo la data di inizio');
@@ -287,8 +290,8 @@ export class ClientiController {
       await dopoChiusura(tx, fornitore.id, b.valido_dal!, agenziaChiusa); // D-114 §19
       const cliente = await tx.clienti.findUnique({ where: { id: BigInt(id) }, include: { corrente: { select: { ragione_sociale: true, piva: true } } } });
       if (!cliente) throw new NotFoundException('Cliente non trovato');
-      const sub = await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id!) } });
-      if (!sub) throw new NotFoundException('Subagente non trovato');
+      const sub = b.subagente_id ? await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id) } }) : null;
+      if (b.subagente_id && !sub) throw new NotFoundException('Subagente non trovato');
       // D-166 §19: la % del subagente non supera la % che il fornitore riconosce a Decobrands
       if (b.pct_subagente != null) await controllaQuotaSubagente(tx, fornitore.id, b.sconto ?? 0, b.valido_dal!, b.pct_subagente);
       // D-112, V13: la riga dello storico si legge bloccata e si consuma una volta sola (409 se già
@@ -310,7 +313,7 @@ export class ClientiController {
       const creato = await tx.interscambio.create({
         data: {
           cliente_id: BigInt(id),
-          subagente_id: BigInt(b.subagente_id!),
+          subagente_id: b.subagente_id ? BigInt(b.subagente_id) : null,
           fornitore_id: BigInt(b.fornitore_id!),
           codice_cliente_fornitore: b.codice_cliente_fornitore ? b.codice_cliente_fornitore.trim() : null,
           sconto: b.sconto ?? 0,
@@ -328,7 +331,7 @@ export class ClientiController {
         tipo: 'crud', azione: 'create', entita: 'interscambio', entita_id: creato.id, esito: 'successo',
         dettaglio: {
           etichetta: `${cliente.corrente?.ragione_sociale ?? ''} · ${fornitore.corrente?.ragione_sociale ?? ''}`,
-          subagente_id: String(creato.subagente_id),
+          subagente_id: creato.subagente_id === null ? null : String(creato.subagente_id),
           cliente_id: String(creato.cliente_id),
           fornitore_id: String(creato.fornitore_id),
           codice_cliente_fornitore: creato.codice_cliente_fornitore,
@@ -378,6 +381,10 @@ export class ClientiController {
         valido_al: b.valido_al !== undefined ? (b.valido_al ? new Date(b.valido_al) : null) : prima.valido_al,
       };
       if (dopoData.valido_al && dopoData.valido_al <= dopoData.valido_dal) throw new BadRequestException('La data di fine deve essere dopo la data di inizio');
+      // senza subagente la provvigione è tutta di Decobrands: percentuale e regola del subagente non hanno senso
+      if (dopoData.subagente_id == null && (dopoData.pct_subagente != null || dopoData.regola_mensile != null)) {
+        throw new BadRequestException('Senza subagente la provvigione è tutta di Decobrands: percentuale e regola non si impostano');
+      }
       // D-166 §19: la % del subagente non supera la % che il fornitore riconosce a Decobrands
       if (dopoData.pct_subagente != null) await controllaQuotaSubagente(tx, dopoData.fornitore_id, dopoData.sconto, iso(dopoData.valido_dal)!, dopoData.pct_subagente);
       const campi = ['subagente_id', 'fornitore_id', 'codice_cliente_fornitore', 'sconto', 'pct_subagente', 'regola_mensile', 'valido_dal', 'valido_al'] as const;
@@ -529,7 +536,7 @@ export class ClientiController {
         dettaglio: {
           etichetta: `${a.cliente?.corrente?.ragione_sociale ?? ''} · ${a.fornitore?.corrente?.ragione_sociale ?? ''}`,
           interscambio_id: String(a.id),
-          subagente_id: String(a.subagente_id),
+          subagente_id: a.subagente_id === null ? null : String(a.subagente_id),
           cliente_id: String(a.cliente_id),
           fornitore_id: String(a.fornitore_id),
           codice_cliente_fornitore: a.codice_cliente_fornitore,

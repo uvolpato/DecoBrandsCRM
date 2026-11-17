@@ -479,6 +479,7 @@ export const GUIDA: Argomento[] = [
       'Gli importi sono per <b>data del documento</b> (competenza): fatture e note di credito abbinate alle pratiche, anche se non ancora riconosciute nei bollettini. Non cambiano quando arriva un bollettino.',
       'Gli storni per mancato pagamento non cambiano questi numeri: spostano solo il momento in cui la provvigione è pagata (vedi Liquidazioni).',
       'Dai fornitori = imponibile × % che il fornitore riconosce a Decobrands; ai subagenti = imponibile × % del subagente; margine = differenza.',
+      'Un documento di un’agenzia <b>senza subagente</b> compare sotto la voce <b>Senza subagente</b>: la provvigione è tutta di Decobrands (ai subagenti zero).',
       'Più voci nello stesso campo valgono in “o” (Gries o Gasper); campi diversi in “e” (fornitore e cliente).',
     ],
     modifica: 'Si consulta ed esporta con qualunque livello nell’area Provvigioni.',
@@ -673,9 +674,9 @@ export const GUIDA: Argomento[] = [
         campi: [
           ['Fornitore', 'Campo con ricerca.'],
           ['Codice cliente del fornitore', 'Come il fornitore chiama il cliente: serve ad abbinare i documenti in automatico.'],
-          ['Seguito da', 'Subagente, campo con ricerca. Si precompila solo se il vecchio CRM indica un subagente che in anagrafica è uno solo; se il campo resta vuoto scegli tu: è obbligatorio (D-134).'],
+          ['Seguito da', 'Subagente, campo con ricerca. Si precompila solo se il vecchio CRM indica un subagente che in anagrafica è uno solo; se il campo resta vuoto scegli tu. Senza subagente la provvigione è tutta di Decobrands: i campi della percentuale e della regola si spengono.'],
           ['Sconto al cliente', 'Sotto il campo compaiono gli sconti degli scaglioni in vigore dei fornitori; un altro valore va bene lo stesso. Gli sconti si leggono a ogni apertura dal server: se li hai appena cambiati in Fornitori, qui sono già aggiornati.'],
-          ['Al subagente per questo cliente % · Provvigione al subagente', 'Riservati al responsabile: per l’operatore sono spenti (cambiano i soldi del subagente).'],
+          ['Al subagente per questo cliente % · Provvigione al subagente', 'Riservati al responsabile: per l’operatore sono spenti (cambiano i soldi del subagente); senza subagente sono spenti per tutti.'],
         ],
         azioni: [
           ['Aggiungi agenzia · Salva', 'Registra.'],

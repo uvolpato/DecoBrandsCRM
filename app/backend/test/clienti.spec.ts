@@ -484,6 +484,41 @@ describe('agenzie CRUD', () => {
   });
 });
 
+describe('agenzia senza subagente', () => {
+  it('crea senza subagente: 201 con subagente_id null', async () => {
+    const a = await entra('ammi-cli');
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', {
+      fornitore_id: Number(fornitoreId), sconto: 5, valido_dal: '2050-01-01', valido_al: '2050-12-31',
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    expect(r.body.subagente_id).toBeNull();
+    expect(r.body.subagente).toBeNull();
+  });
+
+  it('senza subagente con pct_subagente o regola_mensile: 400', async () => {
+    const a = await entra('ammi-cli');
+    const r1 = await a.post('/clienti/' + clienteId + '/agenzie', {
+      fornitore_id: Number(fornitoreId), sconto: 5, pct_subagente: 10, valido_dal: '2051-01-01',
+    }).expect(400);
+    expect(r1.body.message).toContain('Senza subagente');
+    const r2 = await a.post('/clienti/' + clienteId + '/agenzie', {
+      fornitore_id: Number(fornitoreId), sconto: 5, regola_mensile: 'prima', valido_dal: '2051-01-01',
+    }).expect(400);
+    expect(r2.body.message).toContain('Senza subagente');
+  });
+
+  it('il subagente si aggiunge dopo, con data di validità', async () => {
+    const a = await entra('ammi-cli');
+    const r = await a.post('/clienti/' + clienteId + '/agenzie', {
+      fornitore_id: Number(fornitoreId), sconto: 5, valido_dal: '2052-01-01',
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    expect(r.body.subagente_id).toBeNull();
+    const m = await a.put('/clienti/' + clienteId + '/agenzie/' + r.body.id, { subagente_id: Number(subagenteId) }).expect(200);
+    expect(m.body.subagente_id).toBe(String(subagenteId));
+  });
+});
+
 describe('agenzia da confermare (D-159)', () => {
   it('conferma: mette da_confermare=false e scrive nel registro', async () => {
     const a = await entra('ammi-cli');

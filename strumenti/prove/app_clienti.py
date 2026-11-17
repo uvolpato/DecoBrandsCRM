@@ -48,7 +48,24 @@ with sync_playwright() as p:
     testo = lambda pg, s: pg.locator(s).first.inner_text()
     righe = lambda pg: pg.locator('.dt tbody tr.cliccabile').count()
     finestra = lambda pg: pg.locator('.velo .modale')
-    seg = lambda pg, t: pg.locator('.segmenti [role=tab]:has-text("%s")' % t)
+    seg = lambda pg, t: pg.locator('.clienti-filtri .filtri .segmenti [role=tab]:has-text("%s")' % t)
+    # i segmenti diventano una tendina quando non stanno su una riga (16/11/2026): gli stessi controlli
+    # leggono il pulsante [role=tab] oppure la voce della tendina (.segmenti-select).
+    def nseg(pg, t):  # numero del segmento: .n del pulsante, oppure «Tutti (13)» nella tendina
+        tab = seg(pg, t)
+        if tab.count(): return int(tab.locator('.n').inner_text())
+        testo = pg.locator('.clienti-filtri .filtri .segmenti-select option', has_text=t).first.inner_text()
+        return int(testo[testo.rfind('(') + 1:-1])
+    def clic_seg(pg, t):  # sceglie il segmento: pulsante o voce della tendina
+        tab = seg(pg, t)
+        if tab.count(): tab.click(); return
+        sel = pg.locator('.clienti-filtri .filtri .segmenti-select')
+        for i, txt in enumerate(sel.locator('option').all_inner_texts()):
+            if txt.split(' (')[0] == t: sel.select_option(index=i); return
+    def seg_scelto(pg, t):  # il segmento è scelto? (pulsante o tendina)
+        tab = seg(pg, t)
+        if tab.count(): return tab.get_attribute('aria-selected') == 'true'
+        return pg.locator('.clienti-filtri .filtri .segmenti-select option', has_text=t).first.evaluate('o => o.selected')
     scheda = lambda pg, t: pg.click('.schede-barra [role=tab]:has-text("%s")' % t)
     sovr = lambda pg: pg.evaluate('document.documentElement.scrollWidth > document.documentElement.clientWidth')
     cerca = lambda pg, t: (pg.fill('.filtri input[type=search]', t), pg.wait_for_timeout(300))
@@ -65,11 +82,11 @@ with sync_playwright() as p:
 
     pg = entra(S + '-ammi')
     ok('Clienti' in testo(pg, '.testa h1'), 'titolo della pagina')
-    n_tutti = int(seg(pg, 'Tutti').locator('.n').inner_text()); n_con = int(seg(pg, 'Con agenzie').locator('.n').inner_text()); n_senza = int(seg(pg, 'Senza agenzie').locator('.n').inner_text())
+    n_tutti = nseg(pg, 'Tutti'); n_con = nseg(pg, 'Con agenzie'); n_senza = nseg(pg, 'Senza agenzie')
     ok(n_tutti >= 3 and n_con + n_senza == n_tutti and n_senza >= 1, 'elenco e segmenti: %d clienti = %d con agenzie + %d senza' % (n_tutti, n_con, n_senza))
     # R2-10 (D-24): ricerca e segmenti sulla stessa riga, come il prototipo
     y = lambda s: pg.locator(s).first.bounding_box()['y']
-    ok(abs(y('.clienti-filtri .filtri .cerca') - y('.clienti-filtri .filtri .segmenti')) < 6,
+    ok(abs(y('.clienti-filtri .filtri .cerca') - y('.clienti-filtri .filtri .segmenti, .clienti-filtri .filtri .segmenti-select')) < 6,
        '1440 px: ricerca e segmenti sulla stessa riga')
     nome0 = pg.locator('.dt tbody tr.cliccabile b').first.inner_text()
     cerca(pg, nome0[:6])
@@ -80,15 +97,15 @@ with sync_playwright() as p:
     fb = pg.locator('.filtri').first
     campo = fb.locator('.ricerca.multipla .ricerca-testo').first
     campo.click(); fb.locator('.ricerca-menu li[role=option]', has_text='Gries').first.click(); pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
-    n_f = int(seg(pg, 'Tutti').locator('.n').inner_text())
-    ok('Gries' in (campo.get_attribute('placeholder') or '') and 1 <= n_f <= n_tutti and righe(pg) == n_f and int(seg(pg, 'Senza agenzie').locator('.n').inner_text()) == 0,
+    n_f = nseg(pg, 'Tutti')
+    ok('Gries' in (campo.get_attribute('placeholder') or '') and 1 <= n_f <= n_tutti and righe(pg) == n_f and nseg(pg, 'Senza agenzie') == 0,
        'filtro per fornitore Gries: %d clienti su %d, segmenti aggiornati' % (n_f, n_tutti))
     pg.locator('.dt tbody tr.cliccabile:not(.selezionata)').first.click(); pg.wait_for_timeout(500); pg.go_back(); pg.wait_for_timeout(500)
     ok('Gries' in (pg.locator('.filtri').first.locator('.ricerca.multipla .ricerca-testo').first.get_attribute('placeholder') or '') and righe(pg) == n_f, 'tornando indietro il filtro per fornitore resta')
     pg.screenshot(path=str(USCITA / 'app-clienti-filtro-1440.png'))
     pg.locator('.riepilogo-filtri .btn-icona').nth(1).click(); pg.wait_for_timeout(300)
     ok(righe(pg) == n_tutti, 'riepilogo: togli tutti i filtri, tornano %d clienti' % n_tutti)
-    seg(pg, 'Senza agenzie').click(); pg.wait_for_timeout(300)
+    clic_seg(pg, 'Senza agenzie'); pg.wait_for_timeout(300)
     ok(righe(pg) == n_senza, 'segmento Senza agenzie: %d righe' % n_senza)
 
     # scheda di un cliente senza agenzie
@@ -106,6 +123,10 @@ with sync_playwright() as p:
     # D-112: la proposta del vecchio CRM arriva solo dal documento (fornitore fisso + codice letto)
     ok('Dal vecchio CRM' not in testo(pg, '.velo .modale') and 'non era rappresentato' not in testo(pg, '.velo .modale'),
        'agenzia dalla scheda cliente: nessuna proposta dallo storico')
+    # senza subagente la provvigione è tutta di Decobrands: percentuale e regola si spengono, con la nota
+    ok(pg.locator('#c-pct_subagente[disabled]').count() == 1 and pg.locator('#c-regola_mensile[disabled]').count() == 1
+       and 'Senza subagente' in testo(pg, '.velo .campo:has(#c-pct_subagente) .aiuto'),
+       'senza subagente: percentuale e regola spente, «tutta di Decobrands»')
     f, fid = scegli(pg, 'fornitore_id', 'Gri')
     ok('Gries' in f and fid.isdigit(), 'fornitore scelto dal menu: %s (id %s)' % (f, fid))
     s_, sid = scegli(pg, 'subagente_id', 'Nis')
@@ -185,16 +206,16 @@ with sync_playwright() as p:
     scheda(pg, 'Agenzie'); pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
 
     # memoria della schermata: cliente, ricerca, segmento e scheda
-    seg(pg, 'Senza agenzie').click(); pg.wait_for_timeout(200)  # il ricaricamento ha azzerato la memoria
+    clic_seg(pg, 'Senza agenzie'); pg.wait_for_timeout(200)  # il ricaricamento ha azzerato la memoria
     scheda(pg, 'Pratiche'); url = pg.url
     vai(pg, 'Fornitori'); ok('/fornitori' in pg.url, 'vado a Fornitori')
     pg.go_back(); pg.wait_for_selector('.dt tbody tr.cliccabile'); pg.wait_for_timeout(600)
-    ok(pg.url == url and seg(pg, 'Senza agenzie').get_attribute('aria-selected') == 'true', 'indietro: stesso cliente e segmento ricordato')
+    ok(pg.url == url and seg_scelto(pg, 'Senza agenzie'), 'indietro: stesso cliente e segmento ricordato')
     ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Pratiche")').count() == 1, 'indietro: stessa scheda (Pratiche)')
     scheda(pg, 'Agenzie'); pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
 
     # un cliente con pratiche: la scheda le elenca
-    seg(pg, 'Con agenzie').click(); pg.wait_for_timeout(300)
+    clic_seg(pg, 'Con agenzie'); pg.wait_for_timeout(300)
     for i in range(righe(pg)):
         if pg.locator('.dt tbody tr.cliccabile').nth(i).locator('td').last.inner_text().strip() not in ('0', ''):
             pg.locator('.dt tbody tr.cliccabile').nth(i).click(); break
@@ -205,7 +226,7 @@ with sync_playwright() as p:
     pg.screenshot(path=str(USCITA / 'app-clienti-pratiche-1440.png'))
 
     # elimina le due agenzie di prova
-    seg(pg, 'Senza agenzie').click(); pg.wait_for_timeout(200); seg(pg, 'Tutti').click(); cerca(pg, cliente[:12])
+    clic_seg(pg, 'Senza agenzie'); pg.wait_for_timeout(200); clic_seg(pg, 'Tutti'); cerca(pg, cliente[:12])
     pg.locator('.dt tbody tr.cliccabile', has_text=cliente).first.click(); pg.wait_for_timeout(600)
     scheda(pg, 'Agenzie'); pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
     for chi in ('T' + RUN, 'Ravelli'):
@@ -218,7 +239,7 @@ with sync_playwright() as p:
 
     # D-111: Cerca in Integra — la ricerca parte solo al clic, l'import aggiunge il cliente all'elenco
     integra('ponte-aggiungi', 'cliente', COD, 'Cliente Prova Integra', PIVA)
-    cerca(pg, ''); seg(pg, 'Tutti').click(); pg.wait_for_timeout(400)
+    cerca(pg, ''); clic_seg(pg, 'Tutti'); pg.wait_for_timeout(400)
     n_prima = righe(pg)
     pg.click('button:has-text("Cerca in Integra")'); finestra(pg).wait_for()
     ok(pg.locator('#cerca-integra').count() == 1 and pg.locator('.velo .elenco').count() == 0,
@@ -264,8 +285,14 @@ with sync_playwright() as p:
     # operatore: percentuale e regola spente, il resto si salva (D-50); può cercare in Integra
     pg = entra(S + '-oper'); pg.wait_for_timeout(600)
     ok(pg.locator('button:has-text("Cerca in Integra"):not([disabled])').count() == 1, 'operatore: Cerca in Integra attivo (dati.importa)')
-    seg(pg, 'Tutti').click(); pg.click('.dt tbody tr.cliccabile'); pg.wait_for_timeout(600)
+    clic_seg(pg, 'Tutti'); pg.click('.dt tbody tr.cliccabile'); pg.wait_for_timeout(600)
     pg.click('button:has-text("Aggiungi agenzia")'); finestra(pg).wait_for(); pg.wait_for_selector('#c-pct_subagente')
+    # D-205: senza subagente percentuale e regola sono spente con la nota «tutta di Decobrands»
+    ok(pg.locator('#c-pct_subagente[disabled]').count() == 1 and pg.locator('#c-regola_mensile[disabled]').count() == 1
+       and 'Senza subagente' in testo(pg, '.velo .campo:has(#c-pct_subagente) .aiuto'),
+       'operatore, senza subagente: percentuale e regola spente, nota «tutta di Decobrands»')
+    # D-50: scelto un subagente, percentuale e regola restano spente con la nota del responsabile
+    scegli(pg, 'subagente_id', 'Nis')
     ok(pg.locator('#c-pct_subagente[disabled]').count() == 1 and pg.locator('#c-regola_mensile[disabled]').count() == 1 and 'responsabile' in testo(pg, '.velo .campo:has(#c-pct_subagente) .aiuto'),
        'operatore: percentuale e regola spente, con la nota «li cambia un responsabile»')
     pg.screenshot(path=str(USCITA / 'app-clienti-operatore-1440.png'))

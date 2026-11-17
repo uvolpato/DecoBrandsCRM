@@ -41,6 +41,17 @@ with sync_playwright() as p:
     campo_nome = lambda pg, i: campi(pg).nth(i).get_attribute('placeholder') or ''
     periodo = lambda pg: testo(pg, '.periodo-btn')
     seg = lambda pg, t: pg.locator('.barra-analisi .segmenti [role=tab]:has-text("%s")' % t)
+    # i segmenti della Durata diventano una tendina quando non stanno su una riga (16/11/2026)
+    def clic_durata(pg, t):
+        tab = seg(pg, t)
+        if tab.count(): tab.click(); return
+        sel = pg.locator('.barra-analisi .filtri .segmenti-select')
+        for i, txt in enumerate(sel.locator('option').all_inner_texts()):
+            if txt == t: sel.select_option(index=i); return
+    def durata_scelta(pg, t):
+        tab = seg(pg, t)
+        if tab.count(): return tab.get_attribute('aria-selected') == 'true'
+        return pg.locator('.barra-analisi .filtri .segmenti-select option', has_text=t).first.evaluate('o => o.selected')
     tab = lambda pg, t: pg.locator('.pannello-bi .segmenti [role=tab]:has-text("%s")' % t)
     righe = lambda pg: pg.locator('.pannello-bi .dt tbody tr')
     def quieta(pg):
@@ -79,11 +90,16 @@ with sync_playwright() as p:
     pg.wait_for_function("document.querySelector('.periodo-btn').textContent.includes('ott 2025 → set 2026')"); quieta(pg)
     ok(periodo(pg) == 'ott 2025 → set 2026', 'freccia avanti: torna al periodo di prima')
 
-    seg(pg, '6 mesi').click(); quieta(pg)
+    clic_durata(pg, '6 mesi'); quieta(pg)
     # la risposta del server ridisegna i segmenti: si aspetta che il 6 mesi sia davvero scelto
-    pg.wait_for_function("() => [...document.querySelectorAll('.barra-analisi .segmenti [role=tab]')].some(e => e.textContent.includes('6 mesi') && e.getAttribute('aria-selected') === 'true')")
-    ok(seg(pg, '6 mesi').get_attribute('aria-selected') == 'true', 'durata 6 mesi: il segmento è scelto')
-    seg(pg, '12 mesi').click(); quieta(pg)
+    pg.wait_for_function("""() => {
+      const t = [...document.querySelectorAll('.barra-analisi .segmenti [role=tab]')].some(e => e.textContent.includes('6 mesi') && e.getAttribute('aria-selected') === 'true');
+      if (t) return true;
+      const sel = document.querySelector('.barra-analisi .filtri .segmenti-select');
+      return sel && [...sel.options].some(o => o.textContent.includes('6 mesi') && o.selected);
+    }""")
+    ok(durata_scelta(pg, '6 mesi'), 'durata 6 mesi: il segmento è scelto')
+    clic_durata(pg, '12 mesi'); quieta(pg)
 
     # periodo fisso del seed: qui i numeri coincidono con il prototipo
     pg.goto(BASE + '/analisi?dal=2025-10&al=2026-09'); pg.wait_for_selector('.kpi .kpi-valore'); quieta(pg)

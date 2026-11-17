@@ -122,7 +122,7 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
   const agenzieFiltrate = useMemo(() => {
     const fs = valoriAg.fornitori as string[], ss = valoriAg.subagenti as string[];
     const dc = valoriAg.da_confermare === 'da_confermare';
-    return (dettaglio?.agenzie ?? []).filter((a) => (!fs.length || fs.includes(a.fornitore_id)) && (!ss.length || ss.includes(a.subagente_id)) && (!dc || a.da_confermare));
+    return (dettaglio?.agenzie ?? []).filter((a) => (!fs.length || fs.includes(a.fornitore_id)) && (!ss.length || (a.subagente_id != null && ss.includes(a.subagente_id))) && (!dc || a.da_confermare));
   }, [dettaglio, valoriAg.fornitori, valoriAg.subagenti, valoriAg.da_confermare]);
   // D-159: il filtro «Da confermare» compare solo se c'è almeno un'agenzia da confermare
   const nDaConfermare = useMemo(() => (dettaglio?.agenzie ?? []).filter((a) => a.da_confermare).length, [dettaglio]);

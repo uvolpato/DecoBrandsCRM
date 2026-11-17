@@ -504,7 +504,7 @@ export function dettaglioPratica(S: Dati, id: string) {
     // D-199 §19: raggruppamento effettivo (deroga della pratica o fornitore) per lo scaglione
     raggruppamento: raggruppamentoDi(S, p).raggruppamento,
     raggruppamento_da: raggruppamentoDi(S, p).da,
-    subagente_id: sub?.subagente_id ?? null, subagente: sub ? (S.subagenti.get(sub.subagente_id)?.nome ?? null) : null,
+    subagente_id: sub?.subagente_id ?? null, subagente: sub?.subagente_id != null ? (S.subagenti.get(sub.subagente_id)?.nome ?? null) : null,
     data: p.data, importo: Number(netto), stato: s.chiave, nota, scadenza: s.scadenza ?? null,
     fasi,
     // D-174: «Confermato X di Y» con X = somma delle conferme/proforme valide, Y = importo dell'ordine

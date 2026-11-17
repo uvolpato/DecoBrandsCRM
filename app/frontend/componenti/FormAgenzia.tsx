@@ -17,7 +17,7 @@ import { usePuo } from './Utente';
 
 export interface Agenzia {
   id: string;
-  subagente_id: string;
+  subagente_id: string | null;
   subagente: string | null;
   subagente_codice: string | null;
   fornitore_id: string;
@@ -46,6 +46,8 @@ interface RigaStorico {
 }
 
 const NOTA_RESP = 'Li cambia un responsabile.'; // D-50 §19
+// senza subagente la provvigione è tutta di Decobrands: percentuale e regola non hanno senso
+const NOTA_SENZA_SUB = 'Senza subagente la provvigione è tutta di Decobrands.';
 
 export interface FormAgenziaProps {
   cliente: { id: string; nome: string | null };
@@ -66,6 +68,8 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
   // dello sconto, che mostra gli scaglioni del fornitore scelto e non di tutti (15/11/2026).
   const [sconti, setSconti] = useState<Map<string, number[]>>(new Map());
   const [fornitoreScelto, setFornitoreScelto] = useState<string>(fornitoreFisso?.id ?? agenzia?.fornitore_id ?? '');
+  // subagente scelto: se vuoto, pct_subagente e regola_mensile si disattivano (provvigione tutta di Decobrands)
+  const [subagenteScelto, setSubagenteScelto] = useState<string>(agenzia?.subagente_id ?? '');
   const [errore, setErrore] = useState('');
   // D-170 §19: lasciare la finestra (link del pallino o degli scaglioni) con dati non salvati chiede conferma
   const [conferma, setConferma] = useState<{ risolvi: (si: boolean) => void } | null>(null);
@@ -92,6 +96,12 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daStorico, cliente.id, fornitoreFisso?.id, codice]);
 
+  // D-112: la riga dello storico può proporre il subagente; si riflette sullo stato che disattiva i campi
+  useEffect(() => {
+    if (legame?.rappresentato && legame.subagente_id) setSubagenteScelto((prev) => prev || String(legame.subagente_id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legame]);
+
   useEffect(() => {
     let vivo = true;
     void (async () => {
@@ -113,8 +123,15 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
 
   const campi: CampoProps[] | null = useMemo(() => {
     if (!fornitori || !subagenti) return null;
-    // D-50 §19: percentuale e regola solo al responsabile; per gli altri i campi sono spenti e non si inviano
-    const conResp = (c: CampoProps[]) => c.map((x) => ((x.nome === 'pct_subagente' || x.nome === 'regola_mensile') && !resp ? { ...x, disabilitato: true, aiuto: NOTA_RESP } : x));
+    // D-50 §19: percentuale e regola solo al responsabile; senza subagente sono spenti (tutta a Decobrands)
+    const senzaSub = !subagenteScelto;
+    const conResp = (c: CampoProps[]) => c.map((x) => {
+      if (x.nome === 'pct_subagente' || x.nome === 'regola_mensile') {
+        if (senzaSub) return { ...x, disabilitato: true, aiuto: NOTA_SENZA_SUB };
+        if (!resp) return { ...x, disabilitato: true, aiuto: NOTA_RESP };
+      }
+      return x;
+    });
     const campoFornitore: CampoProps = fornitoreFisso
       ? { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'testo', valore: fornitoreFisso.nome, disabilitato: true }
       : { nome: 'fornitore_id', etichetta: 'Fornitore', tipo: 'ricerca', entita: fornitore, valore: agenzia?.fornitore_id ?? fornitori[0]?.id ?? '', nomeIniziale: agenzia?.fornitore ?? fornitori[0]?.ragione_sociale ?? undefined, onCambia: (v) => setFornitoreScelto(v), link: (id) => '/fornitori/' + id, linkConferma };
@@ -132,7 +149,7 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
       : null;
     return conResp([
       campoFornitore,
-      { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: agenzia?.subagente_id ?? pro?.subagente_id ?? '', nomeIniziale: agenzia?.subagente ?? undefined, link: (id) => '/subagenti/' + id, linkConferma },
+      { nome: 'subagente_id', etichetta: 'Subagente', tipo: 'ricerca', entita: subagente, valore: agenzia?.subagente_id ?? pro?.subagente_id ?? '', nomeIniziale: agenzia?.subagente ?? undefined, onCambia: (v) => setSubagenteScelto(v), link: (id) => '/subagenti/' + id, linkConferma },
       { nome: 'codice_cliente_fornitore', etichetta: 'Codice cliente presso il fornitore', tipo: 'testo', disabilitato: bloccati?.includes('codice'), valore: agenzia?.codice_cliente_fornitore ?? iniziali?.codice_cliente_fornitore ?? pro?.cliente_codice_fornitore ?? '' },
       { nome: 'sconto', etichetta: 'Sconto %', tipo: 'testo', valore: agenzia ? String(agenzia.sconto) : pro ? String(pro.sconto_1) : '0', aiuto: aiutoSconto },
       { nome: 'pct_subagente', etichetta: 'Al subagente per questo cliente %', tipo: 'testo', valore: agenzia ? (agenzia.pct_subagente === null ? '' : String(agenzia.pct_subagente)) : '', aiuto: 'Vuoto = lo scaglione del fornitore.' },
@@ -140,7 +157,7 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
       { nome: 'valido_dal', etichetta: 'Valido dal', tipo: 'data', valore: agenzia?.valido_dal ?? iniziali?.valido_dal ?? oggi() },
       { nome: 'valido_al', etichetta: 'Valido al (vuoto = oggi)', tipo: 'data', valore: agenzia?.valido_al ?? '' },
     ]);
-  }, [fornitori, subagenti, agenzia, fornitoreFisso, iniziali, sconti, fornitoreScelto, resp, legame, bloccati]);
+  }, [fornitori, subagenti, agenzia, fornitoreFisso, iniziali, sconti, fornitoreScelto, subagenteScelto, resp, legame, bloccati]);
 
   const testoStorico = legame
     ? legame.rappresentato
@@ -163,7 +180,8 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
         onConferma={async (v) => {
           const corpo: Record<string, unknown> = {
             fornitore_id: Number(fornitoreFisso?.id ?? v.fornitore_id),
-            subagente_id: Number(v.subagente_id),
+            // senza subagente il campo non si manda: la provvigione è tutta di Decobrands
+            ...(v.subagente_id ? { subagente_id: Number(v.subagente_id) } : {}),
             // D-158: il campo bloccato non è nel form (disabilitato): si riprende il valore iniziale
             codice_cliente_fornitore: (bloccati?.includes('codice') ? (agenzia?.codice_cliente_fornitore ?? iniziali?.codice_cliente_fornitore) : v.codice_cliente_fornitore) || null,
             sconto: Number(v.sconto ?? 0),

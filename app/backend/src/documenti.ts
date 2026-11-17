@@ -1804,17 +1804,17 @@ async function registra(tx: Tx, fid: bigint, pid: bigint, b: NuovoDocumento, ctx
  *  risponde 409 con il codice `agenzia_da_confermare` e i dati dell'agenzia (per il riquadro «Usa questa /
  *  Configura»), così il documento la conferma o la configura prima di usarla. */
 function agenziaDaConfermare(ag: {
-  id: bigint; subagente_id: bigint; fornitore_id: bigint; codice_cliente_fornitore: string | null; sconto: Prisma.Decimal;
+  id: bigint; subagente_id: bigint | null; fornitore_id: bigint; codice_cliente_fornitore: string | null; sconto: Prisma.Decimal;
   pct_subagente: Prisma.Decimal | null; regola_mensile: string | null; valido_dal: Date; valido_al: Date | null;
-  subagente: { nome: string; cognome: string };
+  subagente: { nome: string; cognome: string } | null;
 }) {
   throw new ConflictException({
     code: 'agenzia_da_confermare',
     message: 'Questa agenzia viene dal vecchio CRM: confermala o configurala prima di aprire la pratica.',
     agenzia: {
       id: String(ag.id),
-      subagente_id: String(ag.subagente_id),
-      subagente: `${ag.subagente.cognome} ${ag.subagente.nome}`,
+      subagente_id: ag.subagente_id === null ? null : String(ag.subagente_id),
+      subagente: ag.subagente ? `${ag.subagente.cognome} ${ag.subagente.nome}` : null,
       subagente_codice: null,
       fornitore_id: String(ag.fornitore_id),
       fornitore: null,
@@ -1894,7 +1894,7 @@ async function nuovaPratica(tx: Tx, b: AbbinaDocumento, ctx: Contesto) {
   }
   const t = await tx.ordini_fornitore_testata.create({ data: {
     fornitore_id: fid, fornitore_versione_id: f.versione_corrente_id, cliente_id: cid, cliente_versione_id: c.versione_corrente_id,
-    numero_ordine, numero_ordine_fornitore: b.numero ?? null, data_ordine: new Date(b.data), importo_merce: b.importo ?? null, agente_id: ag.subagente.agente_id,
+    numero_ordine, numero_ordine_fornitore: b.numero ?? null, data_ordine: new Date(b.data), importo_merce: b.importo ?? null, agente_id: ag.subagente?.agente_id ?? null,
   } });
   await logEvent(tx, {
     tipo: 'crud', azione: 'create', entita: 'pratica', entita_id: t.id, esito: 'successo',
@@ -2035,7 +2035,7 @@ async function bloccaDocumento(tx: Tx, id: number) {
   if (!t) throw new NotFoundException('Documento non trovato');
   await bloccaFornitore(tx, Number(t.testata_id));
   await tx.$queryRaw`SELECT id FROM ordini_fornitore_documenti WHERE id = ${BigInt(id)} FOR UPDATE`;
-  const d = await tx.ordini_fornitore_documenti.findUnique({ where: { id: BigInt(id) }, include: { correzione: true, testata: { select: { cliente_id: true, fornitore_id: true } } } });
+  const d = await tx.ordini_fornitore_documenti.findUnique({ where: { id: BigInt(id) }, include: { correzione: true, testata: { select: { cliente_id: true, fornitore_id: true, data_ordine: true } } } });
   if (!d) throw new NotFoundException('Documento non trovato');
   if (!fiscale(d.tipo)) throw new BadRequestException(`${nomeDi(d.tipo)} ${d.numero} non dà provvigioni al subagente`);
   // già pagato al subagente: il trimestre è chiuso, si corregge con una nota di credito (D-11)
@@ -2051,7 +2051,7 @@ async function nomeSubagente(tx: Tx, testata: { cliente_id: bigint; fornitore_id
     where: { cliente_id: testata.cliente_id, fornitore_id: testata.fornitore_id, valido_dal: { lte: data }, OR: [{ valido_al: null }, { valido_al: { gt: data } }] },
     select: { subagente: { select: { nome: true, cognome: true } } },
   });
-  return a ? `${a.subagente.nome} ${a.subagente.cognome}` : '';
+  return a?.subagente ? `${a.subagente.nome} ${a.subagente.cognome}` : '';
 }
 
 @Controller('documenti-fiscali')
@@ -2077,6 +2077,13 @@ export class DocumentiFiscaliController {
     }
     return this.db.$transaction(async (tx) => {
       const d = await bloccaDocumento(tx, id);
+      // senza subagente la provvigione è tutta di Decobrands: non c'è quota del subagente da correggere
+      // (D-146: l'agenzia vale alla data dell'ordine della pratica, come nel motore)
+      const ag = await tx.interscambio.findFirst({
+        where: { cliente_id: d.testata.cliente_id, fornitore_id: d.testata.fornitore_id, valido_dal: { lte: d.testata.data_ordine }, OR: [{ valido_al: null }, { valido_al: { gt: d.testata.data_ordine } }] },
+        select: { subagente_id: true },
+      });
+      if (ag && ag.subagente_id == null) throw new BadRequestException('Senza subagente la provvigione è tutta di Decobrands: non c\'è una quota da correggere');
       const nomeSub = await nomeSubagente(tx, d.testata, d.data);
       const dopo = { tipo: b.tipo, valore: Number(valore), motivo };
       const c = d.correzione

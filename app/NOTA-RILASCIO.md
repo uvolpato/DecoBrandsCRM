@@ -11,6 +11,15 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.12 — 17/11/2026 — agenzia senza subagente
+
+- **Il subagente nell'agenzia non è più obbligatorio** (D-205): senza subagente la provvigione è tutta
+  di Decobrands. La quota del subagente è 0 (anche sui documenti fissati e in modalità per riga), il
+  documento non entra nelle liquidazioni dei subagenti e in Analisi compare sotto «Senza subagente».
+  Nella finestra dell'agenzia «Al subagente %» e «Provvigione al subagente» si spengono finché il
+  subagente è vuoto; il subagente si può aggiungere dopo, con la sua data.
+- Una correzione della quota del subagente su un documento senza subagente è rifiutata.
+
 ### 0.2.11 — 17/11/2026 — ordine, conferma e proforma aggiornati
 
 - **Sostituisci il documento registrato** (D-204): un ordine, una conferma o una proforma che arriva di

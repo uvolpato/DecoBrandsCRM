@@ -33,7 +33,7 @@ afterAll(async () => {
 const pratica = (numero: string) => S.pratiche.find((p) => p.numero === numero)!;
 const praticaM = (numero: string) => M.S.pratiche.find((p: any) => p.numero === numero);
 const doc = (numero: string) => m.trovaDocumento(S, numero)!;
-const nomeSub = (id: string) => S.subagenti.get(id)!.nome;
+const nomeSub = (id: string | null) => (id == null ? '' : S.subagenti.get(id)!.nome);
 const fornitore = (inizio: string) => [...S.fornitori.values()].find((f) => f.nome.startsWith(inizio))!;
 const TRIMESTRI = [2025, 2026].flatMap((a) => [1, 2, 3, 4].map((t) => [a, t] as const));
 

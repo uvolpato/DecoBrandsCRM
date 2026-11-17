@@ -28,7 +28,7 @@ const corto = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…
 
 type Dimensione = 'fornitori' | 'subagenti' | 'clienti';
 interface Riga {
-  chiave: string; nome: string; documenti?: number; clienti?: number; quota?: number;
+  chiave: string | null; nome: string; documenti?: number; clienti?: number; quota?: number;
   fatturato: number; prese: number; pagate: number; margine: number;
   numero?: string; tipo?: string; data?: string; pratica_id?: string; fornitore?: string; subagente?: string;
 }
@@ -48,7 +48,7 @@ interface Risposta {
   grafici: {
     andamento: { mesi: string[]; serie: SerieGrafico[] };
     fornitori: GraficoBarre;
-    subagenti: { etichette: string[]; chiavi: string[]; serie: SerieGrafico[] };
+    subagenti: { etichette: string[]; chiavi: (string | null)[]; serie: SerieGrafico[] };
     clienti: GraficoBarre;
   };
   tabella: { raggruppa: string; totale: number; totali: { fatturato: number; prese: number; pagate: number; margine: number }; righe: Riga[] };
@@ -264,14 +264,14 @@ export function VistaAnalisi() {
                       <FilterBar valori={{ raggruppa }} onChange={(v) => setRaggruppa(String(v.raggruppa))} campi={[{
                         nome: 'raggruppa', tipo: 'segmenti', etichetta: 'Raggruppa', opzioni: RAGGRUPPA.map((x) => ({ ...x, n: x.value === 'documento' ? dati.tabella.totale : undefined })),
                       }]} />
-                      <DataTable naturale righe={dati.tabella.righe} chiave={(r) => r.chiave}
+                      <DataTable naturale righe={dati.tabella.righe} chiave={(r) => r.chiave ?? ''}
                         colonne={raggruppa === 'documento' ? colonneDocumenti : colonneGruppo(raggruppa)}
                         totali={dati.tabella.totali}
                         ordinamentoIniziale={raggruppa === 'documento' ? { key: 'data', dir: 'desc' } : raggruppa === 'mese' ? { key: 'chiave', dir: 'asc' } : { key: 'fatturato', dir: 'desc' }}
                         memoria="tabella" caricando={caricando}
                         filtro={JSON.stringify({ valori, periodo, raggruppa })}
-                        rowClass={(r) => (dim && scelteDi(dim).includes(r.chiave) ? 'selezionata' : '')}
-                        onRowClick={dim ? (r) => alterna(dim, r.chiave) : undefined}
+                        rowClass={(r) => (dim && r.chiave != null && scelteDi(dim).includes(r.chiave) ? 'selezionata' : '')}
+                        onRowClick={dim ? (r) => { if (r.chiave != null) alterna(dim, r.chiave); } : undefined}
                         piede={dim ? 'Clic su una riga per aggiungerla al filtro, di nuovo per toglierla.' : ''}
                         etichettaTotale="Totale" emptyText="Nessun dato" />
                     </div>

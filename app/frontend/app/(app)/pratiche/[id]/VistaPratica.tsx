@@ -460,7 +460,9 @@ export function VistaPratica({ id }: { id: string }) {
                   },
                   { etichetta: 'Da ' + d.fornitore + ' a Decobrands: ' + pct(d.provvigione.agente), valore: d.provvigione.a_decobrands },
                   {
-                    etichetta: 'di cui al subagente ' + (d.subagente ?? '') + ': ' + pct(d.provvigione.sub) + (d.provvigione.eccezione ? ' (eccezione personale)' : ''),
+                    etichetta: d.subagente_id == null
+                      ? 'Subagente: —, tutta a Decobrands'
+                      : 'di cui al subagente ' + (d.subagente ?? '') + ': ' + pct(d.provvigione.sub) + (d.provvigione.eccezione ? ' (eccezione personale)' : ''),
                     valore: d.provvigione.a_subagente,
                     nota: d.provvigione.regole.length ? d.provvigione.regole.join(' · ') : undefined,
                   },
