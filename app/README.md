@@ -133,15 +133,19 @@ il modulo DNS del fornitore del dominio). Le due strade sono scritte anche nel `
 Primo scaricamento sul server (scarica solo i file di `app/`):
 
 ```bash
-git clone --filter=blob:none --sparse https://github.com/uvolpato/DecoBrandsCRM.git decobrands-crm
+git clone --filter=blob:none --no-checkout https://github.com/uvolpato/DecoBrandsCRM.git decobrands-crm
 cd decobrands-crm
-git sparse-checkout set --no-cone "app/"
+git sparse-checkout init --no-cone
+git sparse-checkout set "app/"
+git reset --hard HEAD
 ```
 
-`--no-cone` serve: in modo *cone* (il predefinito con `--sparse`) git scarica **sempre** anche i
-file al primo livello della radice (specifica, preventivo, istruzioni per agenti), che sul server
-non devono andare. Su Windows, in Git Bash, la barra iniziale `/app/` verrebbe convertita in un
-percorso di Windows: si usa `app/`, oppure `MSYS_NO_PATHCONV=1 git sparse-checkout set --no-cone "/app/"`.
+Il primo checkout avviene **dopo** aver impostato il checkout sparso: così i file della radice
+(specifica, preventivo, istruzioni per agenti) non arrivano nemmeno sul disco. `--no-cone` serve
+perché in modo *cone* (il predefinito con `--sparse`) git scarica **sempre** anche i file al primo
+livello della radice; il vecchio `git clone --sparse` faceva il primo checkout pieno e lasciava tutto
+in `app/` e radice. Su Windows, in Git Bash, la barra iniziale `/app/` verrebbe convertita in un
+percorso di Windows: si usa `app/`, oppure `MSYS_NO_PATHCONV=1 … "/app/"`.
 
 Aggiornamenti:
 

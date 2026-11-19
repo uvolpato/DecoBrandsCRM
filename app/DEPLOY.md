@@ -43,12 +43,15 @@ C:\Decobrands\backup\           dump del database e copia dei documenti
 
 ## 3. Primo scaricamento (una volta, da `cmd.exe`)
 
-Basta questo blocco, incollato nel Prompt: scarica **solo `app/`**.
+Basta questo blocco, incollato nel Prompt: scarica **solo `app/`** (il primo checkout avviene
+dopo aver impostato il checkout sparso, così il resto non arriva nemmeno sul disco).
 
 ```bat
-git clone --filter=blob:none --sparse https://github.com/uvolpato/DecoBrandsCRM.git C:\Decobrands
+git clone --filter=blob:none --no-checkout https://github.com/uvolpato/DecoBrandsCRM.git C:\Decobrands
 cd /d C:\Decobrands
-git sparse-checkout set --no-cone "app/"
+git sparse-checkout init --no-cone
+git sparse-checkout set "app/"
+git reset --hard HEAD
 ```
 
 Poi, per installare: `cd C:\Decobrands\app\deploy` e `setup.cmd` (come amministratore).
