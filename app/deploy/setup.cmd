@@ -36,7 +36,7 @@ if exist "%ENVFILE%" (
   set /p DECO_DBURL=Database ^(postgresql://utente:password@localhost:5432/decobrands_db?schema=public^): 
   if "!DECO_DBURL!"=="" set "DECO_DBURL=postgresql://decobrands:password@localhost:5432/decobrands_db?schema=public"
   set "DECO_APPURL="
-  set /p DECO_APPURL=Indirizzo pubblico [https://crm.decobrands.it]: 
+  set /p DECO_APPURL=Indirizzo con cui si apre l'app ^(in intranet: http://IP-del-server o http://crm.decobrands.local^) [https://crm.decobrands.it]: 
   if "!DECO_APPURL!"=="" set "DECO_APPURL=https://crm.decobrands.it"
   set "DECO_APP=%APP%"
   set "DECO_DOCS=%DOCS%"

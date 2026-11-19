@@ -21,6 +21,12 @@ export function configura(app: NestExpressApplication) {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const chiudi = app.close.bind(app);
   app.close = async () => { await chiudi(); await pool.end(); }; // il pool delle sessioni è fuori da Nest
+  // 19/11/2026: il cookie è "secure" solo se l'app è servita in HTTPS (APP_URL). In intranet, per ora,
+  // si entra in chiaro e un cookie secure non verrebbe mai inviato: la sessione non reggeva.
+  // Senza APP_URL resta secure in esercizio (comportamento di prima).
+  const secure = process.env.APP_URL
+    ? process.env.APP_URL.toLowerCase().startsWith('https://')
+    : process.env.NODE_ENV === 'production';
   app.use(
     session({
       store: new Store({ pool, tableName: 'sessioni' }),
@@ -29,7 +35,7 @@ export function configura(app: NestExpressApplication) {
       resave: false,
       saveUninitialized: false, // nessuna sessione per chi non è entrato
       rolling: true,
-      cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 30 * 24 * 3600 * 1000 },
+      cookie: { httpOnly: true, sameSite: 'lax', secure, maxAge: 30 * 24 * 3600 * 1000 },
     }),
   );
   // CSRF: chi ha una sessione manda il token avuto da /api/accesso/io in x-csrf-token su ogni
