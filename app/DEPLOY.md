@@ -43,8 +43,10 @@ C:\Decobrands\backup\           dump del database e copia dei documenti
 
 ## 3. Primo scaricamento (una volta, da `cmd.exe`)
 
-Basta questo blocco, incollato nel Prompt: scarica **solo `app/`** (il primo checkout avviene
-dopo aver impostato il checkout sparso, così il resto non arriva nemmeno sul disco).
+Basta questo blocco, incollato nel Prompt: nel working tree entra **solo `app/`** (il primo checkout
+avviene dopo aver impostato il checkout sparso; `--filter=blob:none` evita di scaricare i file delle
+altre cartelle). Sul disco restano `app\` e la cartella `.git` dei metadati, circa 2 MB; nessuna
+specifica, piano, prototipo o strumento.
 
 ```bat
 git clone --filter=blob:none --no-checkout https://github.com/uvolpato/DecoBrandsCRM.git C:\Decobrands

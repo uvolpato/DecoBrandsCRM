@@ -5,7 +5,7 @@ rem   con tag    -> scarica quel rilascio (es. v0.2.13)
 rem Non scarica mai specifica, piano, preventivo, prototipo, strumenti: nel repository
 rem il primo checkout avviene DOPO aver impostato il checkout sparso, cosi' gli altri
 rem file non arrivano nemmeno sul disco.
-setlocal
+setlocal EnableDelayedExpansion
 set "DEST=C:\Decobrands"
 set "REPO=https://github.com/uvolpato/DecoBrandsCRM.git"
 
@@ -39,6 +39,21 @@ if "%~1"=="" (
   git fetch origin tag %~1 || goto errore
   git checkout -f -B live %~1 || goto errore
 )
+rem Controllo: nella radice devono stare solo .git e app\. Se c'e' altro, si riapplica il
+rem checkout sparso; se resta ancora, ci si ferma invece di pubblicare un albero sbagliato.
+set "EXTRA="
+for /f "delims=" %%f in ('dir /b /a "%DEST%" ^| findstr /v /i /x ".git app"') do set "EXTRA=%%f"
+if defined EXTRA (
+  echo Trovato nella radice qualcosa che non serve: !EXTRA!
+  git sparse-checkout reapply >nul 2>&1
+  set "EXTRA="
+  for /f "delims=" %%f in ('dir /b /a "%DEST%" ^| findstr /v /i /x ".git app"') do set "EXTRA=%%f"
+  if defined EXTRA (
+    echo Il checkout sparso non e' a posto: fermati e controlla a mano %DEST%.
+    exit /b 1
+  )
+)
+
 echo Fatto: & git describe --tags --always
 exit /b 0
 
