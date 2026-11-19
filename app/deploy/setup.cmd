@@ -24,7 +24,8 @@ for %%c in (git node npm) do (
   where %%c >nul 2>&1 || (echo MANCA %%c nel PATH. & exit /b 1)
 )
 node -e "const v=process.versions.node.split('.').map(Number); process.exit(v[0]===24 && v[1]>=15 ? 0 : 1)" || (
-  echo Serve Node 24.15 o successivo nella 24. & exit /b 1)
+  echo Serve Node 24 LTS ^(24.15 o successivo^): la 26 non e' supportata da Prisma 7.
+  echo Installa la 24 LTS da https://nodejs.org/en/download e riapri il Prompt. & exit /b 1)
 where pg_dump >nul 2>&1 || echo ATTENZIONE: pg_dump non nel PATH: backup e migrazioni da controllare.
 where caddy  >nul 2>&1 || echo ATTENZIONE: caddy non nel PATH: il sito non avra' il certificato.
 where soffice >nul 2>&1 || echo ATTENZIONE: soffice non nel PATH: il PDF delle liquidazioni non funzionera'.
