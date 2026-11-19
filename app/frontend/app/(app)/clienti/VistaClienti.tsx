@@ -10,8 +10,8 @@ import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
 import { Copiabile } from '@/componenti/Copiabile';
 import { Icona } from '@/componenti/Icona';
 import { ConfermaGrave } from '@/componenti/ConfermaGrave';
-import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
-import { avviso, Dettagli, quando, Stato } from '@/componenti/Piccoli';
+import { Pagina, Pannello, type Azione } from '@/componenti/Pagina';
+import { avviso, Dettagli, Informazioni, quando, Stato } from '@/componenti/Piccoli';
 import { SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
@@ -159,13 +159,23 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
     { key: 'pratiche_aperte', header: 'Pratiche aperte', align: 'center', cell: (x) => String(x.pratiche_aperte) },
   ];
 
+  // 17/11/2026: due colonne essenziali, i dettagli in seconda riga tenue (niente scorrimento di lato)
+  const regolaAgenzia = (a: Agenzia) => (a.regola_mensile === 'prima' ? 'una fattura: la prima' : a.regola_mensile === 'piu_alta' ? 'una fattura: la più alta' : 'ogni fattura');
+  const periodoAgenzia = (a: Agenzia) => (a.valido_dal === '2000-01-01' ? 'da sempre' : data(a.valido_dal)) + (a.valido_al ? ' → ' + data(a.valido_al) : ''); // D-158: 2000-01-01 = «da sempre» (import dal vecchio CRM)
   const colonneAgenzie: Colonna<Agenzia>[] = [
-    { key: 'fornitore', header: 'Fornitore', grow: true, cell: (a) => <><b>{a.fornitore ? <Link href={'/fornitori/' + a.fornitore_id}>{a.fornitore}</Link> : '—'}</b>{a.da_confermare && <Stato v="attesa">da confermare</Stato>}<span className="sec-riga">{a.subagente ? 'seguito da ' + a.subagente : ''}</span></> },
-    { key: 'codice_cliente_fornitore', header: 'Codice cliente', cell: (a) => a.codice_cliente_fornitore ?? '—' },
-    { key: 'sconto', header: 'Sconto', align: 'center', cell: (a) => a.sconto + ' %' },
-    { key: 'pct_subagente', header: '% subagente', align: 'center', cell: (a) => (a.pct_subagente === null ? '—' : a.pct_subagente + ' %') },
-    { key: 'regola_mensile', header: 'Regola', cell: (a) => a.regola_mensile === 'prima' ? 'una fattura: la prima' : a.regola_mensile === 'piu_alta' ? 'una fattura: la più alta' : 'ogni fattura' },
-    { key: 'periodo', header: 'Periodo', cell: (a) => (a.valido_dal === '2000-01-01' ? 'da sempre' : data(a.valido_dal)) + (a.valido_al ? ' → ' + data(a.valido_al) : '') }, // D-158: 2000-01-01 = «da sempre» (import dal vecchio CRM)
+    {
+      key: 'fornitore', header: 'Fornitore', grow: true, cell: (a) => <>
+        <b>{a.fornitore ? <Link href={'/fornitori/' + a.fornitore_id}>{a.fornitore}</Link> : '—'}</b>
+        {a.da_confermare && <Stato v="attesa">da confermare</Stato>}
+        <span className="sec-riga">{[a.codice_cliente_fornitore ? 'codice ' + a.codice_cliente_fornitore : null, a.subagente ? 'seguito da ' + a.subagente : null].filter(Boolean).join(' · ')}</span>
+      </>,
+    },
+    {
+      key: 'condizioni', header: 'Condizioni', valore: (a) => a.sconto, classe: () => 'avvolgi', cell: (a) => <>
+        <span>Sconto {a.sconto} %{a.pct_subagente !== null && <> · al subagente {a.pct_subagente} %</>}</span>
+        <span className="sec-riga">{regolaAgenzia(a)} · {periodoAgenzia(a)}</span>
+      </>,
+    },
   ];
 
   const colonnePratiche: Colonna<Pratica>[] = [
@@ -214,12 +224,12 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
 
   if (!clienti) return pagina(errore
     ? <Pannello><div className="vuoto"><b>Clienti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
-    : sagome && <SagomaElenco classe="clienti-filtri" filtri={<>{filtri}<CercaInIntegra tipo="cliente" onImportato={async (id) => { await carica(); router.push('/clienti/' + id); }} /></>} larghezze="minmax(0,1.1fr) minmax(0,1fr)" />);
+    : sagome && <SagomaElenco classe="clienti-filtri" filtri={<>{filtri}<CercaInIntegra tipo="cliente" onImportato={async (id) => { await carica(); router.push('/clienti/' + id); }} /></>} larghezze="minmax(0,1.1fr) minmax(560px,1fr)" />);
 
   const azioni: Azione[] = [];
 
   return pagina(
-    <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.1fr) minmax(0,1fr)' } as CSSProperties}>
+    <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.1fr) minmax(560px,1fr)' } as CSSProperties}>
       <div className="pila riempi clienti-filtri">
         {filtri}
         <CercaInIntegra tipo="cliente" onImportato={async (id) => { await carica(); router.push('/clienti/' + id); }} />
@@ -240,7 +250,16 @@ export function VistaClienti({ idSel }: { idSel?: string }) {
               { etichetta: 'Codice soggetto', valore: u.soggetto_codice ?? '—' },
               { etichetta: 'Codice Integra', valore: u.codice_integra ?? '—' },
             ]} />
-            <Nota>Anagrafica da Integra (sola lettura).</Nota>
+            <div className="strumenti-scheda">
+              <span className="spazio" />
+              <Informazioni titolo="Informazioni sul cliente">
+                <ul>
+                  <li>Anagrafica da Integra (sola lettura).</li>
+                  <li>Qui si gestiscono le agenzie (interscambio) del cliente.</li>
+                  <li>Nelle agenzie codice cliente e subagente stanno sotto il fornitore; sconto, regola e periodo sotto «Condizioni».</li>
+                </ul>
+              </Informazioni>
+            </div>
             <Schede riempi memoria={schedaParam ? undefined : 'clienti'} attiva={schedaParam ?? undefined} schede={[
               {
                 id: 'agenzie', etichetta: 'Agenzie', contenuto: () => (

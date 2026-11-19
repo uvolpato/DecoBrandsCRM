@@ -114,8 +114,22 @@ describe('POST /api/documenti/carica (canale comune)', () => {
     expect(await eventi('documento.upload', BigInt(arrivo))).toBe(1);
   });
 
-  it('lo stesso file una seconda volta: 409 (doppione per impronta)', async () => {
-    await op.carica(pdf('fattura 1'), 'altro-nome.pdf').expect(409);
+  it('lo stesso file una seconda volta: 409 (doppione per impronta), senza pratica se è ancora in coda', async () => {
+    const r = await op.carica(pdf('fattura 1'), 'altro-nome.pdf').expect(409);
+    expect(r.body).toMatchObject({ message: 'Documento già caricato: è lo stesso file di uno già arrivato', pratica: null, documento: { id: arrivo } });
+  });
+
+  it('doppione di un file già abbinato: il 409 dice la pratica, per il link', async () => {
+    const dati = pdf('doppione abbinato');
+    const id = BigInt((await op.carica(dati, 'doppione.pdf').expect(201)).body.id);
+    await db.documenti_in_arrivo.update({ where: { id }, data: { abbinato_pratica_id: pratica.id } });
+    const t = await db.ordini_fornitore_testata.findUniqueOrThrow({ where: { id: pratica.id }, select: { numero_ordine: true } });
+    const r = await op.carica(dati, 'di-nuovo.pdf').expect(409);
+    expect(r.body).toMatchObject({
+      message: `Documento già caricato: è lo stesso file della pratica ${t.numero_ordine}`,
+      pratica: { id: String(pratica.id), numero: t.numero_ordine },
+      documento: { id: String(id) },
+    });
   });
 
   it('tipo controllato dal contenuto: un testo chiamato .pdf è rifiutato (415)', async () => {
@@ -875,7 +889,7 @@ describe('proposta con import da Integra e storico (D-111/D-112)', () => {
 });
 
 describe('coda visibile in elenco e lettura non configurata (§7.9)', () => {
-  it('stato=aperte: in coda, in lettura e da controllare insieme, in cima con lo stato', async () => {
+  it('stato=aperte: in coda, in lettura, da controllare ed errore insieme, in cima con lo stato (D-208)', async () => {
     const inCoda = await db.documenti_in_arrivo.create({ data: {
       origine: 'caricamento', file_nome: 'coda-elenco.pdf', stato: 'in_coda',
       file_hash: createHash('sha256').update('coda-elenco').digest('hex'), file_percorso: 'in_arrivo/coda-elenco.pdf',
@@ -884,23 +898,28 @@ describe('coda visibile in elenco e lettura non configurata (§7.9)', () => {
       origine: 'caricamento', file_nome: 'lettura-elenco.pdf', stato: 'in_lettura',
       file_hash: createHash('sha256').update('lettura-elenco').digest('hex'), file_percorso: 'in_arrivo/lettura-elenco.pdf',
     } });
+    // D-208: un documento non letto dopo 3 tentativi è da decidere come gli altri (si apre o si scarta)
+    const inErrore = await db.documenti_in_arrivo.create({ data: {
+      origine: 'caricamento', file_nome: 'errore-elenco.pdf', stato: 'errore', tentativi: 3,
+      file_hash: createHash('sha256').update('errore-elenco').digest('hex'), file_percorso: 'in_arrivo/errore-elenco.pdf',
+    } });
     const r = (await op.get('/documenti?stato=aperte&per_pagina=200').expect(200)).body;
     // il server dichiara la lettura non configurata (V12): nessuna deduzione del browser
     expect(r.lettura_configurata).toBe(false);
     expect(r.documenti.every((x: any) => typeof x.stato === 'string')).toBe(true);
     expect(r.documenti.find((x: any) => x.id === String(inCoda.id))).toMatchObject({ stato: 'in_coda', file_nome: 'coda-elenco.pdf' });
     expect(r.documenti.find((x: any) => x.id === String(inLettura.id))).toMatchObject({ stato: 'in_lettura' });
-    // in coda e in lettura in cima, poi i da controllare
+    expect(r.documenti.find((x: any) => x.id === String(inErrore.id))).toMatchObject({ stato: 'errore', file_nome: 'errore-elenco.pdf' });
+    // in coda e in lettura in cima, poi i da controllare e in fondo gli in errore
     const stati = r.documenti.map((x: any) => x.stato);
     const primoDaControllare = stati.indexOf('da_controllare');
     expect(primoDaControllare).toBeGreaterThanOrEqual(0);
     expect(stati.slice(0, primoDaControllare).every((s: string) => s === 'in_coda' || s === 'in_lettura')).toBe(true);
-    // niente chiusi né in errore
+    // niente chiusi
     expect(stati).not.toContain('scartato');
     expect(stati).not.toContain('abbinato');
-    expect(stati).not.toContain('errore');
-    // il totale di «aperte» è la somma dei tre segmenti
-    expect(r.totale).toBe(r.conteggi.in_coda + r.conteggi.in_lettura + r.conteggi.da_controllare);
+    // il totale di «aperte» è la somma dei quattro segmenti
+    expect(r.totale).toBe(r.conteggi.in_coda + r.conteggi.in_lettura + r.conteggi.da_controllare + r.conteggi.errore);
   });
 
   it('stato=da_controllare resta solo da_controllare (non cambia)', async () => {

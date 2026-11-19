@@ -10,8 +10,8 @@ import { COLORI_GRAFICI, Grafico } from '@/componenti/Grafico';
 import { KpiRow } from '@/componenti/Kpi';
 import { Conferma, Modale } from '@/componenti/Modale';
 import { ConfermaGrave } from '@/componenti/ConfermaGrave';
-import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
-import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
+import { Pagina, Pannello } from '@/componenti/Pagina';
+import { avviso, Informazioni, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, SagomaRiquadri, SagomaTabella, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo } from '@/componenti/Utente';
@@ -319,6 +319,12 @@ function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
     if (!r.subagenti.length) return <div className="report-sub"><div className="vuoto"><b>Nessun subagente con documenti</b></div></div>;
     return (
       <div className="report-sub">
+        <div className="strumenti-scheda"><span className="spazio" /><Informazioni titolo="Informazioni sul report subagenti">
+          <ul>
+            <li>Numeri del trimestre di liquidazione, compresi i documenti in attesa e le voci di storno.</li>
+            <li>L’esportazione di questo trimestre è nel pulsante <b>Esporta</b>; altri periodi e filtri: <Link href={analisi}>Analisi completa</Link>.</li>
+          </ul>
+        </Informazioni></div>
         <Grafico tipo="bar" orizzontale impilato altezza={Math.max(140, 30 * r.subagenti.length + 56)} titolo="Provvigioni generate per subagente"
           etichette={r.subagenti.map((x) => x.nome)}
           serie={[
@@ -342,7 +348,6 @@ function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
             },
           ]}
           piede={'Margine = provvigioni dai fornitori meno la provvigione al subagente. Ultima colonna: provvigione al subagente ' + etPrec + '. Clic su un subagente a sinistra per il suo report.'} />
-        <Nota>Numeri del trimestre di liquidazione, compresi i documenti in attesa e le voci di storno. L’esportazione di questo trimestre è nel pulsante <b>Esporta</b>; altri periodi e filtri: <Link href={analisi}>Analisi completa</Link>.</Nota>
       </div>
     );
   }
@@ -350,6 +355,12 @@ function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
   if (!n || !sub) return null;
   return (
     <div className="report-sub">
+      <div className="strumenti-scheda"><span className="spazio" /><Informazioni titolo="Informazioni sul report subagenti">
+        <ul>
+          <li>Numeri del trimestre di liquidazione.</li>
+          <li>L’esportazione del trimestre è nel pulsante <b>Esporta</b>; altri periodi e confronti: <Link href={analisi}>Analisi completa di {sub.nome}</Link>.</li>
+        </ul>
+      </Informazioni></div>
       <KpiRow voci={[
         {
           id: 'f', etichetta: 'Fatturato dei suoi clienti', valore: n.fatturato, variante: 'primario',
@@ -377,7 +388,6 @@ function ReportSubagenti({ r, analisi }: { r: Report; analisi: string }) {
           }))} />
         </Pannello>
       </div>
-      <Nota>Numeri del trimestre di liquidazione. L’esportazione del trimestre è nel pulsante <b>Esporta</b>; altri periodi e confronti: <Link href={analisi}>Analisi completa di {sub.nome}</Link>.</Nota>
     </div>
   );
 }

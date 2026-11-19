@@ -681,7 +681,7 @@ async function praticaPerOrdine(db: Db, l: Letto): Promise<PraticaOrdine[]> {
   const numero = (l.numero_ordine_fornitore ?? '').trim();
   if (!numero) return [];
   const pratiche = await db.ordini_fornitore_testata.findMany({
-    where: { numero_ordine_fornitore: numero, ...(l.fornitore_id != null ? { fornitore_id: l.fornitore_id } : {}) },
+    where: { numero_ordine_fornitore: numero, annullata_il: null, ...(l.fornitore_id != null ? { fornitore_id: l.fornitore_id } : {}) }, // D-207: una pratica annullata non si abbina da sola
     select: {
       id: true, numero_ordine: true, numero_ordine_fornitore: true, fornitore_id: true, cliente_id: true, stato: true, data_ordine: true,
       fornitore: { select: { ragione_sociale: true } },
@@ -695,6 +695,17 @@ async function praticaPerOrdine(db: Db, l: Letto): Promise<PraticaOrdine[]> {
     fornitore: p.fornitore?.ragione_sociale ?? null, fornitore_id: p.fornitore_id,
     stato: p.stato, data_ordine: iso(p.data_ordine),
   }));
+}
+
+/** D-207: la pratica annullata citata dal numero d'ordine del documento (per l'anomalia nella coda,
+ *  «pratica annullata»): il documento non si abbina da solo, lo decide una persona. */
+export async function annullataPerOrdine(db: Db, l: Letto): Promise<{ numero_ordine: string } | null> {
+  const numero = (l.numero_ordine_fornitore ?? '').trim();
+  if (!numero) return null;
+  return db.ordini_fornitore_testata.findFirst({
+    where: { numero_ordine_fornitore: numero, annullata_il: { not: null }, ...(l.fornitore_id != null ? { fornitore_id: l.fornitore_id } : {}) },
+    select: { numero_ordine: true },
+  });
 }
 
 /** D-169 (4b): il cliente del documento coincide con quello della pratica trovata per numero d'ordine?
@@ -871,9 +882,12 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   if (cliente_riconosciuto == null && !clienteScelto && !clienteVocabolario && !ab) {
     cliente_riconosciuto = await clientePerSomiglianza(db, l.cliente);
   }
-  // D-60/proforma: il cliente certo (agenzia per codice, scelto a mano o vocabolario) filtra le pratiche
-  // della coppia; il riconosciuto per P.IVA/nome non filtra (resta il confronto per articoli di prima).
+  // D-60: cliente certo (codice, scelto a mano, vocabolario) — per gli altri tipi il riconosciuto
+  // per P.IVA/nome non filtra, resta il confronto per articoli
   const clientePratica = ab?.cliente_id ?? clienteScelto?.cliente_id ?? clienteVocabolario?.cliente_id ?? null;
+  // 18/11/2026: un pagamento non porta il codice del fornitore, quindi vale anche il cliente
+  // riconosciuto per P.IVA/nome: senza un elemento in comune non si propongono tutte le fatturate
+  const clienteTestate = clientePratica ?? (l.tipo === 'pagamento' ? cliente_riconosciuto?.cliente_id ?? null : null);
   const storico = contesto.storico ?? [];
   // D-112: la coppia cliente-fornitore nello storico, con o senza subagente
   const coppiaCon = storico.find((s) => s.rappresentato) ?? null;
@@ -883,6 +897,8 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   // sola riga di Integra (certo, come oggi) o da un elenco di candidati da scegliere.
   // Vale per i tipi che entrano in pratica, prima dell'ordine (il doppione di un ordine vince comunque, vedi sotto).
   const clienteDaIntegra = async (): Promise<Proposta | null> => {
+    if (l.tipo === 'pagamento') return null; // un pagamento non crea la pratica: serve solo quella da saldare
+
     if (l.fornitore_id == null || ab != null || cliente_riconosciuto != null) return null;
     if (coppiaCon) {
       return { ...base, esito: 'cliente_da_integra', cliente_da_integra: { id_integra: null, ragione_sociale: coppiaCon.cliente_ragione_sociale, piva: coppiaCon.cliente_piva, subagente: coppiaCon.subagente_nome, sconto: coppiaCon.sconto } };
@@ -919,9 +935,10 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
     }
     return { ...base, esito: ab ? 'nuova' : 'nessuno', abbinamento: ab, cliente_riconosciuto };
   }
-  if (l.tipo !== 'conferma' && l.tipo !== 'proforma' && l.tipo !== 'fattura' && l.tipo !== 'nota_credito') {
-    // pagamento, altro o tipo non letto: non entrano in una pratica, ma il cliente scelto o
+  if (l.tipo !== 'conferma' && l.tipo !== 'proforma' && l.tipo !== 'fattura' && l.tipo !== 'nota_credito' && l.tipo !== 'pagamento') {
+    // altro o tipo non letto: non entrano in una pratica, ma il cliente scelto o
     // riconosciuto (codice del fornitore, P.IVA, nome) resta quello del documento (D-169, E di Ugo).
+    // Il pagamento prosegue: salda una fattura, quindi si propongono le pratiche fatturate senza pagamento.
     return { ...base, esito: 'nessuno', abbinamento: ab, cliente_riconosciuto };
   }
   // una fattura già registrata in una pratica è un doppione
@@ -953,7 +970,7 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   const codiciDoc = l.righe.map((r) => r.codice).filter((c): c is string => !!c);
   const testate = l.fornitore_id != null
     ? await db.ordini_fornitore_testata.findMany({
-      where: { fornitore_id: l.fornitore_id, ...(clientePratica != null ? { cliente_id: clientePratica } : {}) },
+      where: { fornitore_id: l.fornitore_id, ...(clienteTestate != null ? { cliente_id: clienteTestate } : {}) },
       include: CON_PROP,
     })
     : [];
@@ -963,6 +980,8 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
   const pool = testate.filter((t) => {
     if (l.tipo === 'conferma' || l.tipo === 'proforma') return !t.documenti.some((d) => fiscale(d.tipo));
     if (l.tipo === 'fattura') return !t.documenti.some((d) => fiscale(d.tipo) && d.numero === l.numero);
+    // un pagamento salda una fattura: una pratica che ne ha già uno non si propone (18/11/2026)
+    if (l.tipo === 'pagamento') return !t.documenti.some((d) => d.tipo === 'pagamento');
     return true;
   });
 
@@ -1014,8 +1033,10 @@ export async function propostaDocumento(db: Db, l: Letto, contesto: Contesto = {
     }
   }
 
-  // D-178 §19: il filtro per stato si applica qui, prima dell'esito, così la prima candidata è la proposta fra quelle filtrate
-  const proposti = filtraPratiche(candidati, filtro);
+  // D-178 §19: il filtro per stato si applica qui, prima dell'esito, così la prima candidata è la proposta fra quelle filtrate.
+  // Ugo 18/11/2026: senza un elemento in comune (articoli, o cliente del documento che restringe la ricerca)
+  // non si propongono tutte le fatturate del fornitore: per un pagamento sarebbero l'intero elenco
+  const proposti = filtraPratiche(candidati, filtro).filter((c) => clienteTestate != null || c.punteggio > 0);
   let esito: Esito = 'nessuno';
   if (proposti.length && clientePratica == null) esito = proposti[0].punteggio > 0 ? 'probabile' : 'nessuno';
   else if (proposti.length === 1) esito = 'certo';

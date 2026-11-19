@@ -21,7 +21,7 @@ import { aggiornaPratica } from './pratiche';
 import { cerca, importa, TEMPO_AUTO_MS } from './anagrafica-integra';
 import { IntegraService } from './integra';
 import { cercaLegame } from './storico';
-import { type ClienteConCorrente, candidatiDoppio, controlliFissi, esitoCodiceCliente, fattoreSconto, filtroDalTipo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, ricordaAlias, riconosciClienteDai, risolviFornitore, ruoloConferma, soglieLettura, STATI_PRATICHE, superatiConferma, valutaLettura, type Contesto as ContestoProposta, type FiltroPratiche, type Letto, type RigaStorico } from './proposta';
+import { type ClienteConCorrente, annullataPerOrdine, candidatiDoppio, controlliFissi, esitoCodiceCliente, fattoreSconto, filtroDalTipo, lettoDaCampi, mancaAgenziaRighe, mancaRappresentanzaRighe, normalizzaNome, normalizzaPiva, propostaDocumento, ricordaAlias, riconosciClienteDai, risolviFornitore, ruoloConferma, soglieLettura, STATI_PRATICHE, superatiConferma, valutaLettura, type Contesto as ContestoProposta, type FiltroPratiche, type Letto, type RigaStorico } from './proposta';
 import { PrismaService } from './prisma.service';
 import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
@@ -29,6 +29,7 @@ import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registr
 // Il browser manda solo i valori digitati; netto, totali e stato li calcola il server (V12, D-28).
 
 type Tx = Prisma.TransactionClient;
+type Db = Prisma.TransactionClient | PrismaClient;
 const Dec = Prisma.Decimal;
 const dataIt = (s: string) => s.split('-').reverse().join('/');
 const NOME: Record<TipoDocumento, string> = {
@@ -104,7 +105,21 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
   if (f.dati.length > MAX_BYTE) throw new PayloadTooLargeException(`Il file supera ${MB} MB`);
   const est = formato(f.dati, f.nome);
   const hash = createHash('sha256').update(f.dati).digest('hex');
-  const doppione = () => new ConflictException('Documento già caricato: è lo stesso file di uno già arrivato');
+  // Il 409 del doppione dice la pratica dell'abbinamento **e** la riga del documento che ha già il file:
+  // così la pagina Documenti linka la pratica o, se non c'è, la pagina del documento (id dal database, V12/D-28).
+  const doppione = async (client: Db, riga: { id: bigint; abbinato_pratica_id: bigint | null } | null) => {
+    const pratica_id = riga?.abbinato_pratica_id ?? null;
+    const p = pratica_id == null ? null
+      : await client.ordini_fornitore_testata.findUnique({ where: { id: pratica_id }, select: { numero_ordine: true } });
+    const documento = riga ? { id: String(riga.id) } : null;
+    return p
+      ? new ConflictException({
+        message: `Documento già caricato: è lo stesso file della pratica ${p.numero_ordine}`,
+        pratica: { id: String(pratica_id), numero: p.numero_ordine },
+        documento,
+      })
+      : new ConflictException({ message: 'Documento già caricato: è lo stesso file di uno già arrivato', pratica: null, documento });
+  };
 
   const radice = process.env.DOCUMENTI_DIR;
   if (!radice) throw new Error('DOCUMENTI_DIR non definita in .env');
@@ -114,8 +129,8 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
   const file_nome = basename(f.nome.replace(/\\/g, '/')).replace(/[\x00-\x1f]/g, '').slice(0, 255) || `documento.${est}`;
   // A4-14: se la riga con la stessa impronta sparisce fra la lettura e la transazione, si rifà da capo una volta
   for (let tentativo = 0; ; tentativo++) {
-    const gia = await db.documenti_in_arrivo.findUnique({ where: { file_hash: hash }, select: { id: true, stato: true, file_percorso: true } });
-    if (gia && gia.stato !== 'scartato') throw doppione();
+    const gia = await db.documenti_in_arrivo.findUnique({ where: { file_hash: hash }, select: { id: true, stato: true, file_percorso: true, abbinato_pratica_id: true } });
+    if (gia && gia.stato !== 'scartato') throw await doppione(db, gia);
     // U10/D-122: un file scartato non si rianima da solo: dalla casella si ignora (D-54 lo ricarica a mano)
     if (gia && f.origine !== 'caricamento') return { esito: 'ignorato', motivo: 'scartato' };
     const file_percorso = gia?.file_percorso ?? `in_arrivo/${g.slice(0, 4)}/${g}/${hash}.${est}`;
@@ -128,7 +143,7 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
           await tx.$queryRaw`SELECT id FROM documenti_in_arrivo WHERE id = ${gia.id} FOR UPDATE`;
           const riga = await tx.documenti_in_arrivo.findUnique({ where: { id: gia.id } });
           if (!riga) return null; // A4-14: la riga è stata eliminata fra la lettura e la transazione
-          if (riga.stato !== 'scartato') throw doppione();
+          if (riga.stato !== 'scartato') throw await doppione(tx, riga);
           d = await tx.documenti_in_arrivo.update({
             where: { id: gia.id },
             data: { ...dati, stato: 'in_coda', tentativi: 0, errore: null, ricevuto_il: new Date(), scartato_il: null, scartato_da: null, motivo_scarto: null, nota_scarto: null },
@@ -150,7 +165,10 @@ export async function riceviDocumento(db: PrismaService, f: FileRicevuto, ctx: C
       // F6-A2: qui, dopo il commit, si sveglia il lettore (stato in_coda = da leggere, §6.5)
       return { esito: 'in_coda', id: String(d.id), file_nome: d.file_nome, stato: d.stato, ricevuto_il: d.ricevuto_il.toISOString() };
     } catch (e) {
-      if ((e as { code?: string }).code === 'P2002') throw doppione(); // stesso file arrivato insieme da due parti
+      if ((e as { code?: string }).code === 'P2002') { // stesso file arrivato insieme da due parti
+        const altra = await db.documenti_in_arrivo.findUnique({ where: { file_hash: hash }, select: { id: true, stato: true, abbinato_pratica_id: true } });
+        throw await doppione(db, altra);
+      }
       throw e;
     }
   }
@@ -292,8 +310,10 @@ class CercaDocumenti {
 /* ---------- Pagina Documenti (F6-A4a, §7.9, §8.1, D-72) ---------- */
 
 const STATI_ELENCO = ['da_controllare', 'in_coda', 'in_lettura', 'errore'] as const;
-// §7.9: la lista «Da controllare» mostra anche i documenti in coda e in lettura, in cima
-const STATI_APERTE = ['in_coda', 'in_lettura', 'da_controllare'] as const;
+// §7.9: la lista «Da controllare» mostra anche i documenti in coda e in lettura, in cima.
+// Anche `errore` (D-208): un documento non letto dopo 3 tentativi si apre e si sistema a mano o
+// si scarta, quindi è da decidere come gli altri; fuori da qui non era raggiungibile da nessuna pagina.
+const STATI_APERTE = ['in_coda', 'in_lettura', 'da_controllare', 'errore'] as const;
 const STATI_FILTRO = [...STATI_ELENCO, 'aperte'] as const;
 const TIPI_ARRIVO = [...TIPI_DOCUMENTO, 'bollettino'] as const;
 const MOTIVI_SCARTO = ['Doppione', 'Non riguarda Decobrands', 'Documento illeggibile', 'Altro', 'Tolto dalla coda'] as const;
@@ -529,6 +549,17 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
   const campoFornitore = d.campi.find((c) => c.campo === 'fornitore');
   const fornitoreNome = (campoFornitore?.valore_finale ?? campoFornitore?.valore_letto ?? null);
   const p = await propostaDocumento(db, letto, await contestoDocumento(db, ponte, letto, fornitoreNome), filtro);
+  // D-207: il documento cita un ordine di una pratica annullata → non si abbina da solo, anomalia in coda
+  const annullata = await annullataPerOrdine(db, letto);
+  if (annullata) {
+    await apriAnomalia(db, {
+      servizio: 'provvigioni', codice: 'provvigioni.pratica_annullata', chiave: String(id),
+      messaggio: `Il documento cita l'ordine ${letto.numero_ordine_fornitore} della pratica ${annullata.numero_ordine}, che è annullata: non si abbina da solo.`,
+      dettaglio: { documento_id: String(id), pratica: annullata.numero_ordine },
+    });
+  } else {
+    await chiudiAnomalia(db, 'provvigioni', 'provvigioni.pratica_annullata', String(id));
+  }
   // il cliente dell'abbinamento è un BigInt: nella risposta va come stringa (come gli altri id)
   const proposta = {
     ...p,
@@ -560,6 +591,14 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
   const piva_da_salvare = await suggerimentoPiva(db, letto, p.abbinamento?.cliente_id ?? null, p.cliente_riconosciuto?.cliente_id ?? null);
   // D-175: spunta verde/avviso giallo dell'intestazione (il cliente associato è lo stesso del link «Cliente»)
   const codice_cliente_esito = await esitoCodiceCliente(db, letto, p.abbinamento?.cliente_id ?? p.cliente_riconosciuto?.cliente_id ?? null);
+  // D-170: la quota pagata può mancare fra i campi (documenti letti prima che lo schema la chiedesse):
+  // si riprende dalla risposta grezza del lettore, riga per riga (V12)
+  const grezze = (d.lettura_grezza as unknown as { extract_result?: { righe?: { quota_pagata?: unknown }[] } } | null)?.extract_result?.righe;
+  const quotaGrezza = (i: number) => {
+    const v = Array.isArray(grezze) ? grezze[i]?.quota_pagata : null;
+    const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v.trim().replace(',', '.')) : NaN;
+    return Number.isFinite(n) ? n : null;
+  };
   return {
     id: String(d.id), file_nome: d.file_nome, file_tipo: fileTipo(d.file_percorso), stato: d.stato,
     tipo: d.tipo, livello: d.livello, ricevuto_il: d.ricevuto_il.toISOString(),
@@ -581,7 +620,7 @@ async function dettaglioDocumento(db: DbLetto, id: bigint, ponte: Ponte | null =
       fornitore: letto.fornitore, importo: letto.importo,
       mese: letto.mese, anno: letto.anno, riferimento_fattura: letto.riferimento_fattura,
     },
-    righe: letto.righe.map((r, i) => ({ i, ...r })),
+    righe: letto.righe.map((r, i) => ({ i, ...r, quota_pagata: r.quota_pagata ?? quotaGrezza(i) })),
     // D-126 §19: i totali del piede della tabella delle righe dal server, non sommati nel browser (V12)
     totali: {
       importo: Number(r2(letto.righe.reduce((s, r) => s + (r.importo ?? 0), 0))),
@@ -771,7 +810,7 @@ export class DocumentiController {
   @Richiede('provvigioni.consulta')
   async elenco(@Query() q: ElencoDocumenti) {
     const stato = q.stato ?? 'da_controllare';
-    // §7.9: «aperte» = in coda + in lettura + da controllare, i documenti da decidere
+    // §7.9: «aperte» = in coda + in lettura + da controllare + errore (D-208), i documenti da decidere
     const stati = stato === 'aperte' ? STATI_APERTE : [stato];
     const perPagina = q.per_pagina ?? await righePagina(this.db);
     const pagina = q.pagina ?? 1;
@@ -843,7 +882,9 @@ export class DocumentiController {
     // §7.9: il connettore di lettura non scelto (o non utilizzabile) → i file restano in coda (V12)
     const lettura = await letturaConfig(this.db);
     const lettura_configurata = !!lettura && lettura.connettore === 'llamacloud_eu';
-    const totale = stato === 'aperte' ? conteggi.in_coda + conteggi.in_lettura + conteggi.da_controllare : conteggi[stato];
+    const totale = stato === 'aperte'
+      ? conteggi.in_coda + conteggi.in_lettura + conteggi.da_controllare + conteggi.errore // D-208: anche i non letti
+      : conteggi[stato];
     return {
       documenti: righe.map((r) => ({
         id: String(r.id), file_nome: r.file_nome, file_tipo: fileTipo(r.file_percorso), tipo: r.tipo,
@@ -1470,8 +1511,71 @@ async function ricalcolaStornoTotale(tx: Tx, fattura: { id: bigint; testata_id: 
   }
 }
 
+/** Versione precedente di un documento della pratica (D-204 §19): il documento in arrivo di quando era
+ *  quello attuale, sostituito in seguito. Solo da consultare, mai nei calcoli (V12). */
+export interface VersionePrecedente {
+  arrivo_id: string | null; // documento in arrivo vecchio: da qui il PDF (stessi permessi della pratica)
+  tipo: string | null;
+  numero: string | null;
+  data: string | null;
+  importo: number | null;
+  righe: number; // numero di righe lette di allora
+  righe_lette: { codice: string | null; descrizione: string | null; quantita: number | null; prezzo: number | null; importo: number | null }[];
+  sostituito_il: string; // quando è stato sostituito (ts dell'evento del registro)
+  sostituito_da: string | null; // chi l'ha sostituito
+  motivo: string | null;
+  file_nome: string | null;
+}
+
+/** D-204 §19: le versioni precedenti dei documenti della pratica, dalla più recente. Il collegamento
+ *  si ricava dagli eventi `documento.update` con `sostituito: true` del registro (catena
+ *  `prima.arrivo_id` → `dopo.arrivo_id`); i valori di allora dai campi letti del documento in arrivo
+ *  vecchio (`documenti_campi`, ancora `abbinato` alla pratica). Niente migrazione (D-204). */
+async function versioniPrecedenti(db: Db, t: Testata): Promise<Map<string, VersionePrecedente[]>> {
+  const out = new Map<string, VersionePrecedente[]>();
+  const ids = t.documenti.map((d) => d.id);
+  if (!ids.length) return out;
+  const eventi = await db.registro.findMany({
+    where: { entita: 'documento', entita_id: { in: ids }, codice: 'documento.update', dettaglio: { path: ['sostituito'], equals: true } },
+    orderBy: { id: 'asc' },
+    select: { entita_id: true, dettaglio: true, ts: true, utente: { select: { nome: true } } },
+  });
+  const perDoc = new Map<bigint, typeof eventi>();
+  for (const e of eventi) {
+    if (e.entita_id == null) continue;
+    const a = perDoc.get(e.entita_id); if (a) a.push(e); else perDoc.set(e.entita_id, [e]);
+  }
+  for (const d of t.documenti) {
+    const evs = perDoc.get(d.id);
+    if (!evs?.length) continue;
+    // catena dal documento attuale all'indietro, dall'evento più recente al primo
+    let corrente = d.arrivo_id ? String(d.arrivo_id) : null;
+    const versioni: VersionePrecedente[] = [];
+    for (let i = evs.length - 1; i >= 0; i--) {
+      const det = evs[i].dettaglio as { prima?: { arrivo_id?: string | null }; dopo?: { arrivo_id?: string | null }; motivo?: string | null };
+      if (corrente == null || (det.dopo?.arrivo_id ?? null) !== corrente) continue;
+      versioni.push({
+        arrivo_id: det.prima?.arrivo_id ?? null, tipo: null, numero: null, data: null, importo: null,
+        righe: 0, righe_lette: [], sostituito_il: iso(evs[i].ts), sostituito_da: evs[i].utente?.nome ?? null,
+        motivo: det.motivo ?? null, file_nome: null,
+      });
+      corrente = det.prima?.arrivo_id ?? null;
+    }
+    if (!versioni.length) continue;
+    for (const v of versioni) {
+      if (!v.arrivo_id) continue; // documento registrato a mano, senza file: nessun valore di allora da mostrare
+      const l = await lettoDaCampi(db, BigInt(v.arrivo_id));
+      v.tipo = l.tipo; v.numero = l.numero; v.data = l.data; v.importo = l.importo; v.righe = l.righe.length;
+      v.righe_lette = l.righe.map((r) => ({ codice: r.codice, descrizione: r.descrizione, quantita: r.quantita, prezzo: r.prezzo, importo: r.importo }));
+      v.file_nome = (await db.documenti_in_arrivo.findUnique({ where: { id: BigInt(v.arrivo_id) }, select: { file_nome: true } }))?.file_nome ?? null;
+    }
+    out.set(String(d.id), versioni);
+  }
+  return out;
+}
+
 /** Documenti fiscali della pratica con netto e totali dal motore (§5.3), dalla pratica già caricata. */
-function documentiPratica(t: Testata) {
+async function documentiPratica(t: Testata, db: Db) {
   const somma = (tipo: string) => r2(t.documenti.filter((d) => d.tipo === tipo).reduce((s, d) => s.plus(d.importo), new Dec(0)));
   const stornato = new Map<bigint, Prisma.Decimal>();
   for (const d of t.documenti) if (d.fattura_id) stornato.set(d.fattura_id, (stornato.get(d.fattura_id) ?? new Dec(0)).minus(d.importo));
@@ -1486,6 +1590,8 @@ function documentiPratica(t: Testata) {
     d.fattura_id ? (t.documenti.find((x) => x.id === d.fattura_id)?.numero ?? null) : null;
   // D-174: il documento sostituito mostra il numero di quello che lo sostituisce (per il grigio «superato da …»)
   const superatoDa = (d: { superato_da: bigint | null }) => (d.superato_da ? (t.documenti.find((x) => x.id === d.superato_da)?.numero ?? null) : null);
+  // D-204 §19: le versioni precedenti sostituite, sotto il documento attuale (solo per i tracciati)
+  const versioni = await versioniPrecedenti(db, t);
   return {
     pratica: { id: String(t.id), numero: t.numero_ordine, stato: t.stato, importo: Number(t.importo) },
     // D-60: ordini, conferme, proforma, pagamenti e altri, solo tracciati
@@ -1494,6 +1600,7 @@ function documentiPratica(t: Testata) {
       arrivo_id: d.arrivo_id ? String(d.arrivo_id) : null, file_nome: d.arrivo?.file_nome ?? null, note: d.note,
       ruolo: d.ruolo, superato: d.superato_da != null, superato_da: superatoDa(d),
       righe: righeDi(d), riferimento: riferimento(d),
+      versioni: versioni.get(String(d.id)) ?? [],
     })),
     documenti: t.documenti.filter((d) => fiscale(d.tipo)).map((d) => {
       const s = stornato.get(d.id) ?? new Dec(0);
@@ -1556,7 +1663,7 @@ export class DocumentiPraticaController {
   async elenco(@Param('id', ParseIntPipe) id: number) {
     const t = await this.db.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, include: CON_PRATICA });
     if (!t) throw new NotFoundException('Pratica non trovata');
-    return documentiPratica(t);
+    return documentiPratica(t, this.db);
   }
 
   /** Confronto fra due documenti della pratica (D-78, V12): il browser manda solo i due id, le righe
@@ -1579,7 +1686,7 @@ export class DocumentiPraticaController {
       const pid = BigInt(id);
       await bloccaPratiche(tx, [pid]);
       const d = await registra(tx, fid, pid, b, ctx);
-      return documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(d.tipo)} ${d.numero}`.trim()));
+      return documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(d.tipo)} ${d.numero}`.trim()), tx);
     });
     await archiviaDopo(this.db, b.arrivo_id ? BigInt(b.arrivo_id) : null);
     return r;
@@ -1597,9 +1704,10 @@ export class DocumentiPraticaController {
     const r = await this.db.$transaction(async (tx) => {
       const fid = await bloccaFornitore(tx, id);
       const pid = BigInt(id), nid = BigInt(b.pratica_id);
-      const nuova = await tx.ordini_fornitore_testata.findUnique({ where: { id: nid }, select: { fornitore_id: true, numero_ordine: true } });
+      const nuova = await tx.ordini_fornitore_testata.findUnique({ where: { id: nid }, select: { fornitore_id: true, numero_ordine: true, annullata_il: true } });
       if (!nuova) throw new NotFoundException('Pratica di destinazione non trovata');
       if (nuova.fornitore_id !== fid) throw new BadRequestException('La pratica di destinazione è di un altro fornitore');
+      if (nuova.annullata_il) throw new ConflictException(`La pratica ${nuova.numero_ordine} è annullata: non ci si spostano documenti`); // D-207
       await bloccaPratiche(tx, [pid, nid]);
       const d = await documentoDi(tx, pid, did); // liquidato: 409
       const quale = `${nomeDi(d.tipo)} ${d.numero}`.trim();
@@ -1620,7 +1728,7 @@ export class DocumentiPraticaController {
       }, ctx);
       const motivo = `${quale} spostato in ${nuova.numero_ordine}`;
       await aggiornaPratica(tx, pid, ctx, motivo);
-      return documentiPratica(await aggiornaPratica(tx, nid, ctx, motivo));
+      return documentiPratica(await aggiornaPratica(tx, nid, ctx, motivo), tx);
     });
     await archiviaDopo(this.db, arrivo_id); // il file segue il documento
     return r;
@@ -1670,7 +1778,7 @@ export class DocumentiPraticaController {
         if (d.tipo === 'fattura' && cambiaImporto) await ricalcolaStornoTotale(tx, d, importo, ctx);
         for (const c of altre) await aggiornaPratica(tx, c.testata_id, ctx, motivo);
       }
-      return documentiPratica(await aggiornaPratica(tx, pid, ctx, motivo));
+      return documentiPratica(await aggiornaPratica(tx, pid, ctx, motivo), tx);
     });
   }
 
@@ -1944,7 +2052,7 @@ export class DocumentiAbbinaController {
         tipo: 'documento', azione: 'match', entita: 'documento', entita_id: d.id, esito: 'successo',
         dettaglio: { etichetta: `${nomeDi(d.tipo)} ${d.numero}`.trim(), documento_id: String(d.id), arrivo_id: String(id), pratica_id: String(pid), tipo: d.tipo, pratica_nuova: !b.pratica_id },
       }, ctx);
-      return { documento_id: String(d.id), ...documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(d.tipo)} ${d.numero}`.trim())) };
+      return { documento_id: String(d.id), ...(await documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(d.tipo)} ${d.numero}`.trim()), tx)) };
     });
     await archiviaDopo(this.db, BigInt(id));
     return r;
@@ -2019,7 +2127,7 @@ export class DocumentiAbbinaController {
           prima, dopo: { data: dataNuova, importo: importoNuovo, arrivo_id: String(did) },
         },
       }, ctx);
-      return { documento_id: String(esistente.id), ...documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(tipo)} ${esistente.numero} aggiornata`)) };
+      return { documento_id: String(esistente.id), ...(await documentiPratica(await aggiornaPratica(tx, pid, ctx, `${nomeDi(tipo)} ${esistente.numero} aggiornata`), tx)) };
     });
     await archiviaDopo(this.db, did);
     return r;

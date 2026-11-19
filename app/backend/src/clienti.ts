@@ -20,7 +20,8 @@ import { normalizzaPiva, segnaUsata } from './storico';
 const Facoltativo = () => ValidateIf((_o, v) => v !== undefined);
 
 class DatiAgenzia {
-  @Facoltativo() @IsInt() subagente_id?: number;
+  // D-205 §19: null = subagente tolto (si distingue da undefined = campo non mandato)
+  @IsOptional() @IsInt() subagente_id?: number | null;
   @Facoltativo() @IsInt() fornitore_id?: number;
   @IsOptional() @IsString() @MaxLength(50) codice_cliente_fornitore?: string | null;
   @Facoltativo() @IsNumber() @Min(0) @Max(100) sconto?: number;
@@ -360,7 +361,7 @@ export class ClientiController {
       });
       if (!prima || prima.cliente_id !== BigInt(id)) throw new NotFoundException('Agenzia non trovata');
       soloResponsabile(req, b, { pct: prima.pct_subagente === null ? null : Number(prima.pct_subagente), regola: prima.regola_mensile });
-      if (b.subagente_id !== undefined) {
+      if (b.subagente_id != null) {
         const sub = await tx.subagenti.findUnique({ where: { id: BigInt(b.subagente_id) } });
         if (!sub) throw new NotFoundException('Subagente non trovato');
       }
@@ -369,7 +370,7 @@ export class ClientiController {
         if (!fornitore) throw new NotFoundException('Fornitore non trovato');
       }
       const dopoData = {
-        subagente_id: b.subagente_id !== undefined ? BigInt(b.subagente_id) : prima.subagente_id,
+        subagente_id: b.subagente_id !== undefined ? (b.subagente_id === null ? null : BigInt(b.subagente_id)) : prima.subagente_id,
         fornitore_id: b.fornitore_id !== undefined ? BigInt(b.fornitore_id) : prima.fornitore_id,
         codice_cliente_fornitore: b.codice_cliente_fornitore !== undefined
           ? (b.codice_cliente_fornitore ? b.codice_cliente_fornitore.trim() : null)

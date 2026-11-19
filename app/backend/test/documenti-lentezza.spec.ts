@@ -35,7 +35,8 @@ afterAll(async () => {
 });
 
 describe('documenti: tempi della coda e del dettaglio', () => {
-  it('coda e dettaglio sotto la soglia, anche con il ponte di Integra lento', async () => {
+  // misura solo sulla copia dei dati veri: su un database di prova vuoto non c'è nessun documento da aprire
+  (/decobrands_test_perf/.test(process.env.DATABASE_URL ?? '') ? it : it.skip)('coda e dettaglio sotto la soglia, anche con il ponte di Integra lento', async () => {
     const nome = 'perf-' + Date.now();
     await db.utenti.create({
       data: {

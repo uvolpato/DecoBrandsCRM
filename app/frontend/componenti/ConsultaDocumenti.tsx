@@ -24,6 +24,13 @@ export interface DocPratica {
   id: string; tipo: string; numero: string | null; data: string; importo: number;
   arrivo_id: string | null; file_nome: string | null; note?: string | null;
   righe?: RigaDoc[]; riferimento?: string | null; pratica_id?: string;
+  versioni?: VersioneDoc[];
+}
+/** Versione precedente di un documento sostituito (D-204 §19): solo da consultare, mai nei calcoli. */
+export interface VersioneDoc {
+  arrivo_id: string | null; tipo: string | null; numero: string | null; data: string | null;
+  importo: number | null; righe: number; righe_lette: RigaDoc[];
+  sostituito_il: string; sostituito_da: string | null; motivo: string | null; file_nome: string | null;
 }
 /** Riga già confrontata dal server (D-78, V12): `a` è il documento di confronto, `b` quello corrente. */
 interface RigaConfronto { quantita: number; prezzo: number; importo: number }
@@ -201,6 +208,12 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
               },
             ]} />
             {cur.note && <p className="testo-tenue">{cur.note}</p>}
+            {(cur.versioni ?? []).length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <b className="testo-tenue">Versioni precedenti</b>
+                <VersioniPrecedenti versioni={cur.versioni!} />
+              </div>
+            )}
             {src && <p><a href={src} target="_blank" rel="noreferrer">{foto ? 'Apri la foto in una scheda' : 'Apri il PDF in una scheda'}</a></p>}
             {rif && !caricando && variate.length > 0 && (
               <div style={{ margin: '14px 0 8px' }}>
@@ -230,6 +243,56 @@ export function ConsultaDocumenti({ docs, iniziale, pratica, codiceIniziale, onC
         </div>
       </div>
     </div>
+  );
+}
+
+/** D-204 §19: le versioni precedenti di un documento sostituito, sotto il documento attuale.
+ *  Solo da consultare (V12): il PDF vecchio e le righe lette di allora, in sola lettura. */
+export function VersioniPrecedenti({ versioni }: { versioni: VersioneDoc[] }) {
+  if (!versioni.length) return null;
+  return (
+    <ul style={{ listStyle: 'none', margin: '6px 0 0 12px', padding: 0 }}>
+      {versioni.map((v, i) => (
+        <li key={i} style={{ padding: '4px 0 4px 10px', borderLeft: '2px solid var(--bordo-tenue)' }}>
+          <div>
+            <b>{(TIPO[v.tipo ?? ''] ?? v.tipo ?? 'Documento') + (v.numero ? ' ' + v.numero : '')}</b>
+            <span className="sec-riga">
+              {v.data ? ' del ' + dataIt(v.data) : ''}{v.importo != null ? ' · ' + euro(v.importo) : ''}
+              {' · ' + v.righe + (v.righe === 1 ? ' riga' : ' righe')}
+            </span>
+          </div>
+          <div className="testo-tenue">
+            sostituito il {dataIt(v.sostituito_il)}{v.sostituito_da ? ' da ' + v.sostituito_da : ''}{v.motivo ? ' — ' + v.motivo : ''}
+          </div>
+          {v.arrivo_id && (
+            <a href={'/api/documenti/' + v.arrivo_id + '/file'} target="_blank" rel="noreferrer">Apri il PDF</a>
+          )}
+          {v.righe_lette.length > 0 && (
+            <details style={{ marginTop: 2 }}>
+              <summary className="testo-tenue" style={{ cursor: 'pointer' }}>Vedi le righe di allora</summary>
+              <table style={{ marginTop: 4, borderCollapse: 'collapse', fontSize: 12, color: 'var(--testo-tenue)' }}>
+                <thead>
+                  <tr>{['Articolo', 'Descrizione', 'Quantità', 'Prezzo', 'Importo'].map((h, j) => (
+                    <th key={h} style={{ textAlign: j < 2 ? 'left' : 'right', fontWeight: 600, padding: '2px 8px 2px 0', borderBottom: '1px solid var(--bordo-tenue)' }}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {v.righe_lette.map((r, j) => (
+                    <tr key={j}>
+                      <td style={{ padding: '2px 8px 2px 0' }}>{r.codice ?? '—'}</td>
+                      <td style={{ padding: '2px 8px 2px 0' }}>{r.descrizione ?? ''}</td>
+                      <td style={{ padding: '2px 8px 2px 0', textAlign: 'right' }}>{r.quantita ?? '—'}</td>
+                      <td style={{ padding: '2px 8px 2px 0', textAlign: 'right' }}>{r.prezzo == null ? '—' : euro(r.prezzo)}</td>
+                      <td style={{ padding: '2px 0', textAlign: 'right' }}>{euro(r.importo ?? (r.quantita ?? 0) * (r.prezzo ?? 0))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 

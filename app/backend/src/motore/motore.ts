@@ -62,6 +62,16 @@ export const speseEscluse = (S: Dati, p: Pratica, d: Documento) =>
   S.fornitori.get(p.fornitore_id)?.spese_base_provvigione ? ZERO : speseDoc(d);
 /** Base della provvigione di un documento: il valore salvato (calcolo.base), se manca il netto. */
 export const baseDoc = (d: Documento): Dec => (d.calcolo?.base != null ? new Dec(d.calcolo.base) : d.importo);
+/** 18/11/2026: la provvigione di una fattura si calcola sull'importo del pagamento del cliente quando c'è
+ *  (lo sconto per pagamento anticipato è già dentro l'importo), altrimenti sull'imponibile della fattura.
+ *  Con più fatture nella pratica il pagamento non si sa a quale si riferisce: resta la fattura.
+ *  Un pagamento registrato senza importo (0) non è una base: si usa la fattura. */
+export function baseProvvigione(p: Pratica, d: Documento): Dec {
+  // D-183 §19: i valori di un periodo chiuso non si spostano
+  if (d.congelato_il || d.tipo !== 'fattura' || p.documenti.filter((x) => x.tipo === 'fattura').length > 1) return baseDoc(d);
+  const pag = [...p.pagamenti].filter((x) => !x.importo.isZero()).sort((a, b) => b.data.localeCompare(a.data))[0];
+  return pag ? pag.importo.abs() : baseDoc(d);
+}
 /** Base della provvigione di una pratica = somma delle basi dei documenti (congelati o no, D-183). */
 export const basePratica = (p: Pratica) => r2(somma(p.documenti.map(baseDoc)));
 
@@ -74,6 +84,7 @@ export const pagato = (p: Pratica) => p.pagamenti.length > 0;
 
 /** Lo stato si ricava dai documenti arrivati, non si scrive a mano (§5.1). */
 export function statoPratica(S: Dati, p: Pratica) {
+  if (p.annullata) return { chiave: 'annullata' as const, scadenza: null, giorni: null }; // D-207: davanti a ogni stato
   const fase = fasePratica(p);
   if (fase !== 'attesa') return { chiave: fase };
   const gg = S.fornitori.get(p.fornitore_id)!.giorni_conferma;
@@ -298,6 +309,8 @@ export function quotaSub(S: Dati, p: Pratica, d: Documento, base?: Dec) {
   // senza subagente la provvigione è tutta di Decobrands: quota 0, prima di tutto (anche del congelato)
   const ab = abbinamento(S, p.cliente_id, p.fornitore_id, p.data);
   if (ab && ab.subagente_id == null) return { pct: ZERO, provvigione: ZERO, regola: 'senza_subagente', vale: null, eccezione: false };
+  // D-207 §19: una pratica annullata non dà provvigioni ai documenti aperti (i congelati restano, D-183)
+  if (p.annullata && !d.congelato_il) return { pct: ZERO, provvigione: ZERO, regola: 'annullata', vale: null, eccezione: false };
   // D-183 §19: un documento congelato non si ricalcola: vale la quota fissata nel `calcolo`.
   if (d.congelato_il && d.calcolo?.provvigione_subagente != null) {
     const c = d.calcolo;
@@ -548,11 +561,18 @@ export function calcoloDocumento(S: Dati, p: Pratica, d: Documento): CalcoloDocu
  *  (per gruppi in modalità `riga`, con lo sconto medio in `documento`). `agente`/`sub` null quando la
  *  provvigione è «da decidere» (sconto sotto la prima soglia). */
 export function provvigioneDocumento(S: Dati, p: Pratica, d: Documento) {
+  // D-207 §19: pratica annullata → provvigione prevista 0 per i documenti aperti; i congelati restano (D-183)
+  if (p.annullata && !d.congelato_il) return { base: baseProvvigione(p, d), agente: ZERO, sub: ZERO, pct_agente: ZERO, pct_sub: ZERO };
   const c = d.congelato_il && d.calcolo ? d.calcolo : calcoloDocumento(S, p, d);
+  // 18/11/2026: su una fattura la base è il pagamento del cliente quando c'è; la provvigione scende in
+  // proporzione, alla stessa percentuale effettiva (un solo arrotondamento, nessun valore nuovo dal browser).
+  const base = d.tipo === 'fattura' ? baseProvvigione(p, d) : new Dec(c.base);
+  const del = new Dec(c.base);
+  const scala = (v: string | null) => (v == null || del.isZero() || base.equals(del) ? (v == null ? null : new Dec(v)) : r2(new Dec(v).times(base).div(del)));
   return {
-    base: new Dec(c.base),
-    agente: c.provvigione_agente != null ? new Dec(c.provvigione_agente) : null,
-    sub: c.provvigione_subagente != null ? new Dec(c.provvigione_subagente) : null,
+    base,
+    agente: scala(c.provvigione_agente),
+    sub: scala(c.provvigione_subagente),
     pct_agente: c.pct_agente != null ? new Dec(c.pct_agente) : null,
     pct_sub: c.pct_subagente != null ? new Dec(c.pct_subagente) : null,
   };
@@ -579,7 +599,7 @@ export const righeBollettinoDi = (S: Dati, d: Documento, fornitore_id: string) =
     .filter(({ b }) => b.fornitore_id === fornitore_id)
     .sort((x, y) => x.b.anno * 100 + x.b.mese - (y.b.anno * 100 + y.b.mese));
 
-type Lato = { imponibile: Dec | null; pct: Dec | null; importo: Dec };
+type Lato = { imponibile: Dec | null; pct: Dec | null; pct_nominale?: Dec | null; importo: Dec }; // D-201 §19: pct_nominale = percentuale del fornitore prima della quota
 type Decisione = NonNullable<RigaBollettino['decisione']>;
 /** Quota pagata di una riga del bollettino: null = 100 % (i bollettini senza la colonna, D-201 §19). */
 const quotaDi = (r: RigaBollettino) => r.quota_pagata ?? new Dec(100);
@@ -612,6 +632,7 @@ type RigaRiconcilia = {
   loro: Lato | null; noi: Lato | null; differenza: Dec | null;
   categoria: string; incasso: boolean; pagamento: boolean; pagata_in: string | null; giorni: number | null;
   decisione: Decisione | null;
+  annullata: boolean; // D-207: il documento è di una pratica annullata (anomalia «pratica annullata»)
   righe: { id: string | null; importo: Dec; pct: Dec | null; quota: Dec | null }[];
   quota: Dec | null; quote_diverse: boolean;
 };
@@ -639,7 +660,8 @@ export function riconcilia(S: Dati, b: Bollettino) {
       loro, noi: null as Lato | null, differenza: null as Dec | null,
       categoria: 'sconosciuta', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
       decisione: (rr.find((r) => r.decisione)?.decisione ?? null) as Decisione | null,
-      // D-201 §19: il dettaglio delle righe del bollettino del gruppo e la sua quota
+      annullata: n.pratica.annullata, // D-207
+      // D-201 §19: il dettaglio delle righe del bollettino (gruppo) e la sua quota
       righe: rr.map((r) => ({ id: r.id, importo: r.importo, pct: r.pct, quota: r.quota_pagata })),
       quota: quotaGruppo(rr), quote_diverse: quoteDiverse(rr),
     };
@@ -647,7 +669,7 @@ export function riconcilia(S: Dati, b: Bollettino) {
     // differenza della coppia D-197 in documento, valori fissati se congelato).
     const v = provvigioneDocumento(S, n.pratica, n.doc);
     const pct = v.pct_agente ?? ZERO;
-    const imp = baseDoc(n.doc);
+    const imp = baseProvvigione(n.pratica, n.doc);
     const congelato = rr.some((r) => r.importo_calcolato != null);
     // D-201 §19: nostro atteso = provvigione del documento × quota/100, un solo arrotondamento al
     // centesimo; senza quota resta il valore di oggi (v.agente). Congelato = valori fissati alla verifica.
@@ -656,8 +678,8 @@ export function riconcilia(S: Dati, b: Bollettino) {
       : riga.quota == null ? (v.agente ?? ZERO) : r2(v.base.times(pct).div(100).times(riga.quota).div(100));
     const pctEffettiva = imp.isZero() ? ZERO : r2(atteso.div(imp).times(100));
     riga.noi = congelato
-      ? { imponibile: imp, pct: rr.find((r) => r.pct_calcolata != null)?.pct_calcolata ?? pctEffettiva, importo: atteso }
-      : { imponibile: imp, pct: pctEffettiva, importo: atteso };
+      ? { imponibile: imp, pct: rr.find((r) => r.pct_calcolata != null)?.pct_calcolata ?? pctEffettiva, pct_nominale: pct, importo: atteso }
+      : { imponibile: imp, pct: pctEffettiva, pct_nominale: pct, importo: atteso };
     riga.differenza = r2(rr.reduce((s, r) => s.plus(r.importo), ZERO).minus(atteso));
     riga.categoria = riga.differenza.abs().lte(TOLLERANZA_QUOTA) && (loro.imponibile == null || loro.imponibile.equals(imp)) ? 'quadra' : 'differenza';
     // maturato: fattura di un mese precedente riconosciuta nel mese in cui il cliente ha pagato
@@ -672,14 +694,16 @@ export function riconcilia(S: Dati, b: Bollettino) {
       loro: { imponibile: r.imponibile, pct: r.pct, importo: r.importo } as Lato | null, noi: null as Lato | null, differenza: null as Dec | null,
       categoria: 'sconosciuta', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
       decisione: r.decisione as Decisione | null,
+      annullata: n?.pratica.annullata ?? false, // D-207
       righe: [{ id: r.id, importo: r.importo, pct: r.pct, quota: r.quota_pagata }], quota: null as Dec | null, quote_diverse: false,
     };
     if (!n) { righe.push(riga); continue; }
     const v = provvigioneDocumento(S, n.pratica, n.doc);
     const pct = v.pct_agente ?? ZERO;
     // §5.14: storno (il cliente non ha pagato) e riaccredito (ha pagato) sul fatturato: non sono differenze da decidere
-    const imp = r.tipo === 'storno' ? baseDoc(n.doc).neg() : baseDoc(n.doc);
-    riga.noi = { imponibile: imp, pct, importo: quota(imp, pct) };
+    const base = baseProvvigione(n.pratica, n.doc); // 18/11/2026: base = pagamento del cliente, quando c'è
+    const imp = r.tipo === 'storno' ? base.neg() : base;
+    riga.noi = { imponibile: imp, pct, pct_nominale: pct, importo: quota(imp, pct) };
     riga.differenza = r2(r.importo.minus(riga.noi.importo));
     riga.categoria = r.tipo ?? 'differenza'; riga.incasso = !!r.tipo;
     righe.push(riga);
@@ -693,9 +717,10 @@ export function riconcilia(S: Dati, b: Bollettino) {
     const riga = {
       id: null as string | null, documento_id: x.doc.id as string | null,
       numero: x.doc.numero, data: x.doc.data, pratica_id: x.pratica.id, cliente_id: x.pratica.cliente_id, tipo: x.doc.tipo,
-      loro: null as Lato | null, noi: { imponibile: baseDoc(x.doc), pct: v.pct_agente ?? ZERO, importo: atteso } as Lato | null, differenza: atteso.neg() as Dec | null,
+      loro: null as Lato | null, noi: { imponibile: baseProvvigione(x.pratica, x.doc), pct: v.pct_agente ?? ZERO, pct_nominale: v.pct_agente ?? ZERO, importo: atteso } as Lato | null, differenza: atteso.neg() as Dec | null,
       categoria: 'mancante', incasso: false, pagamento: false, pagata_in: null as string | null, giorni: null as number | null,
       decisione: attesa?.decisione ?? null,
+      annullata: x.pratica.annullata, // D-207
       righe: [] as { id: string | null; importo: Dec; pct: Dec | null; quota: Dec | null }[], quota: null as Dec | null, quote_diverse: false,
     };
     // maturato (§5.14): una fattura assente non è "mancante": il cliente non ha ancora pagato
@@ -740,6 +765,7 @@ export function statoIncasso(S: Dati, p: Pratica, d: Documento) {
 export function pagamentiDaSollecitare(S: Dati) {
   const out = [];
   for (const p of S.pratiche) for (const d of p.documenti) {
+    if (p.annullata) continue; // D-207: una pratica annullata non ha solleciti di pagamento
     const st = statoIncasso(S, p, d);
     if (st && (st.stato === 'insoluta' || st.stato === 'da_verificare')) {
       out.push({
@@ -799,6 +825,7 @@ export function righeLiquidazione(S: Dati, a: number, t: number) {
     return q.a === a && q.t === t;
   };
   for (const p of S.pratiche) for (const d of p.documenti) {
+    if (p.annullata) continue; // D-207: la pratica annullata non liquida ai subagenti
     const r = riga(p, d, 1);
     if (!r) continue; // provvigione da decidere (gruppo sotto la prima soglia)
     if (S.fornitori.get(p.fornitore_id)!.maturazione === 'maturato') {
@@ -912,6 +939,7 @@ export function analisiTrimestre(S: Dati, a: number, t: number) {
 export function fattiAnalisi(S: Dati) {
   const out = [];
   for (const p of S.pratiche) for (const d of p.documenti) {
+    if (p.annullata) continue; // D-207: gli ordini annullati non entrano nell'Analisi
     const pr = provvigioneDoc(S, p, d);
     if (!pr) continue;
     out.push({

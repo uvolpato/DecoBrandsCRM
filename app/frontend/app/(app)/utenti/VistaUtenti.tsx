@@ -8,7 +8,7 @@ import { Icona } from '@/componenti/Icona';
 import { Conferma } from '@/componenti/Modale';
 import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
-import { avviso, Dettagli, quando, Stato } from '@/componenti/Piccoli';
+import { avviso, Dettagli, Informazioni, quando, Stato } from '@/componenti/Piccoli';
 import { SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { AREE, LIVELLI, RUOLI, usePuo, useUtente } from '@/componenti/Utente';
@@ -240,12 +240,18 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
     );
     return (
       <>
+        <div className="strumenti-scheda"><span className="spazio" /><Informazioni titolo="Informazioni sui permessi">
+          <ul>
+            <li>Evidenziati il ruolo e i livelli di {u.nome}.</li>
+            <li>Un livello comprende quelli prima.</li>
+            <li>Stato del sistema: anche per chi è operatore in un’area.</li>
+          </ul>
+        </Informazioni></div>
         {sezione('sistema', 'Sistema', <Stato v={u.ruolo === 'utente' ? 'neutro' : 'primario'}>{RUOLI[u.ruolo]}</Stato>, u.ruolo !== 'utente',
           elenco.filter((p) => p.area === 'sistema'), RUOLI, u.ruolo, (p, k) => !!p.ruoli?.includes(k) || (!!p.ancheOperatore && k === 'utente'))}
         {Object.keys(AREE).map((a) => sezione(a, AREE[a],
           u.aree[a] ? <Stato v={VARIANTE[u.aree[a]]}>{LIVELLI[u.aree[a]]}</Stato> : <span className="testo-tenue">Nessun accesso</span>, !!u.aree[a],
           elenco.filter((p) => p.area === a), LIVELLI, u.aree[a], (p, k) => ORDINE.indexOf(k) >= ORDINE.indexOf(p.minimo!)))}
-        <Nota>Evidenziati il ruolo e i livelli di {u.nome}. Un livello comprende quelli prima. Stato del sistema: anche per chi è operatore in un’area.</Nota>
       </>
     );
   }

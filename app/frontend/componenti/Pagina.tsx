@@ -104,6 +104,7 @@ export function Pagina({ titolo, sottotitolo, briciole, badge, azioni = [], test
 export interface PannelloProps {
   titolo?: ReactNode;
   nota?: ReactNode;
+  info?: ReactNode; // pulsante «i» nella testata, dopo le azioni (sempre a destra)
   azioni?: Azione[];
   riempi?: boolean;
   senzaMargine?: boolean;
@@ -111,7 +112,7 @@ export interface PannelloProps {
 }
 
 /** Pannello come CRM.Pannello: contenitore bianco con titolo, nota e azioni piccole (secondarie). */
-export function Pannello({ titolo, nota, azioni = [], riempi, senzaMargine, children }: PannelloProps) {
+export function Pannello({ titolo, nota, info, azioni = [], riempi, senzaMargine, children }: PannelloProps) {
   return (
     <section className={'pannello' + (riempi ? ' riempi' : '')}>
       {titolo && (
@@ -120,6 +121,7 @@ export function Pannello({ titolo, nota, azioni = [], riempi, senzaMargine, chil
           <div className="pannello-destra">
             <span className="pannello-nota">{nota}</span>
             {azioni.map((a) => <Pulsante key={a.etichetta} a={{ variante: 'sec', ...a }} piccolo />)}
+            {info}
           </div>
         </div>
       )}

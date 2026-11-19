@@ -197,12 +197,15 @@ describe('filtri (D-22) e voci dei campi (D-23)', () => {
 });
 
 describe('regole e permessi', () => {
-  it('un pagamento o una proforma non cambiano i numeri (D-60)', async () => {
+  it('un pagamento non crea un fatto suo e, pari alla fattura, non cambia i numeri (D-60)', async () => {
     const prima = await pagina('?dal=2025-10&al=2026-09&raggruppa=documento');
     const pratica = await db.ordini_fornitore_testata.findFirstOrThrow({ where: { documenti: { some: { tipo: 'fattura' } } }, orderBy: { id: 'asc' } });
+    const fattura = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { testata_id: pratica.id, tipo: 'fattura' }, orderBy: { id: 'asc' } });
     const creati = await db.$transaction([
       db.ordini_fornitore_documenti.create({ data: { testata_id: pratica.id, tipo: 'proforma', numero: 'PRO-FORMA-1', data: new Date('2026-06-10'), importo: 5000 } }),
-      db.ordini_fornitore_documenti.create({ data: { testata_id: pratica.id, tipo: 'pagamento', numero: 'PAG-1', data: new Date('2026-06-20'), importo: 5000 } }),
+      // 18/11/2026: la provvigione di una fattura si calcola sul pagamento del cliente, quando c'è
+      // (motore.spec.ts); un pagamento pari alla fattura lascia i numeri com'erano e non crea un documento suo
+      db.ordini_fornitore_documenti.create({ data: { testata_id: pratica.id, tipo: 'pagamento', numero: 'PAG-1', data: new Date('2026-06-20'), importo: fattura.importo } }),
     ]);
     try {
       const dopo = await pagina('?dal=2025-10&al=2026-09&raggruppa=documento');

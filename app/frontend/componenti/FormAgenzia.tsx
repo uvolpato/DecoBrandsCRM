@@ -178,10 +178,11 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
       <FormModal titolo={titolo} conferma={agenzia ? 'Salva' : 'Crea'} colonne={2}
         campi={campi} testo={testoStorico} onChiudi={onChiudi}
         onConferma={async (v) => {
+          // D-205 §19: subagente vuoto → null esplicito (si toglie); pct e regola non hanno senso e si azzerano
+          const senzaSub = !v.subagente_id;
           const corpo: Record<string, unknown> = {
             fornitore_id: Number(fornitoreFisso?.id ?? v.fornitore_id),
-            // senza subagente il campo non si manda: la provvigione è tutta di Decobrands
-            ...(v.subagente_id ? { subagente_id: Number(v.subagente_id) } : {}),
+            subagente_id: senzaSub ? null : Number(v.subagente_id),
             // D-158: il campo bloccato non è nel form (disabilitato): si riprende il valore iniziale
             codice_cliente_fornitore: (bloccati?.includes('codice') ? (agenzia?.codice_cliente_fornitore ?? iniziali?.codice_cliente_fornitore) : v.codice_cliente_fornitore) || null,
             sconto: Number(v.sconto ?? 0),
@@ -189,8 +190,11 @@ export function FormAgenzia({ cliente, agenzia = null, fornitoreFisso = null, in
             valido_al: v.valido_al || null,
           };
           if (legame) corpo.storico_id = Number(legame.id); // D-112: la riga passa a usata nella stessa transazione
-          if (v.pct_subagente !== undefined) corpo.pct_subagente = v.pct_subagente ? Number(v.pct_subagente) : null;
-          if (v.regola_mensile !== undefined) corpo.regola_mensile = v.regola_mensile || null;
+          if (senzaSub) { corpo.pct_subagente = null; corpo.regola_mensile = null; }
+          else {
+            if (v.pct_subagente !== undefined) corpo.pct_subagente = v.pct_subagente ? Number(v.pct_subagente) : null;
+            if (v.regola_mensile !== undefined) corpo.regola_mensile = v.regola_mensile || null;
+          }
           const r = await api<Agenzia>('clienti/' + cliente.id + (agenzia ? '/agenzie/' + agenzia.id : '/agenzie'), corpo, agenzia ? 'PUT' : undefined);
           if (!r.ok) return r.messaggio;
           avviso(agenzia ? 'Agenzia salvata' : 'Agenzia creata');

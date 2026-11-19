@@ -119,6 +119,19 @@ describe('F3-A3 incassi dei clienti', () => {
     await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta', nota: 'email di Gasper del 3/9' }).expect(200);
   });
 
+  it('PUT /api/documenti/:id/incasso: annullare un pagamento richiede la motivazione', async () => {
+    const d = await documento('F-2026-0822');
+    await op.put(`/documenti/${d.id}/incasso`, { stato: 'pagata' }).expect(200);
+    const r = await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta' }).expect(400);
+    expect(r.body.message).toBe('Annullare il pagamento richiede una motivazione');
+    expect((await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: d.id } })).stato_incasso).toBe('pagata');
+    const ok = (await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta', nota: 'il fornitore ha segnalato un errore' }).expect(200)).body;
+    expect(ok.stato_incasso).toBe('insoluta');
+    const dopo = await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: d.id } });
+    expect(dopo.stato_incasso).toBe('insoluta');
+    expect(dopo.nota_incasso).toBe('il fornitore ha segnalato un errore');
+  });
+
   it('PUT /api/documenti/:id/incasso su una nota di credito: 400', async () => {
     const nc = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { tipo: 'nota_credito' }, select: { id: true } });
     await op.put(`/documenti/${nc.id}/incasso`, { stato: 'insoluta' }).expect(400);
@@ -156,7 +169,8 @@ describe('F3-A3 incassi dei clienti', () => {
 
   it('C1: importo e numeri dell\'evento solo dalle fatture ancora da sollecitare dopo il blocco', async () => {
     const d = await documento('F-2026-0822');
-    await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta' }).expect(200);
+    // D-62: lasciata pagata dal test precedente, per riportarla indietro serve la motivazione
+    await op.put(`/documenti/${d.id}/incasso`, { stato: 'insoluta', nota: 'prova di annullamento' }).expect(200);
     const testate = (await db.ordini_fornitore_testata.findMany({ where: { cliente_id: d.cliente_id }, select: { id: true } })).map((t) => t.id);
     const altra = await db.ordini_fornitore_documenti.findFirstOrThrow({
       where: { tipo: 'fattura', testata_id: { in: testate }, id: { not: d.id } }, select: { id: true },

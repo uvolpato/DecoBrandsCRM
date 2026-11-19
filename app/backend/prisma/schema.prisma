@@ -248,6 +248,10 @@ model ordini_fornitore_testata {
   numero_ordine_fornitore String? @db.VarChar(50)
   // D-199 §19: deroga della pratica sul raggruppamento del fornitore (null = come il fornitore)
   raggruppamento         String?   @db.VarChar(10) // documento | riga (CHECK)
+  // D-207 §19: pratica annullata (reversibile): davanti a ogni stato ricavato; non si elimina
+  annullata_il           DateTime? @db.Date
+  annullata_motivo       String?   @db.Text
+  annullata_da           BigInt?
   note                  String?
   // risultato del motore, scritto da aggiornaPratica nella stessa transazione di ogni modifica (D-52 §19)
   importo               Decimal   @default(0) @db.Decimal(14, 2) // importoPratica
@@ -259,6 +263,7 @@ model ordini_fornitore_testata {
   fornitore fornitori_versioni           @relation(fields: [fornitore_id, fornitore_versione_id], references: [fornitore_id, id], onDelete: Restrict, map: "ordini_fornitore_testata_fornitore_versione_fkey")
   cliente   clienti_versioni             @relation(fields: [cliente_id, cliente_versione_id], references: [cliente_id, id], onDelete: Restrict, map: "ordini_fornitore_testata_cliente_versione_fkey")
   agente    agenti?                      @relation(fields: [agente_id], references: [id])
+  annullatore utenti?                    @relation("pratica_annullata", fields: [annullata_da], references: [id], onDelete: Restrict)
   righe     ordini_fornitore_righe[]
   documenti ordini_fornitore_documenti[]
   arrivati  documenti_in_arrivo[]
@@ -552,6 +557,7 @@ model utenti {
   versioni_clienti   clienti_versioni[]
   versioni_fornitori fornitori_versioni[]
   liquidazioni       liquidazioni[]
+  pratiche_annullate ordini_fornitore_testata[] @relation("pratica_annullata")
   bollettini_chiusi  bollettini_testata[]
   righe_decise       bollettini_righe[]
   attese_decise      bollettini_attese[]

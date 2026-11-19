@@ -6,9 +6,9 @@ import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { COLORI_GRAFICI, Grafico, type SerieGrafico } from '@/componenti/Grafico';
 import { KpiRow, type Kpi } from '@/componenti/Kpi';
 import { Modale } from '@/componenti/Modale';
-import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
+import { Pagina, Pannello } from '@/componenti/Pagina';
 import { mpiu, PeriodoMesi } from '@/componenti/PeriodoMesi';
-import { avviso } from '@/componenti/Piccoli';
+import { avviso, Informazioni } from '@/componenti/Piccoli';
 import { Sagoma, SagomaRiquadri, SagomaTabella, useSagome } from '@/componenti/Sagoma';
 import { api } from '@/lib/api';
 import { cliente, fornitore, subagente } from '@/lib/entita';
@@ -52,6 +52,8 @@ interface Risposta {
     clienti: GraficoBarre;
   };
   tabella: { raggruppa: string; totale: number; totali: { fatturato: number; prese: number; pagate: number; margine: number }; righe: Riga[] };
+  // D-207 §19: ordini annullati, esclusi da tutti i numeri (conteggio a parte dal server)
+  annullati: number;
 }
 
 const RAGGRUPPA = [
@@ -226,6 +228,11 @@ export function VistaAnalisi() {
             </> : null)
             : <>
               <KpiRow voci={kpi(dati.numeri, dati.confronto)} />
+              {dati.annullati > 0 && (
+                <div style={{ marginTop: 8, padding: '8px 12px', border: '1px solid var(--bordo-tenue)', borderRadius: 8, color: 'var(--testo-tenue)' }}>
+                  Ordini annullati: <b>{dati.annullati}</b> — esclusi da tutti i numeri.
+                </div>
+              )}
               {!dati.tabella.totale
                 ? <Pannello><div className="vuoto"><b>Nessun documento con questi filtri nel periodo</b>Togli un filtro o scegli altri mesi.</div></Pannello>
                 : <>
@@ -259,7 +266,12 @@ export function VistaAnalisi() {
                   </div>
 
                   <div className="pannello pannello-bi">
-                    <div className="pannello-testa"><h2>Dettaglio</h2><div className="pannello-destra"><span className="pannello-nota">stessi filtri dei grafici</span></div></div>
+                    <div className="pannello-testa"><h2>Dettaglio</h2><div className="pannello-destra"><span className="pannello-nota">stessi filtri dei grafici</span><Informazioni titolo="Informazioni sull’analisi">
+                      <ul>
+                        <li>Importi per data del documento (competenza): fatture e note di credito abbinate alle pratiche, comprese quelle non ancora riconosciute nei bollettini.</li>
+                        <li>Gli storni per mancato pagamento non cambiano questi numeri: spostano solo il momento in cui la provvigione è pagata (vedi Liquidazioni).</li>
+                      </ul>
+                    </Informazioni></div></div>
                     <div className="pannello-corpo">
                       <FilterBar valori={{ raggruppa }} onChange={(v) => setRaggruppa(String(v.raggruppa))} campi={[{
                         nome: 'raggruppa', tipo: 'segmenti', etichetta: 'Raggruppa', opzioni: RAGGRUPPA.map((x) => ({ ...x, n: x.value === 'documento' ? dati.tabella.totale : undefined })),
@@ -276,7 +288,6 @@ export function VistaAnalisi() {
                         etichettaTotale="Totale" emptyText="Nessun dato" />
                     </div>
                   </div>
-                  <Nota>Importi per data del documento (competenza): fatture e note di credito abbinate alle pratiche, comprese quelle non ancora riconosciute nei bollettini. Gli storni per mancato pagamento non cambiano questi numeri: spostano solo il momento in cui la provvigione è pagata (vedi Liquidazioni).</Nota>
                 </>}
             </>}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Campo } from '@/componenti/Campo';
 import { DataTable, type Colonna } from '@/componenti/DataTable';
@@ -12,12 +12,12 @@ import { Conferma, Modale } from '@/componenti/Modale';
 import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { AzioniRiga, type AzioneRiga } from '@/componenti/AzioniRiga';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
-import { avviso, Dettagli, Stato, type Variante } from '@/componenti/Piccoli';
+import { avviso, Dettagli, Informazioni, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { SollecitiConferme, SollecitiPagamento } from '@/componenti/Solleciti';
-import { usePuo } from '@/componenti/Utente';
-import { ConsultaDocumenti } from '@/componenti/ConsultaDocumenti';
+import { usePuo, useUtente } from '@/componenti/Utente';
+import { ConsultaDocumenti, VersioniPrecedenti, type VersioneDoc } from '@/componenti/ConsultaDocumenti';
 import { Copiabile } from '@/componenti/Copiabile';
 import { api, caricaPdf } from '@/lib/api';
 import type { Entita } from '@/lib/entita';
@@ -27,7 +27,7 @@ import { data as dataIt, euro, euroSegno, oggi, pct } from '@/lib/formati';
 // documenti fiscali. Stato, importi, variazioni e provvigioni arrivano già calcolati dal server
 // (V12, D-28); qui si compone soltanto.
 
-type Chiave = 'scaduta' | 'attesa' | 'confermata' | 'fatturata';
+type Chiave = 'scaduta' | 'attesa' | 'confermata' | 'fatturata' | 'annullata';
 type Tipo = 'ordine' | 'conferma' | 'proforma' | 'fattura' | 'nota_credito' | 'pagamento' | 'altro';
 interface Tappa {
   titolo: string; fatta?: boolean; ritardo?: boolean; numero?: string; numeri?: string[]; data?: string;
@@ -68,6 +68,7 @@ interface Dettaglio {
   sconto_dopo_nota: { valore: number; scaglione: number; fattura: number } | null;
   azione: { tipo: string; testo: string };
   incassi: Incasso[];
+  annullata: { il: string; motivo: string | null; da: string | null } | null;
 }
 interface Documento {
   id: string; tipo: Tipo; numero: string; data: string; importo: number;
@@ -79,6 +80,8 @@ interface Documento {
   riferimento: string | null;
   // D-199 §19: in modalità riga i gruppi per sconto di riga (il frontend li mostra e basta, V12)
   gruppi?: { sconto: string; base: string; scaglione: string | null; pct_agente: string | null; pct_sub: string | null; provvigione_agente: string | null; provvigione_sub: string | null }[] | null;
+  // D-204 §19: le versioni precedenti del documento sostituito (solo da consultare)
+  versioni?: VersioneDoc[];
 }
 interface Fiscali {
   pratica: { id: string; numero: string; stato: string; importo: number };
@@ -114,6 +117,7 @@ const ETICHETTA: Record<Chiave, { testo: string; v: Variante }> = {
   attesa: { testo: 'Attesa conferma', v: 'attesa' },
   confermata: { testo: 'Confermata', v: 'info' },
   fatturata: { testo: 'Fatturata', v: 'ok' },
+  annullata: { testo: 'Annullata', v: 'neutro' },
 };
 // Stati d'incasso della fattura (§5.14): il server dice quale, qui si mostra l'etichetta
 const INCASSO: Record<string, { testo: string; v: Variante }> = {
@@ -149,6 +153,8 @@ interface DocumentoInCoda {
 
 export function VistaPratica({ id }: { id: string }) {
   const puo = usePuo();
+  const utente = useUtente();
+  const router = useRouter();
   const cerca = useSearchParams();
   const vistaSola = cerca.get('vista') === 'sola'; // §16.4 §19: pagina aperta in una scheda a parte, senza cornice
   const puoModifica = puo('provvigioni.modifica');
@@ -180,12 +186,39 @@ export function VistaPratica({ id }: { id: string }) {
   function sollecita(doc: Incasso) {
     setFinestra(<SollecitiPagamento clienteId={d!.cliente_id} onChiudi={chiudi} onCopiato={() => void carica()} />);
   }
-  async function segnaPagata(doc: Incasso) {
-    const r = await api('documenti/' + doc.documento_id + '/incasso', { stato: 'pagata' }, 'PUT');
-    if (!r.ok) { avviso(r.messaggio, true); return; }
-    avviso('Fattura ' + doc.numero + ' segnata come pagata');
-    chiudi();
-    await carica();
+  function segnaPagata(doc: Incasso) {
+    setFinestra(<Conferma
+      titolo={'Fattura ' + doc.numero + ' pagata'}
+      testo="Il fornitore segnala che il cliente ha pagato: la provvigione si sblocca."
+      etichetta="Segna come pagata"
+      onRisposta={(si) => {
+        chiudi();
+        if (!si) return;
+        void (async () => {
+          const r = await api('documenti/' + doc.documento_id + '/incasso', { stato: 'pagata' }, 'PUT');
+          if (!r.ok) { avviso(r.messaggio, true); return; }
+          avviso('Fattura ' + doc.numero + ' segnata come pagata');
+          await carica();
+        })();
+      }} />);
+  }
+  // D-62 §19: un pagamento segnalato per errore si toglie con la motivazione, che resta nella nota
+  function annullaPagamento(doc: Incasso) {
+    setFinestra(<FormModal
+      titolo="Annulla il pagamento"
+      testo={'La fattura ' + doc.numero + ' torna non pagata: rientra fra i pagamenti da sollecitare.'}
+      conferma="Annulla il pagamento"
+      campi={[{ nome: 'motivo', etichetta: 'Motivo', valore: '', largo: true, aiuto: 'es. il fornitore ha segnalato un errore: il cliente non ha pagato' }]}
+      onChiudi={chiudi}
+      onConferma={async (v) => {
+        if (!v.motivo?.trim()) return 'Serve la motivazione.';
+        const r = await api('documenti/' + doc.documento_id + '/incasso', { stato: 'insoluta', nota: v.motivo.trim() }, 'PUT');
+        if (!r.ok) return r.messaggio;
+        avviso('Fattura ' + doc.numero + ' di nuovo non pagata');
+        chiudi();
+        await carica();
+      }}
+    />);
   }
   function segnaNonPagata(doc: Incasso) {
     setFinestra(<FormModal
@@ -279,6 +312,66 @@ export function VistaPratica({ id }: { id: string }) {
         avviso('Raggruppamento salvato');
         chiudi();
         await carica();
+      }}
+    />);
+  }
+
+  // D-207 §19: annullamento reversibile della pratica, con motivo obbligatorio e data (oggi)
+  function annullaPratica() {
+    setFinestra(<FormModal
+      titolo="Annulla la pratica"
+      testo="La pratica passa ad «annullata»: fuori da attese, bollettini, liquidazioni e Analisi; la provvigione prevista sui documenti aperti torna a zero. I documenti già contabilizzati non cambiano. Si può ripristinare."
+      conferma="Annulla la pratica"
+      campi={[
+        { nome: 'data', etichetta: 'Data annullamento', tipo: 'data', valore: oggi() },
+        { nome: 'motivo', etichetta: 'Motivo', valore: '', largo: true, aiuto: 'obbligatorio: resta nel registro' },
+      ]}
+      onChiudi={chiudi}
+      onConferma={async (v) => {
+        if (!v.motivo?.trim()) return 'Scrivi il motivo dell’annullamento';
+        const r = await api('pratiche/' + id + '/annulla', { motivo: v.motivo.trim(), data: v.data });
+        if (!r.ok) return r.messaggio;
+        avviso('Pratica annullata');
+        chiudi();
+        await carica();
+      }}
+    />);
+  }
+
+  // D-207 §19: ripristino di una pratica annullata, con motivo obbligatorio
+  function ripristinaPratica() {
+    setFinestra(<FormModal
+      titolo="Ripristina la pratica"
+      testo="La pratica torna nello stato ricavato dai documenti e ricalcola le provvigioni dei documenti aperti."
+      conferma="Ripristina"
+      campi={[{ nome: 'motivo', etichetta: 'Motivo', valore: '', largo: true, aiuto: 'obbligatorio: resta nel registro' }]}
+      onChiudi={chiudi}
+      onConferma={async (v) => {
+        if (!v.motivo?.trim()) return 'Scrivi il motivo del ripristino';
+        const r = await api('pratiche/' + id + '/ripristina', { motivo: v.motivo.trim() });
+        if (!r.ok) return r.messaggio;
+        avviso('Pratica ripristinata');
+        chiudi();
+        await carica();
+      }}
+    />);
+  }
+
+  // D-206 §19: eliminazione definitiva, solo amministratore; motivo obbligatorio, conferma col numero
+  function eliminaPratica() {
+    setFinestra(<FormModal
+      titolo="Elimina la pratica"
+      testo={'Righe, documenti e pratica ' + d!.numero + ' vengono cancellati per sempre; i file in arrivo passano negli scartati, il registro conserva la fotografia.'}
+      conferma="Elimina la pratica"
+      campi={[{ nome: 'motivo', etichetta: 'Motivo', valore: '', largo: true, aiuto: 'obbligatorio: scrivi anche il numero ' + d!.numero + ' per confermare' }]}
+      onChiudi={chiudi}
+      onConferma={async (v) => {
+        if (!v.motivo?.trim()) return 'Scrivi il motivo dell’eliminazione';
+        const r = await api('pratiche/' + id, { motivo: v.motivo.trim() }, 'DELETE');
+        if (!r.ok) return r.messaggio;
+        avviso('Pratica eliminata');
+        chiudi();
+        router.push('/pratiche');
       }}
     />);
   }
@@ -408,6 +501,7 @@ export function VistaPratica({ id }: { id: string }) {
           {x.numero ? TIPO[x.tipo] + ' del ' : ''}{dataIt(x.data)}
           {x.superato ? ' · superata da ' + (x.superato_da ?? 'un’altra') : ''}{x.note ? ' · ' + x.note : ''}
         </span>
+        <VersioniPrecedenti versioni={x.versioni ?? []} />
       </span>,
       destra: <span className="azioni-cella">
         {euro(x.importo)}
@@ -435,7 +529,12 @@ export function VistaPratica({ id }: { id: string }) {
               </span>
               {puoModifica && <button type="button" className="btn sec piccolo" onClick={cambiaRaggruppamento}>Cambia</button>}
             </div>
-            <Pannello titolo="Provvigione" nota={fiscali.documenti.length ? 'sul netto fatturato' : 'prevista'}>
+            <Pannello titolo="Provvigione" nota={fiscali.documenti.length ? 'sul netto fatturato' : 'prevista'}
+              info={<Informazioni titolo="Informazioni sulla provvigione">
+                {d.fornitore} {d.provvigione?.maturazione === 'maturato'
+                  ? 'paga sul maturato: la provvigione del subagente si sblocca quando il fornitore la riconosce in un bollettino verificato.'
+                  : 'paga sul fatturato: la provvigione del subagente entra nel trimestre della fattura.'}
+              </Informazioni>}>
               {d.sconto_medio?.oltre && (
                 <div className="avviso-verifica">
                   <span>{d.sconto_medio.gruppo
@@ -468,11 +567,6 @@ export function VistaPratica({ id }: { id: string }) {
                   },
                   { etichetta: 'Margine Decobrands: ' + pct(d.provvigione.margine_pct), valore: d.provvigione.margine },
                 ]} />
-                <Nota>
-                  {d.fornitore} {d.provvigione.maturazione === 'maturato'
-                    ? 'paga sul maturato: la provvigione del subagente si sblocca quando il fornitore la riconosce in un bollettino verificato.'
-                    : 'paga sul fatturato: la provvigione del subagente entra nel trimestre della fattura.'}
-                </Nota>
               </>}
             </Pannello>
           </div>
@@ -514,6 +608,9 @@ export function VistaPratica({ id }: { id: string }) {
                               ...(st.stato !== 'pagata' && st.stato !== 'insoluta' && st.stato !== 'da_verificare' ? [
                                 { nome: 'nonpagata', onClick: () => segnaNonPagata(x) },
                               ] : []),
+                              ...(st.stato === 'pagata' ? [
+                                { nome: 'nonpagata', etichetta: 'Annulla il pagamento', onClick: () => annullaPagamento(x) },
+                              ] : []),
                             ]} />
                         </div>
                       )}
@@ -523,21 +620,28 @@ export function VistaPratica({ id }: { id: string }) {
               </Pannello>
             )}
             <Pannello titolo="Documenti fiscali" nota={String(fiscali.documenti.length)} riempi
+              info={<Informazioni titolo="Informazioni sui documenti fiscali">
+                <ul>
+                  <li>Il netto è fatture − note di credito.</li>
+                  <li>Un documento in un bollettino non si cambia: si corregge con una nota di credito.</li>
+                </ul>
+              </Informazioni>}
               azioni={puoModifica ? [
                 { etichetta: 'Registra fattura', icona: 'piu', onClick: () => registra('fattura') },
                 ...(fatture.length ? [{ etichetta: 'Nota di credito', onClick: () => registra('nota_credito') }] : []),
               ] : []}>
               {fiscaliElenco}
               <div className="dt-piede"><span>Netto {euro(fiscali.totali.netto)}</span></div>
-              <Nota>Il netto è fatture − note di credito. Un documento in un bollettino non si cambia: si corregge con una nota di credito.</Nota>
             </Pannello>
             <Pannello titolo="Documenti" nota={String(fiscali.altri.length)}
+              info={<Informazioni titolo="Informazioni sui documenti">
+                Ordini, conferme, proforma, pagamenti e allegati: restano fuori dal netto e dalla provvigione.
+              </Informazioni>}
               azioni={[
                 { etichetta: 'Consulta affiancati', icona: 'file', onClick: () => apriDoc(), consentito: true },
                 ...(puoModifica ? [{ etichetta: 'Registra un documento', icona: 'piu', onClick: registraAltro }] : []),
               ]}>
               {altri}
-              <Nota>Ordini, conferme, proforma, pagamenti e allegati: restano fuori dal netto e dalla provvigione.</Nota>
             </Pannello>
           </div>
         </div>
@@ -583,6 +687,10 @@ export function VistaPratica({ id }: { id: string }) {
       etichetta: 'Prepara il sollecito', icona: 'posta', variante: 'sec' as const, consentito: true,
       onClick: () => setFinestra(<SollecitiConferme onChiudi={chiudi} />),
     }] : []),
+    // D-207: annullamento reversibile; D-206: eliminazione definitiva solo dell'amministratore
+    ...(puoModifica && !d.annullata ? [{ etichetta: 'Annulla la pratica', icona: 'chiudi', variante: 'sec' as const, consentito: true, onClick: annullaPratica }] : []),
+    ...(puoModifica && !d.annullata && (utente.ruolo === 'amministratore' || utente.ruolo === 'superutente')
+      ? [{ etichetta: 'Elimina la pratica', icona: 'cestino', variante: 'pericolo' as const, consentito: true, onClick: eliminaPratica }] : []),
   ];
 
   // D-180 §19: tutti gli ordini della pratica, dalla fase «Ordini» del server (la testata ne dava uno solo);
@@ -596,6 +704,12 @@ export function VistaPratica({ id }: { id: string }) {
       </>}
       azioni={azioni}>
       <div className="pila riempi">
+        {d.annullata && (
+          <div className="avviso-variazioni" role="status">
+            <span><b>Annullata</b> il {dataIt(d.annullata.il)}{d.annullata.da ? ' da ' + d.annullata.da : ''}{d.annullata.motivo ? ' — ' + d.annullata.motivo : ''}.</span>
+            {puoModifica && <button type="button" className="btn sec piccolo" onClick={ripristinaPratica}>Ripristina</button>}
+          </div>
+        )}
         <Pannello senzaMargine>
           {d.progresso && <p className="nota" style={{ padding: '14px 18px 0' }}>Confermato <b>{euro(d.progresso.x)}</b> di {euro(d.progresso.y)}{d.progresso.parziale ? ' · confermato in parte' : ''}</p>}
           <Binario tappe={d.fasi} />
@@ -629,6 +743,7 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, coda, on
   const [attesa, setAttesa] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [arrivoId, setArrivoId] = useState<number | null>(null);
+  const [doppione, setDoppione] = useState<{ pratica: { id: string; numero: string } | null; documento: { id: string } | null } | null>(null);
   const [multi, setMulti] = useState<{ messaggio: string; corpo: Record<string, unknown> } | null>(null);
   const modifica = !!documento;
   // «Prendi dalla coda»: i documenti compatibili e la scelta fra coda e mano (predefinita sulla coda se ce n'è uno)
@@ -678,12 +793,13 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, coda, on
     const importo = testo('importo').replace(',', '.');
     const note = testo('note');
     setErrore('');
+    setDoppione(null);
     setAttesa(true);
     try {
       let arrivo = arrivoId;
       if (!modifica && file && !arrivo) {
         const c = await caricaPdf(file);
-        if (!c.ok) { setErrore(c.messaggio); return; }
+        if (!c.ok) { setErrore(c.messaggio); setDoppione({ pratica: c.dati?.pratica ?? null, documento: c.dati?.documento ?? null }); return; }
         arrivo = Number(c.dati.id);
         setArrivoId(arrivo);
       }
@@ -825,11 +941,18 @@ function FinestraDocumento({ pratica, documento, tipo, fatture, scelta, coda, on
               <div className="campo largo">
                 <label>PDF o foto (facoltativo)</label>
                 <Caricamento titolo="Allega il file" testo="Un PDF o una foto (JPEG, PNG); il server controlla che sia un documento."
-                  accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => { setFile(f[0] ?? null); setArrivoId(null); }} />
+                  accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => { setFile(f[0] ?? null); setArrivoId(null); setDoppione(null); }} />
                 {file && <span className="aiuto">{file.name}</span>}
               </div>
             )}
             <p className="modulo-errore" role="alert" hidden={!errore}>{errore}</p>
+            {doppione && (doppione.pratica || doppione.documento) && (
+              <p className="aiuto">
+                {doppione.pratica
+                  ? <Link href={'/pratiche/' + doppione.pratica.id}>Apri la pratica {doppione.pratica.numero}</Link>
+                  : <Link href={'/documenti/' + doppione.documento!.id}>Apri il documento</Link>}
+              </p>
+            )}
           </form>
         )}
       </Modale>

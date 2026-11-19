@@ -2,13 +2,15 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Campo } from '@/componenti/Campo';
+import { DataTable, type Colonna } from '@/componenti/DataTable';
 import { Cerniera, type GruppoCerniera, type RigaCerniera } from '@/componenti/Flussi';
 import { FormModal } from '@/componenti/FormModal';
 import { Modale } from '@/componenti/Modale';
 import { ConfermaGrave } from '@/componenti/ConfermaGrave';
+import { Icona } from '@/componenti/Icona';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
 import { PdfEvidenziato } from '@/componenti/PdfEvidenziato';
-import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
+import { avviso, Dettagli, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api } from '@/lib/api';
@@ -26,8 +28,19 @@ const CATEG: Record<string, string> = {
   storno: 'storno: il cliente non ha pagato', riaccredito: 'riaccredito: il cliente ha pagato',
   attesa_incasso: 'non ancora pagata dal cliente', pagata_dopo: 'pagata dopo',
 };
+const TIPI: Record<string, string> = {
+  ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura',
+  nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento', bollettino: 'Bollettino',
+};
 
-interface Lato { imponibile: number; pct: number | null; importo: number }
+interface Lato { imponibile: number; pct: number | null; pct_nominale?: number | null; importo: number }
+
+/** Dettaglio del lato «noi»: percentuale nominale + quota (D-201 §19). */
+const dettNoi = (l: Lato, quota: number | null) =>
+  l.pct_nominale != null
+    ? pct(l.pct_nominale) + ' di ' + euro(l.imponibile) + (quota != null ? ' · quota ' + pct(quota) : '')
+    : l.pct != null ? pct(l.pct) + ' di ' + euro(l.imponibile) : euro(l.imponibile);
+
 interface Riga {
   id: string | null; documento_id: string | null; numero: string; data: string | null; tipo: string | null;
   pratica_id: string | null; cliente_id: string | null; cliente: string | null;
@@ -45,10 +58,32 @@ interface Dettaglio {
   id: string; fornitore_id: string; fornitore: string; maturazione: string; mese: number; anno: number;
   stato: string; badge: string; ricevuto: string; chiuso_il: string | null; chiuso_da: string | null; note: string | null;
   file: { arrivo_id: string; nome: string } | null; modificabile: boolean;
+  righe_fornitore: number; // le righe vere del bollettino (dal PDF o inserite), non quelle del confronto
   righe: Riga[];
   totali: { riconosciuto: number; calcolato: number; differenza: number; aperte: number; contestate: number };
   azione: { tipo: 'decidi' | 'contesta' | 'verifica' | 'chiuso'; testo: string };
 }
+
+/** Quello che il sistema ha letto dal PDF del bollettino (GET /api/documenti/:id), in sola lettura. */
+interface Letto {
+  testata: {
+    tipo: string | null; numero: string | null; data: string | null; fornitore: string | null;
+    cliente: string | null; mese: number | null; anno: number | null; importo: number | null;
+  };
+  righe: {
+    i: number; numero_fattura: string | null; data_fattura: string | null; importo: number | null;
+    provvigione: number | null; quota_pagata: number | null; spesa?: boolean | null;
+  }[];
+}
+
+const COLONNE_LETTE: Colonna<Letto['righe'][number]>[] = [
+  { key: 'numero_fattura', header: 'Fattura', cell: (x) => <b>{x.numero_fattura || '—'}</b> },
+  { key: 'data_fattura', header: 'Data', valore: (x) => x.data_fattura, cell: (x) => (x.data_fattura ? data(x.data_fattura) : '—') },
+  { key: 'importo', header: 'Importo', align: 'right', valore: (x) => x.importo, cell: (x) => (x.importo == null ? '—' : euro(x.importo)) },
+  { key: 'provvigione', header: 'Provvigione', align: 'right', valore: (x) => x.provvigione, cell: (x) => (x.provvigione == null ? '—' : euro(x.provvigione)) },
+  { key: 'quota_pagata', header: 'Quota pagata', align: 'right', valore: (x) => x.quota_pagata, cell: (x) => (x.quota_pagata == null ? '—' : pct(x.quota_pagata)) },
+  { key: 'spesa', header: 'Spesa', cell: (x) => (x.spesa ? 'Sì' : ''), sortable: false },
+];
 
 export function VistaBollettino({ id }: { id: string }) {
   const puo = usePuo();
@@ -56,6 +91,7 @@ export function VistaBollettino({ id }: { id: string }) {
   const [errore, setErrore] = useState('');
   const [finestra, setFinestra] = useState<ReactNode>(null);
   const [bozza, setBozza] = useState<{ oggetto: string; testo: string } | null>(null);
+  const [importando, setImportando] = useState(false);
   const puoModifica = puo('provvigioni.modifica');
   const sagome = useSagome(!d);
 
@@ -157,6 +193,53 @@ export function VistaBollettino({ id }: { id: string }) {
     setTimeout(() => x.classList.remove('evidenzia'), 1600);
   }
 
+  // F7-A7: le righe del PDF sono già lette sul server; qui si chiede solo di importarle (V12).
+  async function importaRighe() {
+    setImportando(true);
+    const r = await api<Dettaglio>(`bollettini/${bollettinoId}/righe/importa`, {});
+    setImportando(false);
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    setD(r.dati);
+    avviso('Righe importate dal PDF');
+  }
+
+  // F7-A7: cosa il sistema ha letto dal PDF del bollettino, in sola lettura (V12). Chi corregge lo fa
+  // dalla pagina Documenti: qui c'è solo il collegamento.
+  async function apriDatiLetti() {
+    const arrivo = d?.file?.arrivo_id;
+    if (!arrivo) return;
+    const r = await api<Letto>('documenti/' + arrivo);
+    if (!r.ok) { avviso(r.messaggio, true); return; }
+    const t = r.dati.testata;
+    setFinestra(
+      <Modale titolo="Dati letti dal bollettino" larga corpoClasse="ricerca-corpo"
+        testo="Quello che il sistema ha letto dal PDF. Per correggerlo apri il documento in Documenti."
+        onChiudi={chiudi}
+        piede={<>
+          <Link className="btn sec" href={'/documenti/' + arrivo}>Apri il documento in Documenti</Link>
+          <button type="button" className="btn sec" onClick={chiudi}>Chiudi</button>
+        </>}>
+        <div className="colonne riempi" style={{ '--colonne': 'minmax(280px, 0.8fr) minmax(0, 1.2fr)' } as React.CSSProperties}>
+          <div style={{ minHeight: 0, overflow: 'hidden', borderRadius: 8 }}>
+            <PdfEvidenziato src={'/api/documenti/' + arrivo + '/file'} pagina={1} posizione={null} />
+          </div>
+          <div className="pila" style={{ minHeight: 0, overflow: 'auto' }}>
+            <Dettagli inColonne voci={[
+              { etichetta: 'Tipo', valore: TIPI[t.tipo ?? ''] ?? t.tipo ?? '—' },
+              { etichetta: 'Numero', valore: t.numero ?? '—' },
+              { etichetta: 'Data', valore: t.data ? data(t.data) : '—' },
+              { etichetta: 'Fornitore', valore: t.fornitore ?? '—' },
+              { etichetta: 'Cliente', valore: t.cliente ?? '—' },
+              { etichetta: 'Periodo', valore: t.mese && t.anno ? `${MESI[t.mese - 1]} ${t.anno}` : '—' },
+              { etichetta: 'Importo', valore: t.importo == null ? '—' : euro(t.importo) },
+            ]} />
+            <DataTable righe={r.dati.righe} colonne={COLONNE_LETTE} chiave={(x) => String(x.i)} naturale perPagina={false}
+              emptyText="Nessuna riga letta" emptyHint="Il PDF non ha righe di fatture." />
+          </div>
+        </div>
+      </Modale>);
+  }
+
   // Testo della contestazione calcolato dal server (V12): qui si copia o si scarica, non si salva.
   async function preparaContestazione() {
     const r = await api<{ oggetto: string; testo: string }>(`bollettini/${bollettinoId}/contestazione`);
@@ -239,7 +322,8 @@ export function VistaBollettino({ id }: { id: string }) {
         {x.quote_diverse && <><br /><span className="testo-tenue">Quote pagate diverse nel gruppo</span></>}
       </>,
       sinistra: x.loro ? { importo: x.loro.importo, dett: (x.quota != null ? 'quota ' + pct(x.quota) + ' · ' : '') + (x.loro.pct != null ? pct(x.loro.pct) + ' di ' + euro(x.loro.imponibile) : euro(x.loro.imponibile)) } : null,
-      destra: x.noi ? { importo: x.noi.importo, dett: x.noi.pct != null ? pct(x.noi.pct) + ' di ' + euro(x.noi.imponibile) : euro(x.noi.imponibile) } : null,
+      // D-201 §19: la percentuale vera del fornitore, con la quota a parte (l'effettiva sembrava la regola)
+      destra: x.noi ? { importo: x.noi.importo, dett: dettNoi(x.noi, x.quota) } : null,
       differenza: x.differenza ?? 0, // D-126 §19: la differenza arriva dal server, non si calcola qui (V12)
       quadra: x.categoria === 'quadra' || x.incasso,
       esito: x.incasso ? esitoIncasso(x) : esitoDecisione,
@@ -297,7 +381,17 @@ export function VistaBollettino({ id }: { id: string }) {
         {barra}
         {d.file ? (
           <div className="colonne riempi" style={{ '--colonne': 'minmax(300px, 0.8fr) minmax(0, 1.9fr)', flex: '1 1 auto', minHeight: 0 } as React.CSSProperties}>
-            <Pannello titolo="Bollettino del fornitore" nota={d.file.nome} riempi>
+            <Pannello titolo="Bollettino del fornitore" nota={d.file.nome} riempi
+              azioni={[{ etichetta: 'Dati letti', onClick: () => void apriDatiLetti() }]}>
+              {modificabile && d.righe_fornitore === 0 && (
+                <div className="avviso-variazioni" role="status" style={{ marginBottom: 12 }}>
+                  <Icona nome="avviso" />
+                  <span>Le righe del PDF non sono ancora state importate: senza righe non c&apos;è confronto.</span>
+                  <button type="button" className="btn sec piccolo" disabled={importando} onClick={() => void importaRighe()}>
+                    Importa le righe dal PDF
+                  </button>
+                </div>
+              )}
               {/* PDF.js invece di <object>: il file arriva con CSP sandbox e il visualizzatore di Chromium non si apre (A4-10) */}
               <PdfEvidenziato src={'/api/documenti/' + d.file.arrivo_id + '/file'} pagina={1} posizione={null} />
             </Pannello>

@@ -409,6 +409,12 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
       <div className="pila riempi">
         <div className="strumenti-scheda">
           <span className="spazio" />
+          <Informazioni titolo="Informazioni sulle sedi">
+            <ul>
+              <li>Una catena = un soggetto con N punti vendita (Consorzio Agrario, MCL): i documenti restano appesi alla sede.</li>
+              <li>Valido_al chiude, non si cancella.</li>
+            </ul>
+          </Informazioni>
           {puoModificare && <button type="button" className="btn sec piccolo" onClick={() => formSede(det, null)}><Icona nome="piu" /> Nuova sede</button>}
         </div>
         <div className="riempi">
@@ -421,7 +427,6 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
             onRowClick={puoModificare ? (x) => formSede(det, x) : undefined}
             emptyText="Nessuna sede" emptyHint="Il settore e il gruppo sono della sede, non dell’azienda." />
         </div>
-        <Nota>Una catena = un soggetto con N punti vendita (Consorzio Agrario, MCL): i documenti restano appesi alla sede. Valido_al chiude, non si cancella.</Nota>
       </div>
     );
   }
@@ -458,6 +463,11 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
     if (!det) return null;
     return (
       <div className="pila">
+        <div className="strumenti-scheda"><span className="spazio" /><Informazioni titolo="Informazioni sulla fatturazione">
+          <ul>
+            <li>Dati dell’amministrazione che cambiano nel tempo; sono del soggetto fiscale, non del ruolo: usati anche nelle fatture dei fornitori. (§4.5)</li>
+          </ul>
+        </Informazioni></div>
         <Dettagli inColonne voci={[
           { etichetta: 'Configurata', valore: f?.attiva ? <Stato v="ok">Sì</Stato> : <Stato v="neutro">No</Stato> },
           { etichetta: 'Codice SDI', valore: f?.codice_destinatario ? <b>{f.codice_destinatario}</b> : <span className="testo-tenue">—</span> },
@@ -468,7 +478,6 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
         ]} />
         {f && (f.split_payment || f.reverse_charge) && <Nota>{(f.split_payment ? 'Split payment. ' : '') + (f.reverse_charge ? 'Reverse charge.' : '')}</Nota>}
         {puoModificare && <div className="strumenti-scheda"><button type="button" className="btn sec piccolo" onClick={() => formFatturazione(det)}><Icona nome="piu" /> Modifica fatturazione</button></div>}
-        <Nota>Dati dell’amministrazione che cambiano nel tempo; sono del soggetto fiscale, non del ruolo: usati anche nelle fatture dei fornitori. (§4.5)</Nota>
       </div>
     );
   }
@@ -490,13 +499,13 @@ export function VistaSoggetti({ idSel }: { idSel?: string }) {
   if (!dati) {
     return cornice(errore
       ? <Pannello><div className="vuoto"><b>Soggetti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={ricarica}>Riprova</button></div></Pannello>
-      : sagome && <SagomaElenco filtri={filtri} larghezze="minmax(0,1fr) minmax(0,1fr)" />);
+      : sagome && <SagomaElenco filtri={filtri} larghezze="minmax(0,1fr) minmax(560px,1fr)" />);
   }
 
   const pagine = Math.max(1, Math.ceil(dati.totale / perPagina));
 
   return cornice(
-    <div className="colonne pari riempi" style={{ '--colonne': 'minmax(0,1fr) minmax(0,1fr)' } as CSSProperties}>
+    <div className="colonne pari riempi" style={{ '--colonne': 'minmax(0,1fr) minmax(560px,1fr)' } as CSSProperties}>
       <div className="pila riempi soggetti-filtri">
         {filtri}
         <div className="riempi">

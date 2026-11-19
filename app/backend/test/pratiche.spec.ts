@@ -58,6 +58,7 @@ const REGOLE: Record<string, (p: any) => boolean> = {
   attesa: (p) => M.statoPratica(p).chiave === 'attesa',
   confermata: (p) => M.statoPratica(p).chiave === 'confermata',
   fatturata: (p) => M.statoPratica(p).chiave === 'fatturata',
+  annullata: (p) => !!p.annullata, // D-207
   variazioni: (p) => M.haVariazioni(p),
   deroga: (p) => p.raggruppamento != null, // D-199
 };
@@ -164,7 +165,7 @@ describe('GET /api/pratiche', () => {
     expect(b.totale).toBe(S.pratiche.length);
     const riga = new Map(b.righe.map((x) => [x.id, x]));
     const salvate = new Map((await db.ordini_fornitore_testata.findMany()).map((t) => [String(t.id), t]));
-    const nomeDb = { fatturata: 'fatturato', confermata: 'confermato', attesa: 'inviato', scaduta: 'inviato' } as const;
+    const nomeDb = { fatturata: 'fatturato', confermata: 'confermato', attesa: 'inviato', scaduta: 'inviato', annullata: 'inviato' } as const;
     for (const p of S.pratiche) {
       const st = statoPratica(S, p).chiave, t = salvate.get(p.id)!;
       expect([p.numero, t.stato, t.importo.toFixed(2), t.variazioni, riga.get(p.id)!.stato])
@@ -307,6 +308,30 @@ describe('GET /api/pratiche/cerca (D-60: il campo di ricerca dello Sposta)', () 
   it('stato non ammesso: 400 (lista chiusa, V12)', async () => {
     const f = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
     await resp.get(`/pratiche/cerca?fornitore_id=${f}&stato=qualsiasi`).expect(400);
+  });
+
+  // Ugo 18/11/2026: «Non pagata» = fatturata senza un documento di pagamento (sostituisce `senza_pagamento`)
+  it('stato=non_pagata: le fatturate senza un pagamento, non tutte le fatturate', async () => {
+    const f = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
+    const fatturate = (await resp.get(`/pratiche/cerca?fornitore_id=${f}&stato=fatturata`).expect(200)).body as { id: string }[];
+    expect(fatturate.length).toBeGreaterThan(0); // il seed ha pratiche fatturate
+    const pag = await db.ordini_fornitore_documenti.create({ data: {
+      testata_id: BigInt(fatturate[0].id), tipo: 'pagamento', numero: 'PAG-PROVA', data: new Date('2026-09-04'),
+    } });
+    try {
+      const senza = (await resp.get(`/pratiche/cerca?fornitore_id=${f}&stato=non_pagata`).expect(200)).body as { id: string; stato: string }[];
+      expect(senza.map((x) => x.id)).toEqual(fatturate.slice(1).map((x) => x.id));
+      expect(senza.every((x) => x.stato === 'fatturata')).toBe(true);
+      // «Fatturata» invece la comprende: il pagamento non cambia lo stato della pratica
+      expect(((await resp.get(`/pratiche/cerca?fornitore_id=${f}&stato=fatturata`).expect(200)).body as { id: string }[]).map((x) => x.id)).toEqual(fatturate.map((x) => x.id));
+    } finally {
+      await db.ordini_fornitore_documenti.delete({ where: { id: pag.id } }); // pulizia: il seed non ha pagamenti
+    }
+  });
+
+  it('il parametro nascosto senza_pagamento non esiste più: 400 (V12)', async () => {
+    const f = (await db.fornitori_versioni.findFirstOrThrow({ where: { ragione_sociale: { startsWith: 'Gries' } } })).fornitore_id;
+    await resp.get(`/pratiche/cerca?fornitore_id=${f}&senza_pagamento=1`).expect(400);
   });
 
   it('con cliente_id filtra per cliente e fornitore: esclude le pratiche di altri clienti (15/11/2026)', async () => {

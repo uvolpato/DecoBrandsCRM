@@ -397,4 +397,63 @@ describe('motore §10 = prototipo', () => {
     expect(n(pr.sub.provvigione)).toBe(n(m.r2(dec(1840.23).times(pr.sub.pct).div(100))));
     expect(n(pr.prese)).toBe(331.24); // 1840,23 × 18 % (scaglione 0 Gries); sul lordo 2044,70 sarebbe 368,05
   });
+
+  // 18/11/2026 (Ugo): «per la pratica tieni la regola pagamento altrimenti fattura» — la provvigione si
+  // calcola sull'importo del pagamento del cliente quando c'è, altrimenti sull'imponibile della fattura.
+  describe('base provvigione = pagamento del cliente, quando c\'è', () => {
+    const forn = () => fornitore('Gries').id;
+    /** Pratica costruita a mano: `nFatture` fatture da 1000 e, se dato, un pagamento del cliente. */
+    const costruisci = (cliente: string, nFatture: number, pagamento: number | null) => {
+      const modello = S.pratiche.find((x) => x.documenti.length)!.documenti[0];
+      const documenti = Array.from({ length: nFatture }, (_, i) => ({
+        ...modello, id: `${cliente}-f${i}`, numero: `${cliente}-F${i + 1}`, data: '2026-09-15', importo: dec(1000),
+        tipo: 'fattura' as const, fattura_id: null, liquidazione_id: null, incasso: null, correzione: null, calcolo: null, righe: [],
+      }));
+      const pagamenti = pagamento == null ? [] : [{ id: `${cliente}-p`, numero: `${cliente}-P1`, data: '2026-09-20', importo: dec(pagamento), superato: false }];
+      const p = { ...pratica('OF/2026/041'), id: `${cliente}-p`, numero: `${cliente}-P`, fornitore_id: forn(), cliente_id: cliente, data: '2026-05-10', documenti, pagamenti, righe: { ordine: [], conferma: [], fattura: [] } };
+      const ag = { id: `${cliente}-ag`, subagente_id: [...S.subagenti.keys()][0], cliente_id: cliente, fornitore_id: forn(), codice: cliente, sconto: dec(0), pct_subagente: null, regola_mensile: null, valido_dal: '2026-01-01', valido_al: null };
+      return { p, S2: { ...S, pratiche: [...S.pratiche, p], interscambio: [...S.interscambio, ag] } };
+    };
+
+    it('una fattura e un pagamento: base e provvigione sull\'importo pagato', () => {
+      const { p, S2 } = costruisci('D-pag-1', 1, 716.08);
+      const d = p.documenti[0];
+      const pr = m.provvigioneDoc(S2, p, d)!;
+      expect(n(pr.importo)).toBe(716.08); // Fattura 742,60 pagata 716,08 (96,43 %)
+      expect(n(pr.prese)).toBe(128.89); // 716,08 × 18 % (sulla fattura sarebbe 180,00)
+      expect(n(pr.pagate)).toBe(71.61); // quota del subagente in proporzione, 10 %
+    });
+
+    it('una fattura congelata in un bollettino chiuso: il pagamento non la muove, base = fattura (D-183)', () => {
+      const { p, S2 } = costruisci('D-pag-cong', 1, 716.08);
+      p.documenti[0].congelato_il = '2026-09-30';
+      expect(n(m.baseProvvigione(p, p.documenti[0]))).toBe(1000);
+      expect(n(m.provvigioneDoc(S2, p, p.documenti[0])!.importo)).toBe(1000);
+    });
+
+    it('una fattura e nessun pagamento: base = fattura, come prima', () => {
+      const { p, S2 } = costruisci('D-pag-2', 1, null);
+      const pr = m.provvigioneDoc(S2, p, p.documenti[0])!;
+      expect([n(pr.importo), n(pr.prese)]).toEqual([1000, 180]); // 1000 × 18 %
+    });
+
+    it('due fatture e un pagamento: il pagamento non si sa a quale si riferisce, resta la fattura', () => {
+      const { p, S2 } = costruisci('D-pag-3', 2, 716.08);
+      expect(n(m.provvigioneDoc(S2, p, p.documenti[0])!.importo)).toBe(1000);
+      expect(n(m.provvigioneDoc(S2, p, p.documenti[1])!.importo)).toBe(1000);
+    });
+
+    it('bollettino: la riga della fattura pagata mostra il pagamento come imponibile e quadra', () => {
+      const { p, S2 } = costruisci('D-pag-4', 1, 716.08);
+      const d = p.documenti[0];
+      const b = {
+        id: 'b-pag-4', fornitore_id: forn(), anno: 2026, mese: 9, stato: 'verificato' as const, ricevuto: '2026-09-20', chiuso_il: null,
+        righe: [{ id: 'rb-pag-4', documento_id: d.id, liquidazione_id: null, numero: d.numero, data: d.data, imponibile: dec(716.08), pct: dec(18), importo: dec(128.89),
+          quota_pagata: null, tipo: null, pct_calcolata: null, importo_calcolato: null, decisione: null }],
+        attese: [],
+      };
+      const riga = m.riconcilia(S2, b).righe.find((x) => x.documento_id === d.id)!;
+      expect([riga.categoria, n(riga.noi!.imponibile), n(riga.noi!.importo), n(riga.differenza)]).toEqual(['quadra', 716.08, 128.89, 0]);
+    });
+  });
 });

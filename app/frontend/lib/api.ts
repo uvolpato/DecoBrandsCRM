@@ -76,8 +76,10 @@ export async function api<T = unknown>(percorso: string, corpo?: object, metodo?
   return { ok: r.ok, stato: r.status, dati: dati as T, messaggio: r.ok ? '' : MESSAGGI[r.status] ?? (testo || MESSAGGI[500]) };
 }
 
-/** POST di un PDF in multipart/form-data (canale comune, §6.5): il file lo controlla il server. */
-export async function caricaPdf(file: File): Promise<Risposta<{ id: string; file_nome: string; stato: string; ricevuto_il: string }>> {
+/** POST di un PDF in multipart/form-data (canale comune, §6.5): il file lo controlla il server.
+ *  Sul 409 del doppione il corpo porta la pratica che lo contiene già e la riga del documento
+ *  (`null` quando manca): la pagina Documenti linka l'una o l'altro. */
+export async function caricaPdf(file: File): Promise<Risposta<{ id: string; file_nome: string; stato: string; ricevuto_il: string; pratica?: { id: string; numero: string } | null; documento?: { id: string } | null }>> {
   if (!csrf) await api('accesso/io');
   const corpo = new FormData();
   corpo.append('file', file);

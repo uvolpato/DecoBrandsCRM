@@ -405,7 +405,8 @@ export class AnalisiController {
   async pagina(@Query() q: Filtri) {
     if (q.dal && q.al && q.dal > q.al) throw new BadRequestException('Il periodo non è valido: il mese di inizio è dopo quello di fine');
     const S = await caricaDati(this.db);
-    return pagina(S, calcola(S, fattiAnalisi(S), q), q);
+    // D-207 §19: gli ordini annullati sono esclusi dai fatti (fattiAnalisi); qui solo il conteggio a parte
+    return { ...pagina(S, calcola(S, fattiAnalisi(S), q), q), annullati: S.pratiche.filter((p) => p.annullata).length };
   }
 
   /** Esportazione (§11): Excel con i fogli e i totali a formule, CSV dei documenti, o PDF convertito dal

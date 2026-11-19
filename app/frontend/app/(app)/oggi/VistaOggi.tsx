@@ -5,8 +5,8 @@ import { Aggiornamenti } from '@/componenti/Aggiornamenti';
 import { Elenco, GruppiDaFare, Periodi, type GruppoDaFare } from '@/componenti/Flussi';
 import { Icona } from '@/componenti/Icona';
 import { Cifre, KpiRow, type Kpi } from '@/componenti/Kpi';
-import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
-import { avviso } from '@/componenti/Piccoli';
+import { Pagina, Pannello } from '@/componenti/Pagina';
+import { avviso, Informazioni } from '@/componenti/Piccoli';
 import { Sagoma, SagomaRiquadri, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { SollecitiConferme, SollecitiPagamento } from '@/componenti/Solleciti';
@@ -154,6 +154,9 @@ export function VistaOggi() {
               {
                 id: 'scadenze', etichetta: 'Prossime scadenze', conta: dati.scadenze.length, contenuto: () => (
                   <>
+                    <div className="strumenti-scheda"><span className="spazio" /><Informazioni titolo="Informazioni sulle prossime scadenze">
+                      Prossimi 15 giorni.
+                    </Informazioni></div>
                     {dati.scadenze.length ? (
                       <ul className="scadenze">
                         {dati.scadenze.map((s) => (
@@ -165,7 +168,6 @@ export function VistaOggi() {
                         ))}
                       </ul>
                     ) : <p className="testo-tenue" style={{ margin: 0 }}>Nessuna scadenza nei prossimi 15 giorni.</p>}
-                    <Nota>Prossimi 15 giorni.</Nota>
                   </>
                 ),
               },

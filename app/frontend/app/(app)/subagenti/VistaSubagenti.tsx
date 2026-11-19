@@ -10,7 +10,7 @@ import { FormModal } from '@/componenti/FormModal';
 import { Modale } from '@/componenti/Modale';
 import { ConfermaGrave } from '@/componenti/ConfermaGrave';
 import { Nota, Pagina, Pannello, type Azione } from '@/componenti/Pagina';
-import { avviso, Dettagli, Stato } from '@/componenti/Piccoli';
+import { avviso, Dettagli, Informazioni, Stato } from '@/componenti/Piccoli';
 import { Sagoma, SagomaCorpo, SagomaElenco, useSagome } from '@/componenti/Sagoma';
 import { Schede } from '@/componenti/Schede';
 import { usePuo, useUtente } from '@/componenti/Utente';
@@ -330,12 +330,18 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
         <div className="strumenti-scheda">
           <h3>Eccezioni personali</h3>
           <span className="spazio" />
+          <Informazioni titolo="Informazioni sulle eccezioni personali">
+            <ul>
+              <li>La percentuale personale vale al posto di quella dello scaglione, nei giorni del suo periodo.</li>
+              <li>Non è legata a una versione delle percentuali: con le versioni nuove continua da sola.</li>
+              <li>Un cambio o una fine valgono da una data dopo l’ultima chiusura del fornitore.</li>
+            </ul>
+          </Informazioni>
           {puoCondizioni && <button type="button" className="btn sec piccolo" onClick={nuovaEccezione}>Aggiungi eccezione</button>}
         </div>
         <div className="riempi">
           <Elenco voci={voci} vuoto="Nessuna: valgono le percentuali standard dei fornitori." />
         </div>
-        <Nota>La percentuale personale vale al posto di quella dello scaglione, nei giorni del suo periodo. Non è legata a una versione delle percentuali: con le versioni nuove continua da sola. Un cambio o una fine valgono da una data dopo l’ultima chiusura del fornitore.</Nota>
       </div>
     );
   }
@@ -368,7 +374,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
       <Pagina titolo="Subagenti" pieno>
         {errore
           ? <Pannello><div className="vuoto"><b>Subagenti non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
-          : sagome && <SagomaElenco filtri={filtri} />}
+          : sagome && <SagomaElenco larghezze="minmax(0,1.15fr) minmax(560px,1fr)" filtri={filtri} />}
         {finestra}
       </Pagina>
     );
@@ -407,7 +413,7 @@ export function VistaSubagenti({ idSel }: { idSel?: string }) {
   }
 
   return pagina(
-    <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(0,1fr)' } as CSSProperties}>
+    <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(560px,1fr)' } as CSSProperties}>
       <div className="pila riempi">
         {filtri}
         <div className="riempi">

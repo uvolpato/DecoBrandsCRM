@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { IsIn, IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
+import { importaRigheDalPdf } from './bollettino';
 import { giornoRoma } from './motore/dati';
 import { PrismaService } from './prisma.service';
 import { logEvent } from './registro';
@@ -166,6 +167,8 @@ export class BollettiniController {
         // D-140: il PDF legato al bollettino del suo fornitore e mese è «abbinato», come quello di una pratica:
         // «da controllare» si conta con lo stato, senza filtri a parte
         if (arrivo_id) await tx.documenti_in_arrivo.update({ where: { id: arrivo_id }, data: { abbinato_bollettino_id: t.id, stato: 'abbinato', controllato_il: new Date() } });
+        // F7-A7: se il PDF è già stato letto, le sue righe entrano nel bollettino nella stessa transazione
+        if (arrivo_id) await importaRigheDalPdf(tx, t.id, arrivo_id);
         await logEvent(tx, {
           tipo: 'crud', azione: 'create', entita: 'bollettino', entita_id: t.id, esito: 'successo',
           dettaglio: { etichetta: `${b.mese}/${b.anno} · ${f.fornitore}`, fornitore_id: String(fornitore_id), mese: b.mese, anno: b.anno, file_nome },

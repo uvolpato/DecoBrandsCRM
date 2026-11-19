@@ -17,7 +17,7 @@ const riga = (codice: string, qta: number, prezzo: number, importo?: number) =>
 /** Una pratica minima con le righe delle tre fasi e i documenti fiscali dati. */
 const pratica = (o: { righe?: { ordine?: any[]; conferma?: any[]; fattura?: any[] }; documenti?: any[]; fornitore_id?: string; cliente_id?: string; data?: string; numero?: string } = {}) => ({
   id: 'p1', numero: o.numero ?? 'OF/2026/999', fornitore_id: o.fornitore_id ?? 'f1', cliente_id: o.cliente_id ?? 'c1', data: o.data ?? '2026-01-01',
-  raggruppamento: null, ordini: [], conferme: [], proforma: [], pagamenti: [],
+  raggruppamento: null, annullata: false, ordini: [], conferme: [], proforma: [], pagamenti: [],
   righe: { ordine: o.righe?.ordine ?? [], conferma: o.righe?.conferma ?? [], fattura: o.righe?.fattura ?? [] },
   documenti: o.documenti ?? [],
 });

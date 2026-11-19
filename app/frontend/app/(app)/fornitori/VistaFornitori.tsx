@@ -282,12 +282,12 @@ export function VistaFornitori({ idSel }: { idSel?: string }) {
 
   if (!fornitori) return pagina(errore
     ? <Pannello><div className="vuoto"><b>Fornitori non caricati</b>{errore} <button type="button" className="btn sec piccolo" onClick={() => void carica()}>Riprova</button></div></Pannello>
-    : sagome && <SagomaElenco filtri={<>{filtri}<CercaInIntegra tipo="fornitore" onImportato={async (id) => { await carica(); router.push('/fornitori/' + id); }} /></>} />);
+    : sagome && <SagomaElenco larghezze="minmax(0,1.15fr) minmax(560px,1fr)" filtri={<>{filtri}<CercaInIntegra tipo="fornitore" onImportato={async (id) => { await carica(); router.push('/fornitori/' + id); }} /></>} />);
 
   const azioni: Azione[] = puoModificare && u ? [{ etichetta: 'Modifica le regole', icona: 'impostazioni', onClick: () => modificaRegole(u) }] : [];
 
   return pagina(
-    <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(0,1fr)' } as CSSProperties}>
+    <div className="colonne riempi" style={{ '--colonne': 'minmax(0,1.15fr) minmax(560px,1fr)' } as CSSProperties}>
       <div className="pila riempi">
         {filtri}
         <CercaInIntegra tipo="fornitore" onImportato={async (id) => { await carica(); router.push('/fornitori/' + id); }} />

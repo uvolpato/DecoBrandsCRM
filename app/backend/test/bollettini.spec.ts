@@ -253,3 +253,61 @@ describe('POST /api/bollettini', () => {
     await op.post('/bollettini', { fornitore_id: Number(gries), anno: 2025, mese: 13 }).expect(400);
   });
 });
+
+describe('righe del bollettino dal PDF letto (F7-A7)', () => {
+  it('alla creazione le righe di lettura_grezza entrano in bollettini_righe, con il documento abbinato', async () => {
+    const gasper = await fornitoreId('Gasper');
+    const c = await op.carica(pdf('bollettino gasper 11/2026'), 'bollettino-novembre.pdf').expect(201);
+    const arrivo = BigInt(c.body.id as string);
+    // il lettore ha già salvato la risposta completa (D-170): le righe stanno in extract_result.righe
+    await db.documenti_in_arrivo.update({
+      where: { id: arrivo },
+      data: {
+        lettura_grezza: { status: 'COMPLETED', extract_result: { tipo: 'bollettino', righe: [
+          { numero_fattura: 'F-2026-0921', data_fattura: '2026-08-20', importo: 3980, provvigione: 557.2, quota_pagata: 96.43 },
+          { numero_fattura: 'F-2026-0000', data_fattura: '2026-11-05', importo: 500, provvigione: 90 },
+          { numero_fattura: 'F-2026-0001', importo: 0, provvigione: 0 },
+        ] } },
+      },
+    });
+    const r = await op.post('/bollettini', { fornitore_id: Number(gasper), anno: 2026, mese: 11, arrivo_id: Number(arrivo) }).expect(201);
+    const id = BigInt(r.body.id as string);
+    const righe = await db.bollettini_righe.findMany({ where: { testata_id: id }, orderBy: { id: 'asc' } });
+    expect(righe).toHaveLength(3);
+    const doc = await db.ordini_fornitore_documenti.findFirstOrThrow({ where: { numero: 'F-2026-0921' }, include: { testata: true } });
+    const f = righe[0];
+    expect([f.fattura_numero, f.fattura_data?.toISOString().slice(0, 10), Number(f.importo_merce), Number(f.importo_riconosciuto), Number(f.pct_riconosciuta), Number(f.quota_pagata), f.tipo_riga])
+      .toEqual(['F-2026-0921', '2026-08-20', 3980, 557.2, 14, 96.43, 'provvigione']);
+    expect([f.documento_id, f.cliente_id, f.cliente_versione_id]).toEqual([doc.id, doc.testata.cliente_id, doc.testata.cliente_versione_id]);
+    // fattura che non conosciamo: resta la riga del fornitore, senza documento né cliente
+    expect([righe[1].documento_id, righe[1].cliente_id, Number(righe[1].importo_riconosciuto)]).toEqual([null, null, 90]);
+    // imponibile 0: nessuna percentuale, non un errore
+    expect([righe[2].pct_riconosciuta, Number(righe[2].importo_riconosciuto)]).toEqual([null, 0]);
+
+    // il confronto a cerniera ora ha la riga del fornitore; il secondo giro è rifiutato (409)
+    const b = (await op.get(`/bollettini/${id}`)).body as { righe: { numero: string; quota: number | null; noi: { pct_nominale: number | null; pct: number | null } | null }[]; righe_fornitore: number };
+    expect(b.righe_fornitore).toBe(3); // F7-A7: la pagina sa che le righe ci sono (niente pulsante «Importa»)
+    // D-201 §19: a schermo va la percentuale del fornitore, con la quota a parte (non l'effettiva)
+    const x = b.righe.find((y) => y.numero === 'F-2026-0921')!;
+    expect([x.noi?.pct_nominale, x.quota]).toEqual([14, 96.43]);
+    expect(b.righe.some((x) => x.numero === 'F-2026-0921')).toBe(true);
+    await op.post(`/bollettini/${id}/righe/importa`, {}).expect(409);
+    expect(await db.bollettini_righe.count({ where: { testata_id: id } })).toBe(3);
+  });
+
+  it('senza PDF: 409; PDF senza righe lette: nessuna riga e nessun errore; in sola lettura: 403', async () => {
+    const gasper = await fornitoreId('Gasper');
+    const senza = await op.post('/bollettini', { fornitore_id: Number(gasper), anno: 2026, mese: 12 }).expect(201);
+    const id = BigInt(senza.body.id as string);
+    const r = await op.post(`/bollettini/${id}/righe/importa`, {}).expect(409);
+    expect(r.body.message).toBe('Questo bollettino non ha un PDF da cui leggere le righe');
+    await lett.post(`/bollettini/${id}/righe/importa`, {}).expect(403);
+
+    // un PDF caricato ma non ancora letto: la rotta non inventa righe
+    const c = await op.carica(pdf('bollettino gasper 1/2027'), 'bollettino-gennaio.pdf').expect(201);
+    const creato = await op.post('/bollettini', { fornitore_id: Number(gasper), anno: 2027, mese: 1, arrivo_id: Number(c.body.id) }).expect(201);
+    const creatoId = BigInt(creato.body.id as string);
+    await op.post(`/bollettini/${creatoId}/righe/importa`, {}).expect(200);
+    expect(await db.bollettini_righe.count({ where: { testata_id: creatoId } })).toBe(0);
+  });
+});

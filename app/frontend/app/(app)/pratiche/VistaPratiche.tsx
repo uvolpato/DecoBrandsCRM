@@ -51,6 +51,7 @@ const STATI: { value: string; label: string }[] = [
   { value: 'attesa', label: 'Attesa conferma' },
   { value: 'confermata', label: 'Attesa fattura' },
   { value: 'fatturata', label: 'Fatturate' },
+  { value: 'annullata', label: 'Annullate' },
   { value: 'variazioni', label: 'Con variazioni' },
 ];
 

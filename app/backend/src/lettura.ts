@@ -32,7 +32,7 @@ export const SCHEMA_DOCUMENTO = {
     tipo: {
       type: 'string',
       enum: ['ordine', 'conferma', 'proforma', 'fattura', 'nota_credito', 'pagamento', 'altro', 'bollettino'],
-      description: 'Tipo del documento',
+      description: 'Tipo del documento: «Shipping Advice» = ordine',
     },
     numero: { type: 'string', description: 'Numero del documento' },
     numero_ordine_fornitore: { type: 'string', description: 'Il numero d’ordine del fornitore: per l’ordine è il suo numero; per proforma, conferma, fattura e nota di credito è il riferimento all’ordine stampato (es. «Auftrag / Order / Ordine n.», «Ihre Bestellung», «Rif. ordine») seguito dal codice' },
@@ -55,7 +55,7 @@ export const SCHEMA_DOCUMENTO = {
           codice: { type: 'string', description: 'Codice articolo' },
           descrizione: { type: 'string', description: 'Descrizione dell’articolo' },
           quantita: { type: 'number', description: 'Quantità' },
-          prezzo: { type: 'number', description: 'Prezzo unitario in euro' },
+          prezzo: { type: 'number', description: 'Prezzo unitario di listino in euro, prima dello sconto di riga: se accanto c’è una percentuale di sconto, è la cifra più alta (quella non scontata)' },
           importo: { type: 'number', description: 'Importo della riga in euro; per il bollettino è l’imponibile della fattura' },
           sconto: { type: 'number', description: 'Sconto percentuale della riga (es. 10 = 10%). Solo se scritto accanto al prezzo (es. «Rabatt», «Sonderrabatt»); altrimenti lascia il campo vuoto' },
           numero_fattura: { type: 'string', description: 'Per il bollettino: numero della fattura del mese' },
@@ -78,8 +78,10 @@ export const PROMPT_DOCUMENTO = [
   'Un rendiconto delle provvigioni del fornitore (Provisionsabrechnung, Abrechnung, «Provisionen») è di tipo bollettino: mese e anno sono quelli del periodo scritto nel titolo.',
   'Nelle righe metti ogni riga con posizione, quantità, prezzo e importo, anche se il codice articolo è un testo (es. «Fracht», «Verpackung», «Porto», «Versand») o manca: il codice si copia così com’è. Per queste righe di spesa metti spesa: true. Non mettere subtotali, totali, intestazioni ripetute o note.',
   'Lo sconto di riga (sconto) è la percentuale scritta accanto al prezzo, es. «Rabatt», «Sonderrabatt», «10,00%»: metti solo il numero (10 per il 10%). Se non c’è, lascia il campo vuoto.',
+  'Il prezzo unitario (prezzo) è il prezzo di listino, prima dello sconto di riga: quando la riga mostra uno sconto in percentuale (es. «30,00 %», «Rabatt») accanto a due cifre, prendi quella più alta, non scontata, e metti la percentuale in sconto. L’importo della riga (importo) è invece quello stampato sul documento, già scontato: non ricalcolarlo.',
   'Se il documento ha più pagine, unisci le righe di tutte le pagine in un solo elenco.',
   'Il tipo è uno di: ordine, conferma, proforma, fattura, nota_credito, pagamento, altro, bollettino.',
+  'Un documento intitolato «Shipping Advice» (avviso di spedizione del fornitore, con «Order no.», «Customer no.», «Date») è di tipo ordine: il suo numero è quello in «Order no.» e la data quella in «Date».',
   'Il fornitore è chi vende la merce: quello indicato nella riga «Fornitore», oppure chi emette la fattura o la conferma.',
   'Il cliente è chi compra: l’intestatario dell’ordine o l’insegna di consegna. Non scambiare i due: un ordine scritto sulla carta del cliente ha il cliente in testata e il fornitore nella riga «Fornitore».',
   'Il codice cliente è il codice con cui il fornitore identifica il cliente (spesso «Codice cliente» o «Kunden-Nr.»).',
@@ -90,6 +92,33 @@ export const PROMPT_DOCUMENTO = [
   'Il numero d’ordine del fornitore (numero_ordine_fornitore) è il numero d’ordine a cui si riferisce il documento: nell’ordine è il numero dell’ordine stesso; nella proforma, conferma, fattura e nota di credito è il numero d’ordine stampato accanto a diciture come «Auftrag», «Order», «Bestellung», «Ordine n.», «Ihre Bestellung», «Rif. ordine». Se il documento non cita un numero d’ordine, lascia il campo vuoto.',
 ].join(' ');
 
+/** 19/11/2026: alcuni fornitori stampano il prezzo di riga già scontato e mettono lo sconto a parte;
+ *  se l'importo di riga è quantità × prezzo, il prezzo è netto: si riporta al listino, altrimenti il
+ *  CRM sconta due volte. */
+export function prezzoDiListino(campi: { campo: string; valore: string | null }[]): void {
+  const righe = new Map<number, Record<string, string>>();
+  for (const c of campi) {
+    const m = /^righe\[(\d+)\]\.(prezzo|quantita|sconto|importo)$/.exec(c.campo);
+    if (!m || c.valore === null) continue;
+    const n = Number(m[1]);
+    const r = righe.get(n) ?? {};
+    r[m[2]] = c.valore;
+    righe.set(n, r);
+  }
+  for (const c of campi) {
+    const m = /^righe\[(\d+)\]\.prezzo$/.exec(c.campo);
+    if (!m || c.valore === null) continue;
+    const r = righe.get(Number(m[1]));
+    if (!r) continue;
+    const p = Number(c.valore), q = Number(r.quantita), s = Number(r.sconto), i = Number(r.importo);
+    // campi mancanti diventano 0 o NaN: la regola non si applica
+    if (!(s > 0 && s < 100 && q > 0 && p > 0) || !Number.isFinite(i)) continue;
+    const listino = q * p * (1 - s / 100);
+    if (Math.abs(i - q * p) > 0.02 || Math.abs(i - listino) <= 0.02) continue;
+    c.valore = (Math.round((p / (1 - s / 100)) * 100) / 100).toFixed(2);
+  }
+}
+
 /** Salvataggio dopo la lettura, in una transazione (V13): la riga si blocca e, se non è più
  *  `in_lettura`, non si scrive niente (un'altra richiesta l'ha già presa). F6-A3: dopo i campi,
  *  fornitore dal nome letto, livello e controlli (stessa transazione). */
@@ -99,6 +128,8 @@ async function salva(db: PrismaService, id: bigint, r: Lettura, soglie: Soglie, 
     const riga = await tx.documenti_in_arrivo.findUnique({ where: { id }, select: { stato: true, file_nome: true } });
     if (!riga || riga.stato !== 'in_lettura') return;
     await tx.documenti_campi.deleteMany({ where: { documento_id: id } });
+    // 19/11/2026: il modello a volte restituisce il prezzo già scontato; si riporta al listino
+    prezzoDiListino(r.campi);
     const campi = r.campi
       .filter((c) => c.valore !== null && c.valore.trim() !== '')
       .map((c) => ({

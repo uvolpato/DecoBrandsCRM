@@ -1,13 +1,13 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, NotFoundException, Param, ParseIntPipe, Put, Req } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Get, HttpCode, NotFoundException, Param, ParseIntPipe, Post, Put, Req } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 import type { Request } from 'express';
 import { Richiede, contesto } from './accesso';
-import { type Dati, caricaDatiBollettino, fiscale } from './motore/dati';
+import { type Dati, caricaDatiBollettino, fiscale, iso } from './motore/dati';
 import { anomaliaProvvigione, descrizioneAnomalia, r2, riconcilia, statoIncasso } from './motore/motore';
 import { congelaDocumenti } from './pratiche';
 import { PrismaService } from './prisma.service';
-import { type Contesto, logEvent } from './registro';
+import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registro';
 
 // Dettaglio del bollettino e riconciliazione "a cerniera" (F3-A2, §6.2, §7.7, §8.1): righe del fornitore
 // contro il nostro calcolo (riconcilia del motore), decisioni sulle righe (D-49), abbinamento di una riga a un
@@ -51,7 +51,7 @@ export function riconciliazione(S: Dati, id: string) {
   const f = S.fornitori.get(b.fornitore_id)!;
   const r = riconcilia(S, b);
   const aperto = b.stato === 'da_verificare';
-  const lato = (l: Riconciliata['loro']) => l && { imponibile: num(l.imponibile), pct: num(l.pct), importo: Number(l.importo) };
+  const lato = (l: Riconciliata['loro']) => l && { imponibile: num(l.imponibile), pct: num(l.pct), pct_nominale: num(l.pct_nominale), importo: Number(l.importo) };
   const contestate = r.righe.filter((x) => x.decisione?.esito === 'contestato').length;
   const n = (k: number, uno: string, piu: string) => `${k} ${k === 1 ? uno : piu}`;
   // D-119 §19: le correzioni di un bollettino contestato arrivano nel bollettino del mese dopo
@@ -67,6 +67,9 @@ export function riconciliazione(S: Dati, id: string) {
     stato: b.stato, // da_verificare | verificato | contestato
     badge: aperto ? (r.aperte ? 'da_verificare' : 'pronto') : b.stato,
     ricevuto: b.ricevuto, chiuso_il: b.chiuso_il, modificabile: aperto,
+    // le righe vere del bollettino (dal PDF o inserite), non quelle del confronto: servono a sapere se
+    // l'import dal PDF è ancora da fare (F7-A7, V12)
+    righe_fornitore: b.righe.length,
     righe: r.righe.map((x) => ({
       id: x.id, documento_id: x.documento_id, numero: x.numero, data: x.data, tipo: x.tipo,
       pratica_id: x.pratica_id, cliente_id: x.cliente_id, cliente: x.cliente_id ? (S.clienti.get(x.cliente_id)?.nome ?? null) : null,
@@ -77,6 +80,7 @@ export function riconciliazione(S: Dati, id: string) {
       // calcola (noi = null) e vale l'importo riconosciuto dal fornitore, come mostrava il prototipo (V12).
       differenza: num(x.differenza ?? (x.loro ? x.loro.importo : null)),
       aperta: x.aperta, incasso: x.incasso, pagamento: x.pagamento, giorni: x.giorni,
+      annullata: x.annullata, // D-207: la riga è di una pratica annullata
       pagata_in: x.pagata_in ? (({ id, mese, anno }) => ({ id, mese, anno }))(S.bollettini.find((o) => o.id === x.pagata_in)!) : null,
       decisione: x.decisione, // {esito, motivo, da, il}; il nome di chi ha deciso lo aggiunge la rotta
       scelte: aperto && !x.incasso ? (SCELTE[x.categoria] ?? []) : [],
@@ -105,6 +109,53 @@ async function blocca(tx: Tx, id: bigint) {
   return { S, b, r: riconcilia(S, b) };
 }
 
+/** Importa in `bollettini_righe` le righe già lette dal PDF del bollettino (F7-A7): stanno in
+ *  `documenti_in_arrivo.lettura_grezza.extract_result.righe`. Se il bollettino ha già righe non tocca
+ *  niente; se la lettura non ha righe restituisce 0 (il bollettino resta vuoto, come prima). V12: si legge
+ *  dal database. Gira dentro la transazione di chi chiama, con la testata già bloccata (V13). */
+export async function importaRigheDalPdf(tx: Tx, bollettinoId: bigint, arrivoId: bigint): Promise<number> {
+  if (await tx.bollettini_righe.count({ where: { testata_id: bollettinoId } })) return 0;
+  const t = await tx.bollettini_testata.findUnique({ where: { id: bollettinoId }, select: { fornitore_id: true, mese: true, anno: true } });
+  const d = await tx.documenti_in_arrivo.findUnique({ where: { id: arrivoId }, select: { lettura_grezza: true } });
+  if (!t || !d) return 0;
+  const lette = (d.lettura_grezza as { extract_result?: { righe?: unknown } } | null)?.extract_result?.righe;
+  if (!Array.isArray(lette)) return 0;
+  const entro = new Date(Date.UTC(t.anno, t.mese, 0)).toISOString().slice(0, 10); // fine del mese del bollettino
+  const numeroLetto = (v: unknown) => {
+    const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v.trim().replace(',', '.')) : NaN;
+    return Number.isFinite(n) ? n : null;
+  };
+  const dati: Prisma.bollettini_righeCreateManyInput[] = [];
+  for (const x of lette as Record<string, unknown>[]) {
+    const numero = typeof x.numero_fattura === 'string' ? x.numero_fattura.trim() : '';
+    const dataF = typeof x.data_fattura === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.data_fattura.trim()) ? x.data_fattura.trim() : null;
+    const imponibile = numeroLetto(x.importo), provvigione = numeroLetto(x.provvigione), quota = numeroLetto(x.quota_pagata);
+    // documento del fornitore: quello con la stessa data, altrimenti il più recente entro la fine del mese
+    const candidati = numero ? await tx.ordini_fornitore_documenti.findMany({
+      where: { tipo: 'fattura', numero, testata: { fornitore_id: t.fornitore_id } },
+      select: { id: true, data: true, testata: { select: { cliente_id: true, cliente_versione_id: true } } },
+      orderBy: { data: 'desc' },
+    }) : [];
+    const doc = candidati.length === 1 ? candidati[0]
+      : candidati.find((c) => dataF && iso(c.data) === dataF) ?? candidati.find((c) => iso(c.data) <= entro) ?? null;
+    dati.push({
+      testata_id: bollettinoId, tipo_riga: 'provvigione',
+      fattura_numero: numero, fattura_data: dataF ? new Date(dataF) : null,
+      importo_merce: imponibile == null ? null : new Prisma.Decimal(imponibile),
+      importo_riconosciuto: new Prisma.Decimal(provvigione ?? 0),
+      // % = provvigione / imponibile × 100 a 2 decimali; null se l'imponibile manca o è 0
+      pct_riconosciuta: provvigione != null && imponibile ? r2(new Prisma.Decimal(provvigione).div(imponibile).times(100)) : null,
+      quota_pagata: quota == null ? null : new Prisma.Decimal(quota), // null = 100 % (D-201 §19)
+      documento_id: doc?.id ?? null,
+      cliente_id: doc?.testata.cliente_id ?? null,
+      cliente_versione_id: doc?.testata.cliente_versione_id ?? null,
+    });
+  }
+  if (!dati.length) return 0;
+  await tx.bollettini_righe.createMany({ data: dati });
+  return dati.length;
+}
+
 const eventoRiga = (tx: Tx, S: Dati, b: Dati['bollettini'][number], x: Riconciliata, riga_id: bigint, prima: object, dopo: object, ctx: Contesto) => logEvent(tx, {
   tipo: 'crud', azione: 'update', entita: 'riga_bollettino', entita_id: riga_id, esito: 'successo',
   dettaglio: { etichetta: `${x.numero}${x.cliente_id ? ' · ' + (S.clienti.get(x.cliente_id)?.nome ?? '') : ''}`, riga_bollettino_id: String(riga_id), bollettino_id: b.id, prima, dopo },
@@ -112,6 +163,21 @@ const eventoRiga = (tx: Tx, S: Dati, b: Dati['bollettini'][number], x: Riconcili
 
 type Pratica = Dati['pratiche'][number];
 type Documento = Pratica['documenti'][number];
+
+/** D-207 §19: una riga del bollettino che punta a un documento di una pratica annullata è un'anomalia
+ *  «pratica annullata» (una per bollettino): il riconoscimento va rimosso, la pratica non conta più. */
+async function anomalieAnnullate(db: Prisma.TransactionClient | PrismaService, S: Dati, b: Dati['bollettini'][number], r: ReturnType<typeof riconcilia>) {
+  const annullate = r.righe.filter((x) => x.annullata);
+  if (annullate.length) {
+    await apriAnomalia(db, {
+      servizio: 'provvigioni', codice: 'provvigioni.pratica_annullata', chiave: String(b.id),
+      messaggio: `Il bollettino di ${MESI[b.mese - 1]} ${b.anno} ha ${annullate.length === 1 ? 'una riga' : `${annullate.length} righe`} di ${annullate.length === 1 ? 'una pratica annullata' : 'pratiche annullate'}: non si riconosce.`,
+      dettaglio: { bollettino_id: b.id, documenti: annullate.map((x) => ({ numero: x.numero, pratica_id: x.pratica_id })) },
+    });
+  } else {
+    await chiudiAnomalia(db, 'provvigioni', 'provvigioni.pratica_annullata', String(b.id));
+  }
+}
 
 /** Alla chiusura il mese è chiuso: per le fatture con storno, riaccredito o riconoscimento al pagamento
  *  lo stato d'incasso può cambiare. Scrive un evento per ogni documento che cambia (§15.2.5, F3-A3). */
@@ -147,6 +213,8 @@ export class BollettinoController {
     const S = await caricaDatiBollettino(this.db, BigInt(id));
     const r = S && riconciliazione(S, String(id));
     if (!r) throw new NotFoundException('Bollettino non trovato');
+    const b = S!.bollettini.find((x) => x.id === String(id))!;
+    await anomalieAnnullate(this.db, S!, b, riconcilia(S!, b)); // D-207: anomalia «pratica annullata»
     const [t, utenti] = await Promise.all([
       this.db.bollettini_testata.findUniqueOrThrow({ where: { id: BigInt(id) }, select: { note: true, chiusore: { select: { nome: true } }, arrivati: { select: { id: true, file_nome: true }, take: 1 } } }),
       this.db.utenti.findMany({ where: { id: { in: r.righe.flatMap((x) => (x.decisione?.da ? [BigInt(x.decisione.da)] : [])) } }, select: { id: true, nome: true } }),
@@ -157,6 +225,25 @@ export class BollettinoController {
       file: t.arrivati[0] ? { arrivo_id: String(t.arrivati[0].id), nome: t.arrivati[0].file_nome } : null,
       righe: r.righe.map((x) => ({ ...x, decisione: x.decisione && { ...x.decisione, da_nome: x.decisione.da ? (nome.get(x.decisione.da) ?? null) : null } })),
     };
+  }
+
+  /** Righe del PDF per un bollettino già creato e ancora vuoto (F7-A7): le legge dalla lettura salvata nel
+   *  documento in arrivo legato al bollettino. Stessi blocchi di `blocca()` (D-51); 409 se ci sono già righe
+   *  o se il bollettino non ha un PDF. */
+  @Post(':id/righe/importa')
+  @HttpCode(200)
+  @Richiede('provvigioni.modifica')
+  async importaRighe(@Param('id', ParseIntPipe) id: number) {
+    await this.db.$transaction(async (tx) => {
+      const { b } = await blocca(tx, BigInt(id));
+      if (b.righe.length) throw new ConflictException('Il bollettino ha già le righe');
+      const file = await tx.documenti_in_arrivo.findFirst({
+        where: { abbinato_bollettino_id: BigInt(id) }, select: { id: true }, orderBy: { id: 'asc' },
+      });
+      if (!file) throw new ConflictException('Questo bollettino non ha un PDF da cui leggere le righe');
+      await importaRigheDalPdf(tx, BigInt(id), file.id);
+    });
+    return this.dettaglio(id);
   }
 
   /** Testo della contestazione da mandare al fornitore (F3-A2b, §7.7): righe contestate con i due lati,
@@ -287,6 +374,7 @@ export class BollettinoController {
     // ponytail: un UPDATE per riga; updateMany per gruppi se i bollettini superano qualche centinaio di righe
     await this.db.$transaction(async (tx) => {
       const { S, b, r } = await blocca(tx, BigInt(id));
+      await anomalieAnnullate(tx, S, b, r); // D-207: chiude o apre l'anomalia «pratica annullata»
       const contestate = r.righe.filter((x) => x.decisione?.esito === 'contestato').length;
       if (r.aperte) throw new ConflictException(`Ci sono ${r.aperte} righe da decidere prima di chiudere il bollettino`);
       if (c.stato === 'verificato' && contestate) throw new ConflictException('Ci sono righe contestate: il bollettino va segnato come contestato');

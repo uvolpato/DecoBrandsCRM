@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Put, Query, Req } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, NotFoundException, Param, ParseIntPipe, Post, Put, Query, Req } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
@@ -15,7 +15,7 @@ import { type Contesto, apriAnomalia, chiudiAnomalia, logEvent } from './registr
 // sulla pratica (aggiornaPratica, D-52 §19); la query aggiunge solo "scaduta" (scadenza < oggi) e il
 // subagente alla data. Niente calcoli nel browser (V12, D-28).
 
-const STATI = ['tutte', 'scaduta', 'attesa', 'confermata', 'fatturata', 'variazioni'] as const;
+const STATI = ['tutte', 'scaduta', 'attesa', 'confermata', 'fatturata', 'annullata', 'variazioni'] as const;
 type Stato = (typeof STATI)[number];
 const ORDINI = ['numero', 'cliente', 'fornitore', 'data', 'importo', 'stato', 'subagente', 'ordine_fornitore'] as const;
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -43,14 +43,28 @@ class CercaPratiche {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) fornitore_id?: number;
   // il documento è vincolato a cliente e fornitore: la ricerca filtra per tutti e due (15/11/2026)
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) cliente_id?: number;
-  // D-177 §19: filtro per stato nella ricerca per l'abbinamento (lista chiusa, V12)
-  @IsOptional() @IsIn(['attesa', 'confermata', 'fatturata']) stato?: 'attesa' | 'confermata' | 'fatturata';
+  // D-177 §19: filtro per stato nella ricerca per l'abbinamento (lista chiusa, V12).
+  // «non_pagata» = fatturata senza un documento di pagamento (Ugo 18/11/2026: un pagamento salda
+  // una fattura, quindi la ricerca per un pagamento usa questo filtro)
+  @IsOptional() @IsIn(['attesa', 'confermata', 'fatturata', 'non_pagata']) stato?: 'attesa' | 'confermata' | 'fatturata' | 'non_pagata';
 }
 
 /** Deroga sul raggruppamento della pratica (D-199 §19): `raggruppamento` null = come il fornitore,
  *  altrimenti documento | riga; il motivo è obbligatorio. */
 class DerogaRaggruppamento {
   @IsOptional() @IsIn(['documento', 'riga']) raggruppamento?: 'documento' | 'riga' | null;
+  @IsString() @IsNotEmpty() @MaxLength(2000) motivo!: string;
+}
+
+/** Annullamento della pratica (D-207 §19): motivo obbligatorio, data facoltativa (oggi). Stessi permessi
+ *  della correzione della provvigione. */
+class AnnullaPratica {
+  @IsString() @IsNotEmpty() @MaxLength(2000) motivo!: string;
+  @IsOptional() @Matches(DATA) data?: string;
+}
+
+/** Eliminazione della pratica (D-206 §19): motivo obbligatorio, solo amministratore. */
+class EliminaPratica {
   @IsString() @IsNotEmpty() @MaxLength(2000) motivo!: string;
 }
 
@@ -95,13 +109,20 @@ export async function aggiornaPratica(tx: Prisma.TransactionClient, id: bigint, 
 }
 
 /** D-183 §19: riscrive i valori calcolati (`calcolo`) dei documenti aperti della pratica, dal motore.
- *  I congelati (congelato_il non nullo) non si toccano. Chiamata a ogni modifica che può cambiare la base. */
+ *  I congelati (congelato_il non nullo) non si toccano. Chiamata a ogni modifica che può cambiare la base.
+ *  D-207 §19: su una pratica annullata la provvigione prevista degli aperti si salva azzerata (come la
+ *  mostra `provvigioneDocumento`/`quotaSub`): il `calcolo` non conserva i valori vecchi. */
 async function salvaCalcolo(tx: Prisma.TransactionClient, id: bigint) {
   const S = await caricaDatiPratica(tx, id);
   if (!S) return;
   for (const pp of S.pratiche) for (const d of pp.documenti) {
     if (d.congelato_il) continue;
-    await tx.ordini_fornitore_documenti.update({ where: { id: BigInt(d.id) }, data: { calcolo: calcoloDocumento(S, pp, d) as unknown as Prisma.InputJsonValue } });
+    const c = calcoloDocumento(S, pp, d);
+    const calcolo = pp.annullata ? {
+      ...c, pct_agente: '0.00', pct_subagente: '0.00', provvigione_agente: '0.00', provvigione_subagente: '0.00',
+      ...(c.gruppi ? { gruppi: c.gruppi.map((g) => ({ ...g, pct_agente: '0.00', pct_sub: '0.00', provvigione_agente: '0.00', provvigione_sub: '0.00' })) } : {}),
+    } : c;
+    await tx.ordini_fornitore_documenti.update({ where: { id: BigInt(d.id) }, data: { calcolo: calcolo as unknown as Prisma.InputJsonValue } });
   }
 }
 
@@ -230,7 +251,8 @@ export class PraticheController {
                a.subagente_id, s.nome || ' ' || s.cognome AS subagente, to_char(t.data_ordine, 'YYYY-MM-DD') AS data,
                t.importo, t.variazioni, t.variazione, ${pagato} AS pagato,
                (t.raggruppamento IS NOT NULL) AS deroga,
-               CASE t.stato WHEN 'fatturato' THEN 'fatturata' WHEN 'confermato' THEN 'confermata'
+               CASE WHEN t.annullata_il IS NOT NULL THEN 'annullata' -- D-207: davanti a ogni stato ricavato
+                 WHEN t.stato = 'fatturato' THEN 'fatturata' WHEN t.stato = 'confermato' THEN 'confermata'
                  ELSE CASE WHEN f.giorni_attesa_conferma > 0 AND t.data_ordine + f.giorni_attesa_conferma < ${oggi}::date THEN 'scaduta' ELSE 'attesa' END END AS stato,
                CASE WHEN f.giorni_attesa_conferma > 0 THEN (t.data_ordine + f.giorni_attesa_conferma) - ${oggi}::date END AS giorni -- 0 = nessuna scadenza (D-60)
         FROM ordini_fornitore_testata t
@@ -244,12 +266,16 @@ export class PraticheController {
         WHERE ${Prisma.join(filtri, ' AND ')}
       )`;
     const stato = q.stato ?? 'tutte';
-    const scelte = stato === 'tutte' ? Prisma.sql`TRUE` : stato === 'variazioni' ? Prisma.sql`variazioni` : Prisma.sql`stato = ${stato}`;
+    // D-207: il segmento «Annullate» è escluso da «Tutte»; i filtri di stato restano sul calcolato
+    const scelte = stato === 'tutte' ? Prisma.sql`stato != 'annullata'`
+      : stato === 'variazioni' ? Prisma.sql`variazioni`
+      : Prisma.sql`stato = ${stato}`;
 
     const [c] = await this.db.$queryRaw<(Record<Stato, number> & { totale: number; deroga: number; importo: Prisma.Decimal | null })[]>`${base}
       SELECT count(*)::int AS tutte,
              count(*) FILTER (WHERE stato = 'scaduta')::int AS scaduta, count(*) FILTER (WHERE stato = 'attesa')::int AS attesa,
              count(*) FILTER (WHERE stato = 'confermata')::int AS confermata, count(*) FILTER (WHERE stato = 'fatturata')::int AS fatturata,
+             count(*) FILTER (WHERE stato = 'annullata')::int AS annullata,
              count(*) FILTER (WHERE variazioni)::int AS variazioni,
              count(*) FILTER (WHERE deroga)::int AS deroga,
              count(*) FILTER (WHERE ${scelte})::int AS totale, sum(importo) FILTER (WHERE ${scelte}) AS importo
@@ -260,7 +286,7 @@ export class PraticheController {
       numero: Prisma.sql`numero`, cliente: Prisma.sql`cliente`, fornitore: Prisma.sql`fornitore`, data: Prisma.sql`data`,
       importo: Prisma.sql`importo`, subagente: Prisma.sql`coalesce(subagente, '')`,
       ordine_fornitore: Prisma.sql`coalesce(numero_ordine_fornitore, '')`,
-      stato: Prisma.sql`CASE stato WHEN 'scaduta' THEN 0 WHEN 'attesa' THEN 1 WHEN 'confermata' THEN 2 ELSE 3 END`,
+      stato: Prisma.sql`CASE stato WHEN 'scaduta' THEN 0 WHEN 'attesa' THEN 1 WHEN 'confermata' THEN 2 WHEN 'fatturata' THEN 3 ELSE 4 END`,
     };
     const dir = q.dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
     const perPagina = q.perPagina ?? await righePagina(this.db); // §7.15: senza perPagina, la riga delle impostazioni
@@ -298,15 +324,19 @@ export class PraticheController {
   @Richiede('provvigioni.consulta')
   async cerca(@Query() q: CercaPratiche) {
     if (!q.fornitore_id) return [];
-    // D-177 §19: il filtro per stato lo applica il server; il browser invia solo la scelta (V12)
-    const stato = q.stato ? Prisma.sql`AND t.stato = ${STATO_DB[q.stato]}` : Prisma.empty;
+    // D-177 §19: il filtro per stato lo applica il server; il browser invia solo la scelta (V12).
+    // Ugo 18/11/2026: «non_pagata» = fatturata senza un documento di pagamento
+    const s = q.stato;
+    const stato = s === 'non_pagata'
+      ? Prisma.sql`AND t.stato = 'fatturato' AND NOT EXISTS (SELECT 1 FROM ordini_fornitore_documenti d WHERE d.testata_id = t.id AND d.tipo = 'pagamento')`
+      : s ? Prisma.sql`AND t.stato = ${STATO_DB[s]}` : Prisma.empty;
     const cliente = q.cliente_id != null ? Prisma.sql`AND t.cliente_id = ${BigInt(q.cliente_id)}` : Prisma.empty;
     // §16.4: colonna Importo della ricerca = importoPratica (l'ultima fase: fatture − note, conferme, ordini),
     // salvato da aggiornaPratica sulla testata (D-52); il server non ricalcola qui (V12).
     const righe = await this.db.$queryRaw<{ id: bigint; numero: string; cliente: string; data: string; stato: string; importo: Prisma.Decimal }[]>`
       SELECT t.id, t.numero_ordine AS numero, coalesce(cv.ragione_sociale, '') AS cliente,
              to_char(t.data_ordine, 'YYYY-MM-DD') AS data,
-             CASE t.stato WHEN 'fatturato' THEN 'fatturata' WHEN 'confermato' THEN 'confermata' ELSE 'attesa' END AS stato,
+             CASE WHEN t.annullata_il IS NOT NULL THEN 'annullata' WHEN t.stato = 'fatturato' THEN 'fatturata' WHEN t.stato = 'confermato' THEN 'confermata' ELSE 'attesa' END AS stato,
              t.importo AS importo
       FROM ordini_fornitore_testata t
       JOIN clienti c ON c.id = t.cliente_id
@@ -325,7 +355,7 @@ export class PraticheController {
     const r = S && dettaglioPratica(S, String(id));
     if (!r) throw new NotFoundException('Pratica non trovata');
     // D-169: il numero d'ordine del fornitore sta sulla testata, non nei dati del motore
-    const t = await this.db.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, select: { numero_ordine_fornitore: true } });
+    const t = await this.db.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, select: { numero_ordine_fornitore: true, annullata_il: true, annullata_motivo: true, annullatore: { select: { nome: true } } } });
     // D-199: il motivo dell'ultima deroga sul raggruppamento sta nel registro, sull'evento che porta
     // `campo: 'raggruppamento'` (un campo esplicito: non si fida dell'ultimo crud.update sulla pratica)
     const ev = await this.db.registro.findFirst({
@@ -334,7 +364,9 @@ export class PraticheController {
     });
     const dd = (ev?.dettaglio ?? null) as { motivo?: string } | null;
     const raggruppamento_motivo = dd?.motivo ?? null;
-    return { ...r, numero_ordine_fornitore: t?.numero_ordine_fornitore ?? null, raggruppamento_motivo };
+    // D-207: la fascia «Annullata il … da … — motivo» della pagina pratica
+    const annullata = t?.annullata_il ? { il: iso(t.annullata_il), motivo: t.annullata_motivo, da: t.annullatore?.nome ?? null } : null;
+    return { ...r, numero_ordine_fornitore: t?.numero_ordine_fornitore ?? null, raggruppamento_motivo, annullata };
   }
 
   /** Imposta la deroga sul raggruppamento della pratica (D-199 §19): null = come il fornitore, altrimenti
@@ -363,6 +395,130 @@ export class PraticheController {
       return { raggruppamento: dopo, raggruppamento_da: dopo == null ? 'fornitore' : 'pratica', motivo };
     });
   }
+
+  /** Annulla la pratica (D-207 §19): motivo obbligatorio, data facoltativa (oggi). Reversibile; davanti
+   *  a ogni stato ricavato, fuori da attese, liquidazioni e Analisi; provvigione prevista 0 sugli aperti. */
+  @Post(':id/annulla')
+  @Richiede('provvigioni.modifica')
+  async annulla(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: AnnullaPratica) {
+    const ctx = contesto(req);
+    const motivo = b.motivo.trim();
+    if (!motivo) throw new BadRequestException('Scrivi il motivo dell\'annullamento');
+    const data = b.data ?? giornoRoma(new Date());
+    await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM ordini_fornitore_testata WHERE id = ${BigInt(id)} FOR UPDATE`;
+      const t = await tx.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, select: { numero_ordine: true, annullata_il: true } });
+      if (!t) throw new NotFoundException('Pratica non trovata');
+      if (t.annullata_il) throw new ConflictException('La pratica è già annullata');
+      await tx.ordini_fornitore_testata.update({ where: { id: BigInt(id) }, data: { annullata_il: new Date(data), annullata_motivo: motivo, annullata_da: ctx.utente_id ?? null } });
+      await salvaCalcolo(tx, BigInt(id)); // D-207: gli aperti si salvano con provvigione prevista 0; i congelati non si toccano (D-183)
+      await logEvent(tx, {
+        tipo: 'stato', azione: 'change_state', entita: 'pratica', entita_id: BigInt(id), esito: 'successo',
+        dettaglio: { etichetta: t.numero_ordine, prima: { stato: 'attiva' }, dopo: { stato: 'annullata' }, annullata_il: data, motivo },
+      }, ctx);
+    });
+    return { annullata_il: data, motivo };
+  }
+
+  /** Ripristina una pratica annullata (D-207 §19): motivo obbligatorio, ricalcola gli aperti (i congelati
+   *  restano, D-183) e torna nello stato ricavato dai documenti. */
+  @Post(':id/ripristina')
+  @Richiede('provvigioni.modifica')
+  async ripristina(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: AnnullaPratica) {
+    const ctx = contesto(req);
+    const motivo = b.motivo.trim();
+    if (!motivo) throw new BadRequestException('Scrivi il motivo del ripristino');
+    await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM ordini_fornitore_testata WHERE id = ${BigInt(id)} FOR UPDATE`;
+      const t = await tx.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, select: { numero_ordine: true, annullata_il: true } });
+      if (!t) throw new NotFoundException('Pratica non trovata');
+      if (!t.annullata_il) throw new ConflictException('La pratica non è annullata');
+      await tx.ordini_fornitore_testata.update({ where: { id: BigInt(id) }, data: { annullata_il: null, annullata_motivo: null, annullata_da: null } });
+      // ricalcolo dello stato e dei valori degli aperti (V12); i congelati non si toccano (D-183)
+      await aggiornaPratica(tx, BigInt(id), ctx);
+      await logEvent(tx, {
+        tipo: 'stato', azione: 'change_state', entita: 'pratica', entita_id: BigInt(id), esito: 'successo',
+        dettaglio: { etichetta: t.numero_ordine, prima: { stato: 'annullata' }, dopo: { stato: 'attiva' }, motivo },
+      }, ctx);
+    });
+    return { ripristinata: true };
+  }
+
+  /** Elimina la pratica (D-206 §19): solo l'amministratore, motivo obbligatorio, solo se non è contabilizzata.
+   *  Righe, correzioni, documenti e pratica spariscono in una transazione (V13); i PDF in arrivo passano
+   *  negli scartati. Il registro tiene la fotografia (D-31), mai cancellata. */
+  @Delete(':id')
+  @HttpCode(204)
+  @Richiede('provvigioni.elimina')
+  async elimina(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() b: EliminaPratica) {
+    const ctx = contesto(req);
+    const ruolo = req.utente?.ruolo;
+    if (ruolo !== 'amministratore' && ruolo !== 'superutente') throw new ForbiddenException('L\'eliminazione di una pratica è dell\'amministratore');
+    const motivo = b.motivo.trim();
+    if (!motivo) throw new BadRequestException('Scrivi il motivo dell\'eliminazione');
+    await this.db.$transaction(async (tx) => {
+      // blocca prima il fornitore come le altre scritture sui documenti (bloccaFornitore): serializza con
+      // la verifica di un bollettino, così `motivoNonEliminabile` non corre con una riga/congelamento che arriva dopo
+      const prima = await tx.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, select: { fornitore_id: true } });
+      if (!prima) throw new NotFoundException('Pratica non trovata');
+      await tx.$queryRaw`SELECT id FROM fornitori WHERE id = ${prima.fornitore_id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT 1 FROM ordini_fornitore_testata WHERE id = ${BigInt(id)} FOR UPDATE`;
+      const t = await tx.ordini_fornitore_testata.findUnique({ where: { id: BigInt(id) }, include: CON_PRATICA });
+      if (!t) throw new NotFoundException('Pratica non trovata');
+      const blocco = await motivoNonEliminabile(tx, t);
+      if (blocco) throw new ConflictException(blocco);
+      // anomalie della pratica (provvigione da decidere) non hanno più ragione di restare aperte (D-182/D-199)
+      await chiudiAnomalia(tx, 'provvigioni', 'provvigione.sconto_medio', String(id));
+      await chiudiAnomalia(tx, 'provvigioni', 'provvigione.gruppo_scaglione', String(id));
+      // fotografia per il registro (D-31): la si scrive prima di cancellare, non si tocca mai
+      const S = await caricaDatiPratica(tx, BigInt(id));
+      const p = S?.pratiche[0];
+      const sub = p ? abbinamento(S, p.cliente_id, p.fornitore_id, p.data) : null;
+      const foto = {
+        numero: t.numero_ordine,
+        fornitore: p ? (S!.fornitori.get(p.fornitore_id)?.nome ?? '') : '',
+        cliente: p ? (S!.clienti.get(p.cliente_id)?.nome ?? '') : '',
+        subagente: sub?.subagente_id != null && p ? (S!.subagenti.get(sub.subagente_id)?.nome ?? null) : null,
+        documenti: t.documenti.map((d) => ({
+          tipo: d.tipo, numero: d.numero, data: iso(d.data), importo: Number(d.importo),
+          provvigione_agente: (d.calcolo as { provvigione_agente?: string } | null)?.provvigione_agente ?? null,
+          provvigione_subagente: (d.calcolo as { provvigione_subagente?: string } | null)?.provvigione_subagente ?? null,
+        })),
+      };
+      // i file in arrivo collegati passano negli scartati (stessa via del pulsante Scarta, D-206), mai cancellati
+      await tx.documenti_in_arrivo.updateMany({
+        where: { abbinato_pratica_id: BigInt(id) },
+        data: { stato: 'scartato', scartato_il: new Date(), scartato_da: ctx.utente_id ?? null, motivo_scarto: `pratica ${t.numero_ordine} eliminata`, nota_scarto: null, abbinato_pratica_id: null },
+      });
+      // ordine di cancellazione per le FK: correzioni, righe, note di credito (stornano le fatture), gli altri
+      await tx.provvigioni_correzioni.deleteMany({ where: { documento: { testata_id: BigInt(id) } } });
+      await tx.ordini_fornitore_righe.deleteMany({ where: { testata_id: BigInt(id) } });
+      await tx.ordini_fornitore_documenti.deleteMany({ where: { testata_id: BigInt(id), fattura_id: { not: null } } });
+      await tx.ordini_fornitore_documenti.deleteMany({ where: { testata_id: BigInt(id) } });
+      await tx.ordini_fornitore_testata.delete({ where: { id: BigInt(id) } });
+      await logEvent(tx, {
+        tipo: 'crud', azione: 'delete', entita: 'pratica', entita_id: BigInt(id), esito: 'successo',
+        dettaglio: { etichetta: t.numero_ordine, motivo, fotografia: foto },
+      }, ctx);
+    });
+  }
+}
+
+const NOME_DOC: Record<string, string> = { ordine: 'Ordine', conferma: 'Conferma', proforma: 'Proforma', fattura: 'Fattura', nota_credito: 'Nota di credito', pagamento: 'Pagamento', altro: 'Documento' };
+
+/** Perché una pratica non si elimina (D-206 §19), o null se si può. Contabilizzata = documento congelato
+ *  (bollettino verificato o contestato, D-183), in una liquidazione chiusa, abbinato a una riga di bollettino
+ *  o con una decisione in un bollettino. */
+async function motivoNonEliminabile(tx: Prisma.TransactionClient, t: Prisma.ordini_fornitore_testataGetPayload<{ include: typeof CON_PRATICA }>): Promise<string | null> {
+  for (const d of t.documenti) {
+    if (d.congelato_il) return `La ${NOME_DOC[d.tipo] ?? d.tipo} ${d.numero} è in un periodo chiuso: la pratica non si elimina`;
+    if (d.liquidazione_id) return `La ${NOME_DOC[d.tipo] ?? d.tipo} ${d.numero} è in una liquidazione chiusa: la pratica non si elimina`;
+  }
+  const ids = t.documenti.map((d) => d.id);
+  if (!ids.length) return null;
+  if (await tx.bollettini_righe.count({ where: { documento_id: { in: ids } } })) return 'La pratica ha documenti abbinati a righe di bollettino: non si elimina';
+  if (await tx.bollettini_attese.count({ where: { documento_id: { in: ids } } })) return 'La pratica ha documenti con una decisione in un bollettino: non si elimina';
+  return null;
 }
 
 /** Risposta del dettaglio dai dati del motore; esportata per la prova di coerenza con caricaDati. */
@@ -489,7 +645,9 @@ export function dettaglioPratica(S: Dati, id: string) {
     };
   })();
 
-  const azione = s.chiave === 'fatturata'
+  const azione = s.chiave === 'annullata'
+    ? { tipo: 'annullata', testo: 'Pratica annullata: non genera provvigioni né scadenze.' }
+    : s.chiave === 'fatturata'
     ? { tipo: 'nessuna', testo: 'Pratica fatturata: non serve altro.' }
     : s.chiave === 'confermata'
       ? { tipo: 'fattura', testo: 'Attesa la fattura del fornitore: registrala quando arriva.' }

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Caricamento, Elenco, ElencoSelezionabile } from '@/componenti/Flussi';
 import { Icona } from '@/componenti/Icona';
 import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
-import { avviso, quando, Stato, type Variante } from '@/componenti/Piccoli';
+import { avviso, Informazioni, quando, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
@@ -50,6 +50,8 @@ export function VistaDocumenti() {
   const [caricando, setCaricando] = useState(true);
   const [versione, setVersione] = useState(0);
   const [scartati, setScartati] = useState<number | null>(null); // il link «N scartati» (§7.16)
+  // file rifiutato dal server (409 del doppione, §6.5): resta in pagina finché non arriva un altro rifiuto
+  const [rifiutato, setRifiutato] = useState<{ messaggio: string; pratica: { id: string; numero: string } | null; documento: { id: string } | null } | null>(null);
   const sagome = useSagome(caricando);
   const attesaLettura = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventi = useEventi();
@@ -92,11 +94,12 @@ export function VistaDocumenti() {
   useEffect(() => () => { if (attesaLettura.current) clearTimeout(attesaLettura.current); }, []);
 
   async function carica(files: File[]) {
+    setRifiutato(null);
     let letti = 0;
     for (const f of files) {
       const r = await caricaPdf(f);
       if (r.ok) letti++;
-      else avviso(r.messaggio, true);
+      else setRifiutato({ messaggio: r.messaggio, pratica: r.dati?.pratica ?? null, documento: r.dati?.documento ?? null });
     }
     if (!letti) return;
     avviso(letti === 1 ? 'Documento caricato: la lettura parte da sola' : 'Documenti caricati: la lettura parte da sola');
@@ -117,7 +120,9 @@ export function VistaDocumenti() {
         <Pannello titolo="Da controllare" nota={dati ? <>
           {dati.totale} {dati.totale === 1 ? 'documento' : 'documenti'}
           {scartati != null && <> · <Link href="/scartati">{scartati} scartati</Link></>}
-        </> : ' '} riempi>
+        </> : ' '} info={<Informazioni titolo="Informazioni sui documenti da controllare">
+          Si legge un documento ogni 15 secondi.
+        </Informazioni>} riempi>
           {dati && !dati.lettura_configurata && (
             <div className="avviso-variazioni" role="status">
               <Icona nome="avviso" />
@@ -130,9 +135,18 @@ export function VistaDocumenti() {
                 testo="PDF di ordini, conferme, fatture e note di credito; bollettini in PDF. Gli Excel non si prendono."
                 accetta="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" onFile={(f) => void carica(f)} />
               <div style={{ height: 12 }} />
+              {rifiutato && (
+                <div className="avviso-variazioni" role="alert">
+                  <Icona nome="avviso" />
+                  <span>{rifiutato.messaggio}
+                    {rifiutato.pratica
+                      ? <> <Link href={'/pratiche/' + rifiutato.pratica.id}>Apri la pratica {rifiutato.pratica.numero}</Link></>
+                      : rifiutato.documento && <> <Link href={'/documenti/' + rifiutato.documento.id}>Apri il documento</Link></>}
+                  </span>
+                </div>
+              )}
             </>
           )}
-          <Nota>Si legge un documento ogni 15 secondi.</Nota>
           {dati?.integra === 'non_disponibile' && (
             <Nota>Integra non raggiungibile: i candidati da importare non sono aggiornati.</Nota>
           )}
@@ -154,11 +168,13 @@ export function VistaDocumenti() {
                 return {
                   id: d.id,
                   href: '/documenti/' + d.id,
-                  titolo: inCoda ? d.file_nome : (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : d.tipo === 'pagamento' && d.data ? ' del ' + data(d.data) + (d.importo != null ? ' · ' + euro(d.importo) : '') : '') + (d.numero_ordine_fornitore && d.tipo !== 'ordine' ? ' · ordine ' + d.numero_ordine_fornitore : ''),
+                  titolo: inCoda || d.stato === 'errore' ? d.file_nome : (d.tipo ? TIPO[d.tipo] ?? d.tipo : 'Documento') + (d.numero ? ' ' + d.numero : d.tipo === 'pagamento' && d.data ? ' del ' + data(d.data) + (d.importo != null ? ' · ' + euro(d.importo) : '') : '') + (d.numero_ordine_fornitore && d.tipo !== 'ordine' ? ' · ordine ' + d.numero_ordine_fornitore : ''),
                   valore: inCoda ? '' : d.importo == null ? '' : euro(d.importo),
                   sotto: inCoda ? 'arrivato il ' + quando(d.ricevuto_il) : (d.fornitore ?? 'fornitore non riconosciuto') + ' · caricato il ' + quando(d.ricevuto_il),
                   stato: inCoda ? <Stato v="info">{d.stato === 'in_coda' ? 'In coda' : 'In lettura'}</Stato>
-                    : l || d.confronto_n > 0 || d.manca_agenzia || d.manca_rappresentanza || d.fornitore_da_integra || d.cliente_da_integra ? <>
+                    : d.stato === 'errore' || l || d.confronto_n > 0 || d.manca_agenzia || d.manca_rappresentanza || d.fornitore_da_integra || d.cliente_da_integra ? <>
+                      {/* D-208 §19: un documento non letto dopo 3 tentativi si apre e si sistema a mano o si scarta */}
+                      {d.stato === 'errore' ? <Stato v="errore">Non leggibile</Stato> : null}
                       {l ? <Stato v={l.v}>{l.testo}</Stato> : null}
                       {d.confronto_n > 0 ? <Stato v="attesa">{d.confronto_n} {d.confronto_n === 1 ? 'avviso' : 'avvisi'}</Stato> : null}
                       {d.fornitore_da_integra ? <Stato v="info">Fornitore in Integra</Stato> : null}
@@ -177,16 +193,17 @@ export function VistaDocumenti() {
         </Pannello>
 
         {selezionato ? (
-          <VistaDocumento key={selezionato} id={selezionato} onFatto={ricarica} />
+          <VistaDocumento key={selezionato} id={selezionato} onFatto={ricarica} aggiorna={vEventi} />
         ) : (
-          <Pannello titolo="Come entrano i documenti" riempi>
+          <Pannello titolo="Come entrano i documenti" riempi info={<Informazioni titolo="Informazioni su come entrano i documenti">
+            Le foto dei documenti arrivano come JPEG o PNG; gli Excel e i messaggi di Outlook si rifiutano.
+          </Informazioni>}>
             <Elenco voci={[
               { testo: <><b>Carica</b> il file qui a sinistra o con <b>Carica documenti</b> nella barra laterale, da qualsiasi pagina.</> },
               { testo: <><b>Lettura automatica</b>: il sistema riconosce fornitore, tipo, numero, data, codice cliente e righe.</> },
               { testo: <><b>Controlla</b> i dati letti e correggili se serve.</> },
               { testo: <><b>Abbina</b>: un ordine apre una nuova pratica; conferme, fatture e note di credito si agganciano alla pratica proposta; un bollettino si registra e si verifica riga per riga.</> },
             ]} />
-            <Nota>Le foto dei documenti arrivano come JPEG o PNG; gli Excel e i messaggi di Outlook si rifiutano.</Nota>
           </Pannello>
         )}
       </div>

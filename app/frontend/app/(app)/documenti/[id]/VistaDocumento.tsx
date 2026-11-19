@@ -70,10 +70,11 @@ const STATO_PRATICA: Record<string, { testo: string; v: Variante }> = {
 // niente soglie fisse nel browser. Il livello del documento resta quello calcolato dal server.
 type Soglie = { soglia_ok: number; soglia_bassa: number };
 
-// D-177 §19: stato iniziale del filtro nella ricerca per l'abbinamento, secondo il tipo del documento
+// D-177 §19: stato iniziale del filtro nella ricerca per l'abbinamento, secondo il tipo del documento.
+// Ugo 18/11/2026: un pagamento cerca le fatturate senza pagamento («Non pagata»)
 const STATO_DAL_TIPO: Record<string, string> = {
   ordine: 'attesa', proforma: 'attesa', conferma: 'attesa',
-  fattura: 'confermata', nota_credito: 'fatturata', pagamento: 'fatturata',
+  fattura: 'confermata', nota_credito: 'fatturata', pagamento: 'non_pagata',
 };
 // i segmenti del filtro per stato, nella finestra di ricerca: '' = nessun filtro (tutte)
 const STATI_ABBUNA = [
@@ -81,6 +82,7 @@ const STATI_ABBUNA = [
   { valore: 'attesa', etichetta: 'Solo ordine' },
   { valore: 'confermata', etichetta: 'Confermata' },
   { valore: 'fatturata', etichetta: 'Fatturata' },
+  { valore: 'non_pagata', etichetta: 'Non pagata' },
 ];
 // D-178 §19: filtro per stato delle pratiche suggerite nella scheda «Pratica proposta» (tendina,
 // non è un filtro di entità: il server riceve solo la scelta e filtra le candidate, V12)
@@ -219,7 +221,7 @@ function EsitoCodiceCliente({ esito, codice }: { esito?: Dettaglio['codice_clien
   return <span className="sec-riga" style={{ color: 'var(--attesa-testo)' }}><Icona nome="avviso" /> {testo}</span>;
 }
 
-export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => void }) {
+export function VistaDocumento({ id, onFatto, aggiorna }: { id: string; onFatto?: () => void; aggiorna?: number }) {
   const router = useRouter();
   const puo = usePuo();
   const puoModifica = puo('provvigioni.modifica');
@@ -248,6 +250,20 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
   }, [id, filtro]);
   // il dettaglio si rimonta al cambio di documento (`key` in VistaDocumenti, D-94): niente azzeramento qui
   useEffect(() => { void carica(); }, [carica]);
+  // il documento selezionato è cambiato sul server (SSE): si richiede il dettaglio, senza doppia lettura al montaggio
+  const primoAggiorna = useRef(aggiorna);
+  useEffect(() => {
+    if (aggiorna === undefined || aggiorna === primoAggiorna.current) return;
+    primoAggiorna.current = aggiorna;
+    void carica();
+  }, [aggiorna, carica]);
+  // si torna dal cliente o dalle impostazioni e il documento si rilegge (V12: si richiede al server)
+  useEffect(() => {
+    const torna = () => { if (document.visibilityState === 'visible') void carica(); };
+    window.addEventListener('focus', torna);
+    document.addEventListener('visibilitychange', torna);
+    return () => { window.removeEventListener('focus', torna); document.removeEventListener('visibilitychange', torna); };
+  }, [carica]);
 
   /** Cambia il filtro delle pratiche suggerite: ricarica dal server, la lista resta più tenue (D-59). */
   const cambiaFiltro = (v: string) => {
@@ -798,12 +814,18 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
         ) : (
           <>
             {doc.proposta.esito === 'nessuno' && <h3>A quale pratica appartiene?</h3>}
-            {doc.proposta.esito === 'nessuno' && (t.codice_cliente
-              ? <Nota>{doc.fornitore
-                ? <>Il codice {t.codice_cliente} non corrisponde a nessun cliente di {nomeFornitore}. Scegli la pratica a mano oppure correggi il codice.</>
-                : <>Fornitore e codice cliente non letti: scegli la pratica a mano oppure correggi il codice.</>}</Nota>
-              // 15/11/2026: codice vuoto (es. il pagamento non ce l'ha) → niente rilievo se il cliente è già scelto
-              : !clienteAssociato && <Nota>Manca il codice cliente: scegli il cliente o la pratica a mano.</Nota>)}
+            {/* Ugo 18/11/2026: la nota segue l'esito del codice; se il codice è buono manca solo la pratica aperta */}
+            {doc.proposta.esito === 'nessuno' && ((t.tipo === 'altro' || !t.tipo)
+              // 18/11/2026: un documento senza tipo non entra in una pratica; va spiegato, non cercato
+              ? <Nota>Letto come «Documento»: un documento generico non entra in una pratica. Se è una conferma, una fattura o un ordine, correggi il tipo con «Correggi i dati letti».</Nota>
+              : doc.codice_cliente_esito?.stato === 'corrisponde' || doc.codice_cliente_esito?.stato === 'da_confermare'
+              ? <Nota>Nessuna pratica aperta da proporre per {doc.codice_cliente_esito.cliente ?? 'questo cliente'}: scegli la pratica a mano qui sotto.</Nota>
+              : t.codice_cliente
+                ? <Nota>{doc.fornitore
+                  ? <>Il codice {t.codice_cliente} non corrisponde a nessun cliente di {nomeFornitore}. Scegli la pratica a mano oppure correggi il codice.</>
+                  : <>Fornitore e codice cliente non letti: scegli la pratica a mano oppure correggi il codice.</>}</Nota>
+                // 15/11/2026: codice vuoto (es. il pagamento non ce l'ha) → niente rilievo se il cliente è già scelto
+                : !clienteAssociato && <Nota>Manca il codice cliente: scegli il cliente o la pratica a mano.</Nota>)}
             {doc.proposta.esito === 'doppio' && (doppio ? (
               <div className="pila">
                 <Nota>Questo {(TIPO[doppio.tipo] ?? 'documento').toLowerCase()} c’è già nella pratica <Link href={'/pratiche/' + doppio.pratica_id}><b>{doppio.pratica_numero}</b></Link>. Se è la versione aggiornata, sostituiscilo; altrimenti scarta il documento.</Nota>
@@ -819,6 +841,8 @@ export function VistaDocumento({ id, onFatto }: { id: string; onFatto?: () => vo
                 const s = STATO_PRATICA[c.pratica.stato] ?? { testo: c.pratica.stato, v: 'neutro' as Variante };
                 return {
                   titolo: c.pratica.numero + ' · ' + (c.pratica.cliente ?? ''),
+                  // Ugo 18/11/2026: la pratica si apre in una nuova scheda, senza lasciare il documento
+                  apri: { href: '/pratiche/' + c.pratica.id + '?vista=sola', etichetta: 'Apri la pratica in una nuova scheda' },
                   sottotitolo: <Stato v={s.v}>{s.testo}</Stato>,
                   consigliata: i === 0 && doc.proposta.esito !== 'nessuno',
                   punti: [...c.motivi, t.tipo === 'nota_credito'

@@ -92,9 +92,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .testa-azioni { display: flex; gap: 8px; flex-wrap: wrap; }
 .corpo { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
 .corpo.pieno { overflow: hidden; }
-/* --colonne: larghezze scelte dalla pagina; sugli schermi stretti si impilano lo stesso (lo style in linea vincerebbe sulla @media) */
-.colonne { display: grid; grid-template-columns: var(--colonne, minmax(0, 1.7fr) minmax(300px, 1fr)); gap: 16px; min-height: 0; }
-.colonne.pari { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+/* --colonne: larghezze scelte dalla pagina; il dettaglio a destra ha una larghezza minima utile
+   (560 px: ci stanno le tabelle senza scorrimento di lato), sotto la soglia le colonne si impilano
+   lo stesso (lo style in linea vincerebbe sulla @media) */
+.colonne { display: grid; grid-template-columns: var(--colonne, minmax(0, 1.7fr) minmax(560px, 1fr)); gap: 16px; min-height: 0; }
+.colonne.pari { grid-template-columns: minmax(0, 1fr) minmax(560px, 1fr); }
 .colonne.posta { grid-template-columns: 330px minmax(0, 1fr); }
 .colonne > * { min-height: 0; min-width: 0; }
 .colonne.riempi, .riempi { flex: 1 1 auto; min-height: 16rem; }
@@ -425,11 +427,14 @@ a.m-cella:hover { background: #f1f6ff; }
 .codice { margin: 0; background: #f8f9fa; border: 1px solid var(--bordo); border-radius: var(--r-piccolo); padding: 12px 14px; font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, Consolas, monospace; }
 
 /* ---------- Schermi stretti ---------- */
-@media (max-width: 1100px) {
+/* sotto i 1250 px il dettaglio non starebbe più largo 560: due colonne si impilano (13/11/2026) */
+@media (max-width: 1250px) {
   .colonne, .colonne.pari { grid-template-columns: minmax(0, 1fr); }
   /* colonne impilate: la prima prende un'altezza fissa e scorre al suo interno, la pagina scorre per il resto */
   .corpo.pieno { overflow: auto; }
   .colonne.riempi:not(.posta) { flex: none; grid-template-rows: minmax(24rem, 70vh) auto; }
+}
+@media (max-width: 1100px) {
   .colonne.posta { grid-template-columns: 260px minmax(0, 1fr); }
   .kpi-riga { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catalogo { grid-template-columns: minmax(0, 1fr); }

@@ -108,14 +108,15 @@ export function ElencoSelezionabile({ voci, selezionata }: { voci: { id: string 
   );
 }
 
-/** Opzioni alternative, ognuna con motivi e un'azione (es. pratiche candidate); la consigliata è in evidenza. */
-export function Scelte({ voci, vuoto = 'Nessuna opzione disponibile.' }: { voci: { titolo: string; sottotitolo?: ReactNode; punti: ReactNode[]; azione: { etichetta: string; onClick: () => void }; consigliata?: boolean }[]; vuoto?: string }) {
+/** Opzioni alternative, ognuna con motivi e un'azione (es. pratiche candidate); la consigliata è in evidenza.
+ *  `apri` mette accanto al titolo il collegamento «apri in una nuova scheda» (come il campo di ricerca). */
+export function Scelte({ voci, vuoto = 'Nessuna opzione disponibile.' }: { voci: { titolo: ReactNode; apri?: { href: string; etichetta: string }; sottotitolo?: ReactNode; punti: ReactNode[]; azione: { etichetta: string; onClick: () => void }; consigliata?: boolean }[]; vuoto?: string }) {
   return (
     <div className="scelte">
       {!voci.length && <p className="testo-tenue">{vuoto}</p>}
-      {voci.map((v) => (
-        <div key={v.titolo} className={'scelta' + (v.consigliata ? ' consigliata' : '')}>
-          <div><h3>{v.titolo}</h3>{v.sottotitolo && <div className="scelta-sotto">{v.sottotitolo}</div>}<ul>{v.punti.map((p, i) => <li key={i}>{p}</li>)}</ul></div>
+      {voci.map((v, i) => (
+        <div key={i} className={'scelta' + (v.consigliata ? ' consigliata' : '')}>
+          <div><h3>{v.titolo}{v.apri && <a className="btn-riga" href={v.apri.href} target="_blank" rel="noopener" title={v.apri.etichetta} aria-label={v.apri.etichetta}><Icona nome="apri-scheda" /></a>}</h3>{v.sottotitolo && <div className="scelta-sotto">{v.sottotitolo}</div>}<ul>{v.punti.map((p, i) => <li key={i}>{p}</li>)}</ul></div>
           <button type="button" className={'btn' + (v.consigliata ? '' : ' sec')} onClick={v.azione.onClick}>{v.azione.etichetta}</button>
         </div>))}
     </div>

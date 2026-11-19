@@ -8,7 +8,7 @@ import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
 import { configura } from '../src/main';
-import { leggiDallaCoda, PROMPT_DOCUMENTO, SCHEMA_DOCUMENTO } from '../src/lettura';
+import { leggiDallaCoda, prezzoDiListino, PROMPT_DOCUMENTO, SCHEMA_DOCUMENTO } from '../src/lettura';
 import { leggiDocumento, type CampoLetto, type Lettura } from '../src/lettore';
 import { PrismaService } from '../src/prisma.service';
 import { svuota } from './svuota';
@@ -260,5 +260,41 @@ describe('F6-A2 lettura dalla coda', () => {
       .toMatchObject({ stato: 'in_coda', tentativi: 0 });
     expect(await db.registro.count({ where: { codice: 'lettura.non_raggiungibile', stato: 'aperta' } })).toBe(1);
     expect(await db.registro.count({ where: { codice: 'lettura.fallita' } })).toBe(0);
+  });
+});
+
+// 19/11/2026: il modello restituisce a volte il prezzo già scontato (es. Gasper); la regola
+// deterministica lo riporta al listino solo se l'importo di riga è quantità × prezzo.
+describe('prezzo di listino', () => {
+  const riga = (...valori: [string, string][]) => valori.map(([campo, valore]) => ({ campo, valore }));
+
+  it('prezzo netto con sconto a parte: torna il listino (esempio Gasper)', () => {
+    const campi = riga(
+      ['righe[0].quantita', '8'], ['righe[0].prezzo', '104.99'], ['righe[0].sconto', '30'], ['righe[0].importo', '839.92'],
+    );
+    prezzoDiListino(campi);
+    expect(campi[1].valore).toBe('149.99');
+  });
+
+  it('prezzo già di listino: invariato', () => {
+    const campi = riga(
+      ['righe[0].quantita', '3'], ['righe[0].prezzo', '50'], ['righe[0].sconto', '10'], ['righe[0].importo', '135'],
+    );
+    prezzoDiListino(campi);
+    expect(campi[1].valore).toBe('50');
+  });
+
+  it('sconto 0: invariato', () => {
+    const campi = riga(
+      ['righe[0].quantita', '2'], ['righe[0].prezzo', '10'], ['righe[0].sconto', '0'], ['righe[0].importo', '20'],
+    );
+    prezzoDiListino(campi);
+    expect(campi[1].valore).toBe('10');
+  });
+
+  it('importo mancante: invariato', () => {
+    const campi = riga(['righe[0].quantita', '2'], ['righe[0].prezzo', '10'], ['righe[0].sconto', '10']);
+    prezzoDiListino(campi);
+    expect(campi[1].valore).toBe('10');
   });
 });

@@ -11,6 +11,40 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.13 — 19/11/2026 — bollettino leggibile, provvigioni sul pagato, deploy
+
+- **Bollettino: le righe arrivano dal PDF.** Il rendiconto del fornitore viene letto come gli altri
+  documenti e le sue righe (fattura, data, importo, provvigione, quota pagata) entrano nel bollettino:
+  il confronto a cerniera mostra «loro» e «noi», le differenze e le fatture del bollettino che non
+  sono fra le nostre pratiche. Per i bollettini già caricati e vuoti c'è *Importa le righe dal PDF*.
+- **Dati letti del bollettino**: pulsante che apre la finestra con il PDF a sinistra e, a destra, i
+  campi e le righe lette (quota compresa), con il collegamento per correggerli in Documenti.
+- **Percentuale e quota separate**: la colonna «Noi calcoliamo» dice «15% di 2.117,30 € · quota 96%»,
+  non più la percentuale effettiva (14,4%) che sembrava un errore.
+- **Provvigione sul pagamento** (D-208): con una sola fattura nella pratica, se c'è il documento di
+  pagamento del cliente la provvigione si calcola su quello (lo sconto per pagamento anticipato è già
+  dentro l'importo), altrimenti sulla fattura. I documenti congelati in un periodo chiuso non si
+  muovono.
+- **Lettura dei prezzi**: il prezzo unitario è quello di listino, prima dello sconto di riga. Se il
+  modello restituisce il prezzo già scontato, un controllo aritmetico lo riporta al listino
+  (`importo = quantità × prezzo` con sconto a parte). Un documento intitolato «Shipping Advice» è un
+  ordine.
+- **Documenti**: il 409 del file già caricato dice la pratica (o il documento in coda) e la apre con un
+  link; i documenti letti tre volte senza successo compaiono in *Da controllare* come «Non leggibile»;
+  il dettaglio si rilegge quando la finestra torna in primo piano; la nota sul codice cliente compare
+  solo quando il codice davvero non corrisponde.
+- **Ricerca della pratica**: filtro **Non pagata** (fatturata e senza pagamento) usato da solo quando
+  il documento è un pagamento; le pratiche suggerite compaiono solo con un elemento in comune (cliente
+  o articoli), con il link per aprirle in una nuova scheda.
+- **Pagamenti**: «Segna come pagata» chiede conferma; «Annulla il pagamento» richiede una motivazione
+  (anche il server la pretende) e riporta la fattura a non pagata.
+- **Pratica**: annullamento e ripristino con motivo, eliminazione (solo amministratore, solo se non è
+  contabilizzata), versioni precedenti dei documenti con *Sostituisci*, agenzia senza subagente.
+- **Interfaccia**: il pulsante «i» sta nella testata dei pannelli, all'estrema destra.
+- **Deploy sul server** (`app/DEPLOY.md`): `setup.cmd` per la prima installazione e `deploy.cmd <tag>`
+  per gli aggiornamenti, con backup, prova di salute e ritorno al rilascio precedente; sul server si
+  scarica solo `app/` (checkout sparso).
+
 ### 0.2.12 — 17/11/2026 — agenzia senza subagente
 
 - **Il subagente nell'agenzia non è più obbligatorio** (D-205): senza subagente la provvigione è tutta

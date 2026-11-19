@@ -80,6 +80,7 @@ export const praticaDaDb = (t: Testata) => {
   return {
     id: id(t.id), numero: t.numero_ordine, fornitore_id: id(t.fornitore_id), cliente_id: id(t.cliente_id), data: iso(t.data_ordine),
     raggruppamento: t.raggruppamento ?? null, // D-199: deroga della pratica (null = come il fornitore)
+    annullata: t.annullata_il != null, // D-207: davanti a ogni stato ricavato dai documenti
     ordini: tracciati('ordine'), conferme: tracciati('conferma'), proforma: tracciati('proforma'), pagamenti: tracciati('pagamento'),
     // tre fotografie delle righe (§4.2.8): più ordini e più fatture della stessa fase si sommano (confronto)
     righe: {

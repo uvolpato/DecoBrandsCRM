@@ -5,10 +5,10 @@ import { Campo } from '@/componenti/Campo';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { Caricamento, Matrice } from '@/componenti/Flussi';
 import { Modale } from '@/componenti/Modale';
-import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
+import { Pagina, Pannello } from '@/componenti/Pagina';
 import { mpiu, PeriodoMesi } from '@/componenti/PeriodoMesi';
 import { SollecitiBollettino } from '@/componenti/Solleciti';
-import { avviso, Stato, type Variante } from '@/componenti/Piccoli';
+import { avviso, Informazioni, Stato, type Variante } from '@/componenti/Piccoli';
 import { Sagoma, SagomaMatrice, useSagome } from '@/componenti/Sagoma';
 import { usePuo } from '@/componenti/Utente';
 import { api, caricaPdf } from '@/lib/api';
@@ -138,6 +138,13 @@ export function VistaBollettini() {
             <button type="button" className="btn sec piccolo" title="Sposta il periodo di un mese indietro" disabled={!dati || da <= primo} onClick={() => sposta(-1)}>‹</button>
             <button type="button" className="btn sec piccolo" title="Sposta il periodo di un mese avanti" disabled={!dati || a >= ultimo} onClick={() => sposta(1)}>›</button>
           </div>
+          <Informazioni titolo="Informazioni sui bollettini">
+            <ul>
+              <li>Un bollettino è atteso per ogni mese chiuso in cui il fornitore ci ha fatturato qualcosa.</li>
+              <li>Le righe si confrontano con quanto calcoliamo dalle pratiche: le differenze vanno accettate o contestate prima di chiudere il bollettino.</li>
+              <li>Si vedono al massimo 6 mesi alla volta.</li>
+            </ul>
+          </Informazioni>
           <FilterBar valori={valori} onChange={setValori} caricando={sagome && !dati} riepilogo={{ prima: [{ etichetta: 'Periodo', testo: da && a ? etichetta(da) + ' – ' + etichetta(a) : '' }] }} campi={[
             { nome: 'fornitori', tipo: 'ricerca', entita: fornitore, multipla: true, etichetta: 'Fornitore', placeholder: 'Tutti i fornitori' },
             {
@@ -157,8 +164,6 @@ export function VistaBollettini() {
               ? <Pannello><div className="vuoto"><b>Nessun fornitore con qualcosa da fare in questo periodo</b>Scegli “Tutti” o cambia i mesi.</div></Pannello>
               : <Matrice angolo="Fornitore" colonne={dati.colonne.map(etichetta)}
                   righe={dati.fornitori.map((f) => ({ titolo: f.fornitore, sotto: 'paga sul ' + f.maturazione, celle: f.celle.map((c) => cella(c, f.id)) }))} />}
-
-        <Nota>Un bollettino è atteso per ogni mese chiuso in cui il fornitore ci ha fatturato qualcosa. Le righe si confrontano con quanto calcoliamo dalle pratiche: le differenze vanno accettate o contestate prima di chiudere il bollettino. Si vedono al massimo 6 mesi alla volta.</Nota>
       </div>
 
       {carica && <FinestraCarica onChiudi={() => setCarica(false)} onCaricato={() => { setCarica(false); setVersione((v) => v + 1); }} />}

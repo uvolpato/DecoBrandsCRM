@@ -72,6 +72,10 @@ export class IncassiController {
       // D-62: la nota della segnalazione ha la sua colonna e si sostituisce a ogni segno, come il prototipo;
       // quella del documento (note) non si tocca. La storia resta nel registro.
       const nota = b.nota?.trim() || null;
+      // D-62 §19: togliere un pagamento segnalato non si fa senza motivazione; il controllo vero sta qui (V12)
+      if (prima === 'pagata' && b.stato !== 'pagata' && !nota) {
+        throw new BadRequestException('Annullare il pagamento richiede una motivazione');
+      }
       await tx.ordini_fornitore_documenti.update({
         where: { id: d.id },
         data: {

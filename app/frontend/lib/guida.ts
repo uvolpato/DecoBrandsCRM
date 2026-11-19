@@ -130,7 +130,7 @@ export const GUIDA: Argomento[] = [
       ['Apri la pratica', 'Per un ordine: crea la pratica nuova, con cliente e fornitore.'],
       ['Registra e verifica', 'Per un bollettino: lo registra e apre la verifica.'],
       ['Scarta il documento', 'Per doppioni o documenti che non riguardano Decobrands.'],
-      ['Sostituisci l’ordine registrato', 'Su un ordine, una conferma o una proforma con lo stesso numero (e fornitore) di uno già registrato nella pratica: la versione aggiornata dal fornitore sostituisce dati, righe e file di quello registrato. Prima mostra il confronto (data, importo, righe, cliente) e chiede un motivo (già precompilato). Il file vecchio resta nello storico, non si cancella.'],
+      ['Sostituisci l’ordine registrato', 'Su un ordine, una conferma o una proforma con lo stesso numero (e fornitore) di uno già registrato nella pratica: la versione aggiornata dal fornitore sostituisce dati, righe e file di quello registrato. Prima mostra il confronto (data, importo, righe, cliente) e chiede un motivo (già precompilato). Il file vecchio resta nello storico, non si cancella: nella pratica compare come versione precedente, con il PDF e le righe di allora.'],
       ['Togli dalla coda', 'Per un documento in coda non ancora letto: lo toglie prima della lettura (va fra gli scartati) con il motivo «Tolto dalla coda».'],
       ['Configura l’agenzia', 'Quando un documento è di un cliente che non ha l’agenzia con quel fornitore alla data che serve (l’ordine della pratica, o la data del documento se la pratica è nuova): apre il form dell’agenzia (cliente e fornitore già fissi). Senza, il documento non entra in una pratica. Serve il livello operatore in Dati: senza, il pulsante è spento e il suggerimento dice perché.'],
       ['Configura le percentuali', 'Quando un ordine è di un fornitore che non ha uno scaglione per lo sconto dell’agenzia alla data dell’ordine (senza, la provvigione sarebbe zero): apre la finestra di un solo scaglione, con fornitore fisso, «Valide dal» alla data dell’ordine e lo sconto dell’agenzia già proposto, e poi riprova ad aprire la pratica. Serve il livello responsabile in Dati: senza, il pulsante è spento e il suggerimento dice perché.'],
@@ -214,7 +214,7 @@ export const GUIDA: Argomento[] = [
       ['Controlla le righe se serve', 'Scheda Righe a confronto: il numero rosso nel titolo dice quante righe cambiano.'],
     ],
     pulsanti: [
-      ['Segmenti di stato', 'Tutte · Conferma in ritardo · Attesa conferma · Attesa fattura · Fatturate · Con variazioni. Con questo filtro la pratica si apre direttamente sulle righe. Nella lista una variazione mostra anche lo scostamento in euro.'],
+      ['Segmenti di stato', 'Tutte · Conferma in ritardo · Attesa conferma · Attesa fattura · Fatturate · Annullate · Con variazioni. «Tutte» non include le annullate. Con questo filtro la pratica si apre direttamente sulle righe. Nella lista una variazione mostra anche lo scostamento in euro.'],
       ['Tutti i fornitori · clienti · subagenti', 'Filtri standard a selezione multipla; i numeri dei segmenti si ricalcolano subito. Imbuto per il riepilogo, imbuto barrato per toglierli tutti.'],
       ['Cerca', 'Per pratica, cliente, numero d’ordine del fornitore o numero di documento.'],
       ['Clic sulla riga', 'Apre la scheda della pratica.'],
@@ -230,6 +230,9 @@ export const GUIDA: Argomento[] = [
       ['Clic su documento o riga a confronto', 'Apre la stessa finestra su quel documento o su quella riga.'],
       ['Incasso del cliente', 'Riquadro della scheda: per ogni fattura pagata, non pagata, in attesa di incasso o da verificare.'],
       ['Sollecita il cliente · Segna come pagata · Segna come non pagata', 'Nel riquadro Incasso: sollecito al cliente, o segnalazione del fornitore ricevuta per email o telefono.'],
+      ['Annulla la pratica', 'Nella testata: passa la pratica ad «annullata» (motivo obbligatorio, data di oggi). Fuori da attese, bollettini, liquidazioni e Analisi; la provvigione prevista sugli aperti torna a zero, i documenti già contabilizzati non cambiano. È reversibile: la fascia in alto ha Ripristina.'],
+      ['Elimina la pratica', 'Solo l’amministratore, con motivo obbligatorio. Cancella righe, documenti e pratica; i file in arrivo passano negli scartati e il registro conserva la fotografia. Non si elimina una pratica contabilizzata (documento congelato, in un bollettino o in una liquidazione): il server risponde 409 con il motivo.'],
+      ['Versioni precedenti', 'Sotto un ordine, una conferma o una proforma sostituiti (D-204): ogni versione precedente con tipo, numero, data, importo, numero di righe e «sostituito il … da … — motivo». Apri il PDF apre il file di allora, Vedi le righe di allora le mostra in sola lettura. Non contano in nessun calcolo.'],
     ],
     finestre: [
       { nome: 'Documenti della pratica', da: 'Consulta affiancati · clic su un documento o su una riga a confronto', cosa: 'A sinistra il documento (schede per ordine, conferma, fattura, nota di credito; ← → per scorrerli), a destra i dati e il confronto riga per riga con un altro documento. Se il file originale non c’è, a sinistra c’è l’anteprima costruita dai dati. Con una nota di credito si vedono solo le righe stornate e la differenza è l’importo stornato.',

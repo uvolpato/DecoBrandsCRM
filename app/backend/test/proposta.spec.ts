@@ -721,6 +721,62 @@ describe('proposta — filtro per stato delle pratiche suggerite (D-178)', () =>
     expect(p.candidati[0].motivi).toContain('pratica già fatturata');
   });
 
+  it('pagamento con il cliente certo: si propongono le fatturate senza un pagamento (18/11/2026)', async () => {
+    await praticaStato('fatturato', 'OF-1', [
+      { tipo: 'fattura', numero: 'F-1', data: '2026-06-01' },
+      { tipo: 'pagamento', numero: 'PAG-1', data: '2026-07-01' },
+    ]);
+    await praticaStato('fatturato', 'OF-2', [{ tipo: 'fattura', numero: 'F-2', data: '2026-06-01' }]);
+    const p = await propostaDocumento(db, L({ tipo: 'pagamento', fornitore_id: gries.id, codice_cliente: 'K-100' }), {}, 'fatturata');
+    expect(p.candidati.map((c) => c.pratica.numero)).toEqual(['OF-2']);
+  });
+
+  // Ugo 18/11/2026: un pagamento non porta articoli; senza cliente certo e senza elementi in comune
+  // non si elencano tutte le fatturate del fornitore
+  it('pagamento senza cliente certo e senza articoli in comune: nessuna pratica proposta', async () => {
+    await praticaStato('fatturato', 'OF-1', [{ tipo: 'fattura', numero: 'F-1', data: '2026-06-01' }]);
+    await praticaStato('fatturato', 'OF-2', [{ tipo: 'fattura', numero: 'F-2', data: '2026-06-01' }]);
+    const p = await propostaDocumento(db, L({ tipo: 'pagamento', fornitore_id: gries.id }), {}, 'fatturata');
+    expect(p.candidati).toEqual([]);
+    expect(p.esito).toBe('nessuno');
+  });
+
+  // Ugo 18/11/2026: un pagamento quasi mai porta il codice cliente; il cliente riconosciuto per
+  // ragione sociale o P.IVA è un elemento di filtro come il codice.
+  it('pagamento con il cliente riconosciuto per ragione sociale: solo le fatturate di quel cliente', async () => {
+    await praticaStato('fatturato', 'OF-1', [{ tipo: 'fattura', numero: 'F-1', data: '2026-06-01' }]);
+    await praticaStato('fatturato', 'OF-2', [
+      { tipo: 'fattura', numero: 'F-2', data: '2026-06-01' },
+      { tipo: 'pagamento', numero: 'PAG-2', data: '2026-07-01' },
+    ]);
+    // pratica fatturata di un altro cliente dello stesso fornitore: fuori dalla proposta
+    const altra = await creaPratica({
+      fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c2.id, cliente_versione_id: c2.versione_id,
+      numero: 'OF-3', data: '2026-05-01', documenti: [{ tipo: 'fattura', numero: 'F-3', data: '2026-06-01' }],
+    });
+    await db.ordini_fornitore_testata.update({ where: { id: altra }, data: { stato: 'fatturato' } });
+    const p = await propostaDocumento(db, L({ tipo: 'pagamento', fornitore_id: gries.id, cliente: 'Verde Vita snc' }), {}, 'fatturata');
+    expect(p.cliente_riconosciuto).toMatchObject({ cliente_id: c1.id });
+    expect(p.candidati.map((c) => c.pratica.numero)).toEqual(['OF-1']);
+  });
+
+  // Correzione 2 (18/11/2026): il cliente riconosciuto per P.IVA/nome filtra solo per il pagamento.
+  // Una fattura resta al comportamento di prima (D-60): si confrontano gli articoli, non il cliente.
+  it('fattura con il cliente riconosciuto per ragione sociale: propone anche la pratica di un altro cliente con articoli in comune', async () => {
+    const altra = await creaPratica({
+      fornitore_id: gries.id, fornitore_versione_id: gries.versione_id, cliente_id: c2.id, cliente_versione_id: c2.versione_id,
+      numero: 'OF-3', data: '2026-05-01', righe: [{ fase: 'ordine', codice: 'A1', quantita: 2, prezzo: 10 }],
+      documenti: [{ tipo: 'fattura', numero: 'F-3', data: '2026-06-01' }],
+    });
+    await db.ordini_fornitore_testata.update({ where: { id: altra }, data: { stato: 'fatturato' } });
+    const p = await propostaDocumento(db, L({
+      tipo: 'fattura', fornitore_id: gries.id, numero: 'F-NUOVA', cliente: 'Verde Vita snc',
+      righe: [R({ codice: 'A1', quantita: 2, prezzo: 10, importo: 20 })],
+    }), {}, 'tutte');
+    expect(p.cliente_riconosciuto).toMatchObject({ cliente_id: c1.id });
+    expect(p.candidati.map((c) => c.pratica.numero)).toEqual(['OF-3']);
+  });
+
   it('«solo_ordine» e «confermata» filtrano per stato', async () => {
     await praticaStato('inviato', 'OF-1');
     await praticaStato('confermato', 'OF-2');

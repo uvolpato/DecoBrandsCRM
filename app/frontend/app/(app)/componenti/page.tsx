@@ -243,9 +243,9 @@ const VOCI: Voce[] = [
     demo: <ElencoSelezionabile selezionata={1} voci={[
       { id: 1, href: '/componenti', titolo: 'Fattura F-2026-0930', valore: euro(3150), sotto: 'Ing’s · arrivato il 03/09/2026', stato: <Stato v="ok">Abbinamento sicuro</Stato> },
       { id: 2, href: '/componenti', titolo: 'Conferma C-2026/1101', valore: euro(880), sotto: 'Gasper · arrivato il 04/09/2026', stato: <Stato v="errore">Cliente non riconosciuto</Stato> }]} /> },
-  { nome: 'Scelte', gruppo: 'Flussi', testo: 'Alternative con i motivi e un’azione ciascuna; quella consigliata è in evidenza.', firma: '<Scelte voci={[{ titolo, sottotitolo, punti, azione: { etichetta, onClick }, consigliata }]} vuoto />',
+  { nome: 'Scelte', gruppo: 'Flussi', testo: 'Alternative con i motivi e un’azione ciascuna; quella consigliata è in evidenza.', firma: '<Scelte voci={[{ titolo: nodo, apri: { href, etichetta }, sottotitolo, punti, azione: { etichetta, onClick }, consigliata }]} vuoto />',
     demo: <Scelte voci={[
-      { titolo: 'DB-2026-0412 · Arredo Bagno Rossi', sottotitolo: <><Stato v="attesa">Attesa conferma</Stato> › <Stato v="info">Confermata</Stato></>, punti: ['codice cliente K-10122', '3 articoli in comune', 'importo uguale all’ordine'], consigliata: true, azione: { etichetta: 'Abbina a DB-2026-0412', onClick: prova } },
+      { titolo: 'DB-2026-0412 · Arredo Bagno Rossi', apri: { href: '/pratiche/1?vista=sola', etichetta: 'Apri la pratica in una nuova scheda' }, sottotitolo: <><Stato v="attesa">Attesa conferma</Stato> › <Stato v="info">Confermata</Stato></>, punti: ['codice cliente K-10122', '3 articoli in comune', 'importo uguale all’ordine'], consigliata: true, azione: { etichetta: 'Abbina a DB-2026-0412', onClick: prova } },
       { titolo: 'DB-2026-0420 · Bianchi Interni', punti: ['1 articolo in comune', <span key="x" className="negativo">-120,00 € rispetto all’ordine</span>], azione: { etichetta: 'Abbina a DB-2026-0420', onClick: prova } }]} /> },
   { nome: 'Binario', gruppo: 'Flussi', testo: 'Le fasi documentali di una pratica, con le differenze fra una fase e la precedente.', firma: '<Binario tappe={[{ titolo, fatta, ritardo, numero, data, importo, delta, testo, assente }]} />',
     demo: <Binario tappe={[

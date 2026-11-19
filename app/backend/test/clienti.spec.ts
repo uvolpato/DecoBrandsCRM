@@ -8,6 +8,7 @@ import { configura } from '../src/main';
 import { ultimaChiusura } from '../src/motore/dati';
 import { cifra } from '../src/password';
 import { PrismaService } from '../src/prisma.service';
+import { ricalcolaDocumentiAperti } from '../src/pratiche';
 import { svuota } from './svuota';
 import { seed } from '../prisma/seed';
 
@@ -385,7 +386,7 @@ describe('agenzie CRUD', () => {
   it("agenzia: null sui campi obbligatori e fine uguale all'inizio danno 400", async () => {
     const a = await entra('oper-cli');
     const base = '/clienti/' + clienteId + '/agenzie/' + agenziaId;
-    for (const b of [{ valido_dal: null }, { subagente_id: null }, { sconto: null }]) await a.put(base, b).expect(400);
+    for (const b of [{ valido_dal: null }, { sconto: null }]) await a.put(base, b).expect(400);
     const r = await a.put(base, { valido_dal: '2030-01-01', valido_al: '2030-01-01' }).expect(400);
     expect(r.body.message).toContain('dopo');
   });
@@ -516,6 +517,72 @@ describe('agenzia senza subagente', () => {
     expect(r.body.subagente_id).toBeNull();
     const m = await a.put('/clienti/' + clienteId + '/agenzie/' + r.body.id, { subagente_id: Number(subagenteId) }).expect(200);
     expect(m.body.subagente_id).toBe(String(subagenteId));
+  });
+});
+
+describe('togliere il subagente (D-205)', () => {
+  it('modifica con subagente_id null: si toglie e azzera pct/regola; campo non mandato invariato; null con pct 400', async () => {
+    const a = await entra('ammi-cli');
+    const c = await db.clienti.create({ data: {} });
+    const cv = await db.clienti_versioni.create({ data: { cliente_id: c.id, fonte: 'integra', ragione_sociale: 'Cliente Togli 2', valido_dal: new Date('2025-01-01') } });
+    await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: cv.id } });
+    const r = await a.post('/clienti/' + c.id + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(fornitoreId), sconto: 2,
+      pct_subagente: 10, regola_mensile: 'prima', valido_dal: '2053-01-01',
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    const url = '/clienti/' + c.id + '/agenzie/' + r.body.id;
+    // null con pct_subagente valorizzato → 400 (niente pct senza subagente)
+    const e = await a.put(url, { subagente_id: null, pct_subagente: 10 }).expect(400);
+    expect(e.body.message).toContain('Senza subagente');
+    // campo non mandato → il subagente resta
+    const invariato = await a.put(url, { sconto: 6 }).expect(200);
+    expect(invariato.body.subagente_id).toBe(String(subagenteId));
+    // si toglie davvero, con pct e regola azzerati
+    const m = await a.put(url, { subagente_id: null, pct_subagente: null, regola_mensile: null }).expect(200);
+    expect(m.body.subagente_id).toBeNull();
+    expect(m.body.pct_subagente).toBeNull();
+    expect(m.body.regola_mensile).toBeNull();
+  });
+
+  it('togliere il subagente vale da una data: i documenti prima restano del subagente, dopo a Decobrands', async () => {
+    const a = await entra('ammi-cli');
+    const f = await db.fornitori.create({ data: {} });
+    const fv = await db.fornitori_versioni.create({ data: { fornitore_id: f.id, fonte: 'integra', ragione_sociale: 'Fornitore Togli', valido_dal: new Date('2025-01-01') } });
+    await db.fornitori.update({ where: { id: f.id }, data: { versione_corrente_id: fv.id } });
+    await db.provvigioni_scaglioni.create({ data: { fornitore_id: f.id, sconto_min: 0, pct_agente: 18, pct_subagente: 10, valido_dal: new Date('2025-01-01') } });
+    const c = await db.clienti.create({ data: {} });
+    const cv = await db.clienti_versioni.create({ data: { cliente_id: c.id, fonte: 'integra', ragione_sociale: 'Cliente Togli', valido_dal: new Date('2025-01-01') } });
+    await db.clienti.update({ where: { id: c.id }, data: { versione_corrente_id: cv.id } });
+    // agenzia "storica" con subagente fino a X
+    await a.post('/clienti/' + c.id + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(f.id), sconto: 0, valido_dal: '2054-01-01', valido_al: '2054-07-01',
+    }).expect(201);
+    // agenzia corrente con subagente da X
+    const r = await a.post('/clienti/' + c.id + '/agenzie', {
+      subagente_id: Number(subagenteId), fornitore_id: Number(f.id), sconto: 0, pct_subagente: 10, valido_dal: '2054-07-01',
+    }).expect(201);
+    creati.push(BigInt(r.body.id));
+    // due pratiche con un documento fiscale: una prima di X, una dopo
+    const tp = await db.ordini_fornitore_testata.create({ data: { fornitore_id: f.id, fornitore_versione_id: fv.id, numero_ordine: 'OF/2054/001', data_ordine: new Date('2054-03-01'), cliente_id: c.id, cliente_versione_id: cv.id } });
+    const dp = await db.ordini_fornitore_documenti.create({ data: { testata_id: tp.id, tipo: 'fattura', numero: 'F-PRIMA', data: new Date('2054-03-15'), importo: 1000 } });
+    const td = await db.ordini_fornitore_testata.create({ data: { fornitore_id: f.id, fornitore_versione_id: fv.id, numero_ordine: 'OF/2054/002', data_ordine: new Date('2054-08-01'), cliente_id: c.id, cliente_versione_id: cv.id } });
+    const dd = await db.ordini_fornitore_documenti.create({ data: { testata_id: td.id, tipo: 'fattura', numero: 'F-DOPO', data: new Date('2054-08-15'), importo: 1000 } });
+    // ricalcola gli aperti: prima della modifica entrambi al subagente
+    await db.$transaction((tx) => ricalcolaDocumentiAperti(tx, f.id));
+    const p0 = (await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: dp.id } })).calcolo as { pct_subagente: string | null } | null;
+    const d0 = (await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: dd.id } })).calcolo as { pct_subagente: string | null } | null;
+    expect(p0?.pct_subagente).not.toBeNull();
+    expect(d0?.pct_subagente).not.toBeNull();
+    // togli il subagente dall'agenzia corrente
+    const m = await a.put('/clienti/' + c.id + '/agenzie/' + r.body.id, { subagente_id: null, pct_subagente: null, regola_mensile: null }).expect(200);
+    expect(m.body.subagente_id).toBeNull();
+    // dopo: il documento prima di X resta del subagente, quello dopo è tutto a Decobrands
+    const p1 = (await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: dp.id } })).calcolo as { pct_subagente: string | null; provvigione_subagente: string | null } | null;
+    const d1 = (await db.ordini_fornitore_documenti.findUniqueOrThrow({ where: { id: dd.id } })).calcolo as { pct_subagente: string | null; provvigione_subagente: string | null } | null;
+    expect(p1?.pct_subagente).not.toBeNull();
+    expect(d1?.pct_subagente).toBe('0.00');
+    expect(d1?.provvigione_subagente).toBe('0.00');
   });
 });
 

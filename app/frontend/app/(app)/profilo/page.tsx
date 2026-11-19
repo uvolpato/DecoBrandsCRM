@@ -2,8 +2,8 @@
 import { type FormEvent } from 'react';
 import { areeAperte } from '@/componenti/Barra';
 import { Campo } from '@/componenti/Campo';
-import { Nota, Pagina, Pannello } from '@/componenti/Pagina';
-import { avviso, Dettagli } from '@/componenti/Piccoli';
+import { Pagina, Pannello } from '@/componenti/Pagina';
+import { avviso, Dettagli, Informazioni } from '@/componenti/Piccoli';
 import { LIVELLI, RUOLI, useAggiornaUtente, useUtente } from '@/componenti/Utente';
 import { api } from '@/lib/api';
 
@@ -40,13 +40,18 @@ export default function Profilo() {
               { etichetta: 'Ruolo di Sistema', valore: RUOLI[io.ruolo] ?? io.ruolo },
             ]} />
           </Pannello>
-          <Pannello titolo="Aree che puoi aprire" nota="livello">
+          <Pannello titolo="Aree che puoi aprire" nota="livello"
+            info={<Informazioni titolo="Informazioni sulle aree che puoi aprire">
+              Nome, nome utente, email, ruolo e livelli li cambia chi amministra: da qui si leggono soltanto.
+            </Informazioni>}>
             <Dettagli inColonne voci={aree.map((a) => ({ etichetta: a.t, valore: livello(a.id) }))} />
-            <Nota>Nome, nome utente, email, ruolo e livelli li cambia chi amministra: da qui si leggono soltanto.</Nota>
           </Pannello>
         </div>
         <div className="pila">
-          <Pannello titolo="Pagina di ingresso per area" nota="quando scegli l’area nel menu">
+          <Pannello titolo="Pagina di ingresso per area" nota="quando scegli l’area nel menu"
+            info={<Informazioni titolo="Informazioni sulla pagina di ingresso">
+              Senza scelta si apre la prima pagina dell’area; in Gestione la prima a cui hai accesso. La scelta vale solo per te.
+            </Informazioni>}>
             <form className="modulo" onSubmit={salva} noValidate>
               {aree.map((a) => (
                 <Campo key={a.id} nome={'ingresso_' + a.id} etichetta={a.t} tipo="select"
@@ -58,11 +63,12 @@ export default function Profilo() {
                 <button type="submit" className="btn">Salva le preferenze</button>
               </div>
             </form>
-            <Nota>Senza scelta si apre la prima pagina dell’area; in Gestione la prima a cui hai accesso. La scelta vale solo per te.</Nota>
           </Pannello>
           <Pannello titolo="Sicurezza"
-            azioni={[{ etichetta: 'Cambia la password', icona: 'chiave', href: '/accesso/cambia' }]}>
-            <Nota>Cambiare la password chiude le sessioni aperte sugli altri computer. Per uscire, il menu dell’utente in fondo alla barra.</Nota>
+            azioni={[{ etichetta: 'Cambia la password', icona: 'chiave', href: '/accesso/cambia' }]}
+            info={<Informazioni titolo="Informazioni sulla sicurezza">
+              Cambiare la password chiude le sessioni aperte sugli altri computer. Per uscire, il menu dell’utente in fondo alla barra.
+            </Informazioni>}>
           </Pannello>
         </div>
       </div>
