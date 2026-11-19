@@ -1,21 +1,21 @@
-# Caddy davanti all'app (F7-A2, spec §3.2 e §3.4): tutto al frontend Next, che inoltra /api al backend.
+# Caddy davanti all'app (F7-A2, spec Â§3.2 e Â§3.4): tutto al frontend Next, che inoltra /api al backend.
 # Caddy >= 2.5. Backend e frontend ascoltano solo su 127.0.0.1 (8002 e 8001).
 #
 # Due modi, uno attivo alla volta:
-#  1. INTRANET (attivo qui sotto): porta 80 in chiaro, si apre con l'indirizzo del server
-#     (es. http://192.168.1.50) o con un nome che risolve sul server (es. http://crm.decobrands.local).
+#  1. INTRANET (attivo qui sotto): porta 8080 in chiaro, si apre con l'indirizzo del server
+#     (es. http://192.168.1.50:8080) o con un nome che risolve sul server (es. http://crm.decobrands.local).
 #     In questo caso in backend/.env metti APP_URL con lo stesso indirizzo: il cookie di sessione
 #     resta non "secure" (in HTTPS non verrebbe mai inviato). Niente HSTS in chiaro.
 #  2. PUBBLICO (commentato): crm.decobrands.it con certificato. Si attiva al rilascio con il tecnico
 #     della rete, scegliendo `tls internal` (certificato interno da installare sui PC) oppure la
-#     sfida DNS (serve il modulo DNS del fornitore del dominio). Allora APP_URL diventa https://…
-# Niente trusted_proxies: Caddy sostituisce X-Forwarded-For con l'IP del client, così il limite ai
+#     sfida DNS (serve il modulo DNS del fornitore del dominio). Allora APP_URL diventa https://â€¦
+# Niente trusted_proxies: Caddy sostituisce X-Forwarded-For con l'IP del client, cosÃ¬ il limite ai
 # tentativi per IP e il registro vedono l'IP vero (D-41).
 
-:80 {
+:8080 {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:8001 {
-		# il PDF passa da LibreOffice e può impiegare ~1 minuto: non chiudere prima (F4-A3, §11)
+		# il PDF passa da LibreOffice e puÃ² impiegare ~1 minuto: non chiudere prima (F4-A3, Â§11)
 		transport http {
 			read_timeout 190s
 		}
