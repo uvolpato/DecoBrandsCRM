@@ -17,6 +17,7 @@ set "DOCS=C:\Decobrands\documenti"
 set "LOG=C:\Decobrands\log"
 set "ENVFILE=%APP%\backend\.env"
 
+call "%~dp0node24.bat"
 net session >nul 2>&1 || (echo Servono i privilegi di amministratore: apri il Prompt come amministratore. & exit /b 1)
 
 echo == 1. Prerequisiti

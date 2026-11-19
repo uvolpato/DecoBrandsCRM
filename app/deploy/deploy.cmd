@@ -19,6 +19,7 @@ set "LOG=C:\Decobrands\log"
 set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
 
+call "%~dp0node24.bat"
 if "%TAG%"=="" (
   echo Uso: deploy.cmd ^<tag^>     es. deploy.cmd v0.2.13
   echo I tag sono i rilasci: git tag --list "v*"
