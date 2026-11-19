@@ -5,7 +5,7 @@ rem   nssm stop DecobrandsBackend  (oppure schtasks /end /tn DecobrandsBackend)
 rem   pg_restore --clean --if-exists --dbname="<DATABASE_URL>" "C:\Decobrands\backup\db-AAAAmmgg-HHMM.dump"
 rem   nssm start DecobrandsBackend
 setlocal EnableDelayedExpansion
-set "ENVFILE=C:\Decobrands\CRM\app\backend\.env"
+set "ENVFILE=C:\Decobrands\app\backend\.env"
 set "BACKUP=C:\Decobrands\backup"
 set "DOCS=C:\Decobrands\documenti"
 
