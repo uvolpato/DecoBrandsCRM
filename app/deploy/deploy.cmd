@@ -4,6 +4,12 @@ rem Fa: copia del .env, backup del database e dei documenti, scarica SOLO app/ a
 rem npm ci + build + migrazioni, riavvio dei servizi, prova di salute; se non risponde torna
 rem al rilascio precedente.
 setlocal EnableDelayedExpansion
+rem PostgreSQL fuori dal PATH: si cerca la cartella di installazione e la si aggiunge solo a questa
+rem sessione (serve pg_dump per il backup e, in setup, per le migrazioni)
+where pg_dump >nul 2>&1 || (
+  for /d %%v in ("C:\Program Files\PostgreSQL\*") do if exist "%%v\bin\pg_dump.exe" set "PGPATH=%%v\bin"
+  if defined PGPATH set "PATH=!PGPATH!;!PATH!"
+)
 cd /d "%~dp0.." || exit /b 1
 set "APP=%CD%"
 set "CONFIG=C:\Decobrands\config"

@@ -5,6 +5,12 @@ rem   nssm stop DecobrandsBackend  (oppure schtasks /end /tn DecobrandsBackend)
 rem   pg_restore --clean --if-exists --dbname="<DATABASE_URL>" "C:\Decobrands\backup\db-AAAAmmgg-HHMM.dump"
 rem   nssm start DecobrandsBackend
 setlocal EnableDelayedExpansion
+rem PostgreSQL fuori dal PATH: si cerca la cartella di installazione e la si aggiunge solo a questa
+rem sessione (serve pg_dump per il backup e, in setup, per le migrazioni)
+where pg_dump >nul 2>&1 || (
+  for /d %%v in ("C:\Program Files\PostgreSQL\*") do if exist "%%v\bin\pg_dump.exe" set "PGPATH=%%v\bin"
+  if defined PGPATH set "PATH=!PGPATH!;!PATH!"
+)
 set "ENVFILE=C:\Decobrands\app\backend\.env"
 set "BACKUP=C:\Decobrands\backup"
 set "DOCS=C:\Decobrands\documenti"
