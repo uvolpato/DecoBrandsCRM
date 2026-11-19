@@ -136,10 +136,14 @@ with sync_playwright() as p:
     pg.click('.velo .modale button.pericolo, .velo .modale button:has-text("Elimina")')
     pg.wait_for_function("!document.body.innerText.includes('%s')" % COD, timeout=8000)
     ok(True, 'eliminato il subagente di prova')
+    # 1200 px (pagine a due colonne) e 768 px: niente scorrimento orizzontale
+    pg.set_viewport_size({'width': 1200, 'height': 900}); cerca(pg, ''); pg.click('.dt tbody tr.cliccabile:has-text("Nista")'); pg.wait_for_timeout(400)
+    ok(not sovr(pg) and not pg.evaluate("() => [...document.querySelectorAll('.dt-scorri')].some((e) => e.scrollWidth > e.clientWidth + 1)"),
+       '1200 px: due colonne, nessuno scorrimento orizzontale')
+    pg.screenshot(path=str(USCITA / 'app-subagenti-1200.png'))
     # 768 px
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
-    cerca(pg, ''); pg.click('.dt tbody tr.cliccabile:has-text("Nista")'); pg.wait_for_timeout(400)
     pg.screenshot(path=str(USCITA / 'app-subagenti-768.png'), full_page=True)
     pg.close()
     for u, atteso in (('oper', 1), ('lett', 0)):  # l'operatore può modificare i subagenti (dati.modifica), la lettura no

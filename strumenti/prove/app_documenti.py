@@ -65,7 +65,9 @@ try:
         # §7.9: lettura non configurata → avviso fisso (non a scomparsa) e ritmo dichiarato
         ok(pg.locator('.avviso-variazioni:has-text("lettura dei documenti non è configurata")').count() == 1,
            'avviso fisso: la lettura dei documenti non è configurata')
-        ok('ogni 15 secondi' in testo(pg, '.pannello'), 'nota: si legge un documento ogni 15 secondi')
+        pg.locator('.pannello:has(h2:has-text("Da controllare")) button[aria-label="Informazioni sui documenti da controllare"]').click()
+        ok('ogni 15 secondi' in testo(pg, '.velo .modale'), 'finestra «i»: si legge un documento ogni 15 secondi')
+        pg.click('.velo .modale button:has-text("Chiudi")'); pg.locator('.velo').wait_for(state='detached')
         pg.wait_for_selector(voce)
         pg.click(voce)  # due documenti di prova: si sceglie quello normale
         pg.locator(voce + '[aria-current=true]').wait_for(timeout=10000)

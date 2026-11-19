@@ -79,7 +79,9 @@ with sync_playwright() as p:
     pg.locator('.schede-barra [role=tab]', has_text='Prossime scadenze').click(); pg.wait_for_timeout(200)
     if api['scadenze']:
         ok(pg.locator('.scadenze li').count() == len(api['scadenze']), 'scadenze: %d voci' % len(api['scadenze']))
-        ok('Prossimi 15 giorni' in testo(pg, '.schede-corpo'), 'nota delle scadenze')
+        pg.locator('.schede-corpo button[aria-label="Informazioni sulle prossime scadenze"]').click()
+        ok('Prossimi 15 giorni' in testo(pg, '.velo .modale'), 'finestra «i»: le scadenze sono dei prossimi 15 giorni')
+        pg.click('.velo .modale button:has-text("Chiudi")'); pg.locator('.velo').wait_for(state='detached')
     else:
         ok('Nessuna scadenza nei prossimi 15 giorni' in testo(pg, '.schede-corpo'), 'nessuna scadenza nei 15 giorni')
     pg.locator('.schede-barra [role=tab]', has_text='Ultime operazioni').click(); pg.wait_for_timeout(200)

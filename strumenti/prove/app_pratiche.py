@@ -53,10 +53,10 @@ with sync_playwright() as p:
     # 0.2.9: oltre allo Stato c'è il filtro Raggruppamento: i segmenti di stato sono il primo campo
     SEG = '.filtri > .filtro-slot:nth-child(1) '
     ok('Pratiche' in testo(pg, '.testa h1'), 'titolo della pagina')
-    ok(segm.quanti(pg, SEG) == 6, 'sei segmenti di stato')
+    ok(segm.quanti(pg, SEG) == 7, 'sette segmenti di stato (con Annullate, D-207)')
     n = segm.numero(pg, 'Tutte', SEG)
-    stati = sum(segm.numero(pg, t, SEG) for t in ('Conferma in ritardo', 'Attesa conferma', 'Attesa fattura', 'Fatturate'))
-    ok(n >= 40 and stati == n and segm.numero(pg, 'Con variazioni', SEG) <= n and totali_piede(pg) == n,
+    stati = sum(segm.numero(pg, t, SEG) for t in ('Conferma in ritardo', 'Attesa conferma', 'Attesa fattura', 'Fatturate', 'Annullate'))
+    ok(n >= 40 and stati == n + segm.numero(pg, 'Annullate', SEG) and segm.numero(pg, 'Con variazioni', SEG) <= n and totali_piede(pg) == n,
        'numeri dal server: %d pratiche = somma degli stati, %d con variazioni' % (n, segm.numero(pg, 'Con variazioni', SEG)))
     ok(righe(pg) == min(25, n) and 'di %d elementi' % n in testo(pg, '.dt-piede'), 'prima pagina: %d righe di %d' % (righe(pg), n))
     ok(pg.locator('.dt th:has-text("Ordine fornitore")').count() == 1, 'colonna «Ordine fornitore» (D-169)')

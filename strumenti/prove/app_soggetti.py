@@ -279,8 +279,12 @@ with sync_playwright() as p:
         ok(bool(re.match(r'C\d{6}', seconda)), '%s: il codice soggetto è sotto il nome (%s)' % (percorso, seconda.replace('\n', ' ')[:40]))
         ok('Codice soggetto' in testo(pg, '.dettagli'), '%s: riga Codice soggetto nel pannello' % percorso)
 
-    # ---------- 11. 768 px: si usa, senza scorrimento orizzontale
+    # ---------- 11. 1200 px (banda delle due colonne) e 768 px: si usa, senza scorrimento orizzontale
     vai(pg, 'Soggetti'); pg.wait_for_selector('.soggetti-filtri .dt tbody tr.cliccabile'); pg.wait_for_timeout(600)
+    pg.set_viewport_size({'width': 1200, 'height': 900}); pg.wait_for_timeout(600)
+    ok(not sovr(pg) and not pg.evaluate("() => [...document.querySelectorAll('.dt-scorri')].some((e) => e.scrollWidth > e.clientWidth + 1)"),
+       '1200 px: due colonne, nessuno scorrimento orizzontale')
+    pg.screenshot(path=str(USCITA / 'app-soggetti-1200.png'))
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(600)
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
     ok(righe(pg) > 0 and pg.locator('.pannello-testa h2').count() == 1, '768 px: elenco e scheda si usano')

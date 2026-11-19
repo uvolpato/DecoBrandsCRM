@@ -85,7 +85,15 @@ Si aggiorna a ogni nuova regola (Claude Code la tiene allineata quando chiude un
 26b. **Spiegazioni lunghe sotto una tabella → pulsante informazioni** (icona «i», componente
     `Informazioni`) in alto a destra: apre una finestra con il testo diviso in punti brevi, invece
     di stare in pagina. La tabella resta senza scorrimento orizzontale (testi brevi, larghezze in
-    %, numeri a destra) e scorrono solo le righe, con intestazione fissa.
+    %, numeri a destra) e scorrono solo le righe, con intestazione fissa. Nelle pagine a due
+    colonne (elenco a sinistra, dettaglio a destra) la colonna del dettaglio ha una larghezza
+    minima utile (560 px); sotto i 1250 px le due colonne si impilano, così le tabelle del
+    dettaglio non scendono sotto la minima (17/11/2026).
+26c. **Cosa va nella finestra «i» e cosa resta in pagina** (17/11/2026): spostano le spiegazioni
+    fisse di una pagina, tabella o pannello (definizioni di colonne, regole, «da sapere»);
+    restano i messaggi della situazione — avvisi, richieste di agire, stati vuoti, permessi
+    mancanti — e i testi che spiegano un campo dentro una finestra di modifica. Nel dubbio resta
+    in pagina. Un pulsante per pannello o scheda, titolo = nome del pannello.
 
 ## Conferme e messaggi
 27. **Operazioni senza ritorno**: finestra di conferma con l'elenco **vero** delle conseguenze e

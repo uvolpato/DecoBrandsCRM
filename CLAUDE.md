@@ -178,10 +178,15 @@ Regole del codice del prototipo:
        1. sicurezza: `owasp-security` (o `vibesec`); per SQL e migrazioni anche `postgresql-code-review`;
        2. correttezza: `/code-review`;
        3. complessità: `/ponytail:ponytail-review`;
-      - **con OpenCode** le skill si caricano con lo strumento `skill`, non come comandi a barra: `/code-review`
-        e `/ponytail:ponytail-review` non esistono, si carica `ponytail-review` (copre correttezza + complessità),
-        `owasp-security` (o `vibesec`), `postgresql-code-review` per SQL e migrazioni, e **`caveman`** per le
-        risposte concise. Sempre caricate **davvero**, non ricordate a memoria.
+      - **con OpenCode** le skill si caricano con lo strumento `skill`, non come comandi a barra: correttezza
+        `code-review`, complessità `ponytail-review`, sicurezza `owasp-security` (o `vibesec`), SQL e migrazioni
+        `postgresql-code-review`, e **`caveman`** per le risposte concise. Sempre caricate **davvero**, non
+        ricordate a memoria. Da 18/11/2026 OpenCode vede **le stesse skill di Claude Code** (`opencode.json` →
+        `skills.paths`: `.claude/skills` con `fase` e `orchestratore`, plugin `ponytail`, `engineering`, `design`;
+        più `~/.claude/skills` letto da solo): può fare anche l'orchestratore se Claude non c'è (skill
+        `orchestratore` + `fase`, sezione «Se giri dentro OpenCode»). Restano solo di Claude Code le skill
+        interne senza file (`/simplify`, `/security-review`, artifact): in OpenCode si usano `ponytail-review`
+        e `owasp-security`.
      - **altro codice** (pagine, stile, testi, prove): controllo leggero fatto da te, rileggendo il diff;
      - **nel dubbio si fa la review completa.**
 

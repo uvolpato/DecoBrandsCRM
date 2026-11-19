@@ -7,7 +7,7 @@
 # (password-di-prova, da utenti_prova.js crea <s>). Nel database di prova c'è il seed con 54 pratiche:
 # una è "Con variazioni"; una è "Attesa fattura" senza documenti fiscali.
 # Uso: python strumenti/prove/app_pratica.py <suffisso> <cartella schermate> [base]
-import sys, pathlib, re, time
+import sys, pathlib, re, time, json
 from playwright.sync_api import sync_playwright
 import segmenti as segm
 
@@ -439,6 +439,54 @@ with sync_playwright() as p:
       return fatti;
     }""")
     ok(all(t[2] == 204 for t in tolti), 'pulizia dei documenti di prova: %s' % tolti)
+
+    # --- D-207: annullamento reversibile della pratica (motivo obbligatorio, data, ripristino) ---
+    cerca_e_apri(pg, 'OF/2026/038')
+    ok(pg.locator('.testa-azioni button:has-text("Annulla la pratica")').count() == 1, 'D-207: il pulsante Annulla la pratica nella testata')
+    ok(pg.locator('.testa-azioni button:has-text("Elimina la pratica")').count() == 1, 'D-206: il pulsante Elimina la pratica (amministratore)')
+    pg.locator('.testa-azioni button:has-text("Annulla la pratica")').click(); pg.wait_for_selector('.modale')
+    ok(testo(pg, '.modale h2') == 'Annulla la pratica', 'si apre la finestra dell’annullamento')
+    ok(pg.locator('.modale #c-data').count() == 1 and pg.locator('.modale #c-motivo').count() == 1, 'data e motivo nell’annullamento')
+    pg.fill('#c-motivo', 'prova del giro'); pg.click('.modale-piede button[type=submit]')
+    pg.wait_for_function("document.querySelector('.velo') === null"); pg.wait_for_timeout(1500)
+    ok('Annullata' in testo(pg, '.testa .stato'), 'la pratica passa ad Annullata')
+    ok(pg.locator('.avviso-variazioni:has-text("Annullata")').count() == 1, 'fascia Annullata con il motivo')
+    ok(pg.locator('.avviso-variazioni button:has-text("Ripristina")').count() == 1, 'la fascia ha Ripristina')
+    pg.screenshot(path=str(USCITA / 'app-pratica-annullata-1440.png'), full_page=True)
+    pg.locator('.avviso-variazioni button:has-text("Ripristina")').click(); pg.wait_for_selector('.modale')
+    pg.fill('#c-motivo', 'era giusto'); pg.click('.modale-piede button[type=submit]')
+    pg.wait_for_function("document.querySelector('.velo') === null"); pg.wait_for_timeout(1500)
+    ok('Annullata' not in testo(pg, '.testa .stato'), 'ripristinata: lo stato torna quello ricavato')
+    ok(pg.locator('.avviso-variazioni:has-text("Annullata")').count() == 0, 'sparita la fascia Annullata')
+
+    # --- D-204: gli ordini sostituiti restano come versioni precedenti sotto il documento attuale ---
+    # Scheda simulata dell'elenco documenti della pratica con una versione precedente (PDF, righe, motivo).
+    visti_d204 = {'documenti': 0}
+    def documenti_rotta(route):
+        visti_d204['documenti'] += 1
+        route.fulfill(status=200, content_type='application/json', body=json.dumps({
+            'pratica': {'id': '38', 'numero': 'OF/2026/038', 'stato': 'inviato', 'importo': 0},
+            'altri': [{
+                'id': '10', 'pratica_id': '38', 'tipo': 'ordine', 'numero': 'AU-1', 'data': '2026-05-08', 'importo': 40,
+                'arrivo_id': '999983', 'file_nome': 'ordine.pdf', 'note': None, 'ruolo': None,
+                'superato': False, 'superato_da': None, 'righe': [], 'riferimento': None,
+                'versioni': [{
+                    'arrivo_id': '999981', 'tipo': 'ordine', 'numero': 'AU-1', 'data': '2026-05-05', 'importo': 30,
+                    'righe': 1, 'righe_lette': [{'codice': 'B1', 'descrizione': None, 'quantita': 1, 'prezzo': 30, 'importo': None}],
+                    'sostituito_il': '2026-05-06', 'sostituito_da': 'Ugo Volpato', 'motivo': 'Ordine aggiornato dal fornitore', 'file_nome': 'vecchio.pdf',
+                }],
+            }],
+            'documenti': [], 'totali': {'fatture': 0, 'note_credito': 0, 'netto': 0},
+        }))
+    pg.route(re.compile(r'.*/api/pratiche/\d+/documenti$'), documenti_rotta)
+    cerca_e_apri(pg, 'OF/2026/038')
+    riga_v = pannello_esatto(pg, 'Documenti').locator('.elenco > li', has_text='AU-1')  # le versioni sono <li> annidati
+    ok(riga_v.count() == 1, 'D-204: l’ordine è fra i Documenti')
+    ok('sostituito il 06/05/2026 da Ugo Volpato — Ordine aggiornato dal fornitore' in riga_v.inner_text(), 'D-204: versione precedente con data, autore e motivo')
+    ok(riga_v.locator('a:has-text("Apri il PDF")').count() == 1, 'D-204: il PDF della versione precedente si apre')
+    ok(riga_v.locator('summary:has-text("Vedi le righe di allora")').count() == 1, 'D-204: le righe di allora si consultano in sola lettura')
+    pg.unroute(re.compile(r'.*/api/pratiche/\d+/documenti$'))
+    pg.screenshot(path=str(USCITA / 'app-pratica-versioni-1440.png'), full_page=True)
 
     # --- 15/11/2026: catena navigabile pratica → fornitore → percentuali e pratica → cliente → agenzie ---
     cerca_e_apri(pg, 'OF/2026/038')

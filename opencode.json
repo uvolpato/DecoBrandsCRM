@@ -1,4 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["CLAUDE.md"]
+  "instructions": ["CLAUDE.md"],
+  "skills": {
+    "paths": [
+      ".claude/skills",
+      "C:/Users/uvolp/.claude/plugins/cache/ponytail/ponytail/4.8.3/skills",
+      "C:/Users/uvolp/.claude/plugins/synced/b35ea576-2bfd-47ab-958f-1347b33af501_344c101b-00eb-45a2-80ab-312353737102/engineering~g7/skills",
+      "C:/Users/uvolp/.claude/plugins/synced/b35ea576-2bfd-47ab-958f-1347b33af501_344c101b-00eb-45a2-80ab-312353737102/afe29730-8d0c-470c-801a-a52a510c0510~g5/skills"
+    ]
+  }
 }

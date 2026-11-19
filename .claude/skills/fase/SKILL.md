@@ -82,6 +82,12 @@ Niente `opencode run`: usa lo strumento `task` con gli agenti di `opencode.json`
 tabella (`deepseek/deepseek-v4-pro` per il lavoro da Opus, `deepseek/deepseek-flash` per il resto),
 un sottoagente per pacchetto, in parallelo solo con file ammessi separati.
 
+Se sostituisci Claude Code come orchestratore: leggi prima la skill `orchestratore` e l'ultima
+`strumenti/opencode/memoria-sessione-*.md`; i controlli che faceva Claude li fai tu, caricando davvero
+`code-review`, `ponytail-review`, `owasp-security` (e `postgresql-code-review` su SQL); le operazioni su
+`decobrands_db` (copia `pg_dump`, `--prova`, comando vero), il riavvio della 8002 e i commit li fai **solo se Ugo
+te lo chiede** in quella sessione.
+
 ## Limiti
 
 - OpenCode parte senza la conversazione: un vincolo che manca nel prompt non lo conosce. Nel dubbio

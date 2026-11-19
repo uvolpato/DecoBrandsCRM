@@ -187,6 +187,11 @@ with sync_playwright() as p:
     ok(not pg.evaluate("document.querySelector('.schede-corpo .dt-scorri').scrollWidth > document.querySelector('.schede-corpo .dt-scorri').clientWidth"),
        'Agenzie 1440: nessuno scorrimento orizzontale della tabella')
     pg.screenshot(path=str(USCITA.parents[1] / 'azioni-riga-1440.png'))
+    # 1200 px: la banda 1100–1250, dove il dettaglio scendeva a ~300 px (impilato, niente scorrimento)
+    pg.set_viewport_size({'width': 1200, 'height': 900}); pg.wait_for_timeout(400)
+    ok(not sovr(pg) and not pg.evaluate("document.querySelector('.schede-corpo .dt-scorri').scrollWidth > document.querySelector('.schede-corpo .dt-scorri').clientWidth"),
+       'Agenzie 1200: nessuno scorrimento orizzontale')
+    pg.screenshot(path=str(USCITA / 'app-clienti-1200.png'))
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
     ok(not sovr(pg) and not pg.evaluate("document.querySelector('.schede-corpo .dt-scorri').scrollWidth > document.querySelector('.schede-corpo .dt-scorri').clientWidth"),
        'Agenzie 768: nessuno scorrimento orizzontale')
@@ -199,6 +204,19 @@ with sync_playwright() as p:
     pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s"):has-text("7 %%")' % RUN)
     ok('12 %' in testo(pg, '.schede-corpo .dt tbody tr:has-text("T%s")' % RUN), 'agenzia modificata: sconto 7 %, al subagente 12 % (responsabile, D-166: non supera il fornitore)')
     pg.screenshot(path=str(USCITA / 'app-clienti-agenzie-1440.png'))
+
+    # D-205: togliere il subagente dalla modifica — si svuota il campo e si salva (null esplicito)
+    pg.click('.schede-corpo .dt tbody tr:has-text("T%s") button[aria-label^="Modifica"]' % RUN); finestra(pg).wait_for()
+    ok(pg.input_value('#c-subagente_id') != '', 'modifica: il campo Subagente è precompilato')
+    pg.fill('#c-subagente_id', ''); pg.locator('#c-sconto').focus(); pg.wait_for_timeout(200)
+    ok(pg.locator('#c-pct_subagente[disabled]').count() == 1 and pg.locator('#c-regola_mensile[disabled]').count() == 1
+       and 'Senza subagente' in testo(pg, '.velo .campo:has(#c-pct_subagente) .aiuto'),
+       'subagente svuotato: percentuale e regola si spengono (tutta a Decobrands)')
+    pg.click('.modale-piede button[type=submit]'); finestra(pg).wait_for(state='detached')
+    pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s"):has-text("7 %%")' % RUN)
+    ok('seguito da' not in testo(pg, '.schede-corpo .dt tbody tr:has-text("T%s")' % RUN) and 'Nista' not in testo(pg, '.schede-corpo .dt tbody tr:has-text("T%s")' % RUN),
+       'subagente tolto: la riga non mostra più «seguito da»')
+    pg.screenshot(path=str(USCITA / 'app-clienti-togli-subagente-1440.png'))
 
     # Pratiche
     scheda(pg, 'Pratiche'); pg.wait_for_selector('.schede-corpo .dt')
@@ -213,8 +231,6 @@ with sync_playwright() as p:
     ok(pg.url == url and seg_scelto(pg, 'Senza agenzie'), 'indietro: stesso cliente e segmento ricordato')
     ok(pg.locator('.schede-barra [role=tab][aria-selected=true]:has-text("Pratiche")').count() == 1, 'indietro: stessa scheda (Pratiche)')
     scheda(pg, 'Agenzie'); pg.wait_for_selector('.schede-corpo .dt tbody tr:has-text("T%s")' % RUN)
-
-    # un cliente con pratiche: la scheda le elenca
     clic_seg(pg, 'Con agenzie'); pg.wait_for_timeout(300)
     for i in range(righe(pg)):
         if pg.locator('.dt tbody tr.cliccabile').nth(i).locator('td').last.inner_text().strip() not in ('0', ''):

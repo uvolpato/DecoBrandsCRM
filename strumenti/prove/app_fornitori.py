@@ -174,6 +174,11 @@ with sync_playwright() as p:
     ok('Fornitore Prova Integra' in testo(pg, '.pannello-testa h2'), 'import da Integra: si apre la scheda del nuovo fornitore (D-135)')
     pg.screenshot(path=str(USCITA / 'app-fornitori-importato-1440.png'))
     integra('ponte-togli', 'fornitore', COD); integra('pulisci', 'fornitore', COD)
+    # 1200 px (pagine a due colonne): niente scorrimento di lato né nella pagina né nelle tabelle
+    pg.set_viewport_size({'width': 1200, 'height': 900}); pg.wait_for_timeout(400)
+    ok(not sovr(pg) and not pg.evaluate("() => [...document.querySelectorAll('.dt-scorri')].some((e) => e.scrollWidth > e.clientWidth + 1)"),
+       '1200 px: due colonne, nessuno scorrimento orizzontale')
+    pg.screenshot(path=str(USCITA / 'app-fornitori-1200.png'))
     # 768 px
     pg.set_viewport_size({'width': 768, 'height': 1024}); pg.wait_for_timeout(400)
     ok(not sovr(pg), '768 px: nessuno scorrimento orizzontale della pagina')
