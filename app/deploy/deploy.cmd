@@ -208,6 +208,7 @@ for /f %%t in ('powershell -NoProfile -Command "[DateTimeOffset]::UtcNow.ToUnixT
 set /a ATTESA=%PREAVVISO%*60
 set /a TRASCORSI=0
 echo Preavviso di %PREAVVISO% minuti: chi e' dentro vede il banner e ha il tempo di salvare.
+echo Premi Ctrl+C per annullare l'aggiornamento (il banner sparisce da solo).
 :preavviso_giro
 set /a ORA=%INIZIO%+%TRASCORSI%
 > "%STATO%" echo {"fase":"preavviso","tra_minuti":%PREAVVISO%,"inizio":%INIZIO%,"aggiornato":%ORA%}

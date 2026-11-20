@@ -88,7 +88,7 @@ dopo il deploy.
 
 | Momento | Cosa succede |
 |---|---|
-| prima del cartello (D-217) | chiede i minuti di preavviso (0 = nessuno); se >0 scrive `stato.json` preavviso e attende con i servizi accesi |
+| prima del cartello (D-217) | chiede i minuti di preavviso (0 = nessuno); se >0 scrive `stato.json` preavviso e attende con i servizi accesi (Ctrl+C annulla) |
 | subito, prima del backup (D-213) | `:attesa` → scrive il cartello e `stato.json` manutenzione, chiama `ferma-servizi.cmd`; se il cartello non si scrive lo dice |
 | prima di riavviare | `:fermaattesa` → spegne un eventuale mini-server dei rilasci precedenti (D-212, ora tolto) |
 | salute passata | cancella il cartello e, se resta, stampa `ATTENZIONE: cartello di manutenzione NON rimosso` |
