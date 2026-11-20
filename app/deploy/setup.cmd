@@ -62,7 +62,8 @@ copy /y "%ENVFILE%" "%CONFIG%\backend.env" >nul
 echo == 4. Backend: dipendenze, build, migrazioni
 cd /d "%APP%\backend" || exit /b 1
 call npm ci || (echo npm ci backend fallito. & exit /b 1)
-call npm run build || (echo build backend fallito. & exit /b 1)
+call npx prisma generate || (echo generazione del client Prisma fallita. & exit /b 1)
+ncall npm run build || (echo build backend fallito. & exit /b 1)
 call npx prisma migrate deploy || (echo migrazioni fallite: controlla DATABASE_URL nel .env. & exit /b 1)
 
 echo == 5. Primo utente (superutente)

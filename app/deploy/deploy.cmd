@@ -55,6 +55,7 @@ call "%APP%\deploy\scarica.cmd" %TAG% || goto fallito
 echo == 5. Dipendenze, migrazioni, build
 cd /d "%APP%\backend" || goto fallito
 call npm ci || goto fallito
+call npx prisma generate || goto fallito
 call npm run build || goto fallito
 call npx prisma migrate deploy || (echo Migrazioni fallite. Il dump e' in %BACKUP%. & goto fallito)
 
