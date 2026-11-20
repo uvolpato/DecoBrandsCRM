@@ -17,6 +17,7 @@ set "BACKUP=C:\Decobrands\backup"
 set "DOCS=C:\Decobrands\documenti"
 set "LOG=C:\Decobrands\log"
 set "MANUT=%APP%\deploy\manutenzione\maintenance.flag"
+set "STATO=%APP%\deploy\manutenzione\stato.json"
 set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
 
@@ -46,6 +47,18 @@ rem D-215: il cartello sta nella cartella del progetto come nel portale Luis: lo
 rem lo stesso utente che fa il deploy, e la pagina la serve Caddy da li'. Niente mini-server.
 rem Resta solo da spegnere un'eventuale pagina di attesa lasciata accesa da un rilascio precedente.
 call :fermaattesa
+rem D-217: preavviso per chi e' dentro, prima di fermare i servizi. 0 (o invio) = nessun banner:
+rem si va subito alla pagina di attesa. Il banner lo mostra il frontend leggendo stato.json (Caddy).
+set "PREAVVISO=0"
+set /p "PREAVVISO=Minuti di preavviso per chi e' dentro [0 = nessuno]: "
+if not defined PREAVVISO set "PREAVVISO=0"
+echo %PREAVVISO%| findstr /r /c:"^[0-9][0-9]*$" >nul || set "PREAVVISO=0"
+if not "%PREAVVISO%"=="0" (
+  > "%STATO%" echo {"fase":"preavviso","tra_minuti":%PREAVVISO%}
+  echo Preavviso di %PREAVVISO% minuti: chi e' dentro vede il banner e ha il tempo di salvare.
+  set /a ATTESA=%PREAVVISO%*60
+  timeout /t !ATTESA! /nobreak
+)
 rem D-213: la pagina di attesa e' la PRIMA cosa del deploy (backup compreso)
 call :attesa
 for /f %%d in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmm"') do set "STAMP=%%d"
@@ -115,6 +128,7 @@ call :fermaattesa
 call "%APP%\deploy\avvia-servizi.cmd" || goto fallito
 powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" || goto fallito
 del "%MANUT%" >nul 2>&1
+del "%STATO%" >nul 2>&1
 rem 20/11/2026: il del falliva in silenzio (permessi su config\) e la pagina di attesa restava
 if exist "%MANUT%" echo ATTENZIONE: cartello di manutenzione NON rimosso: del "%MANUT%" a mano
 
@@ -142,6 +156,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" ||
   echo Il dump per il database e' in %BACKUP%; chiama aiuto prima di riprovare.
   exit /b 1)
 del "%MANUT%" >nul 2>&1
+del "%STATO%" >nul 2>&1
 rem 20/11/2026: il del falliva in silenzio (permessi su config\) e la pagina di attesa restava
 if exist "%MANUT%" echo ATTENZIONE: cartello di manutenzione NON rimosso: del "%MANUT%" a mano
 echo [%STAMP%] tornato a !PRIMA!>>"%TRACCIA%"
@@ -159,6 +174,7 @@ if not exist "%APP%\deploy\manutenzione\index.html" (
   exit /b 0
 )
 echo manutenzione>"%MANUT%"
+> "%STATO%" echo {"fase":"manutenzione"}
 if exist "%MANUT%" (echo Pagina di attesa attiva) else (echo ATTENZIONE: cartello di manutenzione non scritto: controlla i permessi di %APP%\deploy\manutenzione)
 if exist "%CONFIG%\manutenzione.txt" del "%CONFIG%\manutenzione.txt" >nul 2>&1
 call "%APP%\deploy\ferma-servizi.cmd"
@@ -170,6 +186,7 @@ rem portale cosi' com'era, invece di lasciarlo giù con il cartello di un aggior
 call :fermaattesa
 call "%APP%\deploy\avvia-servizi.cmd"
 del "%MANUT%" >nul 2>&1
+del "%STATO%" >nul 2>&1
 rem 20/11/2026: il del falliva in silenzio (permessi su config\) e la pagina di attesa restava
 if exist "%MANUT%" echo ATTENZIONE: cartello di manutenzione NON rimosso: del "%MANUT%" a mano
 echo Deploy fermato prima della build: il portale e' stato riavviato com'era.

@@ -22,6 +22,14 @@ invece di un errore di connessione, e l'indirizzo chiesto resta nella barra (`/p
 La pagina si ricarica da sola: interroga sé stessa e si accorge di non essere più lei quando la
 risposta non contiene il marcatore `decobrands-attesa` (cioè quando è arrivata l'app).
 
+**Preavviso per chi è dentro (D-217).** Prima di scrivere il cartello, `deploy.cmd` chiede quanti
+minuti di preavviso dare a chi è dentro (0 = nessuno). Se maggiore di 0 scrive `stato.json` con
+`{"fase":"preavviso","tra_minuti":N}` e attende N minuti con i servizi ancora accesi: il frontend,
+che lo legge ogni 5 s, mostra una card sopra il profilo («salva il lavoro»). Quando i servizi si
+fermano, `stato.json` diventa `{"fase":"manutenzione"}` e il frontend si ricarica da solo sulla
+pagina di attesa. `stato.json` è servito da Caddy con un `handle` dedicato **prima** di
+`@manutenzione`, così resta leggibile anche ad app ferma.
+
 ## 2. I pezzi
 
 | Percorso | Cosa | Chi lo scrive |
@@ -29,6 +37,7 @@ risposta non contiene il marcatore `decobrands-attesa` (cioè quando è arrivata
 | `app\deploy\manutenzione\index.html` | la pagina (stile dell'accesso, logo, rotella) | repository |
 | `app\deploy\manutenzione\logo-decobrands.png` | il logo | repository |
 | `app\deploy\manutenzione\maintenance.flag` | il cartello, contiene la parola `manutenzione` | `deploy.cmd`, a ogni deploy |
+| `app\deploy\manutenzione\stato.json` | lo stato del preavviso (D-217): `{"fase":"preavviso","tra_minuti":N}` o `{"fase":"manutenzione"}` | `deploy.cmd` |
 | `app\deploy\Caddyfile` | matcher + `handle` che servono la pagina | repository |
 | `C:\Decobrands\frontend.env` | porta del frontend, serve solo alla diagnostica | `setup.cmd` |
 
@@ -79,7 +88,8 @@ dopo il deploy.
 
 | Momento | Cosa succede |
 |---|---|
-| subito, prima del backup (D-213) | `:attesa` → scrive il cartello, chiama `ferma-servizi.cmd`; se il cartello non si scrive lo dice |
+| prima del cartello (D-217) | chiede i minuti di preavviso (0 = nessuno); se >0 scrive `stato.json` preavviso e attende con i servizi accesi |
+| subito, prima del backup (D-213) | `:attesa` → scrive il cartello e `stato.json` manutenzione, chiama `ferma-servizi.cmd`; se il cartello non si scrive lo dice |
 | prima di riavviare | `:fermaattesa` → spegne un eventuale mini-server dei rilasci precedenti (D-212, ora tolto) |
 | salute passata | cancella il cartello e, se resta, stampa `ATTENZIONE: cartello di manutenzione NON rimosso` |
 | fermato prima della build | `:interrotto` → riavvia i servizi e toglie il cartello |
@@ -100,7 +110,11 @@ Spegnerla:
 
 ```cmd
 del C:\Decobrands\app\deploy\manutenzione\maintenance.flag
+del C:\Decobrands\app\deploy\manutenzione\stato.json
 ```
+
+> Se un deploy muore a metà e riavvii i servizi a mano, cancella **anche** `stato.json`:
+> con `{"fase":"manutenzione"}` ancora presente il frontend si ricaricherebbe in continuazione.
 
 Controllare e applicare una modifica al `Caddyfile` (Caddy **legge la configurazione solo
 all'avvio**: senza riavvio continua con quella vecchia in memoria):

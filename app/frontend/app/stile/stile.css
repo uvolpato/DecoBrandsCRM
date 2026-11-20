@@ -74,6 +74,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .voce .conta.urgente { background: var(--attesa); color: #000; }
 .voce.attiva .conta { background: rgba(255,255,255,.25); color: #fff; }
 .barra-piede { margin-top: auto; padding: 14px 10px 0; border-top: 1px solid rgba(255,255,255,.12); font-size: 12.5px; color: rgba(255,255,255,.5); }
+.barra-manutenzione { flex: none; display: flex; gap: 8px; align-items: flex-start; margin: 10px 12px 0; padding: 8px 10px; border-radius: var(--r-piccolo); background: var(--attesa-tenue); color: var(--attesa-testo); font-size: 12px; line-height: 1.4; }
+.barra-manutenzione .icona { flex: none; width: 16px; height: 16px; margin-top: 1px; }
 .barra-piede button { background: none; border: 0; padding: 0; color: rgba(255,255,255,.75); text-decoration: underline; cursor: pointer; font-size: 12.5px; }
 
 /* ---------- Area principale ---------- */

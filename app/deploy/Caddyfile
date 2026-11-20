@@ -22,6 +22,24 @@
 	# (si toglie a mano: del C:\Decobrands\app\deploy\manutenzione\maintenance.flag).
 	# Si riscrive sulla pagina chiesta, non si sposta: l'indirizzo resta quello (/pratiche resta
 	# /pratiche) e il controllo della pagina sa dove tornare appena l'app risponde.
+	# D-217: preavviso di aggiornamento per chi e' dentro. deploy.cmd scrive stato.json solo durante
+	# il preavviso ({"fase":"preavviso",...}) e la manutenzione ({"fase":"manutenzione"}): Caddy lo
+	# serve (anche ad app ferma) perche' questo handle viene prima di @manutenzione. Se il file non
+	# esiste il matcher non combacia e la richiesta prosegue (fase normale).
+	@stato {
+		path /manutenzione/stato.json
+		file {
+			root C:/Decobrands/app/deploy/manutenzione
+			try_files stato.json
+		}
+	}
+	header @stato Cache-Control "no-store"
+	handle @stato {
+		root * C:/Decobrands/app/deploy/manutenzione
+		try_files stato.json
+		header Content-Type application/json
+		file_server
+	}
 	@manutenzione {
 		# D-215: i file del matcher sono relativi a una radice; quella predefinita e' la cartella di
 		# avvio di Caddy (C:\Windows\System32 per l'attivita' pianificata), quindi va dichiarata.

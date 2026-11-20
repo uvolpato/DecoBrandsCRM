@@ -6,6 +6,7 @@ import { api, esci, type Io } from '@/lib/api';
 import { useEventi } from '@/lib/eventi';
 import { Icona } from './Icona';
 import { ruoloBreve, usePuo, useUtente } from './Utente';
+import { statoDeploy } from '@/lib/manutenzione';
 
 // Barra laterale con il menu per area (D-47, D-53, §7.1): in cima il nome dell'area aperta, sotto
 // le sue voci; in fondo l'utente, che apre il menu con le aree, la password, la Guida ed Esci.
@@ -144,6 +145,29 @@ export function Barra() {
     return () => { document.removeEventListener('click', fuori); document.removeEventListener('keydown', tasto); };
   }, [menuUtente]);
 
+  // preavviso di aggiornamento (D-217): card sopra il profilo; alla manutenzione si ricarica e Caddy
+  // mostra la pagina di attesa. Il segnale sta in manutenzione/stato.json, servito da Caddy (sempre su).
+  const [preavviso, setPreavviso] = useState<number | null>(null);
+  const finePreavviso = useRef<number | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    const giro = async () => {
+      const s = await statoDeploy();
+      if (!vivo) return;
+      if (s?.fase === 'manutenzione') { window.location.reload(); return; }
+      if (s?.fase === 'preavviso' && typeof s.tra_minuti === 'number' && s.tra_minuti > 0) {
+        if (finePreavviso.current == null) finePreavviso.current = Date.now() + s.tra_minuti * 60_000;
+        setPreavviso(Math.max(1, Math.ceil((finePreavviso.current - Date.now()) / 60_000)));
+      } else {
+        finePreavviso.current = null;
+        setPreavviso(null);
+      }
+    };
+    const t = setInterval(() => void giro(), 5000);
+    void giro();
+    return () => { vivo = false; clearInterval(t); };
+  }, []);
+
   const voce = (v: Voce) => {
     const si = attiva(v.href, percorso);
     return (
@@ -171,6 +195,12 @@ export function Barra() {
           </nav>
         ))}
       </div>
+      {preavviso != null && (
+        <div className="barra-manutenzione" role="status">
+          <Icona nome="sistema" />
+          <span>Aggiornamento del portale tra {preavviso} min: salva il lavoro aperto.</span>
+        </div>
+      )}
       <div ref={contenitoreUtente} className={'barra-piede' + (menuUtente ? ' aperta' : '')}>
         {menuUtente && (
           <div ref={riquadroUtente} className="menu-utente" role="menu" aria-label="Utente">
