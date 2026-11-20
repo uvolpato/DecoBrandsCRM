@@ -24,8 +24,8 @@ risposta non contiene il marcatore `decobrands-attesa` (cioè quando è arrivata
 
 **Preavviso per chi è dentro (D-217).** Prima di scrivere il cartello, `deploy.cmd` chiede quanti
 minuti di preavviso dare a chi è dentro (0 = nessuno). Se maggiore di 0 scrive `stato.json` con
-`{"fase":"preavviso","tra_minuti":N}` e attende N minuti con i servizi ancora accesi: il frontend,
-che lo legge ogni 5 s, mostra una card sopra il profilo («salva il lavoro»). Quando i servizi si
+`{"fase":"preavviso","tra_minuti":N,"inizio":<epoch>}` e attende N minuti con i servizi ancora accesi: il frontend,
+che lo legge ogni 5 s, mostra una card sopra il profilo con countdown (e la nasconde quando scade, se il deploy è stato annullato). Quando i servizi si
 fermano, `stato.json` diventa `{"fase":"manutenzione"}` e il frontend si ricarica da solo sulla
 pagina di attesa. `stato.json` è servito da Caddy con un `handle` dedicato **prima** di
 `@manutenzione`, così resta leggibile anche ad app ferma.

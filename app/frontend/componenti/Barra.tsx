@@ -149,6 +149,7 @@ export function Barra() {
   // si ricarica e Caddy mostra la pagina di attesa. Il segnale sta in stato.json, servito da Caddy.
   const [preavviso, setPreavviso] = useState<{ rimanente: number; totale: number } | null>(null);
   const finePreavviso = useRef<number | null>(null);
+  const inizioPreavviso = useRef<number | null>(null);
   const totalePreavviso = useRef(0);
   useEffect(() => {
     let vivo = true;
@@ -156,12 +157,15 @@ export function Barra() {
       const s = await statoDeploy();
       if (!vivo) return;
       if (s?.fase === 'manutenzione') { window.location.reload(); return; }
-      if (s?.fase === 'preavviso' && typeof s.tra_minuti === 'number' && s.tra_minuti > 0) {
-        if (finePreavviso.current == null) {
+      if (s?.fase === 'preavviso' && typeof s.tra_minuti === 'number' && s.tra_minuti > 0 && typeof s.inizio === 'number') {
+        // istante assoluto: annullando il deploy il countdown non riparte e a 0 la card sparisce
+        if (inizioPreavviso.current !== s.inizio) {
+          inizioPreavviso.current = s.inizio;
           totalePreavviso.current = s.tra_minuti * 60;
-          finePreavviso.current = Date.now() + totalePreavviso.current * 1000;
+          finePreavviso.current = (s.inizio + s.tra_minuti * 60) * 1000;
         }
       } else {
+        inizioPreavviso.current = null;
         finePreavviso.current = null;
         setPreavviso(null);
       }
@@ -170,7 +174,7 @@ export function Barra() {
     const tick = setInterval(() => {
       if (finePreavviso.current == null) return;
       const rimanente = Math.max(0, Math.ceil((finePreavviso.current - Date.now()) / 1000));
-      setPreavviso({ rimanente, totale: totalePreavviso.current });
+      setPreavviso(rimanente <= 0 ? null : { rimanente, totale: totalePreavviso.current });
     }, 1000);
     void giro();
     return () => { vivo = false; clearInterval(poll); clearInterval(tick); };

@@ -3,7 +3,7 @@
 // il preavviso ({"fase":"preavviso","tra_minuti":N}) e la manutenzione ({"fase":"manutenzione"}); se
 // il file non c'e' (fase normale) Caddy non lo serve e qui torna null.
 
-export interface StatoDeploy { fase: 'preavviso' | 'manutenzione'; tra_minuti?: number }
+export interface StatoDeploy { fase: 'preavviso' | 'manutenzione'; tra_minuti?: number; inizio?: number }
 
 export async function statoDeploy(): Promise<StatoDeploy | null> {
   try {

@@ -47,6 +47,8 @@ rem D-215: il cartello sta nella cartella del progetto come nel portale Luis: lo
 rem lo stesso utente che fa il deploy, e la pagina la serve Caddy da li'. Niente mini-server.
 rem Resta solo da spegnere un'eventuale pagina di attesa lasciata accesa da un rilascio precedente.
 call :fermaattesa
+rem D-217: se un deploy precedente e' stato annullato, il suo stato.json non deve restare
+del "%STATO%" >nul 2>&1
 rem D-217: preavviso per chi e' dentro, prima di fermare i servizi. 0 (o invio) = nessun banner:
 rem si va subito alla pagina di attesa. Il banner lo mostra il frontend leggendo stato.json (Caddy).
 set "PREAVVISO=0"
@@ -55,7 +57,8 @@ if not defined PREAVVISO set "PREAVVISO=0"
 rem solo cifre: un carattere non numerico riporta a 0 (niente pipe, che in finestra elevata puo' appendere)
 for /f "delims=0123456789" %%c in ("%PREAVVISO%") do set "PREAVVISO=0"
 if not "%PREAVVISO%"=="0" (
-  > "%STATO%" echo {"fase":"preavviso","tra_minuti":%PREAVVISO%}
+  for /f %%t in ('powershell -NoProfile -Command "[int][double]::Parse((Get-Date -UFormat %s))"') do set "INIZIO=%%t"
+  > "%STATO%" echo {"fase":"preavviso","tra_minuti":%PREAVVISO%,"inizio":!INIZIO!}
   echo Preavviso di %PREAVVISO% minuti: chi e' dentro vede il banner e ha il tempo di salvare.
   set /a ATTESA=%PREAVVISO%*60
   timeout /t !ATTESA! /nobreak
