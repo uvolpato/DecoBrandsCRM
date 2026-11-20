@@ -96,7 +96,7 @@ Impostazioni; dopo averli cambiati nel file si riavvia il backend (D-70).
 facoltativi `SMTP_PORT`, 587 se manca o 465 per TLS diretto, e `SMTP_FROM`), il CRM manda le email con
 quelli e **ignora** i campi di *Impostazioni → Posta*, che restano per l'altra via (valori salvati nel
 database, password cifrata). Per Gmail serve una «password per le app»; se `SMTP_FROM` è un indirizzo
-del dominio (es. `shop@luisbg.it`) deve essere un alias «Invia come» verificato su quell'account,
+del dominio (es. `ordini@decobrands.it`) deve essere un alias «Invia come» verificato su quell'account,
 altrimenti Gmail riscrive il mittente.
 
 Senza `PONTE_URL` la sincronizzazione non parte. Il ponte vero (F0-A8) si prepara con

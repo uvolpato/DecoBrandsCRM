@@ -94,7 +94,7 @@ Poi scrive `NODE_ENV=production`, `SESSION_SECRET` e `SEGRETI_CHIAVE` casuali (�
 
 **Posta in uscita (D-209).** `setup.cmd` non la chiede: si aggiungono a mano in
 `app\backend\.env` le righe `SMTP_HOST`, `SMTP_PORT` (587, oppure 465 per TLS diretto), `SMTP_USER`,
-`SMTP_PASS` (per Gmail una «password per le app») e `SMTP_FROM` (es. `"Luis S.r.l. <shop@luisbg.it>"`,
+`SMTP_PASS` (per Gmail una «password per le app») e `SMTP_FROM` (es. `"Decobrands S.r.l. <ordini@decobrands.it>"`,
 che deve essere un alias «Invia come» verificato su quell'account). Se ci sono, **vincono** sui campi
 di *Impostazioni → Posta*; poi si riavvia il backend. Anche questa password non va nel repository: il
 `.env` è fuori dal controllo di versione.
