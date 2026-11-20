@@ -1,6 +1,10 @@
 # Prova di salute: backend (8002) e frontend (la porta configurata, 8001 di norma, 8082 senza Caddy).
 # Esce 0 se rispondono, 1 se no. La chiamano setup.cmd, deploy.cmd ed esponi-in-rete.cmd.
 $ErrorActionPreference = 'Stop'
+# D-212: la pagina di attesa risponde sulla STESSA porta del frontend: se il mini-server e' ancora
+# acceso la prova passerebbe con l'app spenta, e il deploy direbbe "fatto" mostrando la cortesia.
+$mini = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*manutenzione*servi.js*' }
+if ($mini) { Write-Host "NON risponde l'app: c'e' ancora la pagina di attesa (pid $($mini.ProcessId))"; exit 1 }
 $porta = 8001
 $envFile = 'C:\Decobrands\frontend.env'
 if (Test-Path $envFile) {

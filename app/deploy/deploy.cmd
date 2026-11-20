@@ -117,6 +117,8 @@ call :fermaattesa
 call "%APP%\deploy\avvia-servizi.cmd" || goto fallito
 powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" || goto fallito
 del "%MANUT%" >nul 2>&1
+rem 20/11/2026: il del falliva in silenzio (permessi su config\) e la pagina di attesa restava
+if exist "%MANUT%" echo ATTENZIONE: cartello di manutenzione NON rimosso: del "%MANUT%" a mano
 
 echo [%STAMP%] deploy %TAG% completato>>"%TRACCIA%"
 echo.
@@ -143,6 +145,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" ||
   echo Il dump per il database e' in %BACKUP%; chiama aiuto prima di riprovare.
   exit /b 1)
 del "%MANUT%" >nul 2>&1
+rem 20/11/2026: il del falliva in silenzio (permessi su config\) e la pagina di attesa restava
+if exist "%MANUT%" echo ATTENZIONE: cartello di manutenzione NON rimosso: del "%MANUT%" a mano
 echo [%STAMP%] tornato a !PRIMA!>>"%TRACCIA%"
 echo Tornato a !PRIMA!. Se nel frattempo erano girate migrazioni, il database ha la struttura nuova:
 echo il dump %BACKUP%\db-%STAMP%.dump serve per ripristinarlo.
@@ -170,6 +174,8 @@ rem portale cosi' com'era, invece di lasciarlo giù con il cartello di un aggior
 call :fermaattesa
 call "%APP%\deploy\avvia-servizi.cmd"
 del "%MANUT%" >nul 2>&1
+rem 20/11/2026: il del falliva in silenzio (permessi su config\) e la pagina di attesa restava
+if exist "%MANUT%" echo ATTENZIONE: cartello di manutenzione NON rimosso: del "%MANUT%" a mano
 echo Deploy fermato prima della build: il portale e' stato riavviato com'era.
 exit /b 1
 
