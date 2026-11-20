@@ -54,6 +54,7 @@ cliente).
 | `PRD-crm-provvigioni.md` | PRD unico: problema, utenti, misure, storie con criteri, fuori ambito, rischi, domande e incoerenze fra i documenti (sintesi; vince la spec) |
 | `specifica-automazione-llm.md` | Specifica tecnica della fase LLM e agenti in locale (A1–A8, `suggerimenti`, ombra → attivazione, V12) |
 | `specifica-anagrafica-soggetti.md` | **Proposta** di anagrafica unica a soggetti, **additiva**: master nuovo sopra `clienti`/`fornitori` esistenti, senza rinominare tabelle né toccare le FK. Con DDL, compatibilità, import e decisioni aperte |
+| `specifica-manutenzione-caddy.md` | Pagina di attesa durante i deploy: cartello `maintenance.flag`, blocco `Caddyfile` (con la regola della radice nel matcher `file`), cosa fa `deploy.cmd`, trappole già viste e comandi a mano (D-213, D-215) |
 | `doppioni-anagrafica-integra.md` | Possibili doppioni dell'anagrafica di Integra da correggere (stessa P.IVA su due master, agenti che sono anche fornitori, Decobrands, P.IVA estere), con le query per ritrovarli |
 | `PRD-supporto-decisioni-llm.md` | PRD della fase successiva: modelli linguistici e agenti in locale (proposte con probabilità, in ombra prima, V12) |
 | `preventivo-crm-provvigioni.md` | Preventivo |

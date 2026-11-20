@@ -33,7 +33,7 @@ app/deploy/
 ├── servizio-backend.bat       avvio senza finestra, usato dai servizi
 ├── servizio-frontend.bat      idem per Next
 ├── manutenzione\              pagina di attesa durante i deploy: index.html + logo + maintenance.flag (D-215)
-│                              come funziona e le trappole: app\MANUTENZIONE.md
+│                              come funziona e le trappole: specifica-manutenzione-caddy.md (radice)
 └── Caddyfile                  due blocchi: intranet :8082 attivo, pubblico commentato
 ```
 
@@ -216,7 +216,7 @@ mutuamente esclusive (vince la prima che combacia), quindi non conta l'ordine de
 `header @manutenzione Cache-Control "no-store"` evita che la pagina resti in cache dopo il deploy.
 Cartello e pagina stanno nella cartella del progetto, come nel portale Luis (D-215): li scrive e li
 toglie lo stesso utente che fa il deploy, e Caddy li legge da lì. Tutto il resto — trappole già
-viste, comandi a mano, controllo in 30 secondi — sta in `app/MANUTENZIONE.md`.
+viste, comandi a mano, controllo in 30 secondi — sta in `specifica-manutenzione-caddy.md`.
 `handle_errors` non servirebbe: un `reverse_proxy` che trova il servizio spento scrive
 il 502 da sé e non passa dagli error handler. Dopo aver modificato il `Caddyfile` si controlla prima di
 riavviare: `caddy validate --config C:\Decobrands\app\deploy\Caddyfile` (`C:\caddy\caddy.exe`, non è
