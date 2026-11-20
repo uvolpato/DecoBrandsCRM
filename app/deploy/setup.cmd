@@ -61,7 +61,7 @@ copy /y "%ENVFILE%" "%CONFIG%\backend.env" >nul
 
 echo == 4. Backend: dipendenze, build, migrazioni
 cd /d "%APP%\backend" || exit /b 1
-call npm ci || (echo npm ci backend fallito. & exit /b 1)
+call npm ci --no-audit --no-fund || (echo npm ci backend fallito. & exit /b 1)
 call npx prisma generate || (echo generazione del client Prisma fallita. & exit /b 1)
 call npm run build || (echo build backend fallito. & exit /b 1)
 call npx prisma migrate deploy || (echo migrazioni fallite: controlla DATABASE_URL nel .env. & exit /b 1)
@@ -74,7 +74,7 @@ call npm run superutente -- "!UTENTE!" "!EMAIL!" "!NOME!" || (echo Creazione del
 
 echo == 6. Frontend: dipendenze e build
 cd /d "%APP%\frontend" || exit /b 1
-call npm ci || (echo npm ci frontend fallito. & exit /b 1)
+call npm ci --no-audit --no-fund || (echo npm ci frontend fallito. & exit /b 1)
 call npm run build || (echo build frontend fallito. & exit /b 1)
 
 echo == 7. Servizi Windows

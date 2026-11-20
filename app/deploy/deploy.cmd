@@ -52,15 +52,28 @@ if errorlevel 8 (echo Copia dei documenti fallita: mi fermo. & exit /b 1)
 echo == 4. Scarico solo app/ al rilascio %TAG%
 call "%APP%\deploy\scarica.cmd" %TAG% || goto fallito
 
-echo == 5. Dipendenze, migrazioni, build
+echo == 5. Dipendenze (solo se i lockfile cambiano), migrazioni, build
+set "LOCK="
+if defined PRIMA for /f "usebackq delims=" %%f in (`git -C "%APP%\.." diff --name-only %PRIMA% %TAG% -- app/backend/package-lock.json app/frontend/package-lock.json 2^>nul`) do set "LOCK=1"
+
 cd /d "%APP%\backend" || goto fallito
-call npm ci || goto fallito
+if not exist node_modules set "LOCK=1"
+if defined LOCK (
+  call npm ci --no-audit --no-fund || goto fallito
+) else (
+  echo package-lock invariato: salto npm ci del backend.
+)
 call npx prisma generate || goto fallito
 call npm run build || goto fallito
 call npx prisma migrate deploy || (echo Migrazioni fallite. Il dump e' in %BACKUP%. & goto fallito)
 
 cd /d "%APP%\frontend" || goto fallito
-call npm ci || goto fallito
+if not exist node_modules set "LOCK=1"
+if defined LOCK (
+  call npm ci --no-audit --no-fund || goto fallito
+) else (
+  echo package-lock invariato: salto npm ci del frontend.
+)
 call npm run build || goto fallito
 
 echo == 6. Riavvio e prova di salute
