@@ -11,6 +11,15 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.16 — 20/11/2026 — Caddy si riavvia davvero, deploy come amministratore
+
+- **`avvia-servizi.cmd` ferma e riavvia anche l'attività `DecobrandsCaddy`.** Prima faceva solo
+  `schtasks /run`: con Caddy già in ascolto la seconda istanza usciva (porta 8082 occupata) e restava
+  in piedi quella vecchia, quindi un `Caddyfile` nuovo non entrava mai in vigore senza riavviare il
+  server.
+- **Il deploy va lanciato da una console come amministratore** (`DEPLOY.md` §7): i servizi sono
+  attività pianificate e senza privilegi `schtasks` risponde «Accesso negato».
+
 ### 0.2.15 — 20/11/2026 — pagina di cortesia durante gli aggiornamenti
 
 - **Mentre il CRM si aggiorna si vede una pagina di cortesia** invece di un errore di connessione

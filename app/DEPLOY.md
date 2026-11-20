@@ -118,6 +118,10 @@ Due dettagli che hanno già fatto perdere tempo:
 Senza argomento (doppio click) prende l'ultima versione di `main` e lascia la finestra aperta con
 l'esito; con un tag, quel rilascio. Il resto è identico.
 
+Va lanciato **da una console come amministratore**: i servizi sono attività pianificate (`schtasks`),
+e senza privilegi anche solo chiedere se un'attività esiste dà «Accesso negato» — il deploy si
+ferma al primo `/end`. Con `nssm` invece l'amministratore serve per il servizio.
+
 1. Copia il `.env` in `config\`, imposta `DATABASE_URL` da lì.
 2. **Backup**: `pg_dump` in `backup\db-AAAAMMGG-HHMM.dump` e `robocopy` dei documenti. Se il backup
    fallisce, si ferma.
@@ -149,7 +153,11 @@ La pagina di cortesia è nel `Caddyfile`: un `@manutenzione file C:/Decobrands/m
 `respond` prima del `reverse_proxy` (l'ordine predefinito delle direttive in Caddy mette già `respond`
 prima del proxy). `handle_errors` non servirebbe: un `reverse_proxy` che trova il servizio spento scrive
 il 502 da sé e non passa dagli error handler. Dopo aver modificato il `Caddyfile` si controlla prima di
-riavviare: `caddy validate --config C:\Decobrands\app\deploy\Caddyfile`.
+riavviare: `caddy validate --config C:\Decobrands\app\deploy\Caddyfile` (`C:\caddy\caddy.exe`, non è
+nel PATH). Caddy **legge la configurazione all'avvio**: con le attività pianificate si riavvia con
+`schtasks /end /tn DecobrandsCaddy` e poi `schtasks /run /tn DecobrandsCaddy` (amministratore);
+`avvia-servizi.cmd` lo fa già a ogni deploy — con il solo `/run` la seconda istanza non troverebbe la
+8082 libera e resterebbe in piedi quella vecchia.
 
 ## 9. Backup e ripristino
 

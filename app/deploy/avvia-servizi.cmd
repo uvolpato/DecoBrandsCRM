@@ -9,12 +9,15 @@ if not errorlevel 1 (
   exit /b 0
 )
 
-for %%t in (DecobrandsBackend DecobrandsFrontend) do (
+for %%t in (DecobrandsBackend DecobrandsFrontend DecobrandsCaddy) do (
   schtasks /end /tn %%t >nul 2>&1
 )
 timeout /t 2 /nobreak >nul
 for %%t in (DecobrandsBackend DecobrandsFrontend) do (
   schtasks /run /tn %%t >nul 2>&1 || (echo Attivita' %%t non trovata: lancia setup.cmd & exit /b 1)
 )
+rem 20/11/2026: Caddy si ferma e si riavvia come gli altri. Con il solo /run la seconda istanza
+rem non trova la porta 8082 libera e muore, e resta in piedi quella vecchia con il Caddyfile vecchio.
+rem Non e' fatale: se Caddy non e' una nostra attivita' (servizio di Luis) non c'e' niente da fare.
 schtasks /run /tn DecobrandsCaddy >nul 2>&1
 exit /b 0
