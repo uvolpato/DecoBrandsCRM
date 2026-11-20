@@ -162,7 +162,16 @@ export async function casellaConfig(db: Db) {
   };
 }
 
+/** Posta in uscita: se il server ha `SMTP_HOST`, `SMTP_USER` e `SMTP_PASS` nel `.env` valgono quelli
+ *  (D-209); altrimenti si usano i valori salvati nelle Impostazioni, con la password cifrata. */
 export async function postaConfig(db: Db) {
+  const e = process.env;
+  if (e.SMTP_HOST && e.SMTP_USER && e.SMTP_PASS) {
+    return {
+      server: e.SMTP_HOST, porta: Number(e.SMTP_PORT) || 587, utente: e.SMTP_USER, password: e.SMTP_PASS,
+      mittente: e.SMTP_FROM || '',
+    };
+  }
   const v = await valoriSezione(db, 'posta');
   if (!v.server || !v.utente) return null;
   const password = await segretoDi(v.password);

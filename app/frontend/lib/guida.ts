@@ -778,6 +778,7 @@ export const GUIDA: Argomento[] = [
       'Alcuni parametri non stanno qui ma nel file .env del server (per esempio SEGRETI_CHIAVE, senza cui le password non si possono salvare): li trovi elencati in fondo alla sezione, in sola lettura, con il file da modificare e il riavvio del backend che serve per caricarli.',
       'Quando cambi il server di Posta, Casella o Integra devi riscrivere anche la password: quella salvata non viene mai riusata verso un indirizzo nuovo.',
       'Posta, Casella e Integra sono le <b>connessioni</b>: le modifica e le prova solo il <b>superutente</b>. Un amministratore le vede ma i campi sono spenti, senza <i>Salva</i> né <i>Prova la connessione</i>, perché chi le dirotta su un server suo leggerebbe le password e i link di reset.',
+      'La posta in uscita può arrivare anche dal file <i>.env</i> del server: se ci sono <code>SMTP_HOST</code>, <code>SMTP_USER</code> e <code>SMTP_PASS</code>, il CRM manda con quelli e i campi di <i>Posta in uscita</i> non contano (in fondo alla sezione li vedi in sola lettura).',
       'In esercizio l’app non parte con i valori d’esempio del file (per esempio CAMBIARE) o con una chiave più corta di 32 caratteri: genera una stringa nuova con openssl rand -base64 48 e riavvia il backend.',
     ],
     modifica: 'Superutente e Amministratore; le connessioni (Posta, Casella, Integra) solo Superutente.',

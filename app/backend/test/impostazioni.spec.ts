@@ -99,6 +99,20 @@ describe('F5-A6 rotte delle impostazioni', () => {
     expect(await postaConfig(db)).toMatchObject({ server: 'smtp.nuovo.example', password: 'altra' });
   });
 
+  it('con SMTP_* nel .env la posta usa quelli e vince sulle Impostazioni (D-209)', async () => {
+    const chiavi = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];
+    Object.assign(process.env, { SMTP_HOST: 'smtp.env.example', SMTP_PORT: '2525', SMTP_USER: 'posta@env.example', SMTP_PASS: 'segreta-env', SMTP_FROM: 'Prova <posta@env.example>' });
+    try {
+      expect(await postaConfig(db)).toMatchObject({
+        server: 'smtp.env.example', porta: 2525, utente: 'posta@env.example', password: 'segreta-env', mittente: 'Prova <posta@env.example>',
+      });
+    } finally {
+      for (const k of chiavi) delete process.env[k];
+    }
+    // senza SMTP_* si torna ai valori salvati (il test D-115 li ha appena scritti: smtp.nuovo.example)
+    expect((await postaConfig(db))!.server).toBe('smtp.nuovo.example');
+  });
+
   it('permesso: amministratore sì, operatore e sola lettura no', async () => {
     await ammi.get('/api/impostazioni').expect(200);
     for (const a of [oper, lett]) {

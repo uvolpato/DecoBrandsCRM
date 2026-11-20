@@ -30,6 +30,13 @@ const AMBIENTE = [
   { nome: 'DOCUMENTI_DIR', uso: 'Cartella dei documenti arrivati, sul server.', sezioni: ['casella', 'conservazione'], obbligatorio: true },
   { nome: 'DOCUMENTI_MAX_MB', uso: 'Dimensione massima di un documento caricato, in MB (20 se non scritto).', sezioni: ['casella'] },
   { nome: 'APP_URL', uso: 'Indirizzo pubblico dell’app, per i link nelle email (localhost se non scritto).', sezioni: ['posta'] },
+  // D-209 §19: se ci sono, questi vincono sui campi di Impostazioni → Posta (utile quando la posta la
+  // gestisce chi amministra il server, senza dare la password SMTP al portale).
+  { nome: 'SMTP_HOST', uso: 'Posta in uscita: se c’è (con SMTP_USER e SMTP_PASS), vince sui campi di Posta nelle Impostazioni.', sezioni: ['posta'] },
+  { nome: 'SMTP_PORT', uso: 'Porta SMTP (587 se non scritta; 465 per TLS diretto).', sezioni: ['posta'] },
+  { nome: 'SMTP_USER', uso: 'Utente SMTP (di solito l’indirizzo di posta).', sezioni: ['posta'] },
+  { nome: 'SMTP_PASS', uso: 'Password SMTP (password per le app di Google o Microsoft).', sezioni: ['posta'], segreto: true },
+  { nome: 'SMTP_FROM', uso: 'Mittente che compare nelle email, es. Nome <indirizzo@dominio.it>; vuoto = SMTP_USER.', sezioni: ['posta'] },
 ];
 
 const TESTO_PROVA: Record<string, string> = {

@@ -30,6 +30,7 @@ app/deploy/
 ├── ferma-servizi.cmd          li ferma prima di npm ci e della build (EPERM sui file aperti)
 ├── servizio-backend.bat       avvio senza finestra, usato dai servizi
 ├── servizio-frontend.bat      idem per Next
+├── manutenzione\              pagina di attesa durante i deploy: index.html + logo (D-210)
 └── Caddyfile                  due blocchi: intranet :8082 attivo, pubblico commentato
 ```
 
@@ -91,6 +92,13 @@ di `main` (la finestra resta aperta con l'esito). A mano, l'equivalente è `git 
 Poi scrive `NODE_ENV=production`, `SESSION_SECRET` e `SEGRETI_CHIAVE` casuali (≥ 32 caratteri),
 `DOCUMENTI_DIR=C:\Decobrands\documenti`, `APP_URL`, `SOFFICE` se trova LibreOffice.
 
+**Posta in uscita (D-209).** `setup.cmd` non la chiede: si aggiungono a mano in
+`app\backend\.env` le righe `SMTP_HOST`, `SMTP_PORT` (587, oppure 465 per TLS diretto), `SMTP_USER`,
+`SMTP_PASS` (per Gmail una «password per le app») e `SMTP_FROM` (es. `"Luis S.r.l. <shop@luisbg.it>"`,
+che deve essere un alias «Invia come» verificato su quell'account). Se ci sono, **vincono** sui campi
+di *Impostazioni → Posta*; poi si riavvia il backend. Anche questa password non va nel repository: il
+`.env` è fuori dal controllo di versione.
+
 Due dettagli che hanno già fatto perdere tempo:
 
 - il file che conta è **`app\backend\.env`** (la copia in `config\` è solo una riserva);
@@ -131,10 +139,13 @@ se lo richiede da solo (UAC) e riparte elevato, una volta sola (variabile `DECOB
    `node_modules`); poi `prisma generate`, `npm run build`, `prisma migrate deploy`.
 5. Riavvio dei servizi, prova di salute (90 s). Se non risponde: torna al tag precedente, rebuild,
    riavvio; se nel frattempo sono girate migrazioni lo dice e lascia il dump per il ripristino.
-   **Pagina di cortesia** (dal deploy del portale Luis): prima di fermare i servizi `deploy.cmd` crea
-   `C:\Decobrands\config\manutenzione.txt`, e Caddy risponde con *Stiamo aggiornando il CRM* (503) invece di
-   un errore di connessione; il file si toglie dopo la prova di salute. Se il deploy muore a metà il
-   file resta e la pagina resta, e lo script dice come toglierla (`del C:\Decobrands\config\manutenzione.txt`).
+   **Pagina di attesa** (dal deploy del portale Luis, D-210): prima di fermare i servizi `deploy.cmd`
+   copia `deploy\manutenzione\` (la pagina con il logo) in `C:\Decobrands\config\manutenzione` e crea
+   `C:\Decobrands\config\manutenzione.txt`. Finché quel file c'è, Caddy risponde con la pagina di attesa
+   (fondo scuro come l'accesso, logo, rotella e «Aggiornamento in corso») invece di un errore di
+   connessione; l'indirizzo chiesto resta nella barra e la pagina si ricarica da sola appena il portale
+   risponde. Il file si toglie dopo la prova di salute. Se il deploy muore a metà il file resta e la
+   pagina resta, e lo script dice come toglierla (`del C:\Decobrands\config\manutenzione.txt`).
 6. Riga in `backup\deploy.log` (tag, ora, utente).
 
 ## 8. Rete e certificato
@@ -150,9 +161,12 @@ se lo richiede da solo (UAC) e riparte elevato, una volta sola (variabile `DECOB
 
 Backend e frontend ascoltano **solo su 127.0.0.1** (8002 e 8001); dal firewall entra solo la 8082.
 
-La pagina di cortesia è nel `Caddyfile`: un `@manutenzione file C:/Decobrands/config/manutenzione.txt` con
-`respond` prima del `reverse_proxy` (l'ordine predefinito delle direttive in Caddy mette già `respond`
-prima del proxy). `handle_errors` non servirebbe: un `reverse_proxy` che trova il servizio spento scrive
+La pagina di attesa sta nel `Caddyfile`: `@manutenzione file C:/Decobrands/config/manutenzione.txt`,
+poi `handle @manutenzione` (radice `C:/Decobrands/config/manutenzione`, `try_files {path} /index.html`,
+`file_server`) e infine un `handle` senza matcher con il `reverse_proxy`. Le due `handle` sono
+mutuamente esclusive (vince la prima che combacia), quindi non conta l'ordine delle direttive;
+`header @manutenzione Cache-Control "no-store"` evita che la pagina resti in cache dopo il deploy.
+`handle_errors` non servirebbe: un `reverse_proxy` che trova il servizio spento scrive
 il 502 da sé e non passa dagli error handler. Dopo aver modificato il `Caddyfile` si controlla prima di
 riavviare: `caddy validate --config C:\Decobrands\app\deploy\Caddyfile` (`C:\caddy\caddy.exe`, non è
 nel PATH). Caddy **legge la configurazione all'avvio**: con le attività pianificate si riavvia con

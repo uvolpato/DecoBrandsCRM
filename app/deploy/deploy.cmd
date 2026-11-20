@@ -78,9 +78,14 @@ call "%APP%\deploy\scarica.cmd" %SCARICA% || goto fallito
 echo == 5. Dipendenze (solo se i lockfile cambiano), migrazioni, build
 rem 20/11/2026: i servizi in corsa tengono aperti i file di node_modules e .next (npm ci -> EPERM):
 rem si fermano prima di toccarli. Il ritorno indietro passa di qui una seconda volta.
-rem Dal deploy del portale Luis: mentre i servizi sono fermi Caddy mostra la pagina di cortesia.
+rem Dal deploy del portale Luis: mentre i servizi sono fermi Caddy mostra la pagina di attesa.
 rem Il file sta in config\, non nella radice: la radice e' il repository e scarica.cmd si ferma se
 rem vi trova qualcosa oltre a .git, app e le cartelle dati.
+rem D-210: la pagina e' un file (deploy\manutenzione, con il logo) e si copia fuori dal repository
+rem PRIMA di alzare il cartello; Caddy la legge da li'.
+if not exist "%CONFIG%\manutenzione" mkdir "%CONFIG%\manutenzione"
+robocopy "%APP%\deploy\manutenzione" "%CONFIG%\manutenzione" /E /NFL /NDL /NJH /NJS /NP >nul
+if errorlevel 8 (echo Copia della pagina di attesa fallita. & goto fallito)
 echo manutenzione>"%MANUT%"
 call "%APP%\deploy\ferma-servizi.cmd"
 set "LOCK="

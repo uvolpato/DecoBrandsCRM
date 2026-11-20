@@ -10,4 +10,7 @@ process.env.DATABASE_URL = (process.env.DATABASE_URL_TEST ?? process.env.DATABAS
 process.env.TENTATIVI_IP ??= '1000'; // le prove escono tutte da 127.0.0.1
 process.env.DOCUMENTI_DIR = join(tmpdir(), 'decobrands-test-documenti'); // mai la cartella vera
 process.env.DOCUMENTI_MAX_MB = '1'; // il limite si prova con un file piccolo
+// D-209: la posta in uscita legge SMTP_* dal .env; le prove non devono usare quello di chi sviluppa
+// (manderebbero email vere): partono dalle Impostazioni, o mettono i SMTP_* da sé nel test.
+for (const k of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM']) delete process.env[k];
 if (!/decobrands_test/.test(process.env.DATABASE_URL)) throw new Error('Le prove girano solo su decobrands_test');

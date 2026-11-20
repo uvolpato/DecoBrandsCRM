@@ -92,6 +92,13 @@ Senza `schema.json` usa lo schema vero dei documenti (`SCHEMA_DOCUMENTO` e `PROM
 I parametri del `.env` (come `SEGRETI_CHIAVE`) si leggono in sola lettura in fondo alla sezione delle
 Impostazioni; dopo averli cambiati nel file si riavvia il backend (D-70).
 
+**Posta in uscita dal `.env`** (D-209): se ci sono `SMTP_HOST`, `SMTP_USER` e `SMTP_PASS` (e
+facoltativi `SMTP_PORT`, 587 se manca o 465 per TLS diretto, e `SMTP_FROM`), il CRM manda le email con
+quelli e **ignora** i campi di *Impostazioni → Posta*, che restano per l'altra via (valori salvati nel
+database, password cifrata). Per Gmail serve una «password per le app»; se `SMTP_FROM` è un indirizzo
+del dominio (es. `shop@luisbg.it`) deve essere un alias «Invia come» verificato su quell'account,
+altrimenti Gmail riscrive il mittente.
+
 Senza `PONTE_URL` la sincronizzazione non parte. Il ponte vero (F0-A8) si prepara con
 `strumenti/integra/viste-crm.sql`; il CRM legge solo le viste, mai Integra.
 
@@ -113,7 +120,8 @@ il modulo DNS del fornitore del dominio). Le due strade sono scritte anche nel `
 
 1. In `backend/.env`: `NODE_ENV=production`, `DATABASE_URL` del database di esercizio, `DOCUMENTI_DIR`
    su una cartella che sta fuori dal repository, `SOFFICE`, `SEGRETI_CHIAVE` (le chiavi si leggono solo
-   da lì) e `SESSION_SECRET`. `SESSION_SECRET` e `SEGRETI_CHIAVE` devono essere stringhe nuove di
+   da lì) e `SESSION_SECRET`; per la posta in uscita i cinque `SMTP_*` (D-209, vedi sopra).
+   `SESSION_SECRET` e `SEGRETI_CHIAVE` devono essere stringhe nuove di
    almeno 32 caratteri (`openssl rand -base64 48`): con i valori d'esempio del `.env.example`
    (`CAMBIARE`) o più corti, con `NODE_ENV=production` il backend non parte (D-145). La prima volta:
    `npx prisma migrate deploy` e `npm run superutente -- …`.
