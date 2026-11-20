@@ -34,6 +34,8 @@ echo [%STAMP%] deploy %TAG% da %USERNAME%>>"%TRACCIA%"
 
 echo == 1. Copia del .env (fuori dal repository)
 if exist "%ENVFILE%" (copy /y "%ENVFILE%" "%CONFIG%\backend.env" >nul)
+rem DATABASE_URL della .env vince su una variabile d'ambiente gia' presente nel sistema (dotenv non la sovrascrive)
+for /f "usebackq tokens=1,* delims==" %%a in (`findstr /b /c:"DATABASE_URL=" "%ENVFILE%"`) do set "DATABASE_URL=%%b"
 
 echo == 2. Rilascio attuale (per il ritorno indietro)
 set "PRIMA="

@@ -58,6 +58,8 @@ if exist "%ENVFILE%" (
   powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\scrivi-env.ps1" || (echo Scrittura del .env non riuscita. & exit /b 1)
 )
 copy /y "%ENVFILE%" "%CONFIG%\backend.env" >nul
+rem DATABASE_URL della .env vince su una variabile d'ambiente gia' presente nel sistema (dotenv non la sovrascrive)
+for /f "usebackq tokens=1,* delims==" %%a in (`findstr /b /c:"DATABASE_URL=" "%ENVFILE%"`) do set "DATABASE_URL=%%b"
 
 echo == 4. Backend: dipendenze, build, migrazioni
 cd /d "%APP%\backend" || exit /b 1
