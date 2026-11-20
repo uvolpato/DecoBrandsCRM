@@ -1,9 +1,10 @@
 # Deploy sul server `decobrands` — documento e piano
 
 Stato: **proposta**, da approvare (19/11/2026). Modello: come il Portale B2B Luis — **due file
-`.cmd`** eseguiti **sul server Windows**: `setup.cmd` (una volta) e `deploy.cmd <tag>` (a ogni
-rilascio). Niente Docker, niente script Linux. Sul server si scarica **solo `app/`**: specifica,
-piano, preventivo, prototipo e strumenti restano nel repository di sviluppo.
+`.cmd`** eseguiti **sul server Windows**: `setup.cmd` (una volta) e `deploy.cmd` (a ogni
+rilascio: con un tag scarica quel rilascio, con il doppio click — nessun argomento — l'ultima
+versione di `main`). Niente Docker, niente script Linux. Sul server si scarica **solo `app/`**:
+specifica, piano, preventivo, prototipo e strumenti restano nel repository di sviluppo.
 
 ## 1. Com'è adesso
 
@@ -19,7 +20,7 @@ app/deploy/
 ├── scarica.cmd               git pull / checkout di un tag: SOLO app/ (checkout sparso)
 ├── setup.cmd                 una volta: prerequisiti, cartelle, .env, npm ci, build,
 │                              migrazioni, primo utente, servizi Windows, Caddy, prova
-├── deploy.cmd <tag>           a ogni rilascio: backup, tag, npm ci (se serve), migrazioni,
+├── deploy.cmd [tag]           a ogni rilascio: backup, tag (o main), npm ci (se serve), migrazioni,
 │                              build, riavvio, prova di salute, ritorno indietro se non risponde
 ├── backup.cmd                 pg_dump + copia documenti, rotazione 14 giorni (02:00 ogni notte)
 ├── node24.bat                 mette davanti al PATH la Node 24 LTS (il server ha anche la 26)
@@ -59,7 +60,9 @@ git reset --hard HEAD
 
 Poi, per installare: `cd C:\Decobrands\app\deploy` e `setup.cmd` (come amministratore).
 
-Aggiornamenti: `deploy.cmd v0.2.13`. A mano, l'equivalente è `git pull` (o `scarica.cmd`) dentro
+Aggiornamenti: `deploy.cmd v0.2.14`, oppure **doppio click su `deploy.cmd`** per l'ultima versione
+di `main` (la finestra resta aperta con l'esito). A mano, l'equivalente è `git pull` (o
+`scarica.cmd`) dentro
 `C:\Decobrands`: il checkout sparso limita tutto a `app/`.
 
 ## 4. Prerequisiti (a mano, una volta)
@@ -110,12 +113,15 @@ Due dettagli che hanno già fatto perdere tempo:
    aggiungere), e `DecobrandsBackup` alle 02:00.
 7. Avvio e prova di salute su `127.0.0.1:8002/api/salute` e `127.0.0.1:8001`.
 
-## 7. `deploy.cmd <tag>` (a ogni rilascio)
+## 7. `deploy.cmd [tag]` (a ogni rilascio)
+
+Senza argomento (doppio click) prende l'ultima versione di `main` e lascia la finestra aperta con
+l'esito; con un tag, quel rilascio. Il resto è identico.
 
 1. Copia il `.env` in `config\`, imposta `DATABASE_URL` da lì.
 2. **Backup**: `pg_dump` in `backup\db-AAAAMMGG-HHMM.dump` e `robocopy` dei documenti. Se il backup
    fallisce, si ferma.
-3. `scarica.cmd <tag>`: fetch del tag e checkout, sempre dentro `app/`.
+3. `scarica.cmd <tag>`: fetch del tag e checkout, sempre dentro `app/` (senza tag: `origin/main`).
 4. `npm ci --no-audit --no-fund` **solo se** i `package-lock.json` sono cambiati (o se manca
    `node_modules`); poi `prisma generate`, `npm run build`, `prisma migrate deploy`.
 5. Riavvio dei servizi, prova di salute (90 s). Se non risponde: torna al tag precedente, rebuild,

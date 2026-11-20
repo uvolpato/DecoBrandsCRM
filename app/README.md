@@ -121,9 +121,10 @@ il modulo DNS del fornitore del dominio). Le due strade sono scritte anche nel `
 3. `avvia-esercizio.bat` apre i due processi con `deploy/avvia-backend.bat` e
    `deploy/avvia-frontend.bat`, poi Caddy (`deploy/Caddyfile`). Aprire l'indirizzo del server sulla
    porta 8082: la 80 la usa il gestionale, la 8082 la prende Caddy.
-4. Aggiornamento: fermare i tre processi e lanciare `deploy/pubblica.bat`. Fa `git pull` (solo
-   `app/`), `npm ci`, `npx prisma migrate deploy` e `npm run build` nei due progetti; poi si
-   riavvia con `avvia-esercizio.bat`. Gli stessi passi a mano sono nella sezione *Pubblicazione*.
+4. Aggiornamento: `deploy/deploy.cmd` — **doppio click** per l'ultima versione di `main`, oppure
+   `deploy.cmd <tag>` per un rilascio preciso; fa anche backup e ritorno indietro (`DEPLOY.md`).
+   In alternativa `deploy/pubblica.bat` (git pull, `npm ci`, migrazioni e build, senza backup) e poi
+   `avvia-esercizio.bat`. Gli stessi passi a mano sono nella sezione *Pubblicazione*.
 
 `NODE_ENV=production` toglie `'unsafe-eval'` dalla CSP (D-86): le prove Playwright che usano
 `wait_for_function` girano solo in sviluppo, non contro l'istanza di esercizio.
@@ -152,5 +153,6 @@ Aggiornamenti:
 git pull
 ```
 
-oppure `deploy/pubblica.bat`, che fa anche `npm ci`, le migrazioni e la build. Sul server la radice
-contiene solo `app/` (più i file di configurazione git).
+oppure `deploy/deploy.cmd` (doppio click: ultima versione di `main`, con backup, migrazioni e build),
+o `deploy/pubblica.bat`, che fa `git pull`, `npm ci`, le migrazioni e la build senza backup. Sul
+server la radice contiene solo `app/` (più i file di configurazione git).

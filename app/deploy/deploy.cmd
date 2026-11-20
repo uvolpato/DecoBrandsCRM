@@ -1,5 +1,5 @@
 @echo off
-rem Aggiornamento del CRM su un rilascio (uso: deploy.cmd v0.2.13).
+rem Aggiornamento del CRM (uso: deploy.cmd v0.2.14, oppure doppio click = ultima versione di main).
 rem Fa: copia del .env, backup del database e dei documenti, scarica SOLO app/ a quel tag,
 rem npm ci + build + migrazioni, riavvio dei servizi, prova di salute; se non risponde torna
 rem al rilascio precedente.
@@ -20,11 +20,14 @@ set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
 
 call "%~dp0node24.bat"
+rem Doppio click (nessun argomento): ultima versione di main, con la finestra aperta alla fine.
+rem Il richiamo di se stesso serve a un solo "pause": vale anche per le uscite d'errore.
 if "%TAG%"=="" (
-  echo Uso: deploy.cmd ^<tag^>     es. deploy.cmd v0.2.13
-  echo I tag sono i rilasci: git tag --list "v*"
-  exit /b 1
+  call "%~f0" main
+  pause
+  exit /b
 )
+if /i "%TAG%"=="main" (set "RIF=origin/main") else (set "RIF=%TAG%")
 
 for %%d in ("%CONFIG%" "%BACKUP%" "%LOG%") do if not exist %%d mkdir %%d
 for /f %%d in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmm"') do set "STAMP=%%d"
@@ -51,15 +54,17 @@ pg_dump --dbname="!DBURL!" --format=custom --file="%BACKUP%\db-%STAMP%.dump" || 
 if exist "%DOCS%" robocopy "%DOCS%" "%BACKUP%\documenti" /E /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 (echo Copia dei documenti fallita: mi fermo. & exit /b 1)
 
-echo == 4. Scarico solo app/ al rilascio %TAG%
-call "%APP%\deploy\scarica.cmd" %TAG% || goto fallito
+echo == 4. Scarico solo app/ a %TAG%
+set "SCARICA=%TAG%"
+if /i "%TAG%"=="main" set "SCARICA="
+call "%APP%\deploy\scarica.cmd" %SCARICA% || goto fallito
 
 echo == 5. Dipendenze (solo se i lockfile cambiano), migrazioni, build
 rem 20/11/2026: i servizi in corsa tengono aperti i file di node_modules e .next (npm ci -> EPERM):
 rem si fermano prima di toccarli. Il ritorno indietro passa di qui una seconda volta.
 call "%APP%\deploy\ferma-servizi.cmd"
 set "LOCK="
-if defined PRIMA for /f "usebackq delims=" %%f in (`git -C "%APP%\.." diff --name-only %PRIMA% %TAG% -- app/backend/package-lock.json app/frontend/package-lock.json 2^>nul`) do set "LOCK=1"
+if defined PRIMA for /f "usebackq delims=" %%f in (`git -C "%APP%\.." diff --name-only %PRIMA% %RIF% -- app/backend/package-lock.json app/frontend/package-lock.json 2^>nul`) do set "LOCK=1"
 
 cd /d "%APP%\backend" || goto fallito
 if not exist node_modules set "LOCK=1"

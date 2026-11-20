@@ -11,6 +11,15 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.14 — 20/11/2026 — deploy col doppio click
+
+- **`deploy/deploy.cmd` senza argomento prende l'ultima versione di `main`** e lascia la finestra
+  aperta con l'esito (prima il doppio click stampava l'uso ed usciva, e ogni errore chiudeva la
+  finestra). Con un tag si comporta come prima: backup, migrazioni, build, prova di salute, ritorno
+  al rilascio precedente. Il ritorno indietro resta il tag più recente.
+- **`app/README.md` e `app/DEPLOY.md`** aggiornati: l'aggiornamento è `deploy.cmd` (doppio click o
+  tag), `pubblica.bat` resta senza backup.
+
 ### 0.2.13 — 19/11/2026 — bollettino leggibile, provvigioni sul pagato, deploy
 
 - **Bollettino: le righe arrivano dal PDF.** Il rendiconto del fornitore viene letto come gli altri
