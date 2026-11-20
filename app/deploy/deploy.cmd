@@ -55,6 +55,9 @@ echo == 4. Scarico solo app/ al rilascio %TAG%
 call "%APP%\deploy\scarica.cmd" %TAG% || goto fallito
 
 echo == 5. Dipendenze (solo se i lockfile cambiano), migrazioni, build
+rem 20/11/2026: i servizi in corsa tengono aperti i file di node_modules e .next (npm ci -> EPERM):
+rem si fermano prima di toccarli. Il ritorno indietro passa di qui una seconda volta.
+call "%APP%\deploy\ferma-servizi.cmd"
 set "LOCK="
 if defined PRIMA for /f "usebackq delims=" %%f in (`git -C "%APP%\.." diff --name-only %PRIMA% %TAG% -- app/backend/package-lock.json app/frontend/package-lock.json 2^>nul`) do set "LOCK=1"
 

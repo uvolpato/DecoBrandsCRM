@@ -62,6 +62,9 @@ rem DATABASE_URL della .env vince su una variabile d'ambiente gia' presente nel 
 for /f "usebackq tokens=1,* delims==" %%a in (`findstr /b /c:"DATABASE_URL=" "%ENVFILE%"`) do set "DATABASE_URL=%%b"
 
 echo == 4. Backend: dipendenze, build, database
+rem 20/11/2026: se i servizi stanno girando (installazione ripetuta) tengono aperti node_modules e
+rem .next: npm ci muore con EPERM. Si fermano prima di toccare i file; li riavvia avvia-servizi.cmd.
+call "%APP%\deploy\ferma-servizi.cmd"
 cd /d "%APP%\backend" || exit /b 1
 call npm ci --no-audit --no-fund || (echo npm ci backend fallito. & exit /b 1)
 call npx prisma generate || (echo generazione del client Prisma fallita. & exit /b 1)
@@ -80,6 +83,12 @@ if /i "!AZZERA!"=="SI" (
 )
 
 echo == 5. Utente superutente
+cd /d "%APP%\backend" || exit /b 1
+node dist\src\superutente.js --chi > "%LOG%\superutente.txt" 2>&1
+if not errorlevel 1 (
+  type "%LOG%\superutente.txt"
+  goto dopo-superutente
+)
 set /p UTENTE=Nome utente del superutente: 
 set /p EMAIL=Email: 
 set /p NOME=Nome e cognome: 
@@ -90,6 +99,8 @@ if errorlevel 1 (
   exit /b 1
 )
 type "%LOG%\superutente.txt"
+
+:dopo-superutente
 
 echo == 6. Frontend: dipendenze e build
 cd /d "%APP%\frontend" || exit /b 1
