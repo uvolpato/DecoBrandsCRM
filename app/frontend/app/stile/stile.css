@@ -5,6 +5,7 @@
    stati success / warning / danger / info con i loro fondi tenui.
    Carattere Public Sans incorporato, cifre tabellari.
    ============================================================ */
+@font-face { font-family: 'DSEG7'; src: url('/fonts/dseg7.woff2') format('woff2'); font-display: swap; }
 :root {
   --sfondo: #f5f6f8;
   --superficie: #ffffff;
@@ -77,7 +78,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .barra-manutenzione { flex: none; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; margin: 10px 12px 8px; padding: 8px 10px; border-radius: var(--r-piccolo); font-size: 12px; line-height: 1.4; background: var(--ok-tenue); color: var(--ok-testo); transition: background-color .3s, color .3s; }
 .barra-manutenzione-titolo { display: flex; align-items: center; gap: 6px; }
 .barra-manutenzione .icona { flex: none; width: 16px; height: 16px; }
-.barra-manutenzione .tempo { font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .08em; font-size: 22px; line-height: 1.1; margin-top: 2px; }
+.barra-manutenzione .tempo { font-family: 'DSEG7', ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .08em; font-size: 22px; line-height: 1.1; margin-top: 2px; }
 .barra-manutenzione.giallo { background: var(--attesa-tenue); color: var(--attesa-testo); }
 .barra-manutenzione.rosso { background: var(--errore-tenue); color: var(--errore-testo); animation: barra-lampeggio .8s linear infinite; }
 @keyframes barra-lampeggio { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: .4; } }
