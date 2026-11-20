@@ -56,13 +56,7 @@ set /p "PREAVVISO=Minuti di preavviso per chi e' dentro [0 = nessuno]: "
 if not defined PREAVVISO set "PREAVVISO=0"
 rem solo cifre: un carattere non numerico riporta a 0 (niente pipe, che in finestra elevata puo' appendere)
 for /f "delims=0123456789" %%c in ("%PREAVVISO%") do set "PREAVVISO=0"
-if not "%PREAVVISO%"=="0" (
-  for /f %%t in ('powershell -NoProfile -Command "[int][double]::Parse((Get-Date -UFormat %s))"') do set "INIZIO=%%t"
-  > "%STATO%" echo {"fase":"preavviso","tra_minuti":%PREAVVISO%,"inizio":!INIZIO!}
-  echo Preavviso di %PREAVVISO% minuti: chi e' dentro vede il banner e ha il tempo di salvare.
-  set /a ATTESA=%PREAVVISO%*60
-  timeout /t !ATTESA! /nobreak
-)
+if not "%PREAVVISO%"=="0" call :preavviso
 rem D-213: la pagina di attesa e' la PRIMA cosa del deploy (backup compreso)
 call :attesa
 for /f %%d in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmm"') do set "STAMP=%%d"
@@ -206,3 +200,18 @@ if exist "%MANUT_PID%" (
   del "%MANUT_PID%" >nul 2>&1
 )
 exit /b 0
+
+rem D-217: preavviso con battito. Riscrive stato.json ogni 5 s cosi' il frontend capisce se il
+rem deploy e' stato annullato (nessun aggiornamento per ~15 s) e nasconde il countdown.
+:preavviso
+for /f %%t in ('powershell -NoProfile -Command "[int][double]::Parse((Get-Date -UFormat %s))"') do set "INIZIO=%%t"
+set /a ATTESA=%PREAVVISO%*60
+set /a TRASCORSI=0
+echo Preavviso di %PREAVVISO% minuti: chi e' dentro vede il banner e ha il tempo di salvare.
+:preavviso_giro
+set /a ORA=%INIZIO%+%TRASCORSI%
+> "%STATO%" echo {"fase":"preavviso","tra_minuti":%PREAVVISO%,"inizio":%INIZIO%,"aggiornato":%ORA%}
+if %TRASCORSI% geq %ATTESA% exit /b 0
+timeout /t 5 /nobreak >nul
+set /a TRASCORSI+=5
+goto preavviso_giro

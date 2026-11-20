@@ -151,6 +151,8 @@ export function Barra() {
   const finePreavviso = useRef<number | null>(null);
   const inizioPreavviso = useRef<number | null>(null);
   const totalePreavviso = useRef(0);
+  const ultimoBattito = useRef<number | null>(null);
+  const ultimoBattitoVisto = useRef(0);
   useEffect(() => {
     let vivo = true;
     const giro = async () => {
@@ -158,6 +160,18 @@ export function Barra() {
       if (!vivo) return;
       if (s?.fase === 'manutenzione') { window.location.reload(); return; }
       if (s?.fase === 'preavviso' && typeof s.tra_minuti === 'number' && s.tra_minuti > 0 && typeof s.inizio === 'number') {
+        // battito: il deploy riscrive il file ogni 5 s; se non lo fa da ~15 s e' stato annullato
+        if (typeof s.aggiornato === 'number') {
+          if (ultimoBattito.current !== s.aggiornato) {
+            ultimoBattito.current = s.aggiornato;
+            ultimoBattitoVisto.current = Date.now();
+          } else if (Date.now() - ultimoBattitoVisto.current > 15_000) {
+            inizioPreavviso.current = null;
+            finePreavviso.current = null;
+            setPreavviso(null);
+            return;
+          }
+        }
         // istante assoluto: annullando il deploy il countdown non riparte e a 0 la card sparisce
         if (inizioPreavviso.current !== s.inizio) {
           inizioPreavviso.current = s.inizio;
@@ -167,6 +181,7 @@ export function Barra() {
       } else {
         inizioPreavviso.current = null;
         finePreavviso.current = null;
+        ultimoBattito.current = null;
         setPreavviso(null);
       }
     };
