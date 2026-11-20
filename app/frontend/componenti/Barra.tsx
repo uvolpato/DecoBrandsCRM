@@ -210,8 +210,9 @@ export function Barra() {
         const ss = String(rimanente % 60).padStart(2, '0');
         return (
           <div className={'barra-manutenzione ' + fase} role="status">
-            <Icona nome="sistema" />
-            <span>Aggiornamento tra <b className="tempo">{mm}:{ss}</b>: salva il lavoro aperto.</span>
+            <span className="barra-manutenzione-titolo"><Icona nome="sistema" /><b>Salva il lavoro</b></span>
+            <span>Aggiornamento tra</span>
+            <span className="tempo">{mm}:{ss}</span>
           </div>
         );
       })()}

@@ -17,9 +17,10 @@
   .scena { display: flex; gap: 40px; padding: 32px; align-items: flex-start; flex-wrap: wrap; }
   .barra { width: 260px; background: var(--scuro); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; }
   .spazio { flex: 1; min-height: 120px; }
-  .barra-manutenzione { display: flex; gap: 8px; align-items: flex-start; margin: 10px 12px 8px; padding: 8px 10px; border-radius: var(--r-piccolo); font-size: 12px; line-height: 1.4; background: var(--ok-tenue); color: var(--ok-testo); transition: background-color .3s, color .3s; }
-  .barra-manutenzione .icona { flex: none; width: 16px; height: 16px; margin-top: 1px; }
-  .barra-manutenzione .tempo { font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .06em; font-size: 13px; color: inherit; }
+  .barra-manutenzione { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; margin: 10px 12px 8px; padding: 8px 10px; border-radius: var(--r-piccolo); font-size: 12px; line-height: 1.4; background: var(--ok-tenue); color: var(--ok-testo); transition: background-color .3s, color .3s; }
+  .barra-manutenzione-titolo { display: flex; align-items: center; gap: 6px; }
+  .barra-manutenzione .icona { flex: none; width: 16px; height: 16px; }
+  .barra-manutenzione .tempo { font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .08em; font-size: 22px; line-height: 1.1; margin-top: 2px; color: inherit; }
   .barra-manutenzione.giallo { background: var(--attesa-tenue); color: var(--attesa-testo); }
   .barra-manutenzione.rosso { background: var(--errore-tenue); color: var(--errore-testo); animation: barra-lampeggio .8s linear infinite; }
   @keyframes barra-lampeggio { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: .4; } }
@@ -49,8 +50,9 @@
       <div class="barra">
         <div class="spazio"></div>
         <div id="card" class="barra-manutenzione verde">
-          <svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
-          <span>Aggiornamento tra <b class="tempo" id="tempo">01:00</b>: salva il lavoro aperto.</span>
+          <span class="barra-manutenzione-titolo"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><b>Salva il lavoro</b></span>
+          <span>Aggiornamento tra</span>
+          <span class="tempo" id="tempo">01:00</span>
         </div>
         <div class="barra-piede">
           <div class="io"><span class="io-sigla">UV</span><span><b>Ugo Volpato</b><span class="ruolo">Superutente</span></span></div>
@@ -66,9 +68,9 @@
     <div class="esempi">
       <h2>I tre stati</h2>
       <p>Verde, giallo, rosso lampeggiante.</p>
-      <div class="barra-manutenzione verde"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>Aggiornamento tra <b class="tempo">00:45</b>: salva il lavoro aperto.</span></div>
-      <div class="barra-manutenzione giallo"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>Aggiornamento tra <b class="tempo">00:15</b>: salva il lavoro aperto.</span></div>
-      <div class="barra-manutenzione rosso"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>Aggiornamento tra <b class="tempo">00:08</b>: salva il lavoro aperto.</span></div>
+      <div class="barra-manutenzione verde"><span class="barra-manutenzione-titolo"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><b>Salva il lavoro</b></span><span>Aggiornamento tra</span><span class="tempo">00:45</span></div>
+      <div class="barra-manutenzione giallo"><span class="barra-manutenzione-titolo"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><b>Salva il lavoro</b></span><span>Aggiornamento tra</span><span class="tempo">00:15</span></div>
+      <div class="barra-manutenzione rosso"><span class="barra-manutenzione-titolo"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><b>Salva il lavoro</b></span><span>Aggiornamento tra</span><span class="tempo">00:08</span></div>
     </div>
   </div>
   <script>
