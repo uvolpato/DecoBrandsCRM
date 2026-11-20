@@ -1134,6 +1134,7 @@ body.in-accesso .principale, body:has(.accesso-scena) .principale { padding: 0; 
 .menu-utente { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 30; padding: 6px; background: var(--superficie); color: var(--testo); border: 1px solid var(--bordo); border-radius: var(--r-medio); box-shadow: 0 12px 32px rgba(0,0,0,.22); }
 .menu-utente-mail { padding: 8px 10px 9px; margin-bottom: 4px; border-bottom: 1px solid var(--bordo-tenue); color: var(--testo-tenue); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .barra-piede .menu-utente-voce { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 7px 10px; border-radius: var(--r-piccolo); color: var(--testo); text-decoration: none; font-size: 13px; font-weight: 500; }
+.barra-piede button.menu-utente-voce { width: 100%; } /* un button non si allarga come un collegamento */
 .barra-piede .menu-utente-voce:hover, .barra-piede .menu-utente-voce:focus-visible { background: var(--sfondo); outline: none; }
 .barra-piede .menu-utente-voce.attiva { background: var(--primario-tenue); color: var(--primario); font-weight: 600; }
 .menu-utente-voce .icona { width: 17px; height: 17px; color: var(--testo-tenue); flex: none; }
