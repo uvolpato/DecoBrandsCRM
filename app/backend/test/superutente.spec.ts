@@ -18,9 +18,10 @@ afterAll(async () => {
   await db.$disconnect();
 });
 
-it('crea il superutente con password provvisoria per email; il secondo è rifiutato', async () => {
+it('crea il superutente con password provvisoria per email; il secondo non fa niente', async () => {
   const spia = jest.spyOn(posta, 'mandaPassword').mockResolvedValue();
-  const { u } = await crea(['Capo', 'Capo@Prova-Superutente.it', 'Ugo Volpato']);
+  const esito = await crea(['Capo', 'Capo@Prova-Superutente.it', 'Ugo Volpato']);
+  const u = esito!.u; // il primo utente si crea: esito non nullo
   expect(u).toMatchObject({ username: 'capo', email: 'capo@prova-superutente.it', ruolo: 'superutente', deve_cambiare_password: true });
 
   const [, , password, tipo] = spia.mock.calls[0];
@@ -29,7 +30,7 @@ it('crea il superutente con password provvisoria per email; il secondo è rifiut
   expect(await verifica(password, u.password_hash)).toBe(true);
   expect(await db.registro.count({ where: { codice: 'auth.password_temp', entita_id: u.id } })).toBe(1);
 
-  await expect(crea(['altro', 'altro@prova-superutente.it', 'Altro'])).rejects.toThrow('esiste già');
+  expect(await crea(['altro', 'altro@prova-superutente.it', 'Altro'])).toBeNull(); // idempotente: non ricrea
   await expect(crea(['solo'])).rejects.toThrow('uso:');
   spia.mockRestore();
 });

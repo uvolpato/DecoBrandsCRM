@@ -13,7 +13,14 @@ async function crea(argv: string[]) {
   if (!username || !email || !nome) throw new Error('uso: npm run superutente -- <nome utente> <email> "<nome e cognome>"');
   const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL!, options: '-c TimeZone=UTC' }) });
   try {
-    if (await db.utenti.findFirst({ where: { ruolo: 'superutente' } })) throw new Error('Il superutente esiste già: ce n\'è uno solo');
+    if (await db.utenti.findFirst({ where: { ruolo: 'superutente' } })) {
+      // 20/11/2026: idempotente. All'installazione che si ripete il superutente c'è già: si salta e si
+      // prosegue (la password si recupera con npm run password:provvisoria -- <utente>).
+      const esistente = await db.utenti.findFirstOrThrow({ where: { ruolo: 'superutente' }, select: { username: true } });
+      console.log(`Il superutente ${esistente.username} esiste gia': non lo ricreo.`);
+      console.log(`Per una password provvisoria nuova: npm run password:provvisoria -- ${esistente.username}`);
+      return null;
+    }
     const password = provvisoria();
     // CHECK e indici del database controllano nome utente, email e unicità (§4.2.18)
     const u = await db.$transaction(async (tx) => {
@@ -35,7 +42,9 @@ async function crea(argv: string[]) {
 
 if (require.main === module) {
   crea(process.argv.slice(2))
-    .then(({ u, password }) => {
+    .then((esito) => {
+      if (!esito) return; // superutente già presente: già spiegato da crea()
+      const { u, password } = esito;
       // 20/11/2026: la password provvisoria va anche a video. In un'installazione nuova la posta non e'
       // ancora configurata e l'email non parte: senza questo il primo accesso era impossibile.
       console.log(`Superutente ${u.username} creato.`);

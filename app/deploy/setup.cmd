@@ -85,18 +85,11 @@ set /p EMAIL=Email:
 set /p NOME=Nome e cognome: 
 call npm run superutente -- "!UTENTE!" "!EMAIL!" "!NOME!" > "%LOG%\superutente.txt" 2>&1
 if errorlevel 1 (
-  findstr /c:"esiste gia" "%LOG%\superutente.txt" >nul 2>&1
-  if errorlevel 1 (
-    type "%LOG%\superutente.txt"
-    echo Creazione del superutente fallita.
-    exit /b 1
-  )
-  echo Il superutente esiste gia': non lo ricreo.
-  echo Per una password provvisoria nuova lancia, in app\backend:
-  echo    npm run password:provvisoria -- !UTENTE!
-) else (
   type "%LOG%\superutente.txt"
+  echo Creazione del superutente fallita.
+  exit /b 1
 )
+type "%LOG%\superutente.txt"
 
 echo == 6. Frontend: dipendenze e build
 cd /d "%APP%\frontend" || exit /b 1
