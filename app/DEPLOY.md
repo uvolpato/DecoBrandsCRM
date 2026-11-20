@@ -205,8 +205,11 @@ se lo richiede da solo (UAC) e riparte elevato, una volta sola (variabile `DECOB
 
 Backend e frontend ascoltano **solo su 127.0.0.1** (8002 e 8001); dal firewall entra solo la 8082.
 
-La pagina di attesa sta nel `Caddyfile`: `@manutenzione file C:/Decobrands/app/deploy/manutenzione/maintenance.flag`,
-poi `handle @manutenzione` (radice `C:/Decobrands/app/deploy/manutenzione`, `try_files {path} /index.html`,
+La pagina di attesa sta nel `Caddyfile`: il matcher `@manutenzione` controlla `maintenance.flag` nella
+cartella `C:/Decobrands/app/deploy/manutenzione` (il `root` va dichiarato dentro il `file`: i percorsi
+del matcher sono relativi a una radice, e quella predefinita è la cartella di avvio di Caddy, cioè
+`C:\Windows\System32` con l'attività pianificata), poi `handle @manutenzione` (stessa radice,
+`try_files {path} /index.html`,
 `file_server`) e infine un `handle` senza matcher con il `reverse_proxy`. Le due `handle` sono
 mutuamente esclusive (vince la prima che combacia), quindi non conta l'ordine delle direttive;
 `header @manutenzione Cache-Control "no-store"` evita che la pagina resti in cache dopo il deploy.

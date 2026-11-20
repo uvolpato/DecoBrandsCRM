@@ -22,7 +22,14 @@
 	# (si toglie a mano: del C:\Decobrands\app\deploy\manutenzione\maintenance.flag).
 	# Si riscrive sulla pagina chiesta, non si sposta: l'indirizzo resta quello (/pratiche resta
 	# /pratiche) e il controllo della pagina sa dove tornare appena l'app risponde.
-	@manutenzione file C:/Decobrands/app/deploy/manutenzione/maintenance.flag
+	@manutenzione {
+		# D-215: i file del matcher sono relativi a una radice; quella predefinita e' la cartella di
+		# avvio di Caddy (C:\Windows\System32 per l'attivita' pianificata), quindi va dichiarata.
+		file {
+			root C:/Decobrands/app/deploy/manutenzione
+			try_files maintenance.flag
+		}
+	}
 	header @manutenzione Cache-Control "no-store" # mai in cache: alla fine del deploy deve sparire subito
 	handle @manutenzione {
 		root * C:/Decobrands/app/deploy/manutenzione
