@@ -1,10 +1,5 @@
-'use client';
-import { useParams } from 'next/navigation';
-import { VistaGuida } from '../VistaGuida';
-
-// Guida in linea (§7.17): /guida apre il primo argomento visibile, /guida/:argomento quello
-// scelto; un argomento inesistente (o non permesso) riporta al primo.
+// /guida e /guida/:argomento: la vista sta nel layout, che resta montato fra gli argomenti
+// (rilievo 20/11/2026). La pagina dà solo l'indirizzo; l'argomento lo legge la vista da useParams.
 export default function Pagina() {
-  const { argomento } = useParams<{ argomento?: string[] }>();
-  return <VistaGuida idSel={argomento?.[0]} />;
+  return null;
 }

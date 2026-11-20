@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { FilterBar, type Valori } from '@/componenti/FilterBar';
 import { ElencoSelezionabile } from '@/componenti/Flussi';
@@ -27,8 +28,10 @@ const PERMESSO: Record<string, string> = {
 const testoPiano = (g: Argomento) =>
   JSON.stringify([g.titolo, g.sintesi, g.flusso, g.pulsanti, g.finestre, g.sapere]).replace(/<[^>]+>/g, '').toLowerCase();
 
-export function VistaGuida({ idSel }: { idSel?: string }) {
+export function VistaGuida() {
   const puo = usePuo();
+  const { argomento } = useParams<{ argomento?: string[] }>();
+  const idSel = argomento?.[0];
   const [valori, setValori] = useMemoria<Valori>('guida', { q: '' });
   const visibili = GUIDA.filter((g) => g.gruppo !== 'Gestione' || puo(PERMESSO[g.id]));
   const g = visibili.find((x) => x.id === idSel) ?? visibili[0]; // argomento inesistente: si torna al primo
