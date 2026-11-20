@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anteprima card di preavviso</title>
+<style>
+  :root {
+    --scuro: #212529;
+    --ok-tenue: #d1e7dd; --ok-testo: #0f5132;
+    --attesa-tenue: #fff3cd; --attesa-testo: #664d03;
+    --errore-tenue: #f8d7da; --errore-testo: #b02a37;
+    --r-piccolo: 8px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f5f6f8; font-family: 'Public Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.45; color: #212529; }
+  .scena { display: flex; gap: 40px; padding: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .barra { width: 260px; background: var(--scuro); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; }
+  .spazio { flex: 1; min-height: 120px; }
+  .barra-manutenzione { display: flex; gap: 8px; align-items: flex-start; margin: 10px 12px 8px; padding: 8px 10px; border-radius: var(--r-piccolo); font-size: 12px; line-height: 1.4; background: var(--ok-tenue); color: var(--ok-testo); transition: background-color .3s, color .3s; }
+  .barra-manutenzione .icona { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+  .barra-manutenzione .tempo { font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .06em; font-size: 13px; color: inherit; }
+  .barra-manutenzione.giallo { background: var(--attesa-tenue); color: var(--attesa-testo); }
+  .barra-manutenzione.rosso { background: var(--errore-tenue); color: var(--errore-testo); animation: barra-lampeggio .8s linear infinite; }
+  @keyframes barra-lampeggio { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: .4; } }
+  .icona { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .barra-piede { margin-top: auto; padding: 14px 10px 0; border-top: 1px solid rgba(255,255,255,.12); color: rgba(255,255,255,.5); font-size: 12.5px; }
+  .io { display: flex; align-items: center; gap: 8px; color: #fff; }
+  .io-sigla { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #0d6efd; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+  .io b { color: #fff; font-size: 13px; display: block; }
+  .io .ruolo { color: rgba(255,255,255,.65); font-size: 12px; }
+  .barra-versione { padding: 8px 6px 2px; color: rgba(255,255,255,.4); font-size: 11.5px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  .nota { color: #6c757d; margin: 0 0 16px; max-width: 520px; }
+  .comandi { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid #dee2e6; background: #fff; cursor: pointer; }
+  button:hover { background: #e9ecef; }
+  .esempi { display: flex; gap: 12px; flex-direction: column; width: 260px; }
+  .esempi h2 { font-size: 14px; margin: 0 0 2px; }
+  .esempi p { margin: 0 0 8px; color: #6c757d; font-size: 12.5px; }
+  .esempi .barra-manutenzione { margin: 0; }
+</style>
+</head>
+<body>
+  <div class="scena">
+    <div>
+      <h1>Anteprima card di preavviso</h1>
+      <p class="nota">Countdown dal vivo, con il profilo sotto come nella barra laterale. Verde per la prima metà, giallo per la seconda, rosso lampeggiante negli ultimi 20 secondi.</p>
+      <div class="barra">
+        <div class="spazio"></div>
+        <div id="card" class="barra-manutenzione verde">
+          <svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
+          <span>Aggiornamento tra <b class="tempo" id="tempo">01:00</b>: salva il lavoro aperto.</span>
+        </div>
+        <div class="barra-piede">
+          <div class="io"><span class="io-sigla">UV</span><span><b>Ugo Volpato</b><span class="ruolo">Superutente</span></span></div>
+          <div class="barra-versione">v0.2.20</div>
+        </div>
+      </div>
+      <div class="comandi">
+        <button type="button" onclick="ricomincia(60)">Ricomincia da 01:00</button>
+        <button type="button" onclick="ricomincia(30)">Ricomincia da 00:30</button>
+        <button type="button" onclick="ricomincia(20)">Ultimi 20 secondi (rosso)</button>
+      </div>
+    </div>
+    <div class="esempi">
+      <h2>I tre stati</h2>
+      <p>Verde, giallo, rosso lampeggiante.</p>
+      <div class="barra-manutenzione verde"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>Aggiornamento tra <b class="tempo">00:45</b>: salva il lavoro aperto.</span></div>
+      <div class="barra-manutenzione giallo"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>Aggiornamento tra <b class="tempo">00:15</b>: salva il lavoro aperto.</span></div>
+      <div class="barra-manutenzione rosso"><svg class="icona" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>Aggiornamento tra <b class="tempo">00:08</b>: salva il lavoro aperto.</span></div>
+    </div>
+  </div>
+  <script>
+    let fine = 0, totale = 60;
+    const card = document.getElementById('card');
+    const tempo = document.getElementById('tempo');
+    const due = (n) => String(n).padStart(2, '0');
+    function disegna() {
+      const rimanente = Math.max(0, Math.ceil((fine - Date.now()) / 1000));
+      const fase = rimanente <= 20 ? 'rosso' : rimanente > totale / 2 ? 'verde' : 'giallo';
+      card.className = 'barra-manutenzione ' + fase;
+      tempo.textContent = due(Math.floor(rimanente / 60)) + ':' + due(rimanente % 60);
+    }
+    function ricomincia(sec) { totale = sec; fine = Date.now() + sec * 1000; disegna(); }
+    ricomincia(60);
+    setInterval(disegna, 250);
+  </script>
+</body>
+</html>

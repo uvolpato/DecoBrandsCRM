@@ -145,10 +145,11 @@ export function Barra() {
     return () => { document.removeEventListener('click', fuori); document.removeEventListener('keydown', tasto); };
   }, [menuUtente]);
 
-  // preavviso di aggiornamento (D-217): card sopra il profilo; alla manutenzione si ricarica e Caddy
-  // mostra la pagina di attesa. Il segnale sta in manutenzione/stato.json, servito da Caddy (sempre su).
-  const [preavviso, setPreavviso] = useState<number | null>(null);
+  // preavviso di aggiornamento (D-217): card sopra il profilo con countdown mm:ss; alla manutenzione
+  // si ricarica e Caddy mostra la pagina di attesa. Il segnale sta in stato.json, servito da Caddy.
+  const [preavviso, setPreavviso] = useState<{ rimanente: number; totale: number } | null>(null);
   const finePreavviso = useRef<number | null>(null);
+  const totalePreavviso = useRef(0);
   useEffect(() => {
     let vivo = true;
     const giro = async () => {
@@ -156,16 +157,23 @@ export function Barra() {
       if (!vivo) return;
       if (s?.fase === 'manutenzione') { window.location.reload(); return; }
       if (s?.fase === 'preavviso' && typeof s.tra_minuti === 'number' && s.tra_minuti > 0) {
-        if (finePreavviso.current == null) finePreavviso.current = Date.now() + s.tra_minuti * 60_000;
-        setPreavviso(Math.max(1, Math.ceil((finePreavviso.current - Date.now()) / 60_000)));
+        if (finePreavviso.current == null) {
+          totalePreavviso.current = s.tra_minuti * 60;
+          finePreavviso.current = Date.now() + totalePreavviso.current * 1000;
+        }
       } else {
         finePreavviso.current = null;
         setPreavviso(null);
       }
     };
-    const t = setInterval(() => void giro(), 5000);
+    const poll = setInterval(() => void giro(), 5000);
+    const tick = setInterval(() => {
+      if (finePreavviso.current == null) return;
+      const rimanente = Math.max(0, Math.ceil((finePreavviso.current - Date.now()) / 1000));
+      setPreavviso({ rimanente, totale: totalePreavviso.current });
+    }, 1000);
     void giro();
-    return () => { vivo = false; clearInterval(t); };
+    return () => { vivo = false; clearInterval(poll); clearInterval(tick); };
   }, []);
 
   const voce = (v: Voce) => {
@@ -195,12 +203,18 @@ export function Barra() {
           </nav>
         ))}
       </div>
-      {preavviso != null && (
-        <div className="barra-manutenzione" role="status">
-          <Icona nome="sistema" />
-          <span>Aggiornamento del portale tra {preavviso} min: salva il lavoro aperto.</span>
-        </div>
-      )}
+      {preavviso != null && (() => {
+        const { rimanente, totale } = preavviso;
+        const fase = rimanente <= 20 ? 'rosso' : rimanente > totale / 2 ? 'verde' : 'giallo';
+        const mm = String(Math.floor(rimanente / 60)).padStart(2, '0');
+        const ss = String(rimanente % 60).padStart(2, '0');
+        return (
+          <div className={'barra-manutenzione ' + fase} role="status">
+            <Icona nome="sistema" />
+            <span>Aggiornamento tra <b className="tempo">{mm}:{ss}</b>: salva il lavoro aperto.</span>
+          </div>
+        );
+      })()}
       <div ref={contenitoreUtente} className={'barra-piede' + (menuUtente ? ' aperta' : '')}>
         {menuUtente && (
           <div ref={riquadroUtente} className="menu-utente" role="menu" aria-label="Utente">
