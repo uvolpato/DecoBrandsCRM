@@ -27,7 +27,7 @@ async function crea(argv: string[]) {
       return u;
     });
     await mandaPassword(db, u, password, 'benvenuto');
-    return u;
+    return { u, password };
   } finally {
     await db.$disconnect();
   }
@@ -35,7 +35,13 @@ async function crea(argv: string[]) {
 
 if (require.main === module) {
   crea(process.argv.slice(2))
-    .then((u) => console.log(`Superutente ${u.username} creato: la password provvisoria è stata mandata a ${u.email}.`))
+    .then(({ u, password }) => {
+      // 20/11/2026: la password provvisoria va anche a video. In un'installazione nuova la posta non e'
+      // ancora configurata e l'email non parte: senza questo il primo accesso era impossibile.
+      console.log(`Superutente ${u.username} creato.`);
+      console.log(`Password provvisoria: ${password}`);
+      console.log(`Va cambiata al primo accesso. L'email a ${u.email} parte solo se Posta e' configurata in Impostazioni.`);
+    })
     .catch((e: Error) => {
       console.error(e.message);
       process.exit(1);

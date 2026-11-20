@@ -1,6 +1,6 @@
 'use client';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { Barra, primaPagina, voceDi } from '@/componenti/Barra';
 import { ClasseBody } from '@/componenti/ClasseBody';
 import { Riservata } from '@/componenti/Pagina';
@@ -24,6 +24,12 @@ const SELETTORE_SPENTI = [
 ].join(', ');
 
 export default function Guscio({ children }: { children: ReactNode }) {
+  // useSearchParams (vista=sola) vuole un confine Suspense: senza, la build di produzione si ferma
+  // su ogni pagina ("useSearchParams() should be wrapped in a suspense boundary").
+  return (<Suspense><GuscioInterno>{children}</GuscioInterno></Suspense>);
+}
+
+function GuscioInterno({ children }: { children: ReactNode }) {
   const router = useRouter();
   const percorso = usePathname();
   const [io, setIo] = useState<Io | null>(null);
