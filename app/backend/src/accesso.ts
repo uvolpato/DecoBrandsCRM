@@ -75,8 +75,11 @@ export type Permesso = keyof typeof PERMESSI | 'collegato';
 const grado = (l?: string) => LIVELLI.indexOf(l as Livello); // -1 = nessun livello
 /** I permessi di un utente dal suo ruolo di Sistema e dai livelli nelle aree; il server li rilegge a ogni richiesta (D-38). */
 export function permessiDi(ruolo: string, livelli: Livelli): Permesso[] {
-  const operatore = Object.values(livelli).some((l) => grado(l) >= grado('operatore'));
   const def = PERMESSI as Record<string, DefPermesso>;
+  // D-208 §19: il superutente vede tutto e può tutto, senza livelli nelle aree (è uno solo, e
+  // altrimenti potrebbe chiudersi fuori dalle aree togliendosi i livelli).
+  if (ruolo === 'superutente') return ['collegato', ...(Object.keys(def) as Permesso[])];
+  const operatore = Object.values(livelli).some((l) => grado(l) >= grado('operatore'));
   return ['collegato', ...(Object.keys(def) as Permesso[]).filter((id) => {
     const p = def[id];
     return p.area === 'sistema'

@@ -739,6 +739,7 @@ export const GUIDA: Argomento[] = [
     sapere: [
       'Gli utenti li crea chi amministra: nessuno si registra da solo.',
       'Il superutente è uno solo, si crea all’installazione e gestisce gli amministratori; non si modifica da qui.',
+      'Il superutente vede e può tutto, senza livelli nelle aree: gestisce il portale e lavora in ogni area.',
       'Deve restare almeno un amministratore attivo; non puoi cambiare il tuo ruolo né disattivarti.',
       'L’esito dell’ultima email (consegnata o no) è nella scheda dell’utente.',
       'Se cambi l’email di un utente, al vecchio indirizzo arriva un avviso con chi ha fatto il cambio e quando.',

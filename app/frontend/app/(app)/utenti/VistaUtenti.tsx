@@ -41,8 +41,8 @@ const VISTE: Record<string, (u: Utente) => boolean> = { attivi: (u) => u.attivo,
 const ULTIMA_EMAIL: Record<string, string> = { benvenuto: 'Benvenuto con la password provvisoria', password: 'Nuova password provvisoria', reset: 'Password dimenticata' };
 const ORDINE = Object.keys(LIVELLI); // lettura < operatore < responsabile
 const VARIANTE: Record<string, 'primario' | 'info' | 'neutro'> = { responsabile: 'primario', operatore: 'info', lettura: 'neutro' };
-// "Provvigioni: operatore · Dati: lettura"
-const livelliTesto = (x: Utente) => Object.keys(AREE).filter((a) => x.aree[a]).map((a) => AREE[a] + ': ' + LIVELLI[x.aree[a]].toLowerCase()).join(' · ');
+// "Provvigioni: operatore · Dati: lettura"; il superutente vede tutto (D-208)
+const livelliTesto = (x: Utente) => x.ruolo === 'superutente' ? 'Tutto' : Object.keys(AREE).filter((a) => x.aree[a]).map((a) => AREE[a] + ': ' + LIVELLI[x.aree[a]].toLowerCase()).join(' · ');
 
 // il permesso (sistema.utenti) lo controlla il guscio, come per ogni pagina (D-45)
 export function VistaUtenti({ idSel }: { idSel?: string }) {
@@ -209,7 +209,7 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
         <div className="ruoli-titolo">Accesso alle aree</div>
         <dl className="aree-accesso">
           {Object.keys(AREE).map((a) => (
-            <Fragment key={a}><dt>{AREE[a]}</dt><dd>{u.aree[a] ? <Stato v={VARIANTE[u.aree[a]]}>{LIVELLI[u.aree[a]]}</Stato> : <span className="testo-tenue">Nessun accesso</span>}</dd></Fragment>
+            <Fragment key={a}><dt>{AREE[a]}</dt><dd>{u.ruolo === 'superutente' ? <Stato v="primario">Tutto</Stato> : u.aree[a] ? <Stato v={VARIANTE[u.aree[a]]}>{LIVELLI[u.aree[a]]}</Stato> : <span className="testo-tenue">Nessun accesso</span>}</dd></Fragment>
           ))}
         </dl>
         {nota ? <Nota>{nota}</Nota> : (
@@ -226,6 +226,8 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
   // titolo; aperte quelle dove u ha accesso, così con molte aree si legge prima quello che lo riguarda
   function cosaPuoFare() {
     const elenco = permessi ?? [];
+    // D-208 §19: il superutente vede e può tutto, senza livelli nelle aree
+    const tutto = u.ruolo === 'superutente';
     const spunta = (si: boolean) => (si ? <span className="si" aria-label="sì"><Icona nome="spunta" /></span> : <span className="testo-tenue" aria-label="no">—</span>);
     const sezione = (id: string, titolo: string, mio: ReactNode, aperta: boolean, righe: Permesso[], colonne: Record<string, string>, evid: string | undefined, vale: (p: Permesso, k: string) => boolean) => (
       <details key={id} className="permessi-area" open={aperta}>
@@ -250,8 +252,8 @@ export function VistaUtenti({ idSel }: { idSel?: string }) {
         {sezione('sistema', 'Sistema', <Stato v={u.ruolo === 'utente' ? 'neutro' : 'primario'}>{RUOLI[u.ruolo]}</Stato>, u.ruolo !== 'utente',
           elenco.filter((p) => p.area === 'sistema'), RUOLI, u.ruolo, (p, k) => !!p.ruoli?.includes(k) || (!!p.ancheOperatore && k === 'utente'))}
         {Object.keys(AREE).map((a) => sezione(a, AREE[a],
-          u.aree[a] ? <Stato v={VARIANTE[u.aree[a]]}>{LIVELLI[u.aree[a]]}</Stato> : <span className="testo-tenue">Nessun accesso</span>, !!u.aree[a],
-          elenco.filter((p) => p.area === a), LIVELLI, u.aree[a], (p, k) => ORDINE.indexOf(k) >= ORDINE.indexOf(p.minimo!)))}
+          tutto ? <Stato v="primario">Tutto</Stato> : u.aree[a] ? <Stato v={VARIANTE[u.aree[a]]}>{LIVELLI[u.aree[a]]}</Stato> : <span className="testo-tenue">Nessun accesso</span>, tutto || !!u.aree[a],
+          elenco.filter((p) => p.area === a), LIVELLI, tutto ? 'responsabile' : u.aree[a], (p, k) => ORDINE.indexOf(k) >= ORDINE.indexOf(p.minimo!)))}
       </>
     );
   }

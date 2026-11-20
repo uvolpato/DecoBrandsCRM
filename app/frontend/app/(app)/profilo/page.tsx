@@ -14,7 +14,8 @@ export default function Profilo() {
   const io = useUtente();
   const aggiorna = useAggiornaUtente();
   const aree = areeAperte(io); // solo le aree che l'utente può aprire, con le voci permesse
-  const livello = (id: string) => (id === 'gestione' ? 'secondo il ruolo' : LIVELLI[io.aree[id]] ?? '—');
+  // D-208 §19: il superutente vede e può tutto, senza livelli nelle aree
+  const livello = (id: string) => (io.ruolo === 'superutente' ? 'Tutto' : id === 'gestione' ? 'secondo il ruolo' : LIVELLI[io.aree[id]] ?? '—');
 
   const salva = async (ev: FormEvent<HTMLFormElement>) => {
     ev.preventDefault();

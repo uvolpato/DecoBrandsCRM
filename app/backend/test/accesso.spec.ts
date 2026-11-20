@@ -4,7 +4,7 @@ import { Controller, Get, Module, Post } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
-import { Richiede } from '../src/accesso';
+import { PERMESSI, Richiede, permessiDi } from '../src/accesso';
 import { AppModule, limiti } from '../src/app.module';
 import { configura } from '../src/main';
 import { cifra } from '../src/password';
@@ -121,6 +121,13 @@ describe('entra', () => {
     expect(ev.sessione_id).toBeNull();
     expect(ev.ip).toBeTruthy();
     expect(JSON.stringify(ev.dettaglio)).not.toContain('sessione_id');
+  });
+});
+
+describe('permessi (D-45, D-208)', () => {
+  it('il superutente ha tutti i permessi senza livelli nelle aree; un utente senza livelli solo «collegato»', () => {
+    expect(permessiDi('superutente', {})).toEqual(['collegato', ...Object.keys(PERMESSI)]);
+    expect(permessiDi('utente', {})).toEqual(['collegato']);
   });
 });
 
