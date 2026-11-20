@@ -13,6 +13,10 @@ where caddy >nul 2>&1 || (
     if exist %%c set "PATH=%%~dpc;!PATH!"
   )
 )
+rem 20/11/2026: il servizio si registra con il percorso COMPLETO. L'ambiente del servizio non
+rem eredita il PATH aggiunto qui sopra: con "caddy.exe" e basta non partirebbe.
+set "CADDYEXE="
+for %%c in (caddy.exe) do set "CADDYEXE=%%~$PATH:c"
 where soffice >nul 2>&1 || (
   if exist "%ProgramFiles%\LibreOffice\program\soffice.exe" set "PATH=%ProgramFiles%\LibreOffice\program;!PATH!"
 )
@@ -137,10 +141,10 @@ if not errorlevel 1 (
   goto backup-task
 )
 if defined NSSM (
-  nssm install DecobrandsCaddy "caddy.exe" "run --config %APP%\deploy\Caddyfile" >nul
+  nssm install DecobrandsCaddy "%CADDYEXE%" "run --config %APP%\deploy\Caddyfile" >nul
   nssm set DecobrandsCaddy Start SERVICE_AUTO_START >nul
 ) else (
-  schtasks /create /f /tn DecobrandsCaddy /sc onstart /ru SYSTEM /rl HIGHEST /tr "caddy.exe run --config %APP%\deploy\Caddyfile" >nul
+  schtasks /create /f /tn DecobrandsCaddy /sc onstart /ru SYSTEM /rl HIGHEST /tr "\"%CADDYEXE%\" run --config %APP%\deploy\Caddyfile" >nul
 )
 
 :backup-task

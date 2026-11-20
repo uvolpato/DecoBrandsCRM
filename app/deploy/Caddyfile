@@ -1,4 +1,4 @@
-# Caddy davanti all'app (F7-A2, spec Ã‚Â§3.2 e Ã‚Â§3.4): tutto al frontend Next, che inoltra /api al backend.
+# Caddy davanti all'app (F7-A2, spec 3.2 e 3.4): tutto al frontend Next, che inoltra /api al backend.
 # Caddy >= 2.5. Backend e frontend ascoltano solo su 127.0.0.1 (8002 e 8001).
 #
 # Due modi, uno attivo alla volta:
@@ -8,14 +8,14 @@
 #     resta non "secure" (in HTTPS non verrebbe mai inviato). Niente HSTS in chiaro.
 #  2. PUBBLICO (commentato): crm.decobrands.it con certificato. Si attiva al rilascio con il tecnico
 #     della rete, scegliendo `tls internal` (certificato interno da installare sui PC) oppure la
-#     sfida DNS (serve il modulo DNS del fornitore del dominio). Allora APP_URL diventa https://Ã¢â‚¬Â¦
-# Niente trusted_proxies: Caddy sostituisce X-Forwarded-For con l'IP del client, cosÃƒÂ¬ il limite ai
+#     sfida DNS (serve il modulo DNS del fornitore del dominio). Allora APP_URL diventa https://...
+# Niente trusted_proxies: Caddy sostituisce X-Forwarded-For con l'IP del client, cosi' il limite ai
 # tentativi per IP e il registro vedono l'IP vero (D-41).
 
 :8082 {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:8001 {
-		# il PDF passa da LibreOffice e puÃƒÂ² impiegare ~1 minuto: non chiudere prima (F4-A3, Ã‚Â§11)
+		# il PDF passa da LibreOffice e puo' impiegare ~1 minuto: non chiudere prima (F4-A3, 11)
 		transport http {
 			read_timeout 190s
 		}
