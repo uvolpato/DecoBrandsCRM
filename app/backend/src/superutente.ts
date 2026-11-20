@@ -8,6 +8,16 @@ import { cifra, provvisoria } from './password';
 import { mandaPassword } from './posta';
 import { logEvent } from './registro';
 
+/** Il superutente che c'è, se c'è: la usa setup.cmd per non richiedere di configurarlo di nuovo. */
+export async function superutentePresente() {
+  const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL!, options: '-c TimeZone=UTC' }) });
+  try {
+    return await db.utenti.findFirst({ where: { ruolo: 'superutente' }, select: { username: true, email: true } });
+  } finally {
+    await db.$disconnect();
+  }
+}
+
 async function crea(argv: string[]) {
   const [username, email, nome] = argv.map((a) => a.trim());
   if (!username || !email || !nome) throw new Error('uso: npm run superutente -- <nome utente> <email> "<nome e cognome>"');
@@ -41,20 +51,32 @@ async function crea(argv: string[]) {
 }
 
 if (require.main === module) {
-  crea(process.argv.slice(2))
-    .then((esito) => {
-      if (!esito) return; // superutente già presente: già spiegato da crea()
-      const { u, password } = esito;
-      // 20/11/2026: la password provvisoria va anche a video. In un'installazione nuova la posta non e'
-      // ancora configurata e l'email non parte: senza questo il primo accesso era impossibile.
-      console.log(`Superutente ${u.username} creato.`);
-      console.log(`Password provvisoria: ${password}`);
-      console.log(`Va cambiata al primo accesso. L'email a ${u.email} parte solo se Posta e' configurata in Impostazioni.`);
-    })
-    .catch((e: Error) => {
-      console.error(e.message);
-      process.exit(1);
-    });
+  const argv = process.argv.slice(2);
+  // --chi: c'è già un superutente? Serve a setup.cmd per saltare la configurazione. Esce 0 se c'è.
+  if (argv[0] === '--chi') {
+    superutentePresente()
+      .then((u) => {
+        if (!u) { console.log('Nessun superutente: va creato.'); process.exitCode = 1; return; }
+        console.log(`Superutente presente: ${u.username} (${u.email}). Non lo ricreo.`);
+        console.log(`Password provvisoria nuova: in app\\backend, npm run password:provvisoria -- ${u.username}`);
+      })
+      .catch((e: Error) => { console.error(e.message); process.exit(1); });
+  } else {
+    crea(argv)
+      .then((esito) => {
+        if (!esito) return; // superutente già presente: già spiegato da crea()
+        const { u, password } = esito;
+        // 20/11/2026: la password provvisoria va anche a video. In un'installazione nuova la posta non e'
+        // ancora configurata e l'email non parte: senza questo il primo accesso era impossibile.
+        console.log(`Superutente ${u.username} creato.`);
+        console.log(`Password provvisoria: ${password}`);
+        console.log(`Va cambiata al primo accesso. L'email a ${u.email} parte solo se Posta e' configurata in Impostazioni.`);
+      })
+      .catch((e: Error) => {
+        console.error(e.message);
+        process.exit(1);
+      });
+  }
 }
 
 export { crea };
