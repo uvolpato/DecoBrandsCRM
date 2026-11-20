@@ -79,7 +79,7 @@ echo [%STAMP%] deploy %TAG% FALLITO>>"%TRACCIA%"
 if "!PRIMA!"=="" (echo Nessun rilascio precedente noto: fermati e guarda i log in %LOG%. & exit /b 1)
 echo Torno a !PRIMA! ...
 call "%APP%\deploy\scarica.cmd" !PRIMA! || (echo Ritorno indietro non riuscito. & exit /b 1)
-cd /d "%APP%\backend" && call npm ci && call npm run build
+cd /d "%APP%\backend" && call npm ci && call npx prisma generate && call npm run build
 cd /d "%APP%\frontend" && call npm ci && call npm run build
 call "%APP%\deploy\avvia-servizi.cmd"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" || (
