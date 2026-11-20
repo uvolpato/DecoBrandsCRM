@@ -16,6 +16,7 @@ set "CONFIG=C:\Decobrands\config"
 set "BACKUP=C:\Decobrands\backup"
 set "DOCS=C:\Decobrands\documenti"
 set "LOG=C:\Decobrands\log"
+set "MANUT=C:\Decobrands\manutenzione.txt"
 set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
 
@@ -62,6 +63,9 @@ call "%APP%\deploy\scarica.cmd" %SCARICA% || goto fallito
 echo == 5. Dipendenze (solo se i lockfile cambiano), migrazioni, build
 rem 20/11/2026: i servizi in corsa tengono aperti i file di node_modules e .next (npm ci -> EPERM):
 rem si fermano prima di toccarli. Il ritorno indietro passa di qui una seconda volta.
+rem Dal deploy del portale Luis: mentre i servizi sono fermi Caddy mostra la pagina di cortesia.
+if not exist "C:\Decobrands" mkdir "C:\Decobrands" >nul 2>&1
+echo manutenzione>"%MANUT%"
 call "%APP%\deploy\ferma-servizi.cmd"
 set "LOCK="
 if defined PRIMA for /f "usebackq delims=" %%f in (`git -C "%APP%\.." diff --name-only %PRIMA% %RIF% -- app/backend/package-lock.json app/frontend/package-lock.json 2^>nul`) do set "LOCK=1"
@@ -89,6 +93,7 @@ call npm run build || goto fallito
 echo == 6. Riavvio e prova di salute
 call "%APP%\deploy\avvia-servizi.cmd" || goto fallito
 powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" || goto fallito
+del "%MANUT%" >nul 2>&1
 
 echo [%STAMP%] deploy %TAG% completato>>"%TRACCIA%"
 echo.
@@ -106,8 +111,12 @@ cd /d "%APP%\backend" && call npm ci && call npx prisma generate && call npm run
 cd /d "%APP%\frontend" && call npm ci && call npm run build
 call "%APP%\deploy\avvia-servizi.cmd"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" || (
-  echo Anche !PRIMA! non risponde: ripristina il database con il dump in %BACKUP% e chiama aiuto.
+  echo Anche !PRIMA! non risponde: la pagina di cortesia resta attiva e i servizi potrebbero essere fermi.
+  echo Avviali con "%APP%\deploy\avvia-servizi.cmd"; quando l'app risponde togli la cortesia:
+  echo   del "%MANUT%"
+  echo Il dump per il database e' in %BACKUP%; chiama aiuto prima di riprovare.
   exit /b 1)
+del "%MANUT%" >nul 2>&1
 echo [%STAMP%] tornato a !PRIMA!>>"%TRACCIA%"
 echo Tornato a !PRIMA!. Se nel frattempo erano girate migrazioni, il database ha la struttura nuova:
 echo il dump %BACKUP%\db-%STAMP%.dump serve per ripristinarlo.

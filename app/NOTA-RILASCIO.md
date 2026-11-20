@@ -11,6 +11,14 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.15 — 20/11/2026 — pagina di cortesia durante gli aggiornamenti
+
+- **Mentre il CRM si aggiorna si vede una pagina di cortesia** invece di un errore di connessione
+  (idea presa dal deploy del Portale B2B Luis): i servizi sono fermi per `npm ci` e le due build,
+  e Caddy — che resta su — risponde *Stiamo aggiornando il CRM* (503). `deploy.cmd` crea
+  `C:\Decobrands\manutenzione.txt` prima di fermare i servizi e lo toglie a prova di salute passata;
+  se il deploy si ferma a metà il file resta e lo script dice come toglierlo.
+
 ### 0.2.14 — 20/11/2026 — deploy col doppio click
 
 - **`deploy/deploy.cmd` senza argomento prende l'ultima versione di `main`** e lascia la finestra
