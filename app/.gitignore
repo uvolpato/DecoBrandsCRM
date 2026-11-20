@@ -8,3 +8,5 @@ coverage/
 *.log
 next-env.d.ts
 *.tsbuildinfo
+# anteprima delle email (D-211): file generati, non si committano
+anteprima-posta/

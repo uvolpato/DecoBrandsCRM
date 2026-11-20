@@ -743,6 +743,7 @@ export const GUIDA: Argomento[] = [
       'Deve restare almeno un amministratore attivo; non puoi cambiare il tuo ruolo né disattivarti.',
       'L’esito dell’ultima email (consegnata o no) è nella scheda dell’utente.',
       'Se cambi l’email di un utente, al vecchio indirizzo arriva un avviso con chi ha fatto il cambio e quando.',
+      'Le email (password provvisoria, link di reimposta, avviso di email cambiata) arrivano anche in HTML, con il logo del portale e il pulsante per entrare; chi non legge l’HTML vede il testo semplice.',
     ],
     modifica: 'Superutente e Amministratore.',
   },

@@ -26,7 +26,8 @@
     "sconto:medio": "node dist/src/sconto-medio-ricalcola.js",
     "valori:congelati": "node dist/src/valori-congelati-ricalcola.js",
     "rilettura:mirata": "node dist/src/rilettura-mirata.js",
-    "password:provvisoria": "node dist/src/password-provvisoria.js"
+    "password:provvisoria": "node dist/src/password-provvisoria.js",
+    "posta:anteprima": "node dist/src/posta-anteprima.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.26",

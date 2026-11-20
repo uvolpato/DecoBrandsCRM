@@ -9,7 +9,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Request } from 'express';
 import type { Prisma, utenti } from '@prisma/client';
 import { cifra, MASSIMO, MINIMO, verifica } from './password';
-import { indirizzo, invia } from './posta';
+import { invia, messaggioLinkReset } from './posta';
 import { righePagina } from './impostazioni';
 import { PrismaService } from './prisma.service';
 import { Contesto, logEvent, logEventSicuro } from './registro';
@@ -404,12 +404,7 @@ export class AccessoController {
       this.db.accessi_link.deleteMany({ where: { utente_id: u.id, usato_il: null } }), // uno nuovo annulla i precedenti
       this.db.accessi_link.create({ data: { utente_id: u.id, tipo: 'reset', impronta: impronta(codice), scade_il: new Date(Date.now() + UN_ORA), ip } }),
     ]);
-    await invia(this.db, u.id, 'reset', {
-      a: u.email,
-      oggetto: 'Decobrands: reimposta la password',
-      testo: `Ciao ${u.nome},\n\nper scegliere una nuova password apri questo link entro un'ora:\n${indirizzo()}/accesso/password/${codice}\n\n` +
-        "Se non l'hai chiesto tu, ignora questa email: la password resta quella di prima.",
-    });
+    await invia(this.db, u.id, 'reset', messaggioLinkReset(u.nome, codice, u.email));
   }
 
   /** Nuova password dal link: il link vale una volta; chiude tutte le sessioni dell'utente. */

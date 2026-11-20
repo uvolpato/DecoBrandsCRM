@@ -99,6 +99,11 @@ database, password cifrata). Per Gmail serve una «password per le app»; se `SM
 del dominio (es. `ordini@decobrands.it`) deve essere un alias «Invia come» verificato su quell'account,
 altrimenti Gmail riscrive il mittente.
 
+**Anteprima delle email** (D-211): le email partono in testo semplice + HTML con lo stile del portale
+(logo, riquadro con nome utente e password, pulsante). Per guardarle senza mandarne nessuna, dopo
+`npm run build` in `backend/`: `npm run posta:anteprima -- anteprima-posta`, poi si aprono i quattro
+`.html` della cartella (è ignorata da git). I testi sono gli stessi degli invii veri.
+
 Senza `PONTE_URL` la sincronizzazione non parte. Il ponte vero (F0-A8) si prepara con
 `strumenti/integra/viste-crm.sql`; il CRM legge solo le viste, mai Integra.
 
