@@ -144,6 +144,7 @@ netstat -ano | findstr :8001
 | deploy «riuscito» ma si vede la pagina di attesa | la prova di salute interrogava la 8001, che rispondeva col mini-server | `salute.ps1` ora si ferma se trova il mini-server acceso |
 | durante il **primo** deploy dopo D-215 la pagina non compare | Caddy in memoria guarda ancora il vecchio percorso | è solo quel giro: dal successivo è allineato |
 | portale **senza** Caddy (frontend esposto sulla 8082) | non c'è nessuno che serva la pagina | accettato: durante il deploy si vede l'errore di connessione. Se un giorno serve, si riapre D-212 in spec |
+| il deploy si chiude appena si preme Invio sul preavviso | `%s` nel comando epoch (`Get-Date -UFormat %s`) dentro un file batch: il `%` fa terminare lo script | usare `[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()`, che non contiene `%` |
 
 ## 7. Controllo finale, in 30 secondi
 

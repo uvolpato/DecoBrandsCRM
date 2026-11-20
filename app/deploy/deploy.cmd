@@ -204,7 +204,7 @@ exit /b 0
 rem D-217: preavviso con battito. Riscrive stato.json ogni 5 s cosi' il frontend capisce se il
 rem deploy e' stato annullato (nessun aggiornamento per ~15 s) e nasconde il countdown.
 :preavviso
-for /f %%t in ('powershell -NoProfile -Command "[int][double]::Parse((Get-Date -UFormat %s))"') do set "INIZIO=%%t"
+for /f %%t in ('powershell -NoProfile -Command "[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()"') do set "INIZIO=%%t"
 set /a ATTESA=%PREAVVISO%*60
 set /a TRASCORSI=0
 echo Preavviso di %PREAVVISO% minuti: chi e' dentro vede il banner e ha il tempo di salvare.
