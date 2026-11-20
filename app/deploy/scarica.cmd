@@ -43,10 +43,11 @@ if "%~1"=="" (
   git fetch --force origin tag %~1 || goto errore
   git checkout -f -B live %~1 || goto errore
 )
-rem Controllo: nella radice devono stare solo .git, app\ e le cartelle dati che setup.cmd crea lì
-rem (config, backup, documenti, log). Se c'e' altro, si riapplica il checkout sparso; se resta
-rem ancora, ci si ferma invece di pubblicare un albero sbagliato.
-set "RADICE=.git app config backup documenti log"
+rem Controllo: nella radice devono stare solo .git, app\, le cartelle dati che setup.cmd crea lì
+rem (config, backup, documenti, log) e l'estratto del vecchio CRM (dati-crm-legacy, lo legge
+rem importa-vecchio-crm.cmd). Se c'e' altro, si riapplica il checkout sparso; se resta ancora,
+rem ci si ferma invece di pubblicare un albero sbagliato.
+set "RADICE=.git app config backup documenti log dati-crm-legacy"
 set "EXTRA="
 for /f "delims=" %%f in ('dir /b /a "%DEST%" ^| findstr /v /i /x "%RADICE%"') do set "EXTRA=%%f"
 if defined EXTRA (
