@@ -19,13 +19,6 @@ set "LOG=C:\Decobrands\log"
 set "MANUT=%CONFIG%\manutenzione.txt"
 set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
-rem D-212: la porta su cui il frontend ascolta davvero. Con Caddy e' 8001; senza Caddy il portale e'
-rem esposto direttamente (esponi-in-rete.cmd scrive 0.0.0.0:8082 in frontend.env). La pagina di attesa
-rem va sulla stessa porta, perche' senza Caddy nessuno risponde mentre Next e' fermo.
-set "FRONTEND_PORTA=8001"
-set "FRONTEND_HOST=127.0.0.1"
-if exist "C:\Decobrands\frontend.env" for /f "usebackq tokens=1,* delims==" %%a in ("C:\Decobrands\frontend.env") do set "%%a=%%b"
-set "MANUT_PID=%CONFIG%\manutenzione.pid"
 
 rem 20/11/2026: i servizi sono attivita' pianificate e schtasks, senza privilegi, risponde "Accesso
 rem negato" (visto sul server). Se non siamo amministratori ci si rialza da soli, una volta sola: il
@@ -163,11 +156,21 @@ rem Avvia il processo (senza finestra) e ne scrive il PID in config: cosi' si pu
 rem riavviare il frontend, che deve trovare la porta libera.
 :avviaattesa
 call :fermaattesa
+rem la porta su cui il frontend ascolta davvero: 8001 con Caddy; senza Caddy il portale e' esposto
+rem direttamente (esponi-in-rete.cmd scrive 0.0.0.0:8082 in frontend.env). La pagina va sulla stessa.
+rem Si rilegge qui, non all'inizio: se scarica.cmd ha sostituito questo file mentre girava, le
+rem variabili lette prima possono non esserci piu'.
+set "FRONTEND_PORTA=8001"
+set "FRONTEND_HOST=127.0.0.1"
+if exist "C:\Decobrands\frontend.env" for /f "usebackq tokens=1,* delims==" %%a in ("C:\Decobrands\frontend.env") do set "%%a=%%b"
+if not defined MANUT_PID set "MANUT_PID=%CONFIG%\manutenzione.pid"
+if not defined LOG set "LOG=C:\Decobrands\log"
 powershell -NoProfile -Command "$p = Start-Process -FilePath 'node' -ArgumentList @('%APP%\deploy\manutenzione\servi.js','%FRONTEND_PORTA%','%FRONTEND_HOST%') -WindowStyle Hidden -PassThru -RedirectStandardOutput '%LOG%\manutenzione.log' -RedirectStandardError '%LOG%\manutenzione-errori.log'; $p.Id | Set-Content -Encoding ascii '%MANUT_PID%'"
 if exist "%MANUT_PID%" (echo pagina di attesa sulla porta %FRONTEND_PORTA%) else (echo ATTENZIONE: pagina di attesa non avviata: guarda %LOG%\manutenzione-errori.log)
 exit /b 0
 
 :fermaattesa
+if not defined MANUT_PID set "MANUT_PID=%CONFIG%\manutenzione.pid"
 if exist "%MANUT_PID%" (
   for /f "usebackq" %%p in ("%MANUT_PID%") do taskkill /pid %%p /f >nul 2>&1
   del "%MANUT_PID%" >nul 2>&1
