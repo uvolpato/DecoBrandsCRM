@@ -6,7 +6,7 @@ import { ClasseBody } from '@/componenti/ClasseBody';
 import { Riservata } from '@/componenti/Pagina';
 import { RegioneAvvisi } from '@/componenti/Piccoli';
 import { UtenteCtx, AggiornaUtenteCtx } from '@/componenti/Utente';
-import { api, esci, type Io } from '@/lib/api';
+import { api, type Io } from '@/lib/api';
 import { EventiProvider } from '@/lib/eventi';
 
 // Guscio dell'app (passo 1.11): chiede al server chi è l'utente (D-38) a ogni cambio pagina;
@@ -61,30 +61,14 @@ function GuscioInterno({ children }: { children: ReactNode }) {
     return () => { vivo = false; };
   }, [router, percorso, tentativo]);
 
-  // Inattività (D-89): dopo `timeout_minuti` senza mosse del mouse, tocchi o tasti si esce da soli,
-  // anche con la pagina ferma. Il server scade la sessione allo stesso tempo; qui la si chiude e si
-  // torna all'accesso con il messaggio (le richieste automatiche non contano, come sul server).
+  // Uscita automatica (D-89, D-216): ogni 5 s il guscio chiede chi è l'utente in modo automatico
+  // (`x-automatico`, non conta come attività): se il server risponde 401 — sessione scaduta per il
+  // timeout o sostituita da un nuovo accesso — lib/api riporta all'accesso con il messaggio, senza
+  // che serva un click.
   useEffect(() => {
     if (!io) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const azzera = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => void esci('Sessione scaduta per inattività: entra di nuovo.'), io.timeout_minuti * 60_000);
-    };
-    azzera();
-    window.addEventListener('mousemove', azzera, { passive: true });
-    window.addEventListener('mousedown', azzera);
-    window.addEventListener('keydown', azzera);
-    window.addEventListener('touchstart', azzera, { passive: true });
-    window.addEventListener('wheel', azzera, { passive: true });
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('mousemove', azzera);
-      window.removeEventListener('mousedown', azzera);
-      window.removeEventListener('keydown', azzera);
-      window.removeEventListener('touchstart', azzera);
-      window.removeEventListener('wheel', azzera);
-    };
+    const t = setInterval(() => void api('accesso/io', undefined, undefined, { automatico: true }), 5000);
+    return () => clearInterval(t);
   }, [io]);
 
   // A7-07: in sola lettura si bloccano i pulsanti spenti anche dal clic da tastiera (cattura) e si

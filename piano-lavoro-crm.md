@@ -316,7 +316,7 @@ Totale ore verificato: 28 + 6 + 6 + 4 + 3 + 2 + 17 + 5 = **71 h** di attività +
 
 #### F7-A30 · Una sola sessione per utente e uscita automatica al timeout — 3 h **da approvare**
 - **Dipende da:** F7-A3 · **Riferimenti:** §3.3, D-216
-- **Output:** al login il server marca `sostituita` le sessioni già aperte dello stesso utente (nel JSON della sessione, senza colonne nuove) e il guard le chiude al tocco successivo con 401 e messaggio «Sei stato disconnesso: hai aperto una nuova sessione su un altro computer o browser»; il frontend porta quel messaggio alla pagina di accesso (`motivo`); il guscio autenticato ha un timer di inattività (`timeout_minuti`) che allo scadere chiude la sessione e torna all'accesso da solo, senza aspettare una richiesta.
+- **Output:** al login il server marca `sostituita` le sessioni già aperte dello stesso utente (nel JSON della sessione, senza colonne nuove) e il guard le chiude al tocco successivo con 401 e messaggio «Sei stato disconnesso: hai aperto una nuova sessione su un altro computer o browser»; il frontend porta quel messaggio alla pagina di accesso (`motivo`); il guscio autenticato fa un controllo periodico ogni 5 s (`accesso/io` con `x-automatico`, non rinnova il timeout) che riporta all'accesso da solo quando il server risponde 401 (sessione scaduta o sostituita), senza aspettare un click.
 - **DoD:** `test/accesso.spec.ts` (sessione unica) 0 KO; typecheck frontend e backend; documenti allineati.
 - **Ore:** 3 h **fuori preventivo** (1 server + 1 frontend + 1 prove e documenti): non entrano nel totale di §4 finché Ugo non le approva.
 
