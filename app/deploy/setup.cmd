@@ -61,18 +61,42 @@ copy /y "%ENVFILE%" "%CONFIG%\backend.env" >nul
 rem DATABASE_URL della .env vince su una variabile d'ambiente gia' presente nel sistema (dotenv non la sovrascrive)
 for /f "usebackq tokens=1,* delims==" %%a in (`findstr /b /c:"DATABASE_URL=" "%ENVFILE%"`) do set "DATABASE_URL=%%b"
 
-echo == 4. Backend: dipendenze, build, migrazioni
+echo == 4. Backend: dipendenze, build, database
 cd /d "%APP%\backend" || exit /b 1
 call npm ci --no-audit --no-fund || (echo npm ci backend fallito. & exit /b 1)
 call npx prisma generate || (echo generazione del client Prisma fallita. & exit /b 1)
 call npm run build || (echo build backend fallito. & exit /b 1)
-call npx prisma migrate deploy || (echo migrazioni fallite: controlla DATABASE_URL nel .env. & exit /b 1)
 
-echo == 5. Primo utente (superutente)
+rem 20/11/2026: prima di toccare i dati si chiede. Azzerare cancella pratiche, utenti e documenti
+rem registrati (i PDF su disco restano) e riapplica tutte le migrazioni.
+set "AZZERA="
+set /p AZZERA=Azzerare il database e ripartire da zero? Cancella pratiche, utenti, bollettini. Scrivi SI per farlo, Invio per no: 
+if /i "!AZZERA!"=="SI" (
+  echo Azzeramento del database...
+  call npx prisma migrate reset --force --skip-seed || (echo azzeramento fallito. & exit /b 1)
+  echo Database azzerato: migrazioni riapplicate, dati delle prove non caricati.
+) else (
+  call npx prisma migrate deploy || (echo migrazioni fallite: controlla DATABASE_URL nel .env. & exit /b 1)
+)
+
+echo == 5. Utente superutente
 set /p UTENTE=Nome utente del superutente: 
 set /p EMAIL=Email: 
 set /p NOME=Nome e cognome: 
-call npm run superutente -- "!UTENTE!" "!EMAIL!" "!NOME!" || (echo Creazione del superutente fallita. & exit /b 1)
+call npm run superutente -- "!UTENTE!" "!EMAIL!" "!NOME!" > "%LOG%\superutente.txt" 2>&1
+if errorlevel 1 (
+  findstr /c:"esiste gia" "%LOG%\superutente.txt" >nul 2>&1
+  if errorlevel 1 (
+    type "%LOG%\superutente.txt"
+    echo Creazione del superutente fallita.
+    exit /b 1
+  )
+  echo Il superutente esiste gia': non lo ricreo.
+  echo Per una password provvisoria nuova lancia, in app\backend:
+  echo    npm run password:provvisoria -- !UTENTE!
+) else (
+  type "%LOG%\superutente.txt"
+)
 
 echo == 6. Frontend: dipendenze e build
 cd /d "%APP%\frontend" || exit /b 1
