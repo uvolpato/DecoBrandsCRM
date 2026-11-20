@@ -28,6 +28,7 @@ type Tx = Prisma.TransactionClient;
 // ---------- Configurazione ----------
 const LEGACY = join(__dirname, '..', '..', '..', 'dati-crm-legacy');
 const OUT = join(LEGACY, 'import');
+mkdirSync(OUT, { recursive: true }); // i report si scrivono prima dei conteggi: la cartella deve esserci
 const ESTRAZIONE = '2026-11-08'; // data dell'estratto (riepilogo.json)
 const DAL = new Date(`${ESTRAZIONE}T00:00:00Z`);
 // D-158 §19: il vecchio CRM non ha la data d'inizio dell'agenzia: le agenzie valgono da sempre
@@ -728,7 +729,6 @@ async function scriviDaInserireInIntegra(db: PrismaClient) {
 
 // ---------- Scrittura dei report ----------
 function scriviReport(tempo: number) {
-  mkdirSync(OUT, { recursive: true });
   const { tempi, fusioni, scarti, conflitti, ...conti } = report;
   writeFileSync(join(OUT, 'import-riepilogo.json'), JSON.stringify({
     estratto_il: ESTRAZIONE, ...conti,
