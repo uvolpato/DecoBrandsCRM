@@ -36,6 +36,7 @@ pagina di attesa. `stato.json` è servito da Caddy con un `handle` dedicato **pr
 |---|---|---|
 | `app\deploy\manutenzione\index.html` | la pagina (stile dell'accesso, logo, rotella) | repository |
 | `app\deploy\manutenzione\logo-decobrands.png` | il logo | repository |
+| `app\deploy\manutenzione\favicon.ico` | l'icona nella barra degli indirizzi, la stessa dell'app | repository |
 | `app\deploy\manutenzione\maintenance.flag` | il cartello, contiene la parola `manutenzione` | `deploy.cmd`, a ogni deploy |
 | `app\deploy\manutenzione\stato.json` | lo stato del preavviso (D-217): `{"fase":"preavviso","tra_minuti":N}` o `{"fase":"manutenzione"}` | `deploy.cmd` |
 | `app\deploy\Caddyfile` | matcher + `handle` che servono la pagina | repository |
