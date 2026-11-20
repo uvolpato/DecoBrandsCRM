@@ -11,6 +11,13 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.19 — 20/11/2026 — il fetch dei tag non si blocca più su un tag spostato
+
+- **`scarica.cmd` forza i tag** (`git fetch --force --tags`): sul server c'era un tag locale che
+  differiva da quello di origin e il fetch si fermava con `would clobber existing tag: v0.2.13`, senza
+  allineare il codice. Sul server i tag devono coincidere con origin: il fetch li aggiorna invece di
+  fermarsi (vale anche per il fetch di un singolo tag).
+
 ### 0.2.18 — 20/11/2026 — il backup del database parte davvero
 
 - **`pg_dump` rifiutava la `DATABASE_URL`**: `?schema=public` è un parametro di Prisma e pg_dump

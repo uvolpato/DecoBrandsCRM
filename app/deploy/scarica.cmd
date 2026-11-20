@@ -34,11 +34,13 @@ if "%~1"=="" (
   echo Allineamento al ramo main...
   rem 20/11/2026: --tags perche' il ritorno indietro di deploy.cmd si regge sui tag (git describe):
   rem senza, su un clone senza tag "Attuale:" restava vuoto e il ritorno indietro non era disponibile.
-  git fetch --tags origin +refs/heads/main:refs/remotes/origin/main || goto errore
+  rem --force perche' un tag locale spostato (o scaricato a meta') fa fallire il fetch con
+  rem "would clobber existing tag": sul server i tag devono combaciare con origin, punto.
+  git fetch --force --tags origin +refs/heads/main:refs/remotes/origin/main || goto errore
   git checkout -f -B live origin/main || goto errore
 ) else (
   echo Rilascio %~1 ...
-  git fetch origin tag %~1 || goto errore
+  git fetch --force origin tag %~1 || goto errore
   git checkout -f -B live %~1 || goto errore
 )
 rem Controllo: nella radice devono stare solo .git e app\. Se c'e' altro, si riapplica il
