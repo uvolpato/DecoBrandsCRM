@@ -26,6 +26,7 @@ app/deploy/
 ├── scrivi-env.ps1             scrive backend\.env con segreti nuovi (lo chiama setup.cmd)
 ├── salute.ps1                 prova di salute 8002 + 8001 (usata da setup e deploy)
 ├── avvia-servizi.cmd          avvia/riavvia i servizi (NSSM o attività pianificate)
+├── ferma-servizi.cmd          li ferma prima di npm ci e della build (EPERM sui file aperti)
 ├── servizio-backend.bat       avvio senza finestra, usato dai servizi
 ├── servizio-frontend.bat      idem per Next
 └── Caddyfile                  due blocchi: intranet :8082 attivo, pubblico commentato
