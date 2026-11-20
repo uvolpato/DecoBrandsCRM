@@ -148,6 +148,10 @@ if defined NSSM (
 )
 
 :backup-task
+rem 20/11/2026: senza regola nel firewall di Windows l'app risponde solo dal server stesso.
+rem La 8082 la serve Caddy oppure, senza Caddy, il frontend (esponi-in-rete.cmd).
+netsh advfirewall firewall delete rule name="Decobrands CRM 8082" >nul 2>&1
+netsh advfirewall firewall add rule name="Decobrands CRM 8082" dir=in action=allow protocol=TCP localport=8082 >nul
 echo == 9. Backup notturno (02:00)
 schtasks /create /f /tn DecobrandsBackup /sc daily /st 02:00 /ru SYSTEM /rl HIGHEST /tr "%APP%\deploy\backup.cmd" >nul
 
