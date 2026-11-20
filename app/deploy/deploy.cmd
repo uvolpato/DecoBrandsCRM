@@ -52,7 +52,8 @@ rem si va subito alla pagina di attesa. Il banner lo mostra il frontend leggendo
 set "PREAVVISO=0"
 set /p "PREAVVISO=Minuti di preavviso per chi e' dentro [0 = nessuno]: "
 if not defined PREAVVISO set "PREAVVISO=0"
-echo %PREAVVISO%| findstr /r /c:"^[0-9][0-9]*$" >nul || set "PREAVVISO=0"
+rem solo cifre: un carattere non numerico riporta a 0 (niente pipe, che in finestra elevata puo' appendere)
+for /f "delims=0123456789" %%c in ("%PREAVVISO%") do set "PREAVVISO=0"
 if not "%PREAVVISO%"=="0" (
   > "%STATO%" echo {"fase":"preavviso","tra_minuti":%PREAVVISO%}
   echo Preavviso di %PREAVVISO% minuti: chi e' dentro vede il banner e ha il tempo di salvare.
