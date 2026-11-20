@@ -139,18 +139,20 @@ se lo richiede da solo (UAC) e riparte elevato, una volta sola (variabile `DECOB
    `node_modules`); poi `prisma generate`, `npm run build`, `prisma migrate deploy`.
 5. Riavvio dei servizi, prova di salute (90 s). Se non risponde: torna al tag precedente, rebuild,
    riavvio; se nel frattempo sono girate migrazioni lo dice e lascia il dump per il ripristino.
-   **Pagina di attesa** (dal deploy del portale Luis, D-210/D-212): prima di fermare i servizi `deploy.cmd`
-   copia `deploy\manutenzione\` (la pagina con il logo) in `C:\Decobrands\config\manutenzione` e crea
-   `C:\Decobrands\config\manutenzione.txt`. **Con** Caddy, finché quel file c'è, Caddy risponde con la
-   pagina; **senza** Caddy (portale esposto da Next sulla 8082) il cartello da solo non si vedrebbe,
-   perché nessuno ascolta: fermati i servizi, `deploy.cmd` avvia `manutenzione\servi.js` — un
-   mini-server statico sulla stessa porta del frontend (letta da `C:\Decobrands\frontend.env`, 8001 se
-   manca) e ne scrive il PID in `config\manutenzione.pid`. Prima del riavvio il mini-server si ferma
-   (la porta deve essere libera), la prova di salute decide, e solo allora si toglie il file-cartello.
-   L'indirizzo chiesto resta nella barra e la pagina si ricarica da sola appena il portale risponde.
-   Se il deploy muore a metà il file resta e la pagina resta, e lo script dice come toglierla
-   (`del C:\Decobrands\config\manutenzione.txt`); `avvia-servizi.cmd` toglie da sé un mini-server
-   rimasto acceso da un giro interrotto.
+   **Pagina di attesa** (dal deploy del portale Luis, D-210/D-212/D-213): è la **prima cosa** che fa
+   `deploy.cmd`, appena risolto il tag: copia `deploy\manutenzione\` (la pagina con il logo) in
+   `C:\Decobrands\config\manutenzione`, crea `C:\Decobrands\config\manutenzione.txt`, **ferma subito i
+   servizi** e accende la pagina. Da lì in poi il portale è fermo (backup, scarico, build, migrazioni
+   compresi): chi apre l'indirizzo vede «Aggiornamento in corso», non l'app vecchia né un errore.
+   **Con** Caddy la serve Caddy (finché esiste il file); **senza** Caddy (portale esposto da Next sulla
+   8082) la serve `manutenzione\servi.js`, un mini-server statico sulla stessa porta del frontend
+   (letta da `C:\Decobrands\frontend.env`, 8001 se manca) con il PID in `config\manutenzione.pid`.
+   Prima del riavvio il mini-server si ferma (la porta deve essere libera), la prova di salute decide,
+   e solo allora si toglie il file-cartello. L'indirizzo chiesto resta nella barra e la pagina si
+   ricarica da sola appena il portale risponde. Se il deploy si ferma prima della build (backup
+   fallito, `DATABASE_URL` mancante) i servizi si riavviano da soli e il cartello sparisce; se muore
+   dopo, il cartello resta e lo script dice come toglierlo (`del C:\Decobrands\config\manutenzione.txt`);
+   `avvia-servizi.cmd` toglie da sé un mini-server rimasto acceso da un giro interrotto.
 6. Riga in `backup\deploy.log` (tag, ora, utente).
 
 ## 8. Rete e certificato

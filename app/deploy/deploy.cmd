@@ -44,6 +44,8 @@ if /i "%TAG%"=="main" (set "RIF=origin/main") else (set "RIF=%TAG%")
 for %%d in ("%CONFIG%" "%BACKUP%" "%LOG%") do if not exist %%d mkdir %%d
 rem D-212: un giro interrotto puo' aver lasciato la pagina di attesa accesa sulla porta: si toglie
 call :fermaattesa
+rem D-213: la pagina di attesa e' la PRIMA cosa del deploy (backup compreso)
+call :attesa
 for /f %%d in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmm"') do set "STAMP=%%d"
 set "TRACCIA=%BACKUP%\deploy.log"
 
@@ -60,17 +62,17 @@ for /f "usebackq delims=" %%t in (`git -C "%APP%\.." describe --tags --abbrev=0 
 echo Attuale: !PRIMA!  Nuovo: %TAG%
 
 echo == 3. Backup del database e dei documenti
-where pg_dump >nul 2>&1 || (echo pg_dump non nel PATH: mi fermo, il backup del database e' obbligatorio. & exit /b 1)
+where pg_dump >nul 2>&1 || (echo pg_dump non nel PATH: mi fermo, il backup del database e' obbligatorio. & goto interrotto)
 set "DBURL="
 for /f "usebackq delims=" %%u in (`powershell -NoProfile -Command "$m=Select-String -LiteralPath '%ENVFILE%' -Pattern '^DATABASE_URL=(.+)$'; if($m){$m.Matches[0].Groups[1].Value.Trim()}"`) do set "DBURL=%%u"
-if "!DBURL!"=="" (echo DATABASE_URL non trovato nel .env: mi fermo. & exit /b 1)
+if "!DBURL!"=="" (echo DATABASE_URL non trovato nel .env: mi fermo. & goto interrotto)
 rem 20/11/2026: nella .env il DATABASE_URL finisce con ?schema=public, che e' un parametro di Prisma e
 rem pg_dump lo rifiuta ("invalid URI query parameter"). Si taglia via tutto cio' che segue il punto
 rem interrogativo; va bene finche' non servono altri parametri (sslmode & co.).
 for /f "tokens=1 delims=?" %%q in ("!DBURL!") do set "DBURL=%%q"
-pg_dump --dbname="!DBURL!" --format=custom --file="%BACKUP%\db-%STAMP%.dump" || (echo Backup del database fallito: mi fermo. & exit /b 1)
+pg_dump --dbname="!DBURL!" --format=custom --file="%BACKUP%\db-%STAMP%.dump" || (echo Backup del database fallito: mi fermo. & goto interrotto)
 if exist "%DOCS%" robocopy "%DOCS%" "%BACKUP%\documenti" /E /NFL /NDL /NJH /NJS /NP >nul
-if errorlevel 8 (echo Copia dei documenti fallita: mi fermo. & exit /b 1)
+if errorlevel 8 (echo Copia dei documenti fallita: mi fermo. & goto interrotto)
 
 echo == 4. Scarico solo app/ a %TAG%
 set "SCARICA=%TAG%"
@@ -83,16 +85,10 @@ rem si fermano prima di toccarli. Il ritorno indietro passa di qui una seconda v
 rem Dal deploy del portale Luis: mentre i servizi sono fermi Caddy mostra la pagina di attesa.
 rem Il file sta in config\, non nella radice: la radice e' il repository e scarica.cmd si ferma se
 rem vi trova qualcosa oltre a .git, app e le cartelle dati.
-rem D-210: la pagina e' un file (deploy\manutenzione, con il logo) e si copia fuori dal repository
-rem PRIMA di alzare il cartello; Caddy la legge da li'.
-rem D-212: senza Caddy il cartello da solo non si vede (nessuno ascolta): dopo aver fermato i servizi
-rem parte un mini-server statico sulla porta del frontend che serve la stessa pagina (call :avviaattesa).
-if not exist "%CONFIG%\manutenzione" mkdir "%CONFIG%\manutenzione"
-robocopy "%APP%\deploy\manutenzione" "%CONFIG%\manutenzione" /E /NFL /NDL /NJH /NJS /NP >nul
-if errorlevel 8 (echo Copia della pagina di attesa fallita. & goto fallito)
-echo manutenzione>"%MANUT%"
-call "%APP%\deploy\ferma-servizi.cmd"
-call :avviaattesa
+rem D-213: la pagina e' gia' accesa dall'inizio del deploy (call :attesa); qui si aggiorna con la
+rem versione del rilascio appena scaricato (il mini-server la rilegge a ogni richiesta).
+if exist "%APP%\deploy\manutenzione" robocopy "%APP%\deploy\manutenzione" "%CONFIG%\manutenzione" /E /NFL /NDL /NJH /NJS /NP >nul
+if errorlevel 8 echo ATTENZIONE: pagina di attesa non aggiornata, resta quella di prima.
 set "LOCK="
 if defined PRIMA for /f "usebackq delims=" %%f in (`git -C "%APP%\.." diff --name-only %PRIMA% %RIF% -- app/backend/package-lock.json app/frontend/package-lock.json 2^>nul`) do set "LOCK=1"
 
@@ -132,11 +128,13 @@ echo.
 echo *** Deploy di %TAG% non riuscito ***
 echo [%STAMP%] deploy %TAG% FALLITO>>"%TRACCIA%"
 call :fermaattesa
-if "!PRIMA!"=="" (echo Nessun rilascio precedente noto: fermati e guarda i log in %LOG%. & exit /b 1)
+call :avviaattesa
+if "!PRIMA!"=="" (echo Nessun rilascio precedente noto: il portale e' fermo e resta la pagina di attesa. Avvialo con "%APP%\deploy\avvia-servizi.cmd", togli il cartello con: del "%MANUT%". Guarda i log in %LOG%. & exit /b 1)
 echo Torno a !PRIMA! ...
 call "%APP%\deploy\scarica.cmd" !PRIMA! || (echo Ritorno indietro non riuscito. & exit /b 1)
 cd /d "%APP%\backend" && call npm ci && call npx prisma generate && call npm run build
 cd /d "%APP%\frontend" && call npm ci && call npm run build
+call :fermaattesa
 call "%APP%\deploy\avvia-servizi.cmd"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" || (
   echo Anche !PRIMA! non risponde: la pagina di cortesia resta attiva e i servizi potrebbero essere fermi.
@@ -148,6 +146,31 @@ del "%MANUT%" >nul 2>&1
 echo [%STAMP%] tornato a !PRIMA!>>"%TRACCIA%"
 echo Tornato a !PRIMA!. Se nel frattempo erano girate migrazioni, il database ha la struttura nuova:
 echo il dump %BACKUP%\db-%STAMP%.dump serve per ripristinarlo.
+exit /b 1
+
+rem ---------------------------------------------------------------------------------------------
+rem D-213: la pagina di attesa e' la PRIMA cosa del deploy: si fermano subito i servizi, cosi' chi apre
+rem il portale durante backup, scarico e build vede il cartello e non l'app vecchia. Se la pagina non
+rem c'e' ancora (primo giro dopo questa modifica) l'app resta accesa e la pagina arriva al passo 5.
+:attesa
+if not exist "%APP%\deploy\manutenzione\index.html" if not exist "%CONFIG%\manutenzione\index.html" (
+  echo Pagina di attesa non ancora disponibile: il portale resta acceso fino alla build.
+  exit /b 0
+)
+if not exist "%CONFIG%\manutenzione" mkdir "%CONFIG%\manutenzione"
+if exist "%APP%\deploy\manutenzione" robocopy "%APP%\deploy\manutenzione" "%CONFIG%\manutenzione" /E /NFL /NDL /NJH /NJS /NP >nul
+echo manutenzione>"%MANUT%"
+call "%APP%\deploy\ferma-servizi.cmd"
+call :avviaattesa
+exit /b 0
+
+rem D-213: fermato dopo aver spento i servizi (backup fallito, DATABASE_URL mancante…): si ridà il
+rem portale cosi' com'era, invece di lasciarlo giù con il cartello di un aggiornamento che non c'e'.
+:interrotto
+call :fermaattesa
+call "%APP%\deploy\avvia-servizi.cmd"
+del "%MANUT%" >nul 2>&1
+echo Deploy fermato prima della build: il portale e' stato riavviato com'era.
 exit /b 1
 
 rem ---------------------------------------------------------------------------------------------

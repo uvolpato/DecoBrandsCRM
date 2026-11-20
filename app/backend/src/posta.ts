@@ -1,5 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Prisma, type PrismaClient } from '@prisma/client';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { postaConfig } from './impostazioni';
 import { apriAnomalia, chiudiAnomalia } from './registro';
@@ -31,12 +33,21 @@ export interface ModelloMail {
   dati?: [string, string][]; // etichette e valori in un riquadro grigio (nome utente, password)
   azione?: { testo: string; href: string };
   nota?: string; // in piccolo e grigio, in fondo
+  logoSrc?: string; // solo l'anteprima la cambia: negli invii il logo è allegato (cid)
+}
+
+/** Il logo da allegare al messaggio, in linea (D-214): i client di posta bloccano le immagini che
+ *  arrivano da un indirizzo esterno, e in intranet quell'indirizzo non è raggiungibile da fuori.
+ *  Il file sta in `backend/assets`, accanto al processo (i servizi partono da `backend/`). */
+export function allegatiMail() {
+  const percorso = join(process.cwd(), 'assets', 'logo-decobrands.png');
+  return existsSync(percorso) ? [{ filename: 'logo-decobrands.png', path: percorso, cid: 'logo-decobrands' }] : [];
 }
 
 /** L'email in HTML con lo stile dell'app (§7.0, D-211): fondo grigio come l'app, scheda bianca con i
  *  bordi, logo in cima, pulsante del colore primario e piede con copyright. Stili in linea (i client
- *  di posta scartano i fogli di stile); il logo è quello del portale, servito da APP_URL. */
-export function modelloMail({ titolo, paragrafi, dati, azione, nota }: ModelloMail) {
+ *  di posta scartano i fogli di stile); il logo viaggia dentro il messaggio (`cid:`). */
+export function modelloMail({ titolo, paragrafi, dati, azione, nota, logoSrc = 'cid:logo-decobrands' }: ModelloMail) {
   const font = "font-family:'Public Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
   const righe = (dati ?? []).map(([k, v]) =>
     `<tr><td style="padding:3px 16px 3px 0;color:#6c757d;${font};font-size:13.5px">${esc(k)}</td>` +
@@ -47,7 +58,7 @@ export function modelloMail({ titolo, paragrafi, dati, azione, nota }: ModelloMa
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#f5f6f8;">
 <tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;max-width:560px;background:#ffffff;border:1px solid #dee2e6;border-radius:8px;">
-    <tr><td style="padding:20px 24px 0"><img src="${indirizzo()}/logo-decobrands.png" alt="Decobrands" width="168" style="display:block;border:0"></td></tr>
+    <tr><td style="padding:20px 24px 0"><img src="${esc(logoSrc)}" alt="Decobrands" width="168" style="display:block;border:0"></td></tr>
     <tr><td style="padding:18px 24px 24px;${font};font-size:14px;line-height:1.55;color:#212529">
       <h1 style="margin:0 0 12px;${font};font-size:18px;line-height:1.3;color:#212529">${esc(titolo)}</h1>
       ${paragrafi.map((p) => `<p style="margin:0 0 12px">${esc(p)}</p>`).join('\n      ')}
@@ -87,7 +98,10 @@ async function spedisci(db: Db, m: Messaggio, trasportoFinto?: Transporter): Pro
     const c = await postaConfig(db);
     if (c) {
       const trasporto = trasportoFinto ?? creaTrasporto(c);
-      await trasporto.sendMail({ from: c.mittente || c.utente, to: m.a, subject: m.oggetto, text: m.testo, ...(m.html ? { html: m.html } : {}) });
+      await trasporto.sendMail({
+        from: c.mittente || c.utente, to: m.a, subject: m.oggetto, text: m.testo,
+        ...(m.html ? { html: m.html, attachments: allegatiMail() } : {}),
+      });
       await chiudiAnomalia(db, 'posta', 'posta.respinta', m.a);
       await chiudiAnomalia(db, 'posta', 'posta.connessione', '');
     } else {

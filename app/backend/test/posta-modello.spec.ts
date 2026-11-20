@@ -1,6 +1,6 @@
 // Il modello delle email (§7.13, D-211): HTML con lo stile dell'app (logo, riquadro dei dati,
 // pulsante) e il testo semplice accanto, per i client che non leggono l'HTML.
-import { messaggioEmailCambiata, messaggioLinkReset, messaggioPassword } from '../src/posta';
+import { allegatiMail, messaggioEmailCambiata, messaggioLinkReset, messaggioPassword } from '../src/posta';
 
 const PULSANTE = 'background:#0d6efd';
 
@@ -12,7 +12,7 @@ describe('modello delle email (D-211)', () => {
     expect(m.testo).toContain('K7m2-Pq9x');
     expect(m.html).toContain('Mario &lt;Rossi&gt;');
     expect(m.html).not.toContain('Mario <Rossi>');
-    expect(m.html).toContain('/logo-decobrands.png');
+    expect(m.html).toContain('src="cid:logo-decobrands"'); // il logo viaggia nel messaggio (D-214)
     expect(m.html).toContain(PULSANTE);
     expect(m.html).toContain('mario.rossi');
     expect(m.html).toContain('K7m2-Pq9x');
@@ -40,5 +40,9 @@ describe('modello delle email (D-211)', () => {
     expect(m.html).toContain('mario');
     expect(m.html).toContain('Ugo Volpato');
     expect(m.html).not.toContain(PULSANTE);
+  });
+
+  it('il logo è allegato al messaggio (cid), non linkato a un indirizzo esterno', () => {
+    expect(allegatiMail()).toEqual([expect.objectContaining({ filename: 'logo-decobrands.png', cid: 'logo-decobrands' })]);
   });
 });

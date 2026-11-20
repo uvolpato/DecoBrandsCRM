@@ -2,12 +2,15 @@
 // browser (D-211). Stessi testi degli invii veri (stesse funzioni), con dati d'esempio.
 //   npm run posta:anteprima -- <cartella>     (dopo npm run build)
 import 'dotenv/config';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { messaggioEmailCambiata, messaggioLinkReset, messaggioPassword, type Messaggio } from './posta';
 
 const cartella = resolve(process.argv[2] ?? 'anteprima-posta');
 mkdirSync(cartella, { recursive: true });
+// L'anteprima mostra il logo davvero: nell'email viaggia allegato (cid:), nel browser si usa il file.
+const logo = 'data:image/png;base64,' + readFileSync(join(process.cwd(), 'assets', 'logo-decobrands.png')).toString('base64');
+const html = (m: Messaggio) => (m.html ?? '').replace('src="cid:logo-decobrands"', `src="${logo}"`);
 const prove: { nome: string; m: Messaggio }[] = [
   { nome: 'benvenuto.html', m: messaggioPassword({ email: 'mario.rossi@esempio.it', nome: 'Mario Rossi', username: 'mario.rossi' }, 'K7m2-Pq9x-4t', 'benvenuto') },
   { nome: 'password.html', m: messaggioPassword({ email: 'mario.rossi@esempio.it', nome: 'Mario Rossi', username: 'mario.rossi' }, 'K7m2-Pq9x-4t', 'password') },
@@ -15,7 +18,7 @@ const prove: { nome: string; m: Messaggio }[] = [
   { nome: 'email-cambiata.html', m: messaggioEmailCambiata('mario.rossi@esempio.it', { username: 'mario.rossi' }, { nome: 'Ugo Volpato' }, new Date('2026-11-20T10:30:00Z')) },
 ];
 for (const { nome, m } of prove) {
-  writeFileSync(join(cartella, nome), m.html ?? '');
+  writeFileSync(join(cartella, nome), html(m));
   console.log(`${nome} · oggetto: ${m.oggetto}`);
 }
 console.log(`\nApri ${cartella} nel browser: sono solo file, nessuna email è partita.`);
