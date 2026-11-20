@@ -23,6 +23,8 @@ app/deploy/
 ├── deploy.cmd [tag]           a ogni rilascio: backup, tag (o main), npm ci (se serve), migrazioni,
 │                              build, riavvio, prova di salute, ritorno indietro se non risponde
 ├── backup.cmd                 pg_dump + copia documenti, rotazione 14 giorni (02:00 ogni notte)
+├── importa-vecchio-crm.cmd    una volta, dopo il setup: backup, prova a vuoto, import del vecchio
+│                              CRM e storico dei legami (dati in C:\Decobrands\dati-crm-legacy)
 ├── node24.bat                 mette davanti al PATH la Node 24 LTS (il server ha anche la 26)
 ├── scrivi-env.ps1             scrive backend\.env con segreti nuovi (lo chiama setup.cmd)
 ├── salute.ps1                 prova di salute 8002 + 8001 (usata da setup e deploy)
@@ -39,6 +41,7 @@ Percorsi (costanti in testa ai `.cmd`):
 ```
 C:\Decobrands\              checkout sparso (git vede solo app\)
 C:\Decobrands\app\          backend\, frontend\, deploy\
+C:\Decobrands\dati-crm-legacy\  estratto del vecchio CRM, non tracciato da git (importa-vecchio-crm.cmd)
 C:\Decobrands\documenti\        DOCUMENTI_DIR: PDF arrivati, non tracciata da git
 C:\Decobrands\config\           copia di sicurezza del .env (il file vivo resta in app\backend\.env)
 C:\Decobrands\backup\           dump del database, copia dei documenti, deploy.log
@@ -80,6 +83,41 @@ di `main` (la finestra resta aperta con l'esito). A mano, l'equivalente è `git 
   Non si installa a pezzi: o intero (~700 MB) o niente.
 - **NSSM** (facoltativo): se c'è, i processi diventano servizi Windows; altrimenti `setup.cmd` crea
   attività pianificate all'avvio, equivalenti per l'esercizio.
+
+**Viste di Integra (una volta, sul server).** Il CRM legge clienti, fornitori e subagenti dalle
+viste `public.integra_v_*` del **proprio** database: due script, in quest'ordine, come `postgres`:
+
+```
+psql -U postgres -d decobrands_db -p 5433 -f strumenti\integra-fdw.sql
+psql -U postgres -d decobrands_db -p 5433 -f strumenti\crm-viste-integra.sql
+```
+
+Il primo crea il ponte `postgres_fdw` verso Integra (database `integra` su `localhost:5432`: in
+esercizio è la stessa macchina; restano l'utente in sola lettura e la password, da scrivere
+**solo nella copia sul server**, mai nel repository) e importa le foreign table, chiudendo con
+`clienti`, `ruoli` e `agenti` contati; il secondo crea le viste e dà la `SELECT` al ruolo
+dell'app (`decobrands`). Poi, nella `.env` del backend:
+
+```
+PONTE_URL=postgresql://decobrands:lapassword@localhost:5433/decobrands_db
+```
+
+Se in *Impostazioni → Integra* è configurata una connessione, quella vince sul `PONTE_URL` (e usa
+sempre la porta 5432): lasciarla vuota se il ponte è nello stesso database. Finché le viste non ci
+sono, *Stato del sistema* dice «Integra non raggiungibile» e il resto dell'app funziona.
+Meglio farlo **prima** del primo avvio: rilanciare `integra-fdw.sql` su un'installazione in
+esercizio toglie le viste per qualche secondo (vanno rifatte con il secondo script).
+
+**Anagrafica del vecchio CRM (una volta).** L'estratto `dati-crm-legacy/` (8 file, ~5 MB) non è
+nel repository: si copia a mano nella radice, accanto ad `app\`. Poi:
+
+```cmd
+app\deploy\importa-vecchio-crm.cmd
+```
+
+Controlla i file, fa il backup, una prova a vuoto in transazione (chiede `SI` per proseguire),
+l'import vero e lo storico dei legami. Rilanciabile: `--aggiungi` non cancella e non modifica
+quello che c'è (D-102, D-112). Non serve fermare i servizi: è una sola transazione.
 
 ## 5. `.env` (creato da `setup.cmd`)
 

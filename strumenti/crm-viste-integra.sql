@@ -2,7 +2,8 @@
 -- VISTE INTEGRA per il CRM Decobrands (D-32, D-100, §4.5)
 -- Schema public, nomi con prefisso integra_ (D-101).
 -- SOLA LETTURA (D-100): queste viste leggono le foreign table integra.* e non
--- scrivono mai sul server di Integra. Eseguire come superuser (postgres).
+-- scrivono mai sul server di Integra. Eseguire come superuser (postgres), DOPO
+-- `integra-fdw.sql` (le foreign table integra.* devono già esistere).
 --
 -- Sorgenti: integra.clienti (master anagrafica) JOIN integra.cliazi (ruolo C/F);
 --           integra.agenti JOIN integra.clienti (ruolo agente, D-109).
@@ -121,8 +122,14 @@ WHERE a.azi_cdazi = '001'
 
 -- ----------------------------------------------------------------------------
 -- Permessi: l'app legge SOLO le viste, in sola lettura (D-100).
---   crm_lettura  = utente del ponte in esercizio (§4.5)
---   decobrands   = utente dell'app in sviluppo (DATABASE_URL)
+--   crm_lettura  = utente del ponte in esercizio (§4.5), se esiste
+--   decobrands   = utente dell'app (DATABASE_URL); in esercizio è questo
+-- I ruoli assenti si saltano: sul server di produzione `crm_lettura` non c'è.
 -- ----------------------------------------------------------------------------
-GRANT SELECT ON public.integra_v_clienti, public.integra_v_fornitori, public.integra_v_agenti
-  TO crm_lettura, decobrands;
+DO $$
+DECLARE r text;
+BEGIN
+  FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('crm_lettura', 'decobrands') LOOP
+    EXECUTE format('GRANT SELECT ON public.integra_v_clienti, public.integra_v_fornitori, public.integra_v_agenti TO %I', r);
+  END LOOP;
+END $$;
