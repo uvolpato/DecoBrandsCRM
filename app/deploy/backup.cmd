@@ -22,6 +22,8 @@ where pg_dump >nul 2>&1 || (echo pg_dump non nel PATH & exit /b 1)
 set "DBURL="
 for /f "usebackq delims=" %%u in (`powershell -NoProfile -Command "$m=Select-String -LiteralPath '%ENVFILE%' -Pattern '^DATABASE_URL=(.+)$'; if($m){$m.Matches[0].Groups[1].Value.Trim()}"`) do set "DBURL=%%u"
 if "!DBURL!"=="" (echo DATABASE_URL non trovato & exit /b 1)
+rem 20/11/2026: pg_dump non conosce ?schema=public (parametro di Prisma): si taglia la query string.
+for /f "tokens=1 delims=?" %%q in ("!DBURL!") do set "DBURL=%%q"
 
 pg_dump --dbname="!DBURL!" --format=custom --file="%BACKUP%\db-%STAMP%.dump" || (echo Backup del database fallito & exit /b 1)
 if exist "%DOCS%" robocopy "%DOCS%" "%BACKUP%\documenti" /E /NFL /NDL /NJH /NJS /NP >nul

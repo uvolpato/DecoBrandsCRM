@@ -165,6 +165,11 @@ nel PATH). Caddy **legge la configurazione all'avvio**: con le attività pianifi
 `backup.cmd` ogni notte: `pg_dump -Fc` + `robocopy` dei documenti, rotazione 14 giorni. Il ripristino
 è scritto in cima allo script: fermare il servizio, `pg_restore --clean --if-exists`, riavviare.
 
+La `DATABASE_URL` della `.env` finisce con `?schema=public`, che è un parametro di Prisma: `pg_dump` lo
+rifiuta (`invalid URI query parameter: "schema"`). `backup.cmd` e `deploy.cmd` tagliano via la query
+string prima di passare l'indirizzo al dump. Se un giorno servono altri parametri (`sslmode=require`)
+il taglio va rivisto, perché li perde anche quelli.
+
 ## 10. Piano di lavoro (ore da approvare)
 
 | # | Attività | Ore |

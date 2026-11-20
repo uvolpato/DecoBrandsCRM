@@ -32,7 +32,9 @@ if not exist "%DEST%\.git" (
 
 if "%~1"=="" (
   echo Allineamento al ramo main...
-  git fetch origin +refs/heads/main:refs/remotes/origin/main || goto errore
+  rem 20/11/2026: --tags perche' il ritorno indietro di deploy.cmd si regge sui tag (git describe):
+  rem senza, su un clone senza tag "Attuale:" restava vuoto e il ritorno indietro non era disponibile.
+  git fetch --tags origin +refs/heads/main:refs/remotes/origin/main || goto errore
   git checkout -f -B live origin/main || goto errore
 ) else (
   echo Rilascio %~1 ...

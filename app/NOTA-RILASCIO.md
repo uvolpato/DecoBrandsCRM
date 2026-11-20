@@ -11,6 +11,16 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.18 — 20/11/2026 — il backup del database parte davvero
+
+- **`pg_dump` rifiutava la `DATABASE_URL`**: `?schema=public` è un parametro di Prisma e pg_dump
+  risponde `invalid URI query parameter: "schema"`. Il deploy si fermava al backup (prima di toccare
+  qualsiasi cosa) e lo stesso faceva, ogni notte, `backup.cmd`: il backup automatico non è mai
+  riuscito. Ora `deploy.cmd` e `backup.cmd` tagliano la query string prima del dump (verificato: con
+  la query l'errore, senza il dump viene creato).
+- **`scarica.cmd` su `main` scarica anche i tag** (`git fetch --tags`): senza, `git describe` non
+  trovava `v0.2.17` e il deploy mostrava `Attuale:` vuoto, cioè nessun rilascio a cui tornare.
+
 ### 0.2.17 — 20/11/2026 — il deploy chiede da solo i privilegi
 
 - **`deploy.cmd` senza privilegi si rialza da solo** (UAC, una volta sola: `DECOBRANDS_AMMIN` evita
