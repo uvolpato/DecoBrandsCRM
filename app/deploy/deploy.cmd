@@ -20,6 +20,17 @@ set "MANUT=C:\Decobrands\manutenzione.txt"
 set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
 
+rem 20/11/2026: i servizi sono attivita' pianificate e schtasks, senza privilegi, risponde "Accesso
+rem negato" (visto sul server). Se non siamo amministratori ci si rialza da soli, una volta sola: il
+rem figlio eredita DECOBRANDS_AMMIN e non si entra in un ciclo di finestre.
+net session >nul 2>&1
+if errorlevel 1 if not defined DECOBRANDS_AMMIN (
+  echo Servono i privilegi di amministratore: chiedo la conferma...
+  set "DECOBRANDS_AMMIN=1"
+  powershell -NoProfile -Command "Start-Process -FilePath '%~f0' %* -Verb RunAs"
+  exit /b
+)
+
 call "%~dp0node24.bat"
 rem Doppio click (nessun argomento): ultima versione di main, con la finestra aperta alla fine.
 rem Il richiamo di se stesso serve a un solo "pause": vale anche per le uscite d'errore.

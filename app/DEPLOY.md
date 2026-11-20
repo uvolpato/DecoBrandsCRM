@@ -118,9 +118,10 @@ Due dettagli che hanno già fatto perdere tempo:
 Senza argomento (doppio click) prende l'ultima versione di `main` e lascia la finestra aperta con
 l'esito; con un tag, quel rilascio. Il resto è identico.
 
-Va lanciato **da una console come amministratore**: i servizi sono attività pianificate (`schtasks`),
-e senza privilegi anche solo chiedere se un'attività esiste dà «Accesso negato» — il deploy si
-ferma al primo `/end`. Con `nssm` invece l'amministratore serve per il servizio.
+Va lanciato **come amministratore**: i servizi sono attività pianificate (`schtasks`), e senza
+privilegi anche solo chiedere se un'attività esiste dà «Accesso negato». Se non lo è, `deploy.cmd`
+se lo richiede da solo (UAC) e riparte elevato, una volta sola (variabile `DECOBRANDS_AMMIN`); con
+`nssm` l'amministratore serve per il servizio.
 
 1. Copia il `.env` in `config\`, imposta `DATABASE_URL` da lì.
 2. **Backup**: `pg_dump` in `backup\db-AAAAMMGG-HHMM.dump` e `robocopy` dei documenti. Se il backup

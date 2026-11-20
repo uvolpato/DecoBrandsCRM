@@ -11,6 +11,12 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.17 — 20/11/2026 — il deploy chiede da solo i privilegi
+
+- **`deploy.cmd` senza privilegi si rialza da solo** (UAC, una volta sola: `DECOBRANDS_AMMIN` evita
+  il ciclo di finestre), perché con le attività pianificate `schtasks` senza amministratore dà
+  «Accesso negato». Così il doppio click funziona davvero anche partendo da un utente normale.
+
 ### 0.2.16 — 20/11/2026 — Caddy si riavvia davvero, deploy come amministratore
 
 - **`avvia-servizi.cmd` ferma e riavvia anche l'attività `DecobrandsCaddy`.** Prima faceva solo
