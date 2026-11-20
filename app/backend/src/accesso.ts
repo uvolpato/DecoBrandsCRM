@@ -22,6 +22,7 @@ declare module 'express-session' {
     csrf: string;
     ultimo?: number; // ultima richiesta dell'utente, per il timeout di inattività (D-89)
     creata?: number; // quando la sessione è nata, per la durata massima di 30 giorni (D-89)
+    sostituita?: boolean; // sessione chiusa da un nuovo accesso dello stesso utente (D-216)
   }
 }
 declare module 'express' {
@@ -153,6 +154,7 @@ export const contesto = (req: Request): Contesto => ({
 });
 
 const TRENTA_GIORNI = 30 * 24 * 3600 * 1000;
+const SOSTITUITA = 'Sei stato disconnesso: hai aperto una nuova sessione su un altro computer o browser.';
 
 /** Dopo un accesso riuscito: sessione nuova (contro la session fixation) con utente e token CSRF (D-38). */
 export function apriSessione(req: Request, utente_id: bigint, resta = true) {
@@ -181,6 +183,12 @@ export class AccessoGuard implements CanActivate {
     if (!permesso) throw new ForbiddenException('Rotta senza permesso dichiarato'); // errore di chi sviluppa: si nega
 
     const req = ctx.switchToHttp().getRequest<Request>();
+    // sessione sostituita da un nuovo accesso dello stesso utente (D-216): si chiude subito, così
+    // chi c'era torna all'accesso con il messaggio invece di continuare a lavorare
+    if (req.session?.sostituita) {
+      await new Promise((ok) => req.session.destroy(ok));
+      throw new UnauthorizedException(SOSTITUITA);
+    }
     const id = req.session?.utente_id;
     const trovato = id ? await this.db.utenti.findUnique({ where: { id: BigInt(id) }, include: { aree: true } }) : null;
     const { aree, ...utente } = trovato ?? { aree: [] };
@@ -328,6 +336,7 @@ export class AccessoController {
       }, { utente_id: u?.id, ip: req.ip });
       throw new UnauthorizedException(NON_VALIDE);
     }
+    await this.chiudiAltreSessioni(u.id); // una sola sessione per utente (D-216)
     await apriSessione(req, u.id, b.resta ?? false);
     await this.db.utenti.update({ where: { id: u.id }, data: { ultimo_accesso: new Date() } });
     await logEventSicuro(this.db, {
@@ -336,6 +345,19 @@ export class AccessoController {
     }, { utente_id: u.id, ip: req.ip });
     req.utente = u;
     return this.io(req);
+  }
+
+  /** Una sola sessione per utente (D-216): le sessioni già aperte si marcano `sostituita`, così al
+   *  prossimo tocco chi c'era torna all'accesso con il messaggio. Non si cancellano subito: il guard
+   *  deve sapere *perché* non valgono più. */
+  private async chiudiAltreSessioni(utente_id: bigint) {
+    await this.db.$transaction(async (tx) => {
+      const aperte = await tx.sessioni.findMany({ where: { utente_id } });
+      for (const s of aperte) {
+        const sess = (s.sess ?? {}) as Record<string, unknown>;
+        await tx.sessioni.update({ where: { sid: s.sid }, data: { sess: { ...sess, sostituita: true } } });
+      }
+    });
   }
 
   @Post('esci')

@@ -233,6 +233,19 @@ describe('esci', () => {
   });
 });
 
+describe('sessione unica (D-216)', () => {
+  it('il nuovo accesso sostituisce la precedente: quella vecchia risponde 401 con il messaggio', async () => {
+    await crea('doppia', 'operatore');
+    const prima = await entra('doppia');
+    const seconda = await entra('doppia');
+    await seconda.get('/api/accesso/io').expect(200);
+    await prima.get('/api/accesso/io').expect(401, /nuova sessione/);
+    // il guard ha distrutto la sessione vecchia; la nuova resta
+    const sid = decodeURIComponent(prima.cookie.split(';')[0].split('=')[1]).slice(2).split('.')[0];
+    expect(await db.sessioni.count({ where: { sid } })).toBe(0);
+  });
+});
+
 describe('permessi', () => {
   it('senza sessione: 401', () => request(app.getHttpServer()).get('/api/accesso/io').expect(401));
 

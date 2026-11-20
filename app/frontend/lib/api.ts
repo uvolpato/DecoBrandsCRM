@@ -33,18 +33,31 @@ const MESSAGGI: Record<number, string> = {
 // Esci in corso: niente ricaricamento all'accesso mentre la chiusura non è ancora arrivata (A6-02).
 let uscendo = false;
 
-/** Sessione scaduta (timeout o chiusa altrove): si torna all'accesso con il ritorno alla pagina (D-89). */
-function allAccesso() {
+/** Sessione scaduta (timeout o chiusa altrove): si torna all'accesso con il ritorno alla pagina (D-89);
+ *  `motivo` porta alla pagina di accesso la spiegazione (sostituita da un'altra sessione, D-216). */
+function allAccesso(motivo?: string) {
   if (uscendo || typeof window === 'undefined' || window.location.pathname.startsWith('/accesso')) return;
-  window.location.assign('/accesso?dopo=' + encodeURIComponent(window.location.pathname));
+  const q = new URLSearchParams({ dopo: window.location.pathname });
+  if (motivo) q.set('motivo', motivo);
+  window.location.assign('/accesso?' + q.toString());
 }
 
+/** Il messaggio di un 401 quando è uno dei nostri, non il generico "Unauthorized" di Nest. */
+const motivo401 = (dati: unknown) => {
+  const m = (dati as { message?: unknown } | null)?.message;
+  return typeof m === 'string' && m && m !== 'Unauthorized' ? m : undefined;
+};
+
 /** Esci (D-53): chiude la sessione sul server e solo dopo va all'accesso, così la richiesta di uscita
- *  non corre con le altre richieste della pagina vecchia (A6-02). */
-export async function esci() {
+ *  non corre con le altre richieste della pagina vecchia (A6-02). `motivo` spiega perché (inattività). */
+export async function esci(motivo?: string) {
   uscendo = true;
   await api('accesso/esci', {});
-  if (typeof window !== 'undefined') window.location.replace('/accesso');
+  if (typeof window !== 'undefined') {
+    const q = new URLSearchParams();
+    if (motivo) q.set('motivo', motivo);
+    window.location.replace('/accesso' + (q.size ? '?' + q.toString() : ''));
+  }
 }
 
 /** GET senza corpo, POST con il corpo; PUT e DELETE si chiedono con `metodo`. `automatico` segna le
@@ -69,7 +82,7 @@ export async function api<T = unknown>(percorso: string, corpo?: object, metodo?
   }
   const dati = r.status === 204 ? null : await r.json().catch(() => null);
   if (dati && typeof dati.csrf === 'string') csrf = dati.csrf;
-  if (r.status === 401) allAccesso();
+  if (r.status === 401) allAccesso(motivo401(dati));
   // i messaggi del server sono già in italiano; dalla validazione dei DTO arriva una lista: il primo
   const m = dati?.message;
   const testo = typeof m === 'string' ? m : Array.isArray(m) && typeof m[0] === 'string' ? m[0] : '';
@@ -91,7 +104,7 @@ export async function caricaPdf(file: File): Promise<Risposta<{ id: string; file
   }
   const dati = await r.json().catch(() => null);
   if (dati && typeof dati.csrf === 'string') csrf = dati.csrf;
-  if (r.status === 401) allAccesso();
+  if (r.status === 401) allAccesso(motivo401(dati));
   const m = dati?.message;
   const testo = typeof m === 'string' ? m : Array.isArray(m) && typeof m[0] === 'string' ? m[0] : '';
   return { ok: r.ok, stato: r.status, dati: dati as never, messaggio: r.ok ? '' : MESSAGGI[r.status] ?? (testo || MESSAGGI[500]) };

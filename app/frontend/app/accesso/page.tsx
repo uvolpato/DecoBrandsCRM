@@ -22,7 +22,7 @@ function Accedi() {
       titolo="Accedi"
       marchio
       testo="Usa il nome utente (o l’email) e la password che ti ha mandato l’amministratore."
-      avviso={q.get('fatto') === 'password' ? 'Password salvata: entra con la nuova password.' : undefined}
+      avviso={q.get('fatto') === 'password' ? 'Password salvata: entra con la nuova password.' : q.get('motivo') ?? undefined}
       conferma="Entra"
       link={[{ testo: 'Password dimenticata?', href: '/accesso/dimenticata' }]}
       onConferma={async (v) => {
