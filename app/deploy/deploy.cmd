@@ -16,7 +16,7 @@ set "CONFIG=C:\Decobrands\config"
 set "BACKUP=C:\Decobrands\backup"
 set "DOCS=C:\Decobrands\documenti"
 set "LOG=C:\Decobrands\log"
-set "MANUT=C:\Decobrands\manutenzione.txt"
+set "MANUT=%CONFIG%\manutenzione.txt"
 set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
 
@@ -79,7 +79,8 @@ echo == 5. Dipendenze (solo se i lockfile cambiano), migrazioni, build
 rem 20/11/2026: i servizi in corsa tengono aperti i file di node_modules e .next (npm ci -> EPERM):
 rem si fermano prima di toccarli. Il ritorno indietro passa di qui una seconda volta.
 rem Dal deploy del portale Luis: mentre i servizi sono fermi Caddy mostra la pagina di cortesia.
-if not exist "C:\Decobrands" mkdir "C:\Decobrands" >nul 2>&1
+rem Il file sta in config\, non nella radice: la radice e' il repository e scarica.cmd si ferma se
+rem vi trova qualcosa oltre a .git, app e le cartelle dati.
 echo manutenzione>"%MANUT%"
 call "%APP%\deploy\ferma-servizi.cmd"
 set "LOCK="

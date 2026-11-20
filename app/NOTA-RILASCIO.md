@@ -11,6 +11,15 @@ La versione si vede in fondo a *Stato del sistema* (numero e commit) e in fondo 
 consegna ha un tag di Git (`v0.2.0`); `git describe --tags` dice cosa gira, `git log v0.1.0..v0.2.0`
 cosa è cambiato.
 
+### 0.2.20 — 20/11/2026 — il controllo della radice non blocca più il deploy
+
+- **`scarica.cmd` ammette le cartelle dati** (`config`, `backup`, `documenti`, `log`) oltre a `.git` e
+  `app`: il controllo che ferma il checkout se nella radice c'è altro, dopo la prima installazione
+  trovava sempre quelle cartelle e si fermava («Il checkout sparso non è a posto»).
+- **La pagina di cortesia sta in `config\`**, non più nella radice del repository
+  (`C:\Decobrands\config\manutenzione.txt`): un file nella radice veniva scambiato per un albero
+  sbagliato e bloccava il deploy successivo.
+
 ### 0.2.19 — 20/11/2026 — il fetch dei tag non si blocca più su un tag spostato
 
 - **`scarica.cmd` forza i tag** (`git fetch --force --tags`): sul server c'era un tag locale che

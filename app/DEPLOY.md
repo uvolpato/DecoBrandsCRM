@@ -132,9 +132,9 @@ se lo richiede da solo (UAC) e riparte elevato, una volta sola (variabile `DECOB
 5. Riavvio dei servizi, prova di salute (90 s). Se non risponde: torna al tag precedente, rebuild,
    riavvio; se nel frattempo sono girate migrazioni lo dice e lascia il dump per il ripristino.
    **Pagina di cortesia** (dal deploy del portale Luis): prima di fermare i servizi `deploy.cmd` crea
-   `C:\Decobrands\manutenzione.txt`, e Caddy risponde con *Stiamo aggiornando il CRM* (503) invece di
+   `C:\Decobrands\config\manutenzione.txt`, e Caddy risponde con *Stiamo aggiornando il CRM* (503) invece di
    un errore di connessione; il file si toglie dopo la prova di salute. Se il deploy muore a metà il
-   file resta e la pagina resta, e lo script dice come toglierla (`del C:\Decobrands\manutenzione.txt`).
+   file resta e la pagina resta, e lo script dice come toglierla (`del C:\Decobrands\config\manutenzione.txt`).
 6. Riga in `backup\deploy.log` (tag, ora, utente).
 
 ## 8. Rete e certificato
@@ -150,7 +150,7 @@ se lo richiede da solo (UAC) e riparte elevato, una volta sola (variabile `DECOB
 
 Backend e frontend ascoltano **solo su 127.0.0.1** (8002 e 8001); dal firewall entra solo la 8082.
 
-La pagina di cortesia è nel `Caddyfile`: un `@manutenzione file C:/Decobrands/manutenzione.txt` con
+La pagina di cortesia è nel `Caddyfile`: un `@manutenzione file C:/Decobrands/config/manutenzione.txt` con
 `respond` prima del `reverse_proxy` (l'ordine predefinito delle direttive in Caddy mette già `respond`
 prima del proxy). `handle_errors` non servirebbe: un `reverse_proxy` che trova il servizio spento scrive
 il 502 da sé e non passa dagli error handler. Dopo aver modificato il `Caddyfile` si controlla prima di

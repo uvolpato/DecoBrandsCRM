@@ -43,15 +43,17 @@ if "%~1"=="" (
   git fetch --force origin tag %~1 || goto errore
   git checkout -f -B live %~1 || goto errore
 )
-rem Controllo: nella radice devono stare solo .git e app\. Se c'e' altro, si riapplica il
-rem checkout sparso; se resta ancora, ci si ferma invece di pubblicare un albero sbagliato.
+rem Controllo: nella radice devono stare solo .git, app\ e le cartelle dati che setup.cmd crea lì
+rem (config, backup, documenti, log). Se c'e' altro, si riapplica il checkout sparso; se resta
+rem ancora, ci si ferma invece di pubblicare un albero sbagliato.
+set "RADICE=.git app config backup documenti log"
 set "EXTRA="
-for /f "delims=" %%f in ('dir /b /a "%DEST%" ^| findstr /v /i /x ".git app"') do set "EXTRA=%%f"
+for /f "delims=" %%f in ('dir /b /a "%DEST%" ^| findstr /v /i /x "%RADICE%"') do set "EXTRA=%%f"
 if defined EXTRA (
   echo Trovato nella radice qualcosa che non serve: !EXTRA!
   git sparse-checkout reapply >nul 2>&1
   set "EXTRA="
-  for /f "delims=" %%f in ('dir /b /a "%DEST%" ^| findstr /v /i /x ".git app"') do set "EXTRA=%%f"
+  for /f "delims=" %%f in ('dir /b /a "%DEST%" ^| findstr /v /i /x "%RADICE%"') do set "EXTRA=%%f"
   if defined EXTRA (
     echo Il checkout sparso non e' a posto: fermati e controlla a mano %DEST%.
     exit /b 1
