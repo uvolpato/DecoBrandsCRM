@@ -30,7 +30,7 @@ app/deploy/
 ├── ferma-servizi.cmd          li ferma prima di npm ci e della build (EPERM sui file aperti)
 ├── servizio-backend.bat       avvio senza finestra, usato dai servizi
 ├── servizio-frontend.bat      idem per Next
-├── manutenzione\              pagina di attesa durante i deploy: index.html + logo (D-210)
+├── manutenzione\              pagina di attesa durante i deploy: index.html + logo + servi.js (D-210, D-212)
 └── Caddyfile                  due blocchi: intranet :8082 attivo, pubblico commentato
 ```
 
@@ -139,13 +139,18 @@ se lo richiede da solo (UAC) e riparte elevato, una volta sola (variabile `DECOB
    `node_modules`); poi `prisma generate`, `npm run build`, `prisma migrate deploy`.
 5. Riavvio dei servizi, prova di salute (90 s). Se non risponde: torna al tag precedente, rebuild,
    riavvio; se nel frattempo sono girate migrazioni lo dice e lascia il dump per il ripristino.
-   **Pagina di attesa** (dal deploy del portale Luis, D-210): prima di fermare i servizi `deploy.cmd`
+   **Pagina di attesa** (dal deploy del portale Luis, D-210/D-212): prima di fermare i servizi `deploy.cmd`
    copia `deploy\manutenzione\` (la pagina con il logo) in `C:\Decobrands\config\manutenzione` e crea
-   `C:\Decobrands\config\manutenzione.txt`. Finché quel file c'è, Caddy risponde con la pagina di attesa
-   (fondo scuro come l'accesso, logo, rotella e «Aggiornamento in corso») invece di un errore di
-   connessione; l'indirizzo chiesto resta nella barra e la pagina si ricarica da sola appena il portale
-   risponde. Il file si toglie dopo la prova di salute. Se il deploy muore a metà il file resta e la
-   pagina resta, e lo script dice come toglierla (`del C:\Decobrands\config\manutenzione.txt`).
+   `C:\Decobrands\config\manutenzione.txt`. **Con** Caddy, finché quel file c'è, Caddy risponde con la
+   pagina; **senza** Caddy (portale esposto da Next sulla 8082) il cartello da solo non si vedrebbe,
+   perché nessuno ascolta: fermati i servizi, `deploy.cmd` avvia `manutenzione\servi.js` — un
+   mini-server statico sulla stessa porta del frontend (letta da `C:\Decobrands\frontend.env`, 8001 se
+   manca) e ne scrive il PID in `config\manutenzione.pid`. Prima del riavvio il mini-server si ferma
+   (la porta deve essere libera), la prova di salute decide, e solo allora si toglie il file-cartello.
+   L'indirizzo chiesto resta nella barra e la pagina si ricarica da sola appena il portale risponde.
+   Se il deploy muore a metà il file resta e la pagina resta, e lo script dice come toglierla
+   (`del C:\Decobrands\config\manutenzione.txt`); `avvia-servizi.cmd` toglie da sé un mini-server
+   rimasto acceso da un giro interrotto.
 6. Riga in `backup\deploy.log` (tag, ora, utente).
 
 ## 8. Rete e certificato
@@ -166,6 +171,8 @@ poi `handle @manutenzione` (radice `C:/Decobrands/config/manutenzione`, `try_fil
 `file_server`) e infine un `handle` senza matcher con il `reverse_proxy`. Le due `handle` sono
 mutuamente esclusive (vince la prima che combacia), quindi non conta l'ordine delle direttive;
 `header @manutenzione Cache-Control "no-store"` evita che la pagina resti in cache dopo il deploy.
+Se il portale gira **senza** Caddy (frontend direttamente sulla 8082) quella `handle` non entra in
+gioco: la pagina la serve il mini-server di `deploy.cmd` (D-212).
 `handle_errors` non servirebbe: un `reverse_proxy` che trova il servizio spento scrive
 il 502 da sé e non passa dagli error handler. Dopo aver modificato il `Caddyfile` si controlla prima di
 riavviare: `caddy validate --config C:\Decobrands\app\deploy\Caddyfile` (`C:\caddy\caddy.exe`, non è

@@ -1,6 +1,12 @@
 @echo off
 rem Avvia o riavvia i servizi dell'app: backend, frontend e Caddy se gestito da noi.
 setlocal
+rem D-212: se un deploy si e' interrotto, la pagina di attesa puo' essere ancora sulla porta del
+rem frontend: la si toglie prima, altrimenti Next non riesce ad ascoltare (EADDRINUSE).
+if exist "C:\Decobrands\config\manutenzione.pid" (
+  for /f "usebackq" %%p in ("C:\Decobrands\config\manutenzione.pid") do taskkill /pid %%p /f >nul 2>&1
+  del "C:\Decobrands\config\manutenzione.pid" >nul 2>&1
+)
 where nssm >nul 2>&1
 if not errorlevel 1 (
   nssm restart DecobrandsBackend >nul 2>&1 || nssm start DecobrandsBackend >nul 2>&1

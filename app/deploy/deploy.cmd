@@ -19,6 +19,13 @@ set "LOG=C:\Decobrands\log"
 set "MANUT=%CONFIG%\manutenzione.txt"
 set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
+rem D-212: la porta su cui il frontend ascolta davvero. Con Caddy e' 8001; senza Caddy il portale e'
+rem esposto direttamente (esponi-in-rete.cmd scrive 0.0.0.0:8082 in frontend.env). La pagina di attesa
+rem va sulla stessa porta, perche' senza Caddy nessuno risponde mentre Next e' fermo.
+set "FRONTEND_PORTA=8001"
+set "FRONTEND_HOST=127.0.0.1"
+if exist "C:\Decobrands\frontend.env" for /f "usebackq tokens=1,* delims==" %%a in ("C:\Decobrands\frontend.env") do set "%%a=%%b"
+set "MANUT_PID=%CONFIG%\manutenzione.pid"
 
 rem 20/11/2026: i servizi sono attivita' pianificate e schtasks, senza privilegi, risponde "Accesso
 rem negato" (visto sul server). Se non siamo amministratori ci si rialza da soli, una volta sola: il
@@ -42,6 +49,8 @@ if "%TAG%"=="" (
 if /i "%TAG%"=="main" (set "RIF=origin/main") else (set "RIF=%TAG%")
 
 for %%d in ("%CONFIG%" "%BACKUP%" "%LOG%") do if not exist %%d mkdir %%d
+rem D-212: un giro interrotto puo' aver lasciato la pagina di attesa accesa sulla porta: si toglie
+call :fermaattesa
 for /f %%d in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmm"') do set "STAMP=%%d"
 set "TRACCIA=%BACKUP%\deploy.log"
 
@@ -83,11 +92,14 @@ rem Il file sta in config\, non nella radice: la radice e' il repository e scari
 rem vi trova qualcosa oltre a .git, app e le cartelle dati.
 rem D-210: la pagina e' un file (deploy\manutenzione, con il logo) e si copia fuori dal repository
 rem PRIMA di alzare il cartello; Caddy la legge da li'.
+rem D-212: senza Caddy il cartello da solo non si vede (nessuno ascolta): dopo aver fermato i servizi
+rem parte un mini-server statico sulla porta del frontend che serve la stessa pagina (call :avviaattesa).
 if not exist "%CONFIG%\manutenzione" mkdir "%CONFIG%\manutenzione"
 robocopy "%APP%\deploy\manutenzione" "%CONFIG%\manutenzione" /E /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 (echo Copia della pagina di attesa fallita. & goto fallito)
 echo manutenzione>"%MANUT%"
 call "%APP%\deploy\ferma-servizi.cmd"
+call :avviaattesa
 set "LOCK="
 if defined PRIMA for /f "usebackq delims=" %%f in (`git -C "%APP%\.." diff --name-only %PRIMA% %RIF% -- app/backend/package-lock.json app/frontend/package-lock.json 2^>nul`) do set "LOCK=1"
 
@@ -112,6 +124,7 @@ if defined LOCK (
 call npm run build || goto fallito
 
 echo == 6. Riavvio e prova di salute
+call :fermaattesa
 call "%APP%\deploy\avvia-servizi.cmd" || goto fallito
 powershell -NoProfile -ExecutionPolicy Bypass -File "%APP%\deploy\salute.ps1" || goto fallito
 del "%MANUT%" >nul 2>&1
@@ -125,6 +138,7 @@ exit /b 0
 echo.
 echo *** Deploy di %TAG% non riuscito ***
 echo [%STAMP%] deploy %TAG% FALLITO>>"%TRACCIA%"
+call :fermaattesa
 if "!PRIMA!"=="" (echo Nessun rilascio precedente noto: fermati e guarda i log in %LOG%. & exit /b 1)
 echo Torno a !PRIMA! ...
 call "%APP%\deploy\scarica.cmd" !PRIMA! || (echo Ritorno indietro non riuscito. & exit /b 1)
@@ -142,3 +156,20 @@ echo [%STAMP%] tornato a !PRIMA!>>"%TRACCIA%"
 echo Tornato a !PRIMA!. Se nel frattempo erano girate migrazioni, il database ha la struttura nuova:
 echo il dump %BACKUP%\db-%STAMP%.dump serve per ripristinarlo.
 exit /b 1
+
+rem ---------------------------------------------------------------------------------------------
+rem D-212: la pagina di attesa come mini-server statico sulla porta del frontend.
+rem Avvia il processo (senza finestra) e ne scrive il PID in config: cosi' si puo' fermare prima di
+rem riavviare il frontend, che deve trovare la porta libera.
+:avviaattesa
+call :fermaattesa
+powershell -NoProfile -Command "$p = Start-Process -FilePath 'node' -ArgumentList @('%APP%\deploy\manutenzione\servi.js','%FRONTEND_PORTA%','%FRONTEND_HOST%') -WindowStyle Hidden -PassThru -RedirectStandardOutput '%LOG%\manutenzione.log' -RedirectStandardError '%LOG%\manutenzione-errori.log'; $p.Id | Set-Content -Encoding ascii '%MANUT_PID%'"
+if exist "%MANUT_PID%" (echo pagina di attesa sulla porta %FRONTEND_PORTA%) else (echo ATTENZIONE: pagina di attesa non avviata: guarda %LOG%\manutenzione-errori.log)
+exit /b 0
+
+:fermaattesa
+if exist "%MANUT_PID%" (
+  for /f "usebackq" %%p in ("%MANUT_PID%") do taskkill /pid %%p /f >nul 2>&1
+  del "%MANUT_PID%" >nul 2>&1
+)
+exit /b 0
