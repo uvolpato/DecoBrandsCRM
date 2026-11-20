@@ -16,7 +16,7 @@ set "CONFIG=C:\Decobrands\config"
 set "BACKUP=C:\Decobrands\backup"
 set "DOCS=C:\Decobrands\documenti"
 set "LOG=C:\Decobrands\log"
-set "MANUT=%CONFIG%\manutenzione.txt"
+set "MANUT=%APP%\deploy\manutenzione\maintenance.flag"
 set "ENVFILE=%APP%\backend\.env"
 set "TAG=%~1"
 
@@ -42,7 +42,9 @@ if "%TAG%"=="" (
 if /i "%TAG%"=="main" (set "RIF=origin/main") else (set "RIF=%TAG%")
 
 for %%d in ("%CONFIG%" "%BACKUP%" "%LOG%") do if not exist %%d mkdir %%d
-rem D-212: un giro interrotto puo' aver lasciato la pagina di attesa accesa sulla porta: si toglie
+rem D-215: il cartello sta nella cartella del progetto come nel portale Luis: lo scrive e lo toglie
+rem lo stesso utente che fa il deploy, e la pagina la serve Caddy da li'. Niente mini-server.
+rem Resta solo da spegnere un'eventuale pagina di attesa lasciata accesa da un rilascio precedente.
 call :fermaattesa
 rem D-213: la pagina di attesa e' la PRIMA cosa del deploy (backup compreso)
 call :attesa
@@ -83,12 +85,8 @@ echo == 5. Dipendenze (solo se i lockfile cambiano), migrazioni, build
 rem 20/11/2026: i servizi in corsa tengono aperti i file di node_modules e .next (npm ci -> EPERM):
 rem si fermano prima di toccarli. Il ritorno indietro passa di qui una seconda volta.
 rem Dal deploy del portale Luis: mentre i servizi sono fermi Caddy mostra la pagina di attesa.
-rem Il file sta in config\, non nella radice: la radice e' il repository e scarica.cmd si ferma se
-rem vi trova qualcosa oltre a .git, app e le cartelle dati.
-rem D-213: la pagina e' gia' accesa dall'inizio del deploy (call :attesa); qui si aggiorna con la
-rem versione del rilascio appena scaricato (il mini-server la rilegge a ogni richiesta).
-if exist "%APP%\deploy\manutenzione" robocopy "%APP%\deploy\manutenzione" "%CONFIG%\manutenzione" /E /NFL /NDL /NJH /NJS /NP >nul
-if errorlevel 8 echo ATTENZIONE: pagina di attesa non aggiornata, resta quella di prima.
+rem La pagina sta in deploy\manutenzione e Caddy la serve da li' (D-215): non si copia in config,
+rem la porta scarica.cmd insieme al resto del rilascio.
 set "LOCK="
 if defined PRIMA for /f "usebackq delims=" %%f in (`git -C "%APP%\.." diff --name-only %PRIMA% %RIF% -- app/backend/package-lock.json app/frontend/package-lock.json 2^>nul`) do set "LOCK=1"
 
@@ -130,7 +128,6 @@ echo.
 echo *** Deploy di %TAG% non riuscito ***
 echo [%STAMP%] deploy %TAG% FALLITO>>"%TRACCIA%"
 call :fermaattesa
-call :avviaattesa
 if "!PRIMA!"=="" (echo Nessun rilascio precedente noto: il portale e' fermo e resta la pagina di attesa. Avvialo con "%APP%\deploy\avvia-servizi.cmd", togli il cartello con: del "%MANUT%". Guarda i log in %LOG%. & exit /b 1)
 echo Torno a !PRIMA! ...
 call "%APP%\deploy\scarica.cmd" !PRIMA! || (echo Ritorno indietro non riuscito. & exit /b 1)
@@ -154,18 +151,17 @@ exit /b 1
 
 rem ---------------------------------------------------------------------------------------------
 rem D-213: la pagina di attesa e' la PRIMA cosa del deploy: si fermano subito i servizi, cosi' chi apre
-rem il portale durante backup, scarico e build vede il cartello e non l'app vecchia. Se la pagina non
-rem c'e' ancora (primo giro dopo questa modifica) l'app resta accesa e la pagina arriva al passo 5.
+rem il portale durante backup, scarico e build vede il cartello e non l'app vecchia.
+rem D-215: il cartello e' deploy\manutenzione\maintenance.flag e la pagina la serve Caddy da li'.
 :attesa
-if not exist "%APP%\deploy\manutenzione\index.html" if not exist "%CONFIG%\manutenzione\index.html" (
-  echo Pagina di attesa non ancora disponibile: il portale resta acceso fino alla build.
+if not exist "%APP%\deploy\manutenzione\index.html" (
+  echo Pagina di attesa non disponibile: il portale resta acceso fino alla build.
   exit /b 0
 )
-if not exist "%CONFIG%\manutenzione" mkdir "%CONFIG%\manutenzione"
-if exist "%APP%\deploy\manutenzione" robocopy "%APP%\deploy\manutenzione" "%CONFIG%\manutenzione" /E /NFL /NDL /NJH /NJS /NP >nul
 echo manutenzione>"%MANUT%"
+if exist "%MANUT%" (echo Pagina di attesa attiva) else (echo ATTENZIONE: cartello di manutenzione non scritto: controlla i permessi di %APP%\deploy\manutenzione)
+if exist "%CONFIG%\manutenzione.txt" del "%CONFIG%\manutenzione.txt" >nul 2>&1
 call "%APP%\deploy\ferma-servizi.cmd"
-call :avviaattesa
 exit /b 0
 
 rem D-213: fermato dopo aver spento i servizi (backup fallito, DATABASE_URL mancante…): si ridà il
@@ -180,24 +176,8 @@ echo Deploy fermato prima della build: il portale e' stato riavviato com'era.
 exit /b 1
 
 rem ---------------------------------------------------------------------------------------------
-rem D-212: la pagina di attesa come mini-server statico sulla porta del frontend.
-rem Avvia il processo (senza finestra) e ne scrive il PID in config: cosi' si puo' fermare prima di
-rem riavviare il frontend, che deve trovare la porta libera.
-:avviaattesa
-call :fermaattesa
-rem la porta su cui il frontend ascolta davvero: 8001 con Caddy; senza Caddy il portale e' esposto
-rem direttamente (esponi-in-rete.cmd scrive 0.0.0.0:8082 in frontend.env). La pagina va sulla stessa.
-rem Si rilegge qui, non all'inizio: se scarica.cmd ha sostituito questo file mentre girava, le
-rem variabili lette prima possono non esserci piu'.
-set "FRONTEND_PORTA=8001"
-set "FRONTEND_HOST=127.0.0.1"
-if exist "C:\Decobrands\frontend.env" for /f "usebackq tokens=1,* delims==" %%a in ("C:\Decobrands\frontend.env") do set "%%a=%%b"
-if not defined MANUT_PID set "MANUT_PID=%CONFIG%\manutenzione.pid"
-if not defined LOG set "LOG=C:\Decobrands\log"
-powershell -NoProfile -Command "$p = Start-Process -FilePath 'node' -ArgumentList @('%APP%\deploy\manutenzione\servi.js','%FRONTEND_PORTA%','%FRONTEND_HOST%') -WindowStyle Hidden -PassThru -RedirectStandardOutput '%LOG%\manutenzione.log' -RedirectStandardError '%LOG%\manutenzione-errori.log'; $p.Id | Set-Content -Encoding ascii '%MANUT_PID%'"
-if exist "%MANUT_PID%" (echo pagina di attesa sulla porta %FRONTEND_PORTA%) else (echo ATTENZIONE: pagina di attesa non avviata: guarda %LOG%\manutenzione-errori.log)
-exit /b 0
-
+rem Solo per i rilasci precedenti a D-215: se era acceso il mini-server della pagina di attesa, tiene
+rem occupata la porta del frontend e Next non riesce ad ascoltare (EADDRINUSE). Lo si spegne.
 :fermaattesa
 if not defined MANUT_PID set "MANUT_PID=%CONFIG%\manutenzione.pid"
 if exist "%MANUT_PID%" (

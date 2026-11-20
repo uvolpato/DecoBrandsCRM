@@ -14,19 +14,18 @@
 
 :8082 {
 	encode zstd gzip
-	# 20/11/2026 (dal deploy del portale Luis): durante un aggiornamento i due processi restano fermi
-	# qualche minuto (npm ci + build) e chi apre l'app vedeva un errore di connessione. deploy.cmd crea
-	# questo file prima di fermare i servizi e lo toglie quando la prova di salute e' passata: finche'
-	# c'e', Caddy risponde con la pagina di attesa. Se un deploy muore a meta' il file resta, e la
-	# pagina dice la verita' (si toglie a mano: del C:\Decobrands\config\manutenzione.txt).
-	# D-210: la pagina non e' piu' una riga qui dentro ma un file, deploy\manutenzione\index.html (con
-	# il logo), che deploy.cmd copia in config\manutenzione. Si riscrive sulla pagina chiesta, non si
-	# sposta: l'indirizzo resta quello (/pratiche resta /pratiche) e il controllo della pagina sa dove
-	# tornare appena l'app risponde.
-	@manutenzione file C:/Decobrands/config/manutenzione.txt
+	# 20/11/2026, come nel portale Luis (D-215): durante un aggiornamento i due processi stanno fermi
+	# qualche minuto (npm ci + build) e chi apre l'app vedeva un errore di connessione. deploy.cmd
+	# scrive deploy\manutenzione\maintenance.flag prima di fermare i servizi e lo toglie quando la
+	# prova di salute e' passata: finche' c'e', Caddy risponde con la pagina di attesa che sta nella
+	# stessa cartella. Se un deploy muore a meta' il cartello resta, e la pagina dice la verita'
+	# (si toglie a mano: del C:\Decobrands\app\deploy\manutenzione\maintenance.flag).
+	# Si riscrive sulla pagina chiesta, non si sposta: l'indirizzo resta quello (/pratiche resta
+	# /pratiche) e il controllo della pagina sa dove tornare appena l'app risponde.
+	@manutenzione file C:/Decobrands/app/deploy/manutenzione/maintenance.flag
 	header @manutenzione Cache-Control "no-store" # mai in cache: alla fine del deploy deve sparire subito
 	handle @manutenzione {
-		root * C:/Decobrands/config/manutenzione
+		root * C:/Decobrands/app/deploy/manutenzione
 		try_files {path} /index.html
 		file_server
 	}
